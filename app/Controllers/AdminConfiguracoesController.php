@@ -5769,23 +5769,37 @@ HTML;
             try {
                 var btn = document.getElementById('v-pills-pagamentos-tab');
                 var pane = document.getElementById('v-pills-pagamentos');
+                var content = document.getElementById('v-pills-tabContent');
                 if (!btn || !pane) {
                     return;
                 }
                 btn.addEventListener('click', function(){
                     try {
-                        var panes = document.querySelectorAll('#v-pills-tabContent .tab-pane');
-                        panes.forEach(function(p){
-                            p.classList.remove('active');
-                            p.classList.remove('show');
-                        });
-                        var links = document.querySelectorAll('#v-pills-tab .nav-link');
-                        links.forEach(function(l){
-                            l.classList.remove('active');
-                        });
-                        btn.classList.add('active');
-                        pane.classList.add('active');
-                        pane.classList.add('show');
+                        // Se o Bootstrap não ativar a aba (por algum erro de JS/DOM), aplicamos o fallback.
+                        window.setTimeout(function(){
+                            try {
+                                var alreadyActive = pane.classList.contains('active') && pane.classList.contains('show');
+                                if (!alreadyActive) {
+                                    var panes = document.querySelectorAll('#v-pills-tabContent .tab-pane');
+                                    panes.forEach(function(p){
+                                        p.classList.remove('active');
+                                        p.classList.remove('show');
+                                    });
+                                    var links = document.querySelectorAll('#v-pills-tab .nav-link');
+                                    links.forEach(function(l){
+                                        l.classList.remove('active');
+                                    });
+                                    btn.classList.add('active');
+                                    pane.classList.add('active');
+                                    pane.classList.add('show');
+                                }
+
+                                // Evita a sensação de "jogou tudo lá pra baixo" ao trocar a aba.
+                                if (content && typeof content.scrollIntoView === 'function') {
+                                    content.scrollIntoView({behavior: 'auto', block: 'start'});
+                                }
+                            } catch (e) {}
+                        }, 0);
                     } catch (e) {}
                 });
             } catch (e) {}
