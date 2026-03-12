@@ -71,6 +71,8 @@ $router->get('/admin/clube/recargas', 'AdminClubeRecargasController', 'index');
 // Correios Mundial (PACKET)
 $router->get('/admin/correios-mundial', 'AdminCorreiosMundialController', 'index');
 $router->get('/admin/correios-mundial/balance', 'AdminCorreiosMundialController', 'balance');
+$router->get('/admin/correios-mundial/pedido/{id}', 'AdminCorreiosMundialController', 'pedido');
+$router->post('/admin/correios-mundial/pedido/{id}/gerar-etiqueta', 'AdminCorreiosMundialController', 'gerarEtiqueta');
 
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');

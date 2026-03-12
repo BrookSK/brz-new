@@ -17,6 +17,77 @@
     </div>
 
     <div class="alert alert-danger" id="cm_error" style="display:none;"></div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header"><strong>Pedidos (Caixa Fechada) - prontos para etiqueta</strong></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php $pedidos = isset($pedidos) && is_array($pedidos) ? $pedidos : []; ?>
+                        <?php if (empty($pedidos)): ?>
+                            <tr><td colspan="4" class="text-muted">Nenhum pedido aguardando etiqueta.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($pedidos as $p): ?>
+                                <?php $pid = (int) ($p['pedido_id'] ?? 0); ?>
+                                <tr>
+                                    <td>#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></td>
+                                    <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
+                                    <td><?= !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-' ?></td>
+                                    <td>
+                                        <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/pedido/<?= $pid ?>">Abrir</a>
+                                        <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/<?= $pid ?>" target="_blank">Pedido</a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header"><strong>Etiquetas geradas (PACKET)</strong></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Rastreio</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php $etiquetas = isset($etiquetas) && is_array($etiquetas) ? $etiquetas : []; ?>
+                        <?php if (empty($etiquetas)): ?>
+                            <tr><td colspan="4" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($etiquetas as $e): ?>
+                                <?php $pid = (int) ($e['pedido_id'] ?? 0); ?>
+                                <tr>
+                                    <td><a href="/admin/correios-mundial/pedido/<?= $pid ?>">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></a></td>
+                                    <td><?= htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) ?></td>
+                                    <td><?= htmlspecialchars((string) ($e['tracking_number'] ?? '')) ?></td>
+                                    <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>

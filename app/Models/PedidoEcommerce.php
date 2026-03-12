@@ -886,6 +886,21 @@ class PedidoEcommerce {
                 }
 
                 if ($trk === '') {
+                    if ($this->tableExists('correios_packet_etiquetas')) {
+                        try {
+                            $st = $this->connection->prepare('SELECT tracking_number FROM correios_packet_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+                            $st->execute([$pedidoId]);
+                            $t = trim((string) ($st->fetchColumn() ?: ''));
+                            if ($t !== '') {
+                                $trk = $t;
+                                $trkFonte = 'Correios Mundial (PACKET)';
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+                }
+
+                if ($trk === '') {
                     if ($this->tableExists('remessa_janela_pedidos')) {
                         try {
                             $st = $this->connection->prepare('SELECT courier_tracking_number, wexpress_tracking_number, wexpress_status FROM remessa_janela_pedidos WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
@@ -1393,6 +1408,21 @@ class PedidoEcommerce {
                 $ncmCol = null;
             }
 
+            $pesoCol = null;
+            try {
+                if ($this->tableExists('produtos')) {
+                    $colsProd = $this->getTableColumns('produtos');
+                    foreach (['weight', 'peso', 'peso_kg', 'product_weight'] as $c) {
+                        if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                            $pesoCol = $c;
+                            break;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $pesoCol = null;
+            }
+
             $pick = function(array $cands) use ($colsItens) {
                 foreach ($cands as $c) {
                     if (is_array($colsItens) && in_array($c, $colsItens, true)) {
@@ -1436,6 +1466,12 @@ class PedidoEcommerce {
                 $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
             } else {
                 $selectParts[] = "'' AS ncm";
+            }
+
+            if ($pesoCol && $colProdutoId) {
+                $selectParts[] = '(SELECT pr.' . $pesoCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS peso_kg';
+            } else {
+                $selectParts[] = 'NULL AS peso_kg';
             }
             $selectParts[] = "(SELECT pf.nome_arquivo FROM produto_fotos pf WHERE pf.produto_id = pi." . ($colProdutoId ?: 'produto_id') . " ORDER BY pf.principal DESC, pf.ordem ASC LIMIT 1) as imagem_principal";
 
