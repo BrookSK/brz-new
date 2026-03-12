@@ -14,6 +14,12 @@
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($pageError)): ?>
+        <div class="alert alert-warning">
+            <?= htmlspecialchars((string) $pageError) ?>
+        </div>
+    <?php endif; ?>
+
     <div class="alert alert-danger" id="cm_pedido_error" style="display:none;"></div>
     <div class="alert alert-success" id="cm_pedido_success" style="display:none;"></div>
 
@@ -146,7 +152,7 @@
                     </div>
 
                     <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-primary" type="button" onclick="gerarEtiqueta()" <?= (!empty($existingEtiqueta) && !empty($existingEtiqueta['tracking_number'])) ? 'disabled' : '' ?>>Gerar etiqueta</button>
+                        <button class="btn btn-primary" type="button" onclick="gerarEtiqueta()" <?= (!empty($existingEtiqueta) && !empty($existingEtiqueta['tracking_number'])) || !empty($pageError) ? 'disabled' : '' ?>>Gerar etiqueta</button>
                     </div>
 
                 </div>

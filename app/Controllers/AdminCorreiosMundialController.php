@@ -82,6 +82,15 @@ class AdminCorreiosMundialController extends Controller {
             $docType = 'CNPJ';
         }
 
+        // Em alguns bancos o CPF/CNPJ pode vir como número e perder zeros à esquerda.
+        // Para reduzir falso-positivo de documento inválido, completar com zeros quando fizer sentido.
+        if ($docType === 'CPF' && $destDocDigits !== '' && strlen($destDocDigits) < 11) {
+            $destDocDigits = str_pad($destDocDigits, 11, '0', STR_PAD_LEFT);
+        }
+        if ($docType === 'CNPJ' && $destDocDigits !== '' && strlen($destDocDigits) < 14) {
+            $destDocDigits = str_pad($destDocDigits, 14, '0', STR_PAD_LEFT);
+        }
+
         $cep = $this->onlyDigits((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? '')));
         $logradouro = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
         $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
@@ -312,47 +321,44 @@ class AdminCorreiosMundialController extends Controller {
         $sender = $this->buildSenderFromConfig();
 
         // Validações do destinatário (guia v2.8)
+        $pageError = '';
         $zipDigits = $this->onlyDigits((string) ($destinatario['recipientZipCode'] ?? ''));
         if (strlen($zipDigits) !== 8) {
-            $this->json(['success' => false, 'error' => 'CEP do destinatário inválido (deve conter 8 dígitos)'], 400);
-            return;
+            $pageError = 'Dados do destinatário incompletos: CEP inválido (deve conter 8 dígitos). Atualize o endereço do cliente/pedido e tente novamente.';
         }
         $destinatario['recipientZipCode'] = $zipDigits;
 
         $phoneDigits = $this->onlyDigits((string) ($destinatario['recipientPhoneNumber'] ?? ''));
         if (strlen($phoneDigits) === 0) {
-            $this->json(['success' => false, 'error' => 'Telefone do destinatário é obrigatório'], 400);
-            return;
+            if ($pageError === '') {
+                $pageError = 'Dados do destinatário incompletos: telefone é obrigatório (10 ou 11 dígitos, sem +55). Atualize o cadastro e tente novamente.';
+            }
         }
-        if (!in_array(strlen($phoneDigits), [10, 11], true)) {
-            $this->json(['success' => false, 'error' => 'Telefone do destinatário inválido (deve conter 10 ou 11 dígitos)'], 400);
-            return;
+        if ($pageError === '' && !in_array(strlen($phoneDigits), [10, 11], true)) {
+            $pageError = 'Dados do destinatário incompletos: telefone inválido (deve conter 10 ou 11 dígitos, sem +55). Atualize o cadastro e tente novamente.';
         }
         $destinatario['recipientPhoneNumber'] = $phoneDigits;
 
         $destEmail = trim((string) ($destinatario['recipientEmail'] ?? ''));
         if ($destEmail === '') {
-            $this->json(['success' => false, 'error' => 'E-mail do destinatário é obrigatório'], 400);
-            return;
+            if ($pageError === '') {
+                $pageError = 'Dados do destinatário incompletos: e-mail é obrigatório. Atualize o cadastro e tente novamente.';
+            }
         }
-        if (filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
-            $this->json(['success' => false, 'error' => 'E-mail do destinatário inválido'], 400);
-            return;
+        if ($pageError === '' && filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
+            $pageError = 'Dados do destinatário incompletos: e-mail inválido. Atualize o cadastro e tente novamente.';
         }
 
         $docType = strtoupper(trim((string) ($destinatario['recipientDocumentType'] ?? '')));
         $docNum = $this->onlyDigits((string) ($destinatario['recipientDocumentNumber'] ?? ''));
-        if ($docType === 'CPF' && strlen($docNum) !== 11) {
-            $this->json(['success' => false, 'error' => 'CPF do destinatário inválido (deve conter 11 dígitos)'], 400);
-            return;
+        if ($pageError === '' && $docType === 'CPF' && strlen($docNum) !== 11) {
+            $pageError = 'Dados do destinatário incompletos: CPF inválido (deve conter 11 dígitos). Atualize o CPF do cliente e tente novamente.';
         }
-        if ($docType === 'CNPJ' && strlen($docNum) !== 14) {
-            $this->json(['success' => false, 'error' => 'CNPJ do destinatário inválido (deve conter 14 dígitos)'], 400);
-            return;
+        if ($pageError === '' && $docType === 'CNPJ' && strlen($docNum) !== 14) {
+            $pageError = 'Dados do destinatário incompletos: CNPJ inválido (deve conter 14 dígitos). Atualize o CNPJ do cliente e tente novamente.';
         }
-        if (!in_array($docType, ['CPF', 'CNPJ', 'PASSPORT'], true)) {
-            $this->json(['success' => false, 'error' => 'Tipo de documento do destinatário inválido (CPF/CNPJ/PASSPORT)'], 400);
-            return;
+        if ($pageError === '' && !in_array($docType, ['CPF', 'CNPJ', 'PASSPORT'], true)) {
+            $pageError = 'Dados do destinatário incompletos: tipo de documento inválido (CPF/CNPJ/PASSPORT).';
         }
         $destinatario['recipientDocumentType'] = $docType;
         $destinatario['recipientDocumentNumber'] = $docNum;
@@ -391,6 +397,7 @@ class AdminCorreiosMundialController extends Controller {
             'items' => $items,
             'defaults' => $defaults,
             'existingEtiqueta' => $existingEtiqueta,
+            'pageError' => $pageError,
         ]);
     }
 
