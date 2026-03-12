@@ -18,13 +18,7 @@ class CorreiosPacketService {
 
         $tokenResp = $this->getValidToken($cfg);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
-            return [
-                'success' => false,
-                'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'),
-                'http_code' => $tokenResp['http_code'] ?? null,
-                'request_url' => $tokenResp['request_url'] ?? null,
-                'meta' => $tokenResp,
-            ];
+            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
         }
 
         $token = (string) $tokenResp['token'];
@@ -97,13 +91,7 @@ class CorreiosPacketService {
 
         $tokenResp = $this->getValidToken($cfg);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
-            return [
-                'success' => false,
-                'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'),
-                'http_code' => $tokenResp['http_code'] ?? null,
-                'request_url' => $tokenResp['request_url'] ?? null,
-                'meta' => $tokenResp,
-            ];
+            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
         }
 
         $token = (string) $tokenResp['token'];
@@ -171,18 +159,12 @@ class CorreiosPacketService {
 
         $tokenResp = $this->getValidToken($cfg);
         if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
-            return [
-                'success' => false,
-                'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'),
-                'http_code' => $tokenResp['http_code'] ?? null,
-                'request_url' => $tokenResp['request_url'] ?? null,
-                'meta' => $tokenResp,
-            ];
+            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
         }
 
         $token = (string) $tokenResp['token'];
         $baseUrl = $this->getPacketBaseUrl((string) ($cfg['ambiente'] ?? 'homologacao'));
-        $url = rtrim($baseUrl, '/') . '/v1/packages/tracking-numbers/balance';
+        $url = rtrim($baseUrl, '/') . '/v1/balance';
 
         $headers = [
             'Accept: application/json',
@@ -270,33 +252,9 @@ class CorreiosPacketService {
                 return ['success' => false, 'error' => $msg, 'http_code' => $httpCode, 'raw' => $json, 'request_url' => $url];
             }
 
-            $currentBalance = null;
-            foreach (['currentBalance', 'balance', 'saldo', 'available', 'availableBalance', 'trackingNumbersBalance'] as $k) {
-                if (array_key_exists($k, $json) && (is_numeric($json[$k]) || is_string($json[$k]))) {
-                    $v = $json[$k];
-                    if (is_numeric($v)) {
-                        $currentBalance = (float) $v;
-                        break;
-                    }
-                    $sv = trim((string) $v);
-                    if ($sv !== '' && is_numeric(str_replace(',', '.', preg_replace('/[^0-9,\.\-]/', '', $sv)))) {
-                        $currentBalance = (float) str_replace(',', '.', preg_replace('/[^0-9,\.\-]/', '', $sv));
-                        break;
-                    }
-                }
-            }
-            if ($currentBalance === null) {
-                foreach ($json as $v) {
-                    if (is_numeric($v)) {
-                        $currentBalance = (float) $v;
-                        break;
-                    }
-                }
-            }
-
             return [
                 'success' => true,
-                'currentBalance' => $currentBalance,
+                'currentBalance' => $json['currentBalance'] ?? null,
                 'raw' => $json,
                 'http_code' => $httpCode,
                 'request_url' => $url,
@@ -396,7 +354,6 @@ class CorreiosPacketService {
 
         $raw = null;
         $httpCode = null;
-        $respContentType = '';
         try {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -409,23 +366,15 @@ class CorreiosPacketService {
             curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
             curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
             curl_setopt($ch, CURLOPT_ENCODING, '');
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
             $raw = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $respContentType = (string) (curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '');
             $err = curl_error($ch);
             curl_close($ch);
 
             if ($raw === false || $raw === null) {
                 return ['success' => false, 'error' => 'Falha na requisição de token: ' . $err, 'http_code' => $httpCode, 'request_url' => $url];
-            }
-
-            if (trim((string) $raw) === '') {
-                $ct = $respContentType !== '' ? (' content-type=' . $respContentType) : '';
-                return ['success' => false, 'error' => 'Resposta vazia ao solicitar token (HTTP ' . (string) $httpCode . ').' . $ct, 'http_code' => $httpCode, 'request_url' => $url];
             }
 
             $json = json_decode((string) $raw, true);
@@ -434,8 +383,7 @@ class CorreiosPacketService {
                 if ($snippet === '') {
                     $snippet = '<empty>';
                 }
-                $ct = $respContentType !== '' ? (' content-type=' . $respContentType) : '';
-                return ['success' => false, 'error' => 'Resposta inválida (não-JSON) ao solicitar token (HTTP ' . (string) $httpCode . ').' . $ct . ' BODY=' . $snippet, 'http_code' => $httpCode, 'request_url' => $url];
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON) ao solicitar token. BODY=' . $snippet, 'http_code' => $httpCode, 'request_url' => $url];
             }
 
             if (is_int($httpCode) && $httpCode >= 400) {
