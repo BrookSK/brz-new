@@ -807,6 +807,25 @@ class AdminCorreiosMundialController extends Controller {
         return $svg;
     }
 
+    private function svgToDataUri(string $svg): string {
+        $svg = trim((string) $svg);
+        if ($svg === '') return '';
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    private function imageFileToDataUri(string $path): string {
+        $path = (string) $path;
+        if ($path === '' || !is_file($path)) return '';
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = 'image/png';
+        if ($ext === 'jpg' || $ext === 'jpeg') $mime = 'image/jpeg';
+        if ($ext === 'gif') $mime = 'image/gif';
+        if ($ext === 'svg') $mime = 'image/svg+xml';
+        $bin = @file_get_contents($path);
+        if ($bin === false || $bin === null) return '';
+        return 'data:' . $mime . ';base64,' . base64_encode($bin);
+    }
+
     public function etiquetaPdf(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
@@ -889,7 +908,10 @@ class AdminCorreiosMundialController extends Controller {
         if ($safeTracking === '') $safeTracking = 'tracking';
 
         $barTrackingSvg = $this->code128Svg($tracking, 60, 1);
-        $barZipSvg = $recipientZipPretty !== '' ? $this->code128Svg($recipientZipPretty, 60, 1) : '';
+        $barZipSvg = $recipientZipPretty !== '' ? $this->code128Svg(preg_replace('/\D+/', '', $recipientZipPretty), 60, 1) : '';
+
+        $barTrackingImg = $this->svgToDataUri($barTrackingSvg);
+        $barZipImg = $this->svgToDataUri($barZipSvg);
 
         $senderName = (string) ($sender['senderName'] ?? '');
         $senderAddr = trim((string) ($sender['senderAddress'] ?? '') . ' ' . (string) ($sender['senderAddressNumber'] ?? ''));
@@ -907,6 +929,35 @@ class AdminCorreiosMundialController extends Controller {
         $destState = (string) ($destinatario['recipientState'] ?? '');
 
         $orderRef = $customerControlCode !== '' ? $customerControlCode : ('PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT));
+
+        $distributionModality = (string) ($pkg['distributionModality'] ?? '33162');
+        $modalityDescription = ($distributionModality === '33170') ? 'PACKET EXPRESS' : 'PACKET STANDARD';
+
+        $pluginAssets = dirname(__DIR__) . '/Plugins/woocommerce-package-redirect/assets/images/';
+        $logoTransAmerica = $this->imageFileToDataUri($pluginAssets . 'logo-transamerica.png');
+        $logoCorreios = $this->imageFileToDataUri($pluginAssets . 'logo-correios.png');
+        $logoPacket = $this->imageFileToDataUri($pluginAssets . (($distributionModality === '33170') ? 'packet-express.png' : 'packet-standard.png'));
+
+        $senderContract = '';
+        try {
+            $db = Database::getConnection();
+            $tableInfo = null;
+            try {
+                $st = $db->query('DESCRIBE configuracoes_sistema');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (is_array($cols) && in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                    $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $stmt->execute(['entrega_correios_packet_contrato']);
+                    $senderContract = (string) ($stmt->fetchColumn() ?: '');
+                }
+            } catch (\Exception $e) {
+            }
+        } catch (\Exception $e) {
+        }
+
+        $returnCompanyName = 'Braziliana';
+        $returnStreet = 'Rua Votuporanga - 2276 / Eldorado';
+        $returnZipCityUf = '15043-040 - São José do Rio Preto/SP';
 
         $totalWeightKg = 0.0;
         $pedidoItems = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
@@ -937,199 +988,249 @@ class AdminCorreiosMundialController extends Controller {
         $insurance = is_numeric($insurancePaidValue) ? (float) $insurancePaidValue : 0.0;
         $totalUsd = round($sumItems + $freight + $insurance, 2);
 
-        $html = '<!doctype html><html><head><meta charset="utf-8">'
-            . '<style>'
-            . '@page{margin:8mm 8mm 8mm 8mm;}'
-            . 'body{font-family:DejaVu Sans,Arial,Helvetica,sans-serif;color:#000;font-size:11px;}'
-            . '.page{page-break-after:always;}'
-            . '.page:last-child{page-break-after:auto;}'
-            . '.label{border:2px solid #000;padding:6px;}'
-            . '.topRow{width:100%;}'
-            . '.topLeft{float:left;width:50%;}'
-            . '.topRight{float:right;width:50%;text-align:right;}'
-            . '.clear{clear:both;}'
-            . '.bigTrack{font-size:22px;font-weight:bold;text-align:center;margin:4px 0;letter-spacing:1px;}'
-            . '.thin{font-size:10px;}'
-            . '.hr{border-top:2px solid #000;margin:4px 0;}'
-            . '.box{border:1px solid #000;}'
-            . '.boxTitle{background:#000;color:#fff;font-weight:bold;padding:3px 6px;font-size:12px;}'
-            . '.destBody{padding:6px;}'
-            . '.destLeft{width:55%;float:left;}'
-            . '.destRight{width:45%;float:right;text-align:center;}'
-            . '.zipBig{font-size:18px;font-weight:bold;margin-top:4px;}'
-            . '.infoGrid{width:100%;border-collapse:collapse;}'
-            . '.infoGrid td{border:1px solid #000;padding:4px;vertical-align:top;}'
-            . '.checkBox{display:inline-block;border:1px solid #000;width:10px;height:10px;line-height:10px;text-align:center;font-size:10px;margin-right:6px;}'
-            . '.table{width:100%;border-collapse:collapse;}'
-            . '.table th,.table td{border:1px solid #000;padding:4px;font-size:10px;}'
-            . '.table th{background:#f3f3f3;font-weight:bold;}'
-            . '.center{text-align:center;}'
-            . '.right{text-align:right;}'
-            . '</style></head><body>';
-
-        // Page 1: etiqueta
-        $html .= '<div class="page"><div class="label">';
-        $html .= '<div class="topRow">'
-            . '<div class="topLeft">'
-            . '<div style="font-size:16px;font-weight:bold;">Correios</div>'
-            . '<div class="thin"><strong>Order #:</strong> ' . htmlspecialchars($orderRef) . '<br><strong>DDU</strong></div>'
-            . '</div>'
-            . '<div class="topRight">'
-            . '<div style="font-size:16px;font-weight:bold;">PACKET STANDARD</div>'
-            . '<div class="thin">Contrato ' . htmlspecialchars((string) ($pkg['contractNumber'] ?? '')) . '</div>'
-            . '</div>'
-            . '<div class="clear"></div>'
-            . '</div>';
-
-        $html .= '<div class="bigTrack">' . htmlspecialchars($tracking) . '</div>';
-        if ($barTrackingSvg !== '') {
-            $html .= '<div class="center">' . $barTrackingSvg . '</div>';
+        // Reutiliza template do plugin (mesmo layout do print)
+        $itemsAll = [];
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            $itemsAll[] = [
+                'hsCode' => (string) ($it['hsCode'] ?? ''),
+                'description' => (string) ($it['description'] ?? ''),
+                'quantity' => (int) ($it['quantity'] ?? 0),
+                'value' => (float) ($it['value'] ?? 0),
+            ];
         }
-        $html .= '<div style="margin-top:2px;">'
-            . '<div style="float:left;width:50%;" class="thin">Recebedor:<br>Assinatura: ____________________</div>'
-            . '<div style="float:right;width:50%;" class="thin">Documento: ____________________</div>'
-            . '<div class="clear"></div>'
+        $itemsMain = array_slice($itemsAll, 0, 3);
+        $itemsSupplementary = array_slice($itemsAll, 3);
+        $itemWeight = (count($itemsAll) > 0) ? ($totalWeightKg / count($itemsAll)) : 0.0;
+
+        $html = '<!DOCTYPE html><html lang="pt-BR"><head>'
+            . '<meta charset="UTF-8">'
+            . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            . '<title>Etiqueta - ' . htmlspecialchars($tracking) . '</title>'
+            . '<style>'
+            . '@page{margin:0;width:100mm;height:150mm;}'
+            . 'body{font-family:Arial,sans-serif;}'
+            . '.page{page-break-after:always;}'
+            . '.page:last-child{page-break-after:avoid;}'
+            . 'body p{font-size:8pt;margin:0;}'
+            . '.header{margin:2.5mm;position:relative;}'
+            . '.header p,.header strong{margin-top:10px;font-size:10pt;line-height:2px;}'
+            . '.header .logo-container{width:20mm;height:20mm;}'
+            . '.header .logo-container img{vertical-align:middle;width:100%;}'
+            . '.header .left .logo-container img{margin-top:40%;}'
+            . '.header .right{position:absolute;top:0;right:0;float:right;display:block;}'
+            . '.header .right .logo-container{margin-left:auto;}'
+            . '.header .right .logo-container img{vertical-align:middle;width:auto;height:100%;}'
+            . '.header .correios-service-info{text-align:right;}'
+            . '.tracking-number{position:relative;text-align:center;height:18mm;width:80mm;margin-bottom:6mm;margin-left:5mm;padding:0;}'
+            . '.tracking-number p{font-size:15pt;}'
+            . '.tracking-number .bar-code-container{height:100%;width:100%;}'
+            . '.tracking-number .bar-code-container img{width:100%;height:100%;}'
+            . '.tracking-number .service-class{position:absolute;font-size:20pt;top:9mm;left:85mm;}'
+            . '.recipient{width:100%;}'
+            . '.recipient p,.instructions p,.customs-declaration p{font-size:8pt;line-height:10pt;padding:0;}'
+            . '.recipient .recipient-sign{margin:0 2.5mm;margin-bottom:2mm;position:relative;height:24px;width:100%;}'
+            . '.recipient .recipient-sign .document{position:absolute;right:30mm;bottom:-5px;background-color:white;padding:0 1px 0.5px 1px;}'
+            . '.recipient .signature-container{position:relative;width:95mm;}'
+            . '.recipient .signature-container .line{position:absolute;width:80mm;left:55px;border-bottom:solid 1px black;}'
+            . '.recipient .recipient-data{width:99.5%;padding:0;border:solid 1px black;height:26mm;position:relative;}'
+            . '.recipient .recipient-data p{padding-left:2.5mm;font-size:8.5pt;}'
+            . '.recipient .recipient-data .left{width:48mm;}'
+            . '.recipient .recipient-data .section-title{color:white;background-color:black;padding:3px 2.5mm 3px 2.5mm;display:inline-block;margin-bottom:1.5mm;}'
+            . '.recipient .recipient-data .right{position:absolute;top:2mm;right:0.4mm;margin-right:5mm;height:18mm;width:40mm;}'
+            . '.recipient .recipient-data .bar-code-container{height:100%;width:100%;margin-bottom:1.5mm;}'
+            . '.recipient .recipient-data .bar-code-container img{width:100%;height:100%;}'
+            . '.recipient .recipient-data .right div{height:100%;width:100%;}'
+            . '.recipient .recipient-data .right p{text-align:center;}'
+            . '.instructions{margin:0 2.5mm;position:relative;height:26mm;margin-bottom:10px;}'
+            . '.instructions .non-nationalization-policy{position:relative;width:100%;height:10pt;}'
+            . '.instructions .non-nationalization-policy .square{position:absolute;left:0;top:1pt;height:6pt;width:8pt;border:solid 1px black;font-size:5pt;text-align:center;}'
+            . '.instructions .non-nationalization-policy p{position:absolute;left:4mm;top:0;}'
+            . '.instructions .return-section{width:60mm;line-height:0;}'
+            . '.instructions .return-section .note{font-size:6pt;line-height:6px;}'
+            . '.instructions .return-section .title{text-align:center;display:inline-block;width:100%;margin:0;padding:0;}'
+            . '.instructions .return-section .title .line{display:inline-block;vertical-align:middle;width:30%;height:1px;background-color:black;margin-top:4px;}'
+            . '.instructions .return-section p{line-height:12px;}'
+            . '.instructions .return-section .title p{display:inline-block;vertical-align:middle;margin:4px 4px 0 4px;}'
+            . '.instructions .right{position:absolute;top:5mm;right:2.5mm;display:block;}'
+            . '.instructions .right p{font-size:10pt;}'
+            . '.instructions .complaints p{line-height:9px;font-size:6pt;}'
+            . '.customs-declaration{margin:1mm 2.5mm 2.5mm 2.5mm;}'
+            . '.customs-declaration table{width:100%;border-collapse:collapse;}'
+            . '.customs-declaration th,.customs-declaration td{border:1px solid #000;font-size:6pt;font-weight:normal;padding:0;text-align:left;word-wrap:break-word;word-break:break-word;}'
+            . '.customs-declaration .table-header,.customs-declaration .sh{white-space:nowrap;}'
+            . '.suplementary.customs-declaration{margin:0;width:100%;height:100%;}'
+            . '.suplementary.customs-declaration th,.suplementary.customs-declaration td{padding:2;font-size:6pt;text-align:center;vertical-align:middle;}'
+            . '.to-sender{padding:2.5mm;}'
+            . '.to-sender th,.to-sender td{font-size:10pt;padding:5px 40px 5px 5px;}'
+            . '</style>'
+            . '</head><body>';
+
+        $html .= '<div class="page">'
+            . '<div class="header">'
+            . '<div class="left">'
+            . '<div class="logo-container">'
+            . ($logoTransAmerica !== '' ? '<img src="' . $logoTransAmerica . '" alt=" ">' : '')
+            . '</div>'
+            . '<div class="order-info">'
+            . '<p>Order #: ' . htmlspecialchars((string) $pedidoId) . '</p>'
+            . '<p>' . htmlspecialchars((string) ($pkg['taxPaymentMethod'] ?? 'DDU')) . '</p>'
+            . '</div>'
+            . '<div class="logo-container" style="display:inline-block;position:absolute;top:-7.5mm;left:25mm;">'
+            . ($logoCorreios !== '' ? '<img src="' . $logoCorreios . '" alt=" ">' : '')
+            . '</div>'
+            . '</div>'
+            . '<div class="right">'
+            . '<div class="logo-container">'
+            . ($logoPacket !== '' ? '<img src="' . $logoPacket . '" alt=" ">' : '')
+            . '</div>'
+            . '<div class="correios-service-info">'
+            . '<p><strong>' . htmlspecialchars($modalityDescription) . '</strong></p>'
+            . '<p>Contrato <strong>' . htmlspecialchars($senderContract) . '</strong></p>'
+            . '</div>'
+            . '</div>'
             . '</div>';
 
-        $html .= '<div class="hr"></div>';
+        $html .= '<div class="tracking-number">'
+            . '<p><strong>' . htmlspecialchars($tracking) . '</strong></p>'
+            . '<div class="bar-code-container">'
+            . ($barTrackingImg !== '' ? '<img src="' . $barTrackingImg . '" alt=" ">' : '')
+            . '</div>'
+            . '<p class="service-class"><strong>US</strong></p>'
+            . '</div>';
 
-        $html .= '<div class="box">'
-            . '<div class="boxTitle">DESTINATÁRIO</div>'
-            . '<div class="destBody">'
-            . '<div class="destLeft">'
-            . '<div style="font-size:13px;font-weight:bold;">' . htmlspecialchars($destName) . '</div>'
-            . '<div>' . htmlspecialchars($destAddr) . '</div>'
-            . ($destComp !== '' ? '<div>' . htmlspecialchars($destComp) . '</div>' : '')
-            . '<div>' . htmlspecialchars($destCity) . '/' . htmlspecialchars($destState) . '</div>'
+        $html .= '<div class="recipient">'
+            . '<div class="recipient-sign">'
+            . '<div class="signature-container"><p>Recebedor:</p><div class="line"></div></div>'
+            . '<div class="signature-container"><p>Assinatura:</p><div class="line"></div></div>'
+            . '<p class="document">Documento:</p>'
             . '</div>'
-            . '<div class="destRight">'
-            . ($barZipSvg !== '' ? $barZipSvg : '')
-            . '<div class="zipBig">' . htmlspecialchars($recipientZipPretty) . '</div>'
+            . '<div class="recipient-data">'
+            . '<div class="left">'
+            . '<p class="section-title"><strong>DESTINATÁRIO</strong></p>'
+            . '<p>' . htmlspecialchars($destName) . '</p>'
+            . '<p>' . htmlspecialchars($destAddr) . '</p>'
+            . '<p>' . htmlspecialchars($destComp) . '</p>'
+            . '<p>' . htmlspecialchars($destCity) . '/' . htmlspecialchars($destState) . '</p>'
             . '</div>'
-            . '<div class="clear"></div>'
+            . '<div class="right">'
+            . '<div class="bar-code-container">'
+            . ($barZipImg !== '' ? '<img src="' . $barZipImg . '" alt=" ">' : '')
+            . '</div>'
+            . '<p style="font-size:15pt;"><strong>' . htmlspecialchars($recipientZipPretty) . '</strong></p>'
+            . '</div>'
             . '</div>'
             . '</div>';
 
-        $html .= '<div style="margin-top:6px;" class="thin"><strong>Instrução do Remetente no caso de não nacionalização:</strong></div>';
-        $html .= '<div class="thin" style="margin-top:2px;"><span class="checkBox">x</span>Retorno à origem</div>';
-
-        $html .= '<table class="infoGrid" style="margin-top:6px;">'
-            . '<tr>'
-            . '<td style="width:55%;">'
-            . '<div class="thin"><strong>Dúvidas e reclamações:</strong><br>'
-            . htmlspecialchars($senderEmail) . '<br>'
-            . htmlspecialchars($senderWeb)
+        $nonNat = (string) ($pkg['nonNationalizationInstruction'] ?? 'RETURNTOORIGIN');
+        $html .= '<div class="instructions">'
+            . '<div class="left">'
+            . '<p><strong>Instrução do Remetente no caso de não nacionalização:</strong></p>'
+            . '<div class="non-nationalization-policy">'
+            . '<div class="square">' . ($nonNat === 'RETURNTOORIGIN' ? 'X' : '') . '</div>'
+            . '<p>Retorno à origem</p>'
             . '</div>'
-            . '</td>'
-            . '<td style="width:45%;">'
-            . '<div class="thin"><strong>Remetente:</strong><br>'
-            . htmlspecialchars($senderName) . '<br>'
-            . htmlspecialchars($senderAddr) . '<br>'
-            . ($senderComp !== '' ? htmlspecialchars($senderComp) . '<br>' : '')
-            . htmlspecialchars($senderCity) . ' ' . htmlspecialchars($senderState) . '<br>'
-            . htmlspecialchars($senderZip)
+            . '<div class="complaints">'
+            . '<p>Dúvidas e reclamações:</p>'
+            . '<p>' . htmlspecialchars($senderEmail) . ' / ' . htmlspecialchars($senderWeb) . '</p>'
             . '</div>'
-            . '</td>'
-            . '</tr>'
-            . '</table>';
+            . '<div class="return-section">'
+            . '<div class="title"><div class="line"></div><p><strong>DEVOLUÇÃO:</strong></p><div class="line"></div></div>'
+            . '<p class="note">(Em caso de não entrega ao remetente, entregar para:)</p>'
+            . '<p>' . htmlspecialchars($returnCompanyName) . '</p>'
+            . '<p>' . htmlspecialchars($returnStreet) . '</p>'
+            . '<p>' . htmlspecialchars($returnZipCityUf) . '</p>'
+            . '</div>'
+            . '</div>'
+            . '<div class="right">'
+            . '<p><strong>Remetente:</strong></p>'
+            . '<p>' . htmlspecialchars($senderName) . '</p>'
+            . '<p>' . htmlspecialchars($senderAddr) . '</p>'
+            . '<p>' . htmlspecialchars($senderCity) . '</p>'
+            . '<p>' . htmlspecialchars((string) ($sender['senderCountryCode'] ?? 'US')) . '</p>'
+            . '<p><strong>Braziliana</strong></p>'
+            . '</div>'
+            . '</div>';
 
-        $html .= '<div style="margin-top:6px;" class="box">'
-            . '<div class="boxTitle" style="background:#fff;color:#000;border-bottom:1px solid #000;">Declaração para Alfândega</div>'
-            . '<table class="table">'
+        $html .= '<div class="customs-declaration"><table>'
+            . '<tr><th colspan="3"><strong>Declaração para Alfândega</strong></th><th colspan="3">Pode ser aberto Ex Officio 1/1</th></tr>'
             . '<thead><tr>'
-            . '<th style="width:16%">Cod.SH</th>'
-            . '<th style="width:8%" class="center">Qtde</th>'
-            . '<th>Descrição do Conteúdo</th>'
-            . '<th style="width:12%" class="right">Peso KG</th>'
-            . '<th style="width:14%" class="right">Unit USD</th>'
-            . '<th style="width:14%" class="right">Valor USD</th>'
+            . '<th class="table-header sh">Cod SH</th>'
+            . '<th class="table-header">Qtde</th>'
+            . '<th class="table-header">Descrição do Conteúdo</th>'
+            . '<th class="table-header">Peso KG</th>'
+            . '<th class="table-header">Unit USD</th>'
+            . '<th class="table-header">Valor USD</th>'
             . '</tr></thead><tbody>';
 
-        $wPerLine = 0.0;
-        if ($totalWeightKg > 0 && count($items) > 0) {
-            $wPerLine = $totalWeightKg / count($items);
-        }
-        foreach ($items as $it) {
-            if (!is_array($it)) continue;
-            $hs = (string) ($it['hsCode'] ?? '');
-            $desc = (string) ($it['description'] ?? '');
-            $q = (int) ($it['quantity'] ?? 0);
+        $totalItemsValue = 0.0;
+        foreach ($itemsMain as $item) {
+            $q = (int) ($item['quantity'] ?? 0);
             if ($q <= 0) $q = 1;
-            $valUnit = (float) ($it['value'] ?? 0);
-            $line = $valUnit * $q;
+            $v = (float) ($item['value'] ?? 0);
+            $itemTotal = $v * $q;
+            $totalItemsValue += $itemTotal;
             $html .= '<tr>'
-                . '<td>' . htmlspecialchars($hs) . '</td>'
-                . '<td class="center">' . (int) $q . '</td>'
-                . '<td>' . htmlspecialchars($desc) . '</td>'
-                . '<td class="right">' . htmlspecialchars(number_format($wPerLine, 2, '.', ',')) . '</td>'
-                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($valUnit)) . '</td>'
-                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($line)) . '</td>'
+                . '<td>' . htmlspecialchars((string) $item['hsCode']) . '</td>'
+                . '<td>' . (int) $q . '</td>'
+                . '<td>' . htmlspecialchars((string) $item['description']) . '</td>'
+                . '<td>' . htmlspecialchars(number_format($itemWeight / $q, 2, ',', '.')) . '</td>'
+                . '<td>' . htmlspecialchars(number_format($v, 2, ',', '.')) . '</td>'
+                . '<td>' . htmlspecialchars(number_format($itemTotal, 2, ',', '.')) . '</td>'
                 . '</tr>';
         }
-
-        $html .= '<tr><td colspan="5" class="right"><strong>Frete USD:</strong></td><td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($freight)) . '</td></tr>';
-        $html .= '<tr><td colspan="5" class="right"><strong>Seguro USD:</strong></td><td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($insurance)) . '</td></tr>';
-        $html .= '<tr><td colspan="5" class="right"><strong>Total USD (Mercadorias + Frete + Seguro):</strong></td><td class="right"><strong>' . htmlspecialchars($this->cmFmtUsdNoSymbol($totalUsd)) . '</strong></td></tr>';
+        $html .= '<tr><th colspan="5">Frete USD:</th><td>' . htmlspecialchars(number_format($freight, 2, ',', '.')) . '</td></tr>';
+        $html .= '<tr><th colspan="5">Seguro USD:</th><td>' . htmlspecialchars(number_format($insurance, 2, ',', '.')) . '</td></tr>';
+        $totalUsd2 = $totalItemsValue + $freight + $insurance;
+        $html .= '<tr><th colspan="5">Total USD (Mercadorias + Frete + Seguro):</th><td>' . htmlspecialchars(number_format($totalUsd2, 2, ',', '.')) . '</td></tr>';
         $html .= '</tbody></table></div>';
+        $html .= '</div>';
 
-        $html .= '</div></div>';
+        $html .= '<div class="page"><div class="to-sender">'
+            . '<table border="1" style="width:100%;border-collapse:collapse;text-align:left;">'
+            . '<thead><tr><th colspan="5">AO REMETENTE</th></tr></thead><tbody>'
+            . '<tr><td colspan="2"></td><td colspan="3">MUDOU-SE</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">ENDEREÇO INSUFICIENTE</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">NÃO EXISTE O Nº INDICADO</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">FALECIDO</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">DESCONHECIDO</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">RECUSADO</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">AUSENTE</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">NÃO PROCURADO</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">OUTROS:</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">INFORMAÇÃO PRESTADA PELO<br>PORTEIRO OU SÍNDICO</td></tr>'
+            . '<tr><td colspan="2"></td><td colspan="3">REINTEGRADO AO SERVIÇO POSTAL<br>EM ____/____/________</td></tr>'
+            . '<tr><td colspan="5">DATA:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RUBRICA:</td></tr>'
+            . '</tbody></table>'
+            . '</div></div>';
 
-        // Page 2: AO REMETENTE
-        $html .= '<div class="page">'
-            . '<div class="label" style="padding:0;">'
-            . '<table class="table" style="border:2px solid #000;border-collapse:collapse;">'
-            . '<tr><th colspan="2" class="center" style="font-size:16px;background:#fff;">AO REMETENTE</th></tr>'
-            . '<tr><td style="height:36px;">MUDOU-SE</td><td style="width:25%;"></td></tr>'
-            . '<tr><td style="height:36px;">ENDEREÇO INSUFICIENTE</td><td></td></tr>'
-            . '<tr><td style="height:36px;">NÃO EXISTE O Nº INDICADO</td><td></td></tr>'
-            . '<tr><td style="height:36px;">FALECIDO</td><td></td></tr>'
-            . '<tr><td style="height:36px;">DESCONHECIDO</td><td></td></tr>'
-            . '<tr><td style="height:36px;">RECUSADO</td><td></td></tr>'
-            . '<tr><td style="height:36px;">AUSENTE</td><td></td></tr>'
-            . '<tr><td style="height:36px;">NÃO PROCURADO</td><td></td></tr>'
-            . '<tr><td style="height:36px;">OUTROS:</td><td></td></tr>'
-            . '<tr><td style="height:48px;">INFORMAÇÃO PRESTADA PELO<br>PORTEIRO OU SÍNDICO</td><td></td></tr>'
-            . '<tr><td style="height:48px;">REINTEGRADO AO SERVIÇO POSTAL<br>EM ____/____/________</td><td></td></tr>'
-            . '<tr><td style="height:48px;">DATA:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RUBRICA:</td><td></td></tr>'
-            . '</table>'
-            . '</div>'
-            . '</div>';
-
-        // Page 3: SUPPLEMENTARY/CUSTOMS DECLARATION
-        $html .= '<div class="page">'
-            . '<div class="label">'
-            . '<table class="table">'
-            . '<tr><th colspan="5" class="center" style="background:#fff;">SUPPLEMENTARY</th><th class="center" style="background:#fff;">' . htmlspecialchars($tracking) . '</th></tr>'
-            . '<tr><th colspan="6" class="center" style="background:#fff;">CUSTOMS DECLARATION</th></tr>'
+        $html .= '<div class="page"><div class="suplementary customs-declaration">'
+            . '<table>'
+            . '<tr><th colspan="5"><strong>SUPPLEMENTARY</strong></th><th>' . htmlspecialchars($tracking) . '</th></tr>'
+            . '<tr><th colspan="6"><strong>CUSTOMS DECLARATION</strong></th></tr>'
             . '<tr>'
-            . '<th style="width:16%">COD.SH</th>'
-            . '<th style="width:10%" class="center">QUANTITY</th>'
-            . '<th>DESCRIPTION</th>'
-            . '<th style="width:14%" class="right">WEIGHT (KG)</th>'
-            . '<th style="width:14%" class="right">UNI (US)</th>'
-            . '<th style="width:14%" class="right">VALUE (US)</th>'
+            . '<th>COD.SH</th><th>QUANTITY</th><th>DESCRIPTION</th><th>WEIGHT (KG)</th><th>UNI (US)</th><th>VALUE (US)</th>'
             . '</tr>';
 
-        $total3Value = 0.0;
-        foreach ($items as $it) {
-            if (!is_array($it)) continue;
-            $hs = (string) ($it['hsCode'] ?? '');
-            $desc = (string) ($it['description'] ?? '');
-            $q = (int) ($it['quantity'] ?? 0);
+        $total3W = 0.0;
+        $total3V = 0.0;
+        foreach ($itemsSupplementary as $item) {
+            $q = (int) ($item['quantity'] ?? 0);
             if ($q <= 0) $q = 1;
-            $valUnit = (float) ($it['value'] ?? 0);
-            $line = $valUnit * $q;
-            $total3Value += $line;
+            $v = (float) ($item['value'] ?? 0);
+            $line = $v * $q;
+            $total3W += $itemWeight;
+            $total3V += $line;
             $html .= '<tr>'
-                . '<td>' . htmlspecialchars($hs) . '</td>'
-                . '<td class="center">' . (int) $q . '</td>'
-                . '<td>' . htmlspecialchars($desc) . '</td>'
-                . '<td class="right">' . htmlspecialchars(number_format($wPerLine, 2, '.', ',')) . '</td>'
-                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($valUnit)) . '</td>'
-                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($line)) . '</td>'
+                . '<td>' . htmlspecialchars((string) $item['hsCode']) . '</td>'
+                . '<td>' . (int) $q . '</td>'
+                . '<td>' . htmlspecialchars((string) $item['description']) . '</td>'
+                . '<td>' . htmlspecialchars(number_format($itemWeight / $q, 2, ',', '.')) . '</td>'
+                . '<td>' . htmlspecialchars(number_format($v, 2, ',', '.')) . '</td>'
+                . '<td>' . htmlspecialchars(number_format($line, 2, ',', '.')) . '</td>'
                 . '</tr>';
         }
-        $html .= '<tr><th class="right" colspan="3">TOTAL</th><th class="right">' . htmlspecialchars(number_format($totalWeightKg, 2, '.', ',')) . '</th><th></th><th class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($total3Value)) . '</th></tr>';
+        $html .= '<tr><th colspan="3">TOTAL</th><th>' . htmlspecialchars(number_format($totalWeightKg, 2, ',', '.')) . '</th><th></th><th>' . htmlspecialchars(number_format($total3V, 2, ',', '.')) . '</th></tr>';
         $html .= '</table></div></div>';
 
         $html .= '</body></html>';
@@ -1139,7 +1240,8 @@ class AdminCorreiosMundialController extends Controller {
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
+        // Mesmo tamanho do template do plugin: 100mm x 150mm
+        $dompdf->setPaper([0, 0, 283.46, 425.20]);
         $dompdf->render();
 
         $filename = 'etiqueta_PACKET_' . $safeTracking . '.pdf';
