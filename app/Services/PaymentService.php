@@ -231,17 +231,39 @@ class PaymentService {
             try {
                 $hasLogicalError = false;
                 if (is_array($resp) && (isset($resp['errors']) || isset($resp['error']) || isset($resp['message']))) {
-                    if (!isset($resp['data'])) {
+                    // Trata como erro lógico quando 'data' não existe OU vem vazio/nulo.
+                    $dataMissingOrEmpty = false;
+                    if (!array_key_exists('data', $resp)) {
+                        $dataMissingOrEmpty = true;
+                    } else {
+                        $dv = $resp['data'];
+                        if ($dv === null || $dv === '' || $dv === [] || (is_array($dv) && count($dv) === 0)) {
+                            $dataMissingOrEmpty = true;
+                        }
+                    }
+                    if ($dataMissingOrEmpty) {
                         $hasLogicalError = true;
                     }
                 }
                 if ($hasLogicalError) {
                     $msg = '';
-                    if (!empty($resp['message']) && is_string($resp['message'])) {
-                        $msg = (string) $resp['message'];
+                    if (!empty($resp['message'])) {
+                        if (is_string($resp['message'])) {
+                            $msg = (string) $resp['message'];
+                        } elseif (is_scalar($resp['message'])) {
+                            $msg = (string) $resp['message'];
+                        } elseif (is_array($resp['message'])) {
+                            $msg = (string) json_encode($resp['message'], JSON_UNESCAPED_UNICODE);
+                        }
                     }
-                    if ($msg === '' && !empty($resp['error']) && is_string($resp['error'])) {
-                        $msg = (string) $resp['error'];
+                    if ($msg === '' && !empty($resp['error'])) {
+                        if (is_string($resp['error'])) {
+                            $msg = (string) $resp['error'];
+                        } elseif (is_scalar($resp['error'])) {
+                            $msg = (string) $resp['error'];
+                        } elseif (is_array($resp['error'])) {
+                            $msg = (string) json_encode($resp['error'], JSON_UNESCAPED_UNICODE);
+                        }
                     }
 
                     $errDetails = '';
