@@ -114,7 +114,10 @@ class PaymentService {
 
         $payload = null;
         if ($body !== null) {
-            $payload = json_encode($body);
+            $payload = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($payload === false) {
+                throw new \Exception('Câmbio Real: falha ao codificar payload (JSON inválido)');
+            }
         }
 
         if (function_exists('curl_init')) {
