@@ -65,20 +65,29 @@
                             <th>Pedido</th>
                             <th>Cliente</th>
                             <th>Rastreio</th>
+                            <th>Etiqueta</th>
                             <th>Data</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $etiquetas = isset($etiquetas) && is_array($etiquetas) ? $etiquetas : []; ?>
                         <?php if (empty($etiquetas)): ?>
-                            <tr><td colspan="4" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
+                            <tr><td colspan="5" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
                         <?php else: ?>
                             <?php foreach ($etiquetas as $e): ?>
                                 <?php $pid = (int) ($e['pedido_id'] ?? 0); ?>
+                                <?php $trk = (string) ($e['tracking_number'] ?? ''); ?>
                                 <tr>
                                     <td><a href="/admin/correios-mundial/pedido/<?= $pid ?>">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></a></td>
                                     <td><?= htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) ?></td>
-                                    <td><?= htmlspecialchars((string) ($e['tracking_number'] ?? '')) ?></td>
+                                    <td><?= htmlspecialchars($trk) ?></td>
+                                    <td>
+                                        <?php if ($trk !== ''): ?>
+                                            <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/etiqueta/<?= rawurlencode($trk) ?>.pdf" target="_blank">PDF</a>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                 </tr>
                             <?php endforeach; ?>

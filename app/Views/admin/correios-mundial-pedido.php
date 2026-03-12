@@ -76,6 +76,9 @@ $nonNatLabel = [
     <?php if (!empty($existingEtiqueta) && is_array($existingEtiqueta) && !empty($existingEtiqueta['tracking_number'])): ?>
         <div class="alert alert-success">
             Etiqueta já gerada. Rastreio: <strong><?= htmlspecialchars((string) $existingEtiqueta['tracking_number']) ?></strong>
+            <div class="mt-2">
+                <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/etiqueta/<?= rawurlencode((string) $existingEtiqueta['tracking_number']) ?>.pdf" target="_blank">Baixar etiqueta (PDF)</a>
+            </div>
         </div>
     <?php endif; ?>
 

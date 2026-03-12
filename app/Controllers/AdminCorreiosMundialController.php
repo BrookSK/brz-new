@@ -6,6 +6,8 @@ use App\Services\AuthService;
 use App\Services\CorreiosPacketService;
 use App\Models\PedidoEcommerce;
 use Config\Database;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class AdminCorreiosMundialController extends Controller {
     private CorreiosPacketService $svc;
@@ -725,5 +727,195 @@ class AdminCorreiosMundialController extends Controller {
             'pedido_id' => $id,
             'tracking_number' => $tracking,
         ]);
+    }
+
+    private function cmFmtUsd($v): string {
+        if (!is_numeric($v)) return '';
+        return '$ ' . number_format((float) $v, 2, '.', ',');
+    }
+
+    public function etiquetaPdf(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $tracking = (string) $request->getParam('tracking');
+        $tracking = trim($tracking);
+        if ($tracking === '') {
+            http_response_code(400);
+            echo 'Tracking inválido.';
+            return;
+        }
+
+        $this->ensurePacketEtiquetasTable();
+        if (!$this->tableExists('correios_packet_etiquetas')) {
+            http_response_code(500);
+            echo 'Tabela correios_packet_etiquetas não encontrada.';
+            return;
+        }
+
+        $etiqueta = null;
+        try {
+            $st = $this->connection->prepare('SELECT * FROM correios_packet_etiquetas WHERE tracking_number = ? LIMIT 1');
+            $st->execute([$tracking]);
+            $etiqueta = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $etiqueta = null;
+        }
+
+        if (!$etiqueta || empty($etiqueta['pedido_id'])) {
+            http_response_code(404);
+            echo 'Etiqueta não encontrada.';
+            return;
+        }
+
+        $pedidoId = (int) ($etiqueta['pedido_id'] ?? 0);
+        $pedidoModel = new PedidoEcommerce();
+        $pedido = $pedidoModel->getComDetalhes($pedidoId);
+        if (!is_array($pedido) || empty($pedido['id'])) {
+            http_response_code(404);
+            echo 'Pedido não encontrado.';
+            return;
+        }
+
+        $destinatario = $this->buildRecipientFromPedido($pedido);
+        $sender = $this->buildSenderFromConfig();
+
+        $req = [];
+        $reqJson = (string) ($etiqueta['last_request_json'] ?? '');
+        if ($reqJson !== '') {
+            $tmp = json_decode($reqJson, true);
+            if (is_array($tmp)) $req = $tmp;
+        }
+
+        $pkg = [];
+        if (!empty($req['packageList']) && is_array($req['packageList']) && !empty($req['packageList'][0]) && is_array($req['packageList'][0])) {
+            $pkg = $req['packageList'][0];
+        }
+
+        $items = [];
+        if (!empty($pkg['items']) && is_array($pkg['items'])) {
+            $items = $pkg['items'];
+        }
+
+        $customerControlCode = (string) ($etiqueta['customer_control_code'] ?? ($pkg['customerControlCode'] ?? ''));
+
+        $totalWeight = isset($pkg['totalWeight']) ? (int) $pkg['totalWeight'] : null;
+        $packagingLength = isset($pkg['packagingLength']) ? (float) $pkg['packagingLength'] : null;
+        $packagingWidth = isset($pkg['packagingWidth']) ? (float) $pkg['packagingWidth'] : null;
+        $packagingHeight = isset($pkg['packagingHeight']) ? (float) $pkg['packagingHeight'] : null;
+        $freightPaidValue = $pkg['freightPaidValue'] ?? null;
+        $insurancePaidValue = $pkg['insurancePaidValue'] ?? null;
+
+        $safeTracking = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $tracking);
+        if ($safeTracking === '') $safeTracking = 'tracking';
+
+        $html = '<!doctype html><html><head><meta charset="utf-8">'
+            . '<style>'
+            . 'body{font-family:DejaVu Sans,Arial,Helvetica,sans-serif;font-size:12px;color:#111;}'
+            . '.row{width:100%;clear:both;}'
+            . '.col{float:left;box-sizing:border-box;}'
+            . '.box{border:1px solid #000;padding:10px;margin-bottom:10px;}'
+            . '.h1{font-size:18px;font-weight:bold;margin:0 0 6px 0;}'
+            . '.h2{font-size:14px;font-weight:bold;margin:0 0 6px 0;}'
+            . '.muted{color:#444;font-size:11px;}'
+            . 'table{width:100%;border-collapse:collapse;}'
+            . 'th,td{border:1px solid #000;padding:5px;vertical-align:top;font-size:11px;}'
+            . 'th{background:#f3f3f3;}'
+            . '</style></head><body>';
+
+        $html .= '<div class="box">'
+            . '<div class="h1">Correios Mundial (PACKET) - Etiqueta</div>'
+            . '<div><strong>Tracking:</strong> ' . htmlspecialchars($tracking) . '</div>'
+            . ($customerControlCode !== '' ? '<div><strong>Customer Control Code:</strong> ' . htmlspecialchars($customerControlCode) . '</div>' : '')
+            . '<div class="muted">Pedido #' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT) . '</div>'
+            . '</div>';
+
+        $html .= '<div class="row">'
+            . '<div class="col" style="width:49%;margin-right:2%;">'
+            . '<div class="box">'
+            . '<div class="h2">Remetente</div>'
+            . '<div><strong>Nome:</strong> ' . htmlspecialchars((string) ($sender['senderName'] ?? '')) . '</div>'
+            . '<div><strong>Endereço:</strong> ' . htmlspecialchars((string) ($sender['senderAddress'] ?? '')) . ' ' . htmlspecialchars((string) ($sender['senderAddressNumber'] ?? '')) . '</div>'
+            . (!empty($sender['senderAddressComplement']) ? '<div><strong>Complemento:</strong> ' . htmlspecialchars((string) $sender['senderAddressComplement']) . '</div>' : '')
+            . '<div><strong>Cidade/UF:</strong> ' . htmlspecialchars((string) ($sender['senderCityName'] ?? '')) . ' / ' . htmlspecialchars((string) ($sender['senderState'] ?? '')) . '</div>'
+            . '<div><strong>CEP:</strong> ' . htmlspecialchars((string) ($sender['senderZipCode'] ?? '')) . '</div>'
+            . '<div><strong>País:</strong> ' . htmlspecialchars((string) ($sender['senderCountryCode'] ?? '')) . '</div>'
+            . (!empty($sender['senderEmail']) ? '<div><strong>E-mail:</strong> ' . htmlspecialchars((string) $sender['senderEmail']) . '</div>' : '')
+            . '</div></div>'
+            . '<div class="col" style="width:49%;">'
+            . '<div class="box">'
+            . '<div class="h2">Destinatário</div>'
+            . '<div><strong>Nome:</strong> ' . htmlspecialchars((string) ($destinatario['recipientName'] ?? '')) . '</div>'
+            . '<div><strong>Documento:</strong> ' . htmlspecialchars((string) ($destinatario['recipientDocumentType'] ?? '')) . ' ' . htmlspecialchars((string) ($destinatario['recipientDocumentNumber'] ?? '')) . '</div>'
+            . '<div><strong>Endereço:</strong> ' . htmlspecialchars((string) ($destinatario['recipientAddress'] ?? '')) . ' ' . htmlspecialchars((string) ($destinatario['recipientAddressNumber'] ?? '')) . '</div>'
+            . (!empty($destinatario['recipientAddressComplement']) ? '<div><strong>Complemento:</strong> ' . htmlspecialchars((string) $destinatario['recipientAddressComplement']) . '</div>' : '')
+            . '<div><strong>Cidade/UF:</strong> ' . htmlspecialchars((string) ($destinatario['recipientCityName'] ?? '')) . ' / ' . htmlspecialchars((string) ($destinatario['recipientState'] ?? '')) . '</div>'
+            . '<div><strong>CEP:</strong> ' . htmlspecialchars((string) ($destinatario['recipientZipCode'] ?? '')) . '</div>'
+            . '<div><strong>E-mail:</strong> ' . htmlspecialchars((string) ($destinatario['recipientEmail'] ?? '')) . '</div>'
+            . '<div><strong>Telefone:</strong> ' . htmlspecialchars((string) ($destinatario['recipientPhoneNumber'] ?? '')) . '</div>'
+            . '</div></div>'
+            . '</div>';
+
+        $html .= '<div class="box">'
+            . '<div class="h2">Dados do pacote</div>'
+            . '<table><tbody>'
+            . '<tr>'
+            . '<td><strong>Peso total (g)</strong><br>' . htmlspecialchars($totalWeight === null ? '-' : (string) $totalWeight) . '</td>'
+            . '<td><strong>Dimensões (cm)</strong><br>'
+            . htmlspecialchars($packagingLength === null ? '-' : (string) $packagingLength) . ' x '
+            . htmlspecialchars($packagingWidth === null ? '-' : (string) $packagingWidth) . ' x '
+            . htmlspecialchars($packagingHeight === null ? '-' : (string) $packagingHeight)
+            . '</td>'
+            . '<td><strong>Frete pago</strong><br>' . htmlspecialchars($freightPaidValue === null ? '-' : $this->cmFmtUsd($freightPaidValue)) . '</td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td colspan="3"><strong>Seguro pago</strong><br>' . htmlspecialchars($insurancePaidValue === null ? '(vazio)' : $this->cmFmtUsd($insurancePaidValue)) . '</td>'
+            . '</tr>'
+            . '</tbody></table>'
+            . '</div>';
+
+        $html .= '<div class="box">'
+            . '<div class="h2">Items (Declaração)</div>';
+        if (empty($items)) {
+            $html .= '<div class="muted">Itens não disponíveis (request não salvo ou incompleto).</div>';
+        } else {
+            $html .= '<table><thead><tr>'
+                . '<th style="width:18%">HS</th>'
+                . '<th>Descrição</th>'
+                . '<th style="width:10%">Qtd</th>'
+                . '<th style="width:18%">Valor</th>'
+                . '</tr></thead><tbody>';
+            foreach ($items as $it) {
+                if (!is_array($it)) continue;
+                $hs = (string) ($it['hsCode'] ?? '');
+                $desc = (string) ($it['description'] ?? '');
+                $q = (string) ($it['quantity'] ?? '');
+                $val = $it['value'] ?? '';
+                $html .= '<tr>'
+                    . '<td>' . htmlspecialchars($hs) . '</td>'
+                    . '<td>' . htmlspecialchars($desc) . '</td>'
+                    . '<td>' . htmlspecialchars($q) . '</td>'
+                    . '<td>' . htmlspecialchars($this->cmFmtUsd($val)) . '</td>'
+                    . '</tr>';
+            }
+            $html .= '</tbody></table>';
+        }
+        $html .= '</div>';
+
+        $html .= '<div class="muted">Gerado em ' . date('d/m/Y H:i:s') . ' (PDF gerado localmente; a API PACKET não fornece PDF)</div>';
+        $html .= '</body></html>';
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', false);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $filename = 'etiqueta_PACKET_' . $safeTracking . '.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo $dompdf->output();
     }
 }

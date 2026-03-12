@@ -3575,8 +3575,16 @@ class PaymentService {
             if ($forceGateway === 'appmax') {
                 return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
             }
+            if ($forceGateway === 'asaas') {
+                return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
+            }
             $bt = strtoupper((string) ($dadosPagamento['billingType'] ?? ''));
             if (in_array($bt, ['PIX', 'BOLETO'], true)) {
+                // Se Asaas não estiver configurado, não falhar: usar AppMax como fallback.
+                // Isso evita depender do Asaas em fluxos onde o PIX/BOLETO deve ir via AppMax.
+                if (empty($this->asaasApiKey)) {
+                    return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
+                }
                 return $this->processarPagamentoAsaas($dadosPagamento, $valor, $descricao);
             }
             return $this->processarPagamentoAppmax($dadosPagamento, $valor, $descricao);
