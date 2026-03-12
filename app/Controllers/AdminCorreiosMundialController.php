@@ -1232,23 +1232,43 @@ class AdminCorreiosMundialController extends Controller {
 
         $payload = [
             'dispatchNumber' => $dispatchNumber,
-            'originCountry' => 'US',
+            'originCountry' => $originCountry,
             'originOperatorName' => $originOperatorName,
             'destinationOperatorName' => $destinationOperatorName,
             'postalCategoryCode' => $postalCategoryCode,
             'serviceSubclassCode' => $serviceSubclassCode,
+            'triageGroup' => $triageGroup,
             'unitList' => [
                 [
                     'sequence' => 1,
                     'unitType' => $unitType,
-                    'trackingNumbers' => array_values($trackingNumbers),
+                    'trackingNumbers' => $trackingNumbers,
+                    'awbNumber' => $awb,
                 ]
-            ],
+            ]
         ];
 
-        $apiResp = $this->svc->createUnits($payload);
-        if (empty($apiResp['success'])) {
-            $err = $this->packetFriendlyError((string) ($apiResp['error'] ?? 'Falha ao criar unitizador.'), $apiResp['raw'] ?? null);
+        $apiResp = null;
+        $attempts = 0;
+        $maxAttempts = 15;
+        while ($attempts < $maxAttempts) {
+            $attempts++;
+            $apiResp = $this->svc->createUnits($payload);
+            if (!empty($apiResp['success'])) {
+                break;
+            }
+
+            $rawErr = (string) ($apiResp['error'] ?? '');
+            if (stripos($rawErr, 'NEG-118') !== false || stripos($rawErr, 'duplicated dispatch number') !== false) {
+                $payload['dispatchNumber'] = (int) ($payload['dispatchNumber'] ?? 0) + 1;
+                continue;
+            }
+
+            break;
+        }
+
+        if (empty($apiResp) || empty($apiResp['success'])) {
+            $err = $this->packetFriendlyError((string) (($apiResp['error'] ?? '') !== '' ? $apiResp['error'] : 'Falha ao criar unitizador.'), $apiResp['raw'] ?? null);
             header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode($err) . '&bulk=' . rawurlencode($bulk));
             exit;
         }
