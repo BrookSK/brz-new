@@ -195,8 +195,60 @@ class PaymentService {
         }
 
         $nome = (string) ($customer['name'] ?? ($customer['nome'] ?? 'Cliente'));
-        $email = (string) ($customer['email'] ?? '');
-        $phone = (string) ($customer['phone_number'] ?? ($customer['telefone'] ?? ''));
+        $email = (string) ($customer['email'] ?? ($customer['customer_email'] ?? ($customer['email_address'] ?? '')));
+        $phone = (string) ($customer['phone_number'] ?? ($customer['telefone'] ?? ($customer['phone'] ?? '')));
+
+        $nome = trim($nome);
+        if ($nome === '') {
+            $nome = 'Cliente';
+        }
+
+        $email = trim((string) $email);
+        // remove espaços internos que às vezes vêm de autocomplete/cópia
+        $email = preg_replace('/\s+/', '', $email);
+        if ($email === '') {
+            return ['success' => false, 'error' => 'Câmbio Real: e-mail do cliente é obrigatório. Verifique o campo E-mail.'];
+        }
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            // tenta pegar algum fallback comum sem quebrar o fluxo
+            $alt = '';
+            foreach (['usuario_email', 'user_email', 'mail'] as $k) {
+                if (!empty($customer[$k]) && is_string($customer[$k])) {
+                    $alt = trim((string) $customer[$k]);
+                    $alt = preg_replace('/\s+/', '', $alt);
+                    break;
+                }
+            }
+            if ($alt !== '' && filter_var($alt, FILTER_VALIDATE_EMAIL) !== false) {
+                $email = $alt;
+            } else {
+                return ['success' => false, 'error' => 'Câmbio Real: e-mail do cliente inválido. Verifique o campo E-mail.'];
+            }
+        }
+
+        try {
+            $masked = $email;
+            $at = strpos($masked, '@');
+            if ($at !== false) {
+                $local = substr($masked, 0, $at);
+                $domain = substr($masked, $at);
+                if (strlen($local) > 2) {
+                    $local = substr($local, 0, 2) . '***';
+                } else {
+                    $local = '***';
+                }
+                $masked = $local . $domain;
+            } else {
+                $masked = '***';
+            }
+            error_log('[CÂMBIOREAL] Cliente email (mask): ' . $masked);
+        } catch (\Exception $e) {
+        }
+
+        $phone = trim((string) $phone);
+        if ($phone !== '') {
+            $phone = preg_replace('/\D+/', '', $phone);
+        }
 
         $payload = [
             'order_id' => (string) ($pedidoId . '-produto'),
