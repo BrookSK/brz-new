@@ -108,6 +108,7 @@ class PaymentService {
             'Content-Type: application/json',
             'Authorization: Basic ' . $auth,
             'X-APP-ID: ' . (string) $this->cambioRealAppId,
+            'X-APP-SECRET: ' . (string) $this->cambioRealAppSecret,
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
 
