@@ -1034,13 +1034,38 @@ class AdminCorreiosMundialController extends Controller {
             exit;
         }
 
+        $unitCode = trim((string) ($row['unit_code'] ?? ''));
+
         $dispatchNumber = trim((string) ($row['dispatch_number'] ?? ''));
         if ($dispatchNumber === '') {
             header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('dispatchNumber não encontrado no container.'));
             exit;
         }
 
-        $api = $this->svc->cancelDispatch($dispatchNumber);
+        // Primeiro: cancelar pelo unitCode (mais confiável). Depois, fallback para dispatchNumber.
+        $api = null;
+        $attemptLog = [];
+        $ambientesTry = ['homologacao', 'producao'];
+        if ($unitCode !== '') {
+            foreach ($ambientesTry as $ambTry) {
+                $apiU = $this->svc->cancelUnit($unitCode, $ambTry);
+                $attemptLog[] = [
+                    'amb' => $ambTry,
+                    'dn' => 'unit:' . $unitCode,
+                    'http' => $apiU['http_code'] ?? null,
+                    'err' => (string) ($apiU['error'] ?? ''),
+                    'url' => (string) ($apiU['request_url'] ?? ''),
+                ];
+                if (!empty($apiU['success'])) {
+                    $api = $apiU;
+                    break;
+                }
+            }
+        }
+
+        if (empty($api) || empty($api['success'])) {
+            $api = $this->svc->cancelDispatch($dispatchNumber);
+        }
         if (empty($api['success'])) {
             $rawErr = (string) ($api['error'] ?? '');
             // fallback: containers antigos podem ter dispatch_number errado (retry NEG-118)
@@ -1048,7 +1073,6 @@ class AdminCorreiosMundialController extends Controller {
                 $candidateNumbers = [];
                 $candidateNumbers[] = $dispatchNumber;
 
-                $attemptLog = [];
                 $attemptLog[] = [
                     'amb' => 'config',
                     'dn' => $dispatchNumber,
@@ -1080,7 +1104,6 @@ class AdminCorreiosMundialController extends Controller {
                 $candidateNumbers = array_values(array_unique(array_filter(array_map('strval', $candidateNumbers))));
 
                 // fallback adicional: tentar nos dois ambientes (homologação/produção)
-                $ambientesTry = ['homologacao', 'producao'];
                 foreach ($ambientesTry as $ambTry) {
                     foreach ($candidateNumbers as $dnTry) {
                         if ($dnTry === '') continue;

@@ -241,6 +241,94 @@ class CorreiosPacketService {
         }
     }
 
+    public function cancelUnit(string $unitCode, ?string $ambienteOverride = null): array {
+        $cfg = $this->loadPacketConfig();
+        if ($ambienteOverride !== null && $ambienteOverride !== '') {
+            $cfg['ambiente'] = (string) $ambienteOverride;
+        }
+
+        $unitCode = trim((string) $unitCode);
+        if ($unitCode === '') {
+            return ['success' => false, 'error' => 'unitCode vazio.'];
+        }
+
+        if (empty($cfg['login']) || empty($cfg['password']) || empty($cfg['cartao_postagem'])) {
+            return ['success' => false, 'error' => 'Correios Mundial (PACKET) não configurado (login/senha/cartão de postagem).'];
+        }
+
+        $tokenResp = $this->getValidToken($cfg);
+        if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
+            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
+        }
+
+        $token = (string) $tokenResp['token'];
+        $baseUrl = $this->getPacketBaseUrl((string) ($cfg['ambiente'] ?? 'homologacao'));
+        $url = rtrim($baseUrl, '/') . '/v1/units/' . rawurlencode($unitCode);
+
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $token,
+        ];
+
+        $raw = null;
+        $httpCode = null;
+        try {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
+            curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            $raw = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if ($raw === false || $raw === null) {
+                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode, 'request_url' => $url];
+            }
+
+            $trim = trim((string) $raw);
+            if ($trim === '' && (int) $httpCode > 0 && (int) $httpCode < 400) {
+                return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => $raw];
+            }
+            if ($trim === '1') {
+                return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => 1];
+            }
+
+            $json = json_decode((string) $raw, true);
+            if (!is_array($json)) {
+                if ($json !== null && (string) $json === '1') {
+                    return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => $json];
+                }
+                if (is_int($httpCode) && $httpCode >= 400) {
+                    return ['success' => false, 'error' => 'Erro HTTP ' . $httpCode, 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+                }
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+            }
+
+            if (is_int($httpCode) && $httpCode >= 400) {
+                $msg = $this->extractErrorMessage($json);
+                if ($msg === '') {
+                    $msg = 'Erro HTTP ' . $httpCode;
+                }
+                return ['success' => false, 'error' => $msg, 'http_code' => $httpCode, 'raw' => $json, 'request_url' => $url];
+            }
+
+            if (isset($json['result']) && (string) $json['result'] === '1') {
+                return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => $json];
+            }
+
+            return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => $json];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+        }
+    }
+
     public function getBalance(): array {
         $cfg = $this->loadPacketConfig();
 
