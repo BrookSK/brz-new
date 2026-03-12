@@ -68,6 +68,10 @@ $router->post('/admin/pagamentos/salvar-configuracoes', 'AdminPagamentosControll
 // Clube - Recargas (checkout rápido)
 $router->get('/admin/clube/recargas', 'AdminClubeRecargasController', 'index');
 
+// Correios Mundial (PACKET)
+$router->get('/admin/correios-mundial', 'AdminCorreiosMundialController', 'index');
+$router->get('/admin/correios-mundial/balance', 'AdminCorreiosMundialController', 'balance');
+
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
 $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');

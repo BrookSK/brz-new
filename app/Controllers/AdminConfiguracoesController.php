@@ -1572,7 +1572,56 @@ class AdminConfiguracoesController extends Controller {
 
                                             <hr>
 
-                                            <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
+                                            <h6 class="mb-3">Correios Mundial (PACKET)</h6>
+
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Ambiente</label>
+                                                        <select class="form-select" name="entrega_correios_packet_ambiente">
+                                                            <option value="homologacao" ' . ($this->getConfigValue($config, 'entrega', 'correios_packet_ambiente', 'homologacao') === 'homologacao' ? 'selected' : '') . '>Homologação</option>
+                                                            <option value="producao" ' . ($this->getConfigValue($config, 'entrega', 'correios_packet_ambiente', '') === 'producao' ? 'selected' : '') . '>Produção</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-8"></div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Login</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_packet_login" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_packet_login', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Login PACKET">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Password</label>
+                                                        <div class="input-group">
+                                                            <input type="password" class="form-control" name="entrega_correios_packet_password" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_packet_password', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Password PACKET">
+                                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Cartão de postagem</label>
+                                                        <input type="text" class="form-control" name="entrega_correios_packet_cartao_postagem" value="' . htmlspecialchars((string) $this->getConfigValue($config, 'entrega', 'correios_packet_cartao_postagem', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Ex.: 0076772055">
+                                                        <small class="text-muted">Usado para autenticar e gerar o token do PACKET.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6"></div>
+                                            </div>
+                                                    
+                                    </div>
+                                </div>
+
+                                <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
 
                                             <div class="row">
                                                 <div class="col-md-6">
@@ -4210,7 +4259,7 @@ HTML;
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
-                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
+                'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'correios_packet_ambiente', 'correios_packet_login', 'correios_packet_password', 'correios_packet_cartao_postagem', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
                 'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'site_lock_password'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
