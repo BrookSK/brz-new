@@ -1042,9 +1042,31 @@ class AdminCorreiosMundialController extends Controller {
 
         $api = $this->svc->cancelDispatch($dispatchNumber);
         if (empty($api['success'])) {
-            $err = $this->packetFriendlyError((string) ($api['error'] ?? 'Falha ao cancelar despacho.'), $api['raw'] ?? null);
-            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode($err));
-            exit;
+            $rawErr = (string) ($api['error'] ?? '');
+            // fallback: containers antigos podem ter dispatch_number errado (retry NEG-118)
+            if (stripos($rawErr, 'NEG-124') !== false || stripos($rawErr, 'dispatch numbers not found') !== false) {
+                $lr = (string) ($row['last_request_json'] ?? '');
+                if ($lr !== '') {
+                    $jr = json_decode($lr, true);
+                    $dn2 = '';
+                    if (is_array($jr) && isset($jr['dispatchNumber'])) {
+                        $dn2 = trim((string) $jr['dispatchNumber']);
+                    }
+                    if ($dn2 !== '' && $dn2 !== $dispatchNumber) {
+                        $api2 = $this->svc->cancelDispatch($dn2);
+                        if (!empty($api2['success'])) {
+                            $dispatchNumber = $dn2;
+                            $api = $api2;
+                        }
+                    }
+                }
+            }
+
+            if (empty($api['success'])) {
+                $err = $this->packetFriendlyError((string) ($api['error'] ?? 'Falha ao cancelar despacho.'), $api['raw'] ?? null);
+                header('Location: /admin/correios-mundial/containers?error=' . rawurlencode($err));
+                exit;
+            }
         }
 
         try {
@@ -1387,6 +1409,9 @@ class AdminCorreiosMundialController extends Controller {
             header('Location: /admin/correios-mundial/containers/novo?error=' . rawurlencode($err) . '&bulk=' . rawurlencode($bulk));
             exit;
         }
+
+        // se houve retry por NEG-118, o dispatchNumber real pode ter sido incrementado
+        $dispatchNumber = (int) ($payload['dispatchNumber'] ?? $dispatchNumber);
 
         $unitCode = '';
         $raw = $apiResp['raw'] ?? null;
