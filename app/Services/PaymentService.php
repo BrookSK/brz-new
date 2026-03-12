@@ -105,7 +105,7 @@ class PaymentService {
         $auth = base64_encode((string) $this->cambioRealAppId . ':' . (string) $this->cambioRealAppSecret);
         $headers = [
             'Accept: application/json',
-            'Content-Type: application/json',
+            'Content-Type: application/json; charset=utf-8',
             'Authorization: Basic ' . $auth,
             'X-APP-ID: ' . (string) $this->cambioRealAppId,
             'X-APP-SECRET: ' . (string) $this->cambioRealAppSecret,
@@ -251,6 +251,10 @@ class PaymentService {
                 $masked = '***';
             }
             error_log('[CÂMBIOREAL] Cliente email (mask): ' . $masked);
+
+            $hex = bin2hex((string) $email);
+            $hexHead = substr($hex, 0, 60);
+            error_log('[CÂMBIOREAL] Cliente email bytes: len=' . strlen((string) $email) . ' hex_head=' . $hexHead);
         } catch (\Exception $e) {
         }
 
