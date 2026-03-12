@@ -734,6 +734,79 @@ class AdminCorreiosMundialController extends Controller {
         return '$ ' . number_format((float) $v, 2, '.', ',');
     }
 
+    private function cmFmtUsdNoSymbol($v): string {
+        if (!is_numeric($v)) return '';
+        return number_format((float) $v, 2, '.', ',');
+    }
+
+    private function code128Svg(string $text, int $barHeight = 55, int $module = 1): string {
+        $text = (string) $text;
+        if ($text === '') {
+            return '';
+        }
+
+        // Code128 patterns (modules) for values 0..106
+        $patterns = [
+            0=>'212222',1=>'222122',2=>'222221',3=>'121223',4=>'121322',5=>'131222',6=>'122213',7=>'122312',8=>'132212',9=>'221213',
+            10=>'221312',11=>'231212',12=>'112232',13=>'122132',14=>'122231',15=>'113222',16=>'123122',17=>'123221',18=>'223211',19=>'221132',
+            20=>'221231',21=>'213212',22=>'223112',23=>'312131',24=>'311222',25=>'321122',26=>'321221',27=>'312212',28=>'322112',29=>'322211',
+            30=>'212123',31=>'212321',32=>'232121',33=>'111323',34=>'131123',35=>'131321',36=>'112313',37=>'132113',38=>'132311',39=>'211313',
+            40=>'231113',41=>'231311',42=>'112133',43=>'112331',44=>'132131',45=>'113123',46=>'113321',47=>'133121',48=>'313121',49=>'211331',
+            50=>'231131',51=>'213113',52=>'213311',53=>'213131',54=>'311123',55=>'311321',56=>'331121',57=>'312113',58=>'312311',59=>'332111',
+            60=>'314111',61=>'221411',62=>'431111',63=>'111224',64=>'111422',65=>'121124',66=>'121421',67=>'141122',68=>'141221',69=>'112214',
+            70=>'112412',71=>'122114',72=>'122411',73=>'142112',74=>'142211',75=>'241211',76=>'221114',77=>'413111',78=>'241112',79=>'134111',
+            80=>'111242',81=>'121142',82=>'121241',83=>'114212',84=>'124112',85=>'124211',86=>'411212',87=>'421112',88=>'421211',89=>'212141',
+            90=>'214121',91=>'412121',92=>'111143',93=>'111341',94=>'131141',95=>'114113',96=>'114311',97=>'411113',98=>'411311',99=>'113141',
+            100=>'114131',101=>'311141',102=>'411131',103=>'211412',104=>'211214',105=>'211232',106=>'2331112'
+        ];
+
+        // Code Set B
+        $codes = [];
+        $start = 104; // Start B
+        $codes[] = $start;
+        $len = strlen($text);
+        for ($i = 0; $i < $len; $i++) {
+            $o = ord($text[$i]);
+            if ($o < 32 || $o > 126) {
+                $o = 32;
+            }
+            $codes[] = $o - 32;
+        }
+
+        $checksum = $start;
+        for ($i = 1; $i < count($codes); $i++) {
+            $checksum += $codes[$i] * $i;
+        }
+        $checksum = $checksum % 103;
+        $codes[] = $checksum;
+        $codes[] = 106; // Stop
+
+        $x = 0;
+        $bars = [];
+        foreach ($codes as $c) {
+            $p = $patterns[$c] ?? '';
+            if ($p === '') continue;
+            $isBar = true;
+            foreach (str_split($p) as $d) {
+                $w = ((int) $d) * $module;
+                if ($isBar) {
+                    $bars[] = [$x, $w];
+                }
+                $x += $w;
+                $isBar = !$isBar;
+            }
+        }
+        $wTotal = max(1, $x);
+
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' . $wTotal . '" height="' . (int) $barHeight . '" viewBox="0 0 ' . $wTotal . ' ' . (int) $barHeight . '">';
+        $svg .= '<rect width="100%" height="100%" fill="#fff" />';
+        foreach ($bars as $b) {
+            $svg .= '<rect x="' . (int) $b[0] . '" y="0" width="' . (int) $b[1] . '" height="' . (int) $barHeight . '" fill="#000" />';
+        }
+        $svg .= '</svg>';
+        return $svg;
+    }
+
     public function etiquetaPdf(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
@@ -806,103 +879,259 @@ class AdminCorreiosMundialController extends Controller {
         $freightPaidValue = $pkg['freightPaidValue'] ?? null;
         $insurancePaidValue = $pkg['insurancePaidValue'] ?? null;
 
+        $recipientZipDigits = preg_replace('/\D+/', '', (string) ($destinatario['recipientZipCode'] ?? ''));
+        $recipientZipPretty = $recipientZipDigits;
+        if (strlen($recipientZipDigits) === 8) {
+            $recipientZipPretty = substr($recipientZipDigits, 0, 5) . '-' . substr($recipientZipDigits, 5, 3);
+        }
+
         $safeTracking = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $tracking);
         if ($safeTracking === '') $safeTracking = 'tracking';
 
+        $barTrackingSvg = $this->code128Svg($tracking, 60, 1);
+        $barZipSvg = $recipientZipPretty !== '' ? $this->code128Svg($recipientZipPretty, 60, 1) : '';
+
+        $senderName = (string) ($sender['senderName'] ?? '');
+        $senderAddr = trim((string) ($sender['senderAddress'] ?? '') . ' ' . (string) ($sender['senderAddressNumber'] ?? ''));
+        $senderComp = trim((string) ($sender['senderAddressComplement'] ?? ''));
+        $senderCity = (string) ($sender['senderCityName'] ?? '');
+        $senderState = (string) ($sender['senderState'] ?? '');
+        $senderZip = (string) ($sender['senderZipCode'] ?? '');
+        $senderEmail = (string) ($sender['senderEmail'] ?? '');
+        $senderWeb = (string) ($sender['senderWebsite'] ?? '');
+
+        $destName = (string) ($destinatario['recipientName'] ?? '');
+        $destAddr = trim((string) ($destinatario['recipientAddress'] ?? '') . ', ' . (string) ($destinatario['recipientAddressNumber'] ?? ''));
+        $destComp = trim((string) ($destinatario['recipientAddressComplement'] ?? ''));
+        $destCity = (string) ($destinatario['recipientCityName'] ?? '');
+        $destState = (string) ($destinatario['recipientState'] ?? '');
+
+        $orderRef = $customerControlCode !== '' ? $customerControlCode : ('PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT));
+
+        $totalWeightKg = 0.0;
+        $pedidoItems = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
+        foreach ($pedidoItems as $pi) {
+            if (!is_array($pi)) continue;
+            $q = (int) ($pi['quantidade'] ?? 0);
+            if ($q <= 0) $q = 1;
+            $w = 0.0;
+            if (isset($pi['peso_kg']) && is_numeric($pi['peso_kg'])) {
+                $w = (float) $pi['peso_kg'];
+            }
+            if ($w > 0) {
+                $totalWeightKg += ($w * $q);
+            }
+        }
+        $totalWeightKg = round($totalWeightKg, 2);
+
+        $sumItems = 0.0;
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            $q = (int) ($it['quantity'] ?? 0);
+            if ($q <= 0) $q = 1;
+            $valUnit = (float) ($it['value'] ?? 0);
+            $sumItems += ($valUnit * $q);
+        }
+        $sumItems = round($sumItems, 2);
+        $freight = is_numeric($freightPaidValue) ? (float) $freightPaidValue : 0.0;
+        $insurance = is_numeric($insurancePaidValue) ? (float) $insurancePaidValue : 0.0;
+        $totalUsd = round($sumItems + $freight + $insurance, 2);
+
         $html = '<!doctype html><html><head><meta charset="utf-8">'
             . '<style>'
-            . 'body{font-family:DejaVu Sans,Arial,Helvetica,sans-serif;font-size:12px;color:#111;}'
-            . '.row{width:100%;clear:both;}'
-            . '.col{float:left;box-sizing:border-box;}'
-            . '.box{border:1px solid #000;padding:10px;margin-bottom:10px;}'
-            . '.h1{font-size:18px;font-weight:bold;margin:0 0 6px 0;}'
-            . '.h2{font-size:14px;font-weight:bold;margin:0 0 6px 0;}'
-            . '.muted{color:#444;font-size:11px;}'
-            . 'table{width:100%;border-collapse:collapse;}'
-            . 'th,td{border:1px solid #000;padding:5px;vertical-align:top;font-size:11px;}'
-            . 'th{background:#f3f3f3;}'
+            . '@page{margin:8mm 8mm 8mm 8mm;}'
+            . 'body{font-family:DejaVu Sans,Arial,Helvetica,sans-serif;color:#000;font-size:11px;}'
+            . '.page{page-break-after:always;}'
+            . '.page:last-child{page-break-after:auto;}'
+            . '.label{border:2px solid #000;padding:6px;}'
+            . '.topRow{width:100%;}'
+            . '.topLeft{float:left;width:50%;}'
+            . '.topRight{float:right;width:50%;text-align:right;}'
+            . '.clear{clear:both;}'
+            . '.bigTrack{font-size:22px;font-weight:bold;text-align:center;margin:4px 0;letter-spacing:1px;}'
+            . '.thin{font-size:10px;}'
+            . '.hr{border-top:2px solid #000;margin:4px 0;}'
+            . '.box{border:1px solid #000;}'
+            . '.boxTitle{background:#000;color:#fff;font-weight:bold;padding:3px 6px;font-size:12px;}'
+            . '.destBody{padding:6px;}'
+            . '.destLeft{width:55%;float:left;}'
+            . '.destRight{width:45%;float:right;text-align:center;}'
+            . '.zipBig{font-size:18px;font-weight:bold;margin-top:4px;}'
+            . '.infoGrid{width:100%;border-collapse:collapse;}'
+            . '.infoGrid td{border:1px solid #000;padding:4px;vertical-align:top;}'
+            . '.checkBox{display:inline-block;border:1px solid #000;width:10px;height:10px;line-height:10px;text-align:center;font-size:10px;margin-right:6px;}'
+            . '.table{width:100%;border-collapse:collapse;}'
+            . '.table th,.table td{border:1px solid #000;padding:4px;font-size:10px;}'
+            . '.table th{background:#f3f3f3;font-weight:bold;}'
+            . '.center{text-align:center;}'
+            . '.right{text-align:right;}'
             . '</style></head><body>';
 
-        $html .= '<div class="box">'
-            . '<div class="h1">Correios Mundial (PACKET) - Etiqueta</div>'
-            . '<div><strong>Tracking:</strong> ' . htmlspecialchars($tracking) . '</div>'
-            . ($customerControlCode !== '' ? '<div><strong>Customer Control Code:</strong> ' . htmlspecialchars($customerControlCode) . '</div>' : '')
-            . '<div class="muted">Pedido #' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT) . '</div>'
+        // Page 1: etiqueta
+        $html .= '<div class="page"><div class="label">';
+        $html .= '<div class="topRow">'
+            . '<div class="topLeft">'
+            . '<div style="font-size:16px;font-weight:bold;">Correios</div>'
+            . '<div class="thin"><strong>Order #:</strong> ' . htmlspecialchars($orderRef) . '<br><strong>DDU</strong></div>'
+            . '</div>'
+            . '<div class="topRight">'
+            . '<div style="font-size:16px;font-weight:bold;">PACKET STANDARD</div>'
+            . '<div class="thin">Contrato ' . htmlspecialchars((string) ($pkg['contractNumber'] ?? '')) . '</div>'
+            . '</div>'
+            . '<div class="clear"></div>'
             . '</div>';
 
-        $html .= '<div class="row">'
-            . '<div class="col" style="width:49%;margin-right:2%;">'
-            . '<div class="box">'
-            . '<div class="h2">Remetente</div>'
-            . '<div><strong>Nome:</strong> ' . htmlspecialchars((string) ($sender['senderName'] ?? '')) . '</div>'
-            . '<div><strong>Endereço:</strong> ' . htmlspecialchars((string) ($sender['senderAddress'] ?? '')) . ' ' . htmlspecialchars((string) ($sender['senderAddressNumber'] ?? '')) . '</div>'
-            . (!empty($sender['senderAddressComplement']) ? '<div><strong>Complemento:</strong> ' . htmlspecialchars((string) $sender['senderAddressComplement']) . '</div>' : '')
-            . '<div><strong>Cidade/UF:</strong> ' . htmlspecialchars((string) ($sender['senderCityName'] ?? '')) . ' / ' . htmlspecialchars((string) ($sender['senderState'] ?? '')) . '</div>'
-            . '<div><strong>CEP:</strong> ' . htmlspecialchars((string) ($sender['senderZipCode'] ?? '')) . '</div>'
-            . '<div><strong>País:</strong> ' . htmlspecialchars((string) ($sender['senderCountryCode'] ?? '')) . '</div>'
-            . (!empty($sender['senderEmail']) ? '<div><strong>E-mail:</strong> ' . htmlspecialchars((string) $sender['senderEmail']) . '</div>' : '')
-            . '</div></div>'
-            . '<div class="col" style="width:49%;">'
-            . '<div class="box">'
-            . '<div class="h2">Destinatário</div>'
-            . '<div><strong>Nome:</strong> ' . htmlspecialchars((string) ($destinatario['recipientName'] ?? '')) . '</div>'
-            . '<div><strong>Documento:</strong> ' . htmlspecialchars((string) ($destinatario['recipientDocumentType'] ?? '')) . ' ' . htmlspecialchars((string) ($destinatario['recipientDocumentNumber'] ?? '')) . '</div>'
-            . '<div><strong>Endereço:</strong> ' . htmlspecialchars((string) ($destinatario['recipientAddress'] ?? '')) . ' ' . htmlspecialchars((string) ($destinatario['recipientAddressNumber'] ?? '')) . '</div>'
-            . (!empty($destinatario['recipientAddressComplement']) ? '<div><strong>Complemento:</strong> ' . htmlspecialchars((string) $destinatario['recipientAddressComplement']) . '</div>' : '')
-            . '<div><strong>Cidade/UF:</strong> ' . htmlspecialchars((string) ($destinatario['recipientCityName'] ?? '')) . ' / ' . htmlspecialchars((string) ($destinatario['recipientState'] ?? '')) . '</div>'
-            . '<div><strong>CEP:</strong> ' . htmlspecialchars((string) ($destinatario['recipientZipCode'] ?? '')) . '</div>'
-            . '<div><strong>E-mail:</strong> ' . htmlspecialchars((string) ($destinatario['recipientEmail'] ?? '')) . '</div>'
-            . '<div><strong>Telefone:</strong> ' . htmlspecialchars((string) ($destinatario['recipientPhoneNumber'] ?? '')) . '</div>'
-            . '</div></div>'
-            . '</div>';
-
-        $html .= '<div class="box">'
-            . '<div class="h2">Dados do pacote</div>'
-            . '<table><tbody>'
-            . '<tr>'
-            . '<td><strong>Peso total (g)</strong><br>' . htmlspecialchars($totalWeight === null ? '-' : (string) $totalWeight) . '</td>'
-            . '<td><strong>Dimensões (cm)</strong><br>'
-            . htmlspecialchars($packagingLength === null ? '-' : (string) $packagingLength) . ' x '
-            . htmlspecialchars($packagingWidth === null ? '-' : (string) $packagingWidth) . ' x '
-            . htmlspecialchars($packagingHeight === null ? '-' : (string) $packagingHeight)
-            . '</td>'
-            . '<td><strong>Frete pago</strong><br>' . htmlspecialchars($freightPaidValue === null ? '-' : $this->cmFmtUsd($freightPaidValue)) . '</td>'
-            . '</tr>'
-            . '<tr>'
-            . '<td colspan="3"><strong>Seguro pago</strong><br>' . htmlspecialchars($insurancePaidValue === null ? '(vazio)' : $this->cmFmtUsd($insurancePaidValue)) . '</td>'
-            . '</tr>'
-            . '</tbody></table>'
-            . '</div>';
-
-        $html .= '<div class="box">'
-            . '<div class="h2">Items (Declaração)</div>';
-        if (empty($items)) {
-            $html .= '<div class="muted">Itens não disponíveis (request não salvo ou incompleto).</div>';
-        } else {
-            $html .= '<table><thead><tr>'
-                . '<th style="width:18%">HS</th>'
-                . '<th>Descrição</th>'
-                . '<th style="width:10%">Qtd</th>'
-                . '<th style="width:18%">Valor</th>'
-                . '</tr></thead><tbody>';
-            foreach ($items as $it) {
-                if (!is_array($it)) continue;
-                $hs = (string) ($it['hsCode'] ?? '');
-                $desc = (string) ($it['description'] ?? '');
-                $q = (string) ($it['quantity'] ?? '');
-                $val = $it['value'] ?? '';
-                $html .= '<tr>'
-                    . '<td>' . htmlspecialchars($hs) . '</td>'
-                    . '<td>' . htmlspecialchars($desc) . '</td>'
-                    . '<td>' . htmlspecialchars($q) . '</td>'
-                    . '<td>' . htmlspecialchars($this->cmFmtUsd($val)) . '</td>'
-                    . '</tr>';
-            }
-            $html .= '</tbody></table>';
+        $html .= '<div class="bigTrack">' . htmlspecialchars($tracking) . '</div>';
+        if ($barTrackingSvg !== '') {
+            $html .= '<div class="center">' . $barTrackingSvg . '</div>';
         }
-        $html .= '</div>';
+        $html .= '<div style="margin-top:2px;">'
+            . '<div style="float:left;width:50%;" class="thin">Recebedor:<br>Assinatura: ____________________</div>'
+            . '<div style="float:right;width:50%;" class="thin">Documento: ____________________</div>'
+            . '<div class="clear"></div>'
+            . '</div>';
 
-        $html .= '<div class="muted">Gerado em ' . date('d/m/Y H:i:s') . ' (PDF gerado localmente; a API PACKET não fornece PDF)</div>';
+        $html .= '<div class="hr"></div>';
+
+        $html .= '<div class="box">'
+            . '<div class="boxTitle">DESTINATÁRIO</div>'
+            . '<div class="destBody">'
+            . '<div class="destLeft">'
+            . '<div style="font-size:13px;font-weight:bold;">' . htmlspecialchars($destName) . '</div>'
+            . '<div>' . htmlspecialchars($destAddr) . '</div>'
+            . ($destComp !== '' ? '<div>' . htmlspecialchars($destComp) . '</div>' : '')
+            . '<div>' . htmlspecialchars($destCity) . '/' . htmlspecialchars($destState) . '</div>'
+            . '</div>'
+            . '<div class="destRight">'
+            . ($barZipSvg !== '' ? $barZipSvg : '')
+            . '<div class="zipBig">' . htmlspecialchars($recipientZipPretty) . '</div>'
+            . '</div>'
+            . '<div class="clear"></div>'
+            . '</div>'
+            . '</div>';
+
+        $html .= '<div style="margin-top:6px;" class="thin"><strong>Instrução do Remetente no caso de não nacionalização:</strong></div>';
+        $html .= '<div class="thin" style="margin-top:2px;"><span class="checkBox">x</span>Retorno à origem</div>';
+
+        $html .= '<table class="infoGrid" style="margin-top:6px;">'
+            . '<tr>'
+            . '<td style="width:55%;">'
+            . '<div class="thin"><strong>Dúvidas e reclamações:</strong><br>'
+            . htmlspecialchars($senderEmail) . '<br>'
+            . htmlspecialchars($senderWeb)
+            . '</div>'
+            . '</td>'
+            . '<td style="width:45%;">'
+            . '<div class="thin"><strong>Remetente:</strong><br>'
+            . htmlspecialchars($senderName) . '<br>'
+            . htmlspecialchars($senderAddr) . '<br>'
+            . ($senderComp !== '' ? htmlspecialchars($senderComp) . '<br>' : '')
+            . htmlspecialchars($senderCity) . ' ' . htmlspecialchars($senderState) . '<br>'
+            . htmlspecialchars($senderZip)
+            . '</div>'
+            . '</td>'
+            . '</tr>'
+            . '</table>';
+
+        $html .= '<div style="margin-top:6px;" class="box">'
+            . '<div class="boxTitle" style="background:#fff;color:#000;border-bottom:1px solid #000;">Declaração para Alfândega</div>'
+            . '<table class="table">'
+            . '<thead><tr>'
+            . '<th style="width:16%">Cod.SH</th>'
+            . '<th style="width:8%" class="center">Qtde</th>'
+            . '<th>Descrição do Conteúdo</th>'
+            . '<th style="width:12%" class="right">Peso KG</th>'
+            . '<th style="width:14%" class="right">Unit USD</th>'
+            . '<th style="width:14%" class="right">Valor USD</th>'
+            . '</tr></thead><tbody>';
+
+        $wPerLine = 0.0;
+        if ($totalWeightKg > 0 && count($items) > 0) {
+            $wPerLine = $totalWeightKg / count($items);
+        }
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            $hs = (string) ($it['hsCode'] ?? '');
+            $desc = (string) ($it['description'] ?? '');
+            $q = (int) ($it['quantity'] ?? 0);
+            if ($q <= 0) $q = 1;
+            $valUnit = (float) ($it['value'] ?? 0);
+            $line = $valUnit * $q;
+            $html .= '<tr>'
+                . '<td>' . htmlspecialchars($hs) . '</td>'
+                . '<td class="center">' . (int) $q . '</td>'
+                . '<td>' . htmlspecialchars($desc) . '</td>'
+                . '<td class="right">' . htmlspecialchars(number_format($wPerLine, 2, '.', ',')) . '</td>'
+                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($valUnit)) . '</td>'
+                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($line)) . '</td>'
+                . '</tr>';
+        }
+
+        $html .= '<tr><td colspan="5" class="right"><strong>Frete USD:</strong></td><td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($freight)) . '</td></tr>';
+        $html .= '<tr><td colspan="5" class="right"><strong>Seguro USD:</strong></td><td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($insurance)) . '</td></tr>';
+        $html .= '<tr><td colspan="5" class="right"><strong>Total USD (Mercadorias + Frete + Seguro):</strong></td><td class="right"><strong>' . htmlspecialchars($this->cmFmtUsdNoSymbol($totalUsd)) . '</strong></td></tr>';
+        $html .= '</tbody></table></div>';
+
+        $html .= '</div></div>';
+
+        // Page 2: AO REMETENTE
+        $html .= '<div class="page">'
+            . '<div class="label" style="padding:0;">'
+            . '<table class="table" style="border:2px solid #000;border-collapse:collapse;">'
+            . '<tr><th colspan="2" class="center" style="font-size:16px;background:#fff;">AO REMETENTE</th></tr>'
+            . '<tr><td style="height:36px;">MUDOU-SE</td><td style="width:25%;"></td></tr>'
+            . '<tr><td style="height:36px;">ENDEREÇO INSUFICIENTE</td><td></td></tr>'
+            . '<tr><td style="height:36px;">NÃO EXISTE O Nº INDICADO</td><td></td></tr>'
+            . '<tr><td style="height:36px;">FALECIDO</td><td></td></tr>'
+            . '<tr><td style="height:36px;">DESCONHECIDO</td><td></td></tr>'
+            . '<tr><td style="height:36px;">RECUSADO</td><td></td></tr>'
+            . '<tr><td style="height:36px;">AUSENTE</td><td></td></tr>'
+            . '<tr><td style="height:36px;">NÃO PROCURADO</td><td></td></tr>'
+            . '<tr><td style="height:36px;">OUTROS:</td><td></td></tr>'
+            . '<tr><td style="height:48px;">INFORMAÇÃO PRESTADA PELO<br>PORTEIRO OU SÍNDICO</td><td></td></tr>'
+            . '<tr><td style="height:48px;">REINTEGRADO AO SERVIÇO POSTAL<br>EM ____/____/________</td><td></td></tr>'
+            . '<tr><td style="height:48px;">DATA:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RUBRICA:</td><td></td></tr>'
+            . '</table>'
+            . '</div>'
+            . '</div>';
+
+        // Page 3: SUPPLEMENTARY/CUSTOMS DECLARATION
+        $html .= '<div class="page">'
+            . '<div class="label">'
+            . '<table class="table">'
+            . '<tr><th colspan="5" class="center" style="background:#fff;">SUPPLEMENTARY</th><th class="center" style="background:#fff;">' . htmlspecialchars($tracking) . '</th></tr>'
+            . '<tr><th colspan="6" class="center" style="background:#fff;">CUSTOMS DECLARATION</th></tr>'
+            . '<tr>'
+            . '<th style="width:16%">COD.SH</th>'
+            . '<th style="width:10%" class="center">QUANTITY</th>'
+            . '<th>DESCRIPTION</th>'
+            . '<th style="width:14%" class="right">WEIGHT (KG)</th>'
+            . '<th style="width:14%" class="right">UNI (US)</th>'
+            . '<th style="width:14%" class="right">VALUE (US)</th>'
+            . '</tr>';
+
+        $total3Value = 0.0;
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            $hs = (string) ($it['hsCode'] ?? '');
+            $desc = (string) ($it['description'] ?? '');
+            $q = (int) ($it['quantity'] ?? 0);
+            if ($q <= 0) $q = 1;
+            $valUnit = (float) ($it['value'] ?? 0);
+            $line = $valUnit * $q;
+            $total3Value += $line;
+            $html .= '<tr>'
+                . '<td>' . htmlspecialchars($hs) . '</td>'
+                . '<td class="center">' . (int) $q . '</td>'
+                . '<td>' . htmlspecialchars($desc) . '</td>'
+                . '<td class="right">' . htmlspecialchars(number_format($wPerLine, 2, '.', ',')) . '</td>'
+                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($valUnit)) . '</td>'
+                . '<td class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($line)) . '</td>'
+                . '</tr>';
+        }
+        $html .= '<tr><th class="right" colspan="3">TOTAL</th><th class="right">' . htmlspecialchars(number_format($totalWeightKg, 2, '.', ',')) . '</th><th></th><th class="right">' . htmlspecialchars($this->cmFmtUsdNoSymbol($total3Value)) . '</th></tr>';
+        $html .= '</table></div></div>';
+
         $html .= '</body></html>';
 
         $options = new Options();
