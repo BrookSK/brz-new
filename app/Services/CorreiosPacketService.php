@@ -200,12 +200,20 @@ class CorreiosPacketService {
             }
 
             $trim = trim((string) $raw);
+            if ($trim === '' && (int) $httpCode > 0 && (int) $httpCode < 400) {
+                // Algumas implementações retornam 204/200 sem body
+                return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => $raw];
+            }
             if ($trim === '1') {
                 return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => 1];
             }
 
             $json = json_decode((string) $raw, true);
             if (!is_array($json)) {
+                // Pode vir como JSON escalar: "1"
+                if ($json !== null && (string) $json === '1') {
+                    return ['success' => true, 'http_code' => $httpCode, 'request_url' => $url, 'raw' => $json];
+                }
                 if (is_int($httpCode) && $httpCode >= 400) {
                     return ['success' => false, 'error' => 'Erro HTTP ' . $httpCode, 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
                 }
