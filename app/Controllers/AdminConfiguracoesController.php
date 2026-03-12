@@ -5765,6 +5765,32 @@ HTML;
         ob_start();
         ?>
         <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            try {
+                var btn = document.getElementById('v-pills-pagamentos-tab');
+                var pane = document.getElementById('v-pills-pagamentos');
+                if (!btn || !pane) {
+                    return;
+                }
+                btn.addEventListener('click', function(){
+                    try {
+                        var panes = document.querySelectorAll('#v-pills-tabContent .tab-pane');
+                        panes.forEach(function(p){
+                            p.classList.remove('active');
+                            p.classList.remove('show');
+                        });
+                        var links = document.querySelectorAll('#v-pills-tab .nav-link');
+                        links.forEach(function(l){
+                            l.classList.remove('active');
+                        });
+                        btn.classList.add('active');
+                        pane.classList.add('active');
+                        pane.classList.add('show');
+                    } catch (e) {}
+                });
+            } catch (e) {}
+        });
+
         function togglePasswordVisibility(button) {
             const input = button.previousElementSibling;
             const icon = button.querySelector('i');
