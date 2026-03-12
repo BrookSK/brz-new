@@ -270,9 +270,33 @@ class CorreiosPacketService {
                 return ['success' => false, 'error' => $msg, 'http_code' => $httpCode, 'raw' => $json, 'request_url' => $url];
             }
 
+            $currentBalance = null;
+            foreach (['currentBalance', 'balance', 'saldo', 'available', 'availableBalance', 'trackingNumbersBalance'] as $k) {
+                if (array_key_exists($k, $json) && (is_numeric($json[$k]) || is_string($json[$k]))) {
+                    $v = $json[$k];
+                    if (is_numeric($v)) {
+                        $currentBalance = (float) $v;
+                        break;
+                    }
+                    $sv = trim((string) $v);
+                    if ($sv !== '' && is_numeric(str_replace(',', '.', preg_replace('/[^0-9,\.\-]/', '', $sv)))) {
+                        $currentBalance = (float) str_replace(',', '.', preg_replace('/[^0-9,\.\-]/', '', $sv));
+                        break;
+                    }
+                }
+            }
+            if ($currentBalance === null) {
+                foreach ($json as $v) {
+                    if (is_numeric($v)) {
+                        $currentBalance = (float) $v;
+                        break;
+                    }
+                }
+            }
+
             return [
                 'success' => true,
-                'currentBalance' => $json['currentBalance'] ?? null,
+                'currentBalance' => $currentBalance,
                 'raw' => $json,
                 'http_code' => $httpCode,
                 'request_url' => $url,
