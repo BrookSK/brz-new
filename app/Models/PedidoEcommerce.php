@@ -1309,7 +1309,7 @@ class PedidoEcommerce {
             }
 
             // Cliente: preencher campos esperados pela conclusão
-            if (empty($pedido['cliente_nome']) || empty($pedido['cliente_email']) || empty($pedido['cliente_telefone'])) {
+            if (empty($pedido['cliente_nome']) || empty($pedido['cliente_email']) || empty($pedido['cliente_telefone']) || empty($pedido['cliente_cpf_cnpj'])) {
                 $uid = (int) ($pedido['usuario_id'] ?? 0);
                 if ($uid > 0 && $this->tableExists('usuarios')) {
                     try {
@@ -1317,11 +1317,13 @@ class PedidoEcommerce {
                         $colNome = $this->pickColumn($colsU, ['nome', 'name', 'full_name']);
                         $colEmail = $this->pickColumn($colsU, ['email']);
                         $colTel = $this->pickColumn($colsU, ['telefone', 'phone', 'celular', 'mobile', 'whatsapp']);
+                        $colDoc = $this->pickColumn($colsU, ['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf', 'cnpj']);
                         $colSuite = $this->pickColumn($colsU, ['suite']);
                         $sel = ['id'];
                         if ($colNome) $sel[] = $colNome . ' AS nome';
                         if ($colEmail) $sel[] = $colEmail . ' AS email';
                         if ($colTel) $sel[] = $colTel . ' AS telefone';
+                        if ($colDoc) $sel[] = $colDoc . ' AS documento';
                         if ($colSuite) $sel[] = $colSuite . ' AS suite';
                         $stU = $this->connection->prepare('SELECT ' . implode(', ', $sel) . ' FROM usuarios WHERE id = ? LIMIT 1');
                         $stU->execute([$uid]);
@@ -1334,6 +1336,9 @@ class PedidoEcommerce {
                         }
                         if (empty($pedido['cliente_telefone']) && !empty($rowU['telefone'])) {
                             $pedido['cliente_telefone'] = $rowU['telefone'];
+                        }
+                        if (empty($pedido['cliente_cpf_cnpj']) && !empty($rowU['documento'])) {
+                            $pedido['cliente_cpf_cnpj'] = $rowU['documento'];
                         }
                         if (empty($pedido['cliente_suite']) && !empty($rowU['suite'])) {
                             $pedido['cliente_suite'] = $rowU['suite'];

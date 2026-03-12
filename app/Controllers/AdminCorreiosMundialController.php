@@ -75,6 +75,36 @@ class AdminCorreiosMundialController extends Controller {
         if ($destDoc === '' && isset($pedido['cliente']) && is_array($pedido['cliente'])) {
             $destDoc = $this->pickFirstNonEmpty((array) $pedido['cliente'], ['cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
         }
+        if ($destDoc === '') {
+            $uid = (int) ($pedido['usuario_id'] ?? 0);
+            if ($uid > 0 && $this->tableExists('usuarios')) {
+                try {
+                    $colsU = [];
+                    try {
+                        $stCols = $this->connection->query('DESCRIBE usuarios');
+                        $colsU = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsU = [];
+                    }
+
+                    $docCol = null;
+                    foreach (['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf', 'cnpj'] as $c) {
+                        if (in_array($c, $colsU, true)) {
+                            $docCol = $c;
+                            break;
+                        }
+                    }
+
+                    if ($docCol) {
+                        $stU = $this->connection->prepare('SELECT ' . $docCol . ' AS documento FROM usuarios WHERE id = ? LIMIT 1');
+                        $stU->execute([$uid]);
+                        $rowU = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $destDoc = (string) ($rowU['documento'] ?? '');
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+        }
         $destDocDigits = $this->onlyDigits($destDoc);
 
         $docType = 'CPF';
