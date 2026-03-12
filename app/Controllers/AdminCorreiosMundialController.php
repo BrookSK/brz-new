@@ -1005,6 +1005,121 @@ class AdminCorreiosMundialController extends Controller {
         ]);
     }
 
+    public function containerCancelar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $id = (int) ($request->getParam('id') ?? 0);
+        if ($id <= 0) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('ID inválido.'));
+            exit;
+        }
+
+        $this->ensurePacketContainersTable();
+        if (!$this->tableExists('correios_packet_containers')) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Tabela correios_packet_containers não encontrada.'));
+            exit;
+        }
+
+        $row = null;
+        try {
+            $st = $this->connection->prepare('SELECT * FROM correios_packet_containers WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $row = null;
+        }
+        if (!is_array($row)) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Container não encontrado.'));
+            exit;
+        }
+
+        $dispatchNumber = trim((string) ($row['dispatch_number'] ?? ''));
+        if ($dispatchNumber === '') {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('dispatchNumber não encontrado no container.'));
+            exit;
+        }
+
+        $api = $this->svc->cancelDispatch($dispatchNumber);
+        if (empty($api['success'])) {
+            $err = $this->packetFriendlyError((string) ($api['error'] ?? 'Falha ao cancelar despacho.'), $api['raw'] ?? null);
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode($err));
+            exit;
+        }
+
+        try {
+            $stUp = $this->connection->prepare('UPDATE correios_packet_containers SET status = ?, last_response_json = ?, last_http_code = ?, updated_at = NOW() WHERE id = ?');
+            $stUp->execute([
+                'cancelled',
+                json_encode($api['raw'] ?? null),
+                $api['http_code'] ?? null,
+                $id,
+            ]);
+        } catch (\Exception $e) {
+        }
+
+        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode('Despacho cancelado. Agora você pode deletar o container para liberar os pacotes.'));
+        exit;
+    }
+
+    public function containerDeletar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $id = (int) ($request->getParam('id') ?? 0);
+        if ($id <= 0) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('ID inválido.'));
+            exit;
+        }
+
+        $this->ensurePacketContainersTable();
+        if (!$this->tableExists('correios_packet_containers')) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Tabela correios_packet_containers não encontrada.'));
+            exit;
+        }
+
+        $row = null;
+        try {
+            $st = $this->connection->prepare('SELECT id, status, unit_code FROM correios_packet_containers WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $row = null;
+        }
+        if (!is_array($row)) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Container não encontrado.'));
+            exit;
+        }
+
+        $status = strtolower(trim((string) ($row['status'] ?? '')));
+        if ($status !== 'cancelled') {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Para deletar, primeiro cancele o despacho deste container.'));
+            exit;
+        }
+
+        // libera pacotes
+        if ($this->tableExists('correios_packet_etiquetas')) {
+            try {
+                $stRel = $this->connection->prepare('UPDATE correios_packet_etiquetas SET container_id = NULL WHERE container_id = ?');
+                $stRel->execute([$id]);
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            $stDel = $this->connection->prepare('DELETE FROM correios_packet_containers WHERE id = ? LIMIT 1');
+            $stDel->execute([$id]);
+        } catch (\Exception $e) {
+            header('Location: /admin/correios-mundial/containers?error=' . rawurlencode('Falha ao deletar container.'));
+            exit;
+        }
+
+        $unitCode = (string) ($row['unit_code'] ?? '');
+        $msg = $unitCode !== '' ? ('Container deletado: ' . $unitCode) : 'Container deletado.';
+        header('Location: /admin/correios-mundial/containers?success=' . rawurlencode($msg));
+        exit;
+    }
+
     public function containerNovo(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
@@ -1417,9 +1532,11 @@ class AdminCorreiosMundialController extends Controller {
             . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
             . '<title>Etiqueta (Unitizador) - ' . htmlspecialchars($unitCode) . '</title>'
             . '<style>'
-            . '@page { margin: 0px; width: 220mm; height: 110mm; }'
-            . 'body { font-family: Arial, sans-serif; font-size: 8pt; padding: 4mm; }'
-            . 'table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }'
+            . '@page { margin: 0px; }'
+            . 'body { font-family: Arial, sans-serif; font-size: 8pt; margin: 0; padding: 0; }'
+            . '.sheet { width: 220mm; height: 110mm; padding: 4mm; box-sizing: border-box; overflow: hidden; }'
+            . 'table { width: 100%; border-collapse: collapse; margin: 0; page-break-inside: avoid; }'
+            . 'tr, td { page-break-inside: avoid; }'
             . 'td { padding: 5px; border: 1px solid #000; vertical-align: top; }'
             . 'p { margin: 0; }'
             . '.bold { font-weight: bold; }'
@@ -1438,6 +1555,8 @@ class AdminCorreiosMundialController extends Controller {
             . '.group .right p { padding: 15px 60px; font-size: 20pt; color: white; background-color: black; }'
             . '</style>'
             . '</head><body>';
+
+        $html .= '<div class="sheet">';
 
         $html .= '<table>'
             . '<tr>'
@@ -1484,7 +1603,7 @@ class AdminCorreiosMundialController extends Controller {
             . '<tr><td><p class="bold">Service</p><p>DDU</p></td></tr>'
             . '</table>';
 
-        $html .= '</body></html>';
+        $html .= '</div></body></html>';
 
         $options = new Options();
         $options->set('isRemoteEnabled', false);

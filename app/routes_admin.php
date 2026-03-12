@@ -78,6 +78,8 @@ $router->post('/admin/correios-mundial/pedido/{id}/gerar-etiqueta', 'AdminCorrei
 $router->get('/admin/correios-mundial/containers', 'AdminCorreiosMundialController', 'containers');
 $router->get('/admin/correios-mundial/containers/novo', 'AdminCorreiosMundialController', 'containerNovo');
 $router->post('/admin/correios-mundial/containers/criar', 'AdminCorreiosMundialController', 'containerCriar');
+$router->post('/admin/correios-mundial/container/{id}/cancelar', 'AdminCorreiosMundialController', 'containerCancelar');
+$router->post('/admin/correios-mundial/container/{id}/deletar', 'AdminCorreiosMundialController', 'containerDeletar');
 $router->get('/admin/correios-mundial/container/{id}.pdf', 'AdminCorreiosMundialController', 'containerPdf');
 
 // Download PDF da etiqueta (gerada localmente)

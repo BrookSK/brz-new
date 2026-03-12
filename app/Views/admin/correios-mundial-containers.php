@@ -26,28 +26,44 @@
                             <th>ID</th>
                             <th>Remessa</th>
                             <th>Unit Code</th>
+                            <th>Status</th>
                             <th>Qtd pacotes</th>
                             <th>PDF</th>
+                            <th>Ações</th>
                             <th>Data</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $containers = isset($containers) && is_array($containers) ? $containers : []; ?>
                         <?php if (empty($containers)): ?>
-                            <tr><td colspan="6" class="text-muted">Nenhum container criado.</td></tr>
+                            <tr><td colspan="8" class="text-muted">Nenhum container criado.</td></tr>
                         <?php else: ?>
                             <?php foreach ($containers as $c): ?>
                                 <?php $cid = (int) ($c['id'] ?? 0); ?>
                                 <?php $unitCode = (string) ($c['unit_code'] ?? ''); ?>
                                 <?php $dispatchNumber = (string) ($c['dispatch_number'] ?? ''); ?>
+                                <?php $status = strtolower(trim((string) ($c['status'] ?? ''))); ?>
                                 <tr>
                                     <td>#<?= $cid ?></td>
                                     <td><?= htmlspecialchars($dispatchNumber) ?></td>
                                     <td><?= htmlspecialchars($unitCode) ?></td>
+                                    <td><?= htmlspecialchars($status !== '' ? $status : '-') ?></td>
                                     <td><?= (int) ($c['packages_count'] ?? 0) ?></td>
                                     <td>
                                         <?php if ($cid > 0): ?>
                                             <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/container/<?= $cid ?>.pdf" target="_blank">PDF</a>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($cid > 0): ?>
+                                            <form method="post" action="/admin/correios-mundial/container/<?= $cid ?>/cancelar" style="display:inline-block" onsubmit="return confirm('Cancelar o despacho (dispatch) deste container?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning" <?= $status === 'cancelled' ? 'disabled' : '' ?>>Cancelar</button>
+                                            </form>
+                                            <form method="post" action="/admin/correios-mundial/container/<?= $cid ?>/deletar" style="display:inline-block" onsubmit="return confirm('Deletar o container? Isso vai liberar os pacotes para uso em outro container.');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" <?= $status === 'cancelled' ? '' : 'disabled' ?>>Deletar</button>
+                                            </form>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
