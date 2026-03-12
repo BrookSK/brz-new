@@ -226,6 +226,55 @@ class PaymentService {
             $resp = $this->cambioRealRequest('POST', '/service/v1/checkout/request', $payload);
             $data = is_array($resp['data'] ?? null) ? $resp['data'] : [];
 
+            // Alguns retornos do Câmbio Real vêm como erro lógico (status/message/errors) mesmo com HTTP 200.
+            // Nesse caso, não há token/checkout e precisamos mostrar a mensagem real.
+            try {
+                $hasLogicalError = false;
+                if (is_array($resp) && (isset($resp['errors']) || isset($resp['error']) || isset($resp['message']))) {
+                    if (!isset($resp['data'])) {
+                        $hasLogicalError = true;
+                    }
+                }
+                if ($hasLogicalError) {
+                    $msg = '';
+                    if (!empty($resp['message']) && is_string($resp['message'])) {
+                        $msg = (string) $resp['message'];
+                    }
+                    if ($msg === '' && !empty($resp['error']) && is_string($resp['error'])) {
+                        $msg = (string) $resp['error'];
+                    }
+
+                    $errDetails = '';
+                    if (!empty($resp['errors']) && is_array($resp['errors'])) {
+                        $first = reset($resp['errors']);
+                        if (is_string($first)) {
+                            $errDetails = $first;
+                        } elseif (is_array($first) && !empty($first['message']) && is_string($first['message'])) {
+                            $errDetails = (string) $first['message'];
+                        }
+                    }
+                    $full = trim($msg . ($errDetails !== '' ? (' - ' . $errDetails) : ''));
+                    if ($full === '') {
+                        $full = 'Falha ao criar checkout no Câmbio Real.';
+                    }
+
+                    try {
+                        error_log('[CÂMBIOREAL] Erro lógico em checkout/request: ' . json_encode([
+                            'status' => $resp['status'] ?? null,
+                            'message' => $resp['message'] ?? null,
+                            'errors_keys' => is_array($resp['errors'] ?? null) ? array_keys($resp['errors']) : null,
+                        ], JSON_UNESCAPED_UNICODE));
+                    } catch (\Exception $e) {
+                    }
+
+                    return [
+                        'success' => false,
+                        'error' => 'Câmbio Real: ' . $full,
+                    ];
+                }
+            } catch (\Exception $e) {
+            }
+
             $token = '';
             foreach (['token', 'checkout_token', 'checkoutToken', 'id'] as $k) {
                 if ($token === '' && !empty($data[$k]) && is_string($data[$k])) {
@@ -266,6 +315,31 @@ class PaymentService {
             $id = (string) (($data['id'] ?? '') !== '' ? ($data['id'] ?? '') : ($resp['id'] ?? ''));
 
             if ($token === '' || $checkoutUrl === '') {
+                // Se o gateway retornou 'message/errors', isso é mais útil do que "resposta inválida".
+                try {
+                    $msg = '';
+                    if (!empty($resp['message']) && is_string($resp['message'])) {
+                        $msg = (string) $resp['message'];
+                    }
+                    $errDetails = '';
+                    if (!empty($resp['errors']) && is_array($resp['errors'])) {
+                        $first = reset($resp['errors']);
+                        if (is_string($first)) {
+                            $errDetails = (string) $first;
+                        } elseif (is_array($first) && !empty($first['message']) && is_string($first['message'])) {
+                            $errDetails = (string) $first['message'];
+                        }
+                    }
+                    $full = trim($msg . ($errDetails !== '' ? (' - ' . $errDetails) : ''));
+                    if ($full !== '') {
+                        return [
+                            'success' => false,
+                            'error' => 'Câmbio Real: ' . $full,
+                        ];
+                    }
+                } catch (\Exception $e) {
+                }
+
                 $respKeys = [];
                 $dataKeys = [];
                 try {
