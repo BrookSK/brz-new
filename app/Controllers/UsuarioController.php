@@ -718,9 +718,16 @@ class UsuarioController extends Controller {
                     }
                     
                 } catch (\Exception $e) {
-                    $_SESSION['message'] = 'Erro ao atualizar dados: ' . $e->getMessage();
+                    $msg = (string) $e->getMessage();
+                    if (stripos($msg, 'Duplicate entry') !== false && stripos($msg, 'documento') !== false) {
+                        $_SESSION['message'] = 'Não foi possível salvar: este CPF/CNPJ já está cadastrado em outra conta.';
+                    } elseif (stripos($msg, 'Duplicate entry') !== false && stripos($msg, 'email') !== false) {
+                        $_SESSION['message'] = 'Não foi possível salvar: este e-mail já está cadastrado em outra conta.';
+                    } else {
+                        $_SESSION['message'] = 'Não foi possível atualizar seus dados agora. Tente novamente em alguns minutos.';
+                    }
                     $_SESSION['message_type'] = 'danger';
-                    error_log('Erro em meusDados: ' . $e->getMessage());
+                    error_log('Erro em meusDados: ' . $msg);
                 }
                 
                 $this->redirect('/meus-dados');
