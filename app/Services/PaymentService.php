@@ -206,6 +206,12 @@ class PaymentService {
         $email = trim((string) $email);
         // remove espaços internos que às vezes vêm de autocomplete/cópia
         $email = preg_replace('/\s+/', '', $email);
+        // remove caracteres invisíveis/controle que podem passar pelo trim
+        $email = preg_replace('/[\x00-\x1F\x7F]/', '', $email);
+        $email = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $email);
+        $email = strtolower($email);
+        // força um subset seguro de caracteres (evita unicode estranho em domínio/local-part)
+        $email = preg_replace('/[^a-z0-9_\-\.\+@]/', '', $email);
         if ($email === '') {
             return ['success' => false, 'error' => 'Câmbio Real: e-mail do cliente é obrigatório. Verifique o campo E-mail.'];
         }
@@ -258,6 +264,8 @@ class PaymentService {
                 'name' => $nome,
                 'email' => $email,
                 'phone_number' => $phone,
+                'phone1' => $phone,
+                'email_address' => $email,
             ],
             'duplicate' => 0,
             'take_rates' => 0,
