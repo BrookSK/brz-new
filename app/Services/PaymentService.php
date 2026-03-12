@@ -259,21 +259,53 @@ class PaymentService {
         }
 
         $phone = trim((string) $phone);
-        if ($phone !== '') {
-            $phone = preg_replace('/\D+/', '', $phone);
+        $phoneDigits = $phone;
+        if ($phoneDigits !== '') {
+            $phoneDigits = preg_replace('/\D+/', '', $phoneDigits);
+        }
+        $phoneE164 = '';
+        if ($phoneDigits !== '') {
+            // Tenta padronizar para +E164 (melhor compatibilidade com validações do gateway)
+            if (strpos($phoneDigits, '55') === 0) {
+                $phoneE164 = '+' . $phoneDigits;
+            } elseif (strlen($phoneDigits) >= 10) {
+                $phoneE164 = '+55' . $phoneDigits;
+            }
+        }
+
+        // Alguns ambientes exigem telefone válido; sem isso a API pode retornar mensagens genéricas.
+        if ($phoneDigits === '' || strlen($phoneDigits) < 10) {
+            return ['success' => false, 'error' => 'Câmbio Real: telefone do cliente inválido. Verifique o campo Telefone.'];
+        }
+
+        $cpf = '';
+        try {
+            $cpf = (string) ($customer['cpf'] ?? ($customer['documento'] ?? ($customer['cpfCnpj'] ?? '')));
+            $cpf = preg_replace('/\D+/', '', $cpf);
+        } catch (\Exception $e) {
+            $cpf = '';
+        }
+
+        $client = [
+            'name' => $nome,
+            'email' => $email,
+            'email_address' => $email,
+        ];
+
+        // Alguns ambientes validam phone no formato internacional.
+        $client['phone_number'] = $phoneE164 !== '' ? $phoneE164 : $phoneDigits;
+        $client['phone1'] = $phoneE164 !== '' ? $phoneE164 : $phoneDigits;
+
+        // Conforme documentação do gateway, pode ser exigido em algumas contas.
+        if ($cpf !== '') {
+            $client['cpf'] = $cpf;
         }
 
         $payload = [
             'order_id' => (string) ($pedidoId . '-produto'),
             'amount' => round($valorBrl, 2),
             'currency' => 'BRL',
-            'client' => [
-                'name' => $nome,
-                'email' => $email,
-                'phone_number' => $phone,
-                'phone1' => $phone,
-                'email_address' => $email,
-            ],
+            'client' => $client,
             'duplicate' => 0,
             'take_rates' => 0,
             'url_callback' => (string) $successUrl,
