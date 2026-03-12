@@ -589,6 +589,7 @@
                                                 <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                                 <option value="carteira"><?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?></option>
                                                 <option value="cartao_credito"><?= __('checkout.payment.credit_card', 'Cartão de Crédito') ?></option>
+                                                <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
                                                 <option value="boleto"><?= __('checkout.payment.boleto', 'Boleto Bancário') ?></option>
                                                 <option value="pix">PIX</option>
                                             </select>

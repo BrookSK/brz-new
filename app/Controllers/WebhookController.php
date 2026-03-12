@@ -26,6 +26,26 @@ class WebhookController extends Controller {
         }
     }
 
+    public function cambioreal(Request $request) {
+        // CambioReal envia x-www-form-urlencoded por padrão
+        $payload = [];
+        try {
+            $payload = $request->getParams();
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+        } catch (\Exception $e) {
+            $payload = [];
+        }
+
+        try {
+            $result = $this->paymentService->processarWebhookCambioReal($payload);
+            $this->json(['success' => true, 'result' => $result]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function asaas(Request $request) {
         $raw = file_get_contents('php://input');
         $payload = json_decode((string) $raw, true);

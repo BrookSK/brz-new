@@ -184,6 +184,31 @@ class AdminPagamentosController extends Controller {
             $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
             $stmt->execute();
             $pagamentos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Carregar split (pedido_pagamentos) para exibição do "quanto foi para cada conta"
+            $splitPorPedido = [];
+            try {
+                $ids = [];
+                foreach ($pagamentos as $p) {
+                    $pid = (int) ($p['id'] ?? 0);
+                    if ($pid > 0) $ids[] = $pid;
+                }
+                $ids = array_values(array_unique($ids));
+                if (!empty($ids)) {
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $stSplit = $pdo->prepare('SELECT pedido_id, componente, gateway, metodo, moeda, valor, status FROM pedido_pagamentos WHERE pedido_id IN (' . $placeholders . ') ORDER BY pedido_id ASC, id ASC');
+                    $stSplit->execute($ids);
+                    $rowsSplit = $stSplit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rowsSplit as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        if (!isset($splitPorPedido[$pid])) $splitPorPedido[$pid] = [];
+                        $splitPorPedido[$pid][] = $r;
+                    }
+                }
+            } catch (\Exception $e) {
+                $splitPorPedido = [];
+            }
             
             $sqlTotal = "SELECT COUNT(*) as total FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
             $paramsTotal = [];
@@ -378,6 +403,8 @@ class AdminPagamentosController extends Controller {
                             <option value="">Todos gateways</option>
                             <option value="stripe" ' . ($gateway === 'stripe' ? 'selected' : '') . '>Stripe</option>
                             <option value="appmax" ' . ($gateway === 'appmax' ? 'selected' : '') . '>AppMax</option>
+                            <option value="cambioreal" ' . ($gateway === 'cambioreal' ? 'selected' : '') . '>Câmbio Real</option>
+                            <option value="split" ' . ($gateway === 'split' ? 'selected' : '') . '>Split</option>
                             <option value="carteira" ' . ($gateway === 'carteira' ? 'selected' : '') . '>Carteira</option>
                         </select>
                     </div>
@@ -397,6 +424,30 @@ class AdminPagamentosController extends Controller {
                         $valorRow = (float) $pagamento['valor_total_calc'];
                     } elseif (isset($pagamento['valor_total'])) {
                         $valorRow = (float) $pagamento['valor_total'];
+                    }
+
+                    $splitRows = $splitPorPedido[$pedidoIdRow] ?? [];
+                    $splitResumoHtml = '';
+                    if (is_array($splitRows) && !empty($splitRows)) {
+                        $sumByGateway = [];
+                        foreach ($splitRows as $sr) {
+                            $g = strtolower(trim((string) ($sr['gateway'] ?? '')));
+                            if ($g === '') continue;
+                            $v = (float) ($sr['valor'] ?? 0);
+                            if (!isset($sumByGateway[$g])) $sumByGateway[$g] = 0.0;
+                            $sumByGateway[$g] += $v;
+                        }
+                        $parts = [];
+                        foreach ($sumByGateway as $g => $v) {
+                            $label = strtoupper($g);
+                            if ($g === 'cambioreal') $label = 'Câmbio Real';
+                            if ($g === 'appmax') $label = 'AppMax';
+                            if ($g === 'stripe') $label = 'Stripe';
+                            $parts[] = '<span class="badge bg-light text-dark" style="border:1px solid #e5e7eb;">' . htmlspecialchars($label) . ': <strong>R$ ' . number_format((float) $v, 2, ',', '.') . '</strong></span>';
+                        }
+                        if (!empty($parts)) {
+                            $splitResumoHtml = '<div class="mt-2 d-flex flex-wrap gap-2">' . implode(' ', $parts) . '</div>';
+                        }
                     }
 
                     $statusBadge = 'Pendente';
@@ -427,6 +478,7 @@ class AdminPagamentosController extends Controller {
                                     <small class="text-muted">Transação: ' . htmlspecialchars((string) ($pagamento['codigo_transacao'] ?? 'N/A')) . '</small><br>
                                     <strong>Valor: R$ ' . number_format($valorRow, 2, ',', '.') . '</strong>
                                 </p>
+                                ' . $splitResumoHtml . '
                                 <div class="d-flex flex-wrap gap-2">
                                     <a href="/admin/pedidos/detalhes/' . $pedidoIdRow . '" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-eye"></i> Ver Pedido
@@ -1377,6 +1429,10 @@ class AdminPagamentosController extends Controller {
                 'stripe_secret_key',
                 'stripe_webhook_secret',
                 'stripe_enabled',
+                'cambioreal_enabled',
+                'cambioreal_app_id',
+                'cambioreal_app_secret',
+                'cambioreal_base_url',
                 'mercadopago_access_token',
                 'mercadopago_public_key',
                 'mercadopago_client_id',
@@ -1494,6 +1550,32 @@ class AdminPagamentosController extends Controller {
                                 </div>
                             </div>
                         </div>
+
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Câmbio Real</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Base URL</label>
+                                        <input type="text" class="form-control" name="cambioreal_base_url" value="' . htmlspecialchars($config['cambioreal_base_url'] ?? '') . '" placeholder="https://sandbox.cambioreal.com">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">APP ID</label>
+                                        <input type="text" class="form-control" name="cambioreal_app_id" value="' . htmlspecialchars($config['cambioreal_app_id'] ?? '') . '">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">APP Secret</label>
+                                        <input type="password" class="form-control" name="cambioreal_app_secret" value="' . htmlspecialchars($config['cambioreal_app_secret'] ?? '') . '">
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cambioreal_enabled" ' . (!empty($config['cambioreal_enabled']) && (string) $config['cambioreal_enabled'] !== '0' ? 'checked' : '') . '>
+                                        <label class="form-check-label">Habilitar Câmbio Real</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div class="col-md-6">
                             <div class="card mb-4">
@@ -1598,6 +1680,10 @@ class AdminPagamentosController extends Controller {
             'stripe_secret_key',
             'stripe_webhook_secret',
             'stripe_enabled',
+            'cambioreal_enabled',
+            'cambioreal_app_id',
+            'cambioreal_app_secret',
+            'cambioreal_base_url',
             'mercadopago_access_token',
             'mercadopago_public_key',
             'mercadopago_client_id',
@@ -1628,7 +1714,7 @@ class AdminPagamentosController extends Controller {
 
             foreach ($keys as $k) {
                 $val = $dados[$k] ?? '';
-                if (in_array($k, ['stripe_enabled', 'mercadopago_enabled', 'pix_enabled'], true)) {
+                if (in_array($k, ['stripe_enabled', 'mercadopago_enabled', 'pix_enabled', 'cambioreal_enabled'], true)) {
                     $val = !empty($dados[$k]) ? '1' : '0';
                 }
                 $this->saveConfigValueToKeyValueTable($pdo, $table, 'pagamentos', (string) $k, is_string($val) ? $val : (string) $val);

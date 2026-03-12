@@ -166,6 +166,7 @@
                         $formas = [
                             'carteira' => __('checkout.payment.wallet_credit', 'Carteira'),
                             'cartao_credito' => __('checkout.payment.credit_card', 'Cartão de Crédito'),
+                            'cartao_debito' => __('checkout.payment.debit_card', 'Cartão de Débito'),
                             'boleto' => __('checkout.payment.boleto', 'Boleto Bancário'),
                             'pix' => 'PIX',
                         ];
@@ -284,10 +285,10 @@
                         };
                         ?>
 
-                        <?php $renderSplitBox('Pagamento 1: Produtos (Mercado Pago)', is_array($pProduto) ? $pProduto : null); ?>
-                        <?php $renderSplitBox('Pagamento 2: Taxa de serviço (AppMax)', is_array($pTaxa) ? $pTaxa : null); ?>
+                        <?php $renderSplitBox('Pagamento 1: Produtos (Câmbio Real)', is_array($pProduto) ? $pProduto : null); ?>
+                        <?php $renderSplitBox('Pagamento 2: Taxas e impostos (AppMax)', is_array($pTaxa) ? $pTaxa : null); ?>
                         <?php if (is_array($pImposto) && (float) ($pImposto['valor'] ?? 0) > 0): ?>
-                            <?php $renderSplitBox('Pagamento 3: Impostos (Mercado Pago - split)', is_array($pImposto) ? $pImposto : null); ?>
+                            <?php $renderSplitBox('Pagamento 3: Impostos (AppMax - split)', is_array($pImposto) ? $pImposto : null); ?>
                         <?php endif; ?>
 
                     <?php elseif (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>

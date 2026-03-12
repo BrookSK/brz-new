@@ -26,6 +26,11 @@ class PaymentService {
     private $mercadoPagoEnabled;
     private $mercadoPagoAccessToken;
     private $mercadoPagoSellerAccessToken;
+
+    private $cambioRealEnabled;
+    private $cambioRealAppId;
+    private $cambioRealAppSecret;
+    private $cambioRealBaseUrl;
     
     private function garantirTabelaPedidoPagamentos(): void {
         try {
@@ -73,6 +78,237 @@ class PaymentService {
     private function isMercadoPagoEnabled(): bool {
         $v = strtolower(trim((string) $this->mercadoPagoEnabled));
         return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    private function isCambioRealEnabled(): bool {
+        $v = strtolower(trim((string) $this->cambioRealEnabled));
+        return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    private function getCambioRealBaseUrl(): string {
+        $base = trim((string) ($this->cambioRealBaseUrl ?? ''));
+        if ($base !== '') {
+            return rtrim($base, '/');
+        }
+        return 'https://sandbox.cambioreal.com';
+    }
+
+    private function cambioRealRequest(string $method, string $path, ?array $body = null): array {
+        if (!$this->isCambioRealEnabled()) {
+            throw new \Exception('Câmbio Real está desativado');
+        }
+        if (empty($this->cambioRealAppId) || empty($this->cambioRealAppSecret)) {
+            throw new \Exception('Câmbio Real não configurado (APP ID/SECRET ausentes)');
+        }
+
+        $url = $this->getCambioRealBaseUrl() . '/' . ltrim($path, '/');
+        $auth = base64_encode((string) $this->cambioRealAppId . ':' . (string) $this->cambioRealAppSecret);
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: Basic ' . $auth,
+            'X-APP-ID: ' . (string) $this->cambioRealAppId,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        $payload = null;
+        if ($body !== null) {
+            $payload = json_encode($body);
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com Câmbio Real: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                $msg = is_array($decoded) ? json_encode($decoded) : (string) $respBody;
+                throw new \Exception('Erro Câmbio Real HTTP ' . $httpCode . ': ' . $msg);
+            }
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload ?? '',
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    public function createCambioRealCheckoutRequestProduto(int $pedidoId, float $valorBrl, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null): array {
+        $pedidoId = (int) $pedidoId;
+        $valorBrl = (float) $valorBrl;
+
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real está desabilitado.'];
+        }
+
+        $base = Url::base();
+        if ($successUrl === null || trim((string) $successUrl) === '') {
+            $successUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal=success';
+        }
+        if ($errorUrl === null || trim((string) $errorUrl) === '') {
+            $errorUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal=error';
+        }
+
+        $nome = (string) ($customer['name'] ?? ($customer['nome'] ?? 'Cliente'));
+        $email = (string) ($customer['email'] ?? '');
+        $phone = (string) ($customer['phone_number'] ?? ($customer['telefone'] ?? ''));
+
+        $payload = [
+            'order_id' => (string) ($pedidoId . '-produto'),
+            'amount' => round($valorBrl, 2),
+            'currency' => 'BRL',
+            'client' => [
+                'name' => $nome,
+                'email' => $email,
+                'phone_number' => $phone,
+            ],
+            'duplicate' => 0,
+            'take_rates' => 0,
+            'url_callback' => (string) $successUrl,
+            'url_error' => (string) $errorUrl,
+            'products' => [
+                [
+                    'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
+                    'base_value' => round($valorBrl, 2),
+                    'valor' => round($valorBrl, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
+
+        try {
+            $resp = $this->cambioRealRequest('POST', '/service/v1/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? $resp['data'] : [];
+            $token = (string) ($data['token'] ?? '');
+            $checkoutUrl = (string) ($data['checkout'] ?? ($data['ticket'] ?? ''));
+            $code = (string) ($data['code'] ?? '');
+            $id = (string) ($data['id'] ?? '');
+
+            if ($token === '' || $checkoutUrl === '') {
+                return ['success' => false, 'error' => 'Câmbio Real: resposta inválida ao criar solicitação de pagamento.'];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'cambioreal',
+                'metodo' => 'checkout',
+                'moeda' => 'BRL',
+                'valor' => round($valorBrl, 2),
+                'payment_id' => $token,
+                'status' => 'pending',
+                'invoice_url' => $checkoutUrl,
+                'gateway_status' => 'AGUARDANDO_CLIENTE',
+                'metadata' => json_encode(['raw' => $resp, 'code' => $code, 'id' => $id], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $token,
+                'invoice_url' => $checkoutUrl,
+                'code' => $code,
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function obterTransacaoCambioReal(string $token): array {
+        $token = trim((string) $token);
+        if ($token === '') {
+            throw new \Exception('Câmbio Real: token inválido');
+        }
+        return $this->cambioRealRequest('GET', '/service/v1/checkout/get/' . rawurlencode($token), null);
+    }
+
+    public function processarWebhookCambioReal(array $payload): array {
+        $token = '';
+        if (!empty($payload['token']) && is_string($payload['token'])) {
+            $token = (string) $payload['token'];
+        }
+        if ($token === '' && !empty($payload['data']['token']) && is_string($payload['data']['token'])) {
+            $token = (string) $payload['data']['token'];
+        }
+        $token = trim($token);
+        if ($token === '') {
+            return ['success' => false, 'error' => 'Câmbio Real: token ausente no webhook'];
+        }
+
+        $tx = $this->obterTransacaoCambioReal($token);
+        $data = is_array($tx['data'] ?? null) ? $tx['data'] : [];
+        $status = strtoupper(trim((string) ($data['status'] ?? '')));
+        $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? '')));
+
+        $internal = 'pending';
+        if (in_array($status, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'SOLICITACAO_FINALIZADA '], true)) {
+            $internal = 'approved';
+        } elseif (in_array($status, ['REFUNDED'], true)) {
+            $internal = 'refunded';
+        } elseif (str_contains($status, 'CANCEL') || str_contains($status, 'RECUSADA') || str_contains($status, 'INVALIDA') || str_contains($status, 'EXPIR')) {
+            $internal = 'rejected';
+        }
+
+        $metodoNorm = $paymentMethod;
+        if ($metodoNorm === 'credit_card') {
+            $metodoNorm = 'cartao_credito';
+        } elseif ($metodoNorm === 'debit_card') {
+            $metodoNorm = 'cartao_debito';
+        }
+
+        $this->atualizarSplitPorGatewayPaymentId($token, 'cambioreal', $internal, $status);
+        if ($metodoNorm !== '') {
+            try {
+                $this->garantirTabelaPedidoPagamentos();
+                $db = \Config\Database::getConnection();
+                $st = $db->prepare('UPDATE pedido_pagamentos SET metodo = :m, gateway_status = :gs, metadata = :md, updated_at = NOW() WHERE gateway = :g AND payment_id = :pid');
+                $st->execute([
+                    ':m' => (string) $metodoNorm,
+                    ':gs' => (string) $status,
+                    ':md' => json_encode(['raw' => $tx], JSON_UNESCAPED_UNICODE),
+                    ':g' => 'cambioreal',
+                    ':pid' => (string) $token,
+                ]);
+            } catch (\Exception $e) {
+            }
+        }
+
+        return [
+            'success' => true,
+            'gateway' => 'cambioreal',
+            'payment_id' => $token,
+            'payment_status' => $internal,
+            'gateway_status' => $status,
+            'payment_method' => $metodoNorm,
+        ];
     }
 
     private function mercadoPagoTokenForRequestPath(string $path): string {
@@ -2769,6 +3005,11 @@ class PaymentService {
         $this->mercadoPagoEnabled = (string) $this->getConfig('pagamentos', 'mercadopago_enabled', '0');
         $this->mercadoPagoAccessToken = (string) $this->getConfig('pagamentos', 'mercadopago_access_token', '');
         $this->mercadoPagoSellerAccessToken = (string) $this->getConfig('pagamentos', 'mercadopago_seller_access_token', '');
+
+        $this->cambioRealEnabled = (string) $this->getConfig('pagamentos', 'cambioreal_enabled', '0');
+        $this->cambioRealAppId = (string) $this->getConfig('pagamentos', 'cambioreal_app_id', '');
+        $this->cambioRealAppSecret = (string) $this->getConfig('pagamentos', 'cambioreal_app_secret', '');
+        $this->cambioRealBaseUrl = (string) $this->getConfig('pagamentos', 'cambioreal_base_url', '');
     }
 
     private function getConfig(string $categoria, string $chave, $default = null) {
@@ -2795,6 +3036,10 @@ class PaymentService {
                         'appmax_client_id',
                         'appmax_client_secret',
                         'appmax_app_id',
+                        'cambioreal_enabled',
+                        'cambioreal_app_id',
+                        'cambioreal_app_secret',
+                        'cambioreal_base_url',
                         'stripe_secret_key',
                         'stripe_publishable_key',
                         'stripe_ambiente',

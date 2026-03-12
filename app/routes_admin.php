@@ -99,3 +99,6 @@ $router->get('/admin', function() {
     header('Location: /admin/dashboard');
     exit;
 });
+
+// Webhooks
+$router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');

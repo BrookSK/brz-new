@@ -3014,6 +3014,63 @@ HTML;
                                         . '<p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pgTransView) . '</p>'
                                         . '<p class="mb-0"><strong>Data:</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
 
+                                    // Split: exibir quanto foi para cada conta/gateway (pedido_pagamentos)
+                                    try {
+                                        $dbSplit = \Config\Database::getConnection();
+                                        $stSplit = $dbSplit->prepare('SELECT componente, gateway, metodo, moeda, valor, status, invoice_url, bank_slip_url, digitable_line, pix_payload FROM pedido_pagamentos WHERE pedido_id = :p ORDER BY id ASC');
+                                        $stSplit->execute([':p' => (int) $pedido['id']]);
+                                        $rowsSplit = $stSplit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                                        if (!empty($rowsSplit)) {
+                                            echo '<hr><div class="mb-2"><strong>Split (por conta/gateway):</strong></div>';
+                                            echo '<div class="table-responsive"><table class="table table-sm table-bordered">'
+                                                . '<thead><tr>'
+                                                . '<th>Componente</th><th>Gateway</th><th>Método</th><th>Valor</th><th>Status</th><th>Link/PIX</th>'
+                                                . '</tr></thead><tbody>';
+
+                                            foreach ($rowsSplit as $r) {
+                                                $comp = strtoupper((string) ($r['componente'] ?? ''));
+                                                $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
+                                                $gwLabel = $gw !== '' ? strtoupper($gw) : 'N/A';
+                                                if ($gw === 'cambioreal') $gwLabel = 'Câmbio Real';
+                                                if ($gw === 'appmax') $gwLabel = 'AppMax';
+                                                if ($gw === 'stripe') $gwLabel = 'Stripe';
+                                                $met = (string) ($r['metodo'] ?? '');
+                                                $moeda = strtoupper((string) ($r['moeda'] ?? 'BRL'));
+                                                $val = (float) ($r['valor'] ?? 0);
+                                                $st = (string) ($r['status'] ?? '');
+
+                                                $url = trim((string) ($r['invoice_url'] ?? ''));
+                                                $boleto = trim((string) ($r['bank_slip_url'] ?? ''));
+                                                $dig = trim((string) ($r['digitable_line'] ?? ''));
+                                                $pix = trim((string) ($r['pix_payload'] ?? ''));
+
+                                                $link = '';
+                                                if ($url !== '') {
+                                                    $link = '<a href="' . htmlspecialchars($url) . '" target="_blank" rel="noopener">Abrir</a>';
+                                                } elseif ($boleto !== '') {
+                                                    $link = '<a href="' . htmlspecialchars($boleto) . '" target="_blank" rel="noopener">Abrir boleto</a>';
+                                                } elseif ($pix !== '') {
+                                                    $link = '<span class="small text-muted">PIX disponível</span>';
+                                                } elseif ($dig !== '') {
+                                                    $link = '<span class="small text-muted">Linha digitável</span>';
+                                                }
+
+                                                echo '<tr>'
+                                                    . '<td>' . htmlspecialchars($comp) . '</td>'
+                                                    . '<td>' . htmlspecialchars($gwLabel) . '</td>'
+                                                    . '<td>' . htmlspecialchars($met !== '' ? $met : 'N/A') . '</td>'
+                                                    . '<td class="text-end">' . htmlspecialchars($this->formatarMoeda($val, $moeda)) . '</td>'
+                                                    . '<td>' . htmlspecialchars($st !== '' ? $st : 'pending') . '</td>'
+                                                    . '<td>' . $link . '</td>'
+                                                    . '</tr>';
+                                            }
+
+                                            echo '</tbody></table></div>';
+                                        }
+                                    } catch (\Exception $e) {
+                                    }
+
                                     $pgGateway = (string) ($pedido['pagamento_gateway'] ?? '');
                                     $pgMetodo = strtoupper((string) ($pedido['pagamento_metodo'] ?? $pedido['forma_pagamento'] ?? ''));
                                     $pgStatus = strtoupper((string) ($pedido['pagamento_status'] ?? ''));
