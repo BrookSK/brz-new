@@ -354,6 +354,7 @@ class CorreiosPacketService {
 
         $raw = null;
         $httpCode = null;
+        $respContentType = '';
         try {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -366,15 +367,23 @@ class CorreiosPacketService {
             curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
             curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
             curl_setopt($ch, CURLOPT_ENCODING, '');
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 
             $raw = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $respContentType = (string) (curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '');
             $err = curl_error($ch);
             curl_close($ch);
 
             if ($raw === false || $raw === null) {
                 return ['success' => false, 'error' => 'Falha na requisição de token: ' . $err, 'http_code' => $httpCode, 'request_url' => $url];
+            }
+
+            if (trim((string) $raw) === '') {
+                $ct = $respContentType !== '' ? (' content-type=' . $respContentType) : '';
+                return ['success' => false, 'error' => 'Resposta vazia ao solicitar token (HTTP ' . (string) $httpCode . ').' . $ct, 'http_code' => $httpCode, 'request_url' => $url];
             }
 
             $json = json_decode((string) $raw, true);
@@ -383,7 +392,8 @@ class CorreiosPacketService {
                 if ($snippet === '') {
                     $snippet = '<empty>';
                 }
-                return ['success' => false, 'error' => 'Resposta inválida (não-JSON) ao solicitar token. BODY=' . $snippet, 'http_code' => $httpCode, 'request_url' => $url];
+                $ct = $respContentType !== '' ? (' content-type=' . $respContentType) : '';
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON) ao solicitar token (HTTP ' . (string) $httpCode . ').' . $ct . ' BODY=' . $snippet, 'http_code' => $httpCode, 'request_url' => $url];
             }
 
             if (is_int($httpCode) && $httpCode >= 400) {
