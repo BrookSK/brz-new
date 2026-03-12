@@ -33,12 +33,22 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Operador destino</label>
-                    <input type="text" class="form-control" name="destinationOperatorName" value="<?= htmlspecialchars((string) ($defaults['destinationOperatorName'] ?? 'SAOD')) ?>" maxlength="4" required>
+                    <?php $dop = (string) ($defaults['destinationOperatorName'] ?? 'SAOD'); ?>
+                    <select class="form-select" name="destinationOperatorName" required>
+                        <option value="SAOD" <?= $dop === 'SAOD' ? 'selected' : '' ?>>SAOD - Guarulhos</option>
+                        <option value="CWBA" <?= $dop === 'CWBA' ? 'selected' : '' ?>>CWBA - Curitiba</option>
+                    </select>
                 </div>
 
                 <div class="col-md-2">
                     <label class="form-label">Categoria postal</label>
-                    <input type="text" class="form-control" name="postalCategoryCode" value="<?= htmlspecialchars((string) ($defaults['postalCategoryCode'] ?? 'A')) ?>" maxlength="1" required>
+                    <?php $pcc = (string) ($defaults['postalCategoryCode'] ?? 'A'); ?>
+                    <select class="form-select" name="postalCategoryCode" required>
+                        <option value="A" <?= $pcc === 'A' ? 'selected' : '' ?>>A – Airmail ou Priority Mail</option>
+                        <option value="B" <?= $pcc === 'B' ? 'selected' : '' ?>>B – S.A.L Mail ou Non-Priority Mail</option>
+                        <option value="C" <?= $pcc === 'C' ? 'selected' : '' ?>>C – Surface Mail ou Non-Priority Mail</option>
+                        <option value="D" <?= $pcc === 'D' ? 'selected' : '' ?>>D – Priority Mail (terrestre)</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Subclasse serviço</label>
@@ -64,6 +74,7 @@
                     <label class="form-label">Grupo de triagem</label>
                     <?php $tg = (string) ($defaults['triageGroup'] ?? '1'); ?>
                     <select class="form-select" name="triageGroup" required>
+                        <option value="" <?= $tg === '' ? 'selected' : '' ?>>Selecione o grupo</option>
                         <option value="1" <?= $tg === '1' ? 'selected' : '' ?>>1 - São Paulo/SP</option>
                         <option value="2" <?= $tg === '2' ? 'selected' : '' ?>>2 - Valinhos/SP</option>
                         <option value="3" <?= $tg === '3' ? 'selected' : '' ?>>3 - Rio de Janeiro/RJ</option>

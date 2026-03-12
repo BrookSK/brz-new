@@ -1089,13 +1089,13 @@ class AdminCorreiosMundialController extends Controller {
 
         $defaults = [
             'dispatchNumber' => $this->getNextDispatchNumber(),
-            'originOperatorName' => 'BRAS',
+            'originOperatorName' => 'BRAZ',
             'destinationOperatorName' => 'SAOD',
             'postalCategoryCode' => 'A',
             'serviceSubclassCode' => 'NX',
             'unitType' => '2',
             'awb' => '',
-            'triageGroup' => '1',
+            'triageGroup' => '',
             'bulk' => $bulk,
         ];
 
