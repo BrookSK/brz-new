@@ -52,6 +52,53 @@ class AdminCorreiosMundialController extends Controller {
         }
     }
 
+    private function ensurePacketBillsTable(): void {
+        try {
+            if ($this->tableExists('correios_packet_bills')) {
+                return;
+            }
+
+            $sql = "CREATE TABLE IF NOT EXISTS correios_packet_bills (\n"
+                . "  id INT AUTO_INCREMENT PRIMARY KEY,\n"
+                . "  status VARCHAR(30) DEFAULT 'pending',\n"
+                . "  request_id VARCHAR(120) NULL,\n"
+                . "  cn38_code VARCHAR(120) NULL,\n"
+                . "  containers_json LONGTEXT NULL,\n"
+                . "  tracking_count INT NULL,\n"
+                . "  last_request_json LONGTEXT NULL,\n"
+                . "  last_response_json LONGTEXT NULL,\n"
+                . "  last_http_code INT NULL,\n"
+                . "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
+                . "  updated_at TIMESTAMP NULL DEFAULT NULL,\n"
+                . "  KEY idx_correios_packet_bills_status (status),\n"
+                . "  KEY idx_correios_packet_bills_request_id (request_id),\n"
+                . "  KEY idx_correios_packet_bills_cn38_code (cn38_code)\n"
+                . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+            $this->connection->exec($sql);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function ensureContainersHasBillIdColumn(): void {
+        try {
+            $this->ensurePacketContainersTable();
+            if (!$this->tableExists('correios_packet_containers')) {
+                return;
+            }
+
+            $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'correios_packet_containers' AND COLUMN_NAME = 'bill_id'");
+            $stmt->execute();
+            $exists = ((int) $stmt->fetchColumn()) > 0;
+            if ($exists) {
+                return;
+            }
+
+            $this->connection->exec("ALTER TABLE correios_packet_containers ADD COLUMN bill_id INT NULL DEFAULT NULL");
+            $this->connection->exec("ALTER TABLE correios_packet_containers ADD KEY idx_correios_packet_containers_bill_id (bill_id)");
+        } catch (\Exception $e) {
+        }
+    }
+
     private function ensurePacketContainersTable(): void {
         try {
             if ($this->tableExists('correios_packet_containers')) {
@@ -1003,6 +1050,456 @@ class AdminCorreiosMundialController extends Controller {
             'flashError' => (string) ($request->getParam('error') ?? ''),
             'flashSuccess' => (string) ($request->getParam('success') ?? ''),
         ]);
+    }
+
+    public function faturas(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $this->ensurePacketBillsTable();
+        $bills = [];
+        if ($this->tableExists('correios_packet_bills')) {
+            try {
+                $st = $this->connection->prepare('SELECT * FROM correios_packet_bills ORDER BY created_at DESC LIMIT 100');
+                $st->execute();
+                $bills = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $bills = [];
+            }
+        }
+
+        $this->view('admin/correios-mundial-faturas', [
+            'bills' => $bills,
+            'flashError' => (string) ($request->getParam('error') ?? ''),
+            'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+        ]);
+    }
+
+    public function faturaNova(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $this->ensurePacketContainersTable();
+        $this->ensurePacketBillsTable();
+        $this->ensureContainersHasBillIdColumn();
+
+        $balance = $this->svc->getBalance();
+
+        $containers = [];
+        if ($this->tableExists('correios_packet_containers')) {
+            try {
+                $st = $this->connection->prepare("SELECT id, dispatch_number, unit_code, tracking_numbers_json, created_at FROM correios_packet_containers WHERE (bill_id IS NULL OR bill_id = 0) AND status = 'created' AND unit_code IS NOT NULL AND unit_code <> '' ORDER BY created_at DESC LIMIT 200");
+                $st->execute();
+                $containers = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $containers = [];
+            }
+        }
+
+        foreach ($containers as &$c) {
+            $tn = [];
+            $raw = (string) ($c['tracking_numbers_json'] ?? '');
+            if ($raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) $tn = $decoded;
+            }
+            $c['tracking_count'] = is_array($tn) ? count($tn) : 0;
+        }
+        unset($c);
+
+        $this->view('admin/correios-mundial-fatura-nova', [
+            'containers' => $containers,
+            'balance' => $balance,
+            'flashError' => (string) ($request->getParam('error') ?? ''),
+            'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+        ]);
+    }
+
+    public function faturaCriar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $this->ensurePacketContainersTable();
+        $this->ensurePacketBillsTable();
+        $this->ensureContainersHasBillIdColumn();
+
+        if (!$this->tableExists('correios_packet_bills')) {
+            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode('Tabela correios_packet_bills não encontrada.'));
+            exit;
+        }
+
+        $containerIds = $request->getParam('containerIds');
+        if (!is_array($containerIds)) {
+            $containerIds = [];
+        }
+        $containerIds = array_values(array_unique(array_filter(array_map(function ($v) {
+            return (int) $v;
+        }, $containerIds), fn($v) => $v > 0)));
+
+        if (empty($containerIds)) {
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Selecione pelo menos 1 container.'));
+            exit;
+        }
+
+        $balance = $this->svc->getBalance();
+        if (empty($balance['success'])) {
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode((string) ($balance['error'] ?? 'Falha ao consultar saldo.')));
+            exit;
+        }
+        $currentBalance = (int) ($balance['currentBalance'] ?? 0);
+        if ($currentBalance <= 0) {
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Saldo insuficiente para faturamento.'));
+            exit;
+        }
+
+        $unitList = [];
+        $totalTrackings = 0;
+        $containerRows = [];
+
+        try {
+            $in = implode(',', array_fill(0, count($containerIds), '?'));
+            $st = $this->connection->prepare('SELECT id, unit_code, tracking_numbers_json, bill_id, status FROM correios_packet_containers WHERE id IN (' . $in . ')');
+            $st->execute($containerIds);
+            $containerRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $containerRows = [];
+        }
+
+        if (empty($containerRows)) {
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Containers não encontrados.'));
+            exit;
+        }
+
+        foreach ($containerRows as $row) {
+            $cid = (int) ($row['id'] ?? 0);
+            $uc = trim((string) ($row['unit_code'] ?? ''));
+            $billId = (int) ($row['bill_id'] ?? 0);
+            $status = strtolower(trim((string) ($row['status'] ?? '')));
+            if ($cid <= 0 || $uc === '') {
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Container inválido/sem unitCode.'));
+                exit;
+            }
+            if ($billId > 0) {
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Container já está vinculado a uma fatura.'));
+                exit;
+            }
+            if ($status !== 'created') {
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Apenas containers com status created podem ser faturados.'));
+                exit;
+            }
+
+            $tn = [];
+            $raw = (string) ($row['tracking_numbers_json'] ?? '');
+            if ($raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) $tn = $decoded;
+            }
+            $tn = array_values(array_filter(array_map(function ($v) {
+                $v = strtoupper(trim((string) $v));
+                return $v !== '' ? $v : null;
+            }, is_array($tn) ? $tn : [])));
+
+            if (empty($tn)) {
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Container sem trackingNumbers.'));
+                exit;
+            }
+            if (count($tn) > 1000) {
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Limite de 1000 pacotes por mala/unitCode.'));
+                exit;
+            }
+
+            $totalTrackings += count($tn);
+            if ($totalTrackings > 5000) {
+                header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Limite de 5000 códigos de rastreio por fatura excedido.'));
+                exit;
+            }
+
+            $unitList[] = [
+                'unitCode' => $uc,
+                'trackingNumbers' => $tn,
+            ];
+        }
+
+        $billId = 0;
+        try {
+            $stIns = $this->connection->prepare('INSERT INTO correios_packet_bills (status, containers_json, tracking_count, last_request_json, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())');
+            $stIns->execute([
+                'pending',
+                json_encode($containerIds),
+                $totalTrackings,
+                json_encode(['unitList' => $unitList]),
+            ]);
+            $billId = (int) $this->connection->lastInsertId();
+        } catch (\Exception $e) {
+            header('Location: /admin/correios-mundial/faturas/nova?error=' . rawurlencode('Falha ao salvar fatura no banco.'));
+            exit;
+        }
+
+        try {
+            $in = implode(',', array_fill(0, count($containerIds), '?'));
+            $sql = 'UPDATE correios_packet_containers SET bill_id = ? WHERE id IN (' . $in . ') AND (bill_id IS NULL OR bill_id = 0)';
+            $params = array_merge([$billId], $containerIds);
+            $stUp = $this->connection->prepare($sql);
+            $stUp->execute($params);
+        } catch (\Exception $e) {
+        }
+
+        $api = $this->svc->createCn38RequestUnits($unitList);
+        if (empty($api['success'])) {
+            try {
+                $stUp = $this->connection->prepare('UPDATE correios_packet_bills SET status = ?, last_response_json = ?, last_http_code = ?, updated_at = NOW() WHERE id = ?');
+                $stUp->execute([
+                    'error',
+                    json_encode($api['raw'] ?? null),
+                    $api['http_code'] ?? null,
+                    $billId,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode((string) ($api['error'] ?? 'Falha ao iniciar faturamento.')));
+            exit;
+        }
+
+        $rawResp = $api['raw'] ?? [];
+        $requestId = (string) ($rawResp['requestId'] ?? '');
+        $requestStatus = (string) ($rawResp['requestStatus'] ?? '');
+        if ($requestId === '') {
+            header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode('Correios não retornou requestId.'));
+            exit;
+        }
+
+        try {
+            $stUp = $this->connection->prepare('UPDATE correios_packet_bills SET status = ?, request_id = ?, last_response_json = ?, last_http_code = ?, updated_at = NOW() WHERE id = ?');
+            $stUp->execute([
+                $requestStatus !== '' ? strtolower($requestStatus) : 'pending',
+                $requestId,
+                json_encode($api['raw'] ?? null),
+                $api['http_code'] ?? null,
+                $billId,
+            ]);
+        } catch (\Exception $e) {
+        }
+
+        $status = '';
+        $final = null;
+        $started = time();
+        while (true) {
+            $stResp = $this->svc->getCn38RequestUnitsStatus($requestId);
+            if (!empty($stResp['success']) && is_array($stResp['raw'] ?? null)) {
+                $final = $stResp;
+                $status = (string) (($stResp['raw']['requestStatus'] ?? '') !== '' ? $stResp['raw']['requestStatus'] : ($stResp['raw']['status'] ?? ''));
+                if (!in_array(strtolower($status), ['pending', 'processing'], true)) {
+                    break;
+                }
+            }
+
+            if (time() - $started > 120) {
+                break;
+            }
+            sleep(2);
+        }
+
+        if (is_array($final) && !empty($final['success'])) {
+            $rawFinal = $final['raw'] ?? [];
+            $statusFinal = strtolower(trim((string) ($rawFinal['requestStatus'] ?? $status)));
+            $cn38 = (string) ($rawFinal['cn38Code'] ?? '');
+            $errMsg = (string) ($rawFinal['errorMessage'] ?? '');
+
+            try {
+                $stUp = $this->connection->prepare('UPDATE correios_packet_bills SET status = ?, cn38_code = ?, last_response_json = ?, last_http_code = ?, updated_at = NOW() WHERE id = ?');
+                $stUp->execute([
+                    $statusFinal !== '' ? $statusFinal : 'processing',
+                    $cn38 !== '' ? $cn38 : null,
+                    json_encode($rawFinal),
+                    $final['http_code'] ?? null,
+                    $billId,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            if ($statusFinal === 'error') {
+                header('Location: /admin/correios-mundial/faturas?error=' . rawurlencode($errMsg !== '' ? $errMsg : 'Erro ao processar fatura.'));
+                exit;
+            }
+            if ($statusFinal === 'success' && $cn38 !== '') {
+                header('Location: /admin/correios-mundial/faturas?success=' . rawurlencode('Fatura gerada: ' . $cn38));
+                exit;
+            }
+        }
+
+        header('Location: /admin/correios-mundial/faturas?success=' . rawurlencode('Solicitação criada. Aguarde e atualize o status.'));
+        exit;
+    }
+
+    public function faturaPdf(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $id = (int) $request->getParam('id');
+        if ($id <= 0) {
+            http_response_code(400);
+            echo 'ID inválido.';
+            return;
+        }
+
+        $this->ensurePacketBillsTable();
+        $this->ensurePacketContainersTable();
+        if (!$this->tableExists('correios_packet_bills')) {
+            http_response_code(500);
+            echo 'Tabela correios_packet_bills não encontrada.';
+            return;
+        }
+
+        $bill = null;
+        try {
+            $st = $this->connection->prepare('SELECT * FROM correios_packet_bills WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $bill = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            $bill = null;
+        }
+        if (!is_array($bill)) {
+            http_response_code(404);
+            echo 'Fatura não encontrada.';
+            return;
+        }
+
+        $cn38Code = (string) ($bill['cn38_code'] ?? '');
+        if ($cn38Code === '') {
+            http_response_code(400);
+            echo 'cn38Code não encontrado.';
+            return;
+        }
+
+        $containersIds = [];
+        $rawC = (string) ($bill['containers_json'] ?? '');
+        if ($rawC !== '') {
+            $decoded = json_decode($rawC, true);
+            if (is_array($decoded)) {
+                $containersIds = array_values(array_unique(array_filter(array_map('intval', $decoded), fn($v) => $v > 0)));
+            }
+        }
+        if (empty($containersIds)) {
+            http_response_code(400);
+            echo 'Containers não encontrados.';
+            return;
+        }
+
+        $containers = [];
+        try {
+            $in = implode(',', array_fill(0, count($containersIds), '?'));
+            $st = $this->connection->prepare('SELECT * FROM correios_packet_containers WHERE id IN (' . $in . ')');
+            $st->execute($containersIds);
+            $containers = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $containers = [];
+        }
+
+        if (empty($containers)) {
+            http_response_code(400);
+            echo 'Containers inválidos.';
+            return;
+        }
+
+        $c0 = $containers[0];
+        $originOperatorName = (string) ($c0['origin_operator_name'] ?? '');
+        $destinationOperatorName = (string) ($c0['destination_operator_name'] ?? '');
+        $serviceSubclassCode = (string) ($c0['service_subclass_code'] ?? 'NX');
+        $subclassDescription = ($serviceSubclassCode === 'IX') ? 'PACKET EXPRESS' : 'PACKET STANDARD';
+
+        $totalContainers = count($containers);
+        $totalTrackings = 0;
+        foreach ($containers as $c) {
+            $tn = [];
+            $raw = (string) ($c['tracking_numbers_json'] ?? '');
+            if ($raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) $tn = $decoded;
+            }
+            $totalTrackings += is_array($tn) ? count($tn) : 0;
+        }
+
+        $pluginAssets = dirname(__DIR__) . '/Plugins/woocommerce-package-redirect/assets/images/';
+        $logoTransAmerica = $this->imageFileToDataUri($pluginAssets . 'logo-transamerica.png');
+
+        $html = '<!DOCTYPE html><html><head>'
+            . '<meta charset="UTF-8">'
+            . '<style>'
+            . '@page { margin: 0px; }'
+            . 'body { font-family: Arial, sans-serif; font-size: 8pt; margin: 0; padding: 0; }'
+            . '.sheet { width: 220mm; height: 110mm; padding: 4mm; box-sizing: border-box; overflow: hidden; }'
+            . 'table { width: 100%; border-collapse: collapse; margin: 0; }'
+            . 'td { padding: 5px; border: 1px solid #000; vertical-align: top; }'
+            . 'p { margin: 0; }'
+            . '.bold { font-weight: bold; }'
+            . '.en { font-size: 7pt; color: #555; }'
+            . '.logo { width: 20mm; }'
+            . '.logo img { width: 100%; }'
+            . '</style>'
+            . '</head><body><div class="sheet">';
+
+        $html .= '<table>'
+            . '<tr>'
+            . '<td style="width: 30mm;">' . ($logoTransAmerica !== '' ? '<div class="logo"><img src="' . $logoTransAmerica . '" alt=" "></div>' : '') . '</td>'
+            . '<td><p class="bold">FATURA DE ENTREGA<br><span class="en">(Delivery Bill)</span></p></td>'
+            . '<td style="width: 30mm;"><p class="bold">1 de 1</p></td>'
+            . '</tr>'
+            . '</table>';
+
+        $html .= '<table>'
+            . '<tr>'
+            . '<td colspan="2"><p class="bold">OPERADOR DE ORIGEM<br><span class="en">(Office of Origin)</span></p><p>' . htmlspecialchars($originOperatorName) . '</p></td>'
+            . '<td><p class="bold">CÓDIGO CN38<br><span class="en">(CN38 Code)</span></p><p>' . htmlspecialchars($cn38Code) . '</p></td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td colspan="2"><p class="bold">OPERADOR DE DESTINO<br><span class="en">(Office of Destination)</span></p><p>' . htmlspecialchars($destinationOperatorName) . '</p></td>'
+            . '<td><p class="bold">SERVIÇO<br><span class="en">(Service)</span></p><p>' . htmlspecialchars($subclassDescription) . '</p></td>'
+            . '</tr>'
+            . '<tr>'
+            . '<td><p class="bold">QTD. MALAS<br><span class="en">(Units)</span></p><p>' . (int) $totalContainers . '</p></td>'
+            . '<td><p class="bold">QTD. ITENS<br><span class="en">(Items)</span></p><p>' . (int) $totalTrackings . '</p></td>'
+            . '<td><p class="bold">DATA<br><span class="en">(Date)</span></p><p>' . date('d/m/Y') . '</p></td>'
+            . '</tr>'
+            . '</table>';
+
+        $html .= '<table>'
+            . '<tr>'
+            . '<td class="bold">Unit Code</td>'
+            . '<td class="bold">Remessa</td>'
+            . '<td class="bold">Qtd pacotes</td>'
+            . '</tr>';
+        foreach ($containers as $c) {
+            $uc = (string) ($c['unit_code'] ?? '');
+            $dn = (string) ($c['dispatch_number'] ?? '');
+            $tn = [];
+            $raw = (string) ($c['tracking_numbers_json'] ?? '');
+            if ($raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) $tn = $decoded;
+            }
+            $html .= '<tr>'
+                . '<td>' . htmlspecialchars($uc) . '</td>'
+                . '<td>' . htmlspecialchars($dn) . '</td>'
+                . '<td>' . (int) (is_array($tn) ? count($tn) : 0) . '</td>'
+                . '</tr>';
+        }
+        $html .= '</table>';
+
+        $html .= '</div></body></html>';
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', false);
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper([0, 0, 623.6, 311.8]);
+        $dompdf->render();
+
+        $safe = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $cn38Code);
+        if ($safe === '') $safe = 'cn38';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="fatura_cn38_' . $safe . '.pdf"');
+        echo $dompdf->output();
     }
 
     public function containerCancelar(Request $request) {

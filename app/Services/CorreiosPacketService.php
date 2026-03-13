@@ -331,6 +331,160 @@ class CorreiosPacketService {
         }
     }
 
+    public function createCn38RequestUnits(array $unitList, ?string $ambienteOverride = null): array {
+        $cfg = $this->loadPacketConfig();
+        if ($ambienteOverride !== null && $ambienteOverride !== '') {
+            $cfg['ambiente'] = (string) $ambienteOverride;
+        }
+
+        if (empty($cfg['login']) || empty($cfg['password']) || empty($cfg['cartao_postagem'])) {
+            return ['success' => false, 'error' => 'Correios Mundial (PACKET) não configurado (login/senha/cartão de postagem).'];
+        }
+        if (empty($unitList)) {
+            return ['success' => false, 'error' => 'unitList vazio.'];
+        }
+
+        $tokenResp = $this->getValidToken($cfg);
+        if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
+            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
+        }
+
+        $token = (string) $tokenResp['token'];
+        $baseUrl = $this->getPacketBaseUrl((string) ($cfg['ambiente'] ?? 'homologacao'));
+        $url = rtrim($baseUrl, '/') . '/v1/cn38request/units';
+
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $token,
+        ];
+
+        $payload = [
+            'unitList' => array_values($unitList),
+        ];
+
+        $raw = null;
+        $httpCode = null;
+        try {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
+            curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            $raw = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if ($raw === false || $raw === null) {
+                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode, 'request_url' => $url];
+            }
+
+            $json = json_decode((string) $raw, true);
+            if (!is_array($json)) {
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+            }
+
+            if (is_int($httpCode) && $httpCode >= 400) {
+                $msg = $this->extractErrorMessage($json);
+                if ($msg === '') {
+                    $msg = 'Erro HTTP ' . $httpCode;
+                }
+                return ['success' => false, 'error' => $msg, 'http_code' => $httpCode, 'raw' => $json, 'request_url' => $url];
+            }
+
+            return [
+                'success' => true,
+                'http_code' => $httpCode,
+                'request_url' => $url,
+                'raw' => $json,
+                'request' => $payload,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+        }
+    }
+
+    public function getCn38RequestUnitsStatus(string $requestId, ?string $ambienteOverride = null): array {
+        $cfg = $this->loadPacketConfig();
+        if ($ambienteOverride !== null && $ambienteOverride !== '') {
+            $cfg['ambiente'] = (string) $ambienteOverride;
+        }
+
+        $requestId = trim((string) $requestId);
+        if ($requestId === '') {
+            return ['success' => false, 'error' => 'requestId vazio.'];
+        }
+        if (empty($cfg['login']) || empty($cfg['password']) || empty($cfg['cartao_postagem'])) {
+            return ['success' => false, 'error' => 'Correios Mundial (PACKET) não configurado (login/senha/cartão de postagem).'];
+        }
+
+        $tokenResp = $this->getValidToken($cfg);
+        if (empty($tokenResp['success']) || empty($tokenResp['token'])) {
+            return ['success' => false, 'error' => (string) ($tokenResp['error'] ?? 'Falha ao obter token.'), 'meta' => $tokenResp];
+        }
+
+        $token = (string) $tokenResp['token'];
+        $baseUrl = $this->getPacketBaseUrl((string) ($cfg['ambiente'] ?? 'homologacao'));
+        $primaryUrl = rtrim($baseUrl, '/') . '/v1/cn38request/units?requestId=' . rawurlencode($requestId);
+        $fallbackUrl = rtrim($baseUrl, '/') . '/v1/cn38request?requestId=' . rawurlencode($requestId);
+
+        $headers = [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $token,
+        ];
+
+        $raw = null;
+        $httpCode = null;
+        try {
+            $url = $primaryUrl;
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'brz-new/1.0 (+https://brazilianashop.com)');
+            curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            $raw = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if ($raw === false || $raw === null) {
+                return ['success' => false, 'error' => 'Falha na requisição: ' . $err, 'http_code' => $httpCode, 'request_url' => $url];
+            }
+
+            $json = json_decode((string) $raw, true);
+            if (!is_array($json)) {
+                return ['success' => false, 'error' => 'Resposta inválida (não-JSON).', 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+            }
+
+            if (is_int($httpCode) && $httpCode >= 400) {
+                $msg = $this->extractErrorMessage($json);
+                if ($msg === '') {
+                    $msg = 'Erro HTTP ' . $httpCode;
+                }
+                return ['success' => false, 'error' => $msg, 'http_code' => $httpCode, 'raw' => $json, 'request_url' => $url];
+            }
+
+            return [
+                'success' => true,
+                'http_code' => $httpCode,
+                'request_url' => $url,
+                'raw' => $json,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'http_code' => $httpCode, 'raw' => $raw, 'request_url' => $url];
+        }
+    }
+
     public function getBalance(): array {
         $cfg = $this->loadPacketConfig();
 

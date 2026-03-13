@@ -82,6 +82,12 @@ $router->post('/admin/correios-mundial/container/{id}/cancelar', 'AdminCorreiosM
 $router->post('/admin/correios-mundial/container/{id}/deletar', 'AdminCorreiosMundialController', 'containerDeletar');
 $router->get('/admin/correios-mundial/container/{id}.pdf', 'AdminCorreiosMundialController', 'containerPdf');
 
+// Faturas (CN38)
+$router->get('/admin/correios-mundial/faturas', 'AdminCorreiosMundialController', 'faturas');
+$router->get('/admin/correios-mundial/faturas/nova', 'AdminCorreiosMundialController', 'faturaNova');
+$router->post('/admin/correios-mundial/faturas/criar', 'AdminCorreiosMundialController', 'faturaCriar');
+$router->get('/admin/correios-mundial/fatura/{id}.pdf', 'AdminCorreiosMundialController', 'faturaPdf');
+
 // Download PDF da etiqueta (gerada localmente)
 $router->get('/admin/correios-mundial/etiqueta/{tracking}.pdf', 'AdminCorreiosMundialController', 'etiquetaPdf');
 

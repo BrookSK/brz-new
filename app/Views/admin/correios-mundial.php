@@ -4,6 +4,7 @@
         <h1 class="h2">Correios Mundial (PACKET)</h1>
         <div>
             <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/containers">Containers</a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/faturas">Faturas (CN38)</a>
         </div>
     </div>
 
