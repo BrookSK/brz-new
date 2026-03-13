@@ -44,7 +44,7 @@
                 <?php $containers = isset($containers) && is_array($containers) ? $containers : []; ?>
 
                 <div class="row g-3">
-                    <div class="col-lg-6">
+                    <div class="col-12">
                         <div class="mb-2"><strong>Detalhes da Fatura</strong></div>
 
                         <label class="form-label" for="cn38_dispatch_numbers"><strong>Números de Remessa*</strong></label>
@@ -81,6 +81,28 @@
                             <label class="form-label" for="cn38_paste_list"><strong>Colar lista (remessas / ids / unit codes)</strong></label>
                             <textarea class="form-control" rows="4" id="cn38_paste_list" placeholder="Cole aqui (um por linha, separado por vírgula/space)..." <?= (!$balanceOk || $currentBalance <= 0) ? 'disabled' : '' ?>></textarea>
                             <div class="form-text">Ao colar, o sistema tenta selecionar automaticamente os containers correspondentes.</div>
+                        </div>
+
+                        <div class="mt-2 d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-secondary" id="cn38_apply_paste" <?= (!$balanceOk || $currentBalance <= 0) ? 'disabled' : '' ?>>Selecionar</button>
+                            <button type="button" class="btn btn-outline-secondary" id="cn38_clear_selection" <?= (!$balanceOk || $currentBalance <= 0) ? 'disabled' : '' ?>>Limpar seleção</button>
+                        </div>
+
+                        <div class="mt-3" id="cn38_selection_review" style="display:none;">
+                            <div class="text-muted small mb-1"><strong>Conferência</strong></div>
+                            <div class="small">
+                                Encontrados: <span id="cn38_found_count">0</span> | Não encontrados: <span id="cn38_not_found_count">0</span>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-lg-6">
+                                    <div class="text-muted small">Encontrados</div>
+                                    <textarea class="form-control form-control-sm" rows="3" id="cn38_found_list" readonly></textarea>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="text-muted small">Não encontrados</div>
+                                    <textarea class="form-control form-control-sm" rows="3" id="cn38_not_found_list" readonly></textarea>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mt-3 d-flex justify-content-between align-items-center">
@@ -178,16 +200,27 @@
         return out;
     }
 
-    function tryAutoSelectFromPaste() {
+    function applyPasteSelection() {
         var ta = document.getElementById('cn38_paste_list');
         var selectEl = document.getElementById('cn38_dispatch_numbers');
         if (!ta || !selectEl) return;
 
         var tokens = normalizeTokens(ta.value);
-        if (tokens.length <= 0) return;
+        var review = document.getElementById('cn38_selection_review');
+        var foundListEl = document.getElementById('cn38_found_list');
+        var notFoundListEl = document.getElementById('cn38_not_found_list');
+        var foundCountEl = document.getElementById('cn38_found_count');
+        var notFoundCountEl = document.getElementById('cn38_not_found_count');
+
+        if (tokens.length <= 0) {
+            if (review) review.style.display = 'none';
+            return;
+        }
 
         var tokenSet = {};
         tokens.forEach(function(t) { tokenSet[t] = true; });
+
+        var foundTokens = {};
 
         for (var i = 0; i < selectEl.options.length; i++) {
             var o = selectEl.options[i];
@@ -196,8 +229,36 @@
             var unit = String(o.getAttribute('data-unit-code') || '');
             if (tokenSet[cid] || tokenSet[dispatch] || tokenSet[unit]) {
                 o.selected = true;
+                if (tokenSet[cid]) foundTokens[cid] = true;
+                if (tokenSet[dispatch]) foundTokens[dispatch] = true;
+                if (tokenSet[unit]) foundTokens[unit] = true;
             }
         }
+
+        var foundArr = [];
+        var notFoundArr = [];
+        tokens.forEach(function(t) {
+            if (foundTokens[t]) foundArr.push(t);
+            else notFoundArr.push(t);
+        });
+
+        if (review) review.style.display = '';
+        if (foundListEl) foundListEl.value = foundArr.join("\n");
+        if (notFoundListEl) notFoundListEl.value = notFoundArr.join("\n");
+        if (foundCountEl) foundCountEl.textContent = String(foundArr.length);
+        if (notFoundCountEl) notFoundCountEl.textContent = String(notFoundArr.length);
+    }
+
+    function clearSelection() {
+        var selectEl = document.getElementById('cn38_dispatch_numbers');
+        if (!selectEl) return;
+        for (var i = 0; i < selectEl.options.length; i++) {
+            selectEl.options[i].selected = false;
+        }
+        var review = document.getElementById('cn38_selection_review');
+        if (review) review.style.display = 'none';
+        var ta = document.getElementById('cn38_paste_list');
+        if (ta) ta.value = '';
     }
 
     document.addEventListener('change', function(ev) {
@@ -210,7 +271,6 @@
     document.addEventListener('blur', function(ev) {
         var t = ev.target;
         if (t && t.id === 'cn38_paste_list') {
-            tryAutoSelectFromPaste();
             recalc();
         }
     }, true);
@@ -219,9 +279,20 @@
         var t = ev.target;
         if (t && t.id === 'cn38_paste_list') {
             setTimeout(function() {
-                tryAutoSelectFromPaste();
                 recalc();
             }, 10);
+        }
+    });
+
+    document.addEventListener('click', function(ev) {
+        var t = ev.target;
+        if (t && t.id === 'cn38_apply_paste') {
+            applyPasteSelection();
+            recalc();
+        }
+        if (t && t.id === 'cn38_clear_selection') {
+            clearSelection();
+            recalc();
         }
     });
 
