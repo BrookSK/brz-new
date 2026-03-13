@@ -97,24 +97,6 @@
                             <div class="text-danger" style="font-weight: 600;">Aviso: Esta operação é irreversível e acarretará em custos.</div>
                         </div>
                     </div>
-
-                    <div class="col-lg-6">
-                        <div class="mb-2"><strong>Informações de Depuração</strong></div>
-                        <div class="row g-2">
-                            <div class="col-12">
-                                <div class="text-muted small">Request Body</div>
-                                <pre class="bg-light border rounded p-2 small mb-0" id="cn38_debug_request" style="min-height: 80px;">-</pre>
-                            </div>
-                            <div class="col-12">
-                                <div class="text-muted small">Response Body</div>
-                                <pre class="bg-light border rounded p-2 small mb-0" id="cn38_debug_response" style="min-height: 80px;">-</pre>
-                            </div>
-                            <div class="col-12">
-                                <div class="text-muted small">Error Message</div>
-                                <pre class="bg-light border rounded p-2 small mb-0" id="cn38_debug_error" style="min-height: 60px;">-</pre>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div id="cn38_hidden_inputs"></div>
@@ -178,7 +160,6 @@
         }
 
         ensureHiddenInputsFromSelected();
-        updateDebugRequest();
     }
 
     function normalizeTokens(text) {
@@ -217,22 +198,6 @@
                 o.selected = true;
             }
         }
-    }
-
-    function updateDebugRequest() {
-        var pre = document.getElementById('cn38_debug_request');
-        if (!pre) return;
-        var selectEl = document.getElementById('cn38_dispatch_numbers');
-        var selected = getSelectedOptions(selectEl);
-        var unitList = selected.map(function(o) {
-            return {
-                containerId: parseInt(o.value || '0', 10) || 0,
-                dispatchNumber: String(o.getAttribute('data-dispatch-number') || ''),
-                unitCode: String(o.getAttribute('data-unit-code') || ''),
-                trackingCount: parseInt(o.getAttribute('data-tracking-count') || '0', 10) || 0
-            };
-        });
-        pre.textContent = JSON.stringify({ unitList: unitList }, null, 2);
     }
 
     document.addEventListener('change', function(ev) {
