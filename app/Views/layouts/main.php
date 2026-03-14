@@ -940,6 +940,9 @@
                         <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> <?= __('nav.how_it_works', 'Como Funciona') ?></a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/status-pedido"><i class="fas fa-stream"></i> Status do Pedido</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/faq"><i class="fas fa-comments"></i> <?= __('nav.faq', 'FAQ') ?></a>
                     </li>
                     <li class="nav-item">
@@ -1211,6 +1214,7 @@
                         <li class="mb-2"><a href="/" class="footer-link"><?= __('nav.home', 'Início') ?></a></li>
                         <li class="mb-2"><a href="/produtos" class="footer-link"><?= __('nav.products', 'Produtos') ?></a></li>
                         <li class="mb-2"><a href="/como-funciona" class="footer-link"><?= __('nav.how_it_works', 'Como Funciona') ?></a></li>
+                        <li class="mb-2"><a href="/status-pedido" class="footer-link">Status do Pedido</a></li>
                         <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                     </ul>
                 </div>

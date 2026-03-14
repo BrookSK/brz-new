@@ -704,14 +704,26 @@ class AdminCorreiosMundialController extends Controller {
             return;
         }
 
+        $pesoKg = isset($pedido['peso_total']) ? (float) $pedido['peso_total'] : 0.0;
+        $alturaCm = isset($pedido['altura']) ? (int) $pedido['altura'] : 0;
+        $larguraCm = isset($pedido['largura']) ? (int) $pedido['largura'] : 0;
+        $comprimentoCm = isset($pedido['comprimento']) ? (int) $pedido['comprimento'] : 0;
+        if ($pesoKg <= 0 || $alturaCm <= 0 || $larguraCm <= 0 || $comprimentoCm <= 0) {
+            $this->json([
+                'success' => false,
+                'error' => 'Pedido sem medidas/peso real. Preencha Peso real (kg), Altura, Largura e Comprimento antes de gerar a etiqueta.',
+            ], 400);
+            return;
+        }
+
         $raw = file_get_contents('php://input');
         $data = json_decode((string) $raw, true);
         if (!is_array($data)) $data = [];
 
-        $totalWeight = (int) ($data['totalWeight'] ?? 0);
-        $packagingLength = (float) str_replace(',', '.', (string) ($data['packagingLength'] ?? '0'));
-        $packagingWidth = (float) str_replace(',', '.', (string) ($data['packagingWidth'] ?? '0'));
-        $packagingHeight = (float) str_replace(',', '.', (string) ($data['packagingHeight'] ?? '0'));
+        $totalWeight = (int) max(1, round($pesoKg * 1000));
+        $packagingLength = (float) $comprimentoCm;
+        $packagingWidth = (float) $larguraCm;
+        $packagingHeight = (float) $alturaCm;
         $freightPaidValue = (float) str_replace(',', '.', (string) ($data['freightPaidValue'] ?? '0.01'));
         $insurancePaidValueRaw = trim((string) ($data['insurancePaidValue'] ?? ''));
         $insurancePaidValue = null;

@@ -12,6 +12,32 @@ class AdminPedidosEditController extends Controller {
         $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
+    private function ensurePedidoMedidasColumns(): void {
+        try {
+            if (!$this->tableExists('pedidos')) {
+                return;
+            }
+
+            $cols = $this->getColsFromTable('pedidos');
+            $need = [
+                'peso_total' => "ALTER TABLE pedidos ADD COLUMN peso_total DECIMAL(10,3) NULL",
+                'altura' => "ALTER TABLE pedidos ADD COLUMN altura INT NULL",
+                'largura' => "ALTER TABLE pedidos ADD COLUMN largura INT NULL",
+                'comprimento' => "ALTER TABLE pedidos ADD COLUMN comprimento INT NULL",
+            ];
+
+            foreach ($need as $col => $sql) {
+                if (!is_array($cols) || !in_array($col, $cols, true)) {
+                    try {
+                        $this->connection->exec($sql);
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     private function tableExists(string $table): bool {
         try {
             $stmt = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -469,6 +495,28 @@ class AdminPedidosEditController extends Controller {
                                     </button>
                                 </div>
 
+                                <div class="mb-3">
+                                    <div class="fw-bold">Medidas e peso (obrigatório para gerar etiqueta)</div>
+                                    <div class="row g-2 mt-1">
+                                        <div class="col-6">
+                                            <label class="form-label">Peso real (kg)</label>
+                                            <input type="number" class="form-control" id="pedido_peso_total" step="0.001" min="0" value="' . htmlspecialchars((string) ($pedido['peso_total'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label">Altura (cm)</label>
+                                            <input type="number" class="form-control" id="pedido_altura" step="1" min="0" value="' . htmlspecialchars((string) ($pedido['altura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label">Largura (cm)</label>
+                                            <input type="number" class="form-control" id="pedido_largura" step="1" min="0" value="' . htmlspecialchars((string) ($pedido['largura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label">Comprimento (cm)</label>
+                                            <input type="number" class="form-control" id="pedido_comprimento" step="1" min="0" value="' . htmlspecialchars((string) ($pedido['comprimento'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="mb-0">
                                     <label class="form-label">Observação do vendedor</label>
                                     <textarea class="form-control" id="observacao_vendedor" rows="4" placeholder="Observação interna para compras/PDF...">' . htmlspecialchars((string) ($pedido['observacao_vendedor'] ?? ''), ENT_QUOTES, 'UTF-8') . '</textarea>
@@ -743,6 +791,10 @@ class AdminPedidosEditController extends Controller {
                 const dados = {
                     pedido_id: pedidoId,
                     status: document.getElementById("pedido_status")?.value,
+                    peso_total: document.getElementById("pedido_peso_total")?.value,
+                    altura: document.getElementById("pedido_altura")?.value,
+                    largura: document.getElementById("pedido_largura")?.value,
+                    comprimento: document.getElementById("pedido_comprimento")?.value,
                     frete: document.getElementById("valor_frete")?.value,
                     desconto: document.getElementById("percentual_desconto")?.value,
                     observacao_vendedor: document.getElementById("observacao_vendedor")?.value,
@@ -892,6 +944,23 @@ class AdminPedidosEditController extends Controller {
                 'enviado',
                 'entregue',
             ], true);
+
+            $this->ensurePedidoMedidasColumns();
+
+            $pesoTotal = (float) str_replace(',', '.', (string) ($dados['peso_total'] ?? '0'));
+            $altura = (int) ($dados['altura'] ?? 0);
+            $largura = (int) ($dados['largura'] ?? 0);
+            $comprimento = (int) ($dados['comprimento'] ?? 0);
+
+            if ($cicloFechado) {
+                if ($pesoTotal <= 0 || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Para marcar como Caixa Fechada (ou status seguintes), preencha Peso real (kg), Altura, Largura e Comprimento.'
+                    ]);
+                    return;
+                }
+            }
             $statusReserva = $cicloFechado ? 'finalizada' : 'ativa';
 
             $this->connection->beginTransaction();
@@ -1061,6 +1130,23 @@ class AdminPedidosEditController extends Controller {
             if (is_array($colsPedidos) && in_array('observacao_vendedor', $colsPedidos, true)) {
                 $setParts[] = 'observacao_vendedor = :observacao_vendedor';
                 $paramsUpd[':observacao_vendedor'] = (string) ($dados['observacao_vendedor'] ?? '');
+            }
+
+            if (is_array($colsPedidos) && in_array('peso_total', $colsPedidos, true)) {
+                $setParts[] = 'peso_total = :peso_total';
+                $paramsUpd[':peso_total'] = $pesoTotal > 0 ? $pesoTotal : null;
+            }
+            if (is_array($colsPedidos) && in_array('altura', $colsPedidos, true)) {
+                $setParts[] = 'altura = :altura';
+                $paramsUpd[':altura'] = $altura > 0 ? $altura : null;
+            }
+            if (is_array($colsPedidos) && in_array('largura', $colsPedidos, true)) {
+                $setParts[] = 'largura = :largura';
+                $paramsUpd[':largura'] = $largura > 0 ? $largura : null;
+            }
+            if (is_array($colsPedidos) && in_array('comprimento', $colsPedidos, true)) {
+                $setParts[] = 'comprimento = :comprimento';
+                $paramsUpd[':comprimento'] = $comprimento > 0 ? $comprimento : null;
             }
 
             // Se marcar como pago/aprovado, manter payment_status/pago_em consistentes (impacta comissões)

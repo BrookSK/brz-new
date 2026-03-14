@@ -13,6 +13,41 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class AdminPedidosController extends Controller {
 
+    private function ensurePedidoMedidasColumnsPdo(\PDO $pdo): void {
+        try {
+            $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stmtT->execute(['pedidos']);
+            if ((int) ($stmtT->fetchColumn() ?: 0) <= 0) {
+                return;
+            }
+
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+
+            $need = [
+                'peso_total' => "ALTER TABLE pedidos ADD COLUMN peso_total DECIMAL(10,3) NULL",
+                'altura' => "ALTER TABLE pedidos ADD COLUMN altura INT NULL",
+                'largura' => "ALTER TABLE pedidos ADD COLUMN largura INT NULL",
+                'comprimento' => "ALTER TABLE pedidos ADD COLUMN comprimento INT NULL",
+            ];
+
+            foreach ($need as $col => $sql) {
+                if (!is_array($cols) || !in_array($col, $cols, true)) {
+                    try {
+                        $pdo->exec($sql);
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     private function tableExistsPdo(\PDO $pdo, string $table): bool {
         try {
             $st = $pdo->prepare('SHOW TABLES LIKE ?');
@@ -209,6 +244,8 @@ class AdminPedidosController extends Controller {
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $this->ensurePedidoMedidasColumnsPdo($pdo);
 
             $colsPedidos = [];
             try {
@@ -4240,6 +4277,37 @@ HTML;
                 $statusAnterior = null;
             }
 
+            $novoStatusKey = strtolower(trim((string) $novoStatus));
+            $cicloFechado = in_array($novoStatusKey, [
+                'produto_consolidado',
+                'em_transporte',
+                'aguardando_liberacao_aduaneira',
+                'enviado_ao_destinatario',
+                'enviado',
+                'entregue',
+            ], true);
+            if ($cicloFechado) {
+                try {
+                    $stM = $pdo->prepare('SELECT peso_total, altura, largura, comprimento FROM pedidos WHERE id = ? LIMIT 1');
+                    $stM->execute([(int) $id]);
+                    $m = $stM->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $peso = isset($m['peso_total']) ? (float) $m['peso_total'] : 0.0;
+                    $altura = isset($m['altura']) ? (int) $m['altura'] : 0;
+                    $largura = isset($m['largura']) ? (int) $m['largura'] : 0;
+                    $comprimento = isset($m['comprimento']) ? (int) $m['comprimento'] : 0;
+                    if ($peso <= 0 || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
+                        echo '<div class="alert alert-danger">Para marcar como <strong>Caixa Fechada</strong> (ou status seguintes), preencha no pedido: <strong>Peso real (kg)</strong>, <strong>Altura</strong>, <strong>Largura</strong> e <strong>Comprimento</strong>.</div>';
+                        echo '<a href="/admin/pedidos/editar/' . (int) $id . '" class="btn btn-primary me-2">Editar pedido</a>';
+                        echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
+                        exit;
+                    }
+                } catch (\Exception $e) {
+                    echo '<div class="alert alert-danger">Não foi possível validar medidas/peso do pedido. Edite o pedido e tente novamente.</div>';
+                    echo '<a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">Voltar</a>';
+                    exit;
+                }
+            }
+
             // Se marcou como pago/aprovado, manter colunas relacionadas consistentes.
             // Além disso, atualizar o texto exibido no bloco "Pagamento" para bater com o status selecionado.
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
@@ -4257,7 +4325,6 @@ HTML;
                 'entregue' => 'Entregue',
                 'cancelado' => 'Cancelado',
             ];
-            $novoStatusKey = strtolower(trim((string) $novoStatus));
             $pagamentoStatusTexto = $statusLabelMap[$novoStatusKey] ?? ucfirst(str_replace('_', ' ', $novoStatusKey));
 
             if ($isPaid && is_array($cols)) {
