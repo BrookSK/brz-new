@@ -231,8 +231,10 @@ class PaymentService {
 
         $payload = [
             'order_id' => (string) ($pedidoId . '-produto'),
-            'amount' => round($amountUsd, 2),
-            'currency' => 'USD',
+            // Para PIX, queremos que o QR gere exatamente o valor em BRL do seu checkout.
+            // Se enviar USD, o gateway converte com a taxa dele e o valor em BRL pode divergir.
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
             'payment_method' => 'pix',
             'client' => (array) $customer,
             'duplicate' => 0,
@@ -240,8 +242,8 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
-                    'base_value' => round($amountUsd, 2),
-                    'valor' => round($amountUsd, 2),
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
@@ -292,7 +294,7 @@ class PaymentService {
                 'pix_encoded_image' => $pixImg,
                 'pix_payload' => $pixPayload,
                 'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'AGUARDANDO_CLIENTE',
-                'metadata' => json_encode(['raw' => $resp, 'amount_usd' => round($amountUsd, 2)], JSON_UNESCAPED_UNICODE),
+                'metadata' => json_encode(['raw' => $resp, 'amount_usd_calc' => round($amountUsd, 2)], JSON_UNESCAPED_UNICODE),
             ]);
 
             return [
