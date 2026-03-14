@@ -370,6 +370,7 @@ $router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'import
 $router->post('/admin/pedidos/importar/iniciar', 'AdminPedidosController', 'importarPedidosIniciar');
 $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'importarPedidosProcessar');
 $router->get('/admin/pedidos/novo-manual', 'AdminPedidosManualController', 'novo');
+$router->get('/admin/pedidos/novo-manual/clientes', 'AdminPedidosManualController', 'clientesBusca');
 $router->get('/admin/pedidos/novo-manual/cliente-endereco/{id}', 'AdminPedidosManualController', 'clienteEndereco');
 $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController', 'salvar');
 $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');

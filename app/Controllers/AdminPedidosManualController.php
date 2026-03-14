@@ -8,6 +8,125 @@ use App\Models\Carrinho;
 use App\Models\Usuario;
 
 class AdminPedidosManualController extends Controller {
+    public function clientesBusca(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+
+        $q = trim((string) $request->getParam('q', ''));
+        $limit = (int) $request->getParam('limit', 20);
+        if ($limit <= 0) $limit = 20;
+        if ($limit > 50) $limit = 50;
+
+        $pdo = \Config\Database::getConnection();
+
+        $cols = [];
+        try {
+            $stmtCols = $pdo->query('DESCRIBE usuarios');
+            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : '');
+        $emailCol = in_array('email', $cols, true) ? 'email' : '';
+
+        $switchCol = '';
+        foreach (['switch', 'switch_id', 'switchid', 'sw', 'codigo_switch', 'switch_code', 'switchcode', 'chave', 'codigo', 'identificador'] as $cand) {
+            if (in_array($cand, $cols, true)) {
+                $switchCol = $cand;
+                break;
+            }
+        }
+
+        $out = ['ok' => true, 'items' => []];
+
+        if ($q === '') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($out);
+            exit;
+        }
+
+        if (!ctype_digit($q) && mb_strlen($q) < 2) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($out);
+            exit;
+        }
+
+        $params = [];
+        $whereParts = [];
+
+        if (ctype_digit($q)) {
+            $whereParts[] = 'id = :id_exact';
+            $params[':id_exact'] = (int) $q;
+        }
+
+        $like = '%' . $q . '%';
+        if ($nomeCol !== '') {
+            $whereParts[] = $nomeCol . ' LIKE :like';
+        }
+        if ($emailCol !== '') {
+            $whereParts[] = $emailCol . ' LIKE :like';
+        }
+        if ($switchCol !== '') {
+            $whereParts[] = $switchCol . ' LIKE :like';
+        }
+        $params[':like'] = $like;
+
+        if (empty($whereParts)) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($out);
+            exit;
+        }
+
+        $sql = 'SELECT id'
+            . ($nomeCol !== '' ? (', ' . $nomeCol . ' AS nome') : '')
+            . ($emailCol !== '' ? (', ' . $emailCol . ' AS email') : '')
+            . ($switchCol !== '' ? (', ' . $switchCol . ' AS switch_val') : '')
+            . ' FROM usuarios'
+            . ' WHERE (' . implode(' OR ', $whereParts) . ')'
+            . ' ORDER BY id DESC'
+            . ' LIMIT :lim';
+
+        try {
+            $st = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                if ($k === ':id_exact') {
+                    $st->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                } else {
+                    $st->bindValue($k, (string) $v);
+                }
+            }
+            $st->bindValue(':lim', (int) $limit, \PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($rows as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                if ($id <= 0) continue;
+                $nome = (string) ($r['nome'] ?? '');
+                $email = (string) ($r['email'] ?? '');
+                $sw = (string) ($r['switch_val'] ?? '');
+                $label = trim($nome);
+                if ($label === '') {
+                    $label = 'Cliente #' . $id;
+                }
+                $extra = [];
+                if ($email !== '') $extra[] = $email;
+                if ($sw !== '') $extra[] = $sw;
+                if (!empty($extra)) {
+                    $label .= ' (' . implode(' | ', $extra) . ')';
+                }
+                $out['items'][] = ['id' => $id, 'text' => $label];
+            }
+        } catch (\Exception $e) {
+            $out = ['ok' => false, 'error' => 'Falha ao buscar clientes'];
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($out);
+        exit;
+    }
+
     public function novo(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
@@ -24,13 +143,7 @@ class AdminPedidosManualController extends Controller {
         }
         $_SESSION['pedido_manual_form_token'] = $formToken;
 
-        $usuarioModel = new Usuario();
         $usuarios = [];
-        try {
-            $usuarios = $usuarioModel->getAll();
-        } catch (\Exception $e) {
-            $usuarios = [];
-        }
         $pdo = \Config\Database::getConnection();
         $produtos = [];
         try {
@@ -257,18 +370,11 @@ class AdminPedidosManualController extends Controller {
                         <div class="row g-3">
                             <div class="col-md-8">
                                 <label class="form-label">Cliente</label>
-                                <select class="form-select" name="cliente_id" id="cliente_id" required>
-                                    <option value="">Selecione...</option>';
-
-        foreach ($usuarios as $u) {
-            $uid = (int) ($u['id'] ?? 0);
-            $nome = (string) ($u['nome'] ?? ($u['name'] ?? ''));
-            $email = (string) ($u['email'] ?? '');
-            if ($uid <= 0) continue;
-            echo '<option value="' . $uid . '">' . htmlspecialchars($nome . ' (' . $email . ')', ENT_QUOTES, 'UTF-8') . '</option>';
-        }
-
-        echo '                </select>
+                                <input type="text" class="form-control" id="cliente_busca" placeholder="Digite nome, e-mail ou switch..." autocomplete="off" required>
+                                <div id="cliente_busca_results" class="list-group" style="position:relative; z-index: 1050; display:none;"></div>
+                                <select class="form-select" name="cliente_id" id="cliente_id" required style="display:none;">
+                                    <option value="">Selecione...</option>
+                                </select>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Moeda</label>
@@ -486,6 +592,74 @@ class AdminPedidosManualController extends Controller {
         echo 'const PIX_DESCONTO_TAXA_SERVICO_PERCENT = ' . json_encode((float) (new \App\Services\PedidoManualService())->getPixDescontoTaxaServicoPercent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const USD_BRL_RATE = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaConversaoUSDBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+
+        echo "\n";
+        echo 'function initClienteBusca(){\n'
+            . '    const input = document.getElementById(\'cliente_busca\');\n'
+            . '    const results = document.getElementById(\'cliente_busca_results\');\n'
+            . '    const sel = document.getElementById(\'cliente_id\');\n'
+            . '    if (!input || !results || !sel) return;\n'
+            . '    let lastQ = \'\';\n'
+            . '    let t = null;\n'
+            . '    function hide(){ results.style.display = \'none\'; results.innerHTML = \'\'; }\n'
+            . '    function ensureOption(id, text){\n'
+            . '        const v = String(id || \'\');\n'
+            . '        if (!v) return;\n'
+            . '        let opt = null;\n'
+            . '        for (let i=0;i<sel.options.length;i++){ if (sel.options[i].value === v){ opt = sel.options[i]; break; } }\n'
+            . '        if (!opt){ opt = document.createElement(\'option\'); opt.value = v; sel.appendChild(opt); }\n'
+            . '        opt.text = String(text || (\'Cliente #\' + v));\n'
+            . '        sel.value = v;\n'
+            . '        const ev = new Event(\'change\', { bubbles: true });\n'
+            . '        sel.dispatchEvent(ev);\n'
+            . '    }\n'
+            . '    function render(items){\n'
+            . '        results.innerHTML = \'\';\n'
+            . '        if (!items || !items.length){ hide(); return; }\n'
+            . '        items.forEach(it => {\n'
+            . '            const a = document.createElement(\'button\');\n'
+            . '            a.type = \'button\';\n'
+            . '            a.className = \'list-group-item list-group-item-action\';\n'
+            . '            a.textContent = String(it.text || \'\');\n'
+            . '            a.dataset.id = String(it.id || \'\');\n'
+            . '            a.addEventListener(\'click\', function(){\n'
+            . '                const id = this.dataset.id;\n'
+            . '                const text = this.textContent || (\'Cliente #\' + id);\n'
+            . '                ensureOption(id, text);\n'
+            . '                input.value = text;\n'
+            . '                input.dataset.selectedId = String(id || \'\');\n'
+            . '                hide();\n'
+            . '            });\n'
+            . '            results.appendChild(a);\n'
+            . '        });\n'
+            . '        results.style.display = \'block\';\n'
+            . '    }\n'
+            . '    function search(q){\n'
+            . '        const qq = String(q || \'\').trim();\n'
+            . '        lastQ = qq;\n'
+            . '        if (qq.length < 2){ hide(); return; }\n'
+            . '        fetch(\'/admin/pedidos/novo-manual/clientes?q=\' + encodeURIComponent(qq) + \'&limit=20\')\n'
+            . '            .then(r => r.json())\n'
+            . '            .then(j => {\n'
+            . '                if (!j || !j.ok) { hide(); return; }\n'
+            . '                if (String(input.value || \'\').trim() !== lastQ) return;\n'
+            . '                render(j.items || []);\n'
+            . '            })\n'
+            . '            .catch(() => { hide(); });\n'
+            . '    }\n'
+            . '    input.addEventListener(\'input\', function(){\n'
+            . '        const q = String(this.value || \'\');\n'
+            . '        this.dataset.selectedId = \'\';\n'
+            . '        if (t) clearTimeout(t);\n'
+            . '        t = setTimeout(() => search(q), 220);\n'
+            . '    });\n'
+            . '    input.addEventListener(\'focus\', function(){\n'
+            . '        const q = String(this.value || \'\').trim();\n'
+            . '        if (q.length >= 2) search(q);\n'
+            . '    });\n'
+            . '    input.addEventListener(\'blur\', function(){ setTimeout(hide, 180); });\n'
+            . '    window.__ensureClienteOption = ensureOption;\n'
+            . '}\n';
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
 
         echo <<<'JS'
@@ -1370,6 +1544,7 @@ document.addEventListener('DOMContentLoaded', function(){
     const linkInfo = document.getElementById('linkPagamentoInfo');
     const linkResult = document.getElementById('linkResult');
     const clienteSel = document.getElementById('cliente_id');
+    const clienteBuscaInp = document.getElementById('cliente_busca');
 
     let __lastEnderecoPrefillClienteId = 0;
 
@@ -1504,6 +1679,24 @@ document.addEventListener('DOMContentLoaded', function(){
         updateManualPaymentMethodsForCurrency();
         updateLinkVisibility();
         calcTotal();
+    }
+
+    if (typeof initClienteBusca === 'function') {
+        initClienteBusca();
+    }
+
+    if (EXISTING_PEDIDO && Number(EXISTING_PEDIDO.cliente_id || 0) > 0) {
+        const cid = Number(EXISTING_PEDIDO.cliente_id || 0);
+        if (window.__ensureClienteOption) {
+            window.__ensureClienteOption(cid, 'Cliente #' + String(cid));
+        } else if (clienteSel) {
+            clienteSel.value = String(cid);
+            const ev = new Event('change', { bubbles: true });
+            clienteSel.dispatchEvent(ev);
+        }
+        if (clienteBuscaInp && !String(clienteBuscaInp.value || '').trim()) {
+            clienteBuscaInp.value = 'Cliente #' + String(cid);
+        }
     }
 
     const offlineWrap = document.getElementById('offlineInfoWrap');
