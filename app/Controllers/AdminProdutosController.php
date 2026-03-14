@@ -2908,9 +2908,9 @@ HTML;
             $repId = $this->getSessionUserId();
             $repEmail = $this->getSessionUserEmail();
 
-            $price = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('price'));
-            $costPrice = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('cost_price'));
-            $salePrice = str_replace(['$', '.', ','], ['', '', '.'], (string) $request->getParam('sale_price'));
+            $price = $this->parseMoneyToDb($request->getParam('price'));
+            $costPrice = $this->parseMoneyToDb($request->getParam('cost_price'));
+            $salePrice = $this->parseMoneyToDb($request->getParam('sale_price'));
 
             if ($perfil === 'representante' && trim((string) $costPrice) === '') {
                 throw new \Exception('Preço de custo (USD) é obrigatório para representante.');
@@ -2983,7 +2983,7 @@ HTML;
                 if (in_array('representante_email', $cols, true)) $data['representante_email'] = ($repEmail !== '' ? $repEmail : null);
             }
 
-            if (in_array('weight', $cols, true)) $data['weight'] = $request->getParam('weight') ?: 0;
+            if (in_array('weight', $cols, true)) $data['weight'] = $this->parseMoneyToDb($request->getParam('weight'));
             if (in_array('stock', $cols, true)) $data['stock'] = $request->getParam('stock') ?: 0;
             if (in_array('min_stock', $cols, true)) $data['min_stock'] = $request->getParam('min_stock') ?: 0;
 
@@ -3900,7 +3900,7 @@ HTMLSCRIPT;
                 $salePrice,
                 $request->getParam('stock') ?: 0,
                 $request->getParam('min_stock') ?: 0,
-                $request->getParam('weight') ?: 0,
+                $this->parseMoneyToDb($request->getParam('weight')),
                 $request->getParam('status'),
                 (strtolower(trim((string) $request->getParam('status'))) === 'archived' ? 0 : ($request->getParam('active') ?: 0)),
                 $request->getParam('featured') ?: 0,

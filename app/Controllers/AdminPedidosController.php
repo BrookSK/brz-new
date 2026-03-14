@@ -2842,6 +2842,74 @@ HTML;
             } catch (\Exception $e) {
             }
             
+            // Pré-carregar dados do produto (custo/NCM) para sugerir edição quando faltar
+            $produtoMetaById = [];
+            try {
+                $pids = [];
+                if (is_array($itens)) {
+                    foreach ($itens as $it) {
+                        $pid = (int) ($it['produto_id'] ?? 0);
+                        if ($pid > 0) {
+                            $pids[$pid] = true;
+                        }
+                    }
+                }
+                $pids = array_keys($pids);
+
+                if (!empty($pids)) {
+                    $pdoProd = null;
+                    try {
+                        $pdoProd = $pdoCols ?? null;
+                    } catch (\Exception $e) {
+                        $pdoProd = null;
+                    }
+                    if (!($pdoProd instanceof \PDO)) {
+                        $pdoProd = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    }
+
+                    $colsProd = [];
+                    try {
+                        $st = $pdoProd->query('DESCRIBE produtos');
+                        $colsProd = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsProd = [];
+                    }
+
+                    $pick = function(array $candidates) use ($colsProd): string {
+                        foreach ($candidates as $c) {
+                            if (is_array($colsProd) && in_array($c, $colsProd, true)) {
+                                return $c;
+                            }
+                        }
+                        return '';
+                    };
+
+                    $colCusto = $pick(['preco_custo', 'custo', 'cost_price', 'valor_custo']);
+                    $colNcm = $pick(['ncm', 'codigo_ncm', 'ncm_code', 'tariff_code', 'ncm_produto']);
+
+                    $sel = ['id'];
+                    if ($colCusto !== '') $sel[] = $colCusto . ' AS custo';
+                    if ($colNcm !== '') $sel[] = $colNcm . ' AS ncm';
+
+                    if (count($sel) > 1) {
+                        $ph = implode(',', array_fill(0, count($pids), '?'));
+                        $st = $pdoProd->prepare('SELECT ' . implode(', ', $sel) . ' FROM produtos WHERE id IN (' . $ph . ')');
+                        $st->execute($pids);
+                        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($rows as $r) {
+                            $pid = (int) ($r['id'] ?? 0);
+                            if ($pid <= 0) continue;
+                            $produtoMetaById[$pid] = [
+                                'custo' => isset($r['custo']) ? (float) $r['custo'] : null,
+                                'ncm' => isset($r['ncm']) ? (string) $r['ncm'] : null,
+                            ];
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $produtoMetaById = [];
+            }
+
             // Conteúdo principal
             echo '<div class="row">
                     <div class="col-md-12">
@@ -2863,15 +2931,25 @@ HTML;
                                                 <th>Preço Unitário</th>
                                                 <th>Subtotal</th>
                                                 <th>Data de Criação</th>
+                                                <th>Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
                                         
                                         if (empty($itens)) {
-                                            echo '<tr><td colspan="9" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
+                                            echo '<tr><td colspan="10" class="text-center text-warning">Nenhum item encontrado para este pedido</td></tr>';
                                         }
                                         
                                         foreach ($itens as $item) {
+                                            $pidItem = (int) ($item['produto_id'] ?? 0);
+                                            $metaProd = ($pidItem > 0 && isset($produtoMetaById[$pidItem]) && is_array($produtoMetaById[$pidItem]))
+                                                ? $produtoMetaById[$pidItem]
+                                                : null;
+                                            $custoProd = is_array($metaProd) ? ($metaProd['custo'] ?? null) : null;
+                                            $ncmProd = is_array($metaProd) ? trim((string) ($metaProd['ncm'] ?? '')) : '';
+                                            $missingCost = ($custoProd === null || (float) $custoProd <= 0);
+                                            $missingNcm = ($ncmProd === '');
+
                                             echo '<tr>
                                                 <td>';
                                             
@@ -2935,9 +3013,29 @@ HTML;
                                             }
 
                                             $ncmVal = trim((string) ($item['ncm'] ?? ''));
+                                            if ($ncmVal === '' && $ncmProd !== '') {
+                                                $ncmVal = $ncmProd;
+                                            }
                                             $ncmHtml = $ncmVal !== ''
                                                 ? htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8')
                                                 : '<span class="badge bg-warning text-dark">Sem NCM</span>';
+
+                                            $acoesHtml = '';
+                                            if ($pidItem > 0 && ($missingCost || $missingNcm)) {
+                                                $label = 'Editar produto';
+                                                if ($missingCost && $missingNcm) {
+                                                    $label = 'Editar (custo + NCM)';
+                                                } elseif ($missingCost) {
+                                                    $label = 'Editar (custo)';
+                                                } elseif ($missingNcm) {
+                                                    $label = 'Editar (NCM)';
+                                                }
+                                                $acoesHtml = '<a href="/admin/produtos/editar/' . (int) $pidItem . '" class="btn btn-sm btn-warning">'
+                                                    . '<i class="fas fa-pen-to-square me-1"></i>' . htmlspecialchars($label) . '</a>';
+                                            } elseif ($pidItem > 0) {
+                                                $acoesHtml = '<a href="/admin/produtos/editar/' . (int) $pidItem . '" class="btn btn-sm btn-outline-secondary">'
+                                                    . '<i class="fas fa-pen-to-square me-1"></i>Editar</a>';
+                                            }
 
                                             echo '</td>
                                                 <td>' . $nomeHtml . $extraHtml . '</td>
@@ -2948,6 +3046,7 @@ HTML;
                                                 <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
                                                 <td>' . $this->formatarMoeda($item['subtotal'], $pedido['moeda']) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
+                                                <td>' . $acoesHtml . '</td>
                                             </tr>';
                                         }
                                         
@@ -2977,6 +3076,18 @@ HTML;
                                             <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
                                             <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
                                             <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
+                                            <tr><td><strong>CPF</strong></td><td>'
+                                                . (
+                                                    !empty($pedido['cliente_cpf_cnpj'])
+                                                        ? htmlspecialchars((string) $pedido['cliente_cpf_cnpj'])
+                                                        : ('<span class="badge bg-warning text-dark">CPF não informado</span>'
+                                                            . (((int) ($pedido['usuario_id'] ?? 0)) > 0
+                                                                ? (' <a href="/admin/usuarios/editar/' . (int) ($pedido['usuario_id'] ?? 0) . '" class="btn btn-sm btn-warning ms-2">'
+                                                                    . '<i class="fas fa-user-pen me-1"></i>Editar cliente</a>')
+                                                                : '')
+                                                        )
+                                                )
+                                                . '</td></tr>
                                             <tr><td><strong>Suite Cliente</strong></td><td>' . (!empty($pedido['cliente_suite']) ? (int) $pedido['cliente_suite'] : 'N/A') . '</td></tr>
                                             <tr><td><strong>Data Criação</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td></tr>
                                             <tr><td><strong>Última Atualização</strong></td><td>' . date('d/m/Y H:i', strtotime($pedido['updated_at'])) . '</td></tr>
