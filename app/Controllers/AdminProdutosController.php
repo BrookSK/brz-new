@@ -2177,9 +2177,56 @@ HTML;
         $limite = 20;
         $offset = ($pagina - 1) * $limite;
         $busca = (string) $request->getParam('busca', '');
+        $sort = (string) $request->getParam('sort', 'nome');
+        $dir = strtoupper((string) $request->getParam('dir', 'ASC'));
+        if ($dir !== 'ASC' && $dir !== 'DESC') {
+            $dir = 'ASC';
+        }
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE produtos');
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $colNames = [];
+            foreach ($cols as $c) {
+                $fn = (string) ($c['Field'] ?? '');
+                if ($fn !== '') {
+                    $colNames[$fn] = true;
+                }
+            }
+
+            $createdCol = null;
+            foreach (['created_at', 'data_cadastro', 'data_criacao', 'created', 'createdAt', 'cadastrado_em', 'dt_cadastro'] as $cand) {
+                if (!empty($colNames[$cand])) {
+                    $createdCol = $cand;
+                    break;
+                }
+            }
+
+            $sortMap = [
+                'nome' => 'name',
+                'sku' => 'sku',
+                'preco' => !empty($colNames['price']) ? 'price' : (!empty($colNames['preco']) ? 'preco' : (!empty($colNames['valor']) ? 'valor' : 'name')),
+                'status' => !empty($colNames['status']) ? 'status' : (!empty($colNames['active']) ? 'active' : 'name'),
+                'cadastro' => $createdCol ?: 'id',
+                'id' => 'id',
+            ];
+            $orderKey = isset($sortMap[$sort]) ? $sortMap[$sort] : 'name';
+            if (empty($colNames[$orderKey])) {
+                $orderKey = 'name';
+            }
+            $orderBy = "p.{$orderKey} {$dir}";
+            if ($orderKey === 'id') {
+                $orderBy .= ', p.name ASC';
+            } else {
+                $orderBy .= ', p.id ASC';
+            }
 
             $params = [];
             $where = ' WHERE 1=1 ';
@@ -2197,7 +2244,7 @@ HTML;
                 $params[':busca'] = '%' . $busca . '%';
             }
 
-            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.name ASC, p.id ASC LIMIT :limite OFFSET :offset';
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
             $stmt = $pdo->prepare($sql);
             foreach ($params as $k => $v) {
                 if ($k === ':rep_id') {
@@ -2267,8 +2314,24 @@ HTML;
             . '<div class="col-md-8">'
             . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
-            . '<div class="col-md-4">'
-            . '<button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>'
+            . '<div class="col-md-2">'
+            . '<select class="form-select" name="sort">'
+            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
+            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
+            . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
+            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
+            . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
+            . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-1">'
+            . '<select class="form-select" name="dir">'
+            . '<option value="ASC"' . ($dir === 'ASC' ? ' selected' : '') . '>ASC</option>'
+            . '<option value="DESC"' . ($dir === 'DESC' ? ' selected' : '') . '>DESC</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-1">'
+            . '<button type="submit" class="btn btn-outline-primary w-100"><i class="fas fa-search"></i></button>'
             . '</div>'
             . '</form>';
 
@@ -2313,8 +2376,18 @@ HTML;
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
-            $mkUrl = function(int $p) use ($base, $busca): string {
-                return $base . "?pagina={$p}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir): string {
+                $url = $base . "?pagina={$p}";
+                if (trim($busca) !== '') {
+                    $url .= "&busca=" . urlencode($busca);
+                }
+                if (trim($sort) !== '') {
+                    $url .= "&sort=" . urlencode($sort);
+                }
+                if (trim($dir) !== '') {
+                    $url .= "&dir=" . urlencode($dir);
+                }
+                return $url;
             };
 
             $start = max(1, $pagina - 1);
@@ -2373,9 +2446,56 @@ HTML;
         $limite = 20;
         $offset = ($pagina - 1) * $limite;
         $busca = (string) $request->getParam('busca', '');
+        $sort = (string) $request->getParam('sort', 'nome');
+        $dir = strtoupper((string) $request->getParam('dir', 'ASC'));
+        if ($dir !== 'ASC' && $dir !== 'DESC') {
+            $dir = 'ASC';
+        }
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE produtos');
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            } catch (\Exception $e) {
+                $cols = [];
+            }
+            $colNames = [];
+            foreach ($cols as $c) {
+                $fn = (string) ($c['Field'] ?? '');
+                if ($fn !== '') {
+                    $colNames[$fn] = true;
+                }
+            }
+
+            $createdCol = null;
+            foreach (['created_at', 'data_cadastro', 'data_criacao', 'created', 'createdAt', 'cadastrado_em', 'dt_cadastro'] as $cand) {
+                if (!empty($colNames[$cand])) {
+                    $createdCol = $cand;
+                    break;
+                }
+            }
+
+            $sortMap = [
+                'nome' => 'name',
+                'sku' => 'sku',
+                'preco' => !empty($colNames['price']) ? 'price' : (!empty($colNames['preco']) ? 'preco' : (!empty($colNames['valor']) ? 'valor' : 'name')),
+                'status' => !empty($colNames['status']) ? 'status' : (!empty($colNames['active']) ? 'active' : 'name'),
+                'cadastro' => $createdCol ?: 'id',
+                'id' => 'id',
+            ];
+            $orderKey = isset($sortMap[$sort]) ? $sortMap[$sort] : 'name';
+            if (empty($colNames[$orderKey])) {
+                $orderKey = 'name';
+            }
+            $orderBy = "p.{$orderKey} {$dir}";
+            if ($orderKey === 'id') {
+                $orderBy .= ', p.name ASC';
+            } else {
+                $orderBy .= ', p.id ASC';
+            }
 
             $params = [];
             $where = ' WHERE (LOWER(COALESCE(p.status,\'\')) = \'archived\' OR p.active = 0) ';
@@ -2461,8 +2581,24 @@ HTML;
             . '<div class="col-md-8">'
             . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
-            . '<div class="col-md-4">'
-            . '<button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Buscar</button>'
+            . '<div class="col-md-2">'
+            . '<select class="form-select" name="sort">'
+            . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
+            . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
+            . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
+            . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
+            . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
+            . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-1">'
+            . '<select class="form-select" name="dir">'
+            . '<option value="ASC"' . ($dir === 'ASC' ? ' selected' : '') . '>ASC</option>'
+            . '<option value="DESC"' . ($dir === 'DESC' ? ' selected' : '') . '>DESC</option>'
+            . '</select>'
+            . '</div>'
+            . '<div class="col-md-1">'
+            . '<button type="submit" class="btn btn-outline-primary w-100"><i class="fas fa-search"></i></button>'
             . '</div>'
             . '</form>';
 
@@ -2502,8 +2638,18 @@ HTML;
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos/arquivados' : '/admin/produtos/arquivados';
-            $mkUrl = function(int $p) use ($base, $busca): string {
-                return $base . "?pagina={$p}" . (trim($busca) !== '' ? "&busca=" . urlencode($busca) : "");
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir): string {
+                $url = $base . "?pagina={$p}";
+                if (trim($busca) !== '') {
+                    $url .= "&busca=" . urlencode($busca);
+                }
+                if (trim($sort) !== '') {
+                    $url .= "&sort=" . urlencode($sort);
+                }
+                if (trim($dir) !== '') {
+                    $url .= "&dir=" . urlencode($dir);
+                }
+                return $url;
             };
 
             $start = max(1, $pagina - 1);
