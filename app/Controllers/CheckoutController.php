@@ -3157,6 +3157,23 @@ class CheckoutController extends Controller {
                     ];
                 }
             }
+
+            // Em alguns schemas, o QR/payload do PIX fica apenas em pedido_pagamentos (split)
+            // e não em colunas do pedido. Fazer fallback para exibir no checkout/conclusao.
+            if ($billingType === 'PIX' && empty($pixQrCode) && !empty($splitPagamentos)) {
+                foreach ($splitPagamentos as $row) {
+                    if (!is_array($row)) continue;
+                    $img = trim((string) ($row['pix_encoded_image'] ?? ''));
+                    $pay = trim((string) ($row['pix_payload'] ?? ''));
+                    if ($img !== '' || $pay !== '') {
+                        $pixQrCode = [
+                            'encodedImage' => $img !== '' ? $img : null,
+                            'payload' => $pay !== '' ? $pay : null,
+                        ];
+                        break;
+                    }
+                }
+            }
         } else {
             // Legado Asaas
             try {
