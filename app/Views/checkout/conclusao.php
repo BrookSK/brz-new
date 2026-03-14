@@ -206,7 +206,7 @@
                     <?php
                     $splitPagamentos = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
                     $hasSplit = !empty($splitPagamentos);
-                    $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '')));
+                    $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '') ?: ($pedido['forma_pagamento'] ?? '')));
                     $invoiceUrl = (is_array($paymentDetails) ? ($paymentDetails['invoiceUrl'] ?? null) : null);
                     $bankSlipUrl = (is_array($paymentDetails) ? ($paymentDetails['bankSlipUrl'] ?? null) : null);
                     $digitableLine = (is_array($paymentDetails) ? ($paymentDetails['digitableLine'] ?? null) : null);

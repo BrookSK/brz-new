@@ -2800,6 +2800,30 @@ class CheckoutController extends Controller {
                             $gateway = 'appmax';
                             $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                             $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
+
+                            // Persistir QR/payload do PIX em pedido_pagamentos para garantir exibição na conclusão,
+                            // mesmo quando o schema de pedidos não possui colunas payment_pix_*.
+                            if ($gateway === 'appmax' && $formaSel === 'pix') {
+                                try {
+                                    $pix = (isset($payResult['pix']) && is_array($payResult['pix'])) ? $payResult['pix'] : null;
+                                    $this->paymentService->registrarPedidoPagamentoSplit([
+                                        'pedido_id' => (int) $pedidoId,
+                                        'componente' => 'pagamento',
+                                        'gateway' => 'appmax',
+                                        'metodo' => 'pix',
+                                        'moeda' => 'BRL',
+                                        'valor' => (float) ($pedidoRowPay['total'] ?? 0),
+                                        'payment_id' => (string) ($payResult['payment_id'] ?? ''),
+                                        'status' => (string) ($payResult['status'] ?? 'pending'),
+                                        'invoice_url' => (string) ($payResult['invoiceUrl'] ?? ''),
+                                        'bank_slip_url' => (string) ($payResult['bankSlipUrl'] ?? ''),
+                                        'digitable_line' => (string) ($payResult['digitableLine'] ?? ''),
+                                        'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
+                                        'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
+                                    ]);
+                                } catch (\Exception $e) {
+                                }
+                            }
                         }
                     } catch (\Exception $e) {
                         throw new \Exception('Erro ao processar pagamento: ' . $e->getMessage());
@@ -3127,13 +3151,15 @@ class CheckoutController extends Controller {
             $splitPagamentos = [];
         }
 
+        // Determinar forma/billingType (fallback para permitir renderização mesmo sem paymentDetails)
+        $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
+        if ($billingType === 'CARTAO_CREDITO') {
+            $billingType = 'CREDIT_CARD';
+        }
+
         // AppMax: não depende de consulta externa aqui; usar dados persistidos no pedido (quando disponíveis)
         $gatewayPedido = strtolower(trim((string) ($pedido['payment_gateway'] ?? ($pedido['pagamento_gateway'] ?? ''))));
         if ($gatewayPedido === 'appmax') {
-            $billingType = strtoupper((string) ($pedido['forma_pagamento'] ?? ''));
-            if ($billingType === 'CARTAO_CREDITO') {
-                $billingType = 'CREDIT_CARD';
-            }
 
             $invoiceUrl = (string) ($pedido['payment_invoice_url'] ?? ($pedido['invoice_url'] ?? ($pedido['invoiceUrl'] ?? '')));
             $bankSlipUrl = (string) ($pedido['payment_bank_slip_url'] ?? ($pedido['bank_slip_url'] ?? ($pedido['bankSlipUrl'] ?? '')));
@@ -3158,22 +3184,6 @@ class CheckoutController extends Controller {
                 }
             }
 
-            // Em alguns schemas, o QR/payload do PIX fica apenas em pedido_pagamentos (split)
-            // e não em colunas do pedido. Fazer fallback para exibir no checkout/conclusao.
-            if ($billingType === 'PIX' && empty($pixQrCode) && !empty($splitPagamentos)) {
-                foreach ($splitPagamentos as $row) {
-                    if (!is_array($row)) continue;
-                    $img = trim((string) ($row['pix_encoded_image'] ?? ''));
-                    $pay = trim((string) ($row['pix_payload'] ?? ''));
-                    if ($img !== '' || $pay !== '') {
-                        $pixQrCode = [
-                            'encodedImage' => $img !== '' ? $img : null,
-                            'payload' => $pay !== '' ? $pay : null,
-                        ];
-                        break;
-                    }
-                }
-            }
         } else {
             // Legado Asaas
             try {
@@ -3188,6 +3198,31 @@ class CheckoutController extends Controller {
                 }
             } catch (\Exception $e) {
             }
+        }
+
+        // Fallback universal: em alguns schemas, o QR/payload do PIX fica apenas em pedido_pagamentos
+        // (tanto no split quanto no fluxo legado). Garantir exibição no checkout/conclusao.
+        if ($billingType === 'PIX' && empty($pixQrCode) && !empty($splitPagamentos)) {
+            foreach ($splitPagamentos as $row) {
+                if (!is_array($row)) continue;
+                $img = trim((string) ($row['pix_encoded_image'] ?? ''));
+                $pay = trim((string) ($row['pix_payload'] ?? ''));
+                if ($img !== '' || $pay !== '') {
+                    $pixQrCode = [
+                        'encodedImage' => $img !== '' ? $img : null,
+                        'payload' => $pay !== '' ? $pay : null,
+                    ];
+                    break;
+                }
+            }
+        }
+
+        // Se não temos paymentDetails por gateway (ex.: split), ao menos expor billingType para a view
+        if (empty($paymentDetails)) {
+            $paymentDetails = [
+                'billingType' => $billingType,
+                'status' => (string) ($pedido['payment_status'] ?? ''),
+            ];
         }
         
         $this->view('checkout/conclusao', [
