@@ -238,7 +238,9 @@ class PaymentService {
             'payment_method' => 'pix',
             'client' => (array) $customer,
             'duplicate' => 0,
-            'take_rates' => 0,
+            // Garante que taxas/custos/IOF não sejam repassados ao cliente via acréscimo no PIX.
+            // Quando take_rates=0, o comportamento pode seguir o padrão do Painel e aumentar o valor cobrado.
+            'take_rates' => 1,
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
@@ -294,7 +296,13 @@ class PaymentService {
                 'pix_encoded_image' => $pixImg,
                 'pix_payload' => $pixPayload,
                 'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'AGUARDANDO_CLIENTE',
-                'metadata' => json_encode(['raw' => $resp, 'amount_usd_calc' => round($amountUsd, 2)], JSON_UNESCAPED_UNICODE),
+                'metadata' => json_encode([
+                    'raw' => $resp,
+                    'amount_brl_sent' => round($valorBrlOriginal, 2),
+                    'transaction_amount_brl_returned' => (float) ($tx['amount'] ?? 0),
+                    'take_rates_sent' => 1,
+                    'amount_usd_calc' => round($amountUsd, 2),
+                ], JSON_UNESCAPED_UNICODE),
             ]);
 
             return [
