@@ -78,19 +78,137 @@ class PaymentService {
 
     }
 
+    public function createCambioRealDirectPaymentProdutoBoleto(
+        int $pedidoId,
+        float $valorBrlOriginal,
+        string $descricao,
+        array $client
+    ): array {
+        $pedidoId = (int) $pedidoId;
+        $valorBrlOriginal = (float) $valorBrlOriginal;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($valorBrlOriginal <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real está desabilitado.'];
+        }
+
+        $clientName = (string) ($client['name'] ?? ($client['nome'] ?? ''));
+        $clientEmail = (string) ($client['email'] ?? '');
+        $clientDoc = (string) ($client['document'] ?? ($client['documento'] ?? ''));
+        $clientBirth = (string) ($client['birth_date'] ?? ($client['data_nascimento'] ?? ''));
+        $clientPhone = (string) ($client['phone'] ?? ($client['telefone'] ?? ''));
+        $clientIp = (string) ($client['ip'] ?? '127.0.0.1');
+        $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
+
+        $payload = [
+            'order_id' => (string) $pedidoId,
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
+            'payment_method' => 'boleto',
+            'client' => [
+                'name' => $clientName,
+                'email' => $clientEmail,
+                'document' => $clientDoc,
+                'birth_date' => $clientBirth,
+                'phone' => $clientPhone,
+                'ip' => $clientIp,
+                'address' => [
+                    'state' => (string) ($addr['state'] ?? ($addr['estado'] ?? '')),
+                    'city' => (string) ($addr['city'] ?? ($addr['cidade'] ?? '')),
+                    'zip_code' => (string) ($addr['zip_code'] ?? ($addr['cep'] ?? '')),
+                    'district' => (string) ($addr['district'] ?? ($addr['bairro'] ?? '')),
+                    'street' => (string) ($addr['street'] ?? ($addr['endereco'] ?? '')),
+                    'number' => (string) ($addr['number'] ?? ($addr['numero'] ?? '')),
+                ],
+            ],
+            'duplicate' => 0,
+            'take_rates' => 1,
+            'products' => [
+                [
+                    'descricao' => $descricao,
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
+
+        try {
+            $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                $msg = (string) ($resp['message'] ?? 'Falha ao criar boleto no Câmbio Real (Direct API)');
+                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg];
+            }
+
+            $paymentId = (string) ($data['id'] ?? '');
+            $code = (string) ($data['code'] ?? '');
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+
+            $gatewayStatus = strtoupper(trim((string) ($tx['status'] ?? ($tx['payment_status'] ?? 'PENDING'))));
+            $ticketUrl = (string) ($tx['ticket_url'] ?? '');
+            $digitableLine = (string) ($tx['digitable_line'] ?? ($tx['linha_digitavel'] ?? ($tx['barcode_number'] ?? '')));
+
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Câmbio Real: resposta inválida (id ausente)'];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'cambioreal',
+                'metodo' => 'boleto',
+                'moeda' => 'BRL',
+                'valor' => round($valorBrlOriginal, 2),
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'invoice_url' => $ticketUrl,
+                'bank_slip_url' => $ticketUrl,
+                'digitable_line' => $digitableLine,
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'PENDING',
+                'metadata' => json_encode([
+                    'raw' => $resp,
+                    'code' => $code,
+                    'amount_brl_sent' => round($valorBrlOriginal, 2),
+                    'take_rates_sent' => 1,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'code' => $code,
+                'invoice_url' => $ticketUrl,
+                'bank_slip_url' => $ticketUrl,
+                'digitable_line' => $digitableLine,
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     public function createCambioRealDirectPaymentProdutoCartao(
         int $pedidoId,
-        float $amountUsd,
+        float $valorBrlOriginal,
+        float $amountUsdCalc,
         string $descricao,
         array $client,
         array $card
     ): array {
         $pedidoId = (int) $pedidoId;
-        $amountUsd = (float) $amountUsd;
+        $valorBrlOriginal = (float) $valorBrlOriginal;
+        $amountUsdCalc = (float) $amountUsdCalc;
         if ($pedidoId <= 0) {
             return ['success' => false, 'error' => 'Pedido inválido'];
         }
-        if ($amountUsd <= 0) {
+        if ($valorBrlOriginal <= 0) {
             return ['success' => false, 'error' => 'Valor inválido'];
         }
         if (!$this->isCambioRealEnabled()) {
@@ -111,6 +229,9 @@ class PaymentService {
         if (!in_array($type, ['credit', 'debit'], true)) {
             $type = 'credit';
         }
+        if ($type === 'debit') {
+            $paymentMethod = 'debit_card';
+        }
 
         if ($token === '' || $brand === '' || $bin === '' || $dfpId === '' || $holder === '') {
             return ['success' => false, 'error' => 'Câmbio Real: token/brand/bin/dfp_id/holder são obrigatórios para Direct API'];
@@ -127,8 +248,8 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            'amount' => round($amountUsd, 2),
-            'currency' => 'USD',
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
             'payment_method' => $paymentMethod,
             'client' => [
                 'name' => $clientName,
@@ -157,12 +278,12 @@ class PaymentService {
                 'type' => $type,
             ],
             'duplicate' => 0,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'products' => [
                 [
                     'descricao' => $descricao,
-                    'base_value' => round($amountUsd, 2),
-                    'valor' => round($amountUsd, 2),
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
@@ -193,13 +314,19 @@ class PaymentService {
                 'componente' => 'produto',
                 'gateway' => 'cambioreal',
                 'metodo' => ($type === 'debit' ? 'cartao_debito' : 'cartao_credito'),
-                'moeda' => 'USD',
-                'valor' => round($amountUsd, 2),
+                'moeda' => 'BRL',
+                'valor' => round($valorBrlOriginal, 2),
                 'payment_id' => $paymentId,
                 'status' => 'pending',
                 'invoice_url' => $ticketUrl,
                 'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'PENDING',
-                'metadata' => json_encode(['raw' => $resp, 'code' => $code], JSON_UNESCAPED_UNICODE),
+                'metadata' => json_encode([
+                    'raw' => $resp,
+                    'code' => $code,
+                    'amount_brl_sent' => round($valorBrlOriginal, 2),
+                    'amount_usd_calc' => round($amountUsdCalc, 2),
+                    'take_rates_sent' => 1,
+                ], JSON_UNESCAPED_UNICODE),
             ]);
 
             return [

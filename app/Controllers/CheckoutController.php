@@ -2788,6 +2788,27 @@ class CheckoutController extends Controller {
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
                                     }
+                                } elseif ($formaSelecionada === 'boleto') {
+                                    $client = [
+                                        'name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
+                                        'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+                                        'document' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
+                                        'birth_date' => (string) ($dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? '')),
+                                        'phone' => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? ''))),
+                                        'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                                        'address' => [
+                                            'state' => (string) ($dados['estado'] ?? ''),
+                                            'city' => (string) ($dados['cidade'] ?? ''),
+                                            'zip_code' => (string) ($dados['cep'] ?? ''),
+                                            'district' => (string) ($dados['bairro'] ?? ''),
+                                            'street' => (string) ($dados['endereco'] ?? ''),
+                                            'number' => (string) ($dados['numero'] ?? ''),
+                                        ],
+                                    ];
+                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $client);
+                                    if (empty($cr['success'])) {
+                                        throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar boleto Câmbio Real (produto)'));
+                                    }
                                 } else {
                                     $token = (string) ($dados['cambioreal_card_token'] ?? '');
                                     $brand = (string) ($dados['cambioreal_card_brand'] ?? '');
@@ -2845,7 +2866,7 @@ class CheckoutController extends Controller {
                                         'type' => $cardType,
                                     ];
 
-                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
+                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $valorProduto, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar pagamento Câmbio Real (produto)'));
                                     }
