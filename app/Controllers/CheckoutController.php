@@ -2603,7 +2603,8 @@ class CheckoutController extends Controller {
                 if ($moedaPedidoPay === '') {
                     $moedaPedidoPay = 'BRL';
                 }
-                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $moedaPedidoPay === 'BRL' && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
+                // PIX: cobrar direto via AppMax para permitir QR Code (sem link externo do Câmbio Real)
+                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $formaSelecionada !== 'pix' && $moedaPedidoPay === 'BRL' && in_array($formaSelecionada, ['boleto', 'cartao_credito', 'cartao_debito'], true));
                 // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
                 if ($shouldTrySplit && $reused) {
                     $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
@@ -2670,12 +2671,63 @@ class CheckoutController extends Controller {
 
                             $cr = null;
                             if ($valorProduto > 0) {
-                                $cust = [
+                                $token = (string) ($dados['cambioreal_card_token'] ?? '');
+                                $brand = (string) ($dados['cambioreal_card_brand'] ?? '');
+                                $bin = (string) ($dados['cambioreal_card_bin'] ?? '');
+                                $dfpId = (string) ($dados['cambioreal_card_dfp_id'] ?? '');
+                                $cardType = (string) ($dados['cambioreal_card_type'] ?? 'credit');
+
+                                $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                if ($tx <= 1.01) {
+                                    try {
+                                        $dbTx = \Config\Database::getConnection();
+                                        $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                        $stTx->execute();
+                                        $v = (string) ($stTx->fetchColumn() ?: '0');
+                                        $tx2 = (float) str_replace(',', '.', $v);
+                                        if ($tx2 > 1.01) {
+                                            $tx = $tx2;
+                                        }
+                                    } catch (\Exception $e) {
+                                    }
+                                }
+                                if ($tx <= 0) {
+                                    $tx = 1.0;
+                                }
+
+                                $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                if ($amountUsd <= 0) {
+                                    throw new \Exception('Valor inválido para Câmbio Real (USD)');
+                                }
+
+                                $client = [
                                     'name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
                                     'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
-                                    'phone_number' => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? ''))),
+                                    'document' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
+                                    'birth_date' => (string) ($dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? '')),
+                                    'phone' => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? ''))),
+                                    'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                                    'address' => [
+                                        'state' => (string) ($dados['estado'] ?? ''),
+                                        'city' => (string) ($dados['cidade'] ?? ''),
+                                        'zip_code' => (string) ($dados['cep'] ?? ''),
+                                        'district' => (string) ($dados['bairro'] ?? ''),
+                                        'street' => (string) ($dados['endereco'] ?? ''),
+                                        'number' => (string) ($dados['numero'] ?? ''),
+                                    ],
                                 ];
-                                $cr = $this->paymentService->createCambioRealCheckoutRequestProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $cust);
+
+                                $card = [
+                                    'token' => trim($token),
+                                    'brand' => trim($brand),
+                                    'bin' => trim($bin),
+                                    'dfp_id' => trim($dfpId),
+                                    'holder' => (string) ($dados['card_holder_name'] ?? ''),
+                                    'installments' => 1,
+                                    'type' => $cardType,
+                                ];
+
+                                $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
                                 if (empty($cr['success'])) {
                                     throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar pagamento Câmbio Real (produto)'));
                                 }
@@ -2744,7 +2796,8 @@ class CheckoutController extends Controller {
                             // Fluxo legado (AppMax total) - cartao_credito permanece aqui por enquanto.
                             $payResult = $this->processarPagamentoPedido((int) $pedidoId, $dados, $usuario ?? [], $pedidoRowPay);
                             $formaSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
-                            $gateway = in_array($formaSel, ['pix', 'boleto'], true) ? 'asaas' : 'appmax';
+                            // BRL: PaymentService usa AppMax por padrão (PIX/BOLETO/CC/CD)
+                            $gateway = 'appmax';
                             $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                             $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
                         }

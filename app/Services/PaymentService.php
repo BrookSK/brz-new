@@ -30,6 +30,7 @@ class PaymentService {
     private $cambioRealEnabled;
     private $cambioRealAppId;
     private $cambioRealAppSecret;
+    private $cambioRealAppPublic;
     private $cambioRealBaseUrl;
     
     private function garantirTabelaPedidoPagamentos(): void {
@@ -66,13 +67,151 @@ class PaymentService {
                 $db->exec('ALTER TABLE pedido_pagamentos DROP INDEX uk_pp_gateway_payment');
             } catch (\Exception $e) {
             }
+
             try {
                 $db->exec('ALTER TABLE pedido_pagamentos ADD UNIQUE KEY uk_pp_gateway_payment_comp (gateway, payment_id, componente)');
             } catch (\Exception $e) {
             }
+
         } catch (\Exception $e) {
         }
 
+    }
+
+    public function createCambioRealDirectPaymentProdutoCartao(
+        int $pedidoId,
+        float $amountUsd,
+        string $descricao,
+        array $client,
+        array $card
+    ): array {
+        $pedidoId = (int) $pedidoId;
+        $amountUsd = (float) $amountUsd;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($amountUsd <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real está desabilitado.'];
+        }
+
+        $orderId = (string) $pedidoId;
+        $paymentMethod = 'credit_card';
+
+        $token = trim((string) ($card['token'] ?? ''));
+        $brand = trim((string) ($card['brand'] ?? ''));
+        $bin = preg_replace('/\D+/', '', (string) ($card['bin'] ?? ''));
+        $dfpId = trim((string) ($card['dfp_id'] ?? ''));
+        $holder = trim((string) ($card['holder'] ?? ''));
+        $installments = (int) ($card['installments'] ?? 1);
+        if ($installments <= 0) $installments = 1;
+        $type = strtolower(trim((string) ($card['type'] ?? 'credit')));
+        if (!in_array($type, ['credit', 'debit'], true)) {
+            $type = 'credit';
+        }
+
+        if ($token === '' || $brand === '' || $bin === '' || $dfpId === '' || $holder === '') {
+            return ['success' => false, 'error' => 'Câmbio Real: token/brand/bin/dfp_id/holder são obrigatórios para Direct API'];
+        }
+
+        $clientName = (string) ($client['name'] ?? ($client['nome'] ?? ''));
+        $clientEmail = (string) ($client['email'] ?? '');
+        $clientDoc = (string) ($client['document'] ?? ($client['documento'] ?? ''));
+        $clientBirth = (string) ($client['birth_date'] ?? ($client['data_nascimento'] ?? ''));
+        $clientPhone = (string) ($client['phone'] ?? ($client['telefone'] ?? ''));
+        $clientIp = (string) ($client['ip'] ?? '127.0.0.1');
+
+        $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
+
+        $payload = [
+            'order_id' => $orderId,
+            'amount' => round($amountUsd, 2),
+            'currency' => 'USD',
+            'payment_method' => $paymentMethod,
+            'client' => [
+                'name' => $clientName,
+                'email' => $clientEmail,
+                'document' => $clientDoc,
+                'birth_date' => $clientBirth,
+                'phone' => $clientPhone,
+                'ip' => $clientIp,
+                'address' => [
+                    'state' => (string) ($addr['state'] ?? ($addr['estado'] ?? '')),
+                    'city' => (string) ($addr['city'] ?? ($addr['cidade'] ?? '')),
+                    'zip_code' => (string) ($addr['zip_code'] ?? ($addr['cep'] ?? '')),
+                    'district' => (string) ($addr['district'] ?? ($addr['bairro'] ?? '')),
+                    'street' => (string) ($addr['street'] ?? ($addr['endereco'] ?? '')),
+                    'number' => (string) ($addr['number'] ?? ($addr['numero'] ?? '')),
+                ],
+            ],
+            'card' => [
+                'bin' => $bin,
+                'brand' => $brand,
+                'country' => 'BR',
+                'dfp_id' => $dfpId,
+                'holder' => $holder,
+                'installments' => $installments,
+                'token' => $token,
+                'type' => $type,
+            ],
+            'duplicate' => 0,
+            'take_rates' => 0,
+            'products' => [
+                [
+                    'descricao' => $descricao,
+                    'base_value' => round($amountUsd, 2),
+                    'valor' => round($amountUsd, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
+
+        try {
+            $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                $msg = (string) ($resp['message'] ?? 'Falha ao criar transação no Câmbio Real (Direct API)');
+                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg];
+            }
+
+            $paymentId = (string) ($data['id'] ?? '');
+            $code = (string) ($data['code'] ?? '');
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+            $gatewayStatus = strtoupper(trim((string) ($tx['status'] ?? ($tx['payment_status'] ?? 'PENDING'))));
+            $ticketUrl = (string) ($tx['ticket_url'] ?? '');
+
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Câmbio Real: resposta inválida (id ausente)'];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => 'produto',
+                'gateway' => 'cambioreal',
+                'metodo' => ($type === 'debit' ? 'cartao_debito' : 'cartao_credito'),
+                'moeda' => 'USD',
+                'valor' => round($amountUsd, 2),
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'invoice_url' => $ticketUrl,
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'PENDING',
+                'metadata' => json_encode(['raw' => $resp, 'code' => $code], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'code' => $code,
+                'invoice_url' => $ticketUrl,
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 
     private function isMercadoPagoEnabled(): bool {
@@ -83,6 +222,18 @@ class PaymentService {
     private function isCambioRealEnabled(): bool {
         $v = strtolower(trim((string) $this->cambioRealEnabled));
         return ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on');
+    }
+
+    public function getCambioRealAppId(): string {
+        return (string) ($this->cambioRealAppId ?? '');
+    }
+
+    public function getCambioRealAppPublic(): string {
+        return (string) ($this->cambioRealAppPublic ?? '');
+    }
+
+    public function getCambioRealBaseUrlPublic(): string {
+        return (string) $this->getCambioRealBaseUrl();
     }
 
     private function getCambioRealBaseUrl(): string {
@@ -3309,6 +3460,7 @@ class PaymentService {
         $this->cambioRealEnabled = (string) $this->getConfig('pagamentos', 'cambioreal_enabled', '0');
         $this->cambioRealAppId = (string) $this->getConfig('pagamentos', 'cambioreal_app_id', '');
         $this->cambioRealAppSecret = (string) $this->getConfig('pagamentos', 'cambioreal_app_secret', '');
+        $this->cambioRealAppPublic = (string) $this->getConfig('pagamentos', 'cambioreal_app_public', '');
         $this->cambioRealBaseUrl = (string) $this->getConfig('pagamentos', 'cambioreal_base_url', '');
     }
 
@@ -3339,6 +3491,7 @@ class PaymentService {
                         'cambioreal_enabled',
                         'cambioreal_app_id',
                         'cambioreal_app_secret',
+                        'cambioreal_app_public',
                         'cambioreal_base_url',
                         'stripe_secret_key',
                         'stripe_publishable_key',

@@ -1945,6 +1945,10 @@ class AdminConfiguracoesController extends Controller {
                                                                 <input type="text" class="form-control" name="pagamentos_cambioreal_app_id" value="' . htmlspecialchars($this->getConfigValue($config, 'pagamentos', 'cambioreal_app_id', ''), ENT_QUOTES, 'UTF-8') . '">
                                                             </div>
                                                             <div class="mb-3">
+                                                                <label class="form-label">APP Public</label>
+                                                                <input type="text" class="form-control" name="pagamentos_cambioreal_app_public" value="' . htmlspecialchars($this->getConfigValue($config, 'pagamentos', 'cambioreal_app_public', ''), ENT_QUOTES, 'UTF-8') . '">
+                                                            </div>
+                                                            <div class="mb-3">
                                                                 <label class="form-label">APP Secret</label>
                                                                 <div class="input-group">
                                                                     <input type="password" class="form-control" name="pagamentos_cambioreal_app_secret" value="' . htmlspecialchars($this->getConfigValue($config, 'pagamentos', 'cambioreal_app_secret', ''), ENT_QUOTES, 'UTF-8') . '">

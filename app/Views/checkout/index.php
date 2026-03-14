@@ -2,6 +2,18 @@
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
     <script>
+        window.CAMBIOREAL_DIRECT = {
+            appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+            appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+            baseUrl: <?= json_encode((string) ($cambioreal_base_url ?? ''), JSON_UNESCAPED_UNICODE) ?>
+        };
+    </script>
+    <?php
+        $crBase = (string) ($cambioreal_base_url ?? '');
+        $crIsSandbox = stripos($crBase, 'sandbox.cambioreal.com') !== false;
+    ?>
+    <script src="<?= $crIsSandbox ? 'https://sandbox.cambioreal.com/js/card-hash.js' : 'https://www.cambioreal.com/js/card-hash.js' ?>"></script>
+    <script>
         window.CHECKOUT_I18N = {
             attention: <?= json_encode(__('checkout.attention', 'Atenção'), JSON_UNESCAPED_UNICODE) ?>,
             complete_data_and_terms: <?= json_encode(__('checkout.complete_data_and_terms', 'você precisa completar seus dados e aceitar os termos para finalizar a compra.'), JSON_UNESCAPED_UNICODE) ?>,
@@ -1243,7 +1255,7 @@ function debugBotaoFinalizar() {
 }
 
 // Função para processar pedido diretamente
-function processarPedidoDireto() {
+async function processarPedidoDireto() {
     console.log('🔍 [DIRETO] Processando pedido diretamente...');
     
     const form = document.getElementById('checkout-form');
@@ -1299,8 +1311,8 @@ function processarPedidoDireto() {
         formData.append('forma_pagamento', formaPagamento);
         console.log(`🔍 [DIRETO] forma_pagamento: ${formaPagamento} (garantido)`);
 
-        // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL/AppMax)
-        if (formaPagamento === 'cartao_credito' && currentCurrency === 'BRL') {
+        // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL)
+        if ((formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito') && currentCurrency === 'BRL') {
             const camposCartao = document.getElementById('campos-cartao');
             const nomeCartao = camposCartao ? camposCartao.querySelector('input[name="card_holder_name"]') : null;
             const numeroCartao = camposCartao ? camposCartao.querySelector('input[name="card_number"]') : null;
@@ -1345,6 +1357,85 @@ function processarPedidoDireto() {
     botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
     showCheckoutLoading();
     
+    async function maybeAttachCambioRealCardHash(formData){
+        try {
+            const moedaHidden = document.getElementById('moeda_hidden');
+            const currentCurrency = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+            const formaPagamentoSelect = document.getElementById('forma_pagamento');
+            const formaPagamento = formaPagamentoSelect ? String(formaPagamentoSelect.value || '') : '';
+
+            const need = (currentCurrency === 'BRL') && (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
+            if (!need) return;
+
+            const cfg = window.CAMBIOREAL_DIRECT || {};
+            const appId = String(cfg.appId || '').trim();
+            const appPublic = String(cfg.appPublic || '').trim();
+            const baseUrl = String(cfg.baseUrl || '').trim();
+            const sandbox = (baseUrl !== '') ? (baseUrl.indexOf('sandbox.cambioreal.com') !== -1) : true;
+
+            if (!appId || !appPublic || typeof CardHash !== 'function') {
+                return;
+            }
+
+            const camposCartao = document.getElementById('campos-cartao');
+            const blocoManual = document.getElementById('campos-cartao-manual');
+            const holderEl = blocoManual ? blocoManual.querySelector('input[name="card_holder_name"]') : null;
+            const numberEl = blocoManual ? blocoManual.querySelector('input[name="card_number"]') : null;
+            const mmEl = blocoManual ? blocoManual.querySelector('input[name="card_expiry_month"]') : null;
+            const yyEl = blocoManual ? blocoManual.querySelector('input[name="card_expiry_year"]') : null;
+            const cvvEl = blocoManual ? blocoManual.querySelector('input[name="card_cvv"]') : null;
+
+            const holder = holderEl ? String(holderEl.value || '').trim() : '';
+            const number = numberEl ? String(numberEl.value || '').replace(/\s/g,'').trim() : '';
+            const mm = mmEl ? String(mmEl.value || '').trim() : '';
+            const yyyy = yyEl ? String(yyEl.value || '').trim() : '';
+            const cvv = cvvEl ? String(cvvEl.value || '').trim() : '';
+
+            if (!holder || !number || !mm || !yyyy || !cvv) {
+                return;
+            }
+
+            const dfpId = 'PEDIDO_' + String(Date.now());
+            const cardHashLib = new CardHash(appId, appPublic, dfpId, sandbox);
+
+            const expYY = yyyy.length === 4 ? yyyy.substring(2) : yyyy;
+            const expiration = (mm.padStart(2,'0') + expYY.padStart(2,'0')).replace(/\D/g,'');
+
+            const cardData = {
+                number: number,
+                holder_name: holder,
+                expiration_date: expiration,
+                cvv: cvv,
+            };
+
+            const token = await cardHashLib.generateCardHash(cardData);
+            const brand = String(cardHashLib.detectBrand(number) || '').trim();
+            const bin = String(number.substring(0,6) || '').replace(/\D/g,'');
+
+            if (!token || !brand || !bin) {
+                return;
+            }
+
+            formData.set('cambioreal_card_token', token);
+            formData.set('cambioreal_card_brand', brand);
+            formData.set('cambioreal_card_bin', bin);
+            formData.set('cambioreal_card_dfp_id', dfpId);
+            formData.set('cambioreal_card_type', (formaPagamento === 'cartao_debito') ? 'debit' : 'credit');
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    try {
+        await maybeAttachCambioRealCardHash(formData);
+    } catch (e) {
+        hideCheckoutLoading();
+        botao.disabled = false;
+        botao.innerHTML = '<i class="fas fa-check"></i> Finalizar Pedido';
+        alert((e && e.message) ? e.message : 'Falha ao gerar token do cartão.');
+        return;
+    }
+
     // Enviar requisição AJAX (criar pedido)
     fetch('/checkout/processar', {
         method: 'POST',
