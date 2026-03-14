@@ -214,120 +214,100 @@ class PaymentService {
         }
     }
 
-    public function createCambioRealPixPaymentProduto(int $pedidoId, float $valorBrl, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null): array {
+    public function createCambioRealPixPaymentProduto(int $pedidoId, float $amountUsd, float $valorBrlOriginal, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null): array {
         $pedidoId = (int) $pedidoId;
-        $valorBrl = (float) $valorBrl;
+        $amountUsd = (float) $amountUsd;
+        $valorBrlOriginal = (float) $valorBrlOriginal;
 
         if ($pedidoId <= 0) {
             return ['success' => false, 'error' => 'Pedido inválido'];
         }
-        if ($valorBrl <= 0) {
+        if ($amountUsd <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if ($valorBrlOriginal <= 0) {
             return ['success' => false, 'error' => 'Valor inválido'];
         }
 
-        // 1) Criar checkout/request (gera token)
-        $req = $this->createCambioRealCheckoutRequestProduto($pedidoId, $valorBrl, $descricao, $customer, $successUrl, $errorUrl);
-        if (empty($req['success'])) {
-            return $req;
-        }
+        $payload = [
+            'order_id' => (string) ($pedidoId . '-produto'),
+            'amount' => round($amountUsd, 2),
+            'currency' => 'USD',
+            'payment_method' => 'pix',
+            'client' => (array) $customer,
+            'duplicate' => 0,
+            'take_rates' => 0,
+            'products' => [
+                [
+                    'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
+                    'base_value' => round($amountUsd, 2),
+                    'valor' => round($amountUsd, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
 
-        $token = (string) ($req['payment_id'] ?? '');
-        if ($token === '') {
-            return ['success' => false, 'error' => 'Câmbio Real: token não retornado ao criar checkout.'];
-        }
-
-        // 2) Buscar detalhes do checkout para tentar extrair QR do PIX
-        $tx = [];
         try {
-            $tx = $this->obterTransacaoCambioReal($token);
-        } catch (\Exception $e) {
-            $tx = [];
-        }
+            $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
 
-        $txData = is_array($tx['data'] ?? null) ? (array) $tx['data'] : [];
-
-        $findFirstString = function ($data, array $keys) use (&$findFirstString): string {
-            if (!is_array($data)) {
-                return '';
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                $msg = (string) ($resp['message'] ?? 'Falha ao criar PIX no Câmbio Real');
+                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg];
             }
-            foreach ($keys as $k) {
-                if (array_key_exists($k, $data) && is_string($data[$k]) && trim($data[$k]) !== '') {
-                    return trim($data[$k]);
-                }
+
+            $paymentId = (string) ($data['id'] ?? '');
+            if ($paymentId === '') {
+                $paymentId = (string) ($data['code'] ?? '');
             }
-            foreach ($data as $v) {
-                if (is_array($v)) {
-                    $found = $findFirstString($v, $keys);
-                    if ($found !== '') {
-                        return $found;
-                    }
-                }
+
+            $pixPayload = trim((string) ($tx['number'] ?? ''));
+            $pixImg = trim((string) ($tx['barcode'] ?? ''));
+            $invoiceUrl = trim((string) ($tx['ticket_url'] ?? ''));
+            $gatewayStatus = trim((string) ($tx['code'] ?? ($data['code'] ?? 'AGUARDANDO_CLIENTE')));
+
+            if ($pixImg !== '') {
+                // No Direct API o barcode geralmente vem como data:image/svg+xml;base64,...
+                $pixImg = preg_replace('#^data:image/[^;]+;base64,#', '', $pixImg);
+                $pixImg = trim((string) $pixImg);
             }
-            return '';
-        };
 
-        $pixPayload = $findFirstString($txData, [
-            'payload',
-            'emv',
-            'brcode',
-            'br_code',
-            'pix_payload',
-            'pix_emv',
-            'pix_copy_paste',
-            'copy_paste',
-            'copyPaste',
-            'copia_e_cola',
-        ]);
-        $pixImg = $findFirstString($txData, [
-            'encodedImage',
-            'encoded_image',
-            'qr_code_base64',
-            'qrcode_base64',
-            'pix_qrcode_base64',
-            'pix_qr_base64',
-            'pix_encoded_image',
-            'image_base64',
-            'base64',
-        ]);
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Câmbio Real: resposta inválida ao criar PIX (id ausente).'];
+            }
 
-        if ($pixImg !== '') {
-            $pixImg = preg_replace('#^data:image/[^;]+;base64,#', '', $pixImg);
-            $pixImg = trim((string) $pixImg);
-        }
-
-        // Persistir como PIX no split (atualiza registro do produto criado pelo checkout/request)
-        try {
             $this->registrarPedidoPagamentoSplit([
                 'pedido_id' => $pedidoId,
                 'componente' => 'produto',
                 'gateway' => 'cambioreal',
                 'metodo' => 'pix',
                 'moeda' => 'BRL',
-                'valor' => round($valorBrl, 2),
-                'payment_id' => $token,
+                'valor' => round($valorBrlOriginal, 2),
+                'payment_id' => $paymentId,
                 'status' => 'pending',
-                'invoice_url' => (string) ($req['invoice_url'] ?? ''),
+                'invoice_url' => $invoiceUrl,
                 'pix_encoded_image' => $pixImg,
                 'pix_payload' => $pixPayload,
-                'gateway_status' => (string) ($txData['status'] ?? ($tx['status'] ?? 'AGUARDANDO_CLIENTE')),
-                'metadata' => json_encode(['raw_request' => ($req['raw'] ?? null), 'raw_tx' => $tx], JSON_UNESCAPED_UNICODE),
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'AGUARDANDO_CLIENTE',
+                'metadata' => json_encode(['raw' => $resp, 'amount_usd' => round($amountUsd, 2)], JSON_UNESCAPED_UNICODE),
             ]);
-        } catch (\Exception $e) {
-        }
 
-        return [
-            'success' => true,
-            'payment_id' => $token,
-            'invoice_url' => (string) ($req['invoice_url'] ?? ''),
-            'pix' => [
-                'encodedImage' => $pixImg !== '' ? $pixImg : null,
-                'payload' => $pixPayload !== '' ? $pixPayload : null,
-            ],
-            'raw' => [
-                'request' => ($req['raw'] ?? null),
-                'tx' => $tx,
-            ],
-        ];
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'invoice_url' => $invoiceUrl,
+                'pix' => [
+                    'encodedImage' => $pixImg !== '' ? $pixImg : null,
+                    'payload' => $pixPayload !== '' ? $pixPayload : null,
+                ],
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 
     private function isMercadoPagoEnabled(): bool {

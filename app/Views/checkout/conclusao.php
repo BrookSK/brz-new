@@ -276,8 +276,22 @@
                                 <div id="<?= $boxId ?>_copied" class="small text-success mt-1" style="display:none;"><?= __('checkout_done.copied', 'Copiado!') ?></div>
 
                                 <?php if ($pixImg !== ''): ?>
+                                    <?php
+                                    $mime = 'image/png';
+                                    try {
+                                        $decoded = base64_decode($pixImg, true);
+                                        if ($decoded !== false) {
+                                            $head = ltrim(substr((string) $decoded, 0, 200));
+                                            if ($head !== '' && (stripos($head, '<svg') !== false || stripos($head, '<?xml') !== false)) {
+                                                $mime = 'image/svg+xml';
+                                            }
+                                        }
+                                    } catch (\Exception $e) {
+                                        $mime = 'image/png';
+                                    }
+                                    ?>
                                     <div class="text-center my-3">
-                                        <img src="data:image/png;base64,<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
+                                        <img src="data:<?= htmlspecialchars($mime) ?>;base64,<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -292,8 +306,22 @@
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
                         <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
                         <?php if (!empty($pixImage)): ?>
+                            <?php
+                            $mime = 'image/png';
+                            try {
+                                $decoded = base64_decode((string) $pixImage, true);
+                                if ($decoded !== false) {
+                                    $head = ltrim(substr((string) $decoded, 0, 200));
+                                    if ($head !== '' && (stripos($head, '<svg') !== false || stripos($head, '<?xml') !== false)) {
+                                        $mime = 'image/svg+xml';
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                $mime = 'image/png';
+                            }
+                            ?>
                             <div class="text-center my-3">
-                                <img src="data:image/png;base64,<?= $pixImage ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
+                                <img src="data:<?= htmlspecialchars($mime) ?>;base64,<?= htmlspecialchars((string) $pixImage) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
                             </div>
                         <?php endif; ?>
                         <?php if (!empty($pixPayload)): ?>

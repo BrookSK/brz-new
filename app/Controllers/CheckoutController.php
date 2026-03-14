@@ -2671,14 +2671,47 @@ class CheckoutController extends Controller {
                             $cr = null;
                             if ($valorProduto > 0) {
                                 if ($formaSelecionada === 'pix') {
-                                    $cust = [
+                                    $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                    if ($tx <= 1.01) {
+                                        try {
+                                            $dbTx = \Config\Database::getConnection();
+                                            $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                            $stTx->execute();
+                                            $v = (string) ($stTx->fetchColumn() ?: '0');
+                                            $tx2 = (float) str_replace(',', '.', $v);
+                                            if ($tx2 > 1.01) {
+                                                $tx = $tx2;
+                                            }
+                                        } catch (\Exception $e) {
+                                        }
+                                    }
+                                    if ($tx <= 0) {
+                                        $tx = 1.0;
+                                    }
+
+                                    $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                    if ($amountUsd <= 0) {
+                                        throw new \Exception('Valor inválido para Câmbio Real (USD)');
+                                    }
+
+                                    $client = [
                                         'name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
                                         'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
-                                        'documento' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
-                                        'telefone' => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? ''))),
-                                        'cpf' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
+                                        'document' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
+                                        'birth_date' => (string) ($dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? '')),
+                                        'phone' => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? ''))),
+                                        'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                                        'address' => [
+                                            'state' => (string) ($dados['estado'] ?? ''),
+                                            'city' => (string) ($dados['cidade'] ?? ''),
+                                            'zip_code' => (string) ($dados['cep'] ?? ''),
+                                            'district' => (string) ($dados['bairro'] ?? ''),
+                                            'street' => (string) ($dados['endereco'] ?? ''),
+                                            'number' => (string) ($dados['numero'] ?? ''),
+                                        ],
                                     ];
-                                    $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $cust);
+
+                                    $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProduto, (string) $descricaoProduto, $client);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
                                     }
