@@ -691,7 +691,7 @@ class PaymentService {
             'currency' => 'BRL',
             'client' => $client,
             'duplicate' => 0,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'url_callback' => (string) $successUrl,
             'url_error' => (string) $errorUrl,
             'products' => [
