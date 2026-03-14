@@ -2651,7 +2651,80 @@ class CheckoutController extends Controller {
                             }
                             if ($valorImposto < 0) $valorImposto = 0.0;
                             $valorImposto = round((float) $valorImposto, 2);
-                            $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto), 2);
+
+                            // Tenta obter subtotal real dos produtos (sem taxa/impostos), pois em alguns cenários
+                            // o campo 'total' do pedido pode já ser o subtotal, e subtrair taxa/impostos gera valor menor.
+                            $subtotalProdutos = 0.0;
+                            $hasSubtotalProdutos = false;
+                            try {
+                                foreach (['subtotal', 'subtotal_produtos', 'valor_produtos', 'total_produtos'] as $k) {
+                                    if (!$hasSubtotalProdutos && array_key_exists($k, $pedidoNorm) && $pedidoNorm[$k] !== null) {
+                                        $v = (float) $pedidoNorm[$k];
+                                        if ($v > 0) {
+                                            $subtotalProdutos = $v;
+                                            $hasSubtotalProdutos = true;
+                                        }
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                $hasSubtotalProdutos = false;
+                            }
+
+                            if (!$hasSubtotalProdutos) {
+                                try {
+                                    $dbItens = \Config\Database::getConnection();
+                                    $itensTable = '';
+                                    $stmtT = $dbItens->query("SHOW TABLES LIKE 'pedido_itens'");
+                                    $has1 = $stmtT ? ((int) $stmtT->fetchColumn() > 0) : false;
+                                    if ($has1) {
+                                        $itensTable = 'pedido_itens';
+                                    } else {
+                                        $stmtT2 = $dbItens->query("SHOW TABLES LIKE 'pedido_items'");
+                                        $has2 = $stmtT2 ? ((int) $stmtT2->fetchColumn() > 0) : false;
+                                        if ($has2) {
+                                            $itensTable = 'pedido_items';
+                                        }
+                                    }
+
+                                    if ($itensTable !== '') {
+                                        $cols = [];
+                                        $stColsItens = $dbItens->query('DESCRIBE ' . $itensTable);
+                                        $cols = $stColsItens ? ($stColsItens->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                                        $colPedidoId = in_array('pedido_id', $cols, true) ? 'pedido_id' : '';
+                                        $colQtd = '';
+                                        foreach (['quantidade', 'qty', 'qtd'] as $c) {
+                                            if ($colQtd === '' && in_array($c, $cols, true)) {
+                                                $colQtd = $c;
+                                            }
+                                        }
+                                        $colValor = '';
+                                        foreach (['valor', 'preco', 'preco_unitario', 'price', 'unit_price'] as $c) {
+                                            if ($colValor === '' && in_array($c, $cols, true)) {
+                                                $colValor = $c;
+                                            }
+                                        }
+
+                                        if ($colPedidoId !== '' && $colQtd !== '' && $colValor !== '') {
+                                            $stSum = $dbItens->prepare('SELECT SUM(COALESCE(' . $colValor . ',0) * COALESCE(' . $colQtd . ',0)) AS subtotal FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                                            $stSum->execute([(int) $pedidoId]);
+                                            $sv = $stSum->fetchColumn();
+                                            $subtotalProdutos = (float) ($sv ?: 0);
+                                            if ($subtotalProdutos > 0) {
+                                                $hasSubtotalProdutos = true;
+                                            }
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    $hasSubtotalProdutos = false;
+                                }
+                            }
+
+                            if ($hasSubtotalProdutos) {
+                                $valorProduto = round(max(0.0, $subtotalProdutos), 2);
+                            } else {
+                                $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto), 2);
+                            }
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
                             $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto), 2);
 
