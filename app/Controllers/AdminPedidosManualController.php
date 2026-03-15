@@ -27,8 +27,21 @@ class AdminPedidosManualController extends Controller {
             $cols = [];
         }
 
-        $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : '');
-        $emailCol = in_array('email', $cols, true) ? 'email' : '';
+        $nomeCol = '';
+        foreach (['nome', 'name', 'nome_completo', 'full_name', 'nomeCompleto', 'firstname', 'first_name'] as $cand) {
+            if (in_array($cand, $cols, true)) {
+                $nomeCol = $cand;
+                break;
+            }
+        }
+
+        $emailCol = '';
+        foreach (['email', 'user_email', 'mail'] as $cand) {
+            if (in_array($cand, $cols, true)) {
+                $emailCol = $cand;
+                break;
+            }
+        }
 
         $switchCol = '';
         foreach (['switch', 'switch_id', 'switchid', 'sw', 'codigo_switch', 'switch_code', 'switchcode', 'chave', 'codigo', 'identificador'] as $cand) {
