@@ -807,7 +807,27 @@ class AuthController extends Controller {
                     
                     // Redirecionar baseado no perfil
                     if ($isAdmin || $this->authService->podeAcessarPainelAdmin()) {
-                        $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '!';
+                        $displayName = '';
+                        if (is_array($usuario)) {
+                            foreach (['nome', 'name', 'full_name', 'fullname', 'usuario_nome'] as $k) {
+                                $v = $usuario[$k] ?? '';
+                                if (is_string($v) && trim($v) !== '') {
+                                    $displayName = trim($v);
+                                    break;
+                                }
+                            }
+                        }
+                        if ($displayName === '') {
+                            $sessName = $_SESSION['usuario_nome'] ?? '';
+                            if (is_string($sessName) && trim($sessName) !== '') {
+                                $displayName = trim($sessName);
+                            }
+                        }
+                        if ($displayName === '') {
+                            $displayName = 'Usuário';
+                        }
+
+                        $_SESSION['message'] = 'Bem-vindo, ' . $displayName . '!';
                         $_SESSION['message_type'] = 'success';
                         $adminTarget = '/admin/dashboard';
                         if (isset($_SESSION['redirect_after_login'])) {
@@ -885,7 +905,26 @@ class AuthController extends Controller {
                             $target = $redirectTo !== '' ? $redirectTo : '/minha-conta';
                         }
 
-                        $_SESSION['message'] = 'Bem-vendo de volta, ' . $usuario['nome'] . '!';
+                        $displayName = '';
+                        if (is_array($usuario)) {
+                            foreach (['nome', 'name', 'full_name', 'fullname', 'usuario_nome'] as $k) {
+                                $v = $usuario[$k] ?? '';
+                                if (is_string($v) && trim($v) !== '') {
+                                    $displayName = trim($v);
+                                    break;
+                                }
+                            }
+                        }
+                        if ($displayName === '') {
+                            $sessName = $_SESSION['usuario_nome'] ?? '';
+                            if (is_string($sessName) && trim($sessName) !== '') {
+                                $displayName = trim($sessName);
+                            }
+                        }
+                        if ($displayName === '') {
+                            $displayName = 'Usuário';
+                        }
+                        $_SESSION['message'] = 'Bem-vindo de volta, ' . $displayName . '!';
                         $_SESSION['message_type'] = 'success';
                         if (isset($_SESSION['redirect_after_login'])) {
                             unset($_SESSION['redirect_after_login']);
@@ -996,11 +1035,32 @@ class AuthController extends Controller {
                         return;
                     }
                     
-                    $_SESSION['message'] = 'Bem-vindo, ' . $usuario['nome'] . '! Acesso administrativo.';
+                    $displayName = '';
+                    if (is_array($usuario)) {
+                        foreach (['nome', 'name', 'full_name', 'fullname', 'usuario_nome'] as $k) {
+                            $v = $usuario[$k] ?? '';
+                            if (is_string($v) && trim($v) !== '') {
+                                $displayName = trim($v);
+                                break;
+                            }
+                        }
+                    }
+                    if ($displayName === '') {
+                        $sessName = $_SESSION['usuario_nome'] ?? '';
+                        if (is_string($sessName) && trim($sessName) !== '') {
+                            $displayName = trim($sessName);
+                        }
+                    }
+                    if ($displayName === '') {
+                        $displayName = 'Usuário';
+                    }
+
+                    $_SESSION['message'] = 'Bem-vindo, ' . $displayName . '! Acesso administrativo.';
                     $_SESSION['message_type'] = 'success';
 
                     $adminTarget = $redirectTo !== '' ? $redirectTo : '/admin/dashboard';
                     if (isset($_SESSION['redirect_after_login'])) {
+                        $adminTarget = $_SESSION['redirect_after_login'];
                         unset($_SESSION['redirect_after_login']);
                     }
 

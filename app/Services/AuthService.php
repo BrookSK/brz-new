@@ -162,7 +162,16 @@ class AuthService {
         }
         
         $_SESSION['usuario_id'] = $usuario['id'];
-        $_SESSION['usuario_nome'] = $usuario['nome'] ?? ($usuario['name'] ?? '');
+
+        $sessNome = '';
+        foreach (['nome', 'name', 'full_name', 'fullname', 'usuario_nome'] as $k) {
+            $v = $usuario[$k] ?? '';
+            if (is_string($v) && trim($v) !== '') {
+                $sessNome = trim($v);
+                break;
+            }
+        }
+        $_SESSION['usuario_nome'] = $sessNome;
         $_SESSION['usuario_email'] = $usuario['email'];
         $docSess = '';
         if (isset($usuario['documento'])) {
