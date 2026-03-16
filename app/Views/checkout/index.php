@@ -2,6 +2,10 @@
 <?php $isPaymentLink = !empty($is_payment_link); ?>
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
+    <?php if ($isPaymentLink): ?>
+        <input type="hidden" name="is_payment_link" value="1">
+        <input type="hidden" name="ajax" value="1">
+    <?php endif; ?>
     <script>
         window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
         window.CAMBIOREAL_DIRECT = {
@@ -1469,6 +1473,15 @@ async function processarPedidoDireto() {
         }
         
         if (data.success) {
+            if (data.redirect) {
+                const destinoPaylink = data.redirect;
+                console.log('🔍 [DIRETO] Redirecionando para:', destinoPaylink);
+                setTimeout(function() {
+                    window.location.href = destinoPaylink;
+                }, 100);
+                return;
+            }
+
             console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);
 
             const isStripeUsd = (currentCurrency !== 'BRL') && (data.stripe_required === true);
@@ -2459,6 +2472,60 @@ main {
         <title>Pagamento</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <style>
+            :root {
+                --primary-color: #0b1f3a;
+                --primary-color-2: #1d4ed8;
+                --secondary-color: #94a3b8;
+                --accent-color: #38bdf8;
+                --success-color: #10b981;
+                --danger-color: #ef4444;
+                --bg-gradient: #f6f8fb;
+                --surface-gradient: #ffffff;
+                --primary-gradient: #0b1f3a;
+                --primary-btn-gradient: #0b1f3a;
+                --danger-gradient: #ef4444;
+                --info-gradient: #38bdf8;
+                --radius-sm: 10px;
+                --radius-md: 14px;
+                --radius-lg: 18px;
+                --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
+                --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+                --shadow-lg: 0 16px 44px rgba(15, 23, 42, 0.12);
+            }
+            body {
+                margin: 0 !important;
+                min-height: 100vh;
+                background: var(--bg-gradient);
+                color: #0f172a;
+            }
+            .card,
+            .dropdown-menu,
+            .modal-content,
+            .form-control,
+            .form-select,
+            .btn {
+                border-radius: var(--radius-md);
+            }
+            .card {
+                border: 1px solid rgba(148, 163, 184, 0.35);
+                box-shadow: var(--shadow-sm);
+            }
+            .shadow {
+                box-shadow: var(--shadow-md) !important;
+            }
+            .shadow-sm {
+                box-shadow: var(--shadow-sm) !important;
+            }
+            .shadow-lg {
+                box-shadow: var(--shadow-lg) !important;
+            }
+            .btn.btn-primary {
+                background: var(--primary-color);
+                border: 1px solid rgba(11, 31, 58, 0.22);
+                box-shadow: var(--shadow-sm);
+            }
+        </style>
     </head>
     <body style="background:#f6f8fb;">
         <div class="container py-4" style="max-width: 1200px;">

@@ -272,6 +272,7 @@ class AdminPaymentLinksController extends Controller {
                                 <th>Gateway</th>
                                 <th>Método</th>
                                 <th>Cliente</th>
+                                <th>Dados</th>
                                 <th>Produto</th>
                                 <th>Taxa</th>
                                 <th>Impostos</th>
@@ -282,7 +283,7 @@ class AdminPaymentLinksController extends Controller {
                         <tbody>';
 
         if (empty($payments)) {
-            echo '<tr><td colspan="11" class="text-muted">Nenhum pagamento registrado.</td></tr>';
+            echo '<tr><td colspan="12" class="text-muted">Nenhum pagamento registrado.</td></tr>';
         } else {
             foreach ($payments as $p) {
                 $pid = (int) ($p['id'] ?? 0);
@@ -300,6 +301,48 @@ class AdminPaymentLinksController extends Controller {
                 $total = (float) ($p['total_valor'] ?? 0);
                 $created = htmlspecialchars((string) ($p['created_at'] ?? ''), ENT_QUOTES, 'UTF-8');
 
+                $meta = (string) ($p['metadata'] ?? '');
+                $form = null;
+                if ($meta !== '') {
+                    try {
+                        $j = json_decode($meta, true);
+                        if (is_array($j) && isset($j['form']) && is_array($j['form'])) {
+                            $form = $j['form'];
+                        }
+                    } catch (\Throwable $e) {
+                        $form = null;
+                    }
+                }
+
+                $dadosHtml = '-';
+                if (is_array($form)) {
+                    $addr = trim((string) ($form['endereco'] ?? ''));
+                    $num = trim((string) ($form['numero'] ?? ''));
+                    $bairro = trim((string) ($form['bairro'] ?? ''));
+                    $cidade = trim((string) ($form['cidade'] ?? ''));
+                    $estado = trim((string) ($form['estado'] ?? ($form['estado_text'] ?? '')));
+                    $cep = trim((string) ($form['cep'] ?? ''));
+                    $pais = trim((string) ($form['pais'] ?? ''));
+                    $destNome = trim((string) ($form['destinatario_nome'] ?? ''));
+                    $destTel = trim((string) ($form['destinatario_telefone'] ?? ''));
+                    $dn = trim((string) ($form['data_nascimento'] ?? ''));
+
+                    $parts = [];
+                    if ($dn !== '') $parts[] = 'Nascimento: ' . htmlspecialchars($dn, ENT_QUOTES, 'UTF-8');
+                    if ($addr !== '' || $cidade !== '' || $estado !== '' || $cep !== '') {
+                        $linha = trim($addr . ($num !== '' ? ', ' . $num : '') . ($bairro !== '' ? ' - ' . $bairro : ''));
+                        $linha2 = trim($cidade . ($estado !== '' ? '/' . $estado : '') . ($cep !== '' ? ' - ' . $cep : ''));
+                        $linha3 = trim($pais);
+                        $addrTxt = trim($linha . ( $linha2 !== '' ? ' | ' . $linha2 : '') . ($linha3 !== '' ? ' | ' . $linha3 : ''));
+                        if ($addrTxt !== '') $parts[] = 'Endereço: ' . htmlspecialchars($addrTxt, ENT_QUOTES, 'UTF-8');
+                    }
+                    if ($destNome !== '' || $destTel !== '') {
+                        $destTxt = trim($destNome . ($destTel !== '' ? ' (' . $destTel . ')' : ''));
+                        $parts[] = 'Destinatário: ' . htmlspecialchars($destTxt, ENT_QUOTES, 'UTF-8');
+                    }
+                    $dadosHtml = !empty($parts) ? ('<div class="small">' . implode('<br>', $parts) . '</div>') : '-';
+                }
+
                 echo '<tr>'
                     . '<td>' . $pid . '</td>'
                     . '<td>' . $comp . '</td>'
@@ -307,6 +350,7 @@ class AdminPaymentLinksController extends Controller {
                     . '<td>' . $gw . '</td>'
                     . '<td>' . $met . '</td>'
                     . '<td>' . $cliLabel . '</td>'
+                    . '<td>' . $dadosHtml . '</td>'
                     . '<td>' . $cur . ' ' . number_format($vProd, 2, ',', '.') . '</td>'
                     . '<td>' . $cur . ' ' . number_format($vTaxa, 2, ',', '.') . '</td>'
                     . '<td>' . $cur . ' ' . number_format($vImp, 2, ',', '.') . '</td>'

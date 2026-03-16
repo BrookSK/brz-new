@@ -131,6 +131,37 @@ class PaymentLinkController extends Controller {
         $forma = (string) $request->getParam('forma_pagamento', '');
         $forma = strtolower(trim($forma));
 
+        // Persistir dados completos preenchidos no checkout rápido (endereço/entrega/destinatário/etc.)
+        $formSnapshot = [
+            'nome' => $nome,
+            'email' => $email,
+            'documento' => $documento,
+            'telefone' => $telefone,
+            'telefone_ddi' => (string) $request->getParam('telefone_ddi', ''),
+            'telefone_numero' => (string) $request->getParam('telefone_numero', ''),
+            'telefone_ddi_outro' => (string) $request->getParam('telefone_ddi_outro', ''),
+            'data_nascimento' => (string) $request->getParam('data_nascimento', ''),
+            'forma_pagamento' => $forma,
+            'entrega_para_outro' => (string) $request->getParam('entrega_para_outro', ''),
+            'destinatario_nome' => (string) $request->getParam('destinatario_nome', ''),
+            'destinatario_documento' => (string) $request->getParam('destinatario_documento', ''),
+            'destinatario_telefone' => (string) $request->getParam('destinatario_telefone', ''),
+            'pais' => (string) $request->getParam('pais', ''),
+            'cep' => (string) $request->getParam('cep', ''),
+            'endereco' => (string) $request->getParam('endereco', ''),
+            'numero' => (string) $request->getParam('numero', ''),
+            'complemento' => (string) $request->getParam('complemento', ''),
+            'bairro' => (string) $request->getParam('bairro', ''),
+            'cidade' => (string) $request->getParam('cidade', ''),
+            'estado' => (string) $request->getParam('estado', ''),
+            'estado_text' => (string) $request->getParam('estado_text', ''),
+            'endereco_selecionado' => (string) $request->getParam('endereco_selecionado', ''),
+        ];
+        $formSnapshotJson = json_encode($formSnapshot, JSON_UNESCAPED_UNICODE);
+
+        $isAjax = (string) $request->getParam('ajax', '');
+        $isAjax = ($isAjax === '1' || strtolower($isAjax) === 'true' || strtolower($isAjax) === 'on');
+
         $customer = [
             'name' => $nome,
             'email' => $email,
@@ -156,6 +187,11 @@ class PaymentLinkController extends Controller {
             }
 
             $paymentAttemptId = (int) ($attempt['id'] ?? 0);
+            if ($paymentAttemptId > 0 && $formSnapshotJson) {
+                $svc->updatePaymentAttempt($paymentAttemptId, [
+                    'metadata' => json_encode(['form' => $formSnapshot], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
             $total = (float) ($link['total_valor'] ?? 0);
 
             $paySvc = new PaymentService();
@@ -181,6 +217,14 @@ class PaymentLinkController extends Controller {
                 'invoice_url' => (string) ($session['url'] ?? ''),
                 'raw_response' => json_encode($session['raw'] ?? [], JSON_UNESCAPED_UNICODE),
             ]);
+
+            if ($isAjax) {
+                $this->json([
+                    'success' => true,
+                    'redirect' => (string) ($session['url'] ?? '/pagar/' . rawurlencode((string) $token)),
+                ]);
+                return;
+            }
 
             header('Location: ' . (string) ($session['url'] ?? '/pagar/' . rawurlencode((string) $token)));
             exit;
@@ -220,6 +264,7 @@ class PaymentLinkController extends Controller {
         $paySvc = new PaymentService();
 
         $resultBlocks = [];
+        $resultAttemptIds = [];
 
         // 1) Produto via Câmbio Real
         if ($produtoValor > 0) {
@@ -237,6 +282,12 @@ class PaymentLinkController extends Controller {
                 $this->renderNotFound((string) ($attemptProduto['error'] ?? 'Falha ao iniciar pagamento')); return;
             }
             $attemptProdutoId = (int) ($attemptProduto['id'] ?? 0);
+            if ($attemptProdutoId > 0) $resultAttemptIds[] = $attemptProdutoId;
+            if ($attemptProdutoId > 0 && $formSnapshotJson) {
+                $svc->updatePaymentAttempt($attemptProdutoId, [
+                    'metadata' => json_encode(['form' => $formSnapshot], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
 
             $card = [];
             if ($metodoCr === 'credit_card' || $metodoCr === 'debit_card') {
@@ -288,6 +339,12 @@ class PaymentLinkController extends Controller {
                 $this->renderNotFound((string) ($attemptTaxa['error'] ?? 'Falha ao iniciar pagamento')); return;
             }
             $attemptTaxaId = (int) ($attemptTaxa['id'] ?? 0);
+            if ($attemptTaxaId > 0) $resultAttemptIds[] = $attemptTaxaId;
+            if ($attemptTaxaId > 0 && $formSnapshotJson) {
+                $svc->updatePaymentAttempt($attemptTaxaId, [
+                    'metadata' => json_encode(['form' => $formSnapshot], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
 
             $productsValueCents = (int) round($valorAppmax * 100);
             $descricaoTaxa = $descricao . ' (taxas e impostos)';
@@ -357,19 +414,78 @@ class PaymentLinkController extends Controller {
                 ]);
                 if (!empty($attemptImp['success'])) {
                     $attemptImpId = (int) ($attemptImp['id'] ?? 0);
+                    if ($attemptImpId > 0) $resultAttemptIds[] = $attemptImpId;
                     $svc->updatePaymentAttempt($attemptImpId, [
                         'status' => (string) ($appmax['status'] ?? 'pending'),
                         'gateway' => 'appmax',
                         'gateway_payment_id' => (string) ($appmax['payment_id'] ?? ''),
                         'metadata' => json_encode(['gateway_status' => 'SPLIT_ITEM'], JSON_UNESCAPED_UNICODE),
                     ]);
+                    if ($attemptImpId > 0 && $formSnapshotJson) {
+                        $svc->updatePaymentAttempt($attemptImpId, [
+                            'metadata' => json_encode(['gateway_status' => 'SPLIT_ITEM', 'form' => $formSnapshot], JSON_UNESCAPED_UNICODE),
+                        ]);
+                    }
                 }
             }
 
             $resultBlocks[] = ['success' => true, 'gateway' => 'appmax', 'billingType' => $billingType, 'payment_id' => (string) ($appmax['payment_id'] ?? ''), 'persist' => $persist, 'raw' => $appmax];
         }
 
+        if ($isAjax) {
+            $qs = 'ids=' . rawurlencode(implode(',', array_values(array_unique(array_filter($resultAttemptIds)))));
+            $this->json([
+                'success' => true,
+                'redirect' => '/pagar/' . rawurlencode((string) $token) . '/resultado?' . $qs,
+            ]);
+            return;
+        }
+
         $this->renderResultPage($token, $link, $resultBlocks);
+    }
+
+    public function resultado(Request $request) {
+        $token = (string) $request->getParam('token', '');
+        $svc = new PaymentLinkService();
+        $link = $svc->findLinkByToken($token);
+
+        if (!is_array($link) || empty($link['id'])) {
+            $this->renderNotFound('Link de pagamento não encontrado');
+            return;
+        }
+        if (!$this->isLinkActive($link)) {
+            $this->renderNotFound('Link de pagamento expirado ou desativado');
+            return;
+        }
+
+        $idsRaw = (string) $request->getParam('ids', '');
+        $ids = [];
+        foreach (preg_split('/\s*,\s*/', $idsRaw) as $p) {
+            $v = (int) $p;
+            if ($v > 0) $ids[] = $v;
+        }
+        $ids = array_values(array_unique($ids));
+
+        $blocks = [];
+        foreach ($ids as $id) {
+            $row = $svc->findPaymentAttemptById((int) $id);
+            if (!is_array($row)) continue;
+            if ((int) ($row['payment_link_id'] ?? 0) !== (int) ($link['id'] ?? 0)) continue;
+
+            $persist = [
+                'pix_payload' => (string) ($row['pix_payload'] ?? ''),
+                'pix_encoded_image' => (string) ($row['pix_encoded_image'] ?? ''),
+                'bank_slip_url' => (string) ($row['bank_slip_url'] ?? ''),
+                'digitable_line' => (string) ($row['digitable_line'] ?? ''),
+                'invoice_url' => (string) ($row['invoice_url'] ?? ''),
+            ];
+            $blocks[] = [
+                'gateway' => (string) ($row['gateway'] ?? ''),
+                'persist' => $persist,
+            ];
+        }
+
+        $this->renderResultPage($token, $link, $blocks);
     }
 
     private function isLinkActive(array $link): bool {
@@ -426,10 +542,16 @@ class PaymentLinkController extends Controller {
                 echo '<div class="row g-3">'
                     . '<div class="col-md-6">';
                 if ($pixImg !== '') {
-                    $mime = (stripos($pixImg, '<svg') !== false) ? 'image/svg+xml' : 'image/png';
-                    echo '<div class="border rounded p-3 bg-white text-center"><img alt="PIX" style="max-width: 320px; width:100%;" src="data:' . $mime . ';base64,' . htmlspecialchars($pixImg, ENT_QUOTES, 'UTF-8') . '"></div>';
+                    $isSvg = (stripos($pixImg, '<svg') !== false);
+                    $isBase64Like = (bool) preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $pixImg);
+                    if ($isSvg || $isBase64Like) {
+                        $mime = $isSvg ? 'image/svg+xml' : 'image/png';
+                        echo '<div class="border rounded p-3 bg-white text-center"><img alt="PIX" style="max-width: 320px; width:100%;" src="data:' . $mime . ';base64,' . htmlspecialchars($pixImg, ENT_QUOTES, 'UTF-8') . '"></div>';
+                    } else {
+                        echo '<div class="alert alert-warning small mb-0">QR Code não pôde ser exibido automaticamente. Use o código PIX copia e cola ao lado.</div>';
+                    }
                 }
-                echo '</div><div class="col-md-6">'
+                echo '</div><div class="col-md-6"'
                     . '<div class="mb-2"><strong>PIX copia e cola</strong></div>'
                     . '<textarea class="form-control" rows="5" readonly>' . htmlspecialchars($pixPayload, ENT_QUOTES, 'UTF-8') . '</textarea>'
                     . '</div></div>';

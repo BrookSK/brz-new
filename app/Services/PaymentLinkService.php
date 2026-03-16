@@ -309,4 +309,17 @@ class PaymentLinkService {
             return [];
         }
     }
+
+    public function findPaymentAttemptById(int $id): ?array {
+        $id = (int) $id;
+        if ($id <= 0) return null;
+        try {
+            $st = $this->db->prepare('SELECT * FROM payment_link_payments WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            return is_array($row) ? $row : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
 }
