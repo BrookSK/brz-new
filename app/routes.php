@@ -386,6 +386,7 @@ $router->get('/admin/payment-links/{id}', 'AdminPaymentLinksController', 'detalh
 $router->get('/pagar/{token}', 'PaymentLinkController', 'index');
 $router->post('/pagar/{token}/processar', 'PaymentLinkController', 'processar');
 $router->get('/pagar/{token}/resultado', 'PaymentLinkController', 'resultado');
+$router->get('/pagar/{token}/comprovante', 'PaymentLinkController', 'comprovante');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');

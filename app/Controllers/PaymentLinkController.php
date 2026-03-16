@@ -481,11 +481,179 @@ class PaymentLinkController extends Controller {
             ];
             $blocks[] = [
                 'gateway' => (string) ($row['gateway'] ?? ''),
+                'gateway_payment_id' => (string) ($row['gateway_payment_id'] ?? ''),
                 'persist' => $persist,
             ];
         }
 
         $this->renderResultPage($token, $link, $blocks);
+    }
+
+    public function comprovante(Request $request) {
+        $token = (string) $request->getParam('token', '');
+        $svc = new PaymentLinkService();
+        $link = $svc->findLinkByToken($token);
+
+        if (!is_array($link) || empty($link['id'])) {
+            $this->renderNotFound('Link de pagamento não encontrado');
+            return;
+        }
+        if (!$this->isLinkActive($link)) {
+            $this->renderNotFound('Link de pagamento expirado ou desativado');
+            return;
+        }
+
+        $linkId = (int) ($link['id'] ?? 0);
+        $payments = $svc->listPaymentsByLinkId($linkId, 200);
+
+        $descricao = trim((string) ($link['descricao'] ?? 'Pagamento'));
+        if ($descricao === '') $descricao = 'Pagamento';
+        $currency = strtoupper(trim((string) ($link['currency'] ?? 'USD')));
+        $produtoValor = (float) ($link['produto_valor'] ?? 0);
+        $taxaValor = (float) ($link['taxa_servico_valor'] ?? 0);
+        $impostosValor = (float) ($link['impostos_valor'] ?? 0);
+        $totalValor = (float) ($link['total_valor'] ?? 0);
+
+        $form = null;
+        foreach ($payments as $p) {
+            $meta = (string) ($p['metadata'] ?? '');
+            if ($meta === '') continue;
+            $j = json_decode($meta, true);
+            if (is_array($j) && isset($j['form']) && is_array($j['form'])) {
+                $form = $j['form'];
+                break;
+            }
+        }
+
+        $hasAny = !empty($payments);
+        $hasFailure = false;
+        $allPaid = $hasAny;
+        foreach ($payments as $p) {
+            $st = strtolower(trim((string) ($p['status'] ?? '')));
+            if ($st === 'failed' || $st === 'canceled' || $st === 'cancelled' || $st === 'error' || $st === 'refused') {
+                $hasFailure = true;
+            }
+            if (!in_array($st, ['paid','approved','success','succeeded','completed'], true)) {
+                $allPaid = false;
+            }
+        }
+
+        $statusLabel = 'Pendente';
+        $statusClass = 'warning';
+        if ($hasFailure) {
+            $statusLabel = 'Pagamento com falha';
+            $statusClass = 'danger';
+        } elseif ($allPaid) {
+            $statusLabel = 'Pagamento aprovado';
+            $statusClass = 'success';
+        }
+
+        $nome = is_array($form) ? trim((string) ($form['nome'] ?? '')) : '';
+        $email = is_array($form) ? trim((string) ($form['email'] ?? '')) : '';
+        $doc = is_array($form) ? trim((string) ($form['documento'] ?? '')) : '';
+        $tel = is_array($form) ? trim((string) ($form['telefone'] ?? '')) : '';
+        $dn = is_array($form) ? trim((string) ($form['data_nascimento'] ?? '')) : '';
+        $addr = is_array($form) ? trim((string) ($form['endereco'] ?? '')) : '';
+        $num = is_array($form) ? trim((string) ($form['numero'] ?? '')) : '';
+        $bairro = is_array($form) ? trim((string) ($form['bairro'] ?? '')) : '';
+        $cidade = is_array($form) ? trim((string) ($form['cidade'] ?? '')) : '';
+        $estado = is_array($form) ? trim((string) ($form['estado'] ?? ($form['estado_text'] ?? ''))) : '';
+        $cep = is_array($form) ? trim((string) ($form['cep'] ?? '')) : '';
+        $pais = is_array($form) ? trim((string) ($form['pais'] ?? '')) : '';
+
+        $destNome = is_array($form) ? trim((string) ($form['destinatario_nome'] ?? '')) : '';
+        $destDoc = is_array($form) ? trim((string) ($form['destinatario_documento'] ?? '')) : '';
+        $destTel = is_array($form) ? trim((string) ($form['destinatario_telefone'] ?? '')) : '';
+
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Comprovante</title>'
+            . '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">'
+            . '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">'
+            . '<style>@media print{.no-print{display:none!important} body{background:#fff!important} .card{box-shadow:none!important}}</style>'
+            . '</head><body style="background:#f6f8fb;">'
+            . '<div class="container py-4" style="max-width:980px;">'
+            . '<div class="d-flex justify-content-between align-items-center mb-3 no-print">'
+            . '<a class="btn btn-outline-secondary" href="/pagar/' . htmlspecialchars((string) $token, ENT_QUOTES, 'UTF-8') . '/resultado"><i class="fas fa-arrow-left"></i> Voltar</a>'
+            . '<button class="btn btn-primary" type="button" onclick="window.print()"><i class="fas fa-print"></i> Imprimir / Salvar em PDF</button>'
+            . '</div>'
+            . '<div class="card shadow-sm mb-3"><div class="card-body">'
+            . '<div class="d-flex justify-content-between align-items-start">'
+            . '<div><h3 class="mb-1">' . htmlspecialchars($descricao, ENT_QUOTES, 'UTF-8') . '</h3><div class="text-muted">Comprovante</div></div>'
+            . '<div class="text-end"><span class="badge bg-' . htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') . '</span><div class="small text-muted mt-1">' . date('d/m/Y H:i') . '</div></div>'
+            . '</div>'
+            . '</div></div>';
+
+        echo '<div class="card shadow-sm mb-3"><div class="card-body">'
+            . '<div class="row g-2">'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Produto</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($produtoValor, 2, ',', '.') . '</strong></div></div>'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Taxa</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($taxaValor, 2, ',', '.') . '</strong></div></div>'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Impostos</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($impostosValor, 2, ',', '.') . '</strong></div></div>'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Total</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($totalValor, 2, ',', '.') . '</strong></div></div>'
+            . '</div>'
+            . '</div></div>';
+
+        echo '<div class="row g-3">'
+            . '<div class="col-md-6"><div class="card shadow-sm"><div class="card-body">'
+            . '<div class="fw-bold mb-2">Pagador</div>';
+
+        $pagadorLinha = trim($nome);
+        if ($pagadorLinha === '' && $email !== '') $pagadorLinha = $email;
+        if ($pagadorLinha === '') $pagadorLinha = '-';
+
+        echo '<div><strong>' . htmlspecialchars($pagadorLinha, ENT_QUOTES, 'UTF-8') . '</strong></div>';
+        if ($email !== '') echo '<div class="small text-muted">' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '</div>';
+        if ($doc !== '') echo '<div class="small">Documento: ' . htmlspecialchars($doc, ENT_QUOTES, 'UTF-8') . '</div>';
+        if ($tel !== '') echo '<div class="small">Telefone: ' . htmlspecialchars($tel, ENT_QUOTES, 'UTF-8') . '</div>';
+        if ($dn !== '') echo '<div class="small">Nascimento: ' . htmlspecialchars($dn, ENT_QUOTES, 'UTF-8') . '</div>';
+
+        echo '</div></div></div>'
+            . '<div class="col-md-6"><div class="card shadow-sm"><div class="card-body">'
+            . '<div class="fw-bold mb-2">Endereço</div>';
+
+        $addr1 = trim($addr . ($num !== '' ? ', ' . $num : '') . ($bairro !== '' ? ' - ' . $bairro : ''));
+        $addr2 = trim($cidade . ($estado !== '' ? '/' . $estado : '') . ($cep !== '' ? ' - ' . $cep : ''));
+        $addr3 = trim($pais);
+        if ($addr1 === '' && $addr2 === '' && $addr3 === '') {
+            echo '<div class="text-muted">-</div>';
+        } else {
+            if ($addr1 !== '') echo '<div>' . htmlspecialchars($addr1, ENT_QUOTES, 'UTF-8') . '</div>';
+            if ($addr2 !== '') echo '<div>' . htmlspecialchars($addr2, ENT_QUOTES, 'UTF-8') . '</div>';
+            if ($addr3 !== '') echo '<div>' . htmlspecialchars($addr3, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+
+        if ($destNome !== '' || $destDoc !== '' || $destTel !== '') {
+            echo '<hr><div class="fw-bold mb-2">Destinatário</div>';
+            if ($destNome !== '') echo '<div>' . htmlspecialchars($destNome, ENT_QUOTES, 'UTF-8') . '</div>';
+            if ($destDoc !== '') echo '<div class="small">Documento: ' . htmlspecialchars($destDoc, ENT_QUOTES, 'UTF-8') . '</div>';
+            if ($destTel !== '') echo '<div class="small">Telefone: ' . htmlspecialchars($destTel, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+
+        echo '</div></div></div></div>';
+
+        echo '<div class="card shadow-sm mt-3"><div class="card-body">'
+            . '<div class="fw-bold mb-2">Pagamentos</div>';
+
+        if (empty($payments)) {
+            echo '<div class="text-muted">Nenhum pagamento encontrado.</div>';
+        } else {
+            echo '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr>'
+                . '<th>ID</th><th>Componente</th><th>Gateway</th><th>Status</th><th>Payment ID</th><th>Criado</th>'
+                . '</tr></thead><tbody>';
+            foreach ($payments as $p) {
+                $pid = (int) ($p['id'] ?? 0);
+                $comp = htmlspecialchars((string) ($p['componente'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $gw = htmlspecialchars((string) ($p['gateway'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $st = htmlspecialchars((string) ($p['status'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $gpid = htmlspecialchars((string) ($p['gateway_payment_id'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $created = htmlspecialchars((string) ($p['created_at'] ?? ''), ENT_QUOTES, 'UTF-8');
+                echo '<tr><td>' . $pid . '</td><td>' . $comp . '</td><td>' . $gw . '</td><td>' . $st . '</td><td class="text-truncate" style="max-width:240px;">' . ($gpid !== '' ? $gpid : '-') . '</td><td>' . $created . '</td></tr>';
+            }
+            echo '</tbody></table></div>';
+        }
+
+        echo '</div></div>';
+
+        echo '</div><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script></body></html>';
+        exit;
     }
 
     private function isLinkActive(array $link): bool {
@@ -512,6 +680,33 @@ class PaymentLinkController extends Controller {
         $descricao = trim((string) ($link['descricao'] ?? 'Pagamento'));
         if ($descricao === '') $descricao = 'Pagamento';
 
+        $produtoValor = (float) ($link['produto_valor'] ?? 0);
+        $taxaValor = (float) ($link['taxa_servico_valor'] ?? 0);
+        $impostosValor = (float) ($link['impostos_valor'] ?? 0);
+        $totalValor = (float) ($link['total_valor'] ?? 0);
+
+        // Consolidar blocos duplicados (ex.: AppMax taxa + imposto com mesmo payment_id)
+        $normalizedBlocks = [];
+        foreach ($blocks as $b) {
+            $gwKey = strtolower(trim((string) ($b['gateway'] ?? '')));
+            $pidKey = trim((string) ($b['gateway_payment_id'] ?? ''));
+            $groupKey = $gwKey . '|' . $pidKey;
+            if (!isset($normalizedBlocks[$groupKey])) {
+                $normalizedBlocks[$groupKey] = $b;
+            } else {
+                $p1 = is_array($normalizedBlocks[$groupKey]['persist'] ?? null) ? (array) $normalizedBlocks[$groupKey]['persist'] : [];
+                $p2 = is_array($b['persist'] ?? null) ? (array) $b['persist'] : [];
+                $merged = $p1;
+                foreach (['pix_payload','pix_encoded_image','bank_slip_url','digitable_line','invoice_url'] as $k) {
+                    if ((string) ($merged[$k] ?? '') === '' && (string) ($p2[$k] ?? '') !== '') {
+                        $merged[$k] = (string) $p2[$k];
+                    }
+                }
+                $normalizedBlocks[$groupKey]['persist'] = $merged;
+            }
+        }
+        $blocks = array_values($normalizedBlocks);
+
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Pagamento</title>'
             . '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">'
             . '<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">'
@@ -522,21 +717,39 @@ class PaymentLinkController extends Controller {
             . '<a class="btn btn-outline-secondary" href="/pagar/' . htmlspecialchars((string) $token, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-arrow-left"></i> Voltar</a>'
             . '</div>';
 
+        echo '<div class="card mb-3 shadow-sm"><div class="card-body">'
+            . '<div class="row g-2">'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Produto</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($produtoValor, 2, ',', '.') . '</strong></div></div>'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Taxa</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($taxaValor, 2, ',', '.') . '</strong></div></div>'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Impostos</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($impostosValor, 2, ',', '.') . '</strong></div></div>'
+            . '<div class="col-6 col-md-3"><div class="small text-muted">Total</div><div><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($totalValor, 2, ',', '.') . '</strong></div></div>'
+            . '</div>'
+            . '</div></div>';
+
+        echo '<div class="d-flex justify-content-end mb-3">'
+            . '<a class="btn btn-outline-primary" href="/pagar/' . htmlspecialchars((string) $token, ENT_QUOTES, 'UTF-8') . '/comprovante"><i class="fas fa-receipt"></i> Ver comprovante</a>'
+            . '</div>';
+
         if (empty($blocks)) {
             echo '<div class="alert alert-warning">Nenhuma cobrança foi gerada.</div>';
         }
 
         foreach ($blocks as $b) {
             $gw = htmlspecialchars((string) ($b['gateway'] ?? ''), ENT_QUOTES, 'UTF-8');
-            echo '<div class="card mb-3 shadow-sm"><div class="card-body">'
-                . '<div class="mb-2"><strong>Gateway:</strong> ' . ($gw !== '' ? $gw : '-') . '</div>';
-
             $persist = is_array($b['persist'] ?? null) ? (array) $b['persist'] : [];
             $pixPayload = (string) ($persist['pix_payload'] ?? '');
             $pixImg = (string) ($persist['pix_encoded_image'] ?? '');
             $boletoUrl = (string) ($persist['bank_slip_url'] ?? '');
             $digitable = (string) ($persist['digitable_line'] ?? '');
             $invoice = (string) ($persist['invoice_url'] ?? '');
+
+            // Evitar renderizar cards vazios
+            if ($pixPayload === '' && $pixImg === '' && $boletoUrl === '' && $digitable === '' && $invoice === '') {
+                continue;
+            }
+
+            echo '<div class="card mb-3 shadow-sm"><div class="card-body">'
+                . '<div class="mb-2"><strong>Gateway:</strong> ' . ($gw !== '' ? $gw : '-') . '</div>';
 
             if ($pixPayload !== '' || $pixImg !== '') {
                 echo '<div class="row g-3">'
