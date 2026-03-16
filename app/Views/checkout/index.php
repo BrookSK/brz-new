@@ -1,4 +1,5 @@
 <?php ob_start(); ?>
+<?php $isPaymentLink = !empty($is_payment_link); ?>
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
     <script>
@@ -63,7 +64,7 @@
                             <div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="/meus-dados"><?= __('checkout.complete_registration', 'Completar cadastro') ?></a></div>
                         </div>
 
-                        <?php if (empty($usuario) || empty($usuario['id'])): ?>
+                        <?php if (!$isPaymentLink && (empty($usuario) || empty($usuario['id']))): ?>
                             <div class="alert alert-info">
                                 <div><strong><?= __('checkout.have_account_title', 'Já tem conta?') ?></strong> <?= __('checkout.have_account_hint', 'Faça login para finalizar mais rápido.') ?></div>
                                 <div class="mt-2 d-flex flex-wrap gap-2">
@@ -252,7 +253,7 @@
                         </div>
 
                         <!-- Senha (se não logado) -->
-                        <?php if (empty($usuario)): ?>
+                        <?php if (!$isPaymentLink && empty($usuario)): ?>
                         <div class="mb-4">
                             <h6 class="mb-3"><i class="fas fa-lock"></i> <?= __('auth.create_account', 'Criar Conta') ?></h6>
                             <div class="row">
@@ -700,7 +701,7 @@
                                     <span id="subtotal" class="cart-currency" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
                                 </div>
 
-                                <?php if (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube)): ?>
+                                <?php if (!$isPaymentLink && (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube))): ?>
                                     <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
                                         <div class="fw-semibold mb-1" style="color:#0b1f3a;"><?= __('cart.club', 'Clube Brasiliana') ?></div>
                                         <div class="d-flex justify-content-between small">
@@ -726,7 +727,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
-                                    <span><?= __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
+                                    <span><?= $isPaymentLink ? 'Taxa de Serviço' : __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
                                 <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
@@ -744,7 +745,7 @@
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
-                                    <span><?= __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?>:</span>
+                                    <span><?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?></span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
                                         <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
                                     </span>
@@ -758,10 +759,12 @@
                                 <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0))), 2, '.', ',') ?></h6>
                             </div>
 
-                            <div class="alert alert-info small">
-                                <i class="fas fa-info-circle"></i> 
-                                <strong><?= __('checkout.total_weight', 'Peso Total') ?>:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
-                            </div>
+                            <?php if (!$isPaymentLink): ?>
+                                <div class="alert alert-info small">
+                                    <i class="fas fa-info-circle"></i> 
+                                    <strong><?= __('checkout.total_weight', 'Peso Total') ?>:</strong> <?= number_format($peso_total, 3, ',', '.') ?> kg
+                                </div>
+                            <?php endif; ?>
 
                             <?php if (!empty($entrega_fora_br) && !empty($mensagem_entrega_fora_br)): ?>
                                 <div class="alert alert-warning small">
@@ -2447,4 +2450,23 @@ main {
 }
 </style>
 <?php $content = ob_get_clean(); ?>
-<?php include __DIR__ . '/../layouts/main.php'; ?>
+<?php if ($isPaymentLink): ?>
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pagamento</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body style="background:#f6f8fb;">
+        <div class="container py-4" style="max-width: 1200px;">
+            <?= $content ?>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+<?php else: ?>
+    <?php include __DIR__ . '/../layouts/main.php'; ?>
+<?php endif; ?>

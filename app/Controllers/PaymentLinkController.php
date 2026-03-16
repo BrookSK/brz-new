@@ -61,6 +61,7 @@ class PaymentLinkController extends Controller {
         $paySvc = new PaymentService();
 
         $this->view('checkout/index', [
+            'is_payment_link' => true,
             'carrinho' => [],
             'items' => $items,
             'subtotal' => $produto,
