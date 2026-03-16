@@ -331,7 +331,25 @@ class PaymentService {
             foreach ($products as $i => $p) {
                 if (!is_array($p)) continue;
                 $name = trim((string) ($p['name'] ?? ($p['descricao'] ?? '')));
-                $value = (float) ($p['value'] ?? ($p['valor'] ?? 0));
+                $rawValue = $p['value'] ?? ($p['valor'] ?? 0);
+                if (is_string($rawValue)) {
+                    $sv = trim($rawValue);
+                    $sv = str_replace(' ', '', $sv);
+                    $lastComma = strrpos($sv, ',');
+                    $lastDot = strrpos($sv, '.');
+                    $decSep = null;
+                    if ($lastComma !== false || $lastDot !== false) {
+                        $decSep = ($lastComma !== false && ($lastDot === false || $lastComma > $lastDot)) ? ',' : '.';
+                    }
+                    if ($decSep !== null) {
+                        $thousandsSep = $decSep === ',' ? '.' : ',';
+                        $sv = str_replace($thousandsSep, '', $sv);
+                        if ($decSep === ',') $sv = str_replace(',', '.', $sv);
+                    }
+                    $sv = preg_replace('/[^0-9.\-]/', '', $sv);
+                    $rawValue = $sv;
+                }
+                $value = (float) $rawValue;
                 $qty = (int) ($p['qty'] ?? ($p['quantidade'] ?? 1));
                 if ($qty <= 0) $qty = 1;
                 if ($qty > 99) $qty = 99;

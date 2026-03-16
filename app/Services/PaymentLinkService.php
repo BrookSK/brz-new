@@ -19,6 +19,28 @@ class PaymentLinkService {
         }
     }
 
+    private function parseLocaleNumber($v): float {
+        if ($v === null) return 0.0;
+        if (is_int($v) || is_float($v)) return (float) $v;
+        $s = trim((string) $v);
+        if ($s === '') return 0.0;
+        $s = str_replace(' ', '', $s);
+        $lastComma = strrpos($s, ',');
+        $lastDot = strrpos($s, '.');
+        $decSep = null;
+        if ($lastComma !== false || $lastDot !== false) {
+            $decSep = ($lastComma !== false && ($lastDot === false || $lastComma > $lastDot)) ? ',' : '.';
+        }
+        if ($decSep !== null) {
+            $thousandsSep = $decSep === ',' ? '.' : ',';
+            $s = str_replace($thousandsSep, '', $s);
+            if ($decSep === ',') $s = str_replace(',', '.', $s);
+        }
+        $s = preg_replace('/[^0-9.\-]/', '', $s);
+        $n = (float) $s;
+        return $n;
+    }
+
     private function ensureTables(): void {
         try {
             if (!$this->tableExists('payment_links')) {
@@ -151,7 +173,7 @@ class PaymentLinkService {
         foreach ($products as $p) {
             if (!is_array($p)) continue;
             $name = trim((string) ($p['name'] ?? ($p['descricao'] ?? '')));
-            $value = (float) ($p['value'] ?? ($p['valor'] ?? 0));
+            $value = $this->parseLocaleNumber($p['value'] ?? ($p['valor'] ?? 0));
             if ($value < 0) $value = 0.0;
             if ($name === '' || $value <= 0) continue;
             $normalizedProducts[] = ['name' => $name, 'value' => round($value, 2)];
@@ -233,6 +255,72 @@ class PaymentLinkService {
             return is_array($row) ? $row : null;
         } catch (\Exception $e) {
             return null;
+        }
+    }
+
+    public function findLinkById(int $id): ?array {
+        $id = (int) $id;
+        if ($id <= 0) return null;
+        try {
+            $st = $this->db->prepare('SELECT * FROM payment_links WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+            return is_array($row) ? $row : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function duplicateLink(int $id, int $adminUserId): array {
+        $orig = $this->findLinkById($id);
+        if (!is_array($orig) || empty($orig['id'])) {
+            return ['success' => false, 'error' => 'Link não encontrado'];
+        }
+
+        $currency = strtoupper(trim((string) ($orig['currency'] ?? 'USD')));
+        if (!in_array($currency, ['USD', 'BRL'], true)) $currency = 'USD';
+
+        $produto = (float) ($orig['produto_valor'] ?? 0);
+        $taxa = (float) ($orig['taxa_servico_valor'] ?? 0);
+        $impostos = (float) ($orig['impostos_valor'] ?? 0);
+        $total = (float) ($orig['total_valor'] ?? ($produto + $taxa + $impostos));
+        $descricao = (string) ($orig['descricao'] ?? '');
+        $productsJson = (string) ($orig['products_json'] ?? '');
+        if (trim($productsJson) === '') $productsJson = null;
+
+        $expiresAt = date('Y-m-d H:i:s', time() + (30 * 24 * 60 * 60));
+
+        $token = '';
+        try {
+            $token = bin2hex(random_bytes(24));
+        } catch (\Throwable $e) {
+            $token = bin2hex((string) microtime(true));
+        }
+
+        try {
+            $st = $this->db->prepare('INSERT INTO payment_links (token, status, currency, produto_valor, taxa_servico_valor, impostos_valor, total_valor, products_json, descricao, created_by_user_id, expires_at) VALUES (:token, :status, :currency, :produto, :taxa, :impostos, :total, :products_json, :descricao, :uid, :expires_at)');
+            $st->execute([
+                ':token' => $token,
+                ':status' => 'active',
+                ':currency' => $currency,
+                ':produto' => $produto,
+                ':taxa' => $taxa,
+                ':impostos' => $impostos,
+                ':total' => $total,
+                ':products_json' => $productsJson,
+                ':descricao' => trim($descricao) !== '' ? $descricao : null,
+                ':uid' => $adminUserId > 0 ? $adminUserId : null,
+                ':expires_at' => $expiresAt,
+            ]);
+            $newId = (int) $this->db->lastInsertId();
+            return [
+                'success' => true,
+                'id' => $newId,
+                'token' => $token,
+                'public_url' => '/pagar/' . $token,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Falha ao duplicar link'];
         }
     }
 

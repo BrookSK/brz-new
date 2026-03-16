@@ -120,6 +120,9 @@ class AdminPaymentLinksController extends Controller {
                     . '<td>' . $exp . '</td>'
                     . '<td class="d-flex flex-wrap gap-2">'
                     . '  <a class="btn btn-sm btn-outline-primary" href="/admin/payment-links/' . $id . '"><i class="fas fa-clock"></i> Histórico</a>'
+                    . '  <form method="POST" action="/admin/payment-links/duplicar/' . $id . '" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-warning"><i class="fas fa-clone"></i> Duplicar</button>
+                        </form>'
                     . '  <button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> Copiar</button>'
                     . '  <a class="btn btn-sm btn-outline-secondary" href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank"><i class="fas fa-external-link-alt"></i> Abrir</a>'
                     . '</td>'
@@ -176,7 +179,19 @@ class AdminPaymentLinksController extends Controller {
             if (v === null || v === undefined) return 0;
             v = String(v).trim();
             if (!v) return 0;
-            v = v.replace(/\./g, '').replace(',', '.');
+            v = v.replace(/\s+/g, '');
+            var lastComma = v.lastIndexOf(',');
+            var lastDot = v.lastIndexOf('.');
+            var decSep = null;
+            if (lastComma !== -1 || lastDot !== -1) {
+                decSep = (lastComma > lastDot) ? ',' : '.';
+            }
+            if (decSep) {
+                var thousandsSep = decSep === ',' ? '.' : ',';
+                v = v.split(thousandsSep).join('');
+                v = v.replace(decSep, '.');
+            }
+            v = v.replace(/[^0-9.\-]/g, '');
             var n = parseFloat(v);
             return isNaN(n) ? 0 : n;
         }
@@ -294,6 +309,38 @@ HTML;
             @session_start();
         }
         $_SESSION['message'] = 'Link criado: <a href="' . htmlspecialchars((string) ($res['public_url'] ?? ''), ENT_QUOTES, 'UTF-8') . '" target="_blank">abrir link</a>';
+        $_SESSION['message_type'] = 'success';
+        header('Location: /admin/payment-links');
+        exit;
+    }
+
+    public function duplicar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+        $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
+
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) {
+            $_SESSION['message'] = 'Link inválido.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/payment-links');
+            exit;
+        }
+
+        $svc = new PaymentLinkService();
+        $res = $svc->duplicateLink($id, $adminId);
+        if (empty($res['success'])) {
+            $_SESSION['message'] = (string) ($res['error'] ?? 'Falha ao duplicar link');
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/payment-links');
+            exit;
+        }
+
+        $_SESSION['message'] = 'Link duplicado: <a href="' . htmlspecialchars((string) ($res['public_url'] ?? ''), ENT_QUOTES, 'UTF-8') . '" target="_blank">abrir link</a>';
         $_SESSION['message_type'] = 'success';
         header('Location: /admin/payment-links');
         exit;

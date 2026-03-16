@@ -380,6 +380,7 @@ $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualC
 // Payment Links (Admin)
 $router->get('/admin/payment-links', 'AdminPaymentLinksController', 'index');
 $router->post('/admin/payment-links/criar', 'AdminPaymentLinksController', 'criar');
+$router->post('/admin/payment-links/duplicar/{id}', 'AdminPaymentLinksController', 'duplicar');
 $router->get('/admin/payment-links/{id}', 'AdminPaymentLinksController', 'detalhes');
 
 // Payment Links (Público)
