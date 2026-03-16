@@ -4,6 +4,13 @@ $sessionLifetime = 60 * 60 * 24 * 7;
 ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
 ini_set('session.cookie_lifetime', (string) $sessionLifetime);
 
+try {
+    if (!headers_sent()) {
+        header('X-App-Frontcontroller: 1');
+    }
+} catch (\Throwable $e) {
+}
+
 $cookieParams = session_get_cookie_params();
 $xfp = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
 $xfs = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''));
