@@ -275,9 +275,18 @@ class Router {
             $request->setParam($key, $value);
         }
 
-            // Chamar método com parâmetros
-            if (!empty($params)) {
-                $controller->$controllerMethod($request, ...array_values($params));
+            // Chamar método; só repassar params como argumentos se o método aceitar
+            $extraArgs = array_values($params);
+            $paramCount = 1;
+            try {
+                $ref = new \ReflectionMethod($controller, $controllerMethod);
+                $paramCount = $ref->getNumberOfParameters();
+            } catch (\Throwable $e) {
+                $paramCount = 1;
+            }
+
+            if (!empty($extraArgs) && $paramCount > 1) {
+                $controller->$controllerMethod($request, ...$extraArgs);
             } else {
                 $controller->$controllerMethod($request);
             }
