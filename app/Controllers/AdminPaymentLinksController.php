@@ -50,25 +50,23 @@ class AdminPaymentLinksController extends Controller {
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Produto</label>
+                            <label class="form-label">Produto (valor)</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="produto_valor" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Taxa de serviço</label>
+                            <label class="form-label">Taxa de serviço (valor)</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="taxa_servico_valor" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Impostos</label>
+                            <label class="form-label">Impostos (valor)</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="impostos_valor" value="0">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Descrição</label>
                             <input type="text" class="form-control" name="descricao" placeholder="Ex: Pagamento avulso">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Expira em</label>
-                            <input type="datetime-local" class="form-control" name="expires_at">
-                            <div class="form-text">Padrão: 30 dias.</div>
+                        <div class="col-12">
+                            <div class="form-text">O link expira automaticamente em 30 dias.</div>
                         </div>
                         <div class="col-12">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-link"></i> Gerar link</button>
@@ -150,17 +148,6 @@ class AdminPaymentLinksController extends Controller {
             'impostos_valor' => (string) $request->getParam('impostos_valor', '0'),
             'descricao' => (string) $request->getParam('descricao', ''),
         ];
-
-        $expiresRaw = (string) $request->getParam('expires_at', '');
-        $expiresRaw = trim($expiresRaw);
-        if ($expiresRaw !== '') {
-            // datetime-local vem como 2026-03-16T10:00
-            $expiresRaw = str_replace('T', ' ', $expiresRaw);
-            if (strlen($expiresRaw) === 16) {
-                $expiresRaw .= ':00';
-            }
-            $data['expires_at'] = $expiresRaw;
-        }
 
         $res = $svc->createLink($data, $adminId);
         if (empty($res['success'])) {
