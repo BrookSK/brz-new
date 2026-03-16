@@ -9,6 +9,7 @@
     <script>
         window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
         window.IS_PAYMENT_LINK = <?= !empty($is_payment_link) ? 'true' : 'false' ?>;
+        window.PAYMENT_LINK_CURRENCY = window.IS_PAYMENT_LINK ? <?= json_encode((string) ($moeda ?? ''), JSON_UNESCAPED_UNICODE) ?> : '';
         window.CAMBIOREAL_RATE_BRL = <?= json_encode((float) ($cambioreal_rate_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -2048,6 +2049,19 @@ function updatePixServiceFeeInfo() {
 function updatePrices(currency) {
     console.log('🔍 [MOEDA] updatePrices() chamada com currency:', currency);
     console.log('🔍 [MOEDA] window.exchangeRates:', window.exchangeRates);
+
+    if (window.IS_PAYMENT_LINK) {
+        try {
+            if (window.PAYMENT_LINK_CURRENCY) {
+                currency = String(window.PAYMENT_LINK_CURRENCY || '').toUpperCase();
+            }
+            var hiddenCur = document.getElementById('moeda_hidden');
+            if (hiddenCur) {
+                hiddenCur.value = currency;
+            }
+        } catch (e) {
+        }
+    }
     
     const currencySymbol = currency === 'BRL' ? 'R$' : '$';
     const rate = window.exchangeRates[currency];
@@ -2274,14 +2288,37 @@ function updatePaymentMethodsForCurrency(currency) {
     }
 }
 
+// Garantia extra: payment link nunca deve ter opção carteira
+document.addEventListener('DOMContentLoaded', function() {
+    if (!window.IS_PAYMENT_LINK) return;
+    try {
+        var select = document.getElementById('forma_pagamento');
+        if (select) {
+            Array.from(select.options).forEach(function(opt) {
+                if (String(opt.value || '') === 'carteira') {
+                    opt.remove();
+                }
+            });
+            if (String(select.value || '') === 'carteira') {
+                select.value = 'cartao_credito';
+            }
+        }
+    } catch (e) {
+    }
+});
+
 // Inicializar com a moeda do header
 function initCurrency() {
     var headerCurrency = document.getElementById('current-currency');
     var currentCurrency = headerCurrency ? headerCurrency.textContent : 'BRL';
     if (window.IS_PAYMENT_LINK) {
-        var hiddenField0 = document.getElementById('moeda_hidden');
-        if (hiddenField0 && hiddenField0.value) {
-            currentCurrency = hiddenField0.value;
+        if (window.PAYMENT_LINK_CURRENCY) {
+            currentCurrency = String(window.PAYMENT_LINK_CURRENCY || '').toUpperCase();
+        } else {
+            var hiddenField0 = document.getElementById('moeda_hidden');
+            if (hiddenField0 && hiddenField0.value) {
+                currentCurrency = hiddenField0.value;
+            }
         }
     }
     
@@ -2294,6 +2331,14 @@ function initCurrency() {
         hiddenField.value = currentCurrency;
         console.log('Campo oculto atualizado para:', currentCurrency); // Debug
     }
+
+    if (window.IS_PAYMENT_LINK) {
+        try {
+            if (headerCurrency) {
+                headerCurrency.textContent = currentCurrency;
+            }
+        } catch (e) {}
+    }
     
     // Atualizar preços
     updatePrices(currentCurrency);
@@ -2301,6 +2346,10 @@ function initCurrency() {
 
 // Função global para atualizar moeda no checkout
 window.updateCheckoutCurrency = function(currency) {
+    if (window.IS_PAYMENT_LINK) {
+        console.log('🔍 [MOEDA] Ignorando updateCheckoutCurrency em payment link:', currency);
+        return;
+    }
     console.log('Atualizando checkout para:', currency); // Debug
     
     // Atualizar campo oculto
