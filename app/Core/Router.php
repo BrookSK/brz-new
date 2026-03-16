@@ -187,7 +187,7 @@ class Router {
             // Procurar rota com parâmetros
             foreach ($this->routes[$method] as $routePath => $route) {
                 $pattern = preg_replace('/\{[^}]+\}/', '([^/]+)', $routePath);
-                $pattern = '#^' . $pattern . '$#';
+                $pattern = '#^' . $pattern . '/?$#';
                 
                 if (preg_match($pattern, $path, $matches)) {
                     $matchedRoute = $route;
@@ -203,6 +203,18 @@ class Router {
 
         if (!$matchedRoute) {
             http_response_code(404);
+            try {
+                if (!headers_sent()) {
+                    header('X-App-Route-Status: no-match');
+                    header('X-App-Route-Method: ' . (string) $method);
+                    header('X-App-Route-Path: ' . (string) $path);
+                }
+            } catch (\Throwable $e) {
+            }
+            try {
+                error_log('[Router] no route match: ' . (string) $method . ' ' . (string) $path);
+            } catch (\Throwable $e) {
+            }
             $view404 = __DIR__ . '/../Views/errors/404.php';
             if (is_file($view404)) {
                 require $view404;

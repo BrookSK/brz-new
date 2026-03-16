@@ -384,6 +384,7 @@ $router->get('/admin/payment-links/{id}', 'AdminPaymentLinksController', 'detalh
 
 // Payment Links (Público)
 $router->get('/pagar/{token}', 'PaymentLinkController', 'index');
+$router->post('/pagar/{token}', 'PaymentLinkController', 'processar');
 $router->post('/pagar/{token}/processar', 'PaymentLinkController', 'processar');
 $router->get('/pagar/{token}/resultado', 'PaymentLinkController', 'resultado');
 $router->get('/pagar/{token}/comprovante', 'PaymentLinkController', 'comprovante');
