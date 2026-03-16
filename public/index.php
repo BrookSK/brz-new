@@ -245,6 +245,7 @@ function _siteLockIsBypassPath(string $path): bool {
     if (strpos($p, '/loginadmin') === 0) return true;
     if (strpos($p, '/webhook/') === 0) return true;
     if (strpos($p, '/site-lock') === 0) return true;
+    if (strpos($p, '/pagar/') === 0) return true;
     if (strpos($p, '/clube/recarga/status') === 0) return true;
     if (strpos($p, '/clube/recarga/comprovante') === 0) return true;
     if (strpos($p, '/clube/recarga') === 0) {

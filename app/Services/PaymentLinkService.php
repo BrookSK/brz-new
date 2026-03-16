@@ -186,7 +186,7 @@ class PaymentLinkService {
         }
     }
 
-    public function createPaymentAttempt(int $linkId, array $customer, string $metodo, string $componente = 'pagamento'): array {
+    public function createPaymentAttempt(int $linkId, array $customer, string $metodo, string $componente = 'pagamento', array $amounts = []): array {
         $linkId = (int) $linkId;
         if ($linkId <= 0) {
             return ['success' => false, 'error' => 'Link inválido'];
@@ -217,6 +217,24 @@ class PaymentLinkService {
         $taxa = (float) ($link['taxa_servico_valor'] ?? 0);
         $impostos = (float) ($link['impostos_valor'] ?? 0);
         $total = (float) ($link['total_valor'] ?? ($produto + $taxa + $impostos));
+
+        // Override para registrar valores por componente
+        if (!empty($amounts)) {
+            if (array_key_exists('produto_valor', $amounts)) {
+                $produto = (float) $amounts['produto_valor'];
+            }
+            if (array_key_exists('taxa_servico_valor', $amounts)) {
+                $taxa = (float) $amounts['taxa_servico_valor'];
+            }
+            if (array_key_exists('impostos_valor', $amounts)) {
+                $impostos = (float) $amounts['impostos_valor'];
+            }
+            if (array_key_exists('total_valor', $amounts)) {
+                $total = (float) $amounts['total_valor'];
+            } else {
+                $total = round($produto + $taxa + $impostos, 2);
+            }
+        }
 
         $name = trim((string) ($customer['name'] ?? ''));
         $email = trim((string) ($customer['email'] ?? ''));

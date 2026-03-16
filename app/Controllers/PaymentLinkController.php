@@ -306,7 +306,12 @@ class PaymentLinkController extends Controller {
 
         // USD -> Stripe
         if ($currency === 'USD') {
-            $attempt = $svc->createPaymentAttempt($linkId, $customer, 'credit_card', 'pagamento');
+            $attempt = $svc->createPaymentAttempt($linkId, $customer, 'credit_card', 'pagamento', [
+                'produto_valor' => (float) ($link['produto_valor'] ?? 0),
+                'taxa_servico_valor' => (float) ($link['taxa_servico_valor'] ?? 0),
+                'impostos_valor' => (float) ($link['impostos_valor'] ?? 0),
+                'total_valor' => (float) ($link['total_valor'] ?? 0),
+            ]);
             if (empty($attempt['success'])) {
                 $this->renderNotFound((string) ($attempt['error'] ?? 'Falha ao iniciar pagamento'));
                 return;
@@ -384,7 +389,12 @@ class PaymentLinkController extends Controller {
             if ($forma === 'boleto') $metodoCr = 'boleto';
             if ($forma === 'cartao_credito' || $forma === 'cartao_debito') $metodoCr = ($forma === 'cartao_debito') ? 'debit_card' : 'credit_card';
 
-            $attemptProduto = $svc->createPaymentAttempt($linkId, $customer, $metodoCr, 'produto');
+            $attemptProduto = $svc->createPaymentAttempt($linkId, $customer, $metodoCr, 'produto', [
+                'produto_valor' => (float) $produtoValor,
+                'taxa_servico_valor' => 0.0,
+                'impostos_valor' => 0.0,
+                'total_valor' => (float) $produtoValor,
+            ]);
             if (empty($attemptProduto['success'])) {
                 $this->renderNotFound((string) ($attemptProduto['error'] ?? 'Falha ao iniciar pagamento')); return;
             }
@@ -430,7 +440,12 @@ class PaymentLinkController extends Controller {
             if ($forma === 'pix') $billingType = 'PIX';
             if ($forma === 'cartao_credito' || $forma === 'cartao_debito') $billingType = 'CREDIT_CARD';
 
-            $attemptTaxa = $svc->createPaymentAttempt($linkId, $customer, strtolower($billingType), 'taxa_servico');
+            $attemptTaxa = $svc->createPaymentAttempt($linkId, $customer, strtolower($billingType), 'taxa_servico', [
+                'produto_valor' => 0.0,
+                'taxa_servico_valor' => (float) $taxaValor,
+                'impostos_valor' => (float) $impostosValor,
+                'total_valor' => (float) $valorAppmax,
+            ]);
             if (empty($attemptTaxa['success'])) {
                 $this->renderNotFound((string) ($attemptTaxa['error'] ?? 'Falha ao iniciar pagamento')); return;
             }
@@ -496,7 +511,12 @@ class PaymentLinkController extends Controller {
 
             // imposto como item lógico (mesmo payment_id)
             if ($impostosValor > 0) {
-                $attemptImp = $svc->createPaymentAttempt($linkId, $customer, strtolower($billingType), 'imposto');
+                $attemptImp = $svc->createPaymentAttempt($linkId, $customer, strtolower($billingType), 'imposto', [
+                    'produto_valor' => 0.0,
+                    'taxa_servico_valor' => 0.0,
+                    'impostos_valor' => (float) $impostosValor,
+                    'total_valor' => (float) $impostosValor,
+                ]);
                 if (!empty($attemptImp['success'])) {
                     $attemptImpId = (int) ($attemptImp['id'] ?? 0);
                     $svc->updatePaymentAttempt($attemptImpId, [

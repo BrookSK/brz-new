@@ -112,6 +112,7 @@ class AdminPaymentLinksController extends Controller {
                     . '<td>' . $exp . '</td>'
                     . '<td class="d-flex flex-wrap gap-2">'
                     . '  <a class="btn btn-sm btn-outline-primary" href="/admin/payment-links/' . $id . '"><i class="fas fa-clock"></i> Histórico</a>'
+                    . '  <button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> Copiar</button>'
                     . '  <a class="btn btn-sm btn-outline-secondary" href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank"><i class="fas fa-external-link-alt"></i> Abrir</a>'
                     . '</td>'
                     . '</tr>';
@@ -126,6 +127,34 @@ class AdminPaymentLinksController extends Controller {
 
         renderAdminScripts();
 
+        echo '<script>
+            function copyPayLink(btn){
+                try {
+                    var link = btn && btn.getAttribute ? (btn.getAttribute("data-link") || "") : "";
+                    if (!link) return;
+                    var full = link;
+                    if (link.indexOf("http") !== 0) {
+                        full = window.location.origin.replace(/\/$/, "") + link;
+                    }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(full).then(function(){
+                            btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
+                            setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
+                        });
+                        return;
+                    }
+                    var ta = document.createElement("textarea");
+                    ta.value = full;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
+                    setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
+                } catch (e) {
+                }
+            }
+        </script>';
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
         echo '</body></html>';
         exit;
@@ -219,8 +248,13 @@ class AdminPaymentLinksController extends Controller {
             $token = (string) ($link['token'] ?? '');
             $publicUrl = '/pagar/' . rawurlencode($token);
             echo '<div class="card mb-3"><div class="card-body">'
-                . '<div><strong>URL:</strong> <a href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '</a></div>'
+                . '<div class="d-flex flex-wrap align-items-center gap-2"><strong>URL:</strong> <a href="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '</a>'
+                . '<button type="button" class="btn btn-sm btn-outline-success" onclick="copyPayLink(this)" data-link="' . htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-copy"></i> Copiar</button>'
+                . '</div>'
                 . '<div><strong>Moeda:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>'
+                . '<div><strong>Produto:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['produto_valor'] ?? 0), 2, ',', '.') . '</div>'
+                . '<div><strong>Taxa de serviço:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['taxa_servico_valor'] ?? 0), 2, ',', '.') . '</div>'
+                . '<div><strong>Impostos:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['impostos_valor'] ?? 0), 2, ',', '.') . '</div>'
                 . '<div><strong>Total:</strong> ' . htmlspecialchars((string) ($link['currency'] ?? ''), ENT_QUOTES, 'UTF-8') . ' ' . number_format((float) ($link['total_valor'] ?? 0), 2, ',', '.') . '</div>'
                 . '</div></div>';
         }
@@ -233,10 +267,14 @@ class AdminPaymentLinksController extends Controller {
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Componente</th>
                                 <th>Status</th>
                                 <th>Gateway</th>
                                 <th>Método</th>
                                 <th>Cliente</th>
+                                <th>Produto</th>
+                                <th>Taxa</th>
+                                <th>Impostos</th>
                                 <th>Total</th>
                                 <th>Criado</th>
                             </tr>
@@ -244,10 +282,11 @@ class AdminPaymentLinksController extends Controller {
                         <tbody>';
 
         if (empty($payments)) {
-            echo '<tr><td colspan="7" class="text-muted">Nenhum pagamento registrado.</td></tr>';
+            echo '<tr><td colspan="11" class="text-muted">Nenhum pagamento registrado.</td></tr>';
         } else {
             foreach ($payments as $p) {
                 $pid = (int) ($p['id'] ?? 0);
+                $comp = htmlspecialchars((string) ($p['componente'] ?? ''), ENT_QUOTES, 'UTF-8');
                 $st = htmlspecialchars((string) ($p['status'] ?? ''), ENT_QUOTES, 'UTF-8');
                 $gw = htmlspecialchars((string) ($p['gateway'] ?? ''), ENT_QUOTES, 'UTF-8');
                 $met = htmlspecialchars((string) ($p['metodo'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -255,15 +294,22 @@ class AdminPaymentLinksController extends Controller {
                 $cliEmail = trim((string) ($p['customer_email'] ?? ''));
                 $cliLabel = htmlspecialchars($cli !== '' ? $cli : ($cliEmail !== '' ? $cliEmail : '-'), ENT_QUOTES, 'UTF-8');
                 $cur = htmlspecialchars((string) ($p['currency'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $vProd = (float) ($p['produto_valor'] ?? 0);
+                $vTaxa = (float) ($p['taxa_servico_valor'] ?? 0);
+                $vImp = (float) ($p['impostos_valor'] ?? 0);
                 $total = (float) ($p['total_valor'] ?? 0);
                 $created = htmlspecialchars((string) ($p['created_at'] ?? ''), ENT_QUOTES, 'UTF-8');
 
                 echo '<tr>'
                     . '<td>' . $pid . '</td>'
+                    . '<td>' . $comp . '</td>'
                     . '<td>' . $st . '</td>'
                     . '<td>' . $gw . '</td>'
                     . '<td>' . $met . '</td>'
                     . '<td>' . $cliLabel . '</td>'
+                    . '<td>' . $cur . ' ' . number_format($vProd, 2, ',', '.') . '</td>'
+                    . '<td>' . $cur . ' ' . number_format($vTaxa, 2, ',', '.') . '</td>'
+                    . '<td>' . $cur . ' ' . number_format($vImp, 2, ',', '.') . '</td>'
                     . '<td>' . $cur . ' ' . number_format($total, 2, ',', '.') . '</td>'
                     . '<td>' . $created . '</td>'
                     . '</tr>';
@@ -277,6 +323,34 @@ class AdminPaymentLinksController extends Controller {
         echo '</main></div></div>';
 
         renderAdminScripts();
+        echo '<script>
+            function copyPayLink(btn){
+                try {
+                    var link = btn && btn.getAttribute ? (btn.getAttribute("data-link") || "") : "";
+                    if (!link) return;
+                    var full = link;
+                    if (link.indexOf("http") !== 0) {
+                        full = window.location.origin.replace(/\/$/, "") + link;
+                    }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(full).then(function(){
+                            btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
+                            setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
+                        });
+                        return;
+                    }
+                    var ta = document.createElement("textarea");
+                    ta.value = full;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
+                    setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
+                } catch (e) {
+                }
+            }
+        </script>';
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
         echo '</body></html>';
         exit;
