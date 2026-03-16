@@ -237,10 +237,13 @@ class AdminPaymentLinksController extends Controller {
         renderAdminSidebar('payment-links');
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2">Histórico do Link #' . (int) $id . '</h1>
-                <a class="btn btn-outline-secondary" href="/admin/payment-links"><i class="fas fa-arrow-left"></i> Voltar</a>
-            </div>';
+            <div class="d-flex justify-content-between align-items-center mb-3">'
+            . '<h2 class="mb-0">Payment Link #' . (int) $link['id'] . '</h2>'
+            . '<div class="d-flex gap-2">'
+            . '<a class="btn btn-outline-primary" target="_blank" href="/pagar/' . rawurlencode((string) ($link['token'] ?? '')) . '/comprovante"><i class="fas fa-print"></i> Comprovante (PDF)</a>'
+            . '<a class="btn btn-outline-secondary" href="/admin/payment-links"><i class="fas fa-arrow-left"></i> Voltar</a>'
+            . '</div>'
+            . '</div>';
 
         if (!is_array($link)) {
             echo '<div class="alert alert-danger">Link não encontrado.</div>';

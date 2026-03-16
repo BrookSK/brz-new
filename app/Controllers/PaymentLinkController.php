@@ -726,10 +726,6 @@ class PaymentLinkController extends Controller {
             . '</div>'
             . '</div></div>';
 
-        echo '<div class="d-flex justify-content-end mb-3">'
-            . '<a class="btn btn-outline-primary" href="/pagar/' . htmlspecialchars((string) $token, ENT_QUOTES, 'UTF-8') . '/comprovante"><i class="fas fa-receipt"></i> Ver comprovante</a>'
-            . '</div>';
-
         if (empty($blocks)) {
             echo '<div class="alert alert-warning">Nenhuma cobrança foi gerada.</div>';
         }
