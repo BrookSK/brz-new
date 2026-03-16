@@ -8,6 +8,7 @@
     <?php endif; ?>
     <script>
         window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
+        window.IS_PAYMENT_LINK = <?= !empty($is_payment_link) ? 'true' : 'false' ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -1757,6 +1758,10 @@ function atualizarFormaPagamento() {
                 } else {
                     if (blocoStripe) blocoStripe.style.display = 'none';
                     if (blocoManual) blocoManual.style.display = 'block';
+                    try {
+                        const installmentsBox = document.getElementById('installments-box');
+                        if (installmentsBox) installmentsBox.style.display = 'block';
+                    } catch (e) {}
                     // Garantir required para BRL
                     const nomeCartao = blocoManual ? blocoManual.querySelector('input[name="card_holder_name"]') : null;
                     const numeroCartao = blocoManual ? blocoManual.querySelector('input[name="card_number"]') : null;
@@ -1923,12 +1928,18 @@ function updateCambioRealFeesPreview() {
     const rate = (window.exchangeRates && window.exchangeRates['BRL']) ? Number(window.exchangeRates['BRL']) : 0;
     if (!isFinite(rate) || rate <= 0) return;
 
-    // Base (produto): usar o subtotal original (USD) convertido para BRL; fallback para valor exibido
+    // Base (produto):
+    // - Checkout normal: subtotal original em USD, então converte para BRL.
+    // - Payment link em BRL: subtotal já está em BRL.
     let produtoBrl = 0;
     try {
         const baseUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.subtotal) ? Number(window.checkoutOriginalValues.subtotal) : 0;
         if (isFinite(baseUsd) && baseUsd > 0) {
-            produtoBrl = baseUsd * rate;
+            if (window.IS_PAYMENT_LINK) {
+                produtoBrl = baseUsd;
+            } else {
+                produtoBrl = baseUsd * rate;
+            }
         }
     } catch (e) {
     }

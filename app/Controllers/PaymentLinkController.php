@@ -34,29 +34,42 @@ class PaymentLinkController extends Controller {
 
         // Montar itens compatíveis com o checkout atual
         $items = [];
+        $subtotalView = 0.0;
         if ($produto > 0) {
             $items[] = [
                 'nome' => $descricao,
                 'quantidade' => 1,
                 'subtotal' => $produto,
             ];
+            $subtotalView = (float) $produto;
         } else {
             $items[] = [
                 'nome' => $descricao,
                 'quantidade' => 1,
                 'subtotal' => $total,
             ];
+            $subtotalView = (float) $total;
         }
 
         // Checkout usa valores base em USD e converte via exchangeRates.
         // Para Payment Link, manter base sempre em "USD" internamente e fornecer rate BRL quando necessário.
+        $rateBRL = 5.5;
+        try {
+            $dbTx = \Config\Database::getConnection();
+            $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+            $stTx->execute();
+            $v = (string) ($stTx->fetchColumn() ?: '0');
+            $tx2 = (float) str_replace(',', '.', $v);
+            if ($tx2 > 1.01) {
+                $rateBRL = $tx2;
+            }
+        } catch (\Exception $e) {
+        }
+
         $exchangeRates = [
             'USD' => 1.0,
-            'BRL' => 1.0,
+            'BRL' => $rateBRL,
         ];
-        if ($currency === 'BRL') {
-            $exchangeRates['BRL'] = 1.0;
-        }
 
         $paySvc = new PaymentService();
 
@@ -64,7 +77,7 @@ class PaymentLinkController extends Controller {
             'is_payment_link' => true,
             'carrinho' => [],
             'items' => $items,
-            'subtotal' => $produto,
+            'subtotal' => $subtotalView,
             'peso_clube_total' => 0,
             'subtotal_clube' => 0,
             'desconto_clube' => 0,
