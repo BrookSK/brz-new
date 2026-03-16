@@ -2278,6 +2278,12 @@ function updatePaymentMethodsForCurrency(currency) {
 function initCurrency() {
     var headerCurrency = document.getElementById('current-currency');
     var currentCurrency = headerCurrency ? headerCurrency.textContent : 'BRL';
+    if (window.IS_PAYMENT_LINK) {
+        var hiddenField0 = document.getElementById('moeda_hidden');
+        if (hiddenField0 && hiddenField0.value) {
+            currentCurrency = hiddenField0.value;
+        }
+    }
     
     console.log('Header currency encontrado:', headerCurrency ? 'sim' : 'não'); // Debug
     console.log('Moeda inicial:', currentCurrency); // Debug
