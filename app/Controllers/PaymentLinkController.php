@@ -542,16 +542,26 @@ class PaymentLinkController extends Controller {
                 echo '<div class="row g-3">'
                     . '<div class="col-md-6">';
                 if ($pixImg !== '') {
-                    $isSvg = (stripos($pixImg, '<svg') !== false);
-                    $isBase64Like = (bool) preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $pixImg);
-                    if ($isSvg || $isBase64Like) {
-                        $mime = $isSvg ? 'image/svg+xml' : 'image/png';
-                        echo '<div class="border rounded p-3 bg-white text-center"><img alt="PIX" style="max-width: 320px; width:100%;" src="data:' . $mime . ';base64,' . htmlspecialchars($pixImg, ENT_QUOTES, 'UTF-8') . '"></div>';
+                    $pixImgTrim = trim($pixImg);
+                    $isSvgRaw = (stripos($pixImgTrim, '<svg') !== false);
+                    $isDataUri = (stripos($pixImgTrim, 'data:image') === 0);
+                    $isUrl = (stripos($pixImgTrim, 'http://') === 0 || stripos($pixImgTrim, 'https://') === 0);
+
+                    if ($isDataUri || $isUrl) {
+                        echo '<div class="border rounded p-3 bg-white text-center"><img alt="PIX" style="max-width: 320px; width:100%;" src="' . htmlspecialchars($pixImgTrim, ENT_QUOTES, 'UTF-8') . '"></div>';
+                    } elseif ($isSvgRaw) {
+                        $svgB64 = base64_encode($pixImgTrim);
+                        echo '<div class="border rounded p-3 bg-white text-center"><img alt="PIX" style="max-width: 320px; width:100%;" src="data:image/svg+xml;base64,' . htmlspecialchars($svgB64, ENT_QUOTES, 'UTF-8') . '"></div>';
                     } else {
-                        echo '<div class="alert alert-warning small mb-0">QR Code não pôde ser exibido automaticamente. Use o código PIX copia e cola ao lado.</div>';
+                        $isBase64Like = (bool) preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $pixImgTrim);
+                        if ($isBase64Like) {
+                            echo '<div class="border rounded p-3 bg-white text-center"><img alt="PIX" style="max-width: 320px; width:100%;" src="data:image/png;base64,' . htmlspecialchars($pixImgTrim, ENT_QUOTES, 'UTF-8') . '"></div>';
+                        } else {
+                            echo '<div class="alert alert-warning small mb-0">QR Code não pôde ser exibido automaticamente. Use o código PIX copia e cola ao lado.</div>';
+                        }
                     }
                 }
-                echo '</div><div class="col-md-6"'
+                echo '</div><div class="col-md-6">'
                     . '<div class="mb-2"><strong>PIX copia e cola</strong></div>'
                     . '<textarea class="form-control" rows="5" readonly>' . htmlspecialchars($pixPayload, ENT_QUOTES, 'UTF-8') . '</textarea>'
                     . '</div></div>';
