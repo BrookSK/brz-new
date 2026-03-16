@@ -2,6 +2,7 @@
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
     <script>
+        window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -74,7 +75,7 @@
                         <?php endif; ?>
 
                         <!-- Campo oculto para moeda -->
-                        <input type="hidden" name="moeda" id="moeda_hidden" value="BRL">
+                        <input type="hidden" name="moeda" id="moeda_hidden" value="<?= htmlspecialchars((string) ($moeda ?? 'BRL'), ENT_QUOTES, 'UTF-8') ?>">
                         
                         <!-- Dados Pessoais -->
                         <div class="mb-4">
@@ -1437,16 +1438,32 @@ async function processarPedidoDireto() {
     }
 
     // Enviar requisição AJAX (criar pedido)
-    fetch('/checkout/processar', {
+    const endpoint = (window.CHECKOUT_ENDPOINT || '/checkout/processar');
+    fetch(endpoint, {
         method: 'POST',
         body: formData
     })
-    .then(response => {
+    .then(async response => {
         console.log('🔍 [DIRETO] Resposta recebida:', response.status);
-        return response.json();
+        const ct = (response.headers && response.headers.get) ? (response.headers.get('content-type') || '') : '';
+        if (ct.toLowerCase().indexOf('application/json') !== -1) {
+            return response.json();
+        }
+        const html = await response.text();
+        return { __is_html: true, __html: html };
     })
     .then(data => {
         console.log('🔍 [DIRETO] Dados recebidos:', data);
+
+        if (data && data.__is_html) {
+            try {
+                document.open();
+                document.write(data.__html || '');
+                document.close();
+            } catch (e) {
+            }
+            return;
+        }
         
         if (data.success) {
             console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);

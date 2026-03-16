@@ -32,239 +32,76 @@ class PaymentLinkController extends Controller {
         $taxa = (float) ($link['taxa_servico_valor'] ?? 0);
         $impostos = (float) ($link['impostos_valor'] ?? 0);
 
-        $paySvc = new PaymentService();
-        $crAppId = $paySvc->getCambioRealAppId();
-        $crAppPublic = $paySvc->getCambioRealAppPublic();
-        $crBaseUrl = $paySvc->getCambioRealBaseUrlPublic();
-
-        $crIsSandbox = stripos((string) $crBaseUrl, 'sandbox.cambioreal.com') !== false;
-
-        echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pagamento</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-</head>
-<body style="background:#f6f8fb;">
-<div class="container py-4" style="max-width: 980px;">
-  <div class="mb-3">
-    <h3 class="mb-0">' . htmlspecialchars($descricao, ENT_QUOTES, 'UTF-8') . '</h3>
-    <div class="text-muted">Total: <strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($total, 2, ',', '.') . '</strong></div>
-  </div>';
-
-        echo '<div class="row g-4">
-            <div class="col-lg-6">
-              <div class="card shadow-sm">
-                <div class="card-body">
-                  <h5 class="card-title">Dados do cliente</h5>
-                  <form method="POST" action="/pagar/' . htmlspecialchars((string) $token, ENT_QUOTES, 'UTF-8') . '/processar" id="paylinkForm">
-                    <input type="hidden" name="token" value="' . htmlspecialchars((string) $token, ENT_QUOTES, 'UTF-8') . '">
-                    <input type="hidden" name="currency" value="' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . '">
-
-                    <div class="row">
-                      <div class="col-12 mb-3">
-                        <label class="form-label">Nome</label>
-                        <input type="text" class="form-control" name="nome" required>
-                      </div>
-                      <div class="col-12 mb-3">
-                        <label class="form-label">E-mail</label>
-                        <input type="email" class="form-control" name="email" required>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <label class="form-label">Documento (CPF/CNPJ)</label>
-                        <input type="text" class="form-control" name="documento" required>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <label class="form-label">Telefone</label>
-                        <input type="text" class="form-control" name="telefone" required>
-                      </div>
-                    </div>';
-
-        if ($currency === 'BRL') {
-            echo '<hr>
-                    <h6 class="mb-2">Endereço</h6>
-                    <div class="row">
-                      <div class="col-md-4 mb-3">
-                        <label class="form-label">CEP</label>
-                        <input type="text" class="form-control" name="cep" required>
-                      </div>
-                      <div class="col-md-4 mb-3">
-                        <label class="form-label">Estado</label>
-                        <input type="text" class="form-control" name="estado" required>
-                      </div>
-                      <div class="col-md-4 mb-3">
-                        <label class="form-label">Cidade</label>
-                        <input type="text" class="form-control" name="cidade" required>
-                      </div>
-                      <div class="col-md-8 mb-3">
-                        <label class="form-label">Endereço</label>
-                        <input type="text" class="form-control" name="endereco" required>
-                      </div>
-                      <div class="col-md-4 mb-3">
-                        <label class="form-label">Número</label>
-                        <input type="text" class="form-control" name="numero" required>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <label class="form-label">Bairro</label>
-                        <input type="text" class="form-control" name="bairro" required>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <label class="form-label">Data de nascimento</label>
-                        <input type="date" class="form-control" name="data_nascimento">
-                      </div>
-                    </div>';
-        }
-
-        echo '<hr>
-                    <h5 class="card-title">Pagamento</h5>';
-
-        if ($currency === 'USD') {
-            echo '<div class="alert alert-info">Pagamento em USD é realizado via <strong>Stripe (cartão)</strong>.</div>
-                    <input type="hidden" name="forma_pagamento" value="cartao_credito">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-credit-card"></i> Pagar com cartão</button>';
+        // Montar itens compatíveis com o checkout atual
+        $items = [];
+        if ($produto > 0) {
+            $items[] = [
+                'nome' => $descricao,
+                'quantidade' => 1,
+                'subtotal' => $produto,
+            ];
         } else {
-            echo '<div class="mb-3">
-                      <label class="form-label">Método</label>
-                      <select class="form-select" name="forma_pagamento" id="forma_pagamento" required>
-                        <option value="pix">PIX</option>
-                        <option value="boleto">Boleto</option>
-                        <option value="cartao_credito">Cartão de crédito</option>
-                        <option value="cartao_debito">Cartão de débito</option>
-                      </select>
-                    </div>
-
-                    <div id="cardBox" style="display:none;">
-                      <div class="row">
-                        <div class="col-12 mb-3">
-                          <label class="form-label">Nome no cartão</label>
-                          <input type="text" class="form-control" name="card_holder_name" id="card_holder_name">
-                        </div>
-                        <div class="col-md-8 mb-3">
-                          <label class="form-label">Número do cartão</label>
-                          <input type="text" class="form-control" name="card_number" id="card_number" autocomplete="off">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                          <label class="form-label">CVV</label>
-                          <input type="text" class="form-control" name="card_cvv" id="card_cvv" autocomplete="off">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                          <label class="form-label">Mês</label>
-                          <input type="text" class="form-control" name="card_expiry_month" id="card_expiry_month" placeholder="MM">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                          <label class="form-label">Ano</label>
-                          <input type="text" class="form-control" name="card_expiry_year" id="card_expiry_year" placeholder="AAAA">
-                        </div>
-                      </div>
-                      <input type="hidden" name="cambioreal_card_type" id="cambioreal_card_type" value="credit">
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100" id="btnPagar"><i class="fas fa-lock"></i> Gerar pagamento</button>';
+            $items[] = [
+                'nome' => $descricao,
+                'quantidade' => 1,
+                'subtotal' => $total,
+            ];
         }
 
-        echo '</form>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-lg-6">
-              <div class="card shadow-sm">
-                <div class="card-body">
-                  <h5 class="card-title">Resumo</h5>
-                  <div class="d-flex justify-content-between"><span>Produto</span><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($produto, 2, ',', '.') . '</strong></div>
-                  <div class="d-flex justify-content-between"><span>Taxa de serviço</span><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($taxa, 2, ',', '.') . '</strong></div>
-                  <div class="d-flex justify-content-between"><span>Impostos</span><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($impostos, 2, ',', '.') . '</strong></div>
-                  <hr>
-                  <div class="d-flex justify-content-between"><span>Total</span><strong>' . htmlspecialchars($currency, ENT_QUOTES, 'UTF-8') . ' ' . number_format($total, 2, ',', '.') . '</strong></div>
-
-                  <div class="mt-3 text-muted small">Após enviar, você verá as instruções de pagamento (PIX/boletos/links) nesta página.</div>
-                </div>
-              </div>
-            </div>
-        </div>';
-
-        echo '</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
-
+        // Checkout usa valores base em USD e converte via exchangeRates.
+        // Para Payment Link, manter base sempre em "USD" internamente e fornecer rate BRL quando necessário.
+        $exchangeRates = [
+            'USD' => 1.0,
+            'BRL' => 1.0,
+        ];
         if ($currency === 'BRL') {
-            echo '<script>
-                window.CAMBIOREAL_DIRECT = { appId: ' . json_encode((string) $crAppId, JSON_UNESCAPED_UNICODE) . ', appPublic: ' . json_encode((string) $crAppPublic, JSON_UNESCAPED_UNICODE) . ', baseUrl: ' . json_encode((string) $crBaseUrl, JSON_UNESCAPED_UNICODE) . ' };
-            </script>';
-            $scriptSrc = $crIsSandbox ? 'https://sandbox.cambioreal.com/js/card-hash.js' : 'https://www.cambioreal.com/js/card-hash.js';
-            echo '<script src="' . htmlspecialchars($scriptSrc, ENT_QUOTES, 'UTF-8') . '"></script>';
-            echo '<script>
-                (function(){
-                    const sel = document.getElementById("forma_pagamento");
-                    const cardBox = document.getElementById("cardBox");
-                    const typeInp = document.getElementById("cambioreal_card_type");
-                    if (sel) {
-                        const refresh = function(){
-                            const v = String(sel.value || "");
-                            const isCard = (v === "cartao_credito" || v === "cartao_debito");
-                            if (cardBox) cardBox.style.display = isCard ? "block" : "none";
-                            if (typeInp) typeInp.value = (v === "cartao_debito") ? "debit" : "credit";
-                        };
-                        sel.addEventListener("change", refresh);
-                        refresh();
-                    }
-
-                    async function attachCambioRealCardHash(fd){
-                        const v = String(sel ? sel.value : "");
-                        if (!(v === "cartao_credito" || v === "cartao_debito")) return;
-
-                        const cfg = (window.CAMBIOREAL_DIRECT || {});
-                        const appId = String(cfg.appId || "").trim();
-                        const appPublic = String(cfg.appPublic || "").trim();
-                        const baseUrl = String(cfg.baseUrl || "").trim();
-                        const sandbox = baseUrl.indexOf("sandbox.cambioreal.com") !== -1;
-                        if (!appId || !appPublic || typeof CardHash !== "function") return;
-
-                        const number = String((document.getElementById("card_number") && document.getElementById("card_number").value) ? document.getElementById("card_number").value : "").replace(/\D/g, "");
-                        const holder = String((document.getElementById("card_holder_name") && document.getElementById("card_holder_name").value) ? document.getElementById("card_holder_name").value : "").trim();
-                        const cvv = String((document.getElementById("card_cvv") && document.getElementById("card_cvv").value) ? document.getElementById("card_cvv").value : "").replace(/\D/g, "");
-                        const mm = String((document.getElementById("card_expiry_month") && document.getElementById("card_expiry_month").value) ? document.getElementById("card_expiry_month").value : "").replace(/\D/g, "");
-                        const yyyy = String((document.getElementById("card_expiry_year") && document.getElementById("card_expiry_year").value) ? document.getElementById("card_expiry_year").value : "").replace(/\D/g, "");
-                        if (!number || !holder || !cvv || !mm || !yyyy) return;
-
-                        const dfpId = "PAYLINK_" + String(Date.now());
-                        const cardHashLib = new CardHash(appId, appPublic, dfpId, sandbox);
-                        const expYY = yyyy.length === 4 ? yyyy.substring(2) : yyyy;
-                        const expiration = (mm.padStart(2, "0") + expYY.padStart(2, "0")).replace(/\D/g, "");
-
-                        const token = await cardHashLib.generateCardHash({ card_number: number, card_holder: holder, card_expiration: expiration, card_cvv: cvv });
-                        const brand = String(cardHashLib.detectBrand(number) || "").trim();
-                        const bin = String(number.substring(0, 6) || "").replace(/\D/g, "");
-                        if (!token || !brand || !bin) return;
-
-                        fd.set("cambioreal_card_token", token);
-                        fd.set("cambioreal_card_brand", brand);
-                        fd.set("cambioreal_card_bin", bin);
-                        fd.set("cambioreal_card_dfp_id", dfpId);
-                    }
-
-                    const form = document.getElementById("paylinkForm");
-                    if (form) {
-                        form.addEventListener("submit", async function(e){
-                            try {
-                                const v = String(sel ? sel.value : "");
-                                if (v === "cartao_credito" || v === "cartao_debito") {
-                                    e.preventDefault();
-                                    const fd = new FormData(form);
-                                    await attachCambioRealCardHash(fd);
-                                    fetch(form.action, { method: "POST", body: fd }).then(r => r.text()).then(html => { document.open(); document.write(html); document.close(); });
-                                }
-                            } catch (err) {
-                            }
-                        }, { capture: true });
-                    }
-                })();
-            </script>';
+            $exchangeRates['BRL'] = 1.0;
         }
 
-        echo '</body></html>';
+        $paySvc = new PaymentService();
+
+        $this->view('checkout/index', [
+            'carrinho' => [],
+            'items' => $items,
+            'subtotal' => $produto,
+            'peso_clube_total' => 0,
+            'subtotal_clube' => 0,
+            'desconto_clube' => 0,
+            'cashback_clube_estimado' => 0,
+            'peso_total' => 0,
+            'usuario' => [],
+            'perfil_ok' => true,
+            'termos_ok' => true,
+            'campos_faltando' => [],
+            'enderecos' => [],
+            'endereco_prefill' => [
+                'pais' => 'BR',
+                'cep' => '',
+                'endereco' => '',
+                'numero' => '',
+                'complemento' => '',
+                'bairro' => '',
+                'cidade' => '',
+                'estado' => '',
+            ],
+            'moeda' => $currency,
+            'frete' => 0,
+            'taxa_servico' => $taxa,
+            'impostos' => $impostos,
+            'total' => $total,
+            'pix_desconto_taxa_servico_percent' => 0,
+            'cobra_impostos_br' => true,
+            'frete_gratis' => true,
+            'exchange_rates' => $exchangeRates,
+            'stripe_publishable_key' => $paySvc->getStripePublishableKey(),
+            'stripe_enabled' => $paySvc->isStripeEnabled(),
+            'entrega_fora_br' => false,
+            'mensagem_entrega_fora_br' => 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.',
+            'checkout_endpoint' => '/pagar/' . rawurlencode((string) $token) . '/processar',
+            'cambioreal_app_id' => $paySvc->getCambioRealAppId(),
+            'cambioreal_app_public' => $paySvc->getCambioRealAppPublic(),
+            'cambioreal_base_url' => $paySvc->getCambioRealBaseUrlPublic(),
+        ]);
         exit;
     }
 
