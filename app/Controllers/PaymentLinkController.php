@@ -291,6 +291,19 @@ class PaymentLinkController extends Controller {
         $impostosValor = (float) ($link['impostos_valor'] ?? 0);
         $valorAppmax = round(max(0.0, $taxaValor + $impostosValor), 2);
 
+        $products = [];
+        try {
+            $pj = (string) ($link['products_json'] ?? '');
+            if ($pj !== '') {
+                $decoded = json_decode($pj, true);
+                if (is_array($decoded)) {
+                    $products = $decoded;
+                }
+            }
+        } catch (\Throwable $e) {
+            $products = [];
+        }
+
         $paySvc = new PaymentService();
 
         $resultBlocks = [];
@@ -338,7 +351,7 @@ class PaymentLinkController extends Controller {
                 ];
             }
 
-            $cr = $paySvc->createCambioRealDirectPaymentForPaymentLink($attemptProdutoId, $produtoValor, $descricao . ' (produtos)', $client, $metodoCr, $card);
+            $cr = $paySvc->createCambioRealDirectPaymentForPaymentLink($attemptProdutoId, $produtoValor, $descricao . ' (produtos)', $client, $metodoCr, $card, $products);
             if (empty($cr['success'])) {
                 $svc->updatePaymentAttempt($attemptProdutoId, [
                     'status' => 'failed',

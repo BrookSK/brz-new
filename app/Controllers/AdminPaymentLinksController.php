@@ -49,10 +49,7 @@ class AdminPaymentLinksController extends Controller {
                                 <option value="BRL">BRL</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Produto (valor)</label>
-                            <input type="number" step="0.01" min="0" class="form-control" name="produto_valor" value="0">
-                        </div>
+                        <input type="hidden" name="produto_valor" value="0" id="produto_valor_hidden">
                         <div class="col-md-3">
                             <label class="form-label">Taxa de serviço (valor)</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="taxa_servico_valor" value="0">
@@ -60,6 +57,17 @@ class AdminPaymentLinksController extends Controller {
                         <div class="col-md-3">
                             <label class="form-label">Impostos (valor)</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="impostos_valor" value="0">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Produtos</label>
+                            <div id="pl-products" class="d-flex flex-column gap-2"></div>
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="pl-add-product"><i class="fas fa-plus"></i> Adicionar produto</button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Subtotal produtos</label>
+                            <input type="text" class="form-control" id="pl-subtotal" value="0,00" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Descrição</label>
@@ -127,34 +135,124 @@ class AdminPaymentLinksController extends Controller {
 
         renderAdminScripts();
 
-        echo '<script>
-            function copyPayLink(btn){
-                try {
-                    var link = btn && btn.getAttribute ? (btn.getAttribute("data-link") || "") : "";
-                    if (!link) return;
-                    var full = link;
-                    if (link.indexOf("http") !== 0) {
-                        full = window.location.origin.replace(/\/$/, "") + link;
-                    }
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(full).then(function(){
-                            btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
-                            setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
-                        });
-                        return;
-                    }
-                    var ta = document.createElement("textarea");
-                    ta.value = full;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(ta);
+        echo <<<'HTML'
+<script>
+    function copyPayLink(btn){
+        try {
+            var link = btn && btn.getAttribute ? (btn.getAttribute("data-link") || "") : "";
+            if (!link) return;
+            var full = link;
+            if (link.indexOf("http") !== 0) {
+                full = window.location.origin.replace(/\/$/, "") + link;
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(full).then(function(){
                     btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
                     setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
-                } catch (e) {
-                }
+                });
+                return;
             }
-        </script>';
+            var ta = document.createElement("textarea");
+            ta.value = full;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            btn.innerHTML = "<i class=\"fas fa-check\"></i> Copiado";
+            setTimeout(function(){ btn.innerHTML = "<i class=\"fas fa-copy\"></i> Copiar"; }, 1200);
+        } catch (e) {
+        }
+    }
+
+    (function(){
+        function fmtBRL(n){
+            try {
+                return (n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } catch(e) {
+                return String(n || 0);
+            }
+        }
+        function parseNum(v){
+            if (v === null || v === undefined) return 0;
+            v = String(v).trim();
+            if (!v) return 0;
+            v = v.replace(/\./g, '').replace(',', '.');
+            var n = parseFloat(v);
+            return isNaN(n) ? 0 : n;
+        }
+        function renumber(){
+            var wrap = document.getElementById('pl-products');
+            if (!wrap) return;
+            var rows = wrap.querySelectorAll('[data-pl-row]');
+            rows.forEach(function(row, idx){
+                var name = row.querySelector('input[data-pl-name]');
+                var val = row.querySelector('input[data-pl-value]');
+                if (name) name.setAttribute('name', 'products[' + idx + '][name]');
+                if (val) val.setAttribute('name', 'products[' + idx + '][value]');
+            });
+        }
+        function recalc(){
+            var wrap = document.getElementById('pl-products');
+            var subtotal = 0;
+            if (wrap) {
+                var vals = wrap.querySelectorAll('input[data-pl-value]');
+                vals.forEach(function(inp){ subtotal += parseNum(inp.value); });
+            }
+            subtotal = Math.round(subtotal * 100) / 100;
+            var out = document.getElementById('pl-subtotal');
+            if (out) out.value = fmtBRL(subtotal);
+            var hid = document.getElementById('produto_valor_hidden');
+            if (hid) hid.value = String(subtotal.toFixed(2));
+        }
+        function addRow(p){
+            var wrap = document.getElementById('pl-products');
+            if (!wrap) return;
+            var row = document.createElement('div');
+            row.setAttribute('data-pl-row', '1');
+            row.className = 'row g-2 align-items-center';
+            row.innerHTML = ''
+                + '<div class="col-md-6"><input type="text" class="form-control" placeholder="Nome do produto" data-pl-name="1" value="' + (p && p.name ? String(p.name).replace(/"/g,'&quot;') : '') + '"></div>'
+                + '<div class="col-md-3"><input type="number" step="0.01" min="0" class="form-control" placeholder="Valor" data-pl-value="1" value="' + (p && p.value ? String(p.value) : '') + '"></div>'
+                + '<div class="col-md-3 d-flex gap-2">'
+                + '  <button type="button" class="btn btn-outline-danger w-100" data-pl-remove="1"><i class="fas fa-minus"></i> Remover</button>'
+                + '</div>';
+            wrap.appendChild(row);
+            renumber();
+            recalc();
+        }
+
+        document.addEventListener('click', function(e){
+            var t = e && e.target ? e.target : null;
+            if (!t) return;
+            var addBtn = t.closest ? t.closest('#pl-add-product') : null;
+            if (addBtn) {
+                e.preventDefault();
+                addRow({ name: '', value: '' });
+                return;
+            }
+            var rm = t.closest ? t.closest('[data-pl-remove]') : null;
+            if (rm) {
+                e.preventDefault();
+                var row = rm.closest('[data-pl-row]');
+                if (row && row.parentNode) row.parentNode.removeChild(row);
+                renumber();
+                recalc();
+                return;
+            }
+        });
+        document.addEventListener('input', function(e){
+            var t = e && e.target ? e.target : null;
+            if (!t) return;
+            if (t.matches && (t.matches('input[data-pl-value]') || t.matches('input[data-pl-name]'))) {
+                recalc();
+            }
+        });
+        if (document.getElementById('pl-products') && document.getElementById('pl-products').children.length === 0) {
+            addRow({ name: '', value: '' });
+        }
+    })();
+</script>
+HTML;
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
         echo '</body></html>';
         exit;
@@ -170,12 +268,15 @@ class AdminPaymentLinksController extends Controller {
         $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
 
         $svc = new PaymentLinkService();
+        $products = $request->getParam('products', []);
+        if (!is_array($products)) $products = [];
         $data = [
             'currency' => (string) $request->getParam('currency', 'USD'),
             'produto_valor' => (string) $request->getParam('produto_valor', '0'),
             'taxa_servico_valor' => (string) $request->getParam('taxa_servico_valor', '0'),
             'impostos_valor' => (string) $request->getParam('impostos_valor', '0'),
             'descricao' => (string) $request->getParam('descricao', ''),
+            'products' => $products,
         ];
 
         $res = $svc->createLink($data, $adminId);

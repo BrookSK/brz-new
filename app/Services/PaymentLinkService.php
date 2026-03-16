@@ -31,6 +31,7 @@ class PaymentLinkService {
                     `taxa_servico_valor` decimal(10,2) NOT NULL DEFAULT 0.00,
                     `impostos_valor` decimal(10,2) NOT NULL DEFAULT 0.00,
                     `total_valor` decimal(10,2) NOT NULL DEFAULT 0.00,
+                    `products_json` longtext,
                     `descricao` varchar(255) DEFAULT NULL,
                     `created_by_user_id` int(11) DEFAULT NULL,
                     `expires_at` datetime DEFAULT NULL,
@@ -42,6 +43,19 @@ class PaymentLinkService {
                     KEY `idx_currency` (`currency`),
                     KEY `idx_expires_at` (`expires_at`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            } else {
+                try {
+                    $cols = [];
+                    $st = $this->db->query('DESCRIBE payment_links');
+                    $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    if (!in_array('products_json', $cols, true)) {
+                        try {
+                            $this->db->exec("ALTER TABLE payment_links ADD COLUMN products_json longtext AFTER total_valor");
+                        } catch (\Exception $e) {
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
             }
 
             if (!$this->tableExists('payment_link_payments')) {
@@ -131,7 +145,25 @@ class PaymentLinkService {
             $currency = 'USD';
         }
 
-        $produto = (float) ($data['produto_valor'] ?? 0);
+        $products = is_array($data['products'] ?? null) ? (array) $data['products'] : [];
+        $normalizedProducts = [];
+        $produtoSubtotal = 0.0;
+        foreach ($products as $p) {
+            if (!is_array($p)) continue;
+            $name = trim((string) ($p['name'] ?? ($p['descricao'] ?? '')));
+            $value = (float) ($p['value'] ?? ($p['valor'] ?? 0));
+            if ($value < 0) $value = 0.0;
+            if ($name === '' || $value <= 0) continue;
+            $normalizedProducts[] = ['name' => $name, 'value' => round($value, 2)];
+            $produtoSubtotal += (float) $value;
+        }
+        $produtoSubtotal = round($produtoSubtotal, 2);
+
+        $produto = $produtoSubtotal;
+        if ($produto <= 0) {
+            // fallback legado (caso a tela antiga ainda poste produto_valor)
+            $produto = (float) ($data['produto_valor'] ?? 0);
+        }
         $taxa = (float) ($data['taxa_servico_valor'] ?? 0);
         $impostos = (float) ($data['impostos_valor'] ?? 0);
         if ($produto < 0) $produto = 0.0;
@@ -158,7 +190,8 @@ class PaymentLinkService {
         }
 
         try {
-            $st = $this->db->prepare('INSERT INTO payment_links (token, status, currency, produto_valor, taxa_servico_valor, impostos_valor, total_valor, descricao, created_by_user_id, expires_at) VALUES (:token, :status, :currency, :produto, :taxa, :impostos, :total, :descricao, :uid, :expires_at)');
+            $productsJson = !empty($normalizedProducts) ? json_encode($normalizedProducts, JSON_UNESCAPED_UNICODE) : null;
+            $st = $this->db->prepare('INSERT INTO payment_links (token, status, currency, produto_valor, taxa_servico_valor, impostos_valor, total_valor, products_json, descricao, created_by_user_id, expires_at) VALUES (:token, :status, :currency, :produto, :taxa, :impostos, :total, :products_json, :descricao, :uid, :expires_at)');
             $st->execute([
                 ':token' => $token,
                 ':status' => 'active',
@@ -167,6 +200,7 @@ class PaymentLinkService {
                 ':taxa' => $taxa,
                 ':impostos' => $impostos,
                 ':total' => $total,
+                ':products_json' => $productsJson,
                 ':descricao' => $descricao !== '' ? $descricao : null,
                 ':uid' => $adminUserId > 0 ? $adminUserId : null,
                 ':expires_at' => $expiresAt,

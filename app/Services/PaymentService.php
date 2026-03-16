@@ -297,7 +297,8 @@ class PaymentService {
         string $descricao,
         array $client,
         string $paymentMethod,
-        array $card = []
+        array $card = [],
+        array $products = []
     ): array {
         $paymentLinkPaymentId = (int) $paymentLinkPaymentId;
         $valorBrlOriginal = (float) $valorBrlOriginal;
@@ -324,6 +325,45 @@ class PaymentService {
         $clientIp = (string) ($client['ip'] ?? '127.0.0.1');
         $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
 
+        $productsPayload = [];
+        $sum = 0.0;
+        if (!empty($products)) {
+            foreach ($products as $i => $p) {
+                if (!is_array($p)) continue;
+                $name = trim((string) ($p['name'] ?? ($p['descricao'] ?? '')));
+                $value = (float) ($p['value'] ?? ($p['valor'] ?? 0));
+                $qty = (int) ($p['qty'] ?? ($p['quantidade'] ?? 1));
+                if ($qty <= 0) $qty = 1;
+                if ($qty > 99) $qty = 99;
+                if ($value < 0) $value = 0.0;
+                if ($name === '' || $value <= 0) continue;
+                $lineTotal = round($value * $qty, 2);
+                $sum += $lineTotal;
+                $productsPayload[] = [
+                    'descricao' => $name,
+                    'base_value' => round($value, 2),
+                    'valor' => round($value, 2),
+                    'qty' => $qty,
+                    'ref' => 'PAYLINK_' . (string) $paymentLinkPaymentId . '_' . (string) $i,
+                ];
+            }
+        }
+        $sum = round($sum, 2);
+        if (!empty($productsPayload) && $sum > 0) {
+            $valorBrlOriginal = $sum;
+        }
+        if (empty($productsPayload)) {
+            $productsPayload = [
+                [
+                    'descricao' => $descricao,
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
+                    'qty' => 1,
+                    'ref' => 'PAYLINK_' . (string) $paymentLinkPaymentId,
+                ]
+            ];
+        }
+
         $payload = [
             'order_id' => 'PAYLINK_' . (string) $paymentLinkPaymentId,
             'amount' => round($valorBrlOriginal, 2),
@@ -347,15 +387,7 @@ class PaymentService {
             ],
             'duplicate' => 0,
             'take_rates' => 1,
-            'products' => [
-                [
-                    'descricao' => $descricao,
-                    'base_value' => round($valorBrlOriginal, 2),
-                    'valor' => round($valorBrlOriginal, 2),
-                    'qty' => 1,
-                    'ref' => 'PAYLINK_' . (string) $paymentLinkPaymentId,
-                ]
-            ],
+            'products' => $productsPayload,
         ];
 
         if (in_array($paymentMethod, ['credit_card', 'debit_card'], true)) {
