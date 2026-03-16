@@ -123,6 +123,21 @@ class PaymentLinkController extends Controller {
 
     public function processar(Request $request) {
         $token = (string) $request->getParam('token', '');
+
+        try {
+            if (!headers_sent()) {
+                $tok = trim((string) $token);
+                $mask = $tok;
+                if (strlen($tok) > 16) {
+                    $mask = substr($tok, 0, 8) . '...' . substr($tok, -6);
+                }
+                header('X-PaymentLink-Processar: 1');
+                header('X-PaymentLink-Token: ' . $mask);
+                header('X-PaymentLink-Path: ' . (string) $request->getPath());
+            }
+        } catch (\Throwable $e) {
+        }
+
         $svc = new PaymentLinkService();
         $link = $svc->findLinkByToken($token);
 
@@ -692,6 +707,17 @@ class PaymentLinkController extends Controller {
 
     private function renderNotFound(string $msg): void {
         http_response_code(404);
+        try {
+            if (!headers_sent()) {
+                $m = trim((string) $msg);
+                if (strlen($m) > 120) {
+                    $m = substr($m, 0, 120);
+                }
+                header('X-PaymentLink-NotFound: 1');
+                header('X-PaymentLink-Reason: ' . $m);
+            }
+        } catch (\Throwable $e) {
+        }
         echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"><title>Pagamento</title></head><body style="background:#f6f8fb;"><div class="container py-5" style="max-width:720px;"><div class="alert alert-danger">' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</div></div></body></html>';
         exit;
     }
