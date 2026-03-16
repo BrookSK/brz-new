@@ -291,13 +291,19 @@ class PaymentLinkController extends Controller {
 
             $card = [];
             if ($metodoCr === 'credit_card' || $metodoCr === 'debit_card') {
+                $installments = (int) $request->getParam('installments', 1);
+                if ($installments < 1) $installments = 1;
+                if ($installments > 12) $installments = 12;
+                if ($metodoCr === 'debit_card') {
+                    $installments = 1;
+                }
                 $card = [
                     'token' => (string) $request->getParam('cambioreal_card_token', ''),
                     'brand' => (string) $request->getParam('cambioreal_card_brand', ''),
                     'bin' => (string) $request->getParam('cambioreal_card_bin', ''),
                     'dfp_id' => (string) $request->getParam('cambioreal_card_dfp_id', ''),
                     'holder' => (string) $request->getParam('card_holder_name', ''),
-                    'installments' => 1,
+                    'installments' => $installments,
                     'type' => ($metodoCr === 'debit_card') ? 'debit' : 'credit',
                 ];
             }

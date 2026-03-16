@@ -608,9 +608,27 @@
                                                 <option value="carteira"><?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?></option>
                                                 <option value="cartao_credito"><?= __('checkout.payment.credit_card', 'Cartão de Crédito') ?></option>
                                                 <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
-                                                <option value="boleto"><?= __('checkout.payment.boleto', 'Boleto Bancário') ?></option>
                                                 <option value="pix">PIX</option>
+                                                <option value="boleto">Boleto</option>
+                                                <option value="transferencia">Transferência</option>
+                                                <option value="pagamento_entrega"><?= __('checkout.payment.cash_on_delivery', 'Pagamento na Entrega') ?></option>
                                             </select>
+
+                                            <div id="cambioreal-fees-warning" class="alert alert-warning mt-2" style="display:none;">
+                                                <div class="fw-bold mb-1">Atenção: taxas do Câmbio Real no cartão</div>
+                                                <div class="small">
+                                                    Ao pagar com <strong>cartão</strong>, o <strong>Câmbio Real</strong> pode aplicar taxas no valor final (câmbio/VET, IOF e tarifa de processamento).<br>
+                                                    A cobrança pela <strong>AppMax</strong> (taxas/impostos) <strong>não</strong> adiciona essas tarifas do Câmbio Real.
+                                                    <hr class="my-2">
+                                                    <div><strong>Câmbio:</strong> BRL 5,3773</div>
+                                                    <div><strong>VET:</strong> BRL 8,28387</div>
+                                                    <div><strong>Valor estimado a pagar:</strong> BRL 38,52</div>
+                                                    <div class="mt-2"><strong>Detalhes estimados</strong></div>
+                                                    <div>Taxa de envio: BRL 10,70 (USD 1.99)</div>
+                                                    <div>IOF incluso (3.5%): BRL 1,2495</div>
+                                                    <div>Tarifa de processamento (4.24%): BRL 1,57</div>
+                                                </div>
+                                            </div>
                                             <script>
                                             // Adicionar listener para debug
                                             document.getElementById('forma_pagamento').addEventListener('change', function() {
@@ -1327,24 +1345,28 @@ async function processarPedidoDireto() {
             const mesCartao = camposCartao ? camposCartao.querySelector('input[name="card_expiry_month"]') : null;
             const anoCartao = camposCartao ? camposCartao.querySelector('input[name="card_expiry_year"]') : null;
             const cvvCartao = camposCartao ? camposCartao.querySelector('input[name="card_cvv"]') : null;
+            const installmentsEl = camposCartao ? camposCartao.querySelector('select[name="installments"]') : null;
 
             const vNome = nomeCartao ? nomeCartao.value : '';
             const vNumero = numeroCartao ? numeroCartao.value : '';
             const vMes = mesCartao ? mesCartao.value : '';
             const vAno = anoCartao ? anoCartao.value : '';
             const vCvv = cvvCartao ? cvvCartao.value : '';
+            const vInstallments = installmentsEl ? installmentsEl.value : '1';
 
             formData.set('card_holder_name', vNome);
             formData.set('card_number', vNumero);
             formData.set('card_expiry_month', vMes);
             formData.set('card_expiry_year', vAno);
             formData.set('card_cvv', vCvv);
+            formData.set('installments', vInstallments);
 
             console.log('🔍 [DIRETO] [CARTAO] card_holder_name:', vNome);
             console.log('🔍 [DIRETO] [CARTAO] card_number:', vNumero);
             console.log('🔍 [DIRETO] [CARTAO] card_expiry_month:', vMes);
             console.log('🔍 [DIRETO] [CARTAO] card_expiry_year:', vAno);
             console.log('🔍 [DIRETO] [CARTAO] card_cvv:', vCvv);
+            console.log('🔍 [DIRETO] [CARTAO] installments:', vInstallments);
         }
     } else {
         console.error('❌ [DIRETO] Campo forma_pagamento não encontrado');
@@ -1636,6 +1658,15 @@ function atualizarFormaPagamento() {
     
     const formaPagamento = formaPagamentoElement.value;
     console.log('🔍 [DEBUG] Valor selecionado:', formaPagamento);
+
+    const feesWarning = document.getElementById('cambioreal-fees-warning');
+    if (feesWarning) {
+        const moedaHidden = document.getElementById('moeda_hidden');
+        const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+        const isCard = (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
+        const show = (cur === 'BRL') && isCard;
+        feesWarning.style.display = show ? 'block' : 'none';
+    }
     
     // Verificar se os elementos dos campos existem
     const camposCartao = document.getElementById('campos-cartao');

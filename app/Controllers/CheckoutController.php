@@ -2862,7 +2862,12 @@ class CheckoutController extends Controller {
                                         'bin' => trim($bin),
                                         'dfp_id' => trim($dfpId),
                                         'holder' => (string) ($dados['card_holder_name'] ?? ''),
-                                        'installments' => 1,
+                                        'installments' => (function ($v) {
+                                            $i = (int) $v;
+                                            if ($i < 1) $i = 1;
+                                            if ($i > 12) $i = 12;
+                                            return $i;
+                                        })($dados['installments'] ?? 1),
                                         'type' => $cardType,
                                     ];
 
