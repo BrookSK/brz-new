@@ -7,8 +7,15 @@ class Request {
     private $path;
 
     public function __construct() {
-        $this->method = $_SERVER['REQUEST_METHOD'];
-        $this->path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $this->method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        $path = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        if ($path !== '/' && substr($path, -1) === '/') {
+            $path = rtrim($path, '/');
+            if ($path === '') {
+                $path = '/';
+            }
+        }
+        $this->path = $path;
         $this->params = array_merge($_GET, $_POST);
     }
 
