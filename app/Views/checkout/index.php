@@ -620,13 +620,14 @@
                                                     Ao pagar com <strong>cartão</strong>, o <strong>Câmbio Real</strong> pode aplicar taxas no valor final (câmbio/VET, IOF e tarifa de processamento).<br>
                                                     A cobrança pela <strong>AppMax</strong> (taxas/impostos) <strong>não</strong> adiciona essas tarifas do Câmbio Real.
                                                     <hr class="my-2">
-                                                    <div><strong>Câmbio:</strong> BRL 5,3773</div>
-                                                    <div><strong>VET:</strong> BRL 8,28387</div>
-                                                    <div><strong>Valor estimado a pagar:</strong> BRL 38,52</div>
+                                                    <div><strong>Câmbio:</strong> <span id="cr-fee-cambio">-</span></div>
+                                                    <div><strong>VET:</strong> <span id="cr-fee-vet">-</span></div>
+                                                    <div><strong>Valor estimado a pagar:</strong> <span id="cr-fee-estimated">-</span></div>
                                                     <div class="mt-2"><strong>Detalhes estimados</strong></div>
-                                                    <div>Taxa de envio: BRL 10,70 (USD 1.99)</div>
-                                                    <div>IOF incluso (3.5%): BRL 1,2495</div>
-                                                    <div>Tarifa de processamento (4.24%): BRL 1,57</div>
+                                                    <div>Taxa de envio: <span id="cr-fee-shipping">-</span></div>
+                                                    <div>IOF incluso (3.5%): <span id="cr-fee-iof">-</span></div>
+                                                    <div>Tarifa de processamento (4.24%): <span id="cr-fee-processing">-</span></div>
+                                                    <div class="text-muted mt-2" style="font-size:12px;">Valores aproximados. Podem variar conforme a cotação e validações no momento da geração da transação.</div>
                                                 </div>
                                             </div>
                                             <script>
@@ -683,6 +684,14 @@
                                                     <div class="col-6">
                                                         <label class="form-label">CVV</label>
                                                         <input type="text" name="card_cvv" class="form-control" placeholder="123" maxlength="4" autocomplete="cc-csc" inputmode="numeric" required>
+                                                    </div>
+                                                    <div class="col-6" id="installments-box" style="display:none;">
+                                                        <label class="form-label">Parcelamento</label>
+                                                        <select name="installments" class="form-select">
+                                                            <?php for ($i = 1; $i <= 12; $i++): ?>
+                                                                <option value="<?= $i ?>"><?= $i ?>x</option>
+                                                            <?php endfor; ?>
+                                                        </select>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1666,6 +1675,21 @@ function atualizarFormaPagamento() {
         const isCard = (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
         const show = (cur === 'BRL') && isCard;
         feesWarning.style.display = show ? 'block' : 'none';
+        if (show) {
+            try { updateCambioRealFeesPreview(); } catch (e) {}
+        }
+    }
+    
+    // Parcelamento: apenas cartão de crédito em BRL (Câmbio Real)
+    try {
+        const installmentsBox = document.getElementById('installments-box');
+        const moedaHidden = document.getElementById('moeda_hidden');
+        const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+        const showInstallments = (cur === 'BRL') && (formaPagamento === 'cartao_credito');
+        if (installmentsBox) {
+            installmentsBox.style.display = showInstallments ? 'block' : 'none';
+        }
+    } catch (e) {
     }
     
     // Verificar se os elementos dos campos existem
@@ -1891,6 +1915,67 @@ function toggleButton() {
 // Usar taxas de conversão globais se existirem, senão definir locais
 window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.50, 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
 
+function updateCambioRealFeesPreview() {
+    const moedaHidden = document.getElementById('moeda_hidden');
+    const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+    if (cur !== 'BRL') return;
+
+    const rate = (window.exchangeRates && window.exchangeRates['BRL']) ? Number(window.exchangeRates['BRL']) : 0;
+    if (!isFinite(rate) || rate <= 0) return;
+
+    // Base (produto): usar o subtotal original (USD) convertido para BRL; fallback para valor exibido
+    let produtoBrl = 0;
+    try {
+        const baseUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.subtotal) ? Number(window.checkoutOriginalValues.subtotal) : 0;
+        if (isFinite(baseUsd) && baseUsd > 0) {
+            produtoBrl = baseUsd * rate;
+        }
+    } catch (e) {
+    }
+
+    if (!isFinite(produtoBrl) || produtoBrl <= 0) {
+        const subtotalEl = document.getElementById('subtotal');
+        if (subtotalEl) {
+            const raw = (subtotalEl.textContent || '').toString();
+            const cleaned = raw.replace(/[^0-9,\.\-]/g, '').replace(/\.(?=.*\.)/g, '').replace(',', '.');
+            const v = Number(cleaned);
+            if (isFinite(v) && v > 0) produtoBrl = v;
+        }
+    }
+
+    if (!isFinite(produtoBrl) || produtoBrl <= 0) return;
+
+    const shippingUsd = 1.99;
+    const iofPct = 0.035;
+    const procPct = 0.0424;
+
+    const shippingBrl = shippingUsd * rate;
+    const basePlusShipping = produtoBrl + shippingBrl;
+    const iof = basePlusShipping * iofPct;
+    const processing = (basePlusShipping + iof) * procPct;
+    const estimatedTotal = basePlusShipping + iof + processing;
+
+    const usdAmount = produtoBrl / rate;
+    const vet = usdAmount > 0 ? (estimatedTotal / usdAmount) : 0;
+
+    const fmt = (v) => 'BRL ' + (Number(v || 0).toFixed(2)).replace('.', ',');
+    const fmtRate = (v) => 'BRL ' + (Number(v || 0).toFixed(4)).replace('.', ',');
+
+    const elCambio = document.getElementById('cr-fee-cambio');
+    const elVet = document.getElementById('cr-fee-vet');
+    const elEstimated = document.getElementById('cr-fee-estimated');
+    const elShipping = document.getElementById('cr-fee-shipping');
+    const elIof = document.getElementById('cr-fee-iof');
+    const elProc = document.getElementById('cr-fee-processing');
+
+    if (elCambio) elCambio.textContent = fmtRate(rate);
+    if (elVet) elVet.textContent = fmtRate(vet);
+    if (elEstimated) elEstimated.textContent = fmt(estimatedTotal);
+    if (elShipping) elShipping.textContent = fmt(shippingBrl) + ' (USD ' + shippingUsd.toFixed(2) + ')';
+    if (elIof) elIof.textContent = fmt(iof);
+    if (elProc) elProc.textContent = fmt(processing);
+}
+
 <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
 window.pixDescontoTaxaServicoPercent = <?php echo json_encode((float) ($pix_desconto_taxa_servico_percent ?? 0), JSON_UNESCAPED_UNICODE); ?>;
 
@@ -1989,34 +2074,38 @@ function updatePrices(currency) {
     
     console.log('🔍 [MOEDA] Valores convertidos:', convertedValues);
     
-    // Atualizar elementos do resumo do pedido
-    const elements = {
-        subtotal: document.getElementById('subtotal'),
-        frete: document.getElementById('frete'),
-        taxaServico: document.getElementById('taxa-servico'),
-        impostos: document.getElementById('impostos'),
-        total: document.getElementById('total')
-    };
-    
-    console.log('🔍 [MOEDA] Elementos do resumo encontrados:');
-    for (const [key, element] of Object.entries(elements)) {
-        console.log(`🔍 [MOEDA] ${key}:`, !!element);
-    }
-    
-    // Atualizar cada elemento do resumo
-    for (const [key, element] of Object.entries(elements)) {
-        if (element) {
-            if (key === 'frete' && originalValues.frete === 0) {
-                element.textContent = 'Frete grátis';
-            } else {
-                const value = convertedValues[key];
-                const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
-                element.textContent = formattedValue;
-            }
-            console.log(`🔍 [MOEDA] ${key} atualizado para:`, element.textContent);
-        } else {
-            console.error(`❌ [MOEDA] Elemento ${key} não encontrado`);
+    // Atualizar elementos na página
+    try {
+        const elements = {
+            subtotal: document.getElementById('subtotal'),
+            frete: document.getElementById('frete'),
+            taxaServico: document.getElementById('taxa-servico'),
+            impostos: document.getElementById('impostos'),
+            total: document.getElementById('total')
+        };
+
+        console.log('🔍 [MOEDA] Elementos do resumo encontrados:');
+        for (const [key, element] of Object.entries(elements)) {
+            console.log(`🔍 [MOEDA] ${key}:`, !!element);
         }
+
+        // Atualizar cada elemento do resumo
+        for (const [key, element] of Object.entries(elements)) {
+            if (element) {
+                if (key === 'frete' && originalValues.frete === 0) {
+                    element.textContent = 'Frete grátis';
+                } else {
+                    const value = convertedValues[key];
+                    const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
+                    element.textContent = formattedValue;
+                }
+                console.log(`🔍 [MOEDA] ${key} atualizado para:`, element.textContent);
+            } else {
+                console.error(`❌ [MOEDA] Elemento ${key} não encontrado`);
+            }
+        }
+    } catch (e) {
+        console.error('❌ [MOEDA] Erro ao atualizar resumo:', e);
     }
 
     if (typeof updatePixServiceFeeInfo === 'function') {
@@ -2101,6 +2190,18 @@ function updatePrices(currency) {
     if (moedaHidden) {
         moedaHidden.value = currency;
         console.log('🔍 [MOEDA] Campo oculto de moeda atualizado para:', currency);
+    }
+
+    // Recalcular preview de taxas Câmbio Real (se cartão em BRL)
+    try {
+        const formaPagamentoEl = document.getElementById('forma_pagamento');
+        const forma = formaPagamentoEl ? String(formaPagamentoEl.value || '') : '';
+        if (String(currency || '').toUpperCase() === 'BRL' && (forma === 'cartao_credito' || forma === 'cartao_debito')) {
+            if (typeof updateCambioRealFeesPreview === 'function') {
+                updateCambioRealFeesPreview();
+            }
+        }
+    } catch (e) {
     }
 
     // Atualizar opções de forma de pagamento conforme moeda (BRL=AppMax, USD=Stripe)
