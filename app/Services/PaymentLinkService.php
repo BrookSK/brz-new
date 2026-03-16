@@ -78,18 +78,46 @@ class PaymentLinkService {
                     KEY `idx_gateway` (`gateway`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             } else {
-                // Garantir coluna componente em instalações existentes
+                // Garantir colunas em instalações existentes
                 try {
                     $cols = [];
                     $st = $this->db->query('DESCRIBE payment_link_payments');
                     $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                    if (!in_array('componente', $cols, true)) {
-                        $this->db->exec("ALTER TABLE payment_link_payments ADD COLUMN componente varchar(30) NOT NULL DEFAULT 'pagamento' AFTER payment_link_id");
+
+                    $addCols = [
+                        'componente' => "ALTER TABLE payment_link_payments ADD COLUMN componente varchar(30) NOT NULL DEFAULT 'pagamento' AFTER payment_link_id",
+                        'status' => "ALTER TABLE payment_link_payments ADD COLUMN status varchar(20) NOT NULL DEFAULT 'pending' AFTER componente",
+                        'gateway' => "ALTER TABLE payment_link_payments ADD COLUMN gateway varchar(40) NOT NULL DEFAULT '' AFTER status",
+                        'metodo' => "ALTER TABLE payment_link_payments ADD COLUMN metodo varchar(30) NOT NULL DEFAULT '' AFTER gateway",
+                        'currency' => "ALTER TABLE payment_link_payments ADD COLUMN currency varchar(3) NOT NULL DEFAULT 'USD' AFTER metodo",
+                        'produto_valor' => "ALTER TABLE payment_link_payments ADD COLUMN produto_valor decimal(10,2) NOT NULL DEFAULT 0.00 AFTER currency",
+                        'taxa_servico_valor' => "ALTER TABLE payment_link_payments ADD COLUMN taxa_servico_valor decimal(10,2) NOT NULL DEFAULT 0.00 AFTER produto_valor",
+                        'impostos_valor' => "ALTER TABLE payment_link_payments ADD COLUMN impostos_valor decimal(10,2) NOT NULL DEFAULT 0.00 AFTER taxa_servico_valor",
+                        'total_valor' => "ALTER TABLE payment_link_payments ADD COLUMN total_valor decimal(10,2) NOT NULL DEFAULT 0.00 AFTER impostos_valor",
+                        'customer_name' => "ALTER TABLE payment_link_payments ADD COLUMN customer_name varchar(255) DEFAULT NULL AFTER total_valor",
+                        'customer_email' => "ALTER TABLE payment_link_payments ADD COLUMN customer_email varchar(255) DEFAULT NULL AFTER customer_name",
+                        'customer_document' => "ALTER TABLE payment_link_payments ADD COLUMN customer_document varchar(40) DEFAULT NULL AFTER customer_email",
+                        'customer_phone' => "ALTER TABLE payment_link_payments ADD COLUMN customer_phone varchar(40) DEFAULT NULL AFTER customer_document",
+                        'gateway_payment_id' => "ALTER TABLE payment_link_payments ADD COLUMN gateway_payment_id varchar(120) DEFAULT NULL AFTER customer_phone",
+                        'invoice_url' => "ALTER TABLE payment_link_payments ADD COLUMN invoice_url text AFTER gateway_payment_id",
+                        'bank_slip_url' => "ALTER TABLE payment_link_payments ADD COLUMN bank_slip_url text AFTER invoice_url",
+                        'digitable_line' => "ALTER TABLE payment_link_payments ADD COLUMN digitable_line varchar(255) DEFAULT NULL AFTER bank_slip_url",
+                        'pix_payload' => "ALTER TABLE payment_link_payments ADD COLUMN pix_payload text AFTER digitable_line",
+                        'pix_encoded_image' => "ALTER TABLE payment_link_payments ADD COLUMN pix_encoded_image longtext AFTER pix_payload",
+                        'metadata' => "ALTER TABLE payment_link_payments ADD COLUMN metadata longtext AFTER pix_encoded_image",
+                        'raw_response' => "ALTER TABLE payment_link_payments ADD COLUMN raw_response longtext AFTER metadata",
+                    ];
+
+                    foreach ($addCols as $c => $sql) {
+                        if (!in_array($c, $cols, true)) {
+                            try {
+                                $this->db->exec($sql);
+                            } catch (\Exception $e) {
+                            }
+                        }
                     }
-                    if (!in_array('idx_componente', $cols, true)) {
-                        // ignore (index check por DESCRIBE não funciona); tenta criar e ignora erro
-                        try { $this->db->exec("CREATE INDEX idx_componente ON payment_link_payments (componente)"); } catch (\Exception $e) {}
-                    }
+
+                    try { $this->db->exec("CREATE INDEX idx_componente ON payment_link_payments (componente)"); } catch (\Exception $e) {}
                 } catch (\Exception $e) {
                 }
             }
@@ -263,6 +291,10 @@ class PaymentLinkService {
             $id = (int) $this->db->lastInsertId();
             return ['success' => true, 'id' => $id, 'link' => $link];
         } catch (\Exception $e) {
+            try {
+                error_log('[PaymentLinkService] createPaymentAttempt insert failed: ' . $e->getMessage());
+            } catch (\Throwable $t) {
+            }
             return ['success' => false, 'error' => 'Falha ao registrar tentativa de pagamento'];
         }
     }
