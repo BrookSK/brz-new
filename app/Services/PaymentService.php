@@ -78,6 +78,40 @@ class PaymentService {
 
     }
 
+    private function atualizarPaymentLinkPaymentPorGatewayPaymentId(string $paymentId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
+        $paymentId = trim((string) $paymentId);
+        $gateway = strtolower(trim((string) $gateway));
+        if ($paymentId === '' || $gateway === '') return;
+
+        // internal -> status do histórico
+        $st = strtolower(trim((string) $paymentStatusInterno));
+        $histStatus = $st;
+        if (in_array($st, ['approved', 'aprovado', 'paid', 'pago', 'succeeded', 'success'], true)) {
+            $histStatus = 'paid';
+        } elseif (in_array($st, ['rejected', 'failed', 'canceled', 'cancelled'], true)) {
+            $histStatus = 'failed';
+        } elseif (in_array($st, ['refunded'], true)) {
+            $histStatus = 'refunded';
+        } elseif ($st === '') {
+            $histStatus = 'pending';
+        }
+
+        try {
+            $pls = new \App\Services\PaymentLinkService();
+            $db = \Config\Database::getConnection();
+            $stSel = $db->prepare('SELECT id FROM payment_link_payments WHERE LOWER(gateway) = ? AND gateway_payment_id = ? ORDER BY id DESC LIMIT 5');
+            $stSel->execute([$gateway, $paymentId]);
+            $ids = $stSel->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            foreach ($ids as $id) {
+                $pls->updatePaymentAttempt((int) $id, [
+                    'status' => $histStatus,
+                    'metadata' => json_encode(['gateway_status' => $gatewayStatus], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
     public function createCambioRealDirectPaymentProdutoBoleto(
         int $pedidoId,
         float $valorBrlOriginal,
@@ -187,6 +221,190 @@ class PaymentService {
                 'invoice_url' => $ticketUrl,
                 'bank_slip_url' => $ticketUrl,
                 'digitable_line' => $digitableLine,
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function createStripeCheckoutSessionForPaymentLink(int $paymentLinkPaymentId, float $valorUsd, string $descricao, array $customer = [], ?string $successUrl = null, ?string $cancelUrl = null): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $paymentLinkPaymentId = (int) $paymentLinkPaymentId;
+        if ($paymentLinkPaymentId <= 0) {
+            return ['success' => false, 'error' => 'Payment Link Payment inválido.'];
+        }
+
+        $amountCents = (int) round($valorUsd * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para cobrança.'];
+        }
+
+        $base = Url::base();
+        if ($successUrl === null || trim((string) $successUrl) === '') {
+            $successUrl = rtrim($base, '/') . '/pagar?stripe=success';
+        }
+        if ($cancelUrl === null || trim((string) $cancelUrl) === '') {
+            $cancelUrl = rtrim($base, '/') . '/pagar?stripe=cancel';
+        }
+
+        $body = [
+            'mode' => 'payment',
+            'success_url' => (string) $successUrl,
+            'cancel_url' => (string) $cancelUrl,
+            'client_reference_id' => 'payment_link_payment:' . (string) $paymentLinkPaymentId,
+            'metadata[payment_link_payment_id]' => (string) $paymentLinkPaymentId,
+            'line_items[0][quantity]' => '1',
+            'line_items[0][price_data][currency]' => 'usd',
+            'line_items[0][price_data][unit_amount]' => (string) $amountCents,
+            'line_items[0][price_data][product_data][name]' => $descricao !== '' ? $descricao : ('Payment Link #' . $paymentLinkPaymentId),
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['customer_email'] = (string) $customer['email'];
+        }
+
+        try {
+            $session = $this->stripeRequest('POST', '/v1/checkout/sessions', $body);
+            $id = (string) ($session['id'] ?? '');
+            $url = (string) ($session['url'] ?? '');
+            $paymentIntentId = (string) ($session['payment_intent'] ?? '');
+            if ($id === '' || $url === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida ao criar Checkout Session.'];
+            }
+
+            return [
+                'success' => true,
+                'session_id' => $id,
+                'url' => $url,
+                'payment_intent_id' => $paymentIntentId,
+                'raw' => $session,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function createCambioRealDirectPaymentForPaymentLink(
+        int $paymentLinkPaymentId,
+        float $valorBrlOriginal,
+        string $descricao,
+        array $client,
+        string $paymentMethod,
+        array $card = []
+    ): array {
+        $paymentLinkPaymentId = (int) $paymentLinkPaymentId;
+        $valorBrlOriginal = (float) $valorBrlOriginal;
+        $paymentMethod = strtolower(trim((string) $paymentMethod));
+
+        if ($paymentLinkPaymentId <= 0) {
+            return ['success' => false, 'error' => 'Identificador inválido'];
+        }
+        if ($valorBrlOriginal <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real está desabilitado.'];
+        }
+        if (!in_array($paymentMethod, ['pix', 'boleto', 'credit_card', 'debit_card'], true)) {
+            return ['success' => false, 'error' => 'Método inválido'];
+        }
+
+        $clientName = (string) ($client['name'] ?? ($client['nome'] ?? ''));
+        $clientEmail = (string) ($client['email'] ?? '');
+        $clientDoc = (string) ($client['document'] ?? ($client['documento'] ?? ''));
+        $clientBirth = (string) ($client['birth_date'] ?? ($client['data_nascimento'] ?? ''));
+        $clientPhone = (string) ($client['phone'] ?? ($client['telefone'] ?? ''));
+        $clientIp = (string) ($client['ip'] ?? '127.0.0.1');
+        $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
+
+        $payload = [
+            'order_id' => 'PAYLINK_' . (string) $paymentLinkPaymentId,
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
+            'payment_method' => $paymentMethod,
+            'client' => [
+                'name' => $clientName,
+                'email' => $clientEmail,
+                'document' => $clientDoc,
+                'birth_date' => $clientBirth,
+                'phone' => $clientPhone,
+                'ip' => $clientIp,
+                'address' => [
+                    'state' => (string) ($addr['state'] ?? ($addr['estado'] ?? '')),
+                    'city' => (string) ($addr['city'] ?? ($addr['cidade'] ?? '')),
+                    'zip_code' => (string) ($addr['zip_code'] ?? ($addr['cep'] ?? '')),
+                    'district' => (string) ($addr['district'] ?? ($addr['bairro'] ?? '')),
+                    'street' => (string) ($addr['street'] ?? ($addr['endereco'] ?? '')),
+                    'number' => (string) ($addr['number'] ?? ($addr['numero'] ?? '')),
+                ],
+            ],
+            'duplicate' => 0,
+            'take_rates' => 1,
+            'products' => [
+                [
+                    'descricao' => $descricao,
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
+                    'qty' => 1,
+                    'ref' => 'PAYLINK_' . (string) $paymentLinkPaymentId,
+                ]
+            ],
+        ];
+
+        if (in_array($paymentMethod, ['credit_card', 'debit_card'], true)) {
+            $token = trim((string) ($card['token'] ?? ''));
+            $brand = trim((string) ($card['brand'] ?? ''));
+            $bin = trim((string) ($card['bin'] ?? ''));
+            $dfpId = trim((string) ($card['dfp_id'] ?? ''));
+            $holder = trim((string) ($card['holder'] ?? ($card['card_holder'] ?? '')));
+            if ($token === '' || $brand === '' || $bin === '' || $dfpId === '' || $holder === '') {
+                return ['success' => false, 'error' => 'Dados do cartão incompletos'];
+            }
+
+            $payload['card'] = [
+                'token' => $token,
+                'brand' => $brand,
+                'bin' => $bin,
+                'dfp_id' => $dfpId,
+                'holder' => $holder,
+                'installments' => (int) ($card['installments'] ?? 1),
+            ];
+        }
+
+        try {
+            $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                $msg = (string) ($resp['message'] ?? 'Falha ao criar pagamento no Câmbio Real (Direct API)');
+                return ['success' => false, 'error' => $msg, 'raw' => $resp];
+            }
+
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+            $paymentId = (string) ($data['token'] ?? ($tx['token'] ?? ($data['id'] ?? '')));
+
+            $persist = [];
+            if ($paymentMethod === 'pix') {
+                $persist['pix_payload'] = (string) ($tx['number'] ?? '');
+                $persist['pix_encoded_image'] = (string) ($tx['barcode'] ?? '');
+            }
+            if ($paymentMethod === 'boleto') {
+                $persist['bank_slip_url'] = (string) ($tx['ticket_url'] ?? ($tx['boleto_url'] ?? ''));
+                $persist['digitable_line'] = (string) ($tx['digitable_line'] ?? ($tx['linha_digitavel'] ?? ''));
+            }
+
+            return [
+                'success' => true,
+                'gateway' => 'cambioreal',
+                'payment_id' => $paymentId,
+                'persist' => $persist,
                 'raw' => $resp,
             ];
         } catch (\Exception $e) {
@@ -4522,6 +4740,12 @@ class PaymentService {
 
     private function atualizarPagamentoPedidoPorGateway(string $paymentId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
         try {
+            // Payment Links: atualizar histórico quando encontrar match por gateway_payment_id
+            try {
+                $this->atualizarPaymentLinkPaymentPorGatewayPaymentId($paymentId, $gateway, $paymentStatusInterno, $gatewayStatus);
+            } catch (\Exception $e) {
+            }
+
             // Primeiro: se existe split payment com este (gateway,payment_id), atualizar split e recalcular.
             if ($this->atualizarSplitPorGatewayPaymentId($paymentId, $gateway, $paymentStatusInterno, $gatewayStatus)) {
                 return;

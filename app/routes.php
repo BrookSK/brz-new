@@ -376,6 +376,15 @@ $router->post('/admin/pedidos/novo-manual/salvar', 'AdminPedidosManualController
 $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController', 'criar');
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
 $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
+
+// Payment Links (Admin)
+$router->get('/admin/payment-links', 'AdminPaymentLinksController', 'index');
+$router->post('/admin/payment-links/criar', 'AdminPaymentLinksController', 'criar');
+$router->get('/admin/payment-links/{id}', 'AdminPaymentLinksController', 'detalhes');
+
+// Payment Links (Público)
+$router->get('/pagar/{token}', 'PaymentLinkController', 'index');
+$router->post('/pagar/{token}/processar', 'PaymentLinkController', 'processar');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/lixeira', 'AdminPedidosController', 'lixeira');
