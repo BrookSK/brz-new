@@ -9,6 +9,7 @@
     <script>
         window.CHECKOUT_ENDPOINT = <?= json_encode((string) ($checkout_endpoint ?? '/checkout/processar'), JSON_UNESCAPED_UNICODE) ?>;
         window.IS_PAYMENT_LINK = <?= !empty($is_payment_link) ? 'true' : 'false' ?>;
+        window.CAMBIOREAL_RATE_BRL = <?= json_encode((float) ($cambioreal_rate_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -1925,7 +1926,9 @@ function updateCambioRealFeesPreview() {
     const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
     if (cur !== 'BRL') return;
 
-    const rate = (window.exchangeRates && window.exchangeRates['BRL']) ? Number(window.exchangeRates['BRL']) : 0;
+    const rate = (window.CAMBIOREAL_RATE_BRL && Number(window.CAMBIOREAL_RATE_BRL) > 0)
+        ? Number(window.CAMBIOREAL_RATE_BRL)
+        : ((window.exchangeRates && window.exchangeRates['BRL']) ? Number(window.exchangeRates['BRL']) : 0);
     if (!isFinite(rate) || rate <= 0) return;
 
     // Base (produto):

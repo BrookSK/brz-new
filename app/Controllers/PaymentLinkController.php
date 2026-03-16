@@ -52,7 +52,8 @@ class PaymentLinkController extends Controller {
         }
 
         // Checkout usa valores base em USD e converte via exchangeRates.
-        // Para Payment Link, manter base sempre em "USD" internamente e fornecer rate BRL quando necessário.
+        // No Payment Link em BRL, os valores já estão em BRL e NÃO devem ser convertidos.
+        // Ainda assim, precisamos da cotação USD->BRL real para o preview de taxas (envio/IOF/tarifa/VET).
         $rateBRL = 5.5;
         try {
             $dbTx = \Config\Database::getConnection();
@@ -68,7 +69,7 @@ class PaymentLinkController extends Controller {
 
         $exchangeRates = [
             'USD' => 1.0,
-            'BRL' => $rateBRL,
+            'BRL' => ($currency === 'BRL') ? 1.0 : $rateBRL,
         ];
 
         $paySvc = new PaymentService();
@@ -107,6 +108,7 @@ class PaymentLinkController extends Controller {
             'cobra_impostos_br' => true,
             'frete_gratis' => true,
             'exchange_rates' => $exchangeRates,
+            'cambioreal_rate_brl' => $rateBRL,
             'stripe_publishable_key' => $paySvc->getStripePublishableKey(),
             'stripe_enabled' => $paySvc->isStripeEnabled(),
             'entrega_fora_br' => false,
