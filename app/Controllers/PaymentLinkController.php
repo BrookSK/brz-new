@@ -113,7 +113,7 @@ class PaymentLinkController extends Controller {
             'stripe_enabled' => $paySvc->isStripeEnabled(),
             'entrega_fora_br' => false,
             'mensagem_entrega_fora_br' => 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.',
-            'checkout_endpoint' => '/pagar/' . rawurlencode((string) $token) . '/processar',
+            'checkout_endpoint' => '/pagar/' . rawurlencode((string) $token),
             'cambioreal_app_id' => $paySvc->getCambioRealAppId(),
             'cambioreal_app_public' => $paySvc->getCambioRealAppPublic(),
             'cambioreal_base_url' => $paySvc->getCambioRealBaseUrlPublic(),
