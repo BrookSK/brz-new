@@ -434,6 +434,7 @@ $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController
 $router->get('/admin/backup', 'AdminBackupController', 'index');
 $router->post('/admin/backup/salvar', 'AdminBackupController', 'salvar');
 $router->post('/admin/backup/agora', 'AdminBackupController', 'agora');
+$router->get('/admin/backup/download/{id}/{tipo}', 'AdminBackupController', 'download');
 $router->post('/admin/backup/restaurar/{id}', 'AdminBackupController', 'restaurar');
 $router->post('/admin/backup/excluir/{id}', 'AdminBackupController', 'excluir');
 

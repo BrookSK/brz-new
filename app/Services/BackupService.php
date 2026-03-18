@@ -130,6 +130,27 @@ class BackupService {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function getBackupDir(): string {
+        $cfg = $this->getConfig();
+        return $this->normalizeBackupDir((string) ($cfg['pasta_backup'] ?? ''));
+    }
+
+    public function getBackupRun(int $runId): array {
+        $runId = (int) $runId;
+        if ($runId <= 0) {
+            throw new \RuntimeException('Backup inválido');
+        }
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare('SELECT * FROM backup_runs WHERE id = ? LIMIT 1');
+        $stmt->execute([$runId]);
+        $r = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$r) {
+            throw new \RuntimeException('Backup não encontrado');
+        }
+        return $r;
+    }
+
     private function getDbCredentials(): array {
         $ref = new \ReflectionClass(\Config\Database::class);
 

@@ -17,6 +17,84 @@ class AdminBackupController extends Controller {
         return number_format($gb, 2, ',', '.') . ' GB';
     }
 
+    private function isPathInside(string $baseDir, string $path): bool {
+        $baseReal = realpath($baseDir);
+        $pathReal = realpath($path);
+        if ($baseReal === false || $pathReal === false) {
+            return false;
+        }
+        $baseReal = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $baseReal), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $pathReal = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $pathReal), DIRECTORY_SEPARATOR);
+        return strncmp($pathReal, $baseReal, strlen($baseReal)) === 0;
+    }
+
+    public function download(Request $request, $id, $tipo) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $service = new BackupService();
+        $runId = (int) $id;
+        $tipo = strtolower(trim((string) $tipo));
+        if ($tipo !== 'db' && $tipo !== 'files') {
+            http_response_code(400);
+            echo 'Tipo inválido';
+            exit;
+        }
+
+        try {
+            $run = $service->getBackupRun($runId);
+            $backupDir = $service->getBackupDir();
+
+            $path = $tipo === 'db'
+                ? (string) ($run['db_sql_path'] ?? '')
+                : (string) ($run['files_zip_path'] ?? '');
+
+            if ($path === '' || !file_exists($path) || !is_file($path)) {
+                http_response_code(404);
+                echo 'Arquivo não encontrado';
+                exit;
+            }
+
+            if (!$this->isPathInside($backupDir, $path)) {
+                http_response_code(403);
+                echo 'Acesso negado';
+                exit;
+            }
+
+            $filename = basename($path);
+            $size = (int) (@filesize($path) ?: 0);
+
+            while (ob_get_level() > 0) {
+                @ob_end_clean();
+            }
+
+            header('Content-Description: File Transfer');
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Content-Transfer-Encoding: binary');
+            header('Expires: 0');
+            header('Cache-Control: must-revalidate');
+            header('Pragma: public');
+            if ($size > 0) {
+                header('Content-Length: ' . $size);
+            }
+
+            $fh = fopen($path, 'rb');
+            if ($fh === false) {
+                http_response_code(500);
+                echo 'Erro ao abrir arquivo';
+                exit;
+            }
+            fpassthru($fh);
+            fclose($fh);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo 'Erro ao preparar download: ' . $e->getMessage();
+            exit;
+        }
+    }
+
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
@@ -185,15 +263,24 @@ class AdminBackupController extends Controller {
                     ? '<span class="badge bg-success">OK</span>'
                     : '<span class="badge bg-danger">Erro</span>';
 
+                $dbDownload = '';
+                if ($dbPath !== '' && file_exists($dbPath) && is_file($dbPath)) {
+                    $dbDownload = '<a class="ms-2 text-decoration-none" href="/admin/backup/download/' . $id . '/db" title="Download DB"><i class="fas fa-download"></i></a>';
+                }
+                $zipDownload = '';
+                if ($zipPath !== '' && file_exists($zipPath) && is_file($zipPath)) {
+                    $zipDownload = '<a class="ms-2 text-decoration-none" href="/admin/backup/download/' . $id . '/files" title="Download arquivos"><i class="fas fa-download"></i></a>';
+                }
+
                 echo '<tr>
                     <td>#' . $id . '</td>
                     <td>' . htmlspecialchars($createdFmt, ENT_QUOTES, 'UTF-8') . '</td>
                     <td>
-                        <div class="fw-semibold">' . $dbName . '</div>
+                        <div class="fw-semibold">' . $dbName . $dbDownload . '</div>
                         <div class="text-muted small">' . htmlspecialchars($this->fmtBytes($dbSize), ENT_QUOTES, 'UTF-8') . '</div>
                     </td>
                     <td>
-                        <div class="fw-semibold">' . $zipName . '</div>
+                        <div class="fw-semibold">' . $zipName . $zipDownload . '</div>
                         <div class="text-muted small">' . htmlspecialchars($this->fmtBytes($zipSize), ENT_QUOTES, 'UTF-8') . '</div>
                     </td>
                     <td>' . $statusBadge . '</td>
