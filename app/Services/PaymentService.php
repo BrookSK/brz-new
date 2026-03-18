@@ -624,15 +624,20 @@ class PaymentService {
             return ['success' => false, 'error' => 'Valor inválido'];
         }
 
+        // order_id precisa ser único por tentativa. Em reemissões, reutilizar o mesmo order_id pode causar erro no gateway.
+        $orderId = (string) ($pedidoId . '-produto-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 8));
+
         $payload = [
-            'order_id' => (string) ($pedidoId . '-produto'),
+            'order_id' => $orderId,
             // Para PIX, queremos que o QR gere exatamente o valor em BRL do seu checkout.
             // Se enviar USD, o gateway converte com a taxa dele e o valor em BRL pode divergir.
             'amount' => round($valorBrlOriginal, 2),
             'currency' => 'BRL',
             'payment_method' => 'pix',
             'client' => (array) $customer,
-            'duplicate' => 0,
+            // Em reemissões/novas tentativas, o gateway pode ter o client.email já cadastrado.
+            // duplicate=1 permite reaproveitar o cliente/evitar bloqueio por dados repetidos.
+            'duplicate' => 1,
             // Garante que taxas/custos/IOF não sejam repassados ao cliente via acréscimo no PIX.
             // Quando take_rates=0, o comportamento pode seguir o padrão do Painel e aumentar o valor cobrado.
             'take_rates' => 1,
