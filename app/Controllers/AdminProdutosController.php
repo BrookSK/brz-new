@@ -2826,8 +2826,8 @@ JS;
                                         <input type="text" class="form-control" name="name" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">SKU *</label>
-                                        <input type="text" class="form-control" name="sku" required>
+                                        <label class="form-label">SKU</label>
+                                        <input type="text" class="form-control" name="sku">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Loja *</label>
@@ -3370,8 +3370,8 @@ HTML;
                                         <input type="text" class="form-control" name="name" value="' . htmlspecialchars($produto['name']) . '" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">SKU *</label>
-                                        <input type="text" class="form-control" name="sku" value="' . htmlspecialchars($produto['sku']) . '" required>
+                                        <label class="form-label">SKU</label>
+                                        <input type="text" class="form-control" name="sku" value="' . htmlspecialchars($produto['sku']) . '">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Loja *</label>
@@ -5054,6 +5054,88 @@ HTMLSCRIPT;
             return (bool) $st->fetchColumn();
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    public function ncmSearch(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        $q = strtolower(trim((string) $request->getParam('q')));
+        $opts = $this->getNcmOptions();
+
+        $out = [];
+        foreach ($opts as $code => $label) {
+            $codeStr = (string) $code;
+            $labelStr = (string) $label;
+            $hay = strtolower($codeStr . ' ' . $labelStr);
+            if ($q === '' || strpos($hay, $q) !== false) {
+                $out[] = [
+                    'code' => $codeStr,
+                    'label' => $labelStr,
+                    'text' => $codeStr . ' - ' . $labelStr,
+                ];
+            }
+            if (count($out) >= 50) break;
+        }
+
+        $this->json([
+            'success' => true,
+            'items' => $out,
+        ]);
+    }
+
+    public function ncmAtualizar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        $id = $id ?? $request->getParam('id');
+        $produtoId = (int) $id;
+        if ($produtoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Produto inválido'], 400);
+        }
+
+        $ncm = trim((string) $request->getParam('ncm'));
+        $ncmDigits = preg_replace('/\D+/', '', $ncm);
+        if ($ncmDigits === '' || strlen($ncmDigits) < 6) {
+            $this->json(['success' => false, 'error' => 'NCM inválido'], 400);
+        }
+        if (strlen($ncmDigits) > 8) {
+            $ncmDigits = substr($ncmDigits, 0, 8);
+        }
+
+        $opts = $this->getNcmOptions();
+        if (!array_key_exists($ncmDigits, $opts)) {
+            $this->json(['success' => false, 'error' => 'NCM não encontrado na lista'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
+
+            $cols = $this->getTableColumns($pdo, 'produtos');
+            $colNcm = null;
+            foreach (['ncm', 'codigo_ncm', 'ncm_code', 'tariff_code', 'ncm_produto'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $colNcm = $c;
+                    break;
+                }
+            }
+            if (!$colNcm) {
+                $this->json(['success' => false, 'error' => 'Coluna NCM não encontrada em produtos'], 500);
+            }
+
+            $st = $pdo->prepare('UPDATE produtos SET ' . $colNcm . ' = ? WHERE id = ?');
+            $st->execute([(string) $ncmDigits, (int) $produtoId]);
+
+            $this->json([
+                'success' => true,
+                'produto_id' => $produtoId,
+                'ncm' => (string) $ncmDigits,
+                'label' => (string) ($opts[$ncmDigits] ?? ''),
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 }

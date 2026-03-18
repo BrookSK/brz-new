@@ -19,6 +19,10 @@ $router->post('/admin/produtos/remover-foto/{id}', 'AdminProdutosController', 'r
 $router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', 'salvarOrdemGaleria');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
 
+// NCM (atalhos AJAX)
+$router->post('/admin/produtos/ncm/search', 'AdminProdutosController', 'ncmSearch');
+$router->post('/admin/produtos/ncm/atualizar/{id}', 'AdminProdutosController', 'ncmAtualizar');
+
 // Importação de produtos (CSV)
 $router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'importarProdutosModelo');
 $router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');

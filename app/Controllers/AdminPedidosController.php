@@ -3029,9 +3029,11 @@ HTML;
                                             if ($ncmVal === '' && $ncmProd !== '') {
                                                 $ncmVal = $ncmProd;
                                             }
-                                            $ncmHtml = $ncmVal !== ''
-                                                ? htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8')
-                                                : '<span class="badge bg-warning text-dark">Sem NCM</span>';
+                                            if ($ncmVal !== '') {
+                                                $ncmHtml = htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8');
+                                            } else {
+                                                $ncmHtml = '<a href="#" class="badge bg-warning text-dark js-ncm-quick" data-produto-id="' . (int) $pidItem . '" style="text-decoration:none;">Sem NCM</a>';
+                                            }
 
                                             $acoesHtml = '';
                                             if ($pidItem > 0 && ($missingCost || $missingNcm)) {
@@ -3069,6 +3071,152 @@ HTML;
                             </div>
                         </div>
                     </div>';
+
+                    echo '<div class="modal fade" id="modalNcmQuick" tabindex="-1" aria-hidden="true">'
+                        . '<div class="modal-dialog modal-lg">'
+                        . '<div class="modal-content">'
+                        . '<div class="modal-header">'
+                        . '<h5 class="modal-title">Selecionar NCM</h5>'
+                        . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
+                        . '</div>'
+                        . '<div class="modal-body">'
+                        . '<div id="ncmQuickAlert" class="alert alert-info" style="display:none;"></div>'
+                        . '<input type="hidden" id="ncmQuickProdutoId" value="" />'
+                        . '<div class="mb-2">'
+                        . '<input type="text" class="form-control" id="ncmQuickSearch" placeholder="Pesquisar NCM (código ou descrição)..." autocomplete="off" />'
+                        . '</div>'
+                        . '<div class="list-group" id="ncmQuickResults" style="max-height:360px; overflow:auto;"></div>'
+                        . '</div>'
+                        . '<div class="modal-footer">'
+                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
+                        . '<button type="button" class="btn btn-primary" id="btnNcmQuickSalvar" disabled>Salvar NCM</button>'
+                        . '</div>'
+                        . '</div>'
+                        . '</div>'
+                        . '</div>';
+
+                    echo <<<HTML
+<script>(function(){
+    function qs(sel, root){ return (root||document).querySelector(sel); }
+    function qsa(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+    var state = { produtoId: 0, selectedNcm: "" };
+
+    function setAlert(msg, cls){
+        var el = qs("#ncmQuickAlert");
+        if(!el) return;
+        el.style.display = msg ? "block" : "none";
+        el.className = "alert " + (cls||"alert-info");
+        el.textContent = msg||"";
+    }
+    function openModal(){
+        var el = qs("#modalNcmQuick");
+        if(!el || !window.bootstrap || !window.bootstrap.Modal) return;
+        window.bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+    function setSalvarEnabled(on){
+        var b = qs("#btnNcmQuickSalvar");
+        if(b) b.disabled = !on;
+    }
+    function setResults(items){
+        var wrap = qs("#ncmQuickResults");
+        if(!wrap) return;
+        wrap.innerHTML = "";
+        (items||[]).forEach(function(it){
+            var a = document.createElement("a");
+            a.href = "#";
+            a.className = "list-group-item list-group-item-action";
+            a.setAttribute("data-ncm", it.code||"");
+            a.textContent = it.text || (it.code || "");
+            a.addEventListener("click", function(ev){
+                ev.preventDefault();
+                state.selectedNcm = String(it.code||"");
+                qsa("#ncmQuickResults .list-group-item").forEach(function(x){ x.classList.remove("active"); });
+                a.classList.add("active");
+                setSalvarEnabled(!!state.selectedNcm);
+            });
+            wrap.appendChild(a);
+        });
+    }
+    function doSearch(q){
+        var body = new URLSearchParams();
+        body.set("q", String(q||""));
+        return fetch("/admin/produtos/ncm/search", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: body.toString()
+        }).then(function(r){ return r.json(); });
+    }
+    function doSave(produtoId, ncm){
+        var body = new URLSearchParams();
+        body.set("ncm", String(ncm||""));
+        return fetch("/admin/produtos/ncm/atualizar/" + encodeURIComponent(String(produtoId||"")), {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: body.toString()
+        }).then(function(r){ return r.json(); });
+    }
+
+    document.addEventListener("click", function(ev){
+        var a = ev.target && ev.target.closest ? ev.target.closest(".js-ncm-quick") : null;
+        if(!a) return;
+        ev.preventDefault();
+        state.produtoId = parseInt(a.getAttribute("data-produto-id")||"0", 10) || 0;
+        state.selectedNcm = "";
+        var hid = qs("#ncmQuickProdutoId");
+        if(hid) hid.value = String(state.produtoId||"");
+        var input = qs("#ncmQuickSearch");
+        if(input) input.value = "";
+        setSalvarEnabled(false);
+        setAlert("Pesquise e selecione o NCM.", "alert-info");
+        setResults([]);
+        openModal();
+        if(input){
+            setTimeout(function(){ try{ input.focus(); } catch(e){} }, 200);
+            doSearch("").then(function(j){
+                if(!j || !j.success){ return; }
+                setResults(j.items||[]);
+            }).catch(function(){});
+        }
+    });
+
+    var searchInput = qs("#ncmQuickSearch");
+    if(searchInput){
+        var t = null;
+        searchInput.addEventListener("input", function(){
+            if(t) clearTimeout(t);
+            t = setTimeout(function(){
+                doSearch(searchInput.value||"").then(function(j){
+                    if(!j || !j.success){ return; }
+                    setResults(j.items||[]);
+                }).catch(function(){});
+            }, 200);
+        });
+    }
+
+    var btnSave = qs("#btnNcmQuickSalvar");
+    if(btnSave){
+        btnSave.addEventListener("click", function(){
+            if(!state.produtoId || !state.selectedNcm) return;
+            setAlert("Salvando NCM...", "alert-info");
+            btnSave.disabled = true;
+            doSave(state.produtoId, state.selectedNcm).then(function(j){
+                if(!j || !j.success){
+                    setAlert((j && j.error) ? j.error : "Falha ao salvar NCM", "alert-warning");
+                    btnSave.disabled = false;
+                    return;
+                }
+                setAlert("NCM atualizado.", "alert-success");
+                qsa('.js-ncm-quick[data-produto-id="' + String(state.produtoId) + '"]').forEach(function(el){
+                    el.outerHTML = String(j.ncm || state.selectedNcm);
+                });
+            }).catch(function(){
+                setAlert("Erro de rede ao salvar NCM", "alert-warning");
+                btnSave.disabled = false;
+            });
+        });
+    }
+})();</script>
+HTML;
                     
                     echo '<div class="col-md-6">
                         <div class="card mb-4">
@@ -3287,7 +3435,8 @@ HTML;
                                                 . '</div>'
                                                 . '</div>';
 
-                                            echo '<script>(function(){
+                                            echo <<<HTML
+<script>(function(){
                                                 function qs(sel, root){ return (root||document).querySelector(sel); }
                                                 var pendingArgs = {pedidoId:"", componente:"", gateway:"", email:""};
                                                 function setAlert(msg, cls){
@@ -3306,7 +3455,18 @@ HTML;
                                                     var ph = qs("#novoPixQrPlaceholder");
                                                     if(!img || !ph) return;
                                                     if(base64){
-                                                        img.src = "data:image/png;base64," + base64;
+                                                        base64 = String(base64||"").trim();
+                                                        // Pode vir como data URI completo ou apenas base64.
+                                                        if(base64.indexOf("data:image/") === 0){
+                                                            img.src = base64;
+                                                        } else {
+                                                            // Câmbio Real costuma retornar QR em SVG base64.
+                                                            // Base64 de <svg geralmente começa com PHN2Zy.
+                                                            var mime = (base64.indexOf("PHN2Zy") === 0 || base64.indexOf("PD94bW") === 0)
+                                                                ? "image/svg+xml"
+                                                                : "image/png";
+                                                            img.src = "data:" + mime + ";base64," + base64;
+                                                        }
                                                         img.style.display = "block";
                                                         ph.style.display = "none";
                                                     } else {
@@ -3427,7 +3587,8 @@ HTML;
                                                         }
                                                     });
                                                 }
-                                            })();</script>';
+                                            })();</script>
+HTML;
                                         }
                                     } catch (\Exception $e) {
                                     }
