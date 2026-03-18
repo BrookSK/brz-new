@@ -42,7 +42,7 @@ class AdminPedidosController extends Controller {
             $colTelefone = $pickCol(['cliente_telefone', 'customer_phone', 'telefone', 'phone', 'celular']);
             $colDoc = $pickCol(['cliente_documento', 'cliente_cpf_cnpj', 'cpf_cnpj', 'documento', 'customer_document', 'cpf']);
 
-            $colPais = $pickCol(['pais', 'country', 'customer_country']);
+            $colPais = $pickCol(['pais_entrega', 'country_entrega', 'pais', 'country', 'customer_country']);
             $colCep = $pickCol(['cep', 'zipcode', 'zip_code', 'customer_zipcode']);
             $colEndereco = $pickCol(['endereco', 'logradouro', 'address', 'customer_address']);
             $colNumero = $pickCol(['numero', 'address_number', 'customer_address_number']);
@@ -3319,7 +3319,7 @@ HTML;
                     $clienteEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ($pedido['customer_email'] ?? '')));
                     $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
                     $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
-                    $pais = (string) ($pedido['pais'] ?? '');
+                    $pais = (string) ($pedido['pais_entrega'] ?? ($pedido['country_entrega'] ?? ($pedido['pais'] ?? '')));
                     $cep = (string) ($pedido['cep'] ?? '');
                     $endereco = (string) ($pedido['endereco'] ?? '');
                     $numero = (string) ($pedido['numero'] ?? '');
@@ -3456,12 +3456,7 @@ HTML;
                                             <tr><td><strong>ID</strong></td><td>' . $pedido['id'] . '</td></tr>
                                             <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
                                             <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
-                                            <tr><td><strong>Nome Cliente</strong></td><td>'
-                                                . '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">'
-                                                . '<div>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</div>'
-                                                . '<div><a href="#" class="btn btn-sm btn-outline-primary js-abrir-editar-cliente-pedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a></div>'
-                                                . '</div>'
-                                                . '</td></tr>
+                                            <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
                                             <tr><td><strong>CPF</strong></td><td>'
                                                 . (
                                                     !empty($pedido['cliente_cpf_cnpj'])
