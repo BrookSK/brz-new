@@ -329,6 +329,7 @@ class CarrinhoController extends Controller {
 
                 // Normalizar sessão para refletir os valores corretos na view/resumo
                 if (isset($_SESSION['carrinho'][$k]) && is_array($_SESSION['carrinho'][$k])) {
+                    $_SESSION['carrinho'][$k]['nome'] = (string) ($produto['nome'] ?? ($_SESSION['carrinho'][$k]['nome'] ?? ''));
                     $_SESSION['carrinho'][$k]['price'] = $itemPrice;
                     $_SESSION['carrinho'][$k]['preco_unitario'] = $itemPrice;
                     $_SESSION['carrinho'][$k]['subtotal'] = $itemSubtotal;
@@ -339,6 +340,7 @@ class CarrinhoController extends Controller {
 
                 // Normalizar o carrinho local usado pela view
                 if (isset($carrinho[$k]) && is_array($carrinho[$k])) {
+                    $carrinho[$k]['nome'] = (string) ($produto['nome'] ?? ($carrinho[$k]['nome'] ?? ''));
                     $carrinho[$k]['price'] = $itemPrice;
                     $carrinho[$k]['preco_unitario'] = $itemPrice;
                     $carrinho[$k]['subtotal'] = $itemSubtotal;
@@ -429,6 +431,7 @@ class CarrinhoController extends Controller {
                 $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
                 if (!empty($row)) {
+                    $cartMoedaFromDb = strtoupper(trim((string) ($row['moeda'] ?? '')));
                     if (array_key_exists('subtotal_produtos', $row)) {
                         $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
                         if ($subtotalFromDb > 0) {
@@ -467,14 +470,19 @@ class CarrinhoController extends Controller {
                     }
 
                     // Se o DB tiver valores válidos, usar; senão manter cálculo atual
-                    if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
-                        $taxaServico = (float) $taxaServicoFromDb;
-                    }
-                    if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
-                        $impostos = (float) $impostosFromDb;
-                    }
-                    if (isset($totalFromDb) && (float) $totalFromDb > 0) {
-                        $total = (float) $totalFromDb;
+                    $skipPersistedTotals = (isset($cartMoedaFromDb) && $cartMoedaFromDb === 'BRL');
+                    if (!$skipPersistedTotals) {
+                        if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
+                            $taxaServico = (float) $taxaServicoFromDb;
+                        }
+                        if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
+                            $impostos = (float) $impostosFromDb;
+                        }
+                        if (isset($totalFromDb) && (float) $totalFromDb > 0) {
+                            $total = (float) $totalFromDb;
+                        } else {
+                            $total = (float) $subtotal + (float) $taxaServico + (float) $impostos + (float) $frete;
+                        }
                     } else {
                         $total = (float) $subtotal + (float) $taxaServico + (float) $impostos + (float) $frete;
                     }

@@ -2057,6 +2057,7 @@ class CheckoutController extends Controller {
                     $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
                     if (!empty($row)) {
+                        $cartMoedaFromDb = strtoupper(trim((string) ($row['moeda'] ?? '')));
                         if (array_key_exists('subtotal_produtos', $row)) {
                             $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
                             if ($subtotalFromDb > 0) {
@@ -2103,17 +2104,20 @@ class CheckoutController extends Controller {
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
         // Se o DB tiver valores válidos, usar; senão manter cálculo atual
-        if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
-            $taxaServico = (float) $taxaServicoFromDb;
-        }
-        if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
-            $impostos = (float) $impostosFromDb;
+        $skipPersistedTotals = (isset($cartMoedaFromDb) && $cartMoedaFromDb === 'BRL');
+        if (!$skipPersistedTotals) {
+            if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
+                $taxaServico = (float) $taxaServicoFromDb;
+            }
+            if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
+                $impostos = (float) $impostosFromDb;
+            }
         }
         // Frete 0 é valor válido (frete grátis)
         if (isset($freteFromDb) && (float) $freteFromDb >= 0) {
             $frete = (float) $freteFromDb;
         }
-        if (isset($totalFromDb) && (float) $totalFromDb > 0) {
+        if (!$skipPersistedTotals && isset($totalFromDb) && (float) $totalFromDb > 0) {
             $total = (float) $totalFromDb;
         } else {
             $total = (float) $subtotal + (float) $frete + (float) $taxaServico + (float) $impostos;
