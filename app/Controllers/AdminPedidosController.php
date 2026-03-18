@@ -3984,8 +3984,9 @@ HTML;
                         </div>
                         
                         <div class="card">
-                            <div class="card-header">
+                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <h5 class="mb-0">Dados do Cliente</h5>
+                                <a href="#" class="btn btn-sm btn-outline-primary" id="btnAbrirEditarClientePedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a>
                             </div>
                             <div class="card-body">
                                 <p><strong>Nome:</strong> ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</p>
