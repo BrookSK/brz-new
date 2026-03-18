@@ -1382,7 +1382,10 @@ class PaymentService {
 
                 $internal = 'pending';
                 if ($statusNorm !== '') {
-                    if (str_contains($statusNorm, 'APROV') || str_contains($statusNorm, 'PAID') || str_contains($statusNorm, 'PAGO')) {
+                    if (str_contains($statusNorm, 'EXPIR') || str_contains($statusNorm, 'EXPIRED')) {
+                        $internal = 'pending';
+                        $statusNorm = 'EXPIRED';
+                    } elseif (str_contains($statusNorm, 'APROV') || str_contains($statusNorm, 'PAID') || str_contains($statusNorm, 'PAGO')) {
                         $internal = 'approved';
                     } elseif (str_contains($statusNorm, 'REFUND') || str_contains($statusNorm, 'ESTORN')) {
                         $internal = 'refunded';

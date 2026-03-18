@@ -3178,7 +3178,7 @@ HTML;
                                     // Split: exibir quanto foi para cada conta/gateway (pedido_pagamentos)
                                     try {
                                         $dbSplit = \Config\Database::getConnection();
-                                        $stSplit = $dbSplit->prepare('SELECT componente, gateway, metodo, moeda, valor, status, invoice_url, bank_slip_url, digitable_line, pix_payload FROM pedido_pagamentos WHERE pedido_id = :p ORDER BY id ASC');
+                                        $stSplit = $dbSplit->prepare('SELECT componente, gateway, metodo, moeda, valor, status, gateway_status, payment_id, invoice_url, bank_slip_url, digitable_line, pix_payload, pix_encoded_image FROM pedido_pagamentos WHERE pedido_id = :p ORDER BY id ASC');
                                         $stSplit->execute([':p' => (int) $pedido['id']]);
                                         $rowsSplit = $stSplit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -3186,7 +3186,7 @@ HTML;
                                             echo '<hr><div class="mb-2"><strong>Split (por conta/gateway):</strong></div>';
                                             echo '<div class="table-responsive"><table class="table table-sm table-bordered">'
                                                 . '<thead><tr>'
-                                                . '<th>Componente</th><th>Gateway</th><th>Método</th><th>Valor</th><th>Status</th><th>Link/PIX</th>'
+                                                . '<th>Componente</th><th>Gateway</th><th>Método</th><th>Valor</th><th>Status</th><th>Link/PIX</th><th style="width:140px;">Ações</th>'
                                                 . '</tr></thead><tbody>';
 
                                             foreach ($rowsSplit as $r) {
@@ -3200,11 +3200,14 @@ HTML;
                                                 $moeda = strtoupper((string) ($r['moeda'] ?? 'BRL'));
                                                 $val = (float) ($r['valor'] ?? 0);
                                                 $st = (string) ($r['status'] ?? '');
+                                                $gwStatus = strtoupper(trim((string) ($r['gateway_status'] ?? '')));
+                                                $paymentIdRow = trim((string) ($r['payment_id'] ?? ''));
 
                                                 $url = trim((string) ($r['invoice_url'] ?? ''));
                                                 $boleto = trim((string) ($r['bank_slip_url'] ?? ''));
                                                 $dig = trim((string) ($r['digitable_line'] ?? ''));
                                                 $pix = trim((string) ($r['pix_payload'] ?? ''));
+                                                $pixImg = trim((string) ($r['pix_encoded_image'] ?? ''));
 
                                                 $link = '';
                                                 if ($url !== '') {
@@ -3217,17 +3220,164 @@ HTML;
                                                     $link = '<span class="small text-muted">Linha digitável</span>';
                                                 }
 
+                                                $stNorm = strtolower(trim($st !== '' ? $st : 'pending'));
+                                                $metNorm = strtolower(trim((string) $met));
+                                                $gwStatusNorm = strtoupper(trim((string) $gwStatus));
+                                                $isExpired = ($gwStatusNorm === 'EXPIRED') || (strpos($gwStatusNorm, 'EXPIR') !== false);
+                                                $podeGerarNovoPix = ($metNorm === 'pix') && in_array($gw, ['appmax', 'cambioreal'], true) && ($stNorm === 'rejected' || $stNorm === 'expired' || $isExpired);
+                                                $acoes = $podeGerarNovoPix
+                                                    ? ('<button type="button" class="btn btn-sm btn-outline-primary js-gerar-novo-pix"'
+                                                        . ' data-pedido-id="' . (int) $pedido['id'] . '"'
+                                                        . ' data-componente="' . htmlspecialchars(strtolower(trim((string) ($r['componente'] ?? '')))) . '"'
+                                                        . ' data-gateway="' . htmlspecialchars($gw) . '"'
+                                                        . ' data-metodo="' . htmlspecialchars($metNorm) . '">' 
+                                                        . '<i class="fas fa-qrcode me-1"></i>Gerar PIX</button>')
+                                                    : '';
+
                                                 echo '<tr>'
                                                     . '<td>' . htmlspecialchars($comp) . '</td>'
                                                     . '<td>' . htmlspecialchars($gwLabel) . '</td>'
                                                     . '<td>' . htmlspecialchars($met !== '' ? $met : 'N/A') . '</td>'
                                                     . '<td class="text-end">' . htmlspecialchars($this->formatarMoeda($val, $moeda)) . '</td>'
-                                                    . '<td>' . htmlspecialchars($st !== '' ? $st : 'pending') . '</td>'
+                                                    . '<td>' . htmlspecialchars($st !== '' ? $st : 'pending') . ($isExpired ? ' <span class="badge bg-secondary">EXPIRADO</span>' : '') . '</td>'
                                                     . '<td>' . $link . '</td>'
+                                                    . '<td>' . $acoes . '</td>'
                                                     . '</tr>';
                                             }
 
                                             echo '</tbody></table></div>';
+
+                                            echo '<div class="modal fade" id="modalNovoPix" tabindex="-1" aria-hidden="true">'
+                                                . '<div class="modal-dialog modal-lg">'
+                                                . '<div class="modal-content">'
+                                                . '<div class="modal-header">'
+                                                . '<h5 class="modal-title">Novo PIX</h5>'
+                                                . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
+                                                . '</div>'
+                                                . '<div class="modal-body">'
+                                                . '<div id="novoPixAlert" class="alert alert-info" style="display:none;"></div>'
+                                                . '<div class="row g-3">'
+                                                . '<div class="col-md-5">'
+                                                . '<div class="border rounded p-2 text-center" style="min-height:220px;">'
+                                                . '<img id="novoPixQrImg" src="" alt="QR Code" style="max-width:100%; display:none;" />'
+                                                . '<div id="novoPixQrPlaceholder" class="text-muted small" style="padding-top: 90px;">QR Code</div>'
+                                                . '</div>'
+                                                . '</div>'
+                                                . '<div class="col-md-7">'
+                                                . '<label class="form-label">Copia e cola</label>'
+                                                . '<textarea id="novoPixPayload" class="form-control" rows="8" readonly></textarea>'
+                                                . '<div class="d-flex gap-2 mt-2">'
+                                                . '<button type="button" class="btn btn-primary" id="btnCopiarPix">Copiar</button>'
+                                                . '<a href="#" class="btn btn-outline-secondary" id="btnAbrirLinkPix" target="_blank" rel="noopener" style="display:none;">Abrir link</a>'
+                                                . '</div>'
+                                                . '<div class="small text-muted mt-2">Envie o QR ou o código copia-e-cola para o cliente.</div>'
+                                                . '</div>'
+                                                . '</div>'
+                                                . '</div>'
+                                                . '<div class="modal-footer">'
+                                                . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
+                                                . '</div>'
+                                                . '</div>'
+                                                . '</div>'
+                                                . '</div>';
+
+                                            echo '<script>(function(){
+                                                function qs(sel, root){ return (root||document).querySelector(sel); }
+                                                function setAlert(msg, cls){
+                                                    var el = qs("#novoPixAlert");
+                                                    if(!el) return;
+                                                    el.style.display = msg ? "block" : "none";
+                                                    el.className = "alert " + (cls||"alert-info");
+                                                    el.textContent = msg||"";
+                                                }
+                                                function setQr(base64){
+                                                    var img = qs("#novoPixQrImg");
+                                                    var ph = qs("#novoPixQrPlaceholder");
+                                                    if(!img || !ph) return;
+                                                    if(base64){
+                                                        img.src = "data:image/png;base64," + base64;
+                                                        img.style.display = "block";
+                                                        ph.style.display = "none";
+                                                    } else {
+                                                        img.src = "";
+                                                        img.style.display = "none";
+                                                        ph.style.display = "block";
+                                                    }
+                                                }
+                                                function setPayload(v){
+                                                    var ta = qs("#novoPixPayload");
+                                                    if(ta) ta.value = v||"";
+                                                }
+                                                function setLink(url){
+                                                    var a = qs("#btnAbrirLinkPix");
+                                                    if(!a) return;
+                                                    if(url){
+                                                        a.href = url;
+                                                        a.style.display = "inline-block";
+                                                    } else {
+                                                        a.href = "#";
+                                                        a.style.display = "none";
+                                                    }
+                                                }
+
+                                                function openModal(){
+                                                    var el = qs("#modalNovoPix");
+                                                    if(!el || !window.bootstrap || !window.bootstrap.Modal) return;
+                                                    var m = window.bootstrap.Modal.getOrCreateInstance(el);
+                                                    m.show();
+                                                }
+
+                                                document.addEventListener("click", function(ev){
+                                                    var btn = ev.target && ev.target.closest ? ev.target.closest(".js-gerar-novo-pix") : null;
+                                                    if(!btn) return;
+
+                                                    var pedidoId = btn.getAttribute("data-pedido-id")||"";
+                                                    var componente = btn.getAttribute("data-componente")||"";
+                                                    var gateway = btn.getAttribute("data-gateway")||"";
+
+                                                    setAlert("Gerando novo PIX...", "alert-info");
+                                                    setQr("");
+                                                    setPayload("");
+                                                    setLink("");
+                                                    openModal();
+
+                                                    var body = new URLSearchParams();
+                                                    body.set("componente", componente);
+                                                    body.set("gateway", gateway);
+
+                                                    fetch("/admin/pedidos/gerar-novo-pix/" + encodeURIComponent(pedidoId), {
+                                                        method: "POST",
+                                                        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                                                        body: body.toString()
+                                                    }).then(function(r){ return r.json(); })
+                                                    .then(function(data){
+                                                        if(!data || !data.success){
+                                                            setAlert((data && data.error) ? data.error : "Falha ao gerar PIX", "alert-warning");
+                                                            return;
+                                                        }
+                                                        setAlert("PIX gerado. Copie e envie ao cliente.", "alert-success");
+                                                        setQr(data.qr_base64 || "");
+                                                        setPayload(data.payload || "");
+                                                        setLink(data.invoice_url || "");
+                                                    }).catch(function(){
+                                                        setAlert("Erro de rede ao gerar PIX", "alert-warning");
+                                                    });
+                                                });
+
+                                                var copiar = qs("#btnCopiarPix");
+                                                if(copiar){
+                                                    copiar.addEventListener("click", function(){
+                                                        var v = (qs("#novoPixPayload") && qs("#novoPixPayload").value) ? qs("#novoPixPayload").value : "";
+                                                        if(!v) return;
+                                                        if(navigator.clipboard && navigator.clipboard.writeText){
+                                                            navigator.clipboard.writeText(v).then(function(){ setAlert("Copiado!", "alert-success"); });
+                                                        } else {
+                                                            var ta = qs("#novoPixPayload");
+                                                            if(ta){ ta.focus(); ta.select(); try{ document.execCommand("copy"); setAlert("Copiado!", "alert-success"); } catch(e){} }
+                                                        }
+                                                    });
+                                                }
+                                            })();</script>';
                                         }
                                     } catch (\Exception $e) {
                                     }
@@ -5338,6 +5488,204 @@ HTML;
         } catch (\Exception $e) {
             header('Location: /admin/pedidos/detalhes/' . $pedidoId . '?sync_err=' . rawurlencode($e->getMessage()));
             exit;
+        }
+    }
+
+    public function gerarNovoPixSplit(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $id = $id ?? $request->getParam('id');
+        $pedidoId = (int) $id;
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            return;
+        }
+
+        $componente = strtolower(trim((string) $request->getParam('componente')));
+        $gateway = strtolower(trim((string) $request->getParam('gateway')));
+
+        if ($componente === '' || $gateway === '') {
+            $this->json(['success' => false, 'error' => 'Parâmetros inválidos'], 400);
+            return;
+        }
+        if (!in_array($gateway, ['appmax', 'cambioreal'], true)) {
+            $this->json(['success' => false, 'error' => 'Gateway não suportado'], 400);
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT componente, gateway, metodo, moeda, valor FROM pedido_pagamentos WHERE pedido_id = :p AND LOWER(componente) = :c AND LOWER(gateway) = :g ORDER BY id DESC LIMIT 1');
+            $st->execute([':p' => $pedidoId, ':c' => $componente, ':g' => $gateway]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+            if (empty($row)) {
+                $this->json(['success' => false, 'error' => 'Split não encontrado para este componente/gateway'], 404);
+                return;
+            }
+            $valor = (float) ($row['valor'] ?? 0);
+            $moeda = strtoupper(trim((string) ($row['moeda'] ?? 'BRL')));
+            $metodo = strtolower(trim((string) ($row['metodo'] ?? 'pix')));
+            if ($valor <= 0) {
+                $this->json(['success' => false, 'error' => 'Valor inválido para gerar PIX'], 400);
+                return;
+            }
+            if ($moeda !== 'BRL') {
+                $this->json(['success' => false, 'error' => 'Somente BRL suportado para reemitir PIX'], 400);
+                return;
+            }
+
+            $pedidoModel = new PedidoEcommerce();
+            $pedido = $pedidoModel->getComDetalhes($pedidoId);
+            if (!$pedido) {
+                $this->json(['success' => false, 'error' => 'Pedido não encontrado'], 404);
+                return;
+            }
+
+            $paymentService = new PaymentService();
+
+            $clienteNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? 'Cliente'));
+            $clienteEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
+            $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['documento'] ?? ($pedido['cpf'] ?? '')));
+            $clienteNasc = (string) ($pedido['cliente_data_nascimento'] ?? ($pedido['data_nascimento'] ?? ''));
+            $clienteTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ($pedido['celular'] ?? '')));
+
+            $desc = 'Pedido #' . (string) ($pedido['codigo_pedido'] ?? $pedidoId) . ' (' . $componente . ')';
+
+            if ($gateway === 'cambioreal') {
+                if ($componente !== 'produto') {
+                    $this->json(['success' => false, 'error' => 'Câmbio Real: somente componente produto suportado'], 400);
+                    return;
+                }
+                $tx = (float) ($pedido['taxa_conversao'] ?? 0);
+                if ($tx <= 1.01) $tx = 1.0;
+                $amountUsd = round($valor / $tx, 2);
+                if ($amountUsd <= 0) $amountUsd = 1.0;
+
+                $client = [
+                    'name' => $clienteNome,
+                    'email' => $clienteEmail,
+                    'document' => $clienteDoc,
+                    'birth_date' => $clienteNasc,
+                    'phone' => $clienteTel,
+                    'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                    'address' => [
+                        'state' => (string) ($pedido['cliente_estado'] ?? ($pedido['estado'] ?? '')),
+                        'city' => (string) ($pedido['cliente_cidade'] ?? ($pedido['cidade'] ?? '')),
+                        'zip_code' => (string) ($pedido['cliente_cep'] ?? ($pedido['cep'] ?? '')),
+                        'district' => (string) ($pedido['cliente_bairro'] ?? ($pedido['bairro'] ?? '')),
+                        'street' => (string) ($pedido['cliente_endereco'] ?? ($pedido['endereco'] ?? '')),
+                        'number' => (string) ($pedido['cliente_numero'] ?? ($pedido['numero'] ?? '')),
+                    ],
+                ];
+
+                $cr = $paymentService->createCambioRealPixPaymentProduto($pedidoId, $amountUsd, $valor, $desc, $client);
+                if (empty($cr['success'])) {
+                    $this->json(['success' => false, 'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real')], 500);
+                    return;
+                }
+                $pix = (isset($cr['pix']) && is_array($cr['pix'])) ? $cr['pix'] : [];
+                $qr = (string) ($pix['encodedImage'] ?? '');
+                $payload = (string) ($pix['payload'] ?? '');
+                $invoiceUrl = (string) ($cr['invoice_url'] ?? '');
+                $paymentId = (string) ($cr['payment_id'] ?? '');
+
+                $paymentService->registrarPedidoPagamentoSplit([
+                    'pedido_id' => $pedidoId,
+                    'componente' => $componente,
+                    'gateway' => 'cambioreal',
+                    'metodo' => 'pix',
+                    'moeda' => 'BRL',
+                    'valor' => $valor,
+                    'payment_id' => $paymentId,
+                    'status' => 'pending',
+                    'invoice_url' => $invoiceUrl,
+                    'pix_encoded_image' => $qr,
+                    'pix_payload' => $payload,
+                    'gateway_status' => 'AGUARDANDO_CLIENTE',
+                ]);
+
+                $this->json([
+                    'success' => true,
+                    'gateway' => 'cambioreal',
+                    'pedido_id' => $pedidoId,
+                    'componente' => $componente,
+                    'payment_id' => $paymentId,
+                    'invoice_url' => $invoiceUrl,
+                    'qr_base64' => $qr,
+                    'payload' => $payload,
+                ]);
+                return;
+            }
+
+            // AppMax
+            $productsValueCents = (int) round($valor * 100);
+            $products = [
+                [
+                    'sku' => strtoupper($componente) . '_' . (string) $pedidoId,
+                    'name' => $desc,
+                    'quantity' => 1,
+                    'unit_value' => $productsValueCents,
+                    'type' => ($componente === 'produto' ? 'product' : 'service'),
+                    'freight_type' => 'normal',
+                ]
+            ];
+            $payload = [
+                'billingType' => 'PIX',
+                'force_gateway' => 'appmax',
+                'customer_name' => $clienteNome,
+                'customer_email' => $clienteEmail,
+                'customer_phone' => $clienteTel,
+                'customer_document' => $clienteDoc,
+                'externalReference' => (string) $pedidoId,
+                'products' => $products,
+                'products_value_cents' => $productsValueCents,
+                'shipping_value_cents' => 0,
+                'discount_value_cents' => 0,
+            ];
+
+            $res = $paymentService->processarPagamento($payload, $valor, 'BRL', $desc);
+            if (empty($res['success'])) {
+                $this->json(['success' => false, 'error' => (string) ($res['error'] ?? 'Falha ao gerar PIX AppMax')], 500);
+                return;
+            }
+            $paymentId = (string) ($res['payment_id'] ?? '');
+            if ($paymentId === '') {
+                $this->json(['success' => false, 'error' => 'AppMax: payment_id não retornado'], 500);
+                return;
+            }
+            $pix = (isset($res['pix']) && is_array($res['pix'])) ? $res['pix'] : [];
+            $qr = (string) ($pix['encodedImage'] ?? '');
+            $payloadPix = (string) ($pix['payload'] ?? '');
+            $invoiceUrl = (string) ($res['invoiceUrl'] ?? '');
+
+            $paymentService->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => $componente,
+                'gateway' => 'appmax',
+                'metodo' => 'pix',
+                'moeda' => 'BRL',
+                'valor' => $valor,
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'invoice_url' => $invoiceUrl,
+                'pix_encoded_image' => $qr,
+                'pix_payload' => $payloadPix,
+                'gateway_status' => 'PENDING',
+                'metadata' => json_encode(['raw' => $res], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            $this->json([
+                'success' => true,
+                'gateway' => 'appmax',
+                'pedido_id' => $pedidoId,
+                'componente' => $componente,
+                'payment_id' => $paymentId,
+                'invoice_url' => $invoiceUrl,
+                'qr_base64' => $qr,
+                'payload' => $payloadPix,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 }
