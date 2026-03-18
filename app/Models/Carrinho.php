@@ -438,11 +438,6 @@ class Carrinho extends Model {
         $taxaPorKg = $config ? floatval($config['valor']) : 39.0;
         $pesoArredondado = ceil((float) $pesoKg);
         $taxaUSD = $pesoArredondado * $taxaPorKg;
-        
-        if ($moeda === 'BRL') {
-            return $taxaUSD * $taxaConversao;
-        }
-        
         return $taxaUSD;
     }
 

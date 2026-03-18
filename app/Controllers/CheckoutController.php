@@ -6,6 +6,7 @@ use App\Services\AuthService;
 use App\Services\PaymentService;
 use App\Services\CpfValidator;
 use App\Models\Carrinho;
+use App\Models\Produto;
 use App\Models\Usuario;
 use App\Models\Endereco;
 use App\Models\PedidoEcommerce;
@@ -16,6 +17,7 @@ require_once __DIR__ . '/../Models/Model.php';
 require_once __DIR__ . '/../Models/Endereco.php';
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Carrinho.php';
+require_once __DIR__ . '/../Models/Produto.php';
 require_once __DIR__ . '/../Models/PedidoEcommerce.php';
 require_once __DIR__ . '/../Models/AssessoriaOrcamento.php';
 
@@ -1929,6 +1931,13 @@ class CheckoutController extends Controller {
             $stClube = null;
         }
         
+        $produtoModel = null;
+        try {
+            $produtoModel = new Produto();
+        } catch (\Throwable $e) {
+            $produtoModel = null;
+        }
+
         foreach ($carrinho as $produtoId => $item) {
             // Verificar diferentes campos de preço
             $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
@@ -1985,10 +1994,30 @@ class CheckoutController extends Controller {
                 }
             }
             
-            // Buscar detalhes do produto (simulado por enquanto)
+            $pidReal = (int) ($item['produto_id'] ?? 0);
+            if ($pidReal <= 0) {
+                // Fallback: quando o carrinho vier como array indexado por "produtoId:variacaoId"
+                $pidReal = (int) (is_numeric($produtoId) ? $produtoId : 0);
+            }
+
+            $nomeProduto = (string) ($item['nome'] ?? ($item['name'] ?? ''));
+            if ($nomeProduto === '' && $pidReal > 0 && $produtoModel) {
+                try {
+                    $pRow = $produtoModel->find($pidReal);
+                    if (is_array($pRow) && !empty($pRow['nome'])) {
+                        $nomeProduto = (string) $pRow['nome'];
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+            if ($nomeProduto === '') {
+                $nomeProduto = 'Produto ' . (string) $pidReal;
+            }
+
+            // Buscar detalhes do produto
             $produto = [
-                'id' => $produtoId,
-                'nome' => $item['nome'] ?? $item['name'] ?? 'Produto ' . $produtoId,
+                'id' => $pidReal,
+                'nome' => $nomeProduto,
                 'preco' => $precoUnitario,
                 'quantidade' => $quantidade,
                 'subtotal' => $precoUnitario * $quantidade,
