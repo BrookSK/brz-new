@@ -31,6 +31,7 @@ $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
+$router->post('/admin/pedidos/sincronizar-pagamentos/{id}', 'AdminPedidosController', 'sincronizarPagamentos');
 
 // Importação de pedidos (CSV)
 $router->get('/admin/pedidos/importar/modelo', 'AdminPedidosController', 'importarPedidosModelo');

@@ -2510,6 +2510,8 @@ HTML;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $id = $request->getParam('id');
         $embed = ((string) $request->getParam('embed', '0') === '1');
+        $syncOk = ((string) $request->getParam('sync_ok', '0') === '1');
+        $syncErr = (string) $request->getParam('sync_err', '');
         
         try {
             // Usar o PedidoEcommerce que já está corrigido e adaptativo
@@ -2592,6 +2594,11 @@ HTML;
                             <i class="fas fa-headset me-1"></i>Criar ticket
                         </button>
                     </form>
+                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" class="me-2" onsubmit="return confirm(' . "'" . 'Sincronizar status de pagamento (Câmbio Real + AppMax) agora?' . "'" . ');">
+                        <button type="submit" class="btn btn-outline-success">
+                            <i class="fas fa-rotate me-1"></i>Sincronizar pagamentos
+                        </button>
+                    </form>
                     <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i>Exportar PDF
                     </a>
@@ -2606,6 +2613,12 @@ HTML;
                     </a>
                 </div>
             </div>';
+
+            if ($syncOk) {
+                echo '<div class="alert alert-success">Sincronização de pagamentos executada com sucesso.</div>';
+            } elseif ($syncErr !== '') {
+                echo '<div class="alert alert-warning">Falha ao sincronizar pagamentos: ' . htmlspecialchars($syncErr) . '</div>';
+            }
 
             // Destaque: pendência de pagamento (diferença)
             $colsPedido = [];
@@ -5292,6 +5305,38 @@ HTML;
         } catch (\Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             header('Location: /admin/pedidos/detalhes/' . $id . '?ticket_error=1');
+            exit;
+        }
+    }
+
+    public function sincronizarPagamentos(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $id = $id ?? $request->getParam('id');
+        $pedidoId = (int) $id;
+
+        if ($pedidoId <= 0) {
+            header('Location: /admin/pedidos?error=pedido_invalido');
+            exit;
+        }
+
+        try {
+            $paymentService = new PaymentService();
+
+            $r1 = $paymentService->atualizarStatusPagamentoCambioRealSplitPorPedido($pedidoId);
+            $r2 = $paymentService->atualizarStatusPagamentoAppmaxSplitPorPedido($pedidoId);
+
+            $ok = (!empty($r1['success']) && !empty($r2['success']));
+            if ($ok) {
+                header('Location: /admin/pedidos/detalhes/' . $pedidoId . '?sync_ok=1');
+                exit;
+            }
+
+            $err = (string) (($r1['error'] ?? '') !== '' ? ($r1['error'] ?? '') : ($r2['error'] ?? 'Falha ao sincronizar pagamentos'));
+            header('Location: /admin/pedidos/detalhes/' . $pedidoId . '?sync_err=' . rawurlencode($err));
+            exit;
+        } catch (\Exception $e) {
+            header('Location: /admin/pedidos/detalhes/' . $pedidoId . '?sync_err=' . rawurlencode($e->getMessage()));
             exit;
         }
     }

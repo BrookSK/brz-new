@@ -1288,6 +1288,119 @@ class PaymentService {
         ];
     }
 
+    private function mapearStatusCambioRealParaInterno(string $status): array {
+        $statusNorm = strtoupper(trim((string) $status));
+        $internal = 'pending';
+        if (
+            in_array($statusNorm, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'SOLICITACAO_FINALIZADA '], true) ||
+            str_contains($statusNorm, 'PAGO') ||
+            str_contains($statusNorm, 'PAG') ||
+            str_contains($statusNorm, 'COMPENS') ||
+            str_contains($statusNorm, 'CONFIRM') ||
+            in_array($statusNorm, ['PAID', 'CONFIRMED', 'APPROVED', 'COMPLETED', 'COMPENSADA', 'COMPENSADO'], true)
+        ) {
+            $internal = 'approved';
+        } elseif (in_array($statusNorm, ['REFUNDED'], true) || str_contains($statusNorm, 'REFUND')) {
+            $internal = 'refunded';
+        } elseif (
+            str_contains($statusNorm, 'CANCEL') ||
+            str_contains($statusNorm, 'RECUS') ||
+            str_contains($statusNorm, 'INVALID') ||
+            str_contains($statusNorm, 'EXPIR')
+        ) {
+            $internal = 'rejected';
+        }
+        return ['internal' => $internal, 'status_norm' => $statusNorm];
+    }
+
+    public function atualizarStatusPagamentoCambioRealSplitPorPedido(int $pedidoId): array {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+
+        $this->garantirTabelaPedidoPagamentos();
+        $db = \Config\Database::getConnection();
+        $st = $db->prepare("SELECT id, payment_id, gateway_status, status FROM pedido_pagamentos WHERE pedido_id = :p AND gateway = 'cambioreal' ORDER BY id ASC");
+        $st->execute([':p' => $pedidoId]);
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($rows)) {
+            return ['success' => true, 'skipped' => true, 'gateway' => 'cambioreal', 'message' => 'Sem pagamentos Câmbio Real neste pedido'];
+        }
+
+        $results = [];
+        foreach ($rows as $r) {
+            $pid = trim((string) ($r['payment_id'] ?? ''));
+            if ($pid === '') {
+                continue;
+            }
+            try {
+                $tx = $this->obterTransacaoCambioReal($pid);
+                $data = is_array($tx['data'] ?? null) ? (array) $tx['data'] : [];
+                $stGateway = (string) ($data['status'] ?? ($data['payment_status'] ?? ($data['transaction_status'] ?? '')));
+                $mapped = $this->mapearStatusCambioRealParaInterno($stGateway);
+                $this->atualizarSplitPorGatewayPaymentId($pid, 'cambioreal', (string) $mapped['internal'], (string) $mapped['status_norm']);
+                $results[] = ['payment_id' => $pid, 'internal' => $mapped['internal'], 'gateway_status' => $mapped['status_norm']];
+            } catch (\Exception $e) {
+                $results[] = ['payment_id' => $pid, 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['success' => true, 'gateway' => 'cambioreal', 'results' => $results];
+    }
+
+    public function atualizarStatusPagamentoAppmaxSplitPorPedido(int $pedidoId): array {
+        $pedidoId = (int) $pedidoId;
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+
+        $this->garantirTabelaPedidoPagamentos();
+        $db = \Config\Database::getConnection();
+        $st = $db->prepare("SELECT id, payment_id, gateway_status, status FROM pedido_pagamentos WHERE pedido_id = :p AND gateway = 'appmax' ORDER BY id ASC");
+        $st->execute([':p' => $pedidoId]);
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        if (empty($rows)) {
+            return ['success' => true, 'skipped' => true, 'gateway' => 'appmax', 'message' => 'Sem pagamentos AppMax neste pedido'];
+        }
+
+        $results = [];
+        foreach ($rows as $r) {
+            $orderId = trim((string) ($r['payment_id'] ?? ''));
+            if ($orderId === '' || !ctype_digit($orderId)) {
+                $results[] = ['payment_id' => $orderId, 'error' => 'payment_id/order_id inválido'];
+                continue;
+            }
+            try {
+                $raw = $this->appmaxRequest('GET', 'order/' . $orderId, null);
+                $data = is_array($raw) ? ($raw['data'] ?? $raw) : [];
+                $status = '';
+                if (is_array($data)) {
+                    $status = (string) ($data['status'] ?? ($data['order_status'] ?? ($data['order']['status'] ?? '')));
+                }
+                $statusNorm = strtoupper(trim($status));
+
+                $internal = 'pending';
+                if ($statusNorm !== '') {
+                    if (str_contains($statusNorm, 'APROV') || str_contains($statusNorm, 'PAID') || str_contains($statusNorm, 'PAGO')) {
+                        $internal = 'approved';
+                    } elseif (str_contains($statusNorm, 'REFUND') || str_contains($statusNorm, 'ESTORN')) {
+                        $internal = 'refunded';
+                    } elseif (str_contains($statusNorm, 'CANCEL') || str_contains($statusNorm, 'RECUS') || str_contains($statusNorm, 'REJECT')) {
+                        $internal = 'rejected';
+                    }
+                }
+
+                $this->atualizarSplitPorGatewayPaymentId($orderId, 'appmax', $internal, $statusNorm !== '' ? $statusNorm : $internal);
+                $results[] = ['payment_id' => $orderId, 'internal' => $internal, 'gateway_status' => $statusNorm, 'raw' => $raw];
+            } catch (\Exception $e) {
+                $results[] = ['payment_id' => $orderId, 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['success' => true, 'gateway' => 'appmax', 'results' => $results];
+    }
+
     private function mercadoPagoTokenForRequestPath(string $path): string {
         $path = (string) $path;
 
