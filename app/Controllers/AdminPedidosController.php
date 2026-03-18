@@ -3378,19 +3378,19 @@ HTML;
 
     document.addEventListener('keydown', function(ev){
         if(ev.key === 'e' && (ev.ctrlKey || ev.metaKey)){
-            var btn = qs('#btnAbrirEditarClientePedido');
-            if(btn){ ev.preventDefault(); btn.click(); }
-        }
-    });
-
-    var btnOpen = qs('#btnAbrirEditarClientePedido');
-    if(btnOpen){
-        btnOpen.addEventListener('click', function(ev){
             ev.preventDefault();
             setAlert('', 'alert-info');
             openModal();
-        });
-    }
+        }
+    });
+
+    document.addEventListener('click', function(ev){
+        var a = ev.target && ev.target.closest ? ev.target.closest('.js-abrir-editar-cliente-pedido') : null;
+        if(!a) return;
+        ev.preventDefault();
+        setAlert('', 'alert-info');
+        openModal();
+    });
 
     var btnSave = qs('#btnSalvarClientePedido');
     if(btnSave){
@@ -3459,7 +3459,7 @@ HTML;
                                             <tr><td><strong>Nome Cliente</strong></td><td>'
                                                 . '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">'
                                                 . '<div>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</div>'
-                                                . '<div><a href="#" class="btn btn-sm btn-outline-primary" id="btnAbrirEditarClientePedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a></div>'
+                                                . '<div><a href="#" class="btn btn-sm btn-outline-primary js-abrir-editar-cliente-pedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a></div>'
                                                 . '</div>'
                                                 . '</td></tr>
                                             <tr><td><strong>CPF</strong></td><td>'
@@ -3986,7 +3986,7 @@ HTML;
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <h5 class="mb-0">Dados do Cliente</h5>
-                                <a href="#" class="btn btn-sm btn-outline-primary" id="btnAbrirEditarClientePedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a>
+                                <a href="#" class="btn btn-sm btn-outline-primary js-abrir-editar-cliente-pedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a>
                             </div>
                             <div class="card-body">
                                 <p><strong>Nome:</strong> ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</p>
