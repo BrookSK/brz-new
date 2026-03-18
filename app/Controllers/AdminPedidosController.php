@@ -5615,7 +5615,82 @@ HTML;
                     return;
                 }
 
+                // Fallback: se faltar algum dado obrigatório no pedido, tentar completar com dados atuais do usuário
+                $uid = (int) ($pedido['usuario_id'] ?? 0);
+                $uRow = [];
+                $eRow = [];
+                try {
+                    if ($uid > 0) {
+                        $db = \Config\Database::getConnection();
+                        // usuário
+                        try {
+                            $colsU = $db->query('DESCRIBE usuarios');
+                            $uCols = $colsU ? ($colsU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            if (!empty($uCols)) {
+                                $pick = function(array $cands) use ($uCols) {
+                                    foreach ($cands as $c) {
+                                        if (in_array($c, $uCols, true)) return $c;
+                                    }
+                                    return null;
+                                };
+                                $colNome = $pick(['nome', 'name', 'full_name']);
+                                $colEmail = $pick(['email']);
+                                $colTel = $pick(['telefone', 'celular', 'phone', 'mobile', 'whatsapp']);
+                                $colDoc = $pick(['cpf_cnpj', 'documento', 'cpf', 'cnpj', 'document']);
+                                $colNasc = $pick(['data_nascimento', 'nascimento', 'birth_date', 'dob', 'date_of_birth']);
+                                $sel = ['id'];
+                                if ($colNome) $sel[] = $colNome . ' AS nome';
+                                if ($colEmail) $sel[] = $colEmail . ' AS email';
+                                if ($colTel) $sel[] = $colTel . ' AS telefone';
+                                if ($colDoc) $sel[] = $colDoc . ' AS documento';
+                                if ($colNasc) $sel[] = $colNasc . ' AS nascimento';
+                                $stU = $db->prepare('SELECT ' . implode(', ', $sel) . ' FROM usuarios WHERE id = ? LIMIT 1');
+                                $stU->execute([$uid]);
+                                $uRow = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            }
+                        } catch (\Exception $e) {
+                            $uRow = [];
+                        }
+
+                        // endereço principal
+                        try {
+                            $colsE = $db->query('DESCRIBE enderecos');
+                            $eCols = $colsE ? ($colsE->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            if (!empty($eCols) && in_array('usuario_id', $eCols, true)) {
+                                $orderBy = 'id DESC';
+                                if (in_array('principal', $eCols, true)) {
+                                    $orderBy = 'principal DESC, id DESC';
+                                }
+                                $stE = $db->prepare('SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
+                                $stE->execute([$uid]);
+                                $eRow = $stE->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            }
+                        } catch (\Exception $e) {
+                            $eRow = [];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $uRow = [];
+                    $eRow = [];
+                }
+
                 $erros = [];
+                if (trim($clienteNome) === '' && !empty($uRow['nome'])) {
+                    $clienteNome = (string) $uRow['nome'];
+                }
+                if (trim($clienteEmail) === '' && !empty($uRow['email'])) {
+                    $clienteEmail = (string) $uRow['email'];
+                }
+                if (trim($clienteDoc) === '' && !empty($uRow['documento'])) {
+                    $clienteDoc = (string) $uRow['documento'];
+                }
+                if (trim($clienteTel) === '' && !empty($uRow['telefone'])) {
+                    $clienteTel = (string) $uRow['telefone'];
+                }
+                if (trim($clienteNasc) === '' && !empty($uRow['nascimento'])) {
+                    $clienteNasc = (string) $uRow['nascimento'];
+                }
+
                 if (trim($clienteNome) === '') {
                     $erros[] = 'Nome do cliente é obrigatório';
                 }
@@ -5654,6 +5729,15 @@ HTML;
                 $bairro = (string) ($pedido['bairro_entrega'] ?? ($pedido['cliente_bairro'] ?? ($pedido['bairro'] ?? '')));
                 $rua = (string) ($pedido['endereco_entrega'] ?? ($pedido['cliente_endereco'] ?? ($pedido['endereco'] ?? '')));
                 $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['cliente_numero'] ?? ($pedido['numero'] ?? '')));
+
+                // fallback de endereço pela conta/endereço principal
+                if (trim($estado) === '' && isset($eRow['estado'])) $estado = (string) $eRow['estado'];
+                if (trim($cidade) === '' && isset($eRow['cidade'])) $cidade = (string) $eRow['cidade'];
+                if (trim($cep) === '' && isset($eRow['cep'])) $cep = (string) $eRow['cep'];
+                if (trim($bairro) === '' && isset($eRow['bairro'])) $bairro = (string) $eRow['bairro'];
+                if (trim($rua) === '' && isset($eRow['endereco'])) $rua = (string) $eRow['endereco'];
+                if (trim($rua) === '' && isset($eRow['logradouro'])) $rua = (string) $eRow['logradouro'];
+                if (trim($numero) === '' && isset($eRow['numero'])) $numero = (string) $eRow['numero'];
 
                 $cepDigits = preg_replace('/\D+/', '', (string) $cep);
                 if ($cepDigits !== '') {
