@@ -655,7 +655,28 @@ class PaymentService {
             $status = strtolower(trim((string) ($resp['status'] ?? '')));
             if ($status !== '' && $status !== 'success') {
                 $msg = (string) ($resp['message'] ?? 'Falha ao criar PIX no Câmbio Real');
-                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg];
+                $details = '';
+                try {
+                    $errs = $resp['errors'] ?? null;
+                    if (is_array($errs)) {
+                        $flat = [];
+                        foreach ($errs as $k => $v) {
+                            if (is_array($v)) {
+                                foreach ($v as $vv) {
+                                    if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                                }
+                            } elseif (is_scalar($v) && (string) $v !== '') {
+                                $flat[] = (string) $v;
+                            }
+                        }
+                        $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                        if (!empty($flat)) {
+                            $details = ' | ' . implode(' | ', $flat);
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg . $details, 'raw' => $resp];
             }
 
             $paymentId = (string) ($data['id'] ?? '');

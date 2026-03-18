@@ -5614,6 +5614,61 @@ HTML;
                     $this->json(['success' => false, 'error' => 'Câmbio Real: somente componente produto suportado'], 400);
                     return;
                 }
+
+                $erros = [];
+                if (trim($clienteNome) === '') {
+                    $erros[] = 'Nome do cliente é obrigatório';
+                }
+                if (trim($clienteEmail) === '' || filter_var($clienteEmail, FILTER_VALIDATE_EMAIL) === false) {
+                    $erros[] = 'E-mail inválido';
+                }
+                $docDigits = preg_replace('/\D+/', '', (string) $clienteDoc);
+                if ($docDigits === '') {
+                    $erros[] = 'Documento (CPF/CNPJ) é obrigatório';
+                }
+                $telDigits = preg_replace('/\D+/', '', (string) $clienteTel);
+                if ($telDigits === '') {
+                    $erros[] = 'Telefone é obrigatório';
+                }
+                $birth = trim((string) $clienteNasc);
+                if ($birth === '') {
+                    $birth = trim((string) ($pedido['data_nascimento'] ?? ($pedido['cliente_nascimento'] ?? '')));
+                }
+                // Normalizar data de nascimento (Câmbio Real costuma exigir YYYY-MM-DD)
+                if ($birth !== '') {
+                    $b = preg_replace('/\s+/', '', (string) $birth);
+                    // dd/mm/yyyy -> yyyy-mm-dd
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $b, $m)) {
+                        $birth = $m[3] . '-' . $m[2] . '-' . $m[1];
+                    } elseif (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $b, $m)) {
+                        $birth = $m[1] . '-' . $m[2] . '-' . $m[3];
+                    }
+                }
+                if ($birth === '') {
+                    $erros[] = 'Data de nascimento é obrigatória';
+                }
+
+                $estado = (string) ($pedido['estado_entrega'] ?? ($pedido['cliente_estado'] ?? ($pedido['estado'] ?? '')));
+                $cidade = (string) ($pedido['cidade_entrega'] ?? ($pedido['cliente_cidade'] ?? ($pedido['cidade'] ?? '')));
+                $cep = (string) ($pedido['cep_entrega'] ?? ($pedido['cliente_cep'] ?? ($pedido['cep'] ?? '')));
+                $bairro = (string) ($pedido['bairro_entrega'] ?? ($pedido['cliente_bairro'] ?? ($pedido['bairro'] ?? '')));
+                $rua = (string) ($pedido['endereco_entrega'] ?? ($pedido['cliente_endereco'] ?? ($pedido['endereco'] ?? '')));
+                $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['cliente_numero'] ?? ($pedido['numero'] ?? '')));
+
+                $cepDigits = preg_replace('/\D+/', '', (string) $cep);
+                if ($cepDigits !== '') {
+                    $cep = $cepDigits;
+                }
+
+                if (trim($estado) === '' || trim($cidade) === '' || trim($cep) === '' || trim($bairro) === '' || trim($rua) === '' || trim($numero) === '') {
+                    $erros[] = 'Endereço incompleto (estado/cidade/CEP/bairro/rua/número)';
+                }
+
+                if (!empty($erros)) {
+                    $this->json(['success' => false, 'error' => implode(' | ', $erros)], 400);
+                    return;
+                }
+
                 $tx = (float) ($pedido['taxa_conversao'] ?? 0);
                 if ($tx <= 1.01) $tx = 1.0;
                 $amountUsd = round($valor / $tx, 2);
@@ -5622,23 +5677,23 @@ HTML;
                 $client = [
                     'name' => $clienteNome,
                     'email' => $clienteEmail,
-                    'document' => $clienteDoc,
-                    'birth_date' => $clienteNasc,
-                    'phone' => $clienteTel,
+                    'document' => $docDigits,
+                    'birth_date' => $birth,
+                    'phone' => $telDigits,
                     'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
                     'address' => [
-                        'state' => (string) ($pedido['cliente_estado'] ?? ($pedido['estado'] ?? '')),
-                        'city' => (string) ($pedido['cliente_cidade'] ?? ($pedido['cidade'] ?? '')),
-                        'zip_code' => (string) ($pedido['cliente_cep'] ?? ($pedido['cep'] ?? '')),
-                        'district' => (string) ($pedido['cliente_bairro'] ?? ($pedido['bairro'] ?? '')),
-                        'street' => (string) ($pedido['cliente_endereco'] ?? ($pedido['endereco'] ?? '')),
-                        'number' => (string) ($pedido['cliente_numero'] ?? ($pedido['numero'] ?? '')),
+                        'state' => $estado,
+                        'city' => $cidade,
+                        'zip_code' => $cep,
+                        'district' => $bairro,
+                        'street' => $rua,
+                        'number' => $numero,
                     ],
                 ];
 
                 $cr = $paymentService->createCambioRealPixPaymentProduto($pedidoId, $amountUsd, $valor, $desc, $client);
                 if (empty($cr['success'])) {
-                    $this->json(['success' => false, 'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real')], 500);
+                    $this->json(['success' => false, 'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real')], 400);
                     return;
                 }
                 $pix = (isset($cr['pix']) && is_array($cr['pix'])) ? $cr['pix'] : [];
