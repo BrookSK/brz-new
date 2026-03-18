@@ -344,7 +344,7 @@ class AdminUsuariosController extends Controller {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">CPF</label>
-                                <input type="text" class="form-control" name="cpf" value="' . htmlspecialchars($usuario['cpf'] ?? '') . '">
+                                <input type="text" class="form-control" name="cpf" value="' . htmlspecialchars(($usuario['cpf'] ?? '') !== '' ? ($usuario['cpf'] ?? '') : ($usuario['documento'] ?? '')) . '">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Telefone</label>
