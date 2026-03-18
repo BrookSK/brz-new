@@ -3225,12 +3225,14 @@ HTML;
                                                 $gwStatusNorm = strtoupper(trim((string) $gwStatus));
                                                 $isExpired = ($gwStatusNorm === 'EXPIRED') || (strpos($gwStatusNorm, 'EXPIR') !== false);
                                                 $podeGerarNovoPix = ($metNorm === 'pix') && in_array($gw, ['appmax', 'cambioreal'], true) && ($stNorm === 'rejected' || $stNorm === 'expired' || $isExpired);
+                                                $pedidoEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ($pedido['customer_email'] ?? '')));
                                                 $acoes = $podeGerarNovoPix
                                                     ? ('<button type="button" class="btn btn-sm btn-outline-primary js-gerar-novo-pix"'
                                                         . ' data-pedido-id="' . (int) $pedido['id'] . '"'
                                                         . ' data-componente="' . htmlspecialchars(strtolower(trim((string) ($r['componente'] ?? '')))) . '"'
                                                         . ' data-gateway="' . htmlspecialchars($gw) . '"'
-                                                        . ' data-metodo="' . htmlspecialchars($metNorm) . '">' 
+                                                        . ' data-metodo="' . htmlspecialchars($metNorm) . '"'
+                                                        . ' data-email="' . htmlspecialchars($pedidoEmail) . '">' 
                                                         . '<i class="fas fa-qrcode me-1"></i>Gerar PIX</button>')
                                                     : '';
 
@@ -3264,10 +3266,14 @@ HTML;
                                                 . '</div>'
                                                 . '</div>'
                                                 . '<div class="col-md-7">'
-                                                . '<label class="form-label">Copia e cola</label>'
+                                                . '<label class="form-label">E-mail</label>'
+                                                . '<input type="email" id="novoPixEmail" class="form-control" value="' . htmlspecialchars($pedidoEmail) . '" autocomplete="email" />'
+                                                . '<div class="form-text">Confirme/ajuste o e-mail antes de gerar.</div>'
+                                                . '<label class="form-label mt-3">Copia e cola</label>'
                                                 . '<textarea id="novoPixPayload" class="form-control" rows="8" readonly></textarea>'
                                                 . '<div class="d-flex gap-2 mt-2">'
-                                                . '<button type="button" class="btn btn-primary" id="btnCopiarPix">Copiar</button>'
+                                                . '<button type="button" class="btn btn-success" id="btnGerarPixConfirm">Gerar PIX</button>'
+                                                . '<button type="button" class="btn btn-primary" id="btnCopiarPix" disabled>Copiar</button>'
                                                 . '<a href="#" class="btn btn-outline-secondary" id="btnAbrirLinkPix" target="_blank" rel="noopener" style="display:none;">Abrir link</a>'
                                                 . '</div>'
                                                 . '<div class="small text-muted mt-2">Envie o QR ou o código copia-e-cola para o cliente.</div>'
@@ -3283,12 +3289,17 @@ HTML;
 
                                             echo '<script>(function(){
                                                 function qs(sel, root){ return (root||document).querySelector(sel); }
+                                                var pendingArgs = {pedidoId:"", componente:"", gateway:"", email:""};
                                                 function setAlert(msg, cls){
                                                     var el = qs("#novoPixAlert");
                                                     if(!el) return;
                                                     el.style.display = msg ? "block" : "none";
                                                     el.className = "alert " + (cls||"alert-info");
                                                     el.textContent = msg||"";
+                                                }
+                                                function setEmail(v){
+                                                    var i = qs("#novoPixEmail");
+                                                    if(i) i.value = v||"";
                                                 }
                                                 function setQr(base64){
                                                     var img = qs("#novoPixQrImg");
@@ -3319,6 +3330,16 @@ HTML;
                                                         a.style.display = "none";
                                                     }
                                                 }
+                                                function setCopiarEnabled(on){
+                                                    var b = qs("#btnCopiarPix");
+                                                    if(b) b.disabled = !on;
+                                                }
+
+                                                function validarEmail(v){
+                                                    v = String(v||"").trim();
+                                                    if(!v) return false;
+                                                    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+                                                }
 
                                                 function openModal(){
                                                     var el = qs("#modalNovoPix");
@@ -3334,35 +3355,64 @@ HTML;
                                                     var pedidoId = btn.getAttribute("data-pedido-id")||"";
                                                     var componente = btn.getAttribute("data-componente")||"";
                                                     var gateway = btn.getAttribute("data-gateway")||"";
+                                                    var email = btn.getAttribute("data-email")||"";
 
-                                                    setAlert("Gerando novo PIX...", "alert-info");
+                                                    pendingArgs = {pedidoId: pedidoId, componente: componente, gateway: gateway, email: email};
+
+                                                    setAlert("Confirme o e-mail e clique em Gerar PIX.", "alert-info");
                                                     setQr("");
                                                     setPayload("");
                                                     setLink("");
+                                                    setEmail(email);
+                                                    setCopiarEnabled(false);
                                                     openModal();
+                                                });
 
-                                                    var body = new URLSearchParams();
-                                                    body.set("componente", componente);
-                                                    body.set("gateway", gateway);
-
-                                                    fetch("/admin/pedidos/gerar-novo-pix/" + encodeURIComponent(pedidoId), {
-                                                        method: "POST",
-                                                        headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                                                        body: body.toString()
-                                                    }).then(function(r){ return r.json(); })
-                                                    .then(function(data){
-                                                        if(!data || !data.success){
-                                                            setAlert((data && data.error) ? data.error : "Falha ao gerar PIX", "alert-warning");
+                                                var btnGerar = qs("#btnGerarPixConfirm");
+                                                if(btnGerar){
+                                                    btnGerar.addEventListener("click", function(){
+                                                        var email = (qs("#novoPixEmail") && qs("#novoPixEmail").value) ? qs("#novoPixEmail").value : "";
+                                                        if(!validarEmail(email)){
+                                                            setAlert("Informe um e-mail válido.", "alert-warning");
                                                             return;
                                                         }
-                                                        setAlert("PIX gerado. Copie e envie ao cliente.", "alert-success");
-                                                        setQr(data.qr_base64 || "");
-                                                        setPayload(data.payload || "");
-                                                        setLink(data.invoice_url || "");
-                                                    }).catch(function(){
-                                                        setAlert("Erro de rede ao gerar PIX", "alert-warning");
+
+                                                        if(!pendingArgs || !pendingArgs.pedidoId){
+                                                            setAlert("Pedido inválido.", "alert-warning");
+                                                            return;
+                                                        }
+
+                                                        setAlert("Gerando novo PIX...", "alert-info");
+                                                        setQr("");
+                                                        setPayload("");
+                                                        setLink("");
+                                                        setCopiarEnabled(false);
+
+                                                        var body = new URLSearchParams();
+                                                        body.set("componente", pendingArgs.componente||"");
+                                                        body.set("gateway", pendingArgs.gateway||"");
+                                                        body.set("email", String(email||"").trim());
+
+                                                        fetch("/admin/pedidos/gerar-novo-pix/" + encodeURIComponent(pendingArgs.pedidoId), {
+                                                            method: "POST",
+                                                            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                                                            body: body.toString()
+                                                        }).then(function(r){ return r.json(); })
+                                                        .then(function(data){
+                                                            if(!data || !data.success){
+                                                                setAlert((data && data.error) ? data.error : "Falha ao gerar PIX", "alert-warning");
+                                                                return;
+                                                            }
+                                                            setAlert("PIX gerado. Copie e envie ao cliente.", "alert-success");
+                                                            setQr(data.qr_base64 || "");
+                                                            setPayload(data.payload || "");
+                                                            setLink(data.invoice_url || "");
+                                                            setCopiarEnabled(!!(data.payload));
+                                                        }).catch(function(){
+                                                            setAlert("Erro de rede ao gerar PIX", "alert-warning");
+                                                        });
                                                     });
-                                                });
+                                                }
 
                                                 var copiar = qs("#btnCopiarPix");
                                                 if(copiar){
@@ -5503,6 +5553,7 @@ HTML;
 
         $componente = strtolower(trim((string) $request->getParam('componente')));
         $gateway = strtolower(trim((string) $request->getParam('gateway')));
+        $emailOverride = trim((string) $request->getParam('email'));
 
         if ($componente === '' || $gateway === '') {
             $this->json(['success' => false, 'error' => 'Parâmetros inválidos'], 400);
@@ -5545,6 +5596,13 @@ HTML;
 
             $clienteNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? 'Cliente'));
             $clienteEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
+            if ($emailOverride !== '') {
+                if (!filter_var($emailOverride, FILTER_VALIDATE_EMAIL)) {
+                    $this->json(['success' => false, 'error' => 'E-mail inválido'], 400);
+                    return;
+                }
+                $clienteEmail = $emailOverride;
+            }
             $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['documento'] ?? ($pedido['cpf'] ?? '')));
             $clienteNasc = (string) ($pedido['cliente_data_nascimento'] ?? ($pedido['data_nascimento'] ?? ''));
             $clienteTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ($pedido['celular'] ?? '')));

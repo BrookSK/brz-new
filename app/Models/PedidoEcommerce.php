@@ -1309,7 +1309,19 @@ class PedidoEcommerce {
             }
 
             // Cliente: preencher campos esperados pela conclusão
+            // Importante: priorizar dados informados no checkout (salvos no pedido) antes de usar dados atuais do usuário.
             if (empty($pedido['cliente_nome']) || empty($pedido['cliente_email']) || empty($pedido['cliente_telefone']) || empty($pedido['cliente_cpf_cnpj'])) {
+                // Fallback para colunas do próprio pedido (antes de puxar do usuário)
+                if (empty($pedido['cliente_nome'])) {
+                    $pedido['cliente_nome'] = $pedido['nome'] ?? ($pedido['customer_name'] ?? '');
+                }
+                if (empty($pedido['cliente_email'])) {
+                    $pedido['cliente_email'] = $pedido['email'] ?? ($pedido['customer_email'] ?? '');
+                }
+                if (empty($pedido['cliente_telefone'])) {
+                    $pedido['cliente_telefone'] = $pedido['telefone'] ?? ($pedido['customer_phone'] ?? '');
+                }
+
                 $uid = (int) ($pedido['usuario_id'] ?? 0);
                 if ($uid > 0 && $this->tableExists('usuarios')) {
                     try {
@@ -1345,17 +1357,6 @@ class PedidoEcommerce {
                         }
                     } catch (\Exception $e) {
                     }
-                }
-
-                // Fallback para colunas do próprio pedido
-                if (empty($pedido['cliente_nome'])) {
-                    $pedido['cliente_nome'] = $pedido['nome'] ?? ($pedido['customer_name'] ?? '');
-                }
-                if (empty($pedido['cliente_email'])) {
-                    $pedido['cliente_email'] = $pedido['email'] ?? ($pedido['customer_email'] ?? '');
-                }
-                if (empty($pedido['cliente_telefone'])) {
-                    $pedido['cliente_telefone'] = $pedido['telefone'] ?? ($pedido['customer_phone'] ?? '');
                 }
             }
         } catch (\Exception $e) {

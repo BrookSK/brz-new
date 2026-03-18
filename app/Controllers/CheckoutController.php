@@ -4774,6 +4774,8 @@ class CheckoutController extends Controller {
                     foreach ([
                         'cliente_nome' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? '')),
                         'cliente_email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+                        'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+                        'customer_email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
                         'cliente_telefone' => (string) ($dados['telefone'] ?? ''),
                         'cliente_documento' => (string) ($dados['documento'] ?? ''),
                         'documento' => (string) ($dados['documento'] ?? ''),
