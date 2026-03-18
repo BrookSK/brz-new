@@ -133,8 +133,11 @@ class AdminBackupController extends Controller {
                         <div class="fw-semibold"><i class="fas fa-bolt me-2"></i>Ações</div>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="/admin/backup/agora" class="mb-3">
-                            <button type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Fazer backup agora</button>
+                        <form method="POST" action="/admin/backup/agora" class="mb-3" id="backupNowForm">
+                            <button type="submit" class="btn btn-success" id="backupNowBtn">
+                                <span class="backup-now-idle"><i class="fas fa-play me-1"></i>Fazer backup agora</span>
+                                <span class="backup-now-loading" style="display:none;"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Fazendo backup...</span>
+                            </button>
                         </form>
                         <div class="text-muted small">O backup cria um dump do banco (.sql) e um .zip dos arquivos (somente referência). A restauração atua apenas no banco.</div>
                     </div>
@@ -195,8 +198,15 @@ class AdminBackupController extends Controller {
                     </td>
                     <td>' . $statusBadge . '</td>
                     <td class="text-end">
-                        <form method="POST" action="/admin/backup/restaurar/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Confirmar restauração do banco a partir do backup #' . $id . '?\')">
-                            <button type="submit" class="btn btn-sm btn-warning"><i class="fas fa-rotate-left"></i> Restaurar</button>
+                        <form method="POST" action="/admin/backup/restaurar/' . $id . '" style="display:inline-block" class="restoreForm" data-backup-id="' . $id . '">
+                            <input type="hidden" name="tipo" value="db">
+                            <div class="input-group input-group-sm" style="width: 260px; display:inline-flex;">
+                                <select class="form-select" name="tipo_select" aria-label="Tipo de restauração">
+                                    <option value="db" selected>Restaurar banco</option>
+                                    <option value="files">Restaurar arquivos</option>
+                                </select>
+                                <button type="submit" class="btn btn-warning"><i class="fas fa-rotate-left"></i></button>
+                            </div>
                         </form>
                         <form method="POST" action="/admin/backup/excluir/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Excluir backup #' . $id . '?\')">
                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i> Excluir</button>
@@ -215,6 +225,46 @@ class AdminBackupController extends Controller {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function(){
+            var form = document.getElementById("backupNowForm");
+            var btn = document.getElementById("backupNowBtn");
+            if (form && btn) {
+                form.addEventListener("submit", function(){
+                    try {
+                        btn.disabled = true;
+                        var idle = btn.querySelector(".backup-now-idle");
+                        var loading = btn.querySelector(".backup-now-loading");
+                        if (idle) idle.style.display = "none";
+                        if (loading) loading.style.display = "inline";
+                    } catch(e) {}
+                });
+            }
+
+            var restoreForms = document.querySelectorAll("form.restoreForm");
+            restoreForms.forEach(function(f){
+                f.addEventListener("submit", function(e){
+                    try {
+                        var sel = f.querySelector("select[name=\"tipo_select\"]");
+                        var hidden = f.querySelector("input[name=\"tipo\"]");
+                        var v = sel ? String(sel.value || "db") : "db";
+                        if (hidden) hidden.value = v;
+
+                        if (v === "files") {
+                            e.preventDefault();
+                            alert("Restauração de arquivos do sistema\n\nOs arquivos são versionados via GitHub/Git. Para restaurar/rollback de arquivos, use revert/rollback no repositório (Git). Este módulo restaura apenas o banco de dados.");
+                            return false;
+                        }
+
+                        var bid = f.getAttribute("data-backup-id") || "";
+                        return confirm("Confirmar restauração do banco a partir do backup #" + bid + "?");
+                    } catch(err) {
+                        return true;
+                    }
+                });
+            });
+        })();
+    </script>
 </body>
 </html>';
         exit;
@@ -306,6 +356,16 @@ class AdminBackupController extends Controller {
 
         $service = new BackupService();
         try {
+            $tipo = strtoupper(trim((string) $request->getParam('tipo', 'DB')));
+            if ($tipo === 'FILES' || $tipo === 'ARQUIVOS') {
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+                $_SESSION['message'] = 'Restauração de arquivos: utilize rollback/revert via GitHub/Git. Este módulo restaura apenas o banco de dados.';
+                $_SESSION['message_type'] = 'info';
+                header('Location: /admin/backup');
+                exit;
+            }
             $service->restoreDatabase((int) $id);
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
