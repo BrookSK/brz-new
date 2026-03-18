@@ -5777,7 +5777,11 @@ HTML;
 
                 $cr = $paymentService->createCambioRealPixPaymentProduto($pedidoId, $amountUsd, $valor, $desc, $client);
                 if (empty($cr['success'])) {
-                    $this->json(['success' => false, 'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real')], 400);
+                    $this->json([
+                        'success' => false,
+                        'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real'),
+                        'order_id' => (string) ($cr['order_id'] ?? ''),
+                    ], 400);
                     return;
                 }
                 $pix = (isset($cr['pix']) && is_array($cr['pix'])) ? $cr['pix'] : [];
@@ -5808,6 +5812,7 @@ HTML;
                     'componente' => $componente,
                     'payment_id' => $paymentId,
                     'invoice_url' => $invoiceUrl,
+                    'order_id' => (string) ($cr['order_id'] ?? ''),
                     'qr_base64' => $qr,
                     'payload' => $payload,
                 ]);

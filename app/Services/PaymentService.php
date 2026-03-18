@@ -681,7 +681,7 @@ class PaymentService {
                     }
                 } catch (\Exception $e) {
                 }
-                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg . $details, 'raw' => $resp];
+                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg . $details, 'raw' => $resp, 'order_id' => $orderId];
             }
 
             $paymentId = (string) ($data['id'] ?? '');
@@ -730,6 +730,7 @@ class PaymentService {
                 'success' => true,
                 'payment_id' => $paymentId,
                 'invoice_url' => $invoiceUrl,
+                'order_id' => $orderId,
                 'pix' => [
                     'encodedImage' => $pixImg !== '' ? $pixImg : null,
                     'payload' => $pixPayload !== '' ? $pixPayload : null,
