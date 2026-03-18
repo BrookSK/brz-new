@@ -4945,13 +4945,38 @@ class CheckoutController extends Controller {
             return ['pedido_id' => (int) $pedidoId, 'reused' => false, 'idem' => $idemHash];
             
         } catch (\Exception $e) {
-            $this->debugLog('[CRIAR_PEDIDO] Erro ao criar pedido: ' . $e->getMessage());
+            $rawMsg = (string) $e->getMessage();
+            $this->debugLog('[CRIAR_PEDIDO] Erro ao criar pedido: ' . $rawMsg);
             $this->debugLog('[CRIAR_PEDIDO] Stack: ' . $e->getTraceAsString());
+
+            $friendly = 'Não foi possível finalizar o pedido. Verifique seus dados e tente novamente.';
+            $m = strtolower($rawMsg);
+            if (
+                strpos($m, 'cpf_cnpj') !== false ||
+                strpos($m, 'cpf/cnpj') !== false ||
+                strpos($m, 'cpf') !== false ||
+                strpos($m, 'cnpj') !== false ||
+                strpos($m, 'documento') !== false
+            ) {
+                if (
+                    strpos($m, 'cannot be null') !== false ||
+                    strpos($m, 'não pode ser nulo') !== false ||
+                    strpos($m, 'not null') !== false
+                ) {
+                    $friendly = 'Informe um CPF/CNPJ válido para continuar. Confira se os números estão corretos e se o documento é realmente seu. Se estiver correto e o erro persistir, entre em contato com o suporte para verificarmos.';
+                } elseif (strpos($m, 'duplicate entry') !== false || strpos($m, 'duplic') !== false || strpos($m, 'já cadastrado') !== false) {
+                    $friendly = 'Este CPF/CNPJ já está cadastrado. Confira se o CPF/CNPJ é realmente seu e se os números estão corretos. Se estiver correto e o erro persistir, entre em contato com o suporte para verificarmos.';
+                } elseif (strpos($m, 'inválido') !== false || strpos($m, 'invalido') !== false || strpos($m, 'invalid') !== false) {
+                    $friendly = 'CPF/CNPJ inválido. Confira se os números estão corretos e tente novamente. Se o documento estiver correto e o erro persistir, entre em contato com o suporte para verificarmos.';
+                } else {
+                    $friendly = 'Houve um problema com seu CPF/CNPJ. Confira se o documento é realmente seu e se os números estão corretos. Se estiver correto e o erro persistir, entre em contato com o suporte para verificarmos.';
+                }
+            }
             
             // Retornar JSON válido em caso de erro
             $this->json([
                 'success' => false,
-                'error' => 'Erro ao criar pedido: ' . $e->getMessage(),
+                'error' => $friendly,
                 'code' => 500
             ], 500);
             return false;
