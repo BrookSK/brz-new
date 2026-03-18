@@ -114,6 +114,7 @@ $router->post('/assessoria/aceitar-disclaimer', 'AssessoriaController', 'aceitar
 // Cron / Manutenção
 $router->get('/cron/assessoria/limpar-temporarios', 'AssessoriaController', 'cronLimparTemporarios');
 $router->get('/cron/clube/rendimento', 'ClubeController', 'cronRendimento');
+$router->get('/cron/backup', 'CronBackupController', 'run');
 
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function($request) {
@@ -178,6 +179,7 @@ $router->get('/admin', function($request) {
         ['icon' => 'fas fa-wallet', 'label' => 'Recargas Clube (Quick)', 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
+        ['icon' => 'fas fa-database', 'label' => 'Backup', 'url' => '/admin/backup', 'roles' => ['admin']],
     ];
 
     $renderItems = $menuItems;
@@ -427,6 +429,13 @@ $router->get('/admin/configuracoes/importar-usuarios/modelo', 'AdminConfiguracoe
 $router->post('/admin/configuracoes/importar-usuarios/iniciar', 'AdminConfiguracoesController', 'importarUsuariosIniciar');
 $router->post('/admin/configuracoes/importar-usuarios/processar', 'AdminConfiguracoesController', 'importarUsuariosProcessar');
 $router->post('/admin/configuracoes/testar-sigep', 'AdminConfiguracoesController', 'testarSigep');
+
+// Backup do sistema
+$router->get('/admin/backup', 'AdminBackupController', 'index');
+$router->post('/admin/backup/salvar', 'AdminBackupController', 'salvar');
+$router->post('/admin/backup/agora', 'AdminBackupController', 'agora');
+$router->post('/admin/backup/restaurar/{id}', 'AdminBackupController', 'restaurar');
+$router->post('/admin/backup/excluir/{id}', 'AdminBackupController', 'excluir');
 
 // Mercado Pago OAuth (conectar conta do produto)
 $router->get('/mercadopago/oauth/start', 'MercadoPagoOAuthController', 'start');

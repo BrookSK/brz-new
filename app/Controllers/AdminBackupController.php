@@ -1,0 +1,326 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Request;
+use App\Services\AuthService;
+use App\Services\BackupService;
+
+class AdminBackupController extends Controller {
+
+    private function fmtBytes(int $bytes): string {
+        if ($bytes < 1024) return $bytes . ' B';
+        $kb = $bytes / 1024;
+        if ($kb < 1024) return number_format($kb, 1, ',', '.') . ' KB';
+        $mb = $kb / 1024;
+        if ($mb < 1024) return number_format($mb, 1, ',', '.') . ' MB';
+        $gb = $mb / 1024;
+        return number_format($gb, 2, ',', '.') . ' GB';
+    }
+
+    public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $service = new BackupService();
+        $cfg = $service->getConfig();
+        $cronUrl = '';
+        try {
+            $cronUrl = $service->getCronUrl();
+        } catch (\Throwable $e) {
+            $cronUrl = '';
+        }
+
+        $runs = [];
+        try {
+            $runs = $service->listBackups(200);
+        } catch (\Throwable $e) {
+            $runs = [];
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup - Braziliana Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+        renderAdminSidebarStyles();
+
+        echo '</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+        renderAdminSidebar('backup');
+
+        $pasta = htmlspecialchars((string) ($cfg['pasta_backup'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $token = htmlspecialchars((string) ($cfg['cron_token'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $cronUrlEsc = htmlspecialchars((string) $cronUrl, ENT_QUOTES, 'UTF-8');
+        $horario = htmlspecialchars((string) ($cfg['horario'] ?? '02:00:00'), ENT_QUOTES, 'UTF-8');
+        $reter = (int) ($cfg['reter_quantidade'] ?? 10);
+        $rec = (string) ($cfg['recorrencia'] ?? 'diaria');
+
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-database me-2"></i>Backup do Sistema</h1>
+            </div>';
+
+        echo '<div class="alert alert-info">
+            <div class="fw-semibold mb-1">Restauração de arquivos do sistema</div>
+            <div>Os arquivos do sistema são versionados via GitHub/Git. Para restaurar arquivos, utilize o fluxo de revert/rollback no repositório. Este módulo restaura apenas o banco de dados.</div>
+        </div>';
+
+        echo '<div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <div class="fw-semibold"><i class="fas fa-sliders-h me-2"></i>Configurações</div>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/admin/backup/salvar">
+                            <div class="mb-3">
+                                <label class="form-label">Recorrência</label>
+                                <select class="form-select" name="recorrencia">
+                                    <option value="diaria" ' . ($rec === 'diaria' ? 'selected' : '') . '>Diária</option>
+                                    <option value="semanal" ' . ($rec === 'semanal' ? 'selected' : '') . '>Semanal</option>
+                                    <option value="mensal" ' . ($rec === 'mensal' ? 'selected' : '') . '>Mensal</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Horário do backup</label>
+                                <input class="form-control" type="time" name="horario" value="' . htmlspecialchars(substr($horario, 0, 5), ENT_QUOTES, 'UTF-8') . '">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Quantos backups reter</label>
+                                <input class="form-control" type="number" min="1" max="365" name="reter_quantidade" value="' . (int) $reter . '">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Token do CRON</label>
+                                <input class="form-control" type="text" name="cron_token" value="' . $token . '">
+                                <div class="form-text">Use esse token no agendamento para chamar a URL do cron com segurança.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Pasta onde salva</label>
+                                <input class="form-control" type="text" name="pasta_backup" value="' . $pasta . '">
+                                <div class="form-text">A pasta será criada automaticamente (se possível).</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">URL do CRON</label>
+                                <input class="form-control" type="text" readonly value="' . $cronUrlEsc . '">
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar</button>
+                                <a class="btn btn-outline-secondary" href="/admin/backup"><i class="fas fa-rotate me-1"></i>Recarregar</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <div class="fw-semibold"><i class="fas fa-bolt me-2"></i>Ações</div>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/admin/backup/agora" class="mb-3">
+                            <button type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Fazer backup agora</button>
+                        </form>
+                        <div class="text-muted small">O backup cria um dump do banco (.sql) e um .zip dos arquivos (somente referência). A restauração atua apenas no banco.</div>
+                    </div>
+                </div>
+            </div>
+        </div>';
+
+        echo '<div class="card mt-4">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="fw-semibold"><i class="fas fa-clock-rotate-left me-2"></i>Backups realizados</div>
+            </div>
+            <div class="card-body">';
+
+        if (empty($runs)) {
+            echo '<div class="text-muted">Nenhum backup registrado.</div>';
+        } else {
+            echo '<div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data/Hora</th>
+                            <th>DB</th>
+                            <th>Arquivos (referência)</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>';
+
+            foreach ($runs as $r) {
+                $id = (int) ($r['id'] ?? 0);
+                $created = (string) ($r['created_at'] ?? '');
+                $status = (string) ($r['status'] ?? 'ok');
+                $dbPath = (string) ($r['db_sql_path'] ?? '');
+                $zipPath = (string) ($r['files_zip_path'] ?? '');
+                $dbSize = (int) ($r['db_size_bytes'] ?? 0);
+                $zipSize = (int) ($r['files_size_bytes'] ?? 0);
+
+                $dbName = htmlspecialchars(basename($dbPath), ENT_QUOTES, 'UTF-8');
+                $zipName = htmlspecialchars(basename($zipPath), ENT_QUOTES, 'UTF-8');
+
+                $createdFmt = $created !== '' ? date('d/m/Y H:i', strtotime($created)) : '-';
+                $statusBadge = $status === 'ok'
+                    ? '<span class="badge bg-success">OK</span>'
+                    : '<span class="badge bg-danger">Erro</span>';
+
+                echo '<tr>
+                    <td>#' . $id . '</td>
+                    <td>' . htmlspecialchars($createdFmt, ENT_QUOTES, 'UTF-8') . '</td>
+                    <td>
+                        <div class="fw-semibold">' . $dbName . '</div>
+                        <div class="text-muted small">' . htmlspecialchars($this->fmtBytes($dbSize), ENT_QUOTES, 'UTF-8') . '</div>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">' . $zipName . '</div>
+                        <div class="text-muted small">' . htmlspecialchars($this->fmtBytes($zipSize), ENT_QUOTES, 'UTF-8') . '</div>
+                    </td>
+                    <td>' . $statusBadge . '</td>
+                    <td class="text-end">
+                        <form method="POST" action="/admin/backup/restaurar/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Confirmar restauração do banco a partir do backup #' . $id . '?\')">
+                            <button type="submit" class="btn btn-sm btn-warning"><i class="fas fa-rotate-left"></i> Restaurar</button>
+                        </form>
+                        <form method="POST" action="/admin/backup/excluir/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Excluir backup #' . $id . '?\')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i> Excluir</button>
+                        </form>
+                    </td>
+                </tr>';
+            }
+
+            echo '</tbody></table></div>';
+        }
+
+        echo '</div>
+        </div>';
+
+        echo '</main>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
+    public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $service = new BackupService();
+
+        try {
+            $service->saveConfig([
+                'recorrencia' => (string) $request->getParam('recorrencia', 'diaria'),
+                'horario' => (string) $request->getParam('horario', '02:00'),
+                'reter_quantidade' => (int) $request->getParam('reter_quantidade', 10),
+                'cron_token' => (string) $request->getParam('cron_token', ''),
+                'pasta_backup' => (string) $request->getParam('pasta_backup', ''),
+            ]);
+
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Configurações de backup salvas.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Throwable $e) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Erro ao salvar configurações: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/backup');
+        exit;
+    }
+
+    public function agora(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $service = new BackupService();
+        try {
+            $id = $service->createBackupNow('manual');
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Backup criado com sucesso (#' . $id . ').';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Throwable $e) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Erro ao criar backup: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/backup');
+        exit;
+    }
+
+    public function excluir(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $service = new BackupService();
+        try {
+            $service->deleteBackup((int) $id);
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Backup excluído.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Throwable $e) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Erro ao excluir: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/backup');
+        exit;
+    }
+
+    public function restaurar(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $service = new BackupService();
+        try {
+            $service->restoreDatabase((int) $id);
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Banco restaurado a partir do backup #' . (int) $id . '.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Throwable $e) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['message'] = 'Erro ao restaurar: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/backup');
+        exit;
+    }
+}
