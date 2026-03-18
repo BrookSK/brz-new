@@ -1204,6 +1204,41 @@ class CheckoutController extends Controller {
     private function processarPagamentoPedido(int $pedidoId, array $dados, array $usuario, array $pedidoRow): array {
         $forma = (string) ($dados['forma_pagamento'] ?? '');
 
+        $pickNonEmpty = static function(...$vals): string {
+            foreach ($vals as $v) {
+                $s = trim((string) ($v ?? ''));
+                if ($s !== '') return $s;
+            }
+            return '';
+        };
+
+        $nomeEfetivo = $pickNonEmpty(
+            $dados['nome'] ?? '',
+            $pedidoRow['cliente_nome'] ?? '',
+            $pedidoRow['customer_name'] ?? '',
+            $usuario['nome'] ?? '',
+            'Cliente'
+        );
+        $emailEfetivo = $pickNonEmpty(
+            $dados['email'] ?? '',
+            $pedidoRow['cliente_email'] ?? '',
+            $pedidoRow['email'] ?? '',
+            $pedidoRow['customer_email'] ?? '',
+            $usuario['email'] ?? ''
+        );
+        $docEfetivo = $pickNonEmpty(
+            $dados['documento'] ?? '',
+            $pedidoRow['cliente_documento'] ?? '',
+            $pedidoRow['documento'] ?? '',
+            $usuario['documento'] ?? ''
+        );
+        $telEfetivo = $pickNonEmpty(
+            $dados['telefone'] ?? '',
+            $pedidoRow['cliente_telefone'] ?? '',
+            $usuario['telefone'] ?? '',
+            $usuario['celular'] ?? ''
+        );
+
         $billingType = 'CREDIT_CARD';
         if ($forma === 'pix') {
             $billingType = 'PIX';
@@ -1349,10 +1384,10 @@ class CheckoutController extends Controller {
         $payload = [
             'billingType' => $billingType,
             'externalReference' => (string) $pedidoId,
-            'customer_name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
-            'customer_email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
-            'customer_document' => (string) ($dados['documento'] ?? ''),
-            'customer_phone' => (string) ($dados['telefone'] ?? ''),
+            'customer_name' => (string) $nomeEfetivo,
+            'customer_email' => (string) $emailEfetivo,
+            'customer_document' => (string) $docEfetivo,
+            'customer_phone' => (string) $telEfetivo,
             'customer_zipcode' => (string) ($dados['cep'] ?? ''),
             'customer_address' => (string) ($dados['endereco'] ?? ''),
             'customer_address_number' => (string) ($dados['numero'] ?? ''),
@@ -2642,6 +2677,14 @@ class CheckoutController extends Controller {
                     $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
                 }
 
+                $pickNonEmpty = static function(...$vals): string {
+                    foreach ($vals as $v) {
+                        $s = trim((string) ($v ?? ''));
+                        if ($s !== '') return $s;
+                    }
+                    return '';
+                };
+
                 if ($shouldTrySplit) {
                     try {
                         // Split BRL:
@@ -2768,10 +2811,20 @@ class CheckoutController extends Controller {
                             $descricaoProduto = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (produtos)';
                             $descricaoTaxa = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (taxas e impostos)';
                             $payer = [];
-                            if (!empty($dados['email']) && is_string($dados['email'])) {
-                                $payer['email'] = trim((string) $dados['email']);
-                            } elseif (!empty($usuario['email'])) {
-                                $payer['email'] = trim((string) $usuario['email']);
+                            $payerEmail = '';
+                            try {
+                                $payerEmail = $pickNonEmpty(
+                                    $dados['email'] ?? '',
+                                    $pedidoRowPay['cliente_email'] ?? '',
+                                    $pedidoRowPay['email'] ?? '',
+                                    $pedidoRowPay['customer_email'] ?? '',
+                                    $usuario['email'] ?? ''
+                                );
+                            } catch (\Throwable $e) {
+                                $payerEmail = '';
+                            }
+                            if ($payerEmail !== '') {
+                                $payer['email'] = $payerEmail;
                             }
 
                             $cr = null;
@@ -2801,11 +2854,11 @@ class CheckoutController extends Controller {
                                     }
 
                                     $client = [
-                                        'name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
-                                        'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
-                                        'document' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
-                                        'birth_date' => (string) ($dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? '')),
-                                        'phone' => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? ''))),
+                                        'name' => (string) $pickNonEmpty($dados['nome'] ?? '', $pedidoRowPay['cliente_nome'] ?? '', $usuario['nome'] ?? '', 'Cliente'),
+                                        'email' => (string) $pickNonEmpty($dados['email'] ?? '', $pedidoRowPay['cliente_email'] ?? '', $pedidoRowPay['email'] ?? '', $pedidoRowPay['customer_email'] ?? '', $usuario['email'] ?? ''),
+                                        'document' => (string) $pickNonEmpty($dados['documento'] ?? '', $pedidoRowPay['cliente_documento'] ?? '', $pedidoRowPay['documento'] ?? '', $usuario['documento'] ?? ''),
+                                        'birth_date' => (string) $pickNonEmpty($dados['data_nascimento'] ?? '', $usuario['data_nascimento'] ?? ''),
+                                        'phone' => (string) $pickNonEmpty($dados['telefone'] ?? '', $pedidoRowPay['cliente_telefone'] ?? '', $usuario['telefone'] ?? '', $usuario['celular'] ?? ''),
                                         'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
                                         'address' => [
                                             'state' => (string) ($dados['estado'] ?? ''),
@@ -2920,10 +2973,10 @@ class CheckoutController extends Controller {
                                     $billingType = 'CREDIT_CARD';
                                 }
                                 $clienteSplit = [];
-                                $clienteSplit['nome'] = (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente'));
-                                $clienteSplit['email'] = (string) ($dados['email'] ?? ($usuario['email'] ?? ''));
-                                $clienteSplit['telefone'] = (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? ($usuario['celular'] ?? '')));
-                                $clienteSplit['documento'] = (string) ($dados['documento'] ?? ($usuario['documento'] ?? ''));
+                                $clienteSplit['nome'] = (string) $pickNonEmpty($dados['nome'] ?? '', $pedidoRowPay['cliente_nome'] ?? '', $usuario['nome'] ?? '', 'Cliente');
+                                $clienteSplit['email'] = (string) $pickNonEmpty($dados['email'] ?? '', $pedidoRowPay['cliente_email'] ?? '', $pedidoRowPay['email'] ?? '', $pedidoRowPay['customer_email'] ?? '', $usuario['email'] ?? '');
+                                $clienteSplit['telefone'] = (string) $pickNonEmpty($dados['telefone'] ?? '', $pedidoRowPay['cliente_telefone'] ?? '', $usuario['telefone'] ?? '', $usuario['celular'] ?? '');
+                                $clienteSplit['documento'] = (string) $pickNonEmpty($dados['documento'] ?? '', $pedidoRowPay['cliente_documento'] ?? '', $pedidoRowPay['documento'] ?? '', $usuario['documento'] ?? '');
 
                                 if ($billingType === 'CREDIT_CARD') {
                                     $clienteSplit['card_holder_name'] = (string) ($dados['card_holder_name'] ?? '');
