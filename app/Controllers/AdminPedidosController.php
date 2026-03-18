@@ -13,6 +13,85 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class AdminPedidosController extends Controller {
 
+    public function atualizarCliente(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $id = $id ?? $request->getParam('id');
+        $pedidoId = (int) $id;
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            return;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
+
+            $pickCol = function(array $candidates) use ($cols): string {
+                foreach ($candidates as $c) {
+                    if (is_array($cols) && in_array($c, $cols, true)) {
+                        return $c;
+                    }
+                }
+                return '';
+            };
+
+            $colNome = $pickCol(['cliente_nome', 'customer_name', 'nome', 'name']);
+            $colEmail = $pickCol(['cliente_email', 'customer_email', 'email']);
+            $colTelefone = $pickCol(['cliente_telefone', 'customer_phone', 'telefone', 'phone', 'celular']);
+            $colDoc = $pickCol(['cliente_documento', 'cliente_cpf_cnpj', 'cpf_cnpj', 'documento', 'customer_document', 'cpf']);
+
+            $colPais = $pickCol(['pais', 'country', 'customer_country']);
+            $colCep = $pickCol(['cep', 'zipcode', 'zip_code', 'customer_zipcode']);
+            $colEndereco = $pickCol(['endereco', 'logradouro', 'address', 'customer_address']);
+            $colNumero = $pickCol(['numero', 'address_number', 'customer_address_number']);
+            $colComplemento = $pickCol(['complemento', 'address_complement', 'customer_address_complement']);
+            $colBairro = $pickCol(['bairro', 'province', 'district', 'customer_province']);
+            $colCidade = $pickCol(['cidade', 'city', 'customer_city']);
+            $colEstado = $pickCol(['estado', 'state', 'customer_state']);
+
+            $set = [];
+            $params = [];
+
+            $addSet = function(string $col, $val) use (&$set, &$params): void {
+                if ($col === '') return;
+                $set[] = $col . ' = ?';
+                $params[] = $val;
+            };
+
+            $addSet($colNome, trim((string) $request->getParam('nome')));
+            $addSet($colEmail, trim((string) $request->getParam('email')));
+            $addSet($colTelefone, trim((string) $request->getParam('telefone')));
+            $addSet($colDoc, trim((string) $request->getParam('documento')));
+
+            $addSet($colPais, trim((string) $request->getParam('pais')));
+            $addSet($colCep, trim((string) $request->getParam('cep')));
+            $addSet($colEndereco, trim((string) $request->getParam('endereco')));
+            $addSet($colNumero, trim((string) $request->getParam('numero')));
+            $addSet($colComplemento, trim((string) $request->getParam('complemento')));
+            $addSet($colBairro, trim((string) $request->getParam('bairro')));
+            $addSet($colCidade, trim((string) $request->getParam('cidade')));
+            $addSet($colEstado, trim((string) $request->getParam('estado')));
+
+            $set = array_values(array_filter($set, static function($x){ return is_string($x) && trim($x) !== ''; }));
+
+            if (empty($set)) {
+                $this->json(['success' => false, 'error' => 'Nenhum campo suportado para atualizar neste schema'], 400);
+                return;
+            }
+
+            $params[] = $pedidoId;
+            $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?';
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+
+            $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     private function ensurePedidoMedidasColumnsPdo(\PDO $pdo): void {
         try {
             $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -3030,7 +3109,10 @@ HTML;
                                                 $ncmVal = $ncmProd;
                                             }
                                             if ($ncmVal !== '') {
-                                                $ncmHtml = htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8');
+                                                $ncmHtml = '<span>' . htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8') . '</span>'
+                                                    . ' <a href="#" class="text-muted js-ncm-quick" data-produto-id="' . (int) $pidItem . '" data-ncm-current="' . htmlspecialchars($ncmVal, ENT_QUOTES, 'UTF-8') . '" title="Editar NCM" style="text-decoration:none;">'
+                                                    . '<i class="fas fa-pen-to-square"></i>'
+                                                    . '</a>';
                                             } else {
                                                 $ncmHtml = '<a href="#" class="badge bg-warning text-dark js-ncm-quick" data-produto-id="' . (int) $pidItem . '" style="text-decoration:none;">Sem NCM</a>';
                                             }
@@ -3099,7 +3181,7 @@ HTML;
 <script>(function(){
     function qs(sel, root){ return (root||document).querySelector(sel); }
     function qsa(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
-    var state = { produtoId: 0, selectedNcm: "" };
+    var state = { produtoId: 0, selectedNcm: "", triggerEl: null };
 
     function setAlert(msg, cls){
         var el = qs("#ncmQuickAlert");
@@ -3127,6 +3209,10 @@ HTML;
             a.className = "list-group-item list-group-item-action";
             a.setAttribute("data-ncm", it.code||"");
             a.textContent = it.text || (it.code || "");
+            if(state.selectedNcm && String(it.code||"") === String(state.selectedNcm)){
+                a.classList.add("active");
+                setSalvarEnabled(true);
+            }
             a.addEventListener("click", function(ev){
                 ev.preventDefault();
                 state.selectedNcm = String(it.code||"");
@@ -3160,13 +3246,14 @@ HTML;
         var a = ev.target && ev.target.closest ? ev.target.closest(".js-ncm-quick") : null;
         if(!a) return;
         ev.preventDefault();
+        state.triggerEl = a;
         state.produtoId = parseInt(a.getAttribute("data-produto-id")||"0", 10) || 0;
-        state.selectedNcm = "";
+        state.selectedNcm = String(a.getAttribute("data-ncm-current")||"");
         var hid = qs("#ncmQuickProdutoId");
         if(hid) hid.value = String(state.produtoId||"");
         var input = qs("#ncmQuickSearch");
         if(input) input.value = "";
-        setSalvarEnabled(false);
+        setSalvarEnabled(!!state.selectedNcm);
         setAlert("Pesquise e selecione o NCM.", "alert-info");
         setResults([]);
         openModal();
@@ -3206,11 +3293,144 @@ HTML;
                     return;
                 }
                 setAlert("NCM atualizado.", "alert-success");
-                qsa('.js-ncm-quick[data-produto-id="' + String(state.produtoId) + '"]').forEach(function(el){
-                    el.outerHTML = String(j.ncm || state.selectedNcm);
-                });
+                try {
+                    var td = state.triggerEl && state.triggerEl.closest ? state.triggerEl.closest('td') : null;
+                    if(td){
+                        var ncmNew = String(j.ncm || state.selectedNcm || '');
+                        if(ncmNew){
+                            td.innerHTML = '<span>' + ncmNew + '</span> ' +
+                                '<a href="#" class="text-muted js-ncm-quick" data-produto-id="' + String(state.produtoId) + '" data-ncm-current="' + ncmNew + '" title="Editar NCM" style="text-decoration:none;">' +
+                                '<i class="fas fa-pen-to-square"></i>' +
+                                '</a>';
+                        }
+                    }
+                } catch(e) {}
+                btnSave.disabled = false;
             }).catch(function(){
                 setAlert("Erro de rede ao salvar NCM", "alert-warning");
+                btnSave.disabled = false;
+            });
+        });
+    }
+})();</script>
+HTML;
+
+                    $clienteNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
+                    $clienteEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ($pedido['customer_email'] ?? '')));
+                    $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
+                    $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
+                    $pais = (string) ($pedido['pais'] ?? '');
+                    $cep = (string) ($pedido['cep'] ?? '');
+                    $endereco = (string) ($pedido['endereco'] ?? '');
+                    $numero = (string) ($pedido['numero'] ?? '');
+                    $complemento = (string) ($pedido['complemento'] ?? '');
+                    $bairro = (string) ($pedido['bairro'] ?? '');
+                    $cidade = (string) ($pedido['cidade'] ?? '');
+                    $estado = (string) ($pedido['estado'] ?? '');
+
+                    echo '<div class="modal fade" id="modalEditarClientePedido" tabindex="-1" aria-hidden="true">'
+                        . '<div class="modal-dialog modal-lg">'
+                        . '<div class="modal-content">'
+                        . '<div class="modal-header">'
+                        . '<h5 class="modal-title">Editar dados do cliente / endereço</h5>'
+                        . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
+                        . '</div>'
+                        . '<div class="modal-body">'
+                        . '<div id="editClienteAlert" class="alert alert-info" style="display:none;"></div>'
+                        . '<div class="row g-3">'
+                        . '<div class="col-md-6"><label class="form-label">Nome</label><input type="text" class="form-control" id="editClienteNome" value="' . htmlspecialchars($clienteNome, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-6"><label class="form-label">E-mail</label><input type="email" class="form-control" id="editClienteEmail" value="' . htmlspecialchars($clienteEmail, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">Telefone</label><input type="text" class="form-control" id="editClienteTelefone" value="' . htmlspecialchars($clienteTelefone, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">CPF/CNPJ</label><input type="text" class="form-control" id="editClienteDocumento" value="' . htmlspecialchars($clienteDoc, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">País</label><input type="text" class="form-control" id="editClientePais" value="' . htmlspecialchars($pais, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-3"><label class="form-label">CEP</label><input type="text" class="form-control" id="editClienteCep" value="' . htmlspecialchars($cep, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-6"><label class="form-label">Endereço</label><input type="text" class="form-control" id="editClienteEndereco" value="' . htmlspecialchars($endereco, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-3"><label class="form-label">Número</label><input type="text" class="form-control" id="editClienteNumero" value="' . htmlspecialchars($numero, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">Complemento</label><input type="text" class="form-control" id="editClienteComplemento" value="' . htmlspecialchars($complemento, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">Bairro</label><input type="text" class="form-control" id="editClienteBairro" value="' . htmlspecialchars($bairro, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">Cidade</label><input type="text" class="form-control" id="editClienteCidade" value="' . htmlspecialchars($cidade, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">Estado</label><input type="text" class="form-control" id="editClienteEstado" value="' . htmlspecialchars($estado, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '</div>'
+                        . '</div>'
+                        . '<div class="modal-footer">'
+                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
+                        . '<button type="button" class="btn btn-primary" id="btnSalvarClientePedido" data-pedido-id="' . (int) $pedido['id'] . '">Salvar</button>'
+                        . '</div>'
+                        . '</div>'
+                        . '</div>'
+                        . '</div>';
+
+                    echo <<<HTML
+<script>(function(){
+    function qs(sel, root){ return (root||document).querySelector(sel); }
+    function setAlert(msg, cls){
+        var el = qs('#editClienteAlert');
+        if(!el) return;
+        el.style.display = msg ? 'block' : 'none';
+        el.className = 'alert ' + (cls||'alert-info');
+        el.textContent = msg||'';
+    }
+    function openModal(){
+        var el = qs('#modalEditarClientePedido');
+        if(!el || !window.bootstrap || !window.bootstrap.Modal) return;
+        window.bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+
+    document.addEventListener('keydown', function(ev){
+        if(ev.key === 'e' && (ev.ctrlKey || ev.metaKey)){
+            var btn = qs('#btnAbrirEditarClientePedido');
+            if(btn){ ev.preventDefault(); btn.click(); }
+        }
+    });
+
+    var btnOpen = qs('#btnAbrirEditarClientePedido');
+    if(btnOpen){
+        btnOpen.addEventListener('click', function(ev){
+            ev.preventDefault();
+            setAlert('', 'alert-info');
+            openModal();
+        });
+    }
+
+    var btnSave = qs('#btnSalvarClientePedido');
+    if(btnSave){
+        btnSave.addEventListener('click', function(){
+            var pedidoId = btnSave.getAttribute('data-pedido-id')||'';
+            if(!pedidoId) return;
+            btnSave.disabled = true;
+            setAlert('Salvando...', 'alert-info');
+
+            var body = new URLSearchParams();
+            body.set('nome', (qs('#editClienteNome')||{}).value || '');
+            body.set('email', (qs('#editClienteEmail')||{}).value || '');
+            body.set('telefone', (qs('#editClienteTelefone')||{}).value || '');
+            body.set('documento', (qs('#editClienteDocumento')||{}).value || '');
+            body.set('pais', (qs('#editClientePais')||{}).value || '');
+            body.set('cep', (qs('#editClienteCep')||{}).value || '');
+            body.set('endereco', (qs('#editClienteEndereco')||{}).value || '');
+            body.set('numero', (qs('#editClienteNumero')||{}).value || '');
+            body.set('complemento', (qs('#editClienteComplemento')||{}).value || '');
+            body.set('bairro', (qs('#editClienteBairro')||{}).value || '');
+            body.set('cidade', (qs('#editClienteCidade')||{}).value || '');
+            body.set('estado', (qs('#editClienteEstado')||{}).value || '');
+
+            fetch('/admin/pedidos/atualizar-cliente/' + encodeURIComponent(String(pedidoId)), {
+                method: 'POST',
+                headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                body: body.toString()
+            })
+            .then(function(r){ return r.json().catch(function(){ return null; }); })
+            .then(function(j){
+                if(!j || !j.success){
+                    setAlert((j && j.error) ? j.error : 'Falha ao salvar', 'alert-warning');
+                    btnSave.disabled = false;
+                    return;
+                }
+                setAlert('Dados atualizados. Recarregue a página para ver tudo refletido.', 'alert-success');
+                btnSave.disabled = false;
+            })
+            .catch(function(){
+                setAlert('Erro de rede ao salvar', 'alert-warning');
                 btnSave.disabled = false;
             });
         });
@@ -3236,7 +3456,12 @@ HTML;
                                             <tr><td><strong>ID</strong></td><td>' . $pedido['id'] . '</td></tr>
                                             <tr><td><strong>Número Pedido</strong></td><td>' . htmlspecialchars($pedido['codigo_pedido'] ?? $pedido['numero_pedido']) . '</td></tr>
                                             <tr><td><strong>Status</strong></td><td><span class="badge status-' . $pedido['status'] . '">' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</span></td></tr>
-                                            <tr><td><strong>Nome Cliente</strong></td><td>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</td></tr>
+                                            <tr><td><strong>Nome Cliente</strong></td><td>'
+                                                . '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">'
+                                                . '<div>' . htmlspecialchars($pedido['cliente_nome'] ?? $pedido['nome']) . '</div>'
+                                                . '<div><a href="#" class="btn btn-sm btn-outline-primary" id="btnAbrirEditarClientePedido"><i class="fas fa-pen-to-square me-1"></i>Editar dados</a></div>'
+                                                . '</div>'
+                                                . '</td></tr>
                                             <tr><td><strong>CPF</strong></td><td>'
                                                 . (
                                                     !empty($pedido['cliente_cpf_cnpj'])
