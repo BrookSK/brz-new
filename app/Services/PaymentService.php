@@ -172,6 +172,60 @@ class PaymentService {
             ],
         ];
 
+        $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
+            $msg = (string) ($resp['message'] ?? $defaultMsg);
+            $details = '';
+            try {
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $flat = [];
+                    foreach ($errs as $k => $v) {
+                        if (is_array($v)) {
+                            foreach ($v as $vv) {
+                                if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                            }
+                        } elseif (is_scalar($v) && (string) $v !== '') {
+                            $flat[] = (string) $v;
+                        }
+                    }
+                    $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                    if (!empty($flat)) {
+                        $details = ' | ' . implode(' | ', $flat);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+            return 'Câmbio Real: ' . $msg . $details;
+        };
+
+        $isEmailInUseError = static function(array $resp): bool {
+            $hay = '';
+            try {
+                $hay .= ' ' . (string) ($resp['message'] ?? '');
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $hay .= ' ' . json_encode($errs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            } catch (\Exception $e) {
+            }
+            $hay = strtolower($hay);
+            return (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false));
+        };
+
+        $makePlusEmail = static function(string $email, int $pedidoId): string {
+            $email = trim($email);
+            if ($email === '' || strpos($email, '@') === false) return '';
+            [$local, $domain] = explode('@', $email, 2);
+            $local = trim($local);
+            $domain = trim($domain);
+            if ($local === '' || $domain === '') return '';
+            if (strpos($local, '+') !== false) {
+                $local = explode('+', $local, 2)[0];
+            }
+            $tag = 'pix' . $pedidoId . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
+            return $local . '+' . $tag . '@' . $domain;
+        };
+
         try {
             $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
@@ -627,6 +681,15 @@ class PaymentService {
         // order_id precisa ser único por tentativa. Em reemissões, reutilizar o mesmo order_id pode causar erro no gateway.
         $orderId = (string) ($pedidoId . '-produto-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 8));
 
+        $emailUsed = '';
+        try {
+            if (isset($customer['email']) && is_string($customer['email'])) {
+                $emailUsed = trim((string) $customer['email']);
+            }
+        } catch (\Exception $e) {
+            $emailUsed = '';
+        }
+
         $payload = [
             'order_id' => $orderId,
             // Para PIX, queremos que o QR gere exatamente o valor em BRL do seu checkout.
@@ -652,6 +715,60 @@ class PaymentService {
             ],
         ];
 
+        $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
+            $msg = (string) ($resp['message'] ?? $defaultMsg);
+            $details = '';
+            try {
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $flat = [];
+                    foreach ($errs as $k => $v) {
+                        if (is_array($v)) {
+                            foreach ($v as $vv) {
+                                if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                            }
+                        } elseif (is_scalar($v) && (string) $v !== '') {
+                            $flat[] = (string) $v;
+                        }
+                    }
+                    $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                    if (!empty($flat)) {
+                        $details = ' | ' . implode(' | ', $flat);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+            return 'Câmbio Real: ' . $msg . $details;
+        };
+
+        $isEmailInUseError = static function(array $resp): bool {
+            $hay = '';
+            try {
+                $hay .= ' ' . (string) ($resp['message'] ?? '');
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $hay .= ' ' . json_encode($errs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            } catch (\Exception $e) {
+            }
+            $hay = strtolower($hay);
+            return (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false));
+        };
+
+        $makePlusEmail = static function(string $email, int $pedidoId): string {
+            $email = trim($email);
+            if ($email === '' || strpos($email, '@') === false) return '';
+            [$local, $domain] = explode('@', $email, 2);
+            $local = trim($local);
+            $domain = trim($domain);
+            if ($local === '' || $domain === '') return '';
+            if (strpos($local, '+') !== false) {
+                $local = explode('+', $local, 2)[0];
+            }
+            $tag = 'pix' . $pedidoId . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
+            return $local . '+' . $tag . '@' . $domain;
+        };
+
         try {
             $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
@@ -659,29 +776,53 @@ class PaymentService {
 
             $status = strtolower(trim((string) ($resp['status'] ?? '')));
             if ($status !== '' && $status !== 'success') {
-                $msg = (string) ($resp['message'] ?? 'Falha ao criar PIX no Câmbio Real');
-                $details = '';
-                try {
-                    $errs = $resp['errors'] ?? null;
-                    if (is_array($errs)) {
-                        $flat = [];
-                        foreach ($errs as $k => $v) {
-                            if (is_array($v)) {
-                                foreach ($v as $vv) {
-                                    if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
-                                }
-                            } elseif (is_scalar($v) && (string) $v !== '') {
-                                $flat[] = (string) $v;
-                            }
-                        }
-                        $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
-                        if (!empty($flat)) {
-                            $details = ' | ' . implode(' | ', $flat);
-                        }
+                if ($isEmailInUseError($resp)) {
+                    $originalEmail = '';
+                    try {
+                        $originalEmail = (string) (($payload['client']['email'] ?? '') ?: '');
+                    } catch (\Exception $e) {
+                        $originalEmail = '';
                     }
-                } catch (\Exception $e) {
+                    $altEmail = $makePlusEmail($originalEmail, $pedidoId);
+                    if ($altEmail !== '') {
+                        $payloadRetry = $payload;
+                        $payloadRetry['client']['email'] = $altEmail;
+                        $resp2 = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payloadRetry);
+                        $data2 = is_array($resp2['data'] ?? null) ? (array) $resp2['data'] : [];
+                        $tx2 = is_array($data2['transaction'] ?? null) ? (array) $data2['transaction'] : [];
+                        $status2 = strtolower(trim((string) ($resp2['status'] ?? '')));
+                        if ($status2 === '' || $status2 === 'success') {
+                            $resp = $resp2;
+                            $data = $data2;
+                            $tx = $tx2;
+                            $emailUsed = $altEmail;
+                        } else {
+                            return [
+                                'success' => false,
+                                'error' => $buildErrorMessage($resp2, 'Falha ao criar PIX no Câmbio Real'),
+                                'raw' => $resp2,
+                                'order_id' => $orderId,
+                                'email_used' => $altEmail,
+                            ];
+                        }
+                    } else {
+                        return [
+                            'success' => false,
+                            'error' => $buildErrorMessage($resp, 'Falha ao criar PIX no Câmbio Real'),
+                            'raw' => $resp,
+                            'order_id' => $orderId,
+                            'email_used' => $emailUsed,
+                        ];
+                    }
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => $buildErrorMessage($resp, 'Falha ao criar PIX no Câmbio Real'),
+                        'raw' => $resp,
+                        'order_id' => $orderId,
+                        'email_used' => $emailUsed,
+                    ];
                 }
-                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg . $details, 'raw' => $resp, 'order_id' => $orderId];
             }
 
             $paymentId = (string) ($data['id'] ?? '');
@@ -719,6 +860,7 @@ class PaymentService {
                 'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'AGUARDANDO_CLIENTE',
                 'metadata' => json_encode([
                     'raw' => $resp,
+                    'email_used' => $emailUsed,
                     'amount_brl_sent' => round($valorBrlOriginal, 2),
                     'transaction_amount_brl_returned' => (float) ($tx['amount'] ?? 0),
                     'take_rates_sent' => 1,
@@ -731,6 +873,7 @@ class PaymentService {
                 'payment_id' => $paymentId,
                 'invoice_url' => $invoiceUrl,
                 'order_id' => $orderId,
+                'email_used' => $emailUsed,
                 'pix' => [
                     'encodedImage' => $pixImg !== '' ? $pixImg : null,
                     'payload' => $pixPayload !== '' ? $pixPayload : null,

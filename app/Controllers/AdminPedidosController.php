@@ -5781,6 +5781,7 @@ HTML;
                         'success' => false,
                         'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real'),
                         'order_id' => (string) ($cr['order_id'] ?? ''),
+                        'email_used' => (string) ($cr['email_used'] ?? ''),
                     ], 400);
                     return;
                 }
@@ -5813,6 +5814,7 @@ HTML;
                     'payment_id' => $paymentId,
                     'invoice_url' => $invoiceUrl,
                     'order_id' => (string) ($cr['order_id'] ?? ''),
+                    'email_used' => (string) ($cr['email_used'] ?? ''),
                     'qr_base64' => $qr,
                     'payload' => $payload,
                 ]);
