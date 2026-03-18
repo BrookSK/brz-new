@@ -1210,6 +1210,18 @@ class PaymentService {
         if ($token === '' && !empty($payload['data']['token']) && is_string($payload['data']['token'])) {
             $token = (string) $payload['data']['token'];
         }
+        if ($token === '' && !empty($payload['code']) && is_string($payload['code'])) {
+            $token = (string) $payload['code'];
+        }
+        if ($token === '' && !empty($payload['data']['code']) && is_string($payload['data']['code'])) {
+            $token = (string) $payload['data']['code'];
+        }
+        if ($token === '' && !empty($payload['id']) && (is_string($payload['id']) || is_numeric($payload['id']))) {
+            $token = (string) $payload['id'];
+        }
+        if ($token === '' && !empty($payload['data']['id']) && (is_string($payload['data']['id']) || is_numeric($payload['data']['id']))) {
+            $token = (string) $payload['data']['id'];
+        }
         $token = trim($token);
         if ($token === '') {
             return ['success' => false, 'error' => 'Câmbio Real: token ausente no webhook'];
@@ -1221,11 +1233,24 @@ class PaymentService {
         $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? '')));
 
         $internal = 'pending';
-        if (in_array($status, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'SOLICITACAO_FINALIZADA '], true)) {
+        $statusNorm = strtoupper(trim((string) $status));
+        if (
+            in_array($statusNorm, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'SOLICITACAO_FINALIZADA '], true) ||
+            str_contains($statusNorm, 'PAGO') ||
+            str_contains($statusNorm, 'PAG') ||
+            str_contains($statusNorm, 'COMPENS') ||
+            str_contains($statusNorm, 'CONFIRM') ||
+            in_array($statusNorm, ['PAID', 'CONFIRMED', 'APPROVED', 'COMPLETED', 'COMPENSADA', 'COMPENSADO'], true)
+        ) {
             $internal = 'approved';
-        } elseif (in_array($status, ['REFUNDED'], true)) {
+        } elseif (in_array($statusNorm, ['REFUNDED'], true) || str_contains($statusNorm, 'REFUND')) {
             $internal = 'refunded';
-        } elseif (str_contains($status, 'CANCEL') || str_contains($status, 'RECUSADA') || str_contains($status, 'INVALIDA') || str_contains($status, 'EXPIR')) {
+        } elseif (
+            str_contains($statusNorm, 'CANCEL') ||
+            str_contains($statusNorm, 'RECUS') ||
+            str_contains($statusNorm, 'INVALID') ||
+            str_contains($statusNorm, 'EXPIR')
+        ) {
             $internal = 'rejected';
         }
 
@@ -1236,7 +1261,7 @@ class PaymentService {
             $metodoNorm = 'cartao_debito';
         }
 
-        $this->atualizarSplitPorGatewayPaymentId($token, 'cambioreal', $internal, $status);
+        $this->atualizarSplitPorGatewayPaymentId($token, 'cambioreal', $internal, $statusNorm);
         if ($metodoNorm !== '') {
             try {
                 $this->garantirTabelaPedidoPagamentos();
@@ -1244,7 +1269,7 @@ class PaymentService {
                 $st = $db->prepare('UPDATE pedido_pagamentos SET metodo = :m, gateway_status = :gs, metadata = :md, updated_at = NOW() WHERE gateway = :g AND payment_id = :pid');
                 $st->execute([
                     ':m' => (string) $metodoNorm,
-                    ':gs' => (string) $status,
+                    ':gs' => (string) $statusNorm,
                     ':md' => json_encode(['raw' => $tx], JSON_UNESCAPED_UNICODE),
                     ':g' => 'cambioreal',
                     ':pid' => (string) $token,
@@ -1258,7 +1283,7 @@ class PaymentService {
             'gateway' => 'cambioreal',
             'payment_id' => $token,
             'payment_status' => $internal,
-            'gateway_status' => $status,
+            'gateway_status' => $statusNorm,
             'payment_method' => $metodoNorm,
         ];
     }
