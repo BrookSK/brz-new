@@ -317,6 +317,9 @@ class PedidoManualService {
         $usuarioCol = $this->pickFirstExistingColumn($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
         $codigoCol = $this->pickFirstExistingColumn($colsPedidos, ['codigo_pedido', 'numero_pedido']);
         $colTaxa = $this->pickFirstExistingColumn($colsPedidos, ['taxa_servico', 'servicos']);
+        $colSubtotal = $this->pickFirstExistingColumn($colsPedidos, ['subtotal_produtos', 'subtotal']);
+        $colImpostos = $this->pickFirstExistingColumn($colsPedidos, ['valor_impostos', 'impostos']);
+        $colTaxaConversao = $this->pickFirstExistingColumn($colsPedidos, ['taxa_conversao', 'taxa_conversao_utilizada', 'taxaCambio', 'exchange_rate']);
 
         if ($colTotal === '' || $usuarioCol === '') {
             throw new \Exception('Tabela pedidos incompatível (sem total/usuario_id)');
@@ -328,6 +331,9 @@ class PedidoManualService {
         if ($colMoeda !== '') $selectCols[] = $colMoeda . ' AS moeda';
         if ($codigoCol !== '') $selectCols[] = $codigoCol . ' AS codigo_pedido';
         if ($colTaxa !== '') $selectCols[] = $colTaxa . ' AS taxa_servico';
+        if ($colSubtotal !== '') $selectCols[] = $colSubtotal . ' AS subtotal_produtos';
+        if ($colImpostos !== '') $selectCols[] = $colImpostos . ' AS valor_impostos';
+        if ($colTaxaConversao !== '') $selectCols[] = $colTaxaConversao . ' AS taxa_conversao';
 
         $stmt = $this->db->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
         $stmt->execute([$pedidoId]);
@@ -354,8 +360,21 @@ class PedidoManualService {
 
         $taxaServico = (float) ($pedido['taxa_servico'] ?? 0);
         if ($taxaServico < 0) $taxaServico = 0.0;
-        $valorProduto = round(max(0.0, $total - $taxaServico), 2);
+        $subtotalProdutos = (float) ($pedido['subtotal_produtos'] ?? 0);
+        $valorImpostos = (float) ($pedido['valor_impostos'] ?? 0);
+        if ($subtotalProdutos < 0) $subtotalProdutos = 0.0;
+        if ($valorImpostos < 0) $valorImpostos = 0.0;
+
+        // Mesma regra do checkout (split BRL):
+        // - Produtos: subtotal_produtos (quando existe). Senão, (total - taxa_servico - impostos)
+        // - AppMax: taxa_servico + impostos
+        if ($subtotalProdutos > 0) {
+            $valorProduto = round(max(0.0, $subtotalProdutos), 2);
+        } else {
+            $valorProduto = round(max(0.0, $total - $taxaServico - $valorImpostos), 2);
+        }
         $valorTaxa = round(max(0.0, $taxaServico), 2);
+        $valorAppmax = round(max(0.0, $valorTaxa + $valorImpostos), 2);
         if ($valorProduto <= 0 && $valorTaxa <= 0) {
             throw new \Exception('Valores inválidos para split');
         }
@@ -390,30 +409,66 @@ class PedidoManualService {
 
         $pg = new PaymentService();
 
-        // 1) Produto via Mercado Pago
-        $mp = null;
+        // 1) Produto via Câmbio Real (PIX/BOLETO) (igual checkout)
+        $cr = null;
         if ($valorProduto > 0) {
-            $payer = [];
-            if (trim($email) !== '') {
-                $payer['email'] = trim($email);
-            }
-            $mp = $pg->createMercadoPagoCheckoutPreferenceProduto(
-                $pedidoId,
-                $valorProduto,
-                'Pedido manual #' . $codigoPedido . ' (produtos)',
-                $payer
-            );
-            if (empty($mp['success'])) {
-                throw new \Exception((string) ($mp['error'] ?? 'Falha ao gerar link Mercado Pago'));
+            $descricaoProduto = 'Pedido manual #' . $codigoPedido . ' (produtos)';
+            $client = [
+                'name' => $nome !== '' ? $nome : 'Cliente',
+                'email' => $email,
+                'document' => $documento,
+                'phone' => $telefone,
+                'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+            ];
+
+            if ($billingType === 'PIX') {
+                $tx = (float) ($pedido['taxa_conversao'] ?? 0);
+                if ($tx <= 1.01) {
+                    $tx = $this->getTaxaConversaoUSDBRL();
+                }
+                if ($tx <= 0) {
+                    $tx = 1.0;
+                }
+
+                $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                if ($amountUsd <= 0) {
+                    throw new \Exception('Valor inválido para Câmbio Real (USD)');
+                }
+
+                $cr = $pg->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProduto, (string) $descricaoProduto, $client);
+                if (empty($cr['success'])) {
+                    throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
+                }
+            } else {
+                $cr = $pg->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $client);
+                if (empty($cr['success'])) {
+                    throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar boleto Câmbio Real (produto)'));
+                }
             }
         }
 
-        // 2) Taxa via AppMax (PIX/BOLETO)
+        // 2) Taxas + impostos via AppMax (PIX/BOLETO) (igual checkout)
         $taxa = null;
-        if ($valorTaxa > 0) {
-            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, $billingType, $valorTaxa, $nome, $email, $telefone, $documento, $codigoPedido);
+        if ($valorAppmax > 0) {
+            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, $billingType, $valorAppmax, $nome, $email, $telefone, $documento, $codigoPedido);
             if (empty($taxa['success'])) {
                 throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança AppMax (taxa)'));
+            }
+
+            // Replicar registro do componente imposto apontando para o mesmo payment_id da AppMax (SPLIT_ITEM)
+            $appmaxPaymentId = (string) ($taxa['payment_id'] ?? '');
+            if ($appmaxPaymentId !== '' && $valorImpostos > 0) {
+                $pg->registrarPedidoPagamentoSplit([
+                    'pedido_id' => (int) $pedidoId,
+                    'componente' => 'imposto',
+                    'gateway' => 'appmax',
+                    'metodo' => strtolower((string) $billingType),
+                    'moeda' => 'BRL',
+                    'valor' => (float) $valorImpostos,
+                    'payment_id' => $appmaxPaymentId,
+                    'status' => 'pending',
+                    'gateway_status' => 'SPLIT_ITEM',
+                ]);
             }
         }
 
@@ -422,8 +477,17 @@ class PedidoManualService {
             'split' => true,
             'pedido_id' => $pedidoId,
             'moeda' => 'BRL',
-            'produto' => $mp,
+            'produto' => $cr,
             'taxa' => $taxa,
+            'imposto' => [
+                'success' => true,
+                'gateway' => 'appmax',
+                'metodo' => strtolower((string) $billingType),
+                'moeda' => 'BRL',
+                'valor' => (float) $valorImpostos,
+                'payment_id' => is_array($taxa) ? (string) ($taxa['payment_id'] ?? '') : '',
+                'status' => 'pending',
+            ],
         ];
     }
 
