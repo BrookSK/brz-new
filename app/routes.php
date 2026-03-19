@@ -56,6 +56,8 @@ $router->post('/login', 'AuthController', 'login');
 $router->get('/loginadmin', 'AuthController', 'loginAdmin');
 $router->post('/loginadmin', 'AuthController', 'loginAdmin');
 $router->get('/logout', 'AuthController', 'logout');
+$router->get('/impersonacao/sair', 'AuthController', 'sairImpersonacao');
+$router->post('/impersonacao/sair', 'AuthController', 'sairImpersonacao');
 $router->get('/lang/{locale}', 'LangController', 'set');
 $router->get('/recuperar-senha', 'AuthController', 'recuperarSenha');
 $router->post('/recuperar-senha', 'AuthController', 'recuperarSenha');

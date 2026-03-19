@@ -131,6 +131,14 @@ function getUserStatusLabel($status) {
                                     <td><?= date('d/m/Y H:i', strtotime($usuario['created_at'] ?? $usuario['data_criacao'] ?? 'now')) ?></td>
                                     <td>
                                         <div class="btn-group" role="group">
+                                            <?php if (($usuario['perfil'] ?? '') === 'cliente'): ?>
+                                                <form method="POST" action="/admin/usuarios/impersonar/<?= (int) $usuario['id'] ?>" style="display: inline;">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((new \App\Services\AuthService())->getCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Logar como">
+                                                        <i class="fas fa-user-secret"></i>
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
                                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarUsuario(<?= $usuario['id'] ?>)">
                                                 <i class="fas fa-edit"></i>
                                             </button>

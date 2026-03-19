@@ -38,6 +38,23 @@ class AdminUsuariosViews {
             $perfilBadge = 'bg-light text-dark';
         }
 
+        $csrf = '';
+        try {
+            $csrf = (new \App\Services\AuthService())->getCSRFToken();
+        } catch (\Exception $e) {
+            $csrf = '';
+        }
+
+        $btnImpersonar = '';
+        if ($perfil === 'cliente') {
+            $btnImpersonar = '<form method="POST" action="/admin/usuarios/impersonar/' . (int) $usuario['id'] . '" style="display: inline;">'
+                . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) $csrf) . '">' 
+                . '<button type="submit" class="btn btn-sm btn-outline-secondary" title="Logar como">'
+                . '<i class="fas fa-user-secret"></i>'
+                . '</button>'
+                . '</form>';
+        }
+
         return '
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card user-card h-100">
@@ -72,6 +89,7 @@ class AdminUsuariosViews {
                                 <i class="fas fa-eye me-1"></i>Ver
                             </a>
                             <div>
+                                ' . $btnImpersonar . '
                                 <button type="button" class="btn btn-sm btn-success" onclick="adicionarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
                                     <i class="fas fa-dollar-sign"></i>
                                 </button>

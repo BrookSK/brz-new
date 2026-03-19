@@ -61,6 +61,7 @@ $router->get('/admin/usuarios/editar/{id}', 'AdminUsuariosController', 'editar')
 $router->post('/admin/usuarios/atualizar/{id}', 'AdminUsuariosController', 'atualizar');
 $router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');
 $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');
+$router->post('/admin/usuarios/impersonar/{id}', 'AdminUsuariosController', 'impersonar');
 
 // Pagamentos
 $router->get('/admin/pagamentos', 'AdminPagamentosController', 'index');

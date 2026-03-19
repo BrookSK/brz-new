@@ -842,6 +842,20 @@
     </style>
 </head>
 <body>
+    <?php
+    $imp = $_SESSION['impersonation'] ?? null;
+    $impActive = (is_array($imp) && !empty($imp['active']) && !empty($imp['admin_user']) && is_array($imp['admin_user'] ?? null));
+    $impAdminName = $impActive ? (string) (($imp['admin_user']['nome'] ?? '') ?: ($imp['admin_user']['email'] ?? '')) : '';
+    ?>
+    <?php if ($impActive): ?>
+        <div style="position: fixed; right: 16px; bottom: 16px; z-index: 2147483646; max-width: 360px;">
+            <div style="background: rgba(11, 31, 58, 0.95); color: #fff; border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 36px rgba(0,0,0,0.25);">
+                <div style="font-weight: 700; margin-bottom: 6px;">Você está logado como cliente</div>
+                <div style="font-size: 13px; opacity: 0.92; margin-bottom: 10px;">Voltar para: <?= htmlspecialchars($impAdminName, ENT_QUOTES, 'UTF-8') ?></div>
+                <a href="/impersonacao/sair" style="display: inline-block; background: #fff; color: #0b1f3a; text-decoration: none; padding: 8px 12px; border-radius: 10px; font-weight: 700;">Voltar para meu perfil</a>
+            </div>
+        </div>
+    <?php endif; ?>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid px-3">

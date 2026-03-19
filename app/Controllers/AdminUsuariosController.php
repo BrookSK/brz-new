@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Services\AuthService;
+use App\Models\Usuario;
 
 class AdminUsuariosController extends Controller {
     
@@ -742,5 +743,120 @@ class AdminUsuariosController extends Controller {
             echo '<a href="/admin/usuarios/detalhes/' . $id . '" class="btn btn-secondary">Voltar</a>';
             exit;
         }
+    }
+
+    public function impersonar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'suporte', 'vendedor']);
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        if (!empty($_SESSION['impersonation']['active'])) {
+            $_SESSION['message'] = 'Impersonação já está ativa.';
+            $_SESSION['message_type'] = 'warning';
+            header('Location: /admin/usuarios');
+            exit;
+        }
+
+        $id = (int) $request->getParam('id');
+        if ($id <= 0) {
+            $_SESSION['message'] = 'Usuário inválido.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/usuarios');
+            exit;
+        }
+
+        $csrf = (string) $request->getParam('csrf_token', '');
+        if (!$auth->validarCSRF($csrf)) {
+            $_SESSION['message'] = 'Token de segurança inválido.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/usuarios');
+            exit;
+        }
+
+        $admin = $auth->getUsuarioLogado();
+        if (!$admin) {
+            header('Location: /loginadmin');
+            exit;
+        }
+
+        $adminPerfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
+        $adminRole = strtolower(trim((string) ($admin['role'] ?? '')));
+        if (!in_array($adminPerfil, ['admin', 'suporte', 'vendedor'], true) && !in_array($adminRole, ['admin', 'suporte', 'vendedor'], true)) {
+            $_SESSION['message'] = 'Acesso negado.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/usuarios');
+            exit;
+        }
+
+        $uModel = new Usuario();
+        $target = $uModel->find($id);
+        if (!is_array($target) || empty($target['id'])) {
+            $_SESSION['message'] = 'Usuário não encontrado.';
+            $_SESSION['message_type'] = 'danger';
+            header('Location: /admin/usuarios');
+            exit;
+        }
+
+        $targetPerfil = strtolower(trim((string) ($target['perfil'] ?? ($target['role'] ?? 'cliente'))));
+        if ($targetPerfil !== 'cliente') {
+            $_SESSION['message'] = 'Você só pode logar como clientes.';
+            $_SESSION['message_type'] = 'warning';
+            header('Location: /admin/usuarios');
+            exit;
+        }
+
+        // Salvar snapshot do admin para restaurar depois
+        $rememberToken = '';
+        try {
+            if (isset($_COOKIE['remember_token']) && is_string($_COOKIE['remember_token'])) {
+                $rememberToken = (string) $_COOKIE['remember_token'];
+            }
+        } catch (\Exception $e) {
+            $rememberToken = '';
+        }
+        $_SESSION['impersonation'] = [
+            'active' => true,
+            'admin_user' => [
+                'id' => (int) ($admin['id'] ?? 0),
+                'nome' => (string) ($admin['nome'] ?? ''),
+                'email' => (string) ($admin['email'] ?? ''),
+                'documento' => (string) ($admin['documento'] ?? ''),
+                'perfil' => (string) ($admin['perfil'] ?? ''),
+                'role' => (string) ($admin['role'] ?? ''),
+                'avatar' => $admin['avatar'] ?? null,
+            ],
+            'target_user_id' => (int) $target['id'],
+            'started_at' => time(),
+            'remember_token' => $rememberToken,
+        ];
+
+        if ($rememberToken !== '') {
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie('remember_token', '', [
+                    'expires' => time() - 3600,
+                    'path' => '/',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                setcookie('remember_token', '', time() - 3600, '/; samesite=Lax', '', $secure, true);
+            }
+        }
+
+        try {
+            $auth->registrarLogAuditoria((int) ($admin['id'] ?? 0), 'impersonacao_iniciar', 'usuarios', (int) $target['id'], null, ['target_user_id' => (int) $target['id']]);
+        } catch (\Exception $e) {
+        }
+
+        // Trocar sessão para o cliente sem emitir remember_token
+        $auth->criarSessaoSemRemember($target);
+
+        header('Location: /minha-conta');
+        exit;
     }
 }

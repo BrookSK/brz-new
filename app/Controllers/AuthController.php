@@ -1308,6 +1308,65 @@ class AuthController extends Controller {
 
         $this->redirect('/login');
     }
+
+    public function sairImpersonacao(Request $request) {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $imp = $_SESSION['impersonation'] ?? null;
+        if (!is_array($imp) || empty($imp['active']) || empty($imp['admin_user']) || !is_array($imp['admin_user'])) {
+            $this->redirect('/');
+            return;
+        }
+
+        $adminUser = (array) $imp['admin_user'];
+        $adminId = (int) ($adminUser['id'] ?? 0);
+        $targetUserId = (int) ($imp['target_user_id'] ?? 0);
+        $rememberToken = '';
+        if (isset($imp['remember_token']) && is_string($imp['remember_token'])) {
+            $rememberToken = (string) $imp['remember_token'];
+        }
+
+        try {
+            $this->authService->registrarLogAuditoria($adminId, 'impersonacao_finalizar', 'usuarios', $targetUserId > 0 ? $targetUserId : null, ['target_user_id' => $targetUserId], null);
+        } catch (\Exception $e) {
+        }
+
+        unset($_SESSION['impersonation']);
+
+        // Restaurar sessão do admin (sem necessidade de senha)
+        $this->authService->criarSessaoSemRemember([
+            'id' => $adminId,
+            'nome' => (string) ($adminUser['nome'] ?? ''),
+            'email' => (string) ($adminUser['email'] ?? ''),
+            'documento' => (string) ($adminUser['documento'] ?? ''),
+            'perfil' => (string) ($adminUser['perfil'] ?? ''),
+            'role' => (string) ($adminUser['role'] ?? ''),
+            'avatar' => $adminUser['avatar'] ?? null,
+        ]);
+
+        if ($rememberToken !== '') {
+            $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+            $ttl = 60 * 60 * 24 * 7;
+            if (PHP_VERSION_ID >= 70300) {
+                setcookie('remember_token', $rememberToken, [
+                    'expires' => time() + $ttl,
+                    'path' => '/',
+                    'secure' => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                setcookie('remember_token', $rememberToken, time() + $ttl, '/; samesite=Lax', '', $secure, true);
+            }
+        }
+
+        $_SESSION['message'] = 'Você voltou para seu perfil.';
+        $_SESSION['message_type'] = 'success';
+
+        $this->redirect('/admin/dashboard');
+    }
     
     public function register(Request $request) {
         if ($this->authService->estaLogado()) {

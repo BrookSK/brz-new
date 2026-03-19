@@ -72,6 +72,14 @@ class AuthService {
             // se falhar, mantém sessão como fallback
         }
     }
+
+    public function estaLogado() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        return isset($_SESSION['logado']) && $_SESSION['logado'] === true;
+    }
     
     public function login($email, $senha) {
         $usuario = $this->usuarioModel->authenticate($email, $senha);
@@ -219,7 +227,7 @@ class AuthService {
             }
         } catch (\Throwable $e) {
         }
-        
+
         // Gerar CSRF token
         if (!isset($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -227,20 +235,64 @@ class AuthService {
 
         $this->mergeSessionCartToUser((int) ($usuario['id'] ?? 0));
     }
-    
-    public function estaLogado() {
+
+    public function criarSessaoSemRemember($usuario) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        
-        return isset($_SESSION['logado']) && $_SESSION['logado'] === true;
+
+        $_SESSION['usuario_id'] = $usuario['id'];
+
+        $sessNome = '';
+        foreach (['nome', 'name', 'full_name', 'fullname', 'usuario_nome'] as $k) {
+            $v = $usuario[$k] ?? '';
+            if (is_string($v) && trim($v) !== '') {
+                $sessNome = trim($v);
+                break;
+            }
+        }
+        $_SESSION['usuario_nome'] = $sessNome;
+        $_SESSION['usuario_email'] = $usuario['email'];
+
+        $docSess = '';
+        if (isset($usuario['documento'])) {
+            $docSess = preg_replace('/\D+/', '', (string) $usuario['documento']);
+        } elseif (isset($usuario['cpf'])) {
+            $docSess = preg_replace('/\D+/', '', (string) $usuario['cpf']);
+        }
+        $_SESSION['usuario_documento'] = $docSess;
+
+        $perfil = (string) ($usuario['perfil'] ?? '');
+        $role = (string) ($usuario['role'] ?? '');
+        $_SESSION['usuario_perfil'] = $perfil !== '' ? $perfil : $role;
+        $_SESSION['usuario_role'] = $role !== '' ? $role : $perfil;
+
+        $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];
+        $avatarUrl = null;
+        foreach ($avatarCandidates as $c) {
+            if (!empty($usuario[$c]) && is_string($usuario[$c])) {
+                $avatarUrl = $usuario[$c];
+                break;
+            }
+        }
+        $_SESSION['usuario_avatar'] = $avatarUrl;
+
+        $_SESSION['logado'] = true;
+        $_SESSION['ultimo_acesso'] = time();
+
+        // Gerar CSRF token
+        if (!isset($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+
+        $this->mergeSessionCartToUser((int) ($usuario['id'] ?? 0));
     }
-    
+
     public function getUsuarioLogado() {
         if (!$this->estaLogado()) {
             return null;
         }
-        
+
         return [
             'id' => $_SESSION['usuario_id'],
             'nome' => $_SESSION['usuario_nome'],
