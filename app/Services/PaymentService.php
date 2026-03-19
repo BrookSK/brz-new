@@ -193,7 +193,7 @@ class PaymentService {
                         $details = ' | ' . implode(' | ', $flat);
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
             }
             return 'Câmbio Real: ' . $msg . $details;
         };
@@ -231,8 +231,52 @@ class PaymentService {
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
             $status = strtolower(trim((string) ($resp['status'] ?? '')));
             if ($status !== '' && $status !== 'success') {
-                $msg = (string) ($resp['message'] ?? 'Falha ao criar boleto no Câmbio Real (Direct API)');
-                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg];
+                if ($isEmailInUseError($resp)) {
+                    $payloadRetry = $payload;
+                    $payloadRetry['duplicate'] = 1;
+                    $resp2 = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payloadRetry);
+                    $status2 = strtolower(trim((string) ($resp2['status'] ?? '')));
+                    if ($status2 === '' || $status2 === 'success') {
+                        $resp = $resp2;
+                        $data = is_array($resp2['data'] ?? null) ? (array) $resp2['data'] : [];
+                    } else {
+                        $originalEmail = '';
+                        try {
+                            $originalEmail = (string) (($payload['client']['email'] ?? '') ?: '');
+                        } catch (\Throwable $e) {
+                            $originalEmail = '';
+                        }
+                        $altEmail = $makePlusEmail($originalEmail, $pedidoId);
+                        if ($altEmail !== '') {
+                            $payloadRetry2 = $payloadRetry;
+                            $payloadRetry2['client']['email'] = $altEmail;
+                            $resp3 = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payloadRetry2);
+                            $status3 = strtolower(trim((string) ($resp3['status'] ?? '')));
+                            if ($status3 === '' || $status3 === 'success') {
+                                $resp = $resp3;
+                                $data = is_array($resp3['data'] ?? null) ? (array) $resp3['data'] : [];
+                            } else {
+                                return [
+                                    'success' => false,
+                                    'error' => $buildErrorMessage($resp3, 'Falha ao criar boleto no Câmbio Real (Direct API)'),
+                                    'raw' => $resp3,
+                                ];
+                            }
+                        } else {
+                            return [
+                                'success' => false,
+                                'error' => $buildErrorMessage($resp2, 'Falha ao criar boleto no Câmbio Real (Direct API)'),
+                                'raw' => $resp2,
+                            ];
+                        }
+                    }
+                } else {
+                return [
+                    'success' => false,
+                    'error' => $buildErrorMessage($resp, 'Falha ao criar boleto no Câmbio Real (Direct API)'),
+                    'raw' => $resp,
+                ];
+                }
             }
 
             $paymentId = (string) ($data['id'] ?? '');
@@ -488,7 +532,28 @@ class PaymentService {
             $status = strtolower(trim((string) ($resp['status'] ?? '')));
             if ($status !== '' && $status !== 'success') {
                 $msg = (string) ($resp['message'] ?? 'Falha ao criar pagamento no Câmbio Real (Direct API)');
-                return ['success' => false, 'error' => $msg, 'raw' => $resp];
+                $details = '';
+                try {
+                    $errs = $resp['errors'] ?? null;
+                    if (is_array($errs)) {
+                        $flat = [];
+                        foreach ($errs as $k => $v) {
+                            if (is_array($v)) {
+                                foreach ($v as $vv) {
+                                    if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                                }
+                            } elseif (is_scalar($v) && (string) $v !== '') {
+                                $flat[] = (string) $v;
+                            }
+                        }
+                        $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                        if (!empty($flat)) {
+                            $details = ' | ' . implode(' | ', $flat);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg . $details, 'raw' => $resp];
             }
 
             $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
@@ -612,13 +677,111 @@ class PaymentService {
             ],
         ];
 
+        $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
+            $msg = (string) ($resp['message'] ?? $defaultMsg);
+            $details = '';
+            try {
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $flat = [];
+                    foreach ($errs as $k => $v) {
+                        if (is_array($v)) {
+                            foreach ($v as $vv) {
+                                if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                            }
+                        } elseif (is_scalar($v) && (string) $v !== '') {
+                            $flat[] = (string) $v;
+                        }
+                    }
+                    $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                    if (!empty($flat)) {
+                        $details = ' | ' . implode(' | ', $flat);
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+            return 'Câmbio Real: ' . $msg . $details;
+        };
+
+        $isEmailInUseError = static function(array $resp): bool {
+            $hay = '';
+            try {
+                $hay .= ' ' . (string) ($resp['message'] ?? '');
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $hay .= ' ' . json_encode($errs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            } catch (\Throwable $e) {
+            }
+            $hay = strtolower($hay);
+            return (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false));
+        };
+
+        $makePlusEmail = static function(string $email, int $pedidoId): string {
+            $email = trim($email);
+            if ($email === '' || strpos($email, '@') === false) return '';
+            [$local, $domain] = explode('@', $email, 2);
+            $local = trim($local);
+            $domain = trim($domain);
+            if ($local === '' || $domain === '') return '';
+            if (strpos($local, '+') !== false) {
+                $local = explode('+', $local, 2)[0];
+            }
+            $tag = 'pix' . $pedidoId . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
+            return $local . '+' . $tag . '@' . $domain;
+        };
+
         try {
             $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
             $status = strtolower(trim((string) ($resp['status'] ?? '')));
             if ($status !== '' && $status !== 'success') {
-                $msg = (string) ($resp['message'] ?? 'Falha ao criar transação no Câmbio Real (Direct API)');
-                return ['success' => false, 'error' => 'Câmbio Real: ' . $msg];
+                if ($isEmailInUseError($resp)) {
+                    $payloadRetry = $payload;
+                    $payloadRetry['duplicate'] = 1;
+                    $resp2 = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payloadRetry);
+                    $status2 = strtolower(trim((string) ($resp2['status'] ?? '')));
+                    if ($status2 === '' || $status2 === 'success') {
+                        $resp = $resp2;
+                        $data = is_array($resp2['data'] ?? null) ? (array) $resp2['data'] : [];
+                    } else {
+                        $originalEmail = '';
+                        try {
+                            $originalEmail = (string) (($payload['client']['email'] ?? '') ?: '');
+                        } catch (\Throwable $e) {
+                            $originalEmail = '';
+                        }
+                        $altEmail = $makePlusEmail($originalEmail, $pedidoId);
+                        if ($altEmail !== '') {
+                            $payloadRetry2 = $payloadRetry;
+                            $payloadRetry2['client']['email'] = $altEmail;
+                            $resp3 = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payloadRetry2);
+                            $status3 = strtolower(trim((string) ($resp3['status'] ?? '')));
+                            if ($status3 === '' || $status3 === 'success') {
+                                $resp = $resp3;
+                                $data = is_array($resp3['data'] ?? null) ? (array) $resp3['data'] : [];
+                            } else {
+                                return [
+                                    'success' => false,
+                                    'error' => $buildErrorMessage($resp3, 'Falha ao criar transação no Câmbio Real (Direct API)'),
+                                    'raw' => $resp3,
+                                ];
+                            }
+                        } else {
+                            return [
+                                'success' => false,
+                                'error' => $buildErrorMessage($resp2, 'Falha ao criar transação no Câmbio Real (Direct API)'),
+                                'raw' => $resp2,
+                            ];
+                        }
+                    }
+                } else {
+                return [
+                    'success' => false,
+                    'error' => $buildErrorMessage($resp, 'Falha ao criar transação no Câmbio Real (Direct API)'),
+                    'raw' => $resp,
+                ];
+                }
             }
 
             $paymentId = (string) ($data['id'] ?? '');
@@ -969,6 +1132,22 @@ class PaymentService {
                 $msgSafe = (string) $httpCode;
                 try {
                     $msgSafe = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : (string) $httpCode;
+                    if (is_array($decoded) && isset($decoded['errors']) && is_array($decoded['errors'])) {
+                        $flat = [];
+                        foreach ($decoded['errors'] as $k => $v) {
+                            if (is_array($v)) {
+                                foreach ($v as $vv) {
+                                    if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                                }
+                            } elseif (is_scalar($v) && (string) $v !== '') {
+                                $flat[] = (string) $v;
+                            }
+                        }
+                        $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                        if (!empty($flat)) {
+                            $msgSafe .= ' | ' . implode(' | ', array_slice($flat, 0, 8));
+                        }
+                    }
                 } catch (\Exception $e) {
                 }
                 throw new \Exception('Erro Câmbio Real HTTP ' . $httpCode . ': ' . $msgSafe);
