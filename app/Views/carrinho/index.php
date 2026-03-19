@@ -6,6 +6,12 @@
             <?php if (empty($carrinho)): ?>
                 <?php include __DIR__ . '/vazio.php'; ?>
             <?php else: ?>
+                <?php $hasCartChanges = !empty($cart_changes) && is_array($cart_changes); ?>
+                <?php if ($hasCartChanges): ?>
+                    <div class="alert alert-warning">
+                        <strong>Atenção:</strong> alguns produtos do seu carrinho tiveram alterações. Revise os itens marcados antes de finalizar.
+                    </div>
+                <?php endif; ?>
                 <!-- Itens do Carrinho -->
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
@@ -115,6 +121,23 @@
                                             <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                         <?php endif; ?>
                                     </h6>
+                                    <?php if (!empty($item['item_changed'])): ?>
+                                        <div class="alert alert-warning py-2 px-2 mb-2">
+                                            <div class="small">
+                                                <strong>Produto alterado:</strong>
+                                                <?php
+                                                $changed = $item['changed_fields'] ?? [];
+                                                if (!is_array($changed)) $changed = [];
+                                                $labels = [];
+                                                foreach ($changed as $f) {
+                                                    if ($f === 'price') $labels[] = 'preço';
+                                                    if ($f === 'weight') $labels[] = 'peso';
+                                                }
+                                                ?>
+                                                <?= !empty($labels) ? htmlspecialchars(implode(', ', $labels), ENT_QUOTES, 'UTF-8') : 'informações' ?>.
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
                                     <?php if (!empty($item['variacao_descricao'])): ?>
                                         <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
                                     <?php endif; ?>

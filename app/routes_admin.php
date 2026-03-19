@@ -50,9 +50,6 @@ $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'det
 $router->get('/admin/pedidos-wp/export', 'AdminPedidosWpController', 'exportCsv');
 $router->get('/admin/pedidos-wp/export-xlsx', 'AdminPedidosWpController', 'exportXlsx');
  $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
- $router->post('/admin/pedidos-wp/wexpress/regerar/{id}', 'AdminPedidosWpController', 'regerarEtiquetaWexpress');
- $router->get('/admin/pedidos-wp/estatisticas', 'AdminPedidosWpController', 'estatisticas');
- $router->post('/admin/pedidos-wp/autofill-bairro', 'AdminPedidosWpController', 'autofillBairro');
 
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');
@@ -63,6 +60,14 @@ $router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'exclui
 $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');
 $router->post('/admin/usuarios/impersonar/{id}', 'AdminUsuariosController', 'impersonar');
 
+// Rotas de Relatórios
+$router->get('/admin/estoque/relatorios', 'AdminRelatoriosController', 'index');
+$router->get('/admin/estoque/relatorios/financeiro', 'AdminRelatoriosController', 'financeiro');
+$router->get('/admin/estoque/relatorios/financeiro/export', 'AdminRelatoriosController', 'exportFinanceiro');
+$router->get('/admin/estoque/relatorios/movimentacao', 'AdminRelatoriosController', 'movimentacao');
+$router->get('/admin/estoque/relatorios/auditoria', 'AdminRelatoriosController', 'auditoriaLogs');
+$router->get('/admin/estoque/relatorio-pdf', 'AdminRelatoriosController', 'gerarPDF');
+
 // Pagamentos
 $router->get('/admin/pagamentos', 'AdminPagamentosController', 'index');
 $router->post('/admin/pagamentos/confirmar/{id}', 'AdminPagamentosController', 'confirmarPagamento');
@@ -70,7 +75,6 @@ $router->post('/admin/pagamentos/refresh/{id}', 'AdminPagamentosController', 're
 $router->post('/admin/pagamentos/cancelar/{id}', 'AdminPagamentosController', 'cancelarPagamento');
 $router->post('/admin/pagamentos/estornar/{id}', 'AdminPagamentosController', 'estornarPagamento');
 $router->post('/admin/pagamentos/cancelar-pedido/{id}', 'AdminPagamentosController', 'cancelarPedido');
-$router->get('/admin/pagamentos/configuracoes', 'AdminPagamentosController', 'configuracoes');
 $router->post('/admin/pagamentos/salvar-configuracoes', 'AdminPagamentosController', 'salvarConfiguracoes');
 
 // Clube - Recargas (checkout rápido)

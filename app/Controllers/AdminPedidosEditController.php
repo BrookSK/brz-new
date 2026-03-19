@@ -889,6 +889,29 @@ class AdminPedidosEditController extends Controller {
                 return;
             }
 
+            $auth = new AuthService();
+            $usuarioLogado = $auth->getUsuarioLogado();
+            $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
+
+            $oldPedido = [];
+            try {
+                $stOld = $this->connection->prepare('SELECT * FROM pedidos WHERE id = :id LIMIT 1');
+                $stOld->execute([':id' => $pedidoId]);
+                $oldPedido = $stOld->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $oldPedido = [];
+            }
+
+            $oldItensResumo = [];
+            try {
+                $tOld = $this->getItensTableForPedido($pedidoId);
+                $stOldItens = $this->connection->prepare('SELECT produto_id, quantidade, preco_unitario, subtotal FROM ' . $tOld . ' WHERE pedido_id = :id');
+                $stOldItens->execute([':id' => $pedidoId]);
+                $oldItensResumo = $stOldItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $oldItensResumo = [];
+            }
+
             $oldStatus = '';
             try {
                 $stmtOld = $this->connection->prepare('SELECT status FROM pedidos WHERE id = :id LIMIT 1');
@@ -1170,13 +1193,44 @@ class AdminPedidosEditController extends Controller {
             }
 
             $this->connection->commit();
+
+            try {
+                $newPedido = [];
+                try {
+                    $stNew = $this->connection->prepare('SELECT * FROM pedidos WHERE id = :id LIMIT 1');
+                    $stNew->execute([':id' => $pedidoId]);
+                    $newPedido = $stNew->fetch(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $newPedido = [];
+                }
+
+                $newItensResumo = [];
+                try {
+                    $tNew = $this->getItensTableForPedido($pedidoId);
+                    $stNewItens = $this->connection->prepare('SELECT produto_id, quantidade, preco_unitario, subtotal FROM ' . $tNew . ' WHERE pedido_id = :id');
+                    $stNewItens->execute([':id' => $pedidoId]);
+                    $newItensResumo = $stNewItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $newItensResumo = [];
+                }
+
+                $oldPick = [];
+                $newPick = [];
+                foreach (['status', 'peso_total', 'altura', 'largura', 'comprimento', 'total', 'subtotal', 'frete', 'updated_at'] as $k) {
+                    if (is_array($oldPedido) && array_key_exists($k, $oldPedido)) $oldPick[$k] = $oldPedido[$k];
+                    if (is_array($newPedido) && array_key_exists($k, $newPedido)) $newPick[$k] = $newPedido[$k];
+                }
+                $oldPick['itens'] = $oldItensResumo;
+                $newPick['itens'] = $newItensResumo;
+
+                $auth->registrarLogAuditoria($audUsuarioId > 0 ? $audUsuarioId : null, 'pedido_editado', 'pedidos', (int) $pedidoId, $oldPick, $newPick);
+            } catch (\Throwable $e) {
+            }
+
             echo json_encode(['success' => true, 'message' => 'Pedido atualizado com sucesso']);
         } catch (\Exception $e) {
-            try {
-                if ($this->connection && $this->connection->inTransaction()) {
-                    $this->connection->rollBack();
-                }
-            } catch (\Exception $e2) {
+            if ($this->connection->inTransaction()) {
+                $this->connection->rollBack();
             }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }

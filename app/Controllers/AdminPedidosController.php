@@ -28,6 +28,17 @@ class AdminPedidosController extends Controller {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
 
+            $usuarioLogado = $auth->getUsuarioLogado();
+            $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
+            $oldRow = [];
+            try {
+                $stOld = $pdo->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+                $stOld->execute([$pedidoId]);
+                $oldRow = $stOld->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $oldRow = [];
+            }
+
             $pickCol = function(array $candidates) use ($cols): string {
                 foreach ($candidates as $c) {
                     if (is_array($cols) && in_array($c, $cols, true)) {
@@ -85,6 +96,28 @@ class AdminPedidosController extends Controller {
             $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?';
             $st = $pdo->prepare($sql);
             $st->execute($params);
+
+            try {
+                $newRow = [];
+                try {
+                    $stNew = $pdo->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+                    $stNew->execute([$pedidoId]);
+                    $newRow = $stNew->fetch(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $newRow = [];
+                }
+
+                $keys = ['cliente_nome','customer_name','nome','name','cliente_email','customer_email','email','cliente_telefone','customer_phone','telefone','phone','celular','cliente_documento','cliente_cpf_cnpj','cpf_cnpj','documento','customer_document','cpf','pais_entrega','country_entrega','pais','country','customer_country','cep','zipcode','zip_code','customer_zipcode','endereco','logradouro','address','customer_address','numero','address_number','customer_address_number','complemento','address_complement','customer_address_complement','bairro','province','district','customer_province','cidade','city','customer_city','estado','state','customer_state'];
+                $oldPick = [];
+                $newPick = [];
+                foreach ($keys as $k) {
+                    if (is_array($oldRow) && array_key_exists($k, $oldRow)) $oldPick[$k] = $oldRow[$k];
+                    if (is_array($newRow) && array_key_exists($k, $newRow)) $newPick[$k] = $newRow[$k];
+                }
+
+                $auth->registrarLogAuditoria($audUsuarioId > 0 ? $audUsuarioId : null, 'pedido_atualizado_cliente', 'pedidos', (int) $pedidoId, $oldPick, $newPick);
+            } catch (\Throwable $e) {
+            }
 
             $this->json(['success' => true]);
         } catch (\Exception $e) {

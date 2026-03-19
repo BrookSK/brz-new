@@ -1811,7 +1811,7 @@ HTML;
                 }
             }
 
-            $pdo->commit();
+            
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['ok' => true, 'fotos' => $inserted]);
             exit;
@@ -3981,6 +3981,17 @@ HTMLSCRIPT;
             $pdo->beginTransaction();
             $cols = $this->getTableColumns($pdo, 'produtos');
 
+            $usuarioLogado = $auth->getUsuarioLogado();
+            $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
+            $oldRow = [];
+            try {
+                $stOld = $pdo->prepare('SELECT * FROM produtos WHERE id = ? LIMIT 1');
+                $stOld->execute([(int) $id]);
+                $oldRow = $stOld->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                $oldRow = [];
+            }
+
             $perfil = $this->getSessionPerfil();
             $repId = $this->getSessionUserId();
             $repEmail = $this->getSessionUserEmail();
@@ -4133,6 +4144,29 @@ HTMLSCRIPT;
             }
             
             $pdo->commit();
+
+            // Auditoria: registrar diferenças principais (não bloquear o fluxo)
+            try {
+                $newRow = [];
+                try {
+                    $stNew = $pdo->prepare('SELECT * FROM produtos WHERE id = ? LIMIT 1');
+                    $stNew->execute([(int) $id]);
+                    $newRow = $stNew->fetch(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $newRow = [];
+                }
+
+                $keys = ['name','sku','loja','ncm','description','short_description','category_id','price','cost_price','sale_price','stock','min_stock','weight','status','active','featured','foto_principal','loja_id','clube_ativo','moeda','currency','representante_id','representante_email'];
+                $oldPick = [];
+                $newPick = [];
+                foreach ($keys as $k) {
+                    if (is_array($oldRow) && array_key_exists($k, $oldRow)) $oldPick[$k] = $oldRow[$k];
+                    if (is_array($newRow) && array_key_exists($k, $newRow)) $newPick[$k] = $newRow[$k];
+                }
+
+                $auth->registrarLogAuditoria($audUsuarioId > 0 ? $audUsuarioId : null, 'produto_atualizado', 'produtos', (int) $id, $oldPick, $newPick);
+            } catch (\Throwable $e) {
+            }
 
             if ($request->getParam('debug_loja')) {
                 $stmtCol = $pdo->query("SHOW COLUMNS FROM produtos LIKE 'loja'");

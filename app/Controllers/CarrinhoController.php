@@ -18,7 +18,7 @@ class CarrinhoController extends Controller {
         if ($usuarioId <= 0) return 0;
         try {
             $db = $this->carrinhoModel->getConnection();
-            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? AND expira_em > NOW() ORDER BY created_at DESC LIMIT 10');
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
             $st->execute([$usuarioId]);
             $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             $ids = array_values(array_filter(array_map('intval', $ids)));
@@ -223,6 +223,14 @@ class CarrinhoController extends Controller {
                 if ($qtd < 1) $qtd = 1;
                 $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                 $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
+                $priceSnap = null;
+                if (array_key_exists('preco_unit_snapshot', $it) && $it['preco_unit_snapshot'] !== null && $it['preco_unit_snapshot'] !== '') {
+                    $priceSnap = (float) $it['preco_unit_snapshot'];
+                }
+                $weightSnap = null;
+                if (array_key_exists('peso_unit_snapshot', $it) && $it['peso_unit_snapshot'] !== null && $it['peso_unit_snapshot'] !== '') {
+                    $weightSnap = (float) $it['peso_unit_snapshot'];
+                }
                 $out[$key] = [
                     'produto_id' => $pid,
                     'produto_variacao_id' => ($pvId > 0 ? $pvId : null),
@@ -230,6 +238,9 @@ class CarrinhoController extends Controller {
                     'nome' => $it['nome'] ?? null,
                     'price' => $vu,
                     'preco_unitario' => $vu,
+                    'stored_price' => $priceSnap !== null ? $priceSnap : $vu,
+                    'stored_subtotal' => $sub,
+                    'stored_peso_unit' => $weightSnap,
                     'quantidade' => $qtd,
                     'subtotal' => $sub,
                 ];
@@ -279,6 +290,7 @@ class CarrinhoController extends Controller {
 
         $removedExpired = false;
         
+        $cartChanges = [];
         foreach ($carrinho as $k => $item) {
             $this->debugLog('[CARRINHO] Processando item: ' . json_encode($item));
             
@@ -300,6 +312,22 @@ class CarrinhoController extends Controller {
                 
                 // Usar campos mapeados do Model (com override da variação, quando existir)
                 $pvId = (int) ($item['produto_variacao_id'] ?? 0);
+
+                $storedUnit = null;
+                if (isset($item['stored_price'])) {
+                    $storedUnit = (float) $item['stored_price'];
+                } elseif (isset($item['preco_unitario'])) {
+                    $storedUnit = (float) $item['preco_unitario'];
+                } elseif (isset($item['price'])) {
+                    $storedUnit = (float) $item['price'];
+                }
+                $storedPesoUnit = null;
+                if (isset($item['stored_peso_unit'])) {
+                    $storedPesoUnit = (float) $item['stored_peso_unit'];
+                } elseif (isset($item['peso_unit'])) {
+                    $storedPesoUnit = (float) $item['peso_unit'];
+                }
+
                 $itemPrice = floatval($produto['preco'] ?? 0);
                 $itemStock = intval($produto['estoque'] ?? 0);
                 if ($pvId > 0) {
@@ -323,6 +351,22 @@ class CarrinhoController extends Controller {
                 }
                 $pesoItem = ((int) ($item['quantidade'] ?? 0)) * $pesoUnit;
 
+                $changedFields = [];
+                if ($storedUnit !== null && $storedUnit > 0) {
+                    if (abs(((float) $itemPrice) - ((float) $storedUnit)) > 0.009) {
+                        $changedFields[] = 'price';
+                    }
+                }
+                if ($storedPesoUnit !== null && $storedPesoUnit > 0) {
+                    if (abs(((float) $pesoUnit) - ((float) $storedPesoUnit)) > 0.0005) {
+                        $changedFields[] = 'weight';
+                    }
+                }
+                $itemChanged = !empty($changedFields);
+                if ($itemChanged) {
+                    $cartChanges[(string) $k] = $changedFields;
+                }
+
                 $ativo = $this->getItemAtivoFromSession((string) $k);
                 // Se não existir flag ainda, inicializar como ativo
                 $this->setItemAtivoInSession((string) $k, (bool) $ativo);
@@ -330,16 +374,30 @@ class CarrinhoController extends Controller {
                 // Normalizar sessão para refletir os valores corretos na view/resumo
                 if (isset($_SESSION['carrinho'][$k]) && is_array($_SESSION['carrinho'][$k])) {
                     $_SESSION['carrinho'][$k]['nome'] = (string) ($produto['nome'] ?? ($_SESSION['carrinho'][$k]['nome'] ?? ''));
+                    if (!isset($_SESSION['carrinho'][$k]['stored_price']) && isset($_SESSION['carrinho'][$k]['price'])) {
+                        $_SESSION['carrinho'][$k]['stored_price'] = (float) $_SESSION['carrinho'][$k]['price'];
+                    }
+                    if (!isset($_SESSION['carrinho'][$k]['stored_peso_unit']) && isset($_SESSION['carrinho'][$k]['peso_unit'])) {
+                        $_SESSION['carrinho'][$k]['stored_peso_unit'] = (float) $_SESSION['carrinho'][$k]['peso_unit'];
+                    }
                     $_SESSION['carrinho'][$k]['price'] = $itemPrice;
                     $_SESSION['carrinho'][$k]['preco_unitario'] = $itemPrice;
                     $_SESSION['carrinho'][$k]['subtotal'] = $itemSubtotal;
                     $_SESSION['carrinho'][$k]['peso_unit'] = $pesoUnit;
                     $_SESSION['carrinho'][$k]['peso_item'] = $pesoItem;
                     $_SESSION['carrinho'][$k]['ativo'] = $ativo ? 1 : 0;
+                    $_SESSION['carrinho'][$k]['item_changed'] = $itemChanged ? 1 : 0;
+                    $_SESSION['carrinho'][$k]['changed_fields'] = $changedFields;
                 }
 
                 // Normalizar o carrinho local usado pela view
                 if (isset($carrinho[$k]) && is_array($carrinho[$k])) {
+                    if (!isset($carrinho[$k]['stored_price']) && isset($carrinho[$k]['price'])) {
+                        $carrinho[$k]['stored_price'] = (float) $carrinho[$k]['price'];
+                    }
+                    if (!isset($carrinho[$k]['stored_peso_unit']) && isset($carrinho[$k]['peso_unit'])) {
+                        $carrinho[$k]['stored_peso_unit'] = (float) $carrinho[$k]['peso_unit'];
+                    }
                     $carrinho[$k]['nome'] = (string) ($produto['nome'] ?? ($carrinho[$k]['nome'] ?? ''));
                     $carrinho[$k]['price'] = $itemPrice;
                     $carrinho[$k]['preco_unitario'] = $itemPrice;
@@ -347,6 +405,8 @@ class CarrinhoController extends Controller {
                     $carrinho[$k]['peso_unit'] = $pesoUnit;
                     $carrinho[$k]['peso_item'] = $pesoItem;
                     $carrinho[$k]['ativo'] = $ativo ? 1 : 0;
+                    $carrinho[$k]['item_changed'] = $itemChanged ? 1 : 0;
+                    $carrinho[$k]['changed_fields'] = $changedFields;
                 }
                 
                 $this->debugLog('[CARRINHO] Preco: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
@@ -494,6 +554,7 @@ class CarrinhoController extends Controller {
         $this->view('carrinho/index', [
             'carrinho' => $carrinho,
             'produtosDetalhados' => $produtosDetalhados,
+            'cart_changes' => $cartChanges,
             'subtotal' => $subtotal,
             'peso_clube_total' => $pesoClubeTotal,
             'subtotal_clube' => $subtotalClube,

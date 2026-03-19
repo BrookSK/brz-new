@@ -128,7 +128,7 @@ class Carrinho extends Model {
             $params[':session_id'] = $sessionId;
         }
         
-        $where[] = "expira_em > NOW()";
+        // Carrinho não deve expirar automaticamente
         $where[] = "moeda = :moeda";
         $params[':moeda'] = $moeda;
         
@@ -154,7 +154,7 @@ class Carrinho extends Model {
             'session_id' => $sessionId,
             'moeda' => $moeda,
             'taxa_conversao' => $taxaConversao,
-            'expira_em' => date('Y-m-d H:i:s', strtotime('+7 days'))
+            'expira_em' => '2099-12-31 23:59:59'
         ];
         
         $this->create($data);
@@ -208,6 +208,9 @@ class Carrinho extends Model {
         $varCol = (is_array($itemsCols) && in_array('produto_variacao_id', $itemsCols, true))
             ? 'produto_variacao_id'
             : ((is_array($itemsCols) && in_array('variacao_id', $itemsCols, true)) ? 'variacao_id' : 'produto_variacao_id');
+
+        $hasPriceSnap = (is_array($itemsCols) && in_array('preco_unit_snapshot', $itemsCols, true));
+        $hasWeightSnap = (is_array($itemsCols) && in_array('peso_unit_snapshot', $itemsCols, true));
 
         // Verificar se item já existe
         $stmt = $this->connection->prepare(
@@ -269,30 +272,60 @@ class Carrinho extends Model {
                 // fallback: mantém preço do produto
             }
         }
+
+        $pesoUnitSnapshot = null;
+        try {
+            $pesoUnitSnapshot = (float) ($produto['peso'] ?? ($produto['weight'] ?? 0));
+            if ($pesoUnitSnapshot <= 0) {
+                $pesoUnitSnapshot = null;
+            }
+        } catch (\Throwable $e) {
+            $pesoUnitSnapshot = null;
+        }
         
         if ($itemExistente) {
             // Atualizar quantidade
             $novaQuantidade = $itemExistente['quantidade'] + $quantidade;
             $novoSubtotal = $novaQuantidade * $precoUnitario;
             
+            $setExtra = '';
+            if ($hasPriceSnap) $setExtra .= ', preco_unit_snapshot = :preco_unit_snapshot';
+            if ($hasWeightSnap) $setExtra .= ', peso_unit_snapshot = :peso_unit_snapshot';
+
             $stmt = $this->connection->prepare("
                 UPDATE carrinho_items 
-                SET quantidade = :quantidade, {$unitCol} = :valor_unitario, subtotal = :subtotal 
+                SET quantidade = :quantidade, {$unitCol} = :valor_unitario, subtotal = :subtotal{$setExtra}
                 WHERE id = :id
             ");
             $stmt->bindParam(':quantidade', $novaQuantidade);
             $stmt->bindParam(':valor_unitario', $precoUnitario);
             $stmt->bindParam(':subtotal', $novoSubtotal);
+            if ($hasPriceSnap) {
+                $stmt->bindValue(':preco_unit_snapshot', (float) $precoUnitario);
+            }
+            if ($hasWeightSnap) {
+                $stmt->bindValue(':peso_unit_snapshot', $pesoUnitSnapshot !== null ? (float) $pesoUnitSnapshot : null);
+            }
             $stmt->bindParam(':id', $itemExistente['id']);
             $stmt->execute();
         } else {
             // Inserir novo item
             $subtotal = $quantidade * $precoUnitario;
-            
-            $stmt = $this->connection->prepare("
-                INSERT INTO carrinho_items (carrinho_id, produto_id, {$varCol}, variacao_descricao, quantidade, {$unitCol}, subtotal) 
-                VALUES (:carrinho_id, :produto_id, :produto_variacao_id, :variacao_descricao, :quantidade, :valor_unitario, :subtotal)
-            ");
+
+            $colsIns = ['carrinho_id', 'produto_id', $varCol, 'variacao_descricao', 'quantidade', $unitCol, 'subtotal'];
+            $valsIns = [':carrinho_id', ':produto_id', ':produto_variacao_id', ':variacao_descricao', ':quantidade', ':valor_unitario', ':subtotal'];
+            if ($hasPriceSnap) {
+                $colsIns[] = 'preco_unit_snapshot';
+                $valsIns[] = ':preco_unit_snapshot';
+            }
+            if ($hasWeightSnap) {
+                $colsIns[] = 'peso_unit_snapshot';
+                $valsIns[] = ':peso_unit_snapshot';
+            }
+
+            $stmt = $this->connection->prepare(
+                'INSERT INTO carrinho_items (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')'
+            );
             $stmt->bindParam(':carrinho_id', $carrinhoId);
             $stmt->bindParam(':produto_id', $produtoId);
             $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
@@ -300,6 +333,12 @@ class Carrinho extends Model {
             $stmt->bindParam(':quantidade', $quantidade);
             $stmt->bindParam(':valor_unitario', $precoUnitario);
             $stmt->bindParam(':subtotal', $subtotal);
+            if ($hasPriceSnap) {
+                $stmt->bindValue(':preco_unit_snapshot', (float) $precoUnitario);
+            }
+            if ($hasWeightSnap) {
+                $stmt->bindValue(':peso_unit_snapshot', $pesoUnitSnapshot !== null ? (float) $pesoUnitSnapshot : null);
+            }
             $stmt->execute();
         }
         

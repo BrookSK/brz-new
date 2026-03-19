@@ -1716,7 +1716,7 @@ class CheckoutController extends Controller {
         if ($usuarioId <= 0) return 0;
         try {
             $db = $this->carrinhoModel->getConnection();
-            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? AND expira_em > NOW() ORDER BY created_at DESC LIMIT 10');
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
             $st->execute([$usuarioId]);
             $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             $ids = array_values(array_filter(array_map('intval', $ids)));
