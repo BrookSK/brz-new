@@ -119,27 +119,43 @@ ksort($ncmOpcoes);
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">Destinatário</h5>
                     <div class="d-flex gap-2 align-items-center">
-                        <select class="form-select form-select-sm" id="selCliente" style="min-width:220px">
-                            <option value="">Selecionar cliente cadastrado...</option>
+                        <select class="form-select form-select-sm" id="selCliente" style="min-width:240px">
+                            <option value="">— Selecione um cliente —</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalNovoCliente">
                             <i class="fas fa-plus me-1"></i>Novo cliente
                         </button>
+                        <a id="linkEditarCliente" href="/admin/redirecionamento/clientes" target="_blank"
+                           class="btn btn-sm btn-outline-secondary d-none" title="Editar dados do cliente">
+                            <i class="fas fa-pen"></i> Editar cliente
+                        </a>
                     </div>
                 </div>
-                <div class="row g-3">
-                    <div class="col-md-6"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" name="destinatario_nome" id="destNome" required></div>
-                    <div class="col-md-3"><label class="form-label">CPF</label><input class="form-control" type="text" name="destinatario_cpf" id="destCpf"></div>
-                    <div class="col-md-3"><label class="form-label">Data de nascimento</label><input class="form-control" type="date" name="destinatario_data_nascimento" id="destNasc"></div>
-                    <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control" type="email" name="destinatario_email" id="destEmail"></div>
-                    <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" type="text" name="destinatario_telefone" id="destTel"></div>
-                    <div class="col-md-8"><label class="form-label">Logradouro</label><input class="form-control" type="text" name="dest_logradouro" id="destLogr"></div>
-                    <div class="col-md-2"><label class="form-label">Número</label><input class="form-control" type="text" name="dest_numero" id="destNum"></div>
-                    <div class="col-md-2"><label class="form-label">Complemento</label><input class="form-control" type="text" name="dest_complemento" id="destComp"></div>
-                    <div class="col-md-4"><label class="form-label">Bairro</label><input class="form-control" type="text" name="dest_bairro" id="destBairro"></div>
-                    <div class="col-md-4"><label class="form-label">Cidade <span class="text-danger">*</span></label><input class="form-control" type="text" name="dest_cidade" id="destCidade" required></div>
-                    <div class="col-md-2"><label class="form-label">Estado <span class="text-danger">*</span></label><input class="form-control" type="text" name="dest_estado" id="destEstado" maxlength="2" required></div>
-                    <div class="col-md-2"><label class="form-label">CEP</label><input class="form-control" type="text" name="dest_cep" id="destCep"></div>
+
+                <!-- Placeholder quando nenhum cliente selecionado -->
+                <div id="destPlaceholder" class="text-center py-5 text-muted">
+                    <i class="fas fa-user-circle fa-3x mb-3 d-block opacity-25"></i>
+                    Selecione um cliente cadastrado ou cadastre um novo para continuar.
+                </div>
+
+                <!-- Dados do cliente (readonly) -->
+                <div id="destDados" class="d-none">
+                    <input type="hidden" name="cliente_id" id="destClienteId">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Nome</label><input class="form-control bg-light" type="text" name="destinatario_nome" id="destNome" readonly></div>
+                        <div class="col-md-3"><label class="form-label">CPF</label><input class="form-control bg-light" type="text" name="destinatario_cpf" id="destCpf" readonly></div>
+                        <div class="col-md-3"><label class="form-label">Data de nascimento</label><input class="form-control bg-light" type="date" name="destinatario_data_nascimento" id="destNasc" readonly></div>
+                        <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control bg-light" type="email" name="destinatario_email" id="destEmail" readonly></div>
+                        <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control bg-light" type="text" name="destinatario_telefone" id="destTel" readonly></div>
+                        <div class="col-md-8"><label class="form-label">Logradouro</label><input class="form-control bg-light" type="text" name="dest_logradouro" id="destLogr" readonly></div>
+                        <div class="col-md-2"><label class="form-label">Número</label><input class="form-control bg-light" type="text" name="dest_numero" id="destNum" readonly></div>
+                        <div class="col-md-2"><label class="form-label">Complemento</label><input class="form-control bg-light" type="text" name="dest_complemento" id="destComp" readonly></div>
+                        <div class="col-md-4"><label class="form-label">Bairro</label><input class="form-control bg-light" type="text" name="dest_bairro" id="destBairro" readonly></div>
+                        <div class="col-md-4"><label class="form-label">Cidade</label><input class="form-control bg-light" type="text" name="dest_cidade" id="destCidade" readonly></div>
+                        <div class="col-md-2"><label class="form-label">Estado</label><input class="form-control bg-light" type="text" name="dest_estado" id="destEstado" readonly></div>
+                        <div class="col-md-2"><label class="form-label">CEP</label><input class="form-control bg-light" type="text" name="dest_cep" id="destCep" readonly></div>
+                    </div>
+                    <div class="mt-3 small text-muted"><i class="fas fa-info-circle me-1"></i>Para alterar os dados, clique em "Editar cliente".</div>
                 </div>
             </div>
         </div>
@@ -282,11 +298,8 @@ function validarStep(n) {
         if (selRed && !selRed.value) { mostrarErro('Selecione o redirecionador.'); return false; }
     }
     if (n === 2) {
-        const nome = document.getElementById('destNome')?.value.trim();
-        const cidade = document.getElementById('destCidade')?.value.trim();
-        const estado = document.getElementById('destEstado')?.value.trim();
-        if (!nome) { mostrarErro('Informe o nome do destinatário.'); return false; }
-        if (!cidade || !estado) { mostrarErro('Informe cidade e estado do destinatário.'); return false; }
+        const clienteId = document.getElementById('destClienteId')?.value;
+        if (!clienteId) { mostrarErro('Selecione um cliente ou cadastre um novo antes de continuar.'); return false; }
     }
     if (n === 3) {
         const peso = parseFloat(document.getElementById('inputPeso')?.value) || 0;
@@ -539,10 +552,17 @@ document.getElementById('selRedirecionador')?.addEventListener('change', async f
 <?php endif; ?>
 
 document.getElementById('selCliente')?.addEventListener('change', async function() {
-    if (!this.value) return;
+    if (!this.value) {
+        document.getElementById('destDados').classList.add('d-none');
+        document.getElementById('destPlaceholder').classList.remove('d-none');
+        document.getElementById('linkEditarCliente').classList.add('d-none');
+        document.getElementById('destClienteId').value = '';
+        return;
+    }
     const r = await fetch('/admin/redirecionamento/clientes/get?id='+this.value);
     const c = await r.json();
     if (!c.id) return;
+    document.getElementById('destClienteId').value = c.id;
     document.getElementById('destNome').value = c.nome||'';
     document.getElementById('destCpf').value = c.cpf||'';
     document.getElementById('destEmail').value = c.email||'';
@@ -555,6 +575,11 @@ document.getElementById('selCliente')?.addEventListener('change', async function
     document.getElementById('destCidade').value = c.cidade||'';
     document.getElementById('destEstado').value = c.estado||'';
     document.getElementById('destCep').value = c.cep||'';
+    document.getElementById('destDados').classList.remove('d-none');
+    document.getElementById('destPlaceholder').classList.add('d-none');
+    const linkEditar = document.getElementById('linkEditarCliente');
+    linkEditar.href = '/admin/redirecionamento/clientes';
+    linkEditar.classList.remove('d-none');
 });
 
 document.getElementById('btnSalvarCliente')?.addEventListener('click', async () => {
@@ -576,9 +601,12 @@ document.getElementById('btnSalvarCliente')?.addEventListener('click', async () 
     const r = await fetch('/admin/redirecionamento/clientes/salvar',{method:'POST',body:fd});
     const j = await r.json();
     if (j.ok) {
-        document.getElementById('selCliente').appendChild(new Option(j.nome, j.id, true, true));
+        const opt = new Option(j.nome, j.id, true, true);
+        document.getElementById('selCliente').appendChild(opt);
         bootstrap.Modal.getInstance(document.getElementById('modalNovoCliente')).hide();
-        document.getElementById('destNome').value = j.nome;
+        // Selecionar o cliente recém-criado e buscar dados completos
+        document.getElementById('selCliente').value = j.id;
+        document.getElementById('selCliente').dispatchEvent(new Event('change'));
     } else { alert(j.msg||'Erro ao salvar'); }
 });
 
