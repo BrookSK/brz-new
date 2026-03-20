@@ -4,110 +4,784 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\AuthService;
 
-/**
- * Módulo "Redirecionamento" (estrutura inicial: rotas + controllers + views).
- * Implementações operacionais (DB/Stripe/etiquetas) virão em commits posteriores.
- */
 class AdminRedirecionamentoController extends Controller {
 
-    private function requireAcesso(): void {
-        $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'suporte', 'redirecionador']);
+    private function auth(): void {
+        (new AuthService())->requerPerfis(['admin', 'suporte', 'redirecionador']);
     }
+
+    private function adminOnly(): void {
+        (new AuthService())->requerPerfis(['admin', 'suporte']);
+    }
+
+    private function pdo(): \PDO {
+        return \Config\Database::getConnection();
+    }
+
+    /** Cria todas as tabelas do módulo se não existirem */
+    private function migrar(): void {
+        $db = $this->pdo();
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionadores (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario_id INT DEFAULT NULL,
+            nome VARCHAR(200) NOT NULL,
+            email VARCHAR(200) NOT NULL,
+            telefone VARCHAR(30) DEFAULT NULL,
+            suite VARCHAR(50) DEFAULT NULL,
+            conta_bancaria TEXT DEFAULT NULL,
+            status ENUM('ativo','bloqueado') NOT NULL DEFAULT 'ativo',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_email (email),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_clientes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            redirecionador_id INT NOT NULL,
+            nome VARCHAR(200) NOT NULL,
+            cpf VARCHAR(20) DEFAULT NULL,
+            email VARCHAR(200) DEFAULT NULL,
+            telefone VARCHAR(30) DEFAULT NULL,
+            data_nascimento DATE DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_red_id (redirecionador_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_enderecos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            cliente_id INT NOT NULL,
+            logradouro VARCHAR(255) NOT NULL,
+            numero VARCHAR(20) DEFAULT NULL,
+            complemento VARCHAR(100) DEFAULT NULL,
+            bairro VARCHAR(100) DEFAULT NULL,
+            cidade VARCHAR(100) NOT NULL,
+            estado VARCHAR(2) NOT NULL,
+            cep VARCHAR(10) NOT NULL,
+            principal TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_cli_id (cliente_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_tabela_pesos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            peso_ate_kg DECIMAL(6,3) NOT NULL,
+            valor_usd DECIMAL(10,2) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_peso (peso_ate_kg)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_envios (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            redirecionador_id INT NOT NULL,
+            cliente_id INT DEFAULT NULL,
+            id_pedido_cliente VARCHAR(100) DEFAULT NULL,
+            destinatario_nome VARCHAR(200) DEFAULT NULL,
+            destinatario_cpf VARCHAR(20) DEFAULT NULL,
+            destinatario_email VARCHAR(200) DEFAULT NULL,
+            destinatario_telefone VARCHAR(30) DEFAULT NULL,
+            destinatario_data_nascimento DATE DEFAULT NULL,
+            dest_logradouro VARCHAR(255) DEFAULT NULL,
+            dest_numero VARCHAR(20) DEFAULT NULL,
+            dest_complemento VARCHAR(100) DEFAULT NULL,
+            dest_bairro VARCHAR(100) DEFAULT NULL,
+            dest_cidade VARCHAR(100) DEFAULT NULL,
+            dest_estado VARCHAR(2) DEFAULT NULL,
+            dest_cep VARCHAR(10) DEFAULT NULL,
+            moeda VARCHAR(3) NOT NULL DEFAULT 'USD',
+            valor_frete_usd DECIMAL(10,2) DEFAULT NULL,
+            peso_kg DECIMAL(6,3) DEFAULT NULL,
+            largura_cm DECIMAL(6,2) DEFAULT NULL,
+            altura_cm DECIMAL(6,2) DEFAULT NULL,
+            comprimento_cm DECIMAL(6,2) DEFAULT NULL,
+            peso_real_kg DECIMAL(6,3) DEFAULT NULL,
+            largura_real_cm DECIMAL(6,2) DEFAULT NULL,
+            altura_real_cm DECIMAL(6,2) DEFAULT NULL,
+            comprimento_real_cm DECIMAL(6,2) DEFAULT NULL,
+            valor_cobrado_usd DECIMAL(10,2) DEFAULT NULL,
+            valor_correto_usd DECIMAL(10,2) DEFAULT NULL,
+            status ENUM('rascunho','aguardando_pagamento','pago','etiqueta_gerada','coletado','entregue','divergencia','cancelado') NOT NULL DEFAULT 'rascunho',
+            status_pagamento ENUM('pendente','pago','falhou','reembolsado') NOT NULL DEFAULT 'pendente',
+            stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+            tracking_code VARCHAR(100) DEFAULT NULL,
+            etiqueta_url TEXT DEFAULT NULL,
+            observacoes TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_red_id (redirecionador_id),
+            INDEX idx_status (status),
+            INDEX idx_status_pag (status_pagamento)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_produtos_envio (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            envio_id INT NOT NULL,
+            ncm VARCHAR(20) DEFAULT NULL,
+            descricao VARCHAR(255) NOT NULL,
+            preco_usd DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            peso_kg DECIMAL(6,3) NOT NULL DEFAULT 0.000,
+            quantidade INT NOT NULL DEFAULT 1,
+            INDEX idx_envio_id (envio_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_pagamentos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            envio_id INT NOT NULL,
+            tipo ENUM('envio','diferenca','reembolso') NOT NULL DEFAULT 'envio',
+            valor_usd DECIMAL(10,2) NOT NULL,
+            stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+            stripe_client_secret VARCHAR(500) DEFAULT NULL,
+            status ENUM('pendente','pago','falhou','reembolsado') NOT NULL DEFAULT 'pendente',
+            comprovante_url TEXT DEFAULT NULL,
+            pago_em TIMESTAMP NULL DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_envio_id (envio_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_coletas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            envio_id INT NOT NULL,
+            redirecionador_id INT NOT NULL,
+            data_agendada DATE NOT NULL,
+            horario TIME NOT NULL,
+            status ENUM('agendado','confirmado','coletado','cancelado') NOT NULL DEFAULT 'agendado',
+            observacoes TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_envio_id (envio_id),
+            INDEX idx_data (data_agendada)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Seed da tabela de pesos se vazia
+        $count = (int) $db->query("SELECT COUNT(*) FROM redirecionamento_tabela_pesos")->fetchColumn();
+        if ($count === 0) {
+            $pesos = [
+                [0.5,10.76],[1.0,15.33],[1.5,19.94],[2.0,24.55],[2.5,29.16],[3.0,33.74],
+                [3.5,38.02],[4.0,42.59],[4.5,47.15],[5.0,51.68],[5.5,56.24],[6.0,60.81],
+                [6.5,65.37],[7.0,69.93],[7.5,74.49],[8.0,79.05],[8.5,83.62],[9.0,88.18],
+                [9.5,92.75],[10.0,97.31],[10.5,101.88],[11.0,106.44],[11.5,111.00],[12.0,115.57],
+                [12.5,120.13],[13.0,124.69],[13.5,129.25],[14.0,133.81],[14.5,138.38],[15.0,142.94],
+                [15.5,147.51],[16.0,152.07],[16.5,156.63],[17.0,161.20],[17.5,165.76],[18.0,170.33],
+                [18.5,174.89],[19.0,179.46],[19.5,184.01],[20.0,188.57],[20.5,193.14],[21.0,197.70],
+                [21.5,202.27],[22.0,206.83],[22.5,211.39],[23.0,215.96],[23.5,220.52],[24.0,225.09],
+                [24.5,229.65],[25.0,234.21],[25.5,238.78],[26.0,243.33],[26.5,247.90],[27.0,252.46],
+                [27.5,257.02],[28.0,261.59],[28.5,266.15],[29.0,270.72],[29.5,275.28],[30.0,279.84],
+            ];
+            $st = $db->prepare("INSERT IGNORE INTO redirecionamento_tabela_pesos (peso_ate_kg, valor_usd) VALUES (?,?)");
+            foreach ($pesos as [$p, $v]) { $st->execute([$p, $v]); }
+        }
+    }
+
+    /** Calcula valor USD para um peso baseado na tabela */
+    private function calcularValor(float $pesoKg): ?array {
+        try {
+            $st = $this->pdo()->prepare(
+                "SELECT peso_ate_kg, valor_usd FROM redirecionamento_tabela_pesos WHERE peso_ate_kg >= ? ORDER BY peso_ate_kg ASC LIMIT 1"
+            );
+            $st->execute([$pesoKg]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($row) {
+                return ['faixa' => (float)$row['peso_ate_kg'], 'valor_usd' => (float)$row['valor_usd']];
+            }
+            // Acima do máximo: usa a última faixa
+            $last = $this->pdo()->query("SELECT peso_ate_kg, valor_usd FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg DESC LIMIT 1")->fetch(\PDO::FETCH_ASSOC);
+            return $last ? ['faixa' => (float)$last['peso_ate_kg'], 'valor_usd' => (float)$last['valor_usd']] : null;
+        } catch (\Exception $e) { return null; }
+    }
+
+    private function getStripeKeys(): array {
+        try {
+            $db = $this->pdo();
+            $tables = ['configuracoes_sistema','configuracoes','settings','config'];
+            foreach ($tables as $t) {
+                $st = $db->prepare("SHOW TABLES LIKE ?"); $st->execute([$t]);
+                if (!$st->fetchColumn()) continue;
+                $cols = $db->query("DESCRIBE $t")->fetchAll(\PDO::FETCH_COLUMN);
+                $keyCol = in_array('chave',$cols,true)?'chave':(in_array('key',$cols,true)?'key':'');
+                $valCol = in_array('valor',$cols,true)?'valor':(in_array('value',$cols,true)?'value':'');
+                if (!$keyCol || !$valCol) continue;
+                $st2 = $db->prepare("SELECT $keyCol, $valCol FROM $t WHERE $keyCol IN ('stripe_secret_key','stripe_public_key','stripe_publishable_key')");
+                $st2->execute();
+                $rows = $st2->fetchAll(\PDO::FETCH_KEY_PAIR);
+                if (!empty($rows)) {
+                    return [
+                        'secret' => $rows['stripe_secret_key'] ?? '',
+                        'public' => $rows['stripe_public_key'] ?? ($rows['stripe_publishable_key'] ?? ''),
+                    ];
+                }
+            }
+        } catch (\Exception $e) {}
+        return ['secret'=>'','public'=>''];
+    }
+
+    private function getEmailsNotificacao(): array {
+        try {
+            $db = $this->pdo();
+            $tables = ['configuracoes_sistema','configuracoes','settings','config'];
+            foreach ($tables as $t) {
+                $st = $db->prepare("SHOW TABLES LIKE ?"); $st->execute([$t]);
+                if (!$st->fetchColumn()) continue;
+                $cols = $db->query("DESCRIBE $t")->fetchAll(\PDO::FETCH_COLUMN);
+                $keyCol = in_array('chave',$cols,true)?'chave':(in_array('key',$cols,true)?'key':'');
+                $valCol = in_array('valor',$cols,true)?'valor':(in_array('value',$cols,true)?'value':'');
+                if (!$keyCol || !$valCol) continue;
+                $st2 = $db->prepare("SELECT $keyCol, $valCol FROM $t WHERE $keyCol IN ('redirecionamento_email_fabiana','redirecionamento_email_lucas','email_fabiana','email_lucas')");
+                $st2->execute();
+                $rows = $st2->fetchAll(\PDO::FETCH_KEY_PAIR);
+                if (!empty($rows)) {
+                    return [
+                        'fabiana' => $rows['redirecionamento_email_fabiana'] ?? ($rows['email_fabiana'] ?? ''),
+                        'lucas'   => $rows['redirecionamento_email_lucas']   ?? ($rows['email_lucas']   ?? ''),
+                    ];
+                }
+            }
+        } catch (\Exception $e) {}
+        return ['fabiana'=>'','lucas'=>''];
+    }
+
+    private function enviarEmailNotificacao(string $para, string $assunto, string $corpo): void {
+        if (empty($para)) return;
+        try { mail($para, $assunto, $corpo, "Content-Type: text/html; charset=UTF-8\r\nFrom: noreply@braziliana.com"); } catch (\Exception $e) {}
+    }
+
+    // ─── DASHBOARD ────────────────────────────────────────────────────────────
 
     public function dashboard(Request $request) {
-        $this->requireAcesso();
-
-        $kpis = [
-            'total_envios' => 0,
-            'pendentes_pagamento' => 0,
-            'aguardando_coleta' => 0,
-            'divergencias_peso' => 0,
-            'valores_a_receber' => 0.0,
-            'valores_a_devolver' => 0.0,
-        ];
-
-        $this->view('admin/redirecionamento/dashboard', [
-            'kpis' => $kpis,
-        ]);
+        $this->auth();
+        $this->migrar();
+        $db = $this->pdo();
+        $kpis = ['total_envios'=>0,'pendentes_pagamento'=>0,'aguardando_coleta'=>0,'divergencias_peso'=>0,'valores_a_receber'=>0.0,'valores_a_devolver'=>0.0];
+        try {
+            $kpis['total_envios'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios")->fetchColumn();
+            $kpis['pendentes_pagamento'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios WHERE status_pagamento='pendente' AND status NOT IN ('rascunho','cancelado')")->fetchColumn();
+            $kpis['aguardando_coleta'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios WHERE status='pago'")->fetchColumn();
+            $kpis['divergencias_peso'] = (int)$db->query("SELECT COUNT(*) FROM redirecionamento_envios WHERE status='divergencia'")->fetchColumn();
+            $kpis['valores_a_receber'] = (float)($db->query("SELECT COALESCE(SUM(valor_usd),0) FROM redirecionamento_pagamentos WHERE tipo='diferenca' AND status='pendente'")->fetchColumn() ?: 0);
+            $kpis['valores_a_devolver'] = (float)($db->query("SELECT COALESCE(SUM(ABS(valor_usd)),0) FROM redirecionamento_pagamentos WHERE tipo='reembolso' AND status='pendente'")->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+        $this->view('admin/redirecionamento/dashboard', ['kpis' => $kpis]);
     }
+
+    // ─── REDIRECIONADORES ─────────────────────────────────────────────────────
 
     public function redirecionadores(Request $request) {
-        $this->requireAcesso();
-
-        // Placeholder (CRUD ainda não implementado).
-        $redirecionadores = [];
-        $this->view('admin/redirecionamento/redirecionadores', [
-            'redirecionadores' => $redirecionadores,
-        ]);
+        $this->adminOnly();
+        $this->migrar();
+        $db = $this->pdo();
+        $busca = trim((string)$request->getParam('busca',''));
+        $sql = "SELECT * FROM redirecionadores WHERE 1=1";
+        $params = [];
+        if ($busca !== '') { $sql .= " AND (nome LIKE ? OR email LIKE ?)"; $params[] = "%$busca%"; $params[] = "%$busca%"; }
+        $sql .= " ORDER BY nome ASC";
+        $st = $db->prepare($sql); $st->execute($params);
+        $redirecionadores = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $this->view('admin/redirecionamento/redirecionadores', ['redirecionadores'=>$redirecionadores,'busca'=>$busca]);
     }
 
-    public function envios(Request $request) {
-        $this->requireAcesso();
-
-        $envios = [];
-        $this->view('admin/redirecionamento/envios', [
-            'envios' => $envios,
-        ]);
+    public function redirecionadorNovo(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $this->view('admin/redirecionamento/redirecionador-form', ['redirecionador'=>null,'modo'=>'novo']);
     }
 
-    public function divergencias(Request $request) {
-        $this->requireAcesso();
-
-        $divergencias = [];
-        $this->view('admin/redirecionamento/divergencias', [
-            'divergencias' => $divergencias,
-        ]);
+    public function redirecionadorSalvar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $db = $this->pdo();
+        $nome  = trim((string)$request->getParam('nome',''));
+        $email = trim((string)$request->getParam('email',''));
+        $tel   = trim((string)$request->getParam('telefone',''));
+        $suite = trim((string)$request->getParam('suite',''));
+        $status= in_array($request->getParam('status','ativo'),['ativo','bloqueado'],'ativo') ? $request->getParam('status') : 'ativo';
+        if ($nome===''||$email==='') { $_SESSION['message']='Nome e e-mail são obrigatórios.'; $_SESSION['message_type']='danger'; $this->redirect('/admin/redirecionamento/redirecionadores/novo'); return; }
+        if ($suite==='') { $suite = 'BR-'.strtoupper(substr(md5($email.time()),0,6)); }
+        $db->prepare("INSERT INTO redirecionadores (nome,email,telefone,suite,status) VALUES (?,?,?,?,?)")->execute([$nome,$email,$tel,$suite,$status]);
+        $_SESSION['message']='Redirecionador criado com sucesso.'; $_SESSION['message_type']='success';
+        $this->redirect('/admin/redirecionamento/redirecionadores');
     }
+
+    public function redirecionadorEditar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id = (int)$request->getParam('id',0);
+        $r = $this->pdo()->prepare("SELECT * FROM redirecionadores WHERE id=?"); $r->execute([$id]);
+        $redirecionador = $r->fetch(\PDO::FETCH_ASSOC);
+        if (!$redirecionador) { $this->redirect('/admin/redirecionamento/redirecionadores'); return; }
+        $this->view('admin/redirecionamento/redirecionador-form', ['redirecionador'=>$redirecionador,'modo'=>'editar']);
+    }
+
+    public function redirecionadorAtualizar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id    = (int)$request->getParam('id',0);
+        $nome  = trim((string)$request->getParam('nome',''));
+        $email = trim((string)$request->getParam('email',''));
+        $tel   = trim((string)$request->getParam('telefone',''));
+        $suite = trim((string)$request->getParam('suite',''));
+        $status= in_array($request->getParam('status','ativo'),['ativo','bloqueado']) ? $request->getParam('status') : 'ativo';
+        $this->pdo()->prepare("UPDATE redirecionadores SET nome=?,email=?,telefone=?,suite=?,status=? WHERE id=?")->execute([$nome,$email,$tel,$suite,$status,$id]);
+        $_SESSION['message']='Redirecionador atualizado.'; $_SESSION['message_type']='success';
+        $this->redirect('/admin/redirecionamento/redirecionadores');
+    }
+
+    // ─── CLIENTES ─────────────────────────────────────────────────────────────
 
     public function clientes(Request $request) {
-        $this->requireAcesso();
-
-        $clientes = [];
-        $this->view('admin/redirecionamento/clientes', [
-            'clientes' => $clientes,
-        ]);
+        $this->auth(); $this->migrar();
+        $db = $this->pdo();
+        $busca = trim((string)$request->getParam('busca',''));
+        $sql = "SELECT c.*, r.nome AS redirecionador_nome,
+                    (SELECT COUNT(*) FROM redirecionamento_enderecos e WHERE e.cliente_id=c.id) AS enderecos_count
+                FROM redirecionamento_clientes c
+                LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id
+                WHERE 1=1";
+        $params = [];
+        if ($busca!=='') { $sql.=" AND (c.nome LIKE ? OR c.cpf LIKE ? OR c.email LIKE ?)"; $params[]="%$busca%"; $params[]="%$busca%"; $params[]="%$busca%"; }
+        $sql.=" ORDER BY c.nome ASC";
+        $st=$db->prepare($sql); $st->execute($params);
+        $clientes=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        // Para o select de redirecionadores no form
+        $reds=$db->query("SELECT id,nome FROM redirecionadores WHERE status='ativo' ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $this->view('admin/redirecionamento/clientes',['clientes'=>$clientes,'busca'=>$busca,'redirecionadores'=>$reds]);
     }
+
+    public function clienteSalvar(Request $request) {
+        $this->auth(); $this->migrar();
+        $db = $this->pdo();
+        $redId = (int)$request->getParam('redirecionador_id',0);
+        $nome  = trim((string)$request->getParam('nome',''));
+        $cpf   = trim((string)$request->getParam('cpf',''));
+        $email = trim((string)$request->getParam('email',''));
+        $tel   = trim((string)$request->getParam('telefone',''));
+        $nasc  = trim((string)$request->getParam('data_nascimento','')) ?: null;
+        if ($nome==='') { $this->json(['ok'=>false,'msg'=>'Nome obrigatório.']); return; }
+        $db->prepare("INSERT INTO redirecionamento_clientes (redirecionador_id,nome,cpf,email,telefone,data_nascimento) VALUES (?,?,?,?,?,?)")->execute([$redId,$nome,$cpf,$email,$tel,$nasc]);
+        $clienteId = (int)$db->lastInsertId();
+        // Endereço
+        $logr = trim((string)$request->getParam('logradouro',''));
+        $cid  = trim((string)$request->getParam('cidade',''));
+        $est  = trim((string)$request->getParam('estado',''));
+        $cep  = trim((string)$request->getParam('cep',''));
+        if ($logr!==''&&$cid!==''&&$est!=='') {
+            $db->prepare("INSERT INTO redirecionamento_enderecos (cliente_id,logradouro,numero,complemento,bairro,cidade,estado,cep,principal) VALUES (?,?,?,?,?,?,?,?,1)")
+               ->execute([$clienteId,$logr,$request->getParam('numero',''),$request->getParam('complemento',''),$request->getParam('bairro',''),$cid,$est,$cep]);
+        }
+        $this->json(['ok'=>true,'id'=>$clienteId,'nome'=>$nome]);
+    }
+
+    public function clienteGet(Request $request) {
+        $this->auth(); $this->migrar();
+        $id = (int)$request->getParam('id',0);
+        $st = $this->pdo()->prepare("SELECT c.*, e.logradouro,e.numero,e.complemento,e.bairro,e.cidade,e.estado,e.cep FROM redirecionamento_clientes c LEFT JOIN redirecionamento_enderecos e ON e.cliente_id=c.id AND e.principal=1 WHERE c.id=? LIMIT 1");
+        $st->execute([$id]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        $this->json($row ?: []);
+    }
+
+    // ─── ENVIOS ───────────────────────────────────────────────────────────────
+
+    public function envios(Request $request) {
+        $this->auth(); $this->migrar();
+        $db = $this->pdo();
+        $filtroStatus = trim((string)$request->getParam('status',''));
+        $filtroRed    = (int)$request->getParam('redirecionador_id',0);
+        $filtroData   = trim((string)$request->getParam('data',''));
+        $sql = "SELECT e.*,
+                    r.nome AS redirecionador_nome,
+                    c.nome AS cliente_nome
+                FROM redirecionamento_envios e
+                LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id
+                LEFT JOIN redirecionamento_clientes c ON c.id=e.cliente_id
+                WHERE 1=1";
+        $params=[];
+        if ($filtroStatus!=='') { $sql.=" AND e.status=?"; $params[]=$filtroStatus; }
+        if ($filtroRed>0)        { $sql.=" AND e.redirecionador_id=?"; $params[]=$filtroRed; }
+        if ($filtroData!=='')    { $sql.=" AND DATE(e.created_at)=?"; $params[]=$filtroData; }
+        $sql.=" ORDER BY e.id DESC";
+        $st=$db->prepare($sql); $st->execute($params);
+        $envios=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $reds=$db->query("SELECT id,nome FROM redirecionadores ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $this->view('admin/redirecionamento/envios',['envios'=>$envios,'redirecionadores'=>$reds,'filtroStatus'=>$filtroStatus,'filtroRed'=>$filtroRed,'filtroData'=>$filtroData]);
+    }
+
+    public function envioNovo(Request $request) {
+        $this->auth(); $this->migrar();
+        $db = $this->pdo();
+        $reds=$db->query("SELECT id,nome FROM redirecionadores WHERE status='ativo' ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $tabela=$db->query("SELECT peso_ate_kg,valor_usd FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $stripeKeys = $this->getStripeKeys();
+        $this->view('admin/redirecionamento/envio-novo',['redirecionadores'=>$reds,'tabela'=>$tabela,'stripePublicKey'=>$stripeKeys['public']]);
+    }
+
+    public function envioSalvar(Request $request) {
+        $this->auth(); $this->migrar();
+        $db = $this->pdo();
+        $redId   = (int)$request->getParam('redirecionador_id',0);
+        $clienteId=(int)$request->getParam('cliente_id',0);
+        $idPedCli= trim((string)$request->getParam('id_pedido_cliente',''));
+        $pesoKg  = (float)str_replace(',','.',$request->getParam('peso_kg','0'));
+        $largura = (float)str_replace(',','.',$request->getParam('largura_cm','0'));
+        $altura  = (float)str_replace(',','.',$request->getParam('altura_cm','0'));
+        $compr   = (float)str_replace(',','.',$request->getParam('comprimento_cm','0'));
+        $valFrete= (float)str_replace(',','.',$request->getParam('valor_frete_usd','0'));
+
+        $calc = $this->calcularValor($pesoKg);
+        $valorCobrado = $calc ? $calc['valor_usd'] : $valFrete;
+
+        $data = [
+            'redirecionador_id'=>$redId,'cliente_id'=>$clienteId>0?$clienteId:null,
+            'id_pedido_cliente'=>$idPedCli,
+            'destinatario_nome'=>trim((string)$request->getParam('destinatario_nome','')),
+            'destinatario_cpf'=>trim((string)$request->getParam('destinatario_cpf','')),
+            'destinatario_email'=>trim((string)$request->getParam('destinatario_email','')),
+            'destinatario_telefone'=>trim((string)$request->getParam('destinatario_telefone','')),
+            'destinatario_data_nascimento'=>trim((string)$request->getParam('destinatario_data_nascimento',''))?:null,
+            'dest_logradouro'=>trim((string)$request->getParam('dest_logradouro','')),
+            'dest_numero'=>trim((string)$request->getParam('dest_numero','')),
+            'dest_complemento'=>trim((string)$request->getParam('dest_complemento','')),
+            'dest_bairro'=>trim((string)$request->getParam('dest_bairro','')),
+            'dest_cidade'=>trim((string)$request->getParam('dest_cidade','')),
+            'dest_estado'=>trim((string)$request->getParam('dest_estado','')),
+            'dest_cep'=>trim((string)$request->getParam('dest_cep','')),
+            'moeda'=>'USD','valor_frete_usd'=>$valFrete,
+            'peso_kg'=>$pesoKg,'largura_cm'=>$largura,'altura_cm'=>$altura,'comprimento_cm'=>$compr,
+            'valor_cobrado_usd'=>$valorCobrado,'status'=>'aguardando_pagamento','status_pagamento'=>'pendente',
+        ];
+        $cols=implode(',',array_keys($data));
+        $phs=':'.implode(',:',$keys=array_keys($data));
+        $st=$db->prepare("INSERT INTO redirecionamento_envios ($cols) VALUES ($phs)");
+        foreach ($data as $k=>$v) $st->bindValue(":$k",$v);
+        $st->execute();
+        $envioId=(int)$db->lastInsertId();
+
+        // Produtos
+        $produtos = $request->getParam('produtos',[]);
+        if (is_array($produtos)) {
+            $stP=$db->prepare("INSERT INTO redirecionamento_produtos_envio (envio_id,ncm,descricao,preco_usd,peso_kg,quantidade) VALUES (?,?,?,?,?,?)");
+            foreach ($produtos as $p) {
+                $stP->execute([$envioId,$p['ncm']??'',$p['descricao']??'',(float)($p['preco_usd']??0),(float)($p['peso_kg']??0),(int)($p['quantidade']??1)]);
+            }
+        }
+
+        $this->json(['ok'=>true,'envio_id'=>$envioId,'valor_usd'=>$valorCobrado]);
+    }
+
+    public function envioDetalhe(Request $request) {
+        $this->auth(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $db=$this->pdo();
+        $st=$db->prepare("SELECT e.*,r.nome AS redirecionador_nome,c.nome AS cliente_nome FROM redirecionamento_envios e LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id LEFT JOIN redirecionamento_clientes c ON c.id=e.cliente_id WHERE e.id=? LIMIT 1");
+        $st->execute([$id]);
+        $envio=$st->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->redirect('/admin/redirecionamento/envios'); return; }
+        $stP=$db->prepare("SELECT * FROM redirecionamento_produtos_envio WHERE envio_id=?"); $stP->execute([$id]);
+        $produtos=$stP->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $stPag=$db->prepare("SELECT * FROM redirecionamento_pagamentos WHERE envio_id=? ORDER BY id DESC"); $stPag->execute([$id]);
+        $pagamentos=$stPag->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $stripeKeys=$this->getStripeKeys();
+        $this->view('admin/redirecionamento/envio-detalhe',['envio'=>$envio,'produtos'=>$produtos,'pagamentos'=>$pagamentos,'stripePublicKey'=>$stripeKeys['public']]);
+    }
+
+    public function envioAtualizarPeso(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $pesoReal=(float)str_replace(',','.',$request->getParam('peso_real_kg','0'));
+        $largReal=(float)str_replace(',','.',$request->getParam('largura_real_cm','0'));
+        $altReal =(float)str_replace(',','.',$request->getParam('altura_real_cm','0'));
+        $compReal=(float)str_replace(',','.',$request->getParam('comprimento_real_cm','0'));
+        $db=$this->pdo();
+        $st=$db->prepare("SELECT valor_cobrado_usd FROM redirecionamento_envios WHERE id=? LIMIT 1"); $st->execute([$id]);
+        $envio=$st->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+        $calc=$this->calcularValor($pesoReal);
+        $valorCorreto=$calc?$calc['valor_usd']:(float)$envio['valor_cobrado_usd'];
+        $diferenca=round($valorCorreto-(float)$envio['valor_cobrado_usd'],2);
+        $novoStatus=abs($diferenca)>0.01?'divergencia':'pago';
+        $db->prepare("UPDATE redirecionamento_envios SET peso_real_kg=?,largura_real_cm=?,altura_real_cm=?,comprimento_real_cm=?,valor_correto_usd=?,status=? WHERE id=?")
+           ->execute([$pesoReal,$largReal,$altReal,$compReal,$valorCorreto,$novoStatus,$id]);
+        if (abs($diferenca)>0.01) {
+            $tipo=$diferenca>0?'diferenca':'reembolso';
+            $db->prepare("INSERT INTO redirecionamento_pagamentos (envio_id,tipo,valor_usd,status) VALUES (?,?,?,?)")->execute([$id,$tipo,abs($diferenca),'pendente']);
+        }
+        $this->json(['ok'=>true,'valor_correto'=>$valorCorreto,'diferenca'=>$diferenca,'status'=>$novoStatus]);
+    }
+
+    public function envioMarcarColetado(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $this->pdo()->prepare("UPDATE redirecionamento_envios SET status='coletado' WHERE id=?")->execute([$id]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function envioMarcarEntregue(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $this->pdo()->prepare("UPDATE redirecionamento_envios SET status='entregue' WHERE id=?")->execute([$id]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function envioSalvarTracking(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $tracking=trim((string)$request->getParam('tracking_code',''));
+        $etiqueta=trim((string)$request->getParam('etiqueta_url',''));
+        $this->pdo()->prepare("UPDATE redirecionamento_envios SET tracking_code=?,etiqueta_url=?,status='etiqueta_gerada' WHERE id=?")->execute([$tracking,$etiqueta,$id]);
+        // Notificar por e-mail
+        $stE=$this->pdo()->prepare("SELECT e.*,r.nome AS red_nome,r.email AS red_email FROM redirecionamento_envios e LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id WHERE e.id=? LIMIT 1");
+        $stE->execute([$id]); $envio=$stE->fetch(\PDO::FETCH_ASSOC);
+        if ($envio) {
+            $emails=$this->getEmailsNotificacao();
+            $assunto="Etiqueta gerada - Pedido #{$id} ({$envio['red_nome']})";
+            $corpo="<p>Etiqueta gerada para o pedido #{$id} do redirecionador <b>{$envio['red_nome']}</b>.<br>Código de rastreio: <b>$tracking</b><br>Já pode combinar a coleta.</p>";
+            $this->enviarEmailNotificacao($emails['fabiana'],$assunto,$corpo);
+            $this->enviarEmailNotificacao($emails['lucas'],$assunto,$corpo);
+        }
+        $this->json(['ok'=>true]);
+    }
+
+    // ─── PAGAMENTOS / STRIPE ──────────────────────────────────────────────────
+
+    public function criarIntentPagamento(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId=(int)$request->getParam('envio_id',0);
+        $db=$this->pdo();
+        $st=$db->prepare("SELECT * FROM redirecionamento_envios WHERE id=? LIMIT 1"); $st->execute([$envioId]);
+        $envio=$st->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+        $valorUsd=(float)($envio['valor_cobrado_usd']??0);
+        if ($valorUsd<=0) { $this->json(['ok'=>false,'msg'=>'Valor inválido']); return; }
+        $keys=$this->getStripeKeys();
+        if (empty($keys['secret'])) { $this->json(['ok'=>false,'msg'=>'Stripe não configurado']); return; }
+        try {
+            $ch=curl_init('https://api.stripe.com/v1/payment_intents');
+            curl_setopt_array($ch,[
+                CURLOPT_RETURNTRANSFER=>true,
+                CURLOPT_POST=>true,
+                CURLOPT_USERPWD=>$keys['secret'].':',
+                CURLOPT_POSTFIELDS=>http_build_query([
+                    'amount'=>(int)round($valorUsd*100),
+                    'currency'=>'usd',
+                    'metadata[envio_id]'=>$envioId,
+                    'description'=>"Redirecionamento envio #$envioId",
+                ]),
+            ]);
+            $resp=curl_exec($ch); curl_close($ch);
+            $data=json_decode($resp,true);
+            if (!empty($data['client_secret'])) {
+                $db->prepare("UPDATE redirecionamento_envios SET stripe_payment_intent=? WHERE id=?")->execute([$data['id'],$envioId]);
+                $db->prepare("INSERT INTO redirecionamento_pagamentos (envio_id,tipo,valor_usd,stripe_payment_intent,stripe_client_secret,status) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stripe_client_secret=VALUES(stripe_client_secret)")
+                   ->execute([$envioId,'envio',$valorUsd,$data['id'],$data['client_secret'],'pendente']);
+                $this->json(['ok'=>true,'client_secret'=>$data['client_secret'],'payment_intent_id'=>$data['id']]);
+            } else {
+                $this->json(['ok'=>false,'msg'=>$data['error']['message']??'Erro Stripe']);
+            }
+        } catch (\Exception $e) { $this->json(['ok'=>false,'msg'=>$e->getMessage()]); }
+    }
+
+    public function confirmarPagamento(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId=(int)$request->getParam('envio_id',0);
+        $piId=trim((string)$request->getParam('payment_intent_id',''));
+        $db=$this->pdo();
+        $keys=$this->getStripeKeys();
+        $status='pago';
+        if (!empty($keys['secret'])&&!empty($piId)) {
+            $ch=curl_init("https://api.stripe.com/v1/payment_intents/$piId");
+            curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_USERPWD=>$keys['secret'].':']);
+            $resp=curl_exec($ch); curl_close($ch);
+            $data=json_decode($resp,true);
+            if (($data['status']??'')!=='succeeded') $status='pendente';
+        }
+        if ($status==='pago') {
+            $db->prepare("UPDATE redirecionamento_envios SET status_pagamento='pago',status='pago' WHERE id=?")->execute([$envioId]);
+            $db->prepare("UPDATE redirecionamento_pagamentos SET status='pago',pago_em=NOW() WHERE envio_id=? AND tipo='envio'")->execute([$envioId]);
+            // Notificar admin
+            $stE=$db->prepare("SELECT e.*,r.nome AS red_nome FROM redirecionamento_envios e LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id WHERE e.id=? LIMIT 1");
+            $stE->execute([$envioId]); $envio=$stE->fetch(\PDO::FETCH_ASSOC);
+            if ($envio) {
+                $emails=$this->getEmailsNotificacao();
+                $assunto="Novo pedido pago - #{$envioId} ({$envio['red_nome']})";
+                $corpo="<p>O redirecionador <b>{$envio['red_nome']}</b> realizou o pagamento do pedido #{$envioId}. Já pode buscar a caixa.</p>";
+                $this->enviarEmailNotificacao($emails['fabiana'],$assunto,$corpo);
+                $this->enviarEmailNotificacao($emails['lucas'],$assunto,$corpo);
+            }
+        }
+        $this->json(['ok'=>$status==='pago','status'=>$status]);
+    }
+
+    public function uploadComprovante(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId=(int)$request->getParam('envio_id',0);
+        $tipo=in_array($request->getParam('tipo','envio'),['envio','diferenca','reembolso'])?$request->getParam('tipo'):'envio';
+        if (empty($_FILES['comprovante']['tmp_name'])) { $this->json(['ok'=>false,'msg'=>'Arquivo não enviado']); return; }
+        $ext=strtolower(pathinfo($_FILES['comprovante']['name'],PATHINFO_EXTENSION));
+        if (!in_array($ext,['jpg','jpeg','png','pdf'])) { $this->json(['ok'=>false,'msg'=>'Formato inválido']); return; }
+        $dir=__DIR__.'/../../public/uploads/comprovantes/';
+        if (!is_dir($dir)) mkdir($dir,0755,true);
+        $fname='comp_'.$envioId.'_'.$tipo.'_'.time().'.'.$ext;
+        move_uploaded_file($_FILES['comprovante']['tmp_name'],$dir.$fname);
+        $url='/uploads/comprovantes/'.$fname;
+        $this->pdo()->prepare("UPDATE redirecionamento_pagamentos SET comprovante_url=? WHERE envio_id=? AND tipo=?")->execute([$url,$envioId,$tipo]);
+        $this->json(['ok'=>true,'url'=>$url]);
+    }
+
+    // ─── DIVERGÊNCIAS ─────────────────────────────────────────────────────────
+
+    public function divergencias(Request $request) {
+        $this->auth(); $this->migrar();
+        $db=$this->pdo();
+        $st=$db->query("SELECT e.id AS envio_id,e.valor_cobrado_usd,e.valor_correto_usd,
+                            (e.valor_correto_usd - e.valor_cobrado_usd) AS diferenca,
+                            e.status,r.nome AS redirecionador_nome,
+                            p.status AS status_pag, p.comprovante_url, p.id AS pag_id
+                        FROM redirecionamento_envios e
+                        LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id
+                        LEFT JOIN redirecionamento_pagamentos p ON p.envio_id=e.id AND p.tipo IN ('diferenca','reembolso')
+                        WHERE e.status='divergencia'
+                        ORDER BY e.id DESC");
+        $divergencias=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $this->view('admin/redirecionamento/divergencias',['divergencias'=>$divergencias]);
+    }
+
+    public function divergenciaGerarLink(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $pagId=(int)$request->getParam('pag_id',0);
+        $db=$this->pdo();
+        $st=$db->prepare("SELECT * FROM redirecionamento_pagamentos WHERE id=? LIMIT 1"); $st->execute([$pagId]);
+        $pag=$st->fetch(\PDO::FETCH_ASSOC);
+        if (!$pag) { $this->json(['ok'=>false,'msg'=>'Pagamento não encontrado']); return; }
+        $keys=$this->getStripeKeys();
+        if (empty($keys['secret'])) { $this->json(['ok'=>false,'msg'=>'Stripe não configurado']); return; }
+        try {
+            $ch=curl_init('https://api.stripe.com/v1/payment_intents');
+            curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_USERPWD=>$keys['secret'].':',
+                CURLOPT_POSTFIELDS=>http_build_query(['amount'=>(int)round((float)$pag['valor_usd']*100),'currency'=>'usd','description'=>"Diferença envio #{$pag['envio_id']}"])]);
+            $resp=curl_exec($ch); curl_close($ch);
+            $data=json_decode($resp,true);
+            if (!empty($data['client_secret'])) {
+                $db->prepare("UPDATE redirecionamento_pagamentos SET stripe_payment_intent=?,stripe_client_secret=? WHERE id=?")->execute([$data['id'],$data['client_secret'],$pagId]);
+                $this->json(['ok'=>true,'client_secret'=>$data['client_secret']]);
+            } else { $this->json(['ok'=>false,'msg'=>$data['error']['message']??'Erro Stripe']); }
+        } catch (\Exception $e) { $this->json(['ok'=>false,'msg'=>$e->getMessage()]); }
+    }
+
+    public function divergenciaMarcarPago(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $pagId=(int)$request->getParam('pag_id',0);
+        $db=$this->pdo();
+        $db->prepare("UPDATE redirecionamento_pagamentos SET status='pago',pago_em=NOW() WHERE id=?")->execute([$pagId]);
+        $st=$db->prepare("SELECT envio_id FROM redirecionamento_pagamentos WHERE id=? LIMIT 1"); $st->execute([$pagId]);
+        $row=$st->fetch(\PDO::FETCH_ASSOC);
+        if ($row) $db->prepare("UPDATE redirecionamento_envios SET status='pago' WHERE id=? AND status='divergencia'")->execute([$row['envio_id']]);
+        $this->json(['ok'=>true]);
+    }
+
+    // ─── TABELA DE PESOS ──────────────────────────────────────────────────────
 
     public function tabelaPesos(Request $request) {
-        $this->requireAcesso();
-
-        // Placeholder: a tabela real vai ser carregada do banco/configurações.
-        $tabela = [
-            ['peso_min_kg' => 0.5, 'peso_max_kg' => 0.999, 'valor_usd' => 10.76],
-            ['peso_min_kg' => 1.0, 'peso_max_kg' => 1.999, 'valor_usd' => 15.33],
-        ];
-
-        $this->view('admin/redirecionamento/tabela-pesos', [
-            'tabela' => $tabela,
-        ]);
+        $this->auth(); $this->migrar();
+        $tabela=$this->pdo()->query("SELECT * FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela]);
     }
+
+    public function tabelaPesosSalvar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $peso=(float)str_replace(',','.',$request->getParam('peso_ate_kg','0'));
+        $valor=(float)str_replace(',','.',$request->getParam('valor_usd','0'));
+        if ($peso<=0||$valor<=0) { $this->json(['ok'=>false,'msg'=>'Valores inválidos']); return; }
+        $this->pdo()->prepare("INSERT INTO redirecionamento_tabela_pesos (peso_ate_kg,valor_usd) VALUES (?,?) ON DUPLICATE KEY UPDATE valor_usd=VALUES(valor_usd)")->execute([$peso,$valor]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function tabelaPesosExcluir(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $this->pdo()->prepare("DELETE FROM redirecionamento_tabela_pesos WHERE id=?")->execute([$id]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function calcularSimulador(Request $request) {
+        $this->auth(); $this->migrar();
+        $peso=(float)str_replace(',','.',$request->getParam('peso','0'));
+        $calc=$this->calcularValor($peso);
+        $this->json($calc?['ok'=>true,'faixa'=>$calc['faixa'],'valor_usd'=>$calc['valor_usd']]:['ok'=>false,'msg'=>'Fora da tabela']);
+    }
+
+    // ─── PAGAMENTOS (listagem) ────────────────────────────────────────────────
 
     public function pagamentos(Request $request) {
-        $this->requireAcesso();
-
-        $pagamentos = [];
-        $this->view('admin/redirecionamento/pagamentos', [
-            'pagamentos' => $pagamentos,
-        ]);
+        $this->auth(); $this->migrar();
+        $db=$this->pdo();
+        $st=$db->query("SELECT p.*,r.nome AS redirecionador_nome FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id=p.envio_id LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id ORDER BY p.id DESC");
+        $pagamentos=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $this->view('admin/redirecionamento/pagamentos',['pagamentos'=>$pagamentos]);
     }
+
+    // ─── COMPROVANTES ─────────────────────────────────────────────────────────
 
     public function comprovantes(Request $request) {
-        $this->requireAcesso();
-
-        $comprovantes = [];
-        $this->view('admin/redirecionamento/comprovantes', [
-            'comprovantes' => $comprovantes,
-        ]);
+        $this->auth(); $this->migrar();
+        $db=$this->pdo();
+        $st=$db->query("SELECT p.*,r.nome AS redirecionador_nome FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id=p.envio_id LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id WHERE p.comprovante_url IS NOT NULL ORDER BY p.id DESC");
+        $comprovantes=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $this->view('admin/redirecionamento/comprovantes',['comprovantes'=>$comprovantes]);
     }
+
+    // ─── COLETAS ──────────────────────────────────────────────────────────────
 
     public function coletas(Request $request) {
-        $this->requireAcesso();
+        $this->auth(); $this->migrar();
+        $db=$this->pdo();
+        $st=$db->query("SELECT c.*,r.nome AS redirecionador_nome,e.id_pedido_cliente FROM redirecionamento_coletas c LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id LEFT JOIN redirecionamento_envios e ON e.id=c.envio_id ORDER BY c.data_agendada ASC,c.horario ASC");
+        $coletas=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
+        $this->view('admin/redirecionamento/coletas',['coletas'=>$coletas]);
+    }
 
-        $coletas = [];
-        $this->view('admin/redirecionamento/coletas', [
-            'coletas' => $coletas,
-        ]);
+    public function coletaAgendar(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId=(int)$request->getParam('envio_id',0);
+        $data=trim((string)$request->getParam('data_agendada',''));
+        $hora=trim((string)$request->getParam('horario',''));
+        $obs =trim((string)$request->getParam('observacoes',''));
+        if (!$envioId||!$data||!$hora) { $this->json(['ok'=>false,'msg'=>'Dados incompletos']); return; }
+        $db=$this->pdo();
+        $stE=$db->prepare("SELECT redirecionador_id FROM redirecionamento_envios WHERE id=? LIMIT 1"); $stE->execute([$envioId]);
+        $envio=$stE->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
+        $db->prepare("INSERT INTO redirecionamento_coletas (envio_id,redirecionador_id,data_agendada,horario,observacoes) VALUES (?,?,?,?,?)")->execute([$envioId,$envio['redirecionador_id'],$data,$hora,$obs]);
+        // Notificar Fabiana
+        $emails=$this->getEmailsNotificacao();
+        $stR=$db->prepare("SELECT r.nome,r.email FROM redirecionadores r WHERE r.id=? LIMIT 1"); $stR->execute([$envio['redirecionador_id']]);
+        $red=$stR->fetch(\PDO::FETCH_ASSOC);
+        $assunto="Nova coleta agendada - Envio #$envioId";
+        $corpo="<p>O redirecionador <b>".htmlspecialchars($red['nome']??'')."</b> agendou coleta para <b>$data às $hora</b>.<br>Envio: #$envioId</p>";
+        $this->enviarEmailNotificacao($emails['fabiana'],$assunto,$corpo);
+        $this->json(['ok'=>true]);
+    }
+
+    public function coletaConfirmar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $this->pdo()->prepare("UPDATE redirecionamento_coletas SET status='confirmado' WHERE id=?")->execute([$id]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function coletaMarcarColetado(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $db=$this->pdo();
+        $db->prepare("UPDATE redirecionamento_coletas SET status='coletado' WHERE id=?")->execute([$id]);
+        $st=$db->prepare("SELECT envio_id FROM redirecionamento_coletas WHERE id=? LIMIT 1"); $st->execute([$id]);
+        $row=$st->fetch(\PDO::FETCH_ASSOC);
+        if ($row) $db->prepare("UPDATE redirecionamento_envios SET status='coletado' WHERE id=?")->execute([$row['envio_id']]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function coletaReagendar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $id=(int)$request->getParam('id',0);
+        $data=trim((string)$request->getParam('data_agendada',''));
+        $hora=trim((string)$request->getParam('horario',''));
+        $this->pdo()->prepare("UPDATE redirecionamento_coletas SET data_agendada=?,horario=?,status='agendado' WHERE id=?")->execute([$data,$hora,$id]);
+        $this->json(['ok'=>true]);
     }
 }
-

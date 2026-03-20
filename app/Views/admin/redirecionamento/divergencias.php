@@ -1,6 +1,6 @@
 <?php
 $sidebarActive = 'redirecionamento-divergencias';
-$title = 'Redirecionamento - Divergências';
+$title = 'Divergências e Ajustes';
 $divergencias = is_array($divergencias ?? null) ? $divergencias : [];
 ?>
 <?php ob_start(); ?>
@@ -8,55 +8,83 @@ $divergencias = is_array($divergencias ?? null) ? $divergencias : [];
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
             <h1 class="h2 mb-1">Divergências e Ajustes</h1>
-            <div class="text-muted small">Operação essencial (placeholder)</div>
+            <div class="text-muted small"><?= count($divergencias) ?> divergência(s) ativa(s)</div>
         </div>
-        <a class="btn btn-sm btn-outline-primary" href="/admin/redirecionamento/divergencias">Atualizar (em breve)</a>
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-body">
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-sm table-hover align-middle">
-                    <thead>
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <th>Envio</th>
+                            <th class="ps-3">Envio</th>
+                            <th>Redirecionador</th>
                             <th>Valor pago</th>
                             <th>Valor correto</th>
                             <th>Diferença</th>
+                            <th>Tipo</th>
                             <th>Status</th>
-                            <th>Ações</th>
+                            <th class="pe-3 text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($divergencias)): ?>
-                            <tr>
-                                <td colspan="6" class="text-muted text-center">Nenhuma divergência encontrada ainda.</td>
-                            </tr>
-                        <?php else: ?>
-                            <?php foreach ($divergencias as $d): ?>
-                                <tr>
-                                    <td><?= (int) ($d['envio_id'] ?? 0) ?></td>
-                                    <td>US$ <?= number_format((float) ($d['valor_pago_usd'] ?? 0), 2, ',', '.') ?></td>
-                                    <td>US$ <?= number_format((float) ($d['valor_correto_usd'] ?? 0), 2, ',', '.') ?></td>
-                                    <td>
-                                        US$ <?= number_format((float) ($d['diferenca_usd'] ?? 0), 2, ',', '.') ?>
-                                    </td>
-                                    <td><?= htmlspecialchars((string) ($d['status'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-primary" type="button" disabled>Gerar link (em breve)</button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <tr><td colspan="8" class="text-center text-muted py-4">Nenhuma divergência encontrada.</td></tr>
+                        <?php else: foreach ($divergencias as $d):
+                            $dif = (float)($d['diferenca']??0);
+                            $tipo = $dif > 0 ? 'Cobrança' : 'Reembolso';
+                            $tipoColor = $dif > 0 ? 'danger' : 'success';
+                        ?>
+                        <tr>
+                            <td class="ps-3"><a href="/admin/redirecionamento/envios/<?= (int)$d['envio_id'] ?>">#<?= (int)$d['envio_id'] ?></a></td>
+                            <td><?= htmlspecialchars($d['redirecionador_nome']??'',ENT_QUOTES,'UTF-8') ?></td>
+                            <td>US$ <?= number_format((float)($d['valor_cobrado_usd']??0),2,',','.') ?></td>
+                            <td>US$ <?= number_format((float)($d['valor_correto_usd']??0),2,',','.') ?></td>
+                            <td class="fw-bold text-<?= $tipoColor ?>">US$ <?= number_format(abs($dif),2,',','.') ?></td>
+                            <td><span class="badge bg-<?= $tipoColor ?> bg-opacity-10 text-<?= $tipoColor ?> border border-<?= $tipoColor ?> border-opacity-25"><?= $tipo ?></span></td>
+                            <td>
+                                <?php $sp = $d['status_pag']??'pendente'; $sc = ['pendente'=>'warning','pago'=>'success','falhou'=>'danger'][$sp]??'secondary'; ?>
+                                <span class="badge bg-<?= $sc ?> bg-opacity-10 text-<?= $sc ?> border border-<?= $sc ?> border-opacity-25"><?= ucfirst($sp) ?></span>
+                            </td>
+                            <td class="pe-3 text-end d-flex gap-1 justify-content-end">
+                                <?php if (($d['status_pag']??'pendente') === 'pendente'): ?>
+                                <?php if ($dif > 0): ?>
+                                <button type="button" class="btn btn-xs btn-outline-danger btn-gerar-link" data-pag-id="<?= (int)$d['pag_id'] ?>" style="font-size:.75rem;padding:2px 8px">Gerar link Stripe</button>
+                                <?php endif; ?>
+                                <button type="button" class="btn btn-xs btn-outline-success btn-marcar-pago" data-pag-id="<?= (int)$d['pag_id'] ?>" style="font-size:.75rem;padding:2px 8px">Marcar pago</button>
+                                <?php endif; ?>
+                                <?php if (!empty($d['comprovante_url'])): ?>
+                                <a href="<?= htmlspecialchars($d['comprovante_url'],ENT_QUOTES,'UTF-8') ?>" target="_blank" class="btn btn-xs btn-outline-info" style="font-size:.75rem;padding:2px 8px">Comprovante</a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; endif; ?>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-
-    <div class="alert alert-warning mt-4 mb-0">
-        Fluxos de cobrança/reembolso e uploads de comprovante ainda serão implementados.
-    </div>
 </div>
+<script>
+document.querySelectorAll('.btn-gerar-link').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const fd = new FormData(); fd.append('pag_id', btn.dataset.pagId);
+        const r = await fetch('/admin/redirecionamento/divergencias/gerar-link',{method:'POST',body:fd});
+        const j = await r.json();
+        if (j.ok) { alert('Link Stripe gerado. Client secret: ' + j.client_secret); }
+        else { alert('Erro: ' + (j.msg||'Tente novamente')); }
+    });
+});
+document.querySelectorAll('.btn-marcar-pago').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        if (!confirm('Marcar como pago?')) return;
+        const fd = new FormData(); fd.append('pag_id', btn.dataset.pagId);
+        const r = await fetch('/admin/redirecionamento/divergencias/marcar-pago',{method:'POST',body:fd});
+        const j = await r.json();
+        if (j.ok) location.reload();
+        else alert('Erro: ' + (j.msg||'Tente novamente'));
+    });
+});
+</script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>
-

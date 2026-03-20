@@ -129,16 +129,41 @@ $router->get('/admin', function() {
     exit;
 });
 
-// Redirecionamento (módulo novo)
-$router->get('/admin/redirecionamento/dashboard', 'AdminRedirecionamentoController', 'dashboard');
-$router->get('/admin/redirecionamento/redirecionadores', 'AdminRedirecionamentoController', 'redirecionadores');
-$router->get('/admin/redirecionamento/envios', 'AdminRedirecionamentoController', 'envios');
-$router->get('/admin/redirecionamento/divergencias', 'AdminRedirecionamentoController', 'divergencias');
-$router->get('/admin/redirecionamento/clientes', 'AdminRedirecionamentoController', 'clientes');
-$router->get('/admin/redirecionamento/tabela-pesos', 'AdminRedirecionamentoController', 'tabelaPesos');
-$router->get('/admin/redirecionamento/pagamentos', 'AdminRedirecionamentoController', 'pagamentos');
-$router->get('/admin/redirecionamento/comprovantes', 'AdminRedirecionamentoController', 'comprovantes');
-$router->get('/admin/redirecionamento/coletas', 'AdminRedirecionamentoController', 'coletas');
+// Redirecionamento
+$router->get('/admin/redirecionamento/dashboard',                       'AdminRedirecionamentoController', 'dashboard');
+$router->get('/admin/redirecionamento/redirecionadores',                'AdminRedirecionamentoController', 'redirecionadores');
+$router->get('/admin/redirecionamento/redirecionadores/novo',           'AdminRedirecionamentoController', 'redirecionadorNovo');
+$router->post('/admin/redirecionamento/redirecionadores/salvar',        'AdminRedirecionamentoController', 'redirecionadorSalvar');
+$router->get('/admin/redirecionamento/redirecionadores/editar/{id}',    'AdminRedirecionamentoController', 'redirecionadorEditar');
+$router->post('/admin/redirecionamento/redirecionadores/atualizar/{id}','AdminRedirecionamentoController', 'redirecionadorAtualizar');
+$router->get('/admin/redirecionamento/envios',                          'AdminRedirecionamentoController', 'envios');
+$router->get('/admin/redirecionamento/envios/novo',                     'AdminRedirecionamentoController', 'envioNovo');
+$router->post('/admin/redirecionamento/envios/salvar',                  'AdminRedirecionamentoController', 'envioSalvar');
+$router->get('/admin/redirecionamento/envios/{id}',                     'AdminRedirecionamentoController', 'envioDetalhe');
+$router->post('/admin/redirecionamento/envios/{id}/peso-real',          'AdminRedirecionamentoController', 'envioAtualizarPeso');
+$router->post('/admin/redirecionamento/envios/{id}/tracking',           'AdminRedirecionamentoController', 'envioSalvarTracking');
+$router->post('/admin/redirecionamento/envios/{id}/coletado',           'AdminRedirecionamentoController', 'envioMarcarColetado');
+$router->post('/admin/redirecionamento/envios/{id}/entregue',           'AdminRedirecionamentoController', 'envioMarcarEntregue');
+$router->get('/admin/redirecionamento/divergencias',                    'AdminRedirecionamentoController', 'divergencias');
+$router->post('/admin/redirecionamento/divergencias/gerar-link',        'AdminRedirecionamentoController', 'divergenciaGerarLink');
+$router->post('/admin/redirecionamento/divergencias/marcar-pago',       'AdminRedirecionamentoController', 'divergenciaMarcarPago');
+$router->get('/admin/redirecionamento/clientes',                        'AdminRedirecionamentoController', 'clientes');
+$router->post('/admin/redirecionamento/clientes/salvar',                'AdminRedirecionamentoController', 'clienteSalvar');
+$router->get('/admin/redirecionamento/clientes/get',                    'AdminRedirecionamentoController', 'clienteGet');
+$router->get('/admin/redirecionamento/tabela-pesos',                    'AdminRedirecionamentoController', 'tabelaPesos');
+$router->post('/admin/redirecionamento/tabela-pesos/salvar',            'AdminRedirecionamentoController', 'tabelaPesosSalvar');
+$router->post('/admin/redirecionamento/tabela-pesos/excluir',           'AdminRedirecionamentoController', 'tabelaPesosExcluir');
+$router->get('/admin/redirecionamento/tabela-pesos/calcular',           'AdminRedirecionamentoController', 'calcularSimulador');
+$router->get('/admin/redirecionamento/pagamentos',                      'AdminRedirecionamentoController', 'pagamentos');
+$router->get('/admin/redirecionamento/comprovantes',                    'AdminRedirecionamentoController', 'comprovantes');
+$router->post('/admin/redirecionamento/comprovantes/upload',            'AdminRedirecionamentoController', 'uploadComprovante');
+$router->get('/admin/redirecionamento/coletas',                         'AdminRedirecionamentoController', 'coletas');
+$router->post('/admin/redirecionamento/coletas/agendar',                'AdminRedirecionamentoController', 'coletaAgendar');
+$router->post('/admin/redirecionamento/coletas/confirmar',              'AdminRedirecionamentoController', 'coletaConfirmar');
+$router->post('/admin/redirecionamento/coletas/coletado',               'AdminRedirecionamentoController', 'coletaMarcarColetado');
+$router->post('/admin/redirecionamento/coletas/reagendar',              'AdminRedirecionamentoController', 'coletaReagendar');
+$router->post('/admin/redirecionamento/pagamento/criar-intent',         'AdminRedirecionamentoController', 'criarIntentPagamento');
+$router->post('/admin/redirecionamento/pagamento/confirmar',            'AdminRedirecionamentoController', 'confirmarPagamento');
 
 // Webhooks
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
