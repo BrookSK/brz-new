@@ -28,6 +28,25 @@ class AdminCorreiosMundialController extends Controller {
         }
     }
 
+    private function getTableColumns(string $table): array {
+        try {
+            $stmt = $this->connection->query('DESCRIBE ' . $table);
+            $cols = $stmt ? ($stmt->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            return is_array($cols) ? $cols : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function pickColumn(array $cols, array $candidates): string {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) {
+                return $c;
+            }
+        }
+        return '';
+    }
+
     private function ensurePacketEtiquetasTable(): void {
         try {
             if ($this->tableExists('correios_packet_etiquetas')) {
@@ -463,11 +482,24 @@ class AdminCorreiosMundialController extends Controller {
         ];
     }
 
-    private function getPedidosCaixaFechadaSemEtiqueta(): array {
+    private function getPedidosCaixaFechadaSemEtiqueta(bool $apenasRedirecionamento = false): array {
         if (!$this->tableExists('pedidos')) {
             return [];
         }
         $this->ensurePacketEtiquetasTable();
+
+        $extraWhere = '';
+        if ($apenasRedirecionamento) {
+            $colsP = $this->getTableColumns('pedidos');
+            $colOrigem = $this->pickColumn($colsP, ['origem_pedido', 'origem', 'tipo']);
+            $colMoeda = $this->pickColumn($colsP, ['moeda', 'currency', 'moeda_original', 'moeda_origem']);
+            if ($colOrigem !== '') {
+                $extraWhere .= " AND LOWER(COALESCE(p." . $colOrigem . ",'')) IN ('redirecionador','redirecionamento')";
+            }
+            if ($colMoeda !== '') {
+                $extraWhere .= " AND UPPER(COALESCE(p." . $colMoeda . ",'')) = 'USD'";
+            }
+        }
 
         $sql = "
             SELECT p.id AS pedido_id, u.nome AS cliente_nome, p.usuario_id, p.created_at
@@ -476,6 +508,7 @@ class AdminCorreiosMundialController extends Controller {
             LEFT JOIN correios_packet_etiquetas cpe ON cpe.pedido_id = p.id
             WHERE LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado')
               AND cpe.id IS NULL
+              " . $extraWhere . "
             ORDER BY p.created_at ASC
             LIMIT 200
         ";
@@ -494,10 +527,27 @@ class AdminCorreiosMundialController extends Controller {
         }
     }
 
-    private function getEtiquetasGeradas(): array {
+    private function getEtiquetasGeradas(bool $apenasRedirecionamento = false): array {
         $this->ensurePacketEtiquetasTable();
         if (!$this->tableExists('correios_packet_etiquetas')) {
             return [];
+        }
+
+        $extraWhere = '';
+        if ($apenasRedirecionamento && $this->tableExists('pedidos')) {
+            $colsP = $this->getTableColumns('pedidos');
+            $colOrigem = $this->pickColumn($colsP, ['origem_pedido', 'origem', 'tipo']);
+            $colMoeda = $this->pickColumn($colsP, ['moeda', 'currency', 'moeda_original', 'moeda_origem']);
+            $conds = [];
+            if ($colOrigem !== '') {
+                $conds[] = "LOWER(COALESCE(p." . $colOrigem . ",'')) IN ('redirecionador','redirecionamento')";
+            }
+            if ($colMoeda !== '') {
+                $conds[] = "UPPER(COALESCE(p." . $colMoeda . ",'')) = 'USD'";
+            }
+            if (!empty($conds)) {
+                $extraWhere = ' WHERE ' . implode(' AND ', $conds);
+            }
         }
         try {
             $st = $this->connection->prepare("
@@ -505,6 +555,7 @@ class AdminCorreiosMundialController extends Controller {
                 FROM correios_packet_etiquetas cpe
                 LEFT JOIN pedidos p ON p.id = cpe.pedido_id
                 LEFT JOIN usuarios u ON u.id = p.usuario_id
+                " . $extraWhere . "
                 ORDER BY cpe.created_at DESC
                 LIMIT 100
             ");
@@ -519,8 +570,13 @@ class AdminCorreiosMundialController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
 
-        $pedidos = $this->getPedidosCaixaFechadaSemEtiqueta();
-        $etiquetas = $this->getEtiquetasGeradas();
+        $u = $auth->getUsuarioLogado();
+        $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
+        $role = strtolower(trim((string) ($u['role'] ?? '')));
+        $isRedirecionador = ($perfil === 'redirecionador' || $role === 'redirecionador');
+
+        $pedidos = $this->getPedidosCaixaFechadaSemEtiqueta($isRedirecionador);
+        $etiquetas = $this->getEtiquetasGeradas($isRedirecionador);
 
         $this->view('admin/correios-mundial', [
             'pedidos' => $pedidos,
@@ -555,6 +611,11 @@ class AdminCorreiosMundialController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
 
+        $u = $auth->getUsuarioLogado();
+        $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
+        $role = strtolower(trim((string) ($u['role'] ?? '')));
+        $isRedirecionador = ($perfil === 'redirecionador' || $role === 'redirecionador');
+
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
             header('Location: /admin/correios-mundial');
@@ -585,9 +646,22 @@ class AdminCorreiosMundialController extends Controller {
 
         // Validações do destinatário (guia v2.8)
         $pageError = '';
+
+        $origem = strtolower(trim((string) ($pedido['origem_pedido'] ?? ($pedido['origem'] ?? ($pedido['tipo'] ?? '')))));
+        $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? ($pedido['moeda_original'] ?? '')))));
+        if ($isRedirecionador) {
+            if ($origem !== '' && !in_array($origem, ['redirecionador', 'redirecionamento'], true)) {
+                $pageError = 'Este pedido não é do redirecionamento.';
+            }
+            if ($pageError === '' && $moeda !== '' && $moeda !== 'USD') {
+                $pageError = 'Este pedido não está em USD.';
+            }
+        }
         $zipDigits = $this->onlyDigits((string) ($destinatario['recipientZipCode'] ?? ''));
         if (strlen($zipDigits) !== 8) {
-            $pageError = 'Dados do destinatário incompletos: CEP inválido (deve conter 8 dígitos). Atualize o endereço do cliente/pedido e tente novamente.';
+            if ($pageError === '') {
+                $pageError = 'Dados do destinatário incompletos: CEP inválido (deve conter 8 dígitos). Atualize o endereço do cliente/pedido e tente novamente.';
+            }
         }
         $destinatario['recipientZipCode'] = $zipDigits;
 
@@ -668,6 +742,11 @@ class AdminCorreiosMundialController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
 
+        $u = $auth->getUsuarioLogado();
+        $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
+        $role = strtolower(trim((string) ($u['role'] ?? '')));
+        $isRedirecionador = ($perfil === 'redirecionador' || $role === 'redirecionador');
+
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
             $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
@@ -698,21 +777,22 @@ class AdminCorreiosMundialController extends Controller {
             return;
         }
 
+        $origem = strtolower(trim((string) ($pedido['origem_pedido'] ?? ($pedido['origem'] ?? ($pedido['tipo'] ?? '')))));
+        $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? ($pedido['moeda_original'] ?? '')))));
+        if ($isRedirecionador) {
+            if ($origem !== '' && !in_array($origem, ['redirecionador', 'redirecionamento'], true)) {
+                $this->json(['success' => false, 'error' => 'Pedido não é do redirecionamento'], 400);
+                return;
+            }
+            if ($moeda !== '' && $moeda !== 'USD') {
+                $this->json(['success' => false, 'error' => 'Pedido não está em USD'], 400);
+                return;
+            }
+        }
+
         $status = strtolower(trim((string) ($pedido['status'] ?? '')));
         if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
             $this->json(['success' => false, 'error' => 'Pedido não está em Caixa Fechada'], 400);
-            return;
-        }
-
-        $pesoKg = isset($pedido['peso_total']) ? (float) $pedido['peso_total'] : 0.0;
-        $alturaCm = isset($pedido['altura']) ? (int) $pedido['altura'] : 0;
-        $larguraCm = isset($pedido['largura']) ? (int) $pedido['largura'] : 0;
-        $comprimentoCm = isset($pedido['comprimento']) ? (int) $pedido['comprimento'] : 0;
-        if ($pesoKg <= 0 || $alturaCm <= 0 || $larguraCm <= 0 || $comprimentoCm <= 0) {
-            $this->json([
-                'success' => false,
-                'error' => 'Pedido sem medidas/peso real. Preencha Peso real (kg), Altura, Largura e Comprimento antes de gerar a etiqueta.',
-            ], 400);
             return;
         }
 
@@ -720,15 +800,78 @@ class AdminCorreiosMundialController extends Controller {
         $data = json_decode((string) $raw, true);
         if (!is_array($data)) $data = [];
 
-        $totalWeight = (int) max(1, round($pesoKg * 1000));
-        $packagingLength = (float) $comprimentoCm;
-        $packagingWidth = (float) $larguraCm;
-        $packagingHeight = (float) $alturaCm;
+        $parseFloat = static function($v): float {
+            if ($v === null) return 0.0;
+            $s = trim((string) $v);
+            if ($s === '') return 0.0;
+            $s = str_replace(',', '.', $s);
+            return (float) $s;
+        };
+
+        $pesoKgDb = isset($pedido['peso_total']) ? (float) $pedido['peso_total'] : 0.0;
+        $alturaCmDb = isset($pedido['altura']) ? (float) $pedido['altura'] : 0.0;
+        $larguraCmDb = isset($pedido['largura']) ? (float) $pedido['largura'] : 0.0;
+        $comprimentoCmDb = isset($pedido['comprimento']) ? (float) $pedido['comprimento'] : 0.0;
+
+        $totalWeightIn = (int) $parseFloat($data['totalWeight'] ?? 0);
+        $packagingLengthIn = $parseFloat($data['packagingLength'] ?? 0);
+        $packagingWidthIn = $parseFloat($data['packagingWidth'] ?? 0);
+        $packagingHeightIn = $parseFloat($data['packagingHeight'] ?? 0);
+
+        $totalWeight = $totalWeightIn > 0 ? $totalWeightIn : (int) max(0, round($pesoKgDb * 1000));
+        $packagingLength = $packagingLengthIn > 0 ? $packagingLengthIn : (float) $comprimentoCmDb;
+        $packagingWidth = $packagingWidthIn > 0 ? $packagingWidthIn : (float) $larguraCmDb;
+        $packagingHeight = $packagingHeightIn > 0 ? $packagingHeightIn : (float) $alturaCmDb;
+
+        if ($totalWeight <= 0 || $packagingLength <= 0 || $packagingWidth <= 0 || $packagingHeight <= 0) {
+            $this->json([
+                'success' => false,
+                'error' => 'Informe Peso total (g), Comprimento, Largura e Altura para gerar a etiqueta.',
+            ], 400);
+            return;
+        }
+
         $freightPaidValue = (float) str_replace(',', '.', (string) ($data['freightPaidValue'] ?? '0.01'));
         $insurancePaidValueRaw = trim((string) ($data['insurancePaidValue'] ?? ''));
         $insurancePaidValue = null;
         if ($insurancePaidValueRaw !== '') {
             $insurancePaidValue = (float) str_replace(',', '.', $insurancePaidValueRaw);
+        }
+
+        try {
+            if ($this->tableExists('pedidos')) {
+                $colsP = $this->getTableColumns('pedidos');
+                $colPeso = $this->pickColumn($colsP, ['peso_total']);
+                $colAltura = $this->pickColumn($colsP, ['altura']);
+                $colLargura = $this->pickColumn($colsP, ['largura']);
+                $colComprimento = $this->pickColumn($colsP, ['comprimento']);
+
+                $set = [];
+                $params = [];
+                if ($colPeso !== '') {
+                    $set[] = $colPeso . ' = ?';
+                    $params[] = (float) number_format(((float) $totalWeight / 1000.0), 3, '.', '');
+                }
+                if ($colAltura !== '') {
+                    $set[] = $colAltura . ' = ?';
+                    $params[] = (int) round($packagingHeight);
+                }
+                if ($colLargura !== '') {
+                    $set[] = $colLargura . ' = ?';
+                    $params[] = (int) round($packagingWidth);
+                }
+                if ($colComprimento !== '') {
+                    $set[] = $colComprimento . ' = ?';
+                    $params[] = (int) round($packagingLength);
+                }
+                if (!empty($set)) {
+                    $params[] = $id;
+                    $sqlUp = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?';
+                    $stUp = $this->connection->prepare($sqlUp);
+                    $stUp->execute($params);
+                }
+            }
+        } catch (\Exception $e) {
         }
 
         // Validações mínimas (regras doc)

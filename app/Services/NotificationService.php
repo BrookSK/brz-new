@@ -211,12 +211,57 @@ class NotificationService {
             return;
         }
 
-        $to = (string) ($vars['email'] ?? '');
-        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-            return;
+        $tplEventoNome = $this->resolveTemplateEventoNome($eventoNome);
+
+        $parseEmails = static function (string $s): array {
+            $s = trim((string) $s);
+            if ($s === '') return [];
+            $parts = preg_split('/[\s,;]+/', $s);
+            if (!is_array($parts)) return [];
+            $out = [];
+            foreach ($parts as $p) {
+                $p = trim((string) $p);
+                if ($p === '') continue;
+                if (filter_var($p, FILTER_VALIDATE_EMAIL) === false) continue;
+                $out[strtolower($p)] = $p;
+            }
+            return array_values($out);
+        };
+
+        $defaultTo = (string) ($vars['email'] ?? '');
+        $overrideTo = (string) $this->getConfig('notificacoes', 'email_to_override_' . $eventoNome, '');
+        if ($overrideTo === '') {
+            $overrideTo = (string) $this->getConfig('notificacoes', 'email_to_' . $eventoNome, '');
+        }
+        if ($overrideTo === '' && $tplEventoNome !== $eventoNome) {
+            $overrideTo = (string) $this->getConfig('notificacoes', 'email_to_override_' . $tplEventoNome, '');
+            if ($overrideTo === '') {
+                $overrideTo = (string) $this->getConfig('notificacoes', 'email_to_' . $tplEventoNome, '');
+            }
         }
 
-        $tplEventoNome = $this->resolveTemplateEventoNome($eventoNome);
+        $extraTo = (string) $this->getConfig('notificacoes', 'email_to_extra_' . $eventoNome, '');
+        if ($extraTo === '' && $tplEventoNome !== $eventoNome) {
+            $extraTo = (string) $this->getConfig('notificacoes', 'email_to_extra_' . $tplEventoNome, '');
+        }
+
+        $tos = [];
+        if (trim($overrideTo) !== '') {
+            $tos = $parseEmails($overrideTo);
+        } else {
+            $tosMap = [];
+            foreach ($parseEmails($defaultTo) as $e) {
+                $tosMap[strtolower($e)] = $e;
+            }
+            foreach ($parseEmails($extraTo) as $e) {
+                $tosMap[strtolower($e)] = $e;
+            }
+            $tos = array_values($tosMap);
+        }
+
+        if (empty($tos)) {
+            return;
+        }
         $tpl = $this->getEmailTemplate($eventoNome);
         $subjectTpl = (string) ($tpl['assunto'] ?? '');
         $htmlTpl = (string) ($tpl['corpo_html'] ?? '');
@@ -240,11 +285,18 @@ class NotificationService {
 
         $pedidoId = (int) ($vars['pedido_id'] ?? 0);
         $dedupeKeyEvento = $tplEventoNome !== '' ? $tplEventoNome : $eventoNome;
-        $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
-        $this->emailService->send($to, $subject, $html, $dedupeKey, [
-            'evento' => $eventoNome,
-            'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
-        ]);
+
+        foreach ($tos as $to) {
+            $to = trim((string) $to);
+            if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
+                continue;
+            }
+            $dedupeKey = 'pedido_event:' . $dedupeKeyEvento . ':' . ($pedidoId > 0 ? $pedidoId : '0') . ':' . strtolower($to);
+            $this->emailService->send($to, $subject, $html, $dedupeKey, [
+                'evento' => $eventoNome,
+                'pedido_id' => ($pedidoId > 0 ? $pedidoId : null),
+            ]);
+        }
     }
 
     private function enviarWhatsAppPorWebhook(string $eventoNome, array $vars): void {

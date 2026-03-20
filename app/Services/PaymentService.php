@@ -5109,8 +5109,58 @@ class PaymentService {
             }
 
             if ($aprovado && !$hasSplitBoth && in_array('status', $colsP, true)) {
-                $set[] = 'status = :status';
-                $params['status'] = 'pago';
+                $skipStatusUpdate = false;
+                try {
+                    $stCur = $db->prepare('SELECT status FROM pedidos WHERE id = ? LIMIT 1');
+                    $stCur->execute([(int) $pedidoId]);
+                    $curStatus = strtolower(trim((string) ($stCur->fetchColumn() ?: '')));
+                    if (in_array($curStatus, [
+                        'produto_consolidado',
+                        'consolidado',
+                        'etiqueta_gerada',
+                        'em_transporte',
+                        'entregue',
+                        'cancelado',
+                        'cancelled',
+                    ], true)) {
+                        $skipStatusUpdate = true;
+                    }
+                } catch (\Exception $e) {
+                }
+
+                if (!$skipStatusUpdate) {
+                    $pedidoStatusPago = 'pago';
+                    try {
+                        $stmtEnum = $db->prepare('SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1');
+                        $stmtEnum->execute(['pedidos', 'status']);
+                        $colType = (string) ($stmtEnum->fetchColumn() ?: '');
+                        $colTypeLower = strtolower($colType);
+                        if (str_starts_with($colTypeLower, 'enum(')) {
+                            $inside = trim(substr($colType, 5));
+                            $inside = rtrim($inside, ')');
+                            $rawVals = array_filter(array_map('trim', explode(',', $inside)));
+                            $vals = [];
+                            foreach ($rawVals as $rv) {
+                                $rv = trim($rv);
+                                $rv = trim($rv, "\"' ");
+                                if ($rv !== '') {
+                                    $vals[] = $rv;
+                                }
+                            }
+                            $candidates = ['pago', 'paid', 'aprovado', 'approved'];
+                            foreach ($candidates as $cand) {
+                                if (in_array($cand, $vals, true)) {
+                                    $pedidoStatusPago = $cand;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                    }
+
+                    $set[] = 'status = :status';
+                    $params['status'] = $pedidoStatusPago;
+                }
             }
 
             if (!empty($set)) {
@@ -5383,39 +5433,60 @@ class PaymentService {
             }
 
             if ($aprovado && in_array('status', $colsP, true)) {
-                $pedidoStatusPago = 'pago';
+                $skipStatusUpdate = false;
                 try {
-                    $stmtEnum = $db->prepare('SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1');
-                    $stmtEnum->execute(['pedidos', 'status']);
-                    $colType = (string) ($stmtEnum->fetchColumn() ?: '');
-                    $colTypeLower = strtolower($colType);
-
-                    if (str_starts_with($colTypeLower, 'enum(')) {
-                        $inside = trim(substr($colType, 5));
-                        $inside = rtrim($inside, ')');
-                        $rawVals = array_filter(array_map('trim', explode(',', $inside)));
-                        $vals = [];
-                        foreach ($rawVals as $rv) {
-                            $rv = trim($rv);
-                            $rv = trim($rv, "\"' ");
-                            if ($rv !== '') {
-                                $vals[] = $rv;
-                            }
-                        }
-
-                        $candidates = ['pago', 'paid', 'aprovado', 'approved'];
-                        foreach ($candidates as $cand) {
-                            if (in_array($cand, $vals, true)) {
-                                $pedidoStatusPago = $cand;
-                                break;
-                            }
-                        }
+                    $stCur = $db->prepare('SELECT status FROM pedidos WHERE id = ? LIMIT 1');
+                    $stCur->execute([(int) $pedidoId]);
+                    $curStatus = strtolower(trim((string) ($stCur->fetchColumn() ?: '')));
+                    if (in_array($curStatus, [
+                        'produto_consolidado',
+                        'consolidado',
+                        'etiqueta_gerada',
+                        'em_transporte',
+                        'entregue',
+                        'cancelado',
+                        'cancelled',
+                    ], true)) {
+                        $skipStatusUpdate = true;
                     }
                 } catch (\Exception $e) {
                 }
 
-                $set[] = 'status = :status';
-                $params['status'] = $pedidoStatusPago;
+                if (!$skipStatusUpdate) {
+                    $pedidoStatusPago = 'pago';
+                    try {
+                        $stmtEnum = $db->prepare('SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1');
+                        $stmtEnum->execute(['pedidos', 'status']);
+                        $colType = (string) ($stmtEnum->fetchColumn() ?: '');
+                        $colTypeLower = strtolower($colType);
+
+                        if (str_starts_with($colTypeLower, 'enum(')) {
+                            $inside = trim(substr($colType, 5));
+                            $inside = rtrim($inside, ')');
+                            $rawVals = array_filter(array_map('trim', explode(',', $inside)));
+                            $vals = [];
+                            foreach ($rawVals as $rv) {
+                                $rv = trim($rv);
+                                $rv = trim($rv, "\"' ");
+                                if ($rv !== '') {
+                                    $vals[] = $rv;
+                                }
+                            }
+
+                            $candidates = ['pago', 'paid', 'aprovado', 'approved'];
+                            foreach ($candidates as $cand) {
+                                if (in_array($cand, $vals, true)) {
+                                    $pedidoStatusPago = $cand;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                    }
+
+                    $set[] = 'status = :status';
+                    $params['status'] = $pedidoStatusPago;
+                }
             }
 
             if (!empty($set)) {
@@ -5464,6 +5535,7 @@ class PaymentService {
                     $pagoEm = new \DateTime('now');
                 }
                 $this->inserirPedidoNaJanelaRemessa($db, (int) $pedidoId, $pagoEm);
+                $this->tentarGerarEtiquetaCorreiosPacketAposPagamentoAprovado($db, (int) $pedidoId, (string) $gateway);
             }
 
             if ($paymentStatusInterno === 'refunded') {
@@ -5480,6 +5552,560 @@ class PaymentService {
             // Webhook não deve retornar 4xx por causa de erro interno/schema
             return;
         }
+    }
+
+    private function tentarGerarEtiquetaCorreiosPacketAposPagamentoAprovado(\PDO $db, int $pedidoId, string $gateway): void {
+        try {
+            $pedidoId = (int) $pedidoId;
+            if ($pedidoId <= 0) {
+                return;
+            }
+
+            $gateway = strtolower(trim((string) $gateway));
+            if ($gateway !== 'stripe') {
+                return;
+            }
+
+            $this->ensurePacketEtiquetasTablePagamentoService($db);
+            if (!$this->tableExistsPagamentoService($db, 'correios_packet_etiquetas')) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'schema', 'Tabela correios_packet_etiquetas não encontrada.', [], true);
+                return;
+            }
+
+            try {
+                $st = $db->prepare('SELECT id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                $st->execute([$pedidoId]);
+                $exists = (int) ($st->fetchColumn() ?: 0);
+                if ($exists > 0) {
+                    return;
+                }
+            } catch (\Exception $e) {
+            }
+
+            $pedido = $this->pedidoModel->getComDetalhes($pedidoId);
+            if (!is_array($pedido) || empty($pedido['id'])) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'pedido', 'Pedido não encontrado ao tentar gerar etiqueta PACKET.', [], true);
+                return;
+            }
+
+            $origem = strtolower(trim((string) ($pedido['origem_pedido'] ?? '')));
+            $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? '')));
+            if ($origem !== 'redirecionamento' && $origem !== 'redirecionador') {
+                return;
+            }
+            if ($moeda !== 'USD') {
+                return;
+            }
+
+            $status = strtolower(trim((string) ($pedido['status'] ?? '')));
+            if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Pedido não está em Caixa Fechada (status=' . $status . ').', [], true);
+                return;
+            }
+
+            $pesoKg = isset($pedido['peso_total']) ? (float) $pedido['peso_total'] : 0.0;
+            $alturaCm = isset($pedido['altura']) ? (int) $pedido['altura'] : 0;
+            $larguraCm = isset($pedido['largura']) ? (int) $pedido['largura'] : 0;
+            $comprimentoCm = isset($pedido['comprimento']) ? (int) $pedido['comprimento'] : 0;
+            if ($pesoKg <= 0 || $alturaCm <= 0 || $larguraCm <= 0 || $comprimentoCm <= 0) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Pedido sem medidas/peso real. Preencha Peso real (kg), Altura, Largura e Comprimento.', [
+                    'peso_total' => $pesoKg,
+                    'altura' => $alturaCm,
+                    'largura' => $larguraCm,
+                    'comprimento' => $comprimentoCm,
+                ], true);
+                return;
+            }
+
+            $totalWeight = (int) max(1, round($pesoKg * 1000));
+            if ($totalWeight > 30000) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Peso total inválido para PACKET (1 a 30000g).', ['totalWeight' => $totalWeight], true);
+                return;
+            }
+            if ($comprimentoCm < 16 || $comprimentoCm > 100) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Comprimento inválido (mín 16cm, máx 100cm).', ['comprimento' => $comprimentoCm], true);
+                return;
+            }
+            if ($larguraCm < 11 || $larguraCm > 100) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Largura inválida (mín 11cm, máx 100cm).', ['largura' => $larguraCm], true);
+                return;
+            }
+            if ($alturaCm < 2 || $alturaCm > 100) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Altura inválida (mín 2cm, máx 100cm).', ['altura' => $alturaCm], true);
+                return;
+            }
+            if ((($comprimentoCm + $larguraCm + $alturaCm) > 200.0001)) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Soma das dimensões (C+L+A) não pode ultrapassar 200cm.', [
+                    'comprimento' => $comprimentoCm,
+                    'largura' => $larguraCm,
+                    'altura' => $alturaCm,
+                ], true);
+                return;
+            }
+
+            $destinatario = $this->buildRecipientFromPedidoPagamentoService($db, $pedido);
+            $sender = $this->buildSenderFromConfigPagamentoService($db);
+
+            $zipDigits = $this->onlyDigitsPagamentoService((string) ($destinatario['recipientZipCode'] ?? ''));
+            if (strlen($zipDigits) !== 8) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'recipient', 'CEP inválido (deve conter 8 dígitos).', ['cep' => (string) ($destinatario['recipientZipCode'] ?? '')], true);
+                return;
+            }
+            $destinatario['recipientZipCode'] = $zipDigits;
+
+            $phoneDigits = $this->onlyDigitsPagamentoService((string) ($destinatario['recipientPhoneNumber'] ?? ''));
+            if (!in_array(strlen($phoneDigits), [10, 11], true)) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'recipient', 'Telefone inválido (deve conter 10 ou 11 dígitos, sem +55).', ['telefone' => (string) ($destinatario['recipientPhoneNumber'] ?? '')], true);
+                return;
+            }
+            $destinatario['recipientPhoneNumber'] = $phoneDigits;
+
+            $destEmail = trim((string) ($destinatario['recipientEmail'] ?? ''));
+            if ($destEmail === '' || filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'recipient', 'Email do destinatário inválido.', ['email' => $destEmail], true);
+                return;
+            }
+
+            $docType = strtoupper(trim((string) ($destinatario['recipientDocumentType'] ?? '')));
+            $docNum = $this->onlyDigitsPagamentoService((string) ($destinatario['recipientDocumentNumber'] ?? ''));
+            if ($docType === 'CPF' && strlen($docNum) !== 11) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'recipient', 'CPF inválido (deve conter 11 dígitos).', ['cpf' => $docNum], true);
+                return;
+            }
+            if ($docType === 'CNPJ' && strlen($docNum) !== 14) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'recipient', 'CNPJ inválido (deve conter 14 dígitos).', ['cnpj' => $docNum], true);
+                return;
+            }
+            if (!in_array($docType, ['CPF', 'CNPJ', 'PASSPORT'], true)) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'recipient', 'Tipo de documento inválido.', ['doc_type' => $docType], true);
+                return;
+            }
+            $destinatario['recipientDocumentType'] = $docType;
+            $destinatario['recipientDocumentNumber'] = $docNum;
+
+            $itemsIn = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
+            if (empty($itemsIn) || count($itemsIn) > 20) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'items', empty($itemsIn) ? 'Pedido sem itens.' : 'Pedido possui mais de 20 itens (limite da API PACKET).', ['items_count' => is_array($itemsIn) ? count($itemsIn) : 0], true);
+                return;
+            }
+
+            $items = [];
+            $sumItems = 0.0;
+            $idx = 0;
+            foreach ($itemsIn as $it) {
+                if (!is_array($it)) continue;
+                $idx++;
+                $qtd = (int) ($it['quantidade'] ?? 0);
+                if ($qtd <= 0) {
+                    $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'items', 'Item #' . $idx . ' com quantidade inválida.', ['quantidade' => $qtd], true);
+                    return;
+                }
+                $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
+                if ($desc === '') {
+                    $desc = 'Item ' . $idx;
+                }
+
+                $ncmDigits = $this->onlyDigitsPagamentoService((string) ($it['ncm'] ?? ''));
+                if ($ncmDigits === '' || strlen($ncmDigits) < 6) {
+                    $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'items', 'Item #' . $idx . ' sem NCM.', ['ncm' => (string) ($it['ncm'] ?? '')], true);
+                    return;
+                }
+                $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
+
+                $val = (float) ($it['preco_unitario'] ?? 0);
+                if ($val < 0.01) {
+                    $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'items', 'Item #' . $idx . ' com valor inválido.', ['preco_unitario' => $val], true);
+                    return;
+                }
+                $sumItems += ($val * $qtd);
+
+                $items[] = [
+                    'hsCode' => $hs,
+                    'description' => substr($desc, 0, 500),
+                    'quantity' => $qtd,
+                    'value' => (float) number_format($val, 2, '.', ''),
+                ];
+            }
+            if (empty($items)) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'items', 'Pedido sem itens válidos.', [], true);
+                return;
+            }
+
+            $freightPaidValue = isset($pedido['valor_frete']) ? (float) $pedido['valor_frete'] : 0.0;
+            if ($freightPaidValue < 0.01) {
+                $freightPaidValue = 0.01;
+            }
+
+            $sumAduaneiro = $freightPaidValue + $sumItems;
+            if ($sumAduaneiro > 3000.0 + 0.0001) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'eligibility', 'Soma de valores (frete+itens) não pode ultrapassar 3000.00 USD.', ['sum' => $sumAduaneiro], true);
+                return;
+            }
+
+            $customerControlCode = (string) ($pedido['codigo_pedido'] ?? ('PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT)));
+            $customerControlCode = trim($customerControlCode);
+            if ($customerControlCode === '') {
+                $customerControlCode = 'PED-' . str_pad((string) $pedidoId, 6, '0', STR_PAD_LEFT);
+            }
+
+            $package = array_merge([
+                'customerControlCode' => substr($customerControlCode, 0, 100),
+                'totalWeight' => $totalWeight,
+                'packagingLength' => (float) number_format((float) $comprimentoCm, 2, '.', ''),
+                'packagingWidth' => (float) number_format((float) $larguraCm, 2, '.', ''),
+                'packagingHeight' => (float) number_format((float) $alturaCm, 2, '.', ''),
+                'distributionModality' => 33162,
+                'taxPaymentMethod' => 'DDU',
+                'currency' => 'USD',
+                'nonNationalizationInstruction' => 'RETURNTOORIGIN',
+                'packageRfidCode' => '',
+                'freightPaidValue' => (float) number_format((float) $freightPaidValue, 2, '.', ''),
+            ], $sender, $destinatario);
+            $package['items'] = $items;
+
+            $svc = new CorreiosPacketService();
+            $resp = $svc->createPackages([$package]);
+            if (empty($resp['success'])) {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'api', (string) ($resp['error'] ?? 'Falha ao criar pacote na API PACKET.'), [
+                    'http_code' => $resp['http_code'] ?? null,
+                    'raw' => is_array($resp['raw'] ?? null) ? json_encode($resp['raw']) : ($resp['raw'] ?? null),
+                ], true);
+                return;
+            }
+
+            $rawResp = $resp['raw'] ?? null;
+            $tracking = '';
+            if (is_array($rawResp) && isset($rawResp['packageResponseList']) && is_array($rawResp['packageResponseList']) && !empty($rawResp['packageResponseList'][0])) {
+                $first = $rawResp['packageResponseList'][0];
+                if (is_array($first) && !empty($first['trackingNumber'])) {
+                    $tracking = (string) $first['trackingNumber'];
+                }
+            }
+            if (trim($tracking) === '') {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'api', 'Resposta da API sem trackingNumber.', [
+                    'http_code' => $resp['http_code'] ?? null,
+                    'raw' => is_array($rawResp) ? json_encode($rawResp) : null,
+                ], true);
+                return;
+            }
+
+            try {
+                $stIns = $db->prepare('INSERT INTO correios_packet_etiquetas (pedido_id, customer_control_code, tracking_number, status, last_request_json, last_response_json, last_http_code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+                $stIns->execute([
+                    $pedidoId,
+                    $customerControlCode,
+                    $tracking,
+                    'gerada',
+                    json_encode(['packageList' => [$package]]),
+                    json_encode($rawResp),
+                    (int) ($resp['http_code'] ?? 200),
+                ]);
+            } catch (\Exception $e) {
+                try {
+                    $st = $db->prepare('SELECT id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                    $st->execute([$pedidoId]);
+                    $exists = (int) ($st->fetchColumn() ?: 0);
+                    if ($exists > 0) {
+                        return;
+                    }
+                } catch (\Exception $e2) {
+                }
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, $pedidoId, 'db', 'Falha ao salvar etiqueta PACKET: ' . $e->getMessage(), [], true);
+                return;
+            }
+
+            try {
+                $colsP = [];
+                try {
+                    $stCols = $db->query('DESCRIBE pedidos');
+                    $colsP = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsP = [];
+                }
+                if (is_array($colsP) && !empty($colsP)) {
+                    $set = [];
+                    $p = [':id' => (int) $pedidoId];
+                    if (in_array('tracking_code', $colsP, true)) {
+                        $set[] = 'tracking_code = :t';
+                        $p[':t'] = $tracking;
+                    }
+                    if (in_array('tracking_source', $colsP, true)) {
+                        $set[] = 'tracking_source = :ts';
+                        $p[':ts'] = 'Correios Mundial (PACKET)';
+                    }
+                    if (!empty($set)) {
+                        $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id';
+                        $stUp = $db->prepare($sql);
+                        $stUp->execute($p);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
+            try {
+                $this->pedidoModel->atualizarStatus((int) $pedidoId, 'etiqueta_gerada', 'Etiqueta PACKET gerada - Rastreio: ' . $tracking, null);
+            } catch (\Exception $e) {
+            }
+
+            try {
+                $notif = new \App\Services\NotificationService();
+                $notif->notificarEventoPedido('correios_packet_label_created', (int) $pedidoId, [
+                    'tracking_number' => $tracking,
+                    'customer_control_code' => $customerControlCode,
+                ]);
+            } catch (\Exception $e) {
+            }
+        } catch (\Exception $e) {
+            try {
+                $this->logCorreiosPacketAutoFailurePagamentoService($db, (int) $pedidoId, 'exception', $e->getMessage(), [], true);
+            } catch (\Exception $e2) {
+            }
+            return;
+        }
+    }
+
+    private function logCorreiosPacketAutoFailurePagamentoService(\PDO $db, int $pedidoId, string $stage, string $message, array $context = [], bool $notify = false): void {
+        try {
+            $payload = [
+                'pedido_id' => (int) $pedidoId,
+                'stage' => (string) $stage,
+                'message' => (string) $message,
+                'context' => $context,
+            ];
+            error_log('[PACKET][AUTO_LABEL_FAILED] ' . json_encode($payload));
+
+            if ($this->tableExistsPagamentoService($db, 'auditoria_logs')) {
+                try {
+                    $st = $db->prepare('INSERT INTO auditoria_logs (usuario_id, acao, tabela, registro_id, valores_novos) VALUES (NULL, ?, ?, ?, ?)');
+                    $st->execute([
+                        'correios_packet_auto_label_failed',
+                        'pedidos',
+                        (int) $pedidoId,
+                        json_encode($payload),
+                    ]);
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($notify) {
+                try {
+                    $notif = new \App\Services\NotificationService();
+                    $notif->notificarEventoPedido('correios_packet_label_failed', (int) $pedidoId, [
+                        'stage' => (string) $stage,
+                        'error' => (string) $message,
+                    ]);
+                } catch (\Exception $e) {
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function ensurePacketEtiquetasTablePagamentoService(\PDO $db): void {
+        try {
+            if ($this->tableExistsPagamentoService($db, 'correios_packet_etiquetas')) {
+                return;
+            }
+
+            $sql = "CREATE TABLE IF NOT EXISTS correios_packet_etiquetas (\n"
+                . "  id INT AUTO_INCREMENT PRIMARY KEY,\n"
+                . "  pedido_id INT NOT NULL,\n"
+                . "  customer_control_code VARCHAR(120) NULL,\n"
+                . "  tracking_number VARCHAR(120) NULL,\n"
+                . "  status VARCHAR(30) DEFAULT 'gerada',\n"
+                . "  last_request_json LONGTEXT NULL,\n"
+                . "  last_response_json LONGTEXT NULL,\n"
+                . "  last_http_code INT NULL,\n"
+                . "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n"
+                . "  updated_at TIMESTAMP NULL DEFAULT NULL,\n"
+                . "  UNIQUE KEY uniq_correios_packet_etiquetas_pedido_id (pedido_id),\n"
+                . "  KEY idx_correios_packet_etiquetas_tracking_number (tracking_number)\n"
+                . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            $db->exec($sql);
+        } catch (\Exception $e) {
+        }
+    }
+
+    private function tableExistsPagamentoService(\PDO $db, string $table): bool {
+        try {
+            $stmt = $db->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+            $stmt->execute([$table]);
+            return ((int) $stmt->fetchColumn()) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function onlyDigitsPagamentoService(string $v): string {
+        $v = (string) $v;
+        $v = preg_replace('/\D+/', '', $v);
+        return (string) $v;
+    }
+
+    private function pickFirstNonEmptyPagamentoService(array $row, array $keys): string {
+        foreach ($keys as $k) {
+            if (array_key_exists($k, $row)) {
+                $v = trim((string) ($row[$k] ?? ''));
+                if ($v !== '') return $v;
+            }
+        }
+        return '';
+    }
+
+    private function buildRecipientFromPedidoPagamentoService(\PDO $db, array $pedido): array {
+        $destNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
+        $destEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ''));
+        $destTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
+
+        $destDoc = $this->pickFirstNonEmptyPagamentoService($pedido, ['cliente_cpf_cnpj', 'cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
+        if ($destDoc === '' && isset($pedido['cliente']) && is_array($pedido['cliente'])) {
+            $destDoc = $this->pickFirstNonEmptyPagamentoService((array) $pedido['cliente'], ['cpf_cnpj', 'cpfCnpj', 'cpf', 'cnpj', 'documento', 'document']);
+        }
+        if ($destDoc === '') {
+            $uid = (int) ($pedido['usuario_id'] ?? 0);
+            if ($uid > 0 && $this->tableExistsPagamentoService($db, 'usuarios')) {
+                try {
+                    $colsU = [];
+                    try {
+                        $stCols = $db->query('DESCRIBE usuarios');
+                        $colsU = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) {
+                        $colsU = [];
+                    }
+
+                    $docCol = null;
+                    foreach (['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf', 'cnpj'] as $c) {
+                        if (in_array($c, $colsU, true)) {
+                            $docCol = $c;
+                            break;
+                        }
+                    }
+
+                    if ($docCol) {
+                        $stU = $db->prepare('SELECT ' . $docCol . ' AS documento FROM usuarios WHERE id = ? LIMIT 1');
+                        $stU->execute([$uid]);
+                        $rowU = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $destDoc = (string) ($rowU['documento'] ?? '');
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+        }
+        $destDocDigits = $this->onlyDigitsPagamentoService($destDoc);
+
+        $docType = 'CPF';
+        if (strlen($destDocDigits) === 14) {
+            $docType = 'CNPJ';
+        }
+
+        if ($docType === 'CPF' && $destDocDigits !== '' && strlen($destDocDigits) < 11) {
+            $destDocDigits = str_pad($destDocDigits, 11, '0', STR_PAD_LEFT);
+        }
+        if ($docType === 'CNPJ' && $destDocDigits !== '' && strlen($destDocDigits) < 14) {
+            $destDocDigits = str_pad($destDocDigits, 14, '0', STR_PAD_LEFT);
+        }
+
+        $cep = $this->onlyDigitsPagamentoService((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? '')));
+        $logradouro = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
+        $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
+        $complemento = (string) ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''));
+        $cidade = (string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''));
+        $uf = (string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''));
+
+        $telDigits = $this->onlyDigitsPagamentoService($destTel);
+        if (strlen($telDigits) >= 12 && strpos($telDigits, '55') === 0) {
+            $telDigits = substr($telDigits, 2);
+        }
+        if (strlen($telDigits) > 11) {
+            $telDigits = substr($telDigits, -11);
+        }
+
+        return [
+            'recipientName' => substr(trim($destNome), 0, 70),
+            'recipientDocumentType' => $docType,
+            'recipientDocumentNumber' => substr($destDocDigits, 0, 14),
+            'recipientAddress' => substr(trim($logradouro), 0, 170),
+            'recipientAddressNumber' => substr(trim((string) $numero), 0, 10),
+            'recipientAddressComplement' => substr(trim((string) $complemento), 0, 50),
+            'recipientCityName' => substr(trim((string) $cidade), 0, 100),
+            'recipientState' => substr(strtoupper(trim((string) $uf)), 0, 2),
+            'recipientZipCode' => substr($cep, 0, 8),
+            'recipientEmail' => substr(trim((string) $destEmail), 0, 50),
+            'recipientPhoneNumber' => $telDigits,
+        ];
+    }
+
+    private function buildSenderFromConfigPagamentoService(\PDO $db): array {
+        $fromJson = '';
+        try {
+            if ($this->tableExistsPagamentoService($db, 'configuracoes_sistema')) {
+                $cols = [];
+                try {
+                    $stCols = $db->query('DESCRIBE configuracoes_sistema');
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $cols = [];
+                }
+                if (in_array('chave', $cols, true) && in_array('valor', $cols, true)) {
+                    $st = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $st->execute(['entrega_shipstation_from_address_json']);
+                    $fromJson = (string) ($st->fetchColumn() ?: '');
+                }
+            }
+        } catch (\Exception $e) {
+            $fromJson = '';
+        }
+
+        $from = $fromJson !== '' ? json_decode($fromJson, true) : null;
+        if (!is_array($from)) {
+            $from = [];
+        }
+
+        $name = trim((string) ($from['company_name'] ?? ($from['name'] ?? '')));
+        if ($name === '') {
+            $name = 'Braziliana LLC';
+        }
+
+        $addr1 = trim((string) ($from['address_line1'] ?? ''));
+        $addr2 = trim((string) ($from['address_line2'] ?? ''));
+        $city = trim((string) ($from['city_locality'] ?? ''));
+        $state = strtoupper(trim((string) ($from['state_province'] ?? '')));
+        $zip = $this->onlyDigitsPagamentoService((string) ($from['postal_code'] ?? ''));
+        $email = trim((string) ($from['email'] ?? ''));
+
+        $address = $addr1;
+        $number = '';
+        $complement = $addr2;
+
+        if ($address === '') {
+            $address = 'Address';
+        }
+        if ($number === '') {
+            $number = '0';
+        }
+        if ($city === '') {
+            $city = 'City';
+        }
+        if ($zip === '') {
+            $zip = '00000';
+        }
+        if ($state === '') {
+            $state = 'NC';
+        }
+
+        return [
+            'senderName' => substr($name, 0, 70),
+            'senderAddress' => substr($address, 0, 140),
+            'senderAddressNumber' => substr($number, 0, 6),
+            'senderAddressComplement' => substr($complement, 0, 50),
+            'senderZipCode' => substr($zip, 0, 20),
+            'senderCityName' => substr($city, 0, 50),
+            'senderState' => substr($state, 0, 2),
+            'senderCountryCode' => 'US',
+            'senderEmail' => substr($email, 0, 50),
+            'senderWebsite' => 'brazilianashop.com',
+        ];
     }
     
     private function confirmarPagamento($paymentId, $gateway) {

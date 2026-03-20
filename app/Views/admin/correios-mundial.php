@@ -22,6 +22,20 @@
 
     <div class="alert alert-danger" id="cm_error" style="display:none;"></div>
 
+    <?php
+        $cmPerfil = '';
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $cmPerfil = (string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''));
+        } catch (\Exception $e) {
+            $cmPerfil = '';
+        }
+        $cmPerfil = strtolower(trim($cmPerfil));
+        $cmIsRedirecionador = ($cmPerfil === 'redirecionador');
+    ?>
+
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header"><strong>Pedidos (Caixa Fechada) - prontos para etiqueta</strong></div>
         <div class="card-body">
@@ -48,7 +62,9 @@
                                     <td><?= !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-' ?></td>
                                     <td>
                                         <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/pedido/<?= $pid ?>">Abrir</a>
-                                        <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/<?= $pid ?>" target="_blank">Pedido</a>
+                                        <?php if (!$cmIsRedirecionador): ?>
+                                            <a class="btn btn-sm btn-outline-secondary" href="/admin/pedidos/detalhes/<?= $pid ?>" target="_blank">Pedido</a>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

@@ -1,5 +1,17 @@
 <?php ob_start();
 
+$cmPerfil = '';
+try {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $cmPerfil = (string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''));
+} catch (\Exception $e) {
+    $cmPerfil = '';
+}
+$cmPerfil = strtolower(trim($cmPerfil));
+$cmIsRedirecionador = ($cmPerfil === 'redirecionador');
+
 function cm_mask_cpf_cnpj(string $digits): string {
     $d = preg_replace('/\D+/', '', $digits);
     if (strlen($d) === 11) {
@@ -69,7 +81,9 @@ $nonNatLabel = [
         <h1 class="h2">Correios Mundial (PACKET) - Pedido #<?= str_pad((string) (int) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></h1>
         <div class="d-flex gap-2">
             <a href="/admin/correios-mundial" class="btn btn-outline-secondary">Voltar</a>
-            <a href="/admin/pedidos/detalhes/<?= (int) ($pedido['id'] ?? 0) ?>" target="_blank" class="btn btn-outline-secondary">Ver pedido</a>
+            <?php if (!$cmIsRedirecionador): ?>
+                <a href="/admin/pedidos/detalhes/<?= (int) ($pedido['id'] ?? 0) ?>" target="_blank" class="btn btn-outline-secondary">Ver pedido</a>
+            <?php endif; ?>
         </div>
     </div>
 
