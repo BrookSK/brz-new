@@ -6,6 +6,24 @@ use App\Services\AuthService;
 
 class AdminRedirecionamentoController extends Controller {
 
+    /** Adiciona colunas faltantes em uma tabela existente (best-effort) */
+    private function migrarColunas(\PDO $db, string $tabela, array $colunas): void {
+        try {
+            $existentes = $db->query("DESCRIBE `$tabela`")->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($colunas as $col => $def) {
+                if (!in_array($col, $existentes, true)) {
+                    try {
+                        $db->exec("ALTER TABLE `$tabela` ADD COLUMN `$col` $def");
+                    } catch (\Exception $e) {
+                        error_log("[Redirecionamento] ALTER $tabela ADD $col: " . $e->getMessage());
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("[Redirecionamento] migrarColunas($tabela): " . $e->getMessage());
+        }
+    }
+
     private function auth(): void {
         (new AuthService())->requerPerfis(['admin', 'suporte', 'redirecionador']);
     }
@@ -193,6 +211,34 @@ class AdminRedirecionamentoController extends Controller {
             INDEX idx_envio_id (envio_id),
             INDEX idx_data (data_agendada)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // ── Migração defensiva para tabelas que podem existir com schema antigo ──
+        // Para cada tabela, verifica colunas críticas e recria se incompatível.
+        $this->migrarColunas($db, 'redirecionamento_coletas', [
+            'redirecionador_id' => 'INT NOT NULL DEFAULT 0',
+            'data_agendada'     => 'DATE NOT NULL DEFAULT (CURRENT_DATE)',
+            'horario'           => "TIME NOT NULL DEFAULT '00:00:00'",
+            'status'            => "VARCHAR(30) NOT NULL DEFAULT 'agendado'",
+        ]);
+        $this->migrarColunas($db, 'redirecionamento_envios', [
+            'redirecionador_id'  => 'INT NOT NULL DEFAULT 0',
+            'status_pagamento'   => "VARCHAR(30) NOT NULL DEFAULT 'pendente'",
+            'valor_cobrado_usd'  => 'DECIMAL(10,2) DEFAULT NULL',
+            'valor_correto_usd'  => 'DECIMAL(10,2) DEFAULT NULL',
+            'peso_real_kg'       => 'DECIMAL(6,3) DEFAULT NULL',
+            'tracking_code'      => 'VARCHAR(100) DEFAULT NULL',
+            'etiqueta_url'       => 'TEXT DEFAULT NULL',
+        ]);
+        $this->migrarColunas($db, 'redirecionamento_pagamentos', [
+            'stripe_client_secret' => 'VARCHAR(500) DEFAULT NULL',
+            'comprovante_url'      => 'TEXT DEFAULT NULL',
+            'pago_em'              => 'TIMESTAMP NULL DEFAULT NULL',
+        ]);
+        $this->migrarColunas($db, 'redirecionadores', [
+            'suite'          => 'VARCHAR(50) DEFAULT NULL',
+            'conta_bancaria' => 'TEXT DEFAULT NULL',
+            'status'         => "VARCHAR(20) NOT NULL DEFAULT 'ativo'",
+        ]);
 
         // Seed da tabela de pesos se vazia
         try {
