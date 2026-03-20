@@ -21,6 +21,7 @@ class AdminRedirecionamentoController extends Controller {
     /** Cria todas as tabelas do módulo se não existirem */
     private function migrar(): void {
         $db = $this->pdo();
+        try {
         $db->exec("CREATE TABLE IF NOT EXISTS redirecionadores (
             id INT AUTO_INCREMENT PRIMARY KEY,
             usuario_id INT DEFAULT NULL,
@@ -72,6 +73,44 @@ class AdminRedirecionamentoController extends Controller {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uk_peso (peso_ate_kg)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Migração defensiva: garantir colunas corretas na tabela de pesos
+        // (pode existir com schema antigo — dropar e recriar se necessário)
+        try {
+            $existingCols = $db->query("DESCRIBE redirecionamento_tabela_pesos")->fetchAll(\PDO::FETCH_COLUMN);
+            $hasPesoAte  = in_array('peso_ate_kg', $existingCols, true);
+            $hasValorUsd = in_array('valor_usd',   $existingCols, true);
+            if (!$hasPesoAte || !$hasValorUsd) {
+                $hasPesoMax = in_array('peso_max_kg', $existingCols, true);
+                $hasPesoMin = in_array('peso_min_kg', $existingCols, true);
+                if (!$hasPesoAte) {
+                    if ($hasPesoMax) {
+                        $db->exec("ALTER TABLE redirecionamento_tabela_pesos CHANGE peso_max_kg peso_ate_kg DECIMAL(6,3) NOT NULL");
+                    } else {
+                        // Schema incompatível — dropar e recriar limpo
+                        $db->exec("DROP TABLE redirecionamento_tabela_pesos");
+                        $db->exec("CREATE TABLE redirecionamento_tabela_pesos (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            peso_ate_kg DECIMAL(6,3) NOT NULL,
+                            valor_usd DECIMAL(10,2) NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            UNIQUE KEY uk_peso (peso_ate_kg)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                    }
+                }
+                if ($hasPesoMin) {
+                    try { $db->exec("ALTER TABLE redirecionamento_tabela_pesos DROP COLUMN peso_min_kg"); } catch (\Exception $e) {}
+                }
+                if (!$hasValorUsd) {
+                    $db->exec("ALTER TABLE redirecionamento_tabela_pesos ADD COLUMN valor_usd DECIMAL(10,2) NOT NULL DEFAULT 0");
+                }
+                try { $db->exec("ALTER TABLE redirecionamento_tabela_pesos DROP INDEX uk_peso"); } catch (\Exception $e) {}
+                try { $db->exec("ALTER TABLE redirecionamento_tabela_pesos ADD UNIQUE KEY uk_peso (peso_ate_kg)"); } catch (\Exception $e) {}
+            }
+        } catch (\Exception $e) {
+            error_log('[Redirecionamento] migrar tabela_pesos: ' . $e->getMessage());
+        }
 
         $db->exec("CREATE TABLE IF NOT EXISTS redirecionamento_envios (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -156,7 +195,9 @@ class AdminRedirecionamentoController extends Controller {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         // Seed da tabela de pesos se vazia
-        $count = (int) $db->query("SELECT COUNT(*) FROM redirecionamento_tabela_pesos")->fetchColumn();
+        try {
+            $count = (int) $db->query("SELECT COUNT(*) FROM redirecionamento_tabela_pesos")->fetchColumn();
+        } catch (\Exception $e) { $count = 0; }
         if ($count === 0) {
             $pesos = [
                 [0.5,10.76],[1.0,15.33],[1.5,19.94],[2.0,24.55],[2.5,29.16],[3.0,33.74],
@@ -172,6 +213,9 @@ class AdminRedirecionamentoController extends Controller {
             ];
             $st = $db->prepare("INSERT IGNORE INTO redirecionamento_tabela_pesos (peso_ate_kg, valor_usd) VALUES (?,?)");
             foreach ($pesos as [$p, $v]) { $st->execute([$p, $v]); }
+        }
+        } catch (\Exception $e) {
+            error_log('[Redirecionamento] migrar() error: ' . $e->getMessage());
         }
     }
 
