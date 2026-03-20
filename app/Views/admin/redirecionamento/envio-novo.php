@@ -4,6 +4,7 @@ $title = 'Novo Envio';
 $redirecionadores = is_array($redirecionadores ?? null) ? $redirecionadores : [];
 $tabela = is_array($tabela ?? null) ? $tabela : [];
 $stripePublicKey = $stripePublicKey ?? '';
+$redirecionadorFixo = $redirecionadorFixo ?? null;
 ?>
 <?php ob_start(); ?>
 <div class="container-fluid p-4">
@@ -33,12 +34,17 @@ $stripePublicKey = $stripePublicKey ?? '';
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Redirecionador <span class="text-danger">*</span></label>
+                        <?php if ($redirecionadorFixo): ?>
+                        <input class="form-control" type="text" value="<?= htmlspecialchars($redirecionadorFixo['nome'],ENT_QUOTES,'UTF-8') ?>" readonly>
+                        <input type="hidden" name="redirecionador_id" value="<?= (int)$redirecionadorFixo['id'] ?>">
+                        <?php else: ?>
                         <select class="form-select" name="redirecionador_id" id="selRedirecionador" required>
                             <option value="">Selecione...</option>
                             <?php foreach ($redirecionadores as $r): ?>
                             <option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['nome'],ENT_QUOTES,'UTF-8') ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <?php endif; ?>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">ID do pedido (site do cliente) <span class="text-danger">*</span></label>
@@ -291,13 +297,20 @@ document.getElementById('inputComprovante')?.addEventListener('change', async fu
 });
 
 // Carregar clientes ao selecionar redirecionador
+<?php if ($redirecionadorFixo): ?>
+// Redirecionador fixo — carregar clientes automaticamente
+(async () => {
+    const r = await fetch('/admin/redirecionamento/clientes?redirecionador_id=<?= (int)$redirecionadorFixo['id'] ?>&format=json');
+    document.getElementById('selCliente').innerHTML = '<option value="">Selecionar cliente cadastrado...</option>';
+})();
+<?php else: ?>
 document.getElementById('selRedirecionador')?.addEventListener('change', async function() {
     const redId = this.value;
     if (!redId) return;
     const r = await fetch('/admin/redirecionamento/clientes?redirecionador_id='+redId+'&format=json');
-    // fallback: apenas limpa o select
     document.getElementById('selCliente').innerHTML = '<option value="">Selecionar cliente cadastrado...</option>';
 });
+<?php endif; ?>
 
 // Selecionar cliente e preencher campos
 document.getElementById('selCliente')?.addEventListener('change', async function() {
@@ -321,7 +334,11 @@ document.getElementById('selCliente')?.addEventListener('change', async function
 
 // Salvar novo cliente
 document.getElementById('btnSalvarCliente')?.addEventListener('click', async () => {
+    <?php if ($redirecionadorFixo): ?>
+    const redId = '<?= (int)$redirecionadorFixo['id'] ?>';
+    <?php else: ?>
     const redId = document.getElementById('selRedirecionador').value;
+    <?php endif; ?>
     const fd = new FormData();
     fd.append('redirecionador_id', redId);
     fd.append('nome', document.getElementById('ncNome').value);

@@ -4,6 +4,7 @@ $title = 'Clientes dos Redirecionadores';
 $clientes = is_array($clientes ?? null) ? $clientes : [];
 $redirecionadores = is_array($redirecionadores ?? null) ? $redirecionadores : [];
 $busca = htmlspecialchars($busca ?? '', ENT_QUOTES, 'UTF-8');
+$redirecionadorFixo = $redirecionadorFixo ?? null;
 ?>
 <?php ob_start(); ?>
 <div class="container-fluid p-4">
@@ -37,20 +38,20 @@ $busca = htmlspecialchars($busca ?? '', ENT_QUOTES, 'UTF-8');
                             <th>Nome</th>
                             <th>CPF</th>
                             <th>E-mail</th>
-                            <th>Redirecionador</th>
+                            <?php if (!$redirecionadorFixo): ?><th>Redirecionador</th><?php endif; ?>
                             <th>Endereços</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($clientes)): ?>
-                        <tr><td colspan="6" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
+                        <tr><td colspan="<?= $redirecionadorFixo ? 5 : 6 ?>" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
                         <?php else: foreach ($clientes as $c): ?>
                         <tr>
                             <td class="ps-3"><?= (int)$c['id'] ?></td>
                             <td><?= htmlspecialchars($c['nome'],ENT_QUOTES,'UTF-8') ?></td>
                             <td><?= htmlspecialchars($c['cpf']??'',ENT_QUOTES,'UTF-8') ?></td>
                             <td><?= htmlspecialchars($c['email']??'',ENT_QUOTES,'UTF-8') ?></td>
-                            <td><?= htmlspecialchars($c['redirecionador_nome']??'',ENT_QUOTES,'UTF-8') ?></td>
+                            <?php if (!$redirecionadorFixo): ?><td><?= htmlspecialchars($c['redirecionador_nome']??'',ENT_QUOTES,'UTF-8') ?></td><?php endif; ?>
                             <td><?= (int)($c['enderecos_count']??0) ?></td>
                         </tr>
                         <?php endforeach; endif; ?>
@@ -68,6 +69,9 @@ $busca = htmlspecialchars($busca ?? '', ENT_QUOTES, 'UTF-8');
             <div class="modal-header"><h5 class="modal-title">Novo cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="row g-3">
+                    <?php if ($redirecionadorFixo): ?>
+                    <input type="hidden" id="ncRedId" value="<?= (int)$redirecionadorFixo['id'] ?>">
+                    <?php else: ?>
                     <div class="col-md-6">
                         <label class="form-label">Redirecionador <span class="text-danger">*</span></label>
                         <select class="form-select" id="ncRedId">
@@ -77,7 +81,8 @@ $busca = htmlspecialchars($busca ?? '', ENT_QUOTES, 'UTF-8');
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-6"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
+                    <?php endif; ?>
+                    <div class="<?= $redirecionadorFixo ? 'col-md-8' : 'col-md-6' ?>"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
                     <div class="col-md-4"><label class="form-label">CPF</label><input class="form-control" type="text" id="ncCpf"></div>
                     <div class="col-md-4"><label class="form-label">E-mail</label><input class="form-control" type="email" id="ncEmail"></div>
                     <div class="col-md-4"><label class="form-label">Telefone</label><input class="form-control" type="text" id="ncTel"></div>

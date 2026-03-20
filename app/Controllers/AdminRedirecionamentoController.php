@@ -562,20 +562,31 @@ class AdminRedirecionamentoController extends Controller {
     public function clientes(Request $request) {
         $this->auth(); $this->migrar();
         $db = $this->pdo();
+        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+        $redirecionadorFixo = null;
+        $params = [];
         $busca = trim((string)$request->getParam('busca',''));
         $sql = "SELECT c.*, r.nome AS redirecionador_nome,
                     (SELECT COUNT(*) FROM redirecionamento_enderecos e WHERE e.cliente_id=c.id) AS enderecos_count
                 FROM redirecionamento_clientes c
                 LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id
                 WHERE 1=1";
-        $params = [];
+        if ($perfil === 'redirecionador') {
+            $uid = (int)($_SESSION['usuario_id'] ?? 0);
+            $st = $db->prepare("SELECT id,nome FROM redirecionadores WHERE usuario_id=? AND status='ativo' LIMIT 1");
+            $st->execute([$uid]);
+            $redirecionadorFixo = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+            if ($redirecionadorFixo) {
+                $sql .= " AND c.redirecionador_id=?";
+                $params[] = $redirecionadorFixo['id'];
+            }
+        }
         if ($busca!=='') { $sql.=" AND (c.nome LIKE ? OR c.cpf LIKE ? OR c.email LIKE ?)"; $params[]="%$busca%"; $params[]="%$busca%"; $params[]="%$busca%"; }
         $sql.=" ORDER BY c.nome ASC";
         $st=$db->prepare($sql); $st->execute($params);
         $clientes=$st->fetchAll(\PDO::FETCH_ASSOC)?:[];
-        // Para o select de redirecionadores no form
         $reds=$db->query("SELECT id,nome FROM redirecionadores WHERE status='ativo' ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
-        $this->view('admin/redirecionamento/clientes',['clientes'=>$clientes,'busca'=>$busca,'redirecionadores'=>$reds]);
+        $this->view('admin/redirecionamento/clientes',['clientes'=>$clientes,'busca'=>$busca,'redirecionadores'=>$reds,'redirecionadorFixo'=>$redirecionadorFixo]);
     }
 
     public function clienteSalvar(Request $request) {
@@ -640,10 +651,18 @@ class AdminRedirecionamentoController extends Controller {
     public function envioNovo(Request $request) {
         $this->auth(); $this->migrar();
         $db = $this->pdo();
+        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+        $redirecionadorFixo = null;
+        if ($perfil === 'redirecionador') {
+            $uid = (int)($_SESSION['usuario_id'] ?? 0);
+            $st = $db->prepare("SELECT id,nome FROM redirecionadores WHERE usuario_id=? AND status='ativo' LIMIT 1");
+            $st->execute([$uid]);
+            $redirecionadorFixo = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        }
         $reds=$db->query("SELECT id,nome FROM redirecionadores WHERE status='ativo' ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $tabela=$db->query("SELECT peso_ate_kg,valor_usd FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $stripeKeys = $this->getStripeKeys();
-        $this->view('admin/redirecionamento/envio-novo',['redirecionadores'=>$reds,'tabela'=>$tabela,'stripePublicKey'=>$stripeKeys['public']]);
+        $this->view('admin/redirecionamento/envio-novo',['redirecionadores'=>$reds,'tabela'=>$tabela,'stripePublicKey'=>$stripeKeys['public'],'redirecionadorFixo'=>$redirecionadorFixo]);
     }
 
     public function envioSalvar(Request $request) {
