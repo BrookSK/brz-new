@@ -278,10 +278,8 @@ function validarStep(n) {
     if (n === 1) {
         const idPedido = document.getElementById('idPedidoCliente')?.value.trim();
         if (!idPedido) { mostrarErro('Informe o ID do pedido.'); return false; }
-        if (!RED_FIXO_ID) {
-            const sel = document.getElementById('selRedirecionador');
-            if (!sel?.value) { mostrarErro('Selecione o redirecionador.'); return false; }
-        }
+        const selRed = document.getElementById('selRedirecionador');
+        if (selRed && !selRed.value) { mostrarErro('Selecione o redirecionador.'); return false; }
     }
     if (n === 2) {
         const nome = document.getElementById('destNome')?.value.trim();
