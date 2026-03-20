@@ -129,5 +129,16 @@ $router->get('/admin', function() {
     exit;
 });
 
+// Redirecionamento (módulo novo)
+$router->get('/admin/redirecionamento/dashboard', 'AdminRedirecionamentoController', 'dashboard');
+$router->get('/admin/redirecionamento/redirecionadores', 'AdminRedirecionamentoController', 'redirecionadores');
+$router->get('/admin/redirecionamento/envios', 'AdminRedirecionamentoController', 'envios');
+$router->get('/admin/redirecionamento/divergencias', 'AdminRedirecionamentoController', 'divergencias');
+$router->get('/admin/redirecionamento/clientes', 'AdminRedirecionamentoController', 'clientes');
+$router->get('/admin/redirecionamento/tabela-pesos', 'AdminRedirecionamentoController', 'tabelaPesos');
+$router->get('/admin/redirecionamento/pagamentos', 'AdminRedirecionamentoController', 'pagamentos');
+$router->get('/admin/redirecionamento/comprovantes', 'AdminRedirecionamentoController', 'comprovantes');
+$router->get('/admin/redirecionamento/coletas', 'AdminRedirecionamentoController', 'coletas');
+
 // Webhooks
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');

@@ -123,6 +123,93 @@ function renderAdminSidebar($activePage = '') {
         return;
     }
 
+    // Painel dedicado do redirecionador (portal operacional)
+    if ($perfil === 'redirecionador') {
+        $menuItems = [
+            'redirecionamento-dashboard' => [
+                'icon' => 'fas fa-tachometer-alt',
+                'label' => __('admin.menu.redirecionamento.dashboard', 'Dashboard de Redirecionamento'),
+                'url' => '/admin/redirecionamento/dashboard',
+            ],
+            'redirecionamento-envios' => [
+                'icon' => 'fas fa-truck-fast',
+                'label' => __('admin.menu.redirecionamento.envios', 'Envios'),
+                'url' => '/admin/redirecionamento/envios',
+            ],
+            'redirecionamento-divergencias' => [
+                'icon' => 'fas fa-scale-balanced',
+                'label' => __('admin.menu.redirecionamento.divergencias', 'Divergências e Ajustes'),
+                'url' => '/admin/redirecionamento/divergencias',
+            ],
+            'redirecionamento-clientes' => [
+                'icon' => 'fas fa-users',
+                'label' => __('admin.menu.redirecionamento.clientes', 'Clientes'),
+                'url' => '/admin/redirecionamento/clientes',
+            ],
+            'redirecionamento-tabela-pesos' => [
+                'icon' => 'fas fa-table',
+                'label' => __('admin.menu.redirecionamento.tabela_pesos', 'Tabela de Pesos e Preços'),
+                'url' => '/admin/redirecionamento/tabela-pesos',
+            ],
+            'redirecionamento-pagamentos' => [
+                'icon' => 'fas fa-credit-card',
+                'label' => __('admin.menu.redirecionamento.pagamentos', 'Pagamentos'),
+                'url' => '/admin/redirecionamento/pagamentos',
+            ],
+            'redirecionamento-comprovantes' => [
+                'icon' => 'fas fa-file-upload',
+                'label' => __('admin.menu.redirecionamento.comprovantes', 'Comprovantes'),
+                'url' => '/admin/redirecionamento/comprovantes',
+            ],
+            'redirecionamento-coletas' => [
+                'icon' => 'fas fa-calendar-check',
+                'label' => __('admin.menu.redirecionamento.coletas', 'Coletas'),
+                'url' => '/admin/redirecionamento/coletas',
+            ],
+        ];
+
+        echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
+                <i class="fas fa-bars"></i>
+              </button>';
+
+        echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+            <div class="position-sticky pt-3">
+                <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/redirecionamento/dashboard">
+                    <div class="sidebar-brand-icon"><i class="fas fa-truck-fast"></i></div>
+                    <div class="sidebar-brand-text mx-3">' . htmlspecialchars(__('admin.role.redirecionador', 'Redirecionamento'), ENT_QUOTES, 'UTF-8') . '</div>
+                </a>
+                <ul class="nav flex-column">';
+
+        foreach ($menuItems as $key => $item) {
+            $activeClass = ($activePage === $key) ? 'active' : '';
+            echo '<li class="nav-item">
+                <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
+                    <i class="fas fa-fw ' . $item['icon'] . '"></i>
+                    <span>' . $item['label'] . '</span>
+                </a>
+            </li>';
+        }
+
+        echo '</ul>
+                <hr class="sidebar-divider">
+                <div class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-fw fa-home"></i>
+                        <span>' . htmlspecialchars(__('admin.back_to_site', 'Voltar ao Site'), ENT_QUOTES, 'UTF-8') . '</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link" href="/logout">
+                        <i class="fas fa-fw fa-sign-out-alt"></i>
+                        <span>' . htmlspecialchars(__('common.logout', 'Sair'), ENT_QUOTES, 'UTF-8') . '</span>
+                    </a>
+                </div>
+            </div>
+        </nav>';
+
+        return;
+    }
+
     $menuItems = [
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.dashboard', 'Dashboard'), 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'produtos' => ['icon' => 'fas fa-box', 'label' => __('admin.menu.products', 'Produtos'), 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
@@ -148,7 +235,18 @@ function renderAdminSidebar($activePage = '') {
         'payment-links' => ['icon' => 'fas fa-link', 'label' => 'Payment Links', 'url' => '/admin/payment-links', 'roles' => ['admin','vendedor']],
         'clube-recargas' => ['icon' => 'fas fa-wallet', 'label' => 'Recargas Clube', 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'backup' => ['icon' => 'fas fa-database', 'label' => 'Backup', 'url' => '/admin/backup', 'roles' => ['admin']],
-        'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']]
+        'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
+
+        // Módulo Redirecionamento (visível no admin/suporte)
+        'redirecionamento-dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.redirecionamento.dashboard', 'Dashboard de Redirecionamento'), 'url' => '/admin/redirecionamento/dashboard', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-redirecionadores' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.redirecionamento.redirecionadores', 'Redirecionadores'), 'url' => '/admin/redirecionamento/redirecionadores', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-envios' => ['icon' => 'fas fa-truck-fast', 'label' => __('admin.menu.redirecionamento.envios', 'Envios'), 'url' => '/admin/redirecionamento/envios', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-divergencias' => ['icon' => 'fas fa-scale-balanced', 'label' => __('admin.menu.redirecionamento.divergencias', 'Divergências e Ajustes'), 'url' => '/admin/redirecionamento/divergencias', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-clientes' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.redirecionamento.clientes', 'Clientes'), 'url' => '/admin/redirecionamento/clientes', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => __('admin.menu.redirecionamento.tabela_pesos', 'Tabela de Pesos e Preços'), 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.redirecionamento.pagamentos', 'Pagamentos'), 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => __('admin.menu.redirecionamento.comprovantes', 'Comprovantes'), 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => __('admin.menu.redirecionamento.coletas', 'Coletas'), 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']]
     ];
 
     $unreadTickets = 0;
