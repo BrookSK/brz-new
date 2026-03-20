@@ -6,6 +6,32 @@ use App\Services\AuthService;
 
 class AdminRedirecionamentoController extends Controller {
 
+    /**
+     * Verifica se a tabela tem todas as colunas obrigatórias.
+     * Se não tiver, dropa e recria com o DDL correto.
+     * Se tiver, adiciona apenas as colunas faltantes (best-effort).
+     */
+    private function garantirSchema(\PDO $db, string $tabela, array $colsObrigatorias, string $ddl): void {
+        try {
+            $st = $db->prepare("SHOW TABLES LIKE ?");
+            $st->execute([$tabela]);
+            $existe = (bool) $st->fetchColumn();
+
+            if (!$existe) return; // CREATE TABLE IF NOT EXISTS já criou
+
+            $existentes = $db->query("DESCRIBE `$tabela`")->fetchAll(\PDO::FETCH_COLUMN);
+            $faltam = array_diff($colsObrigatorias, $existentes);
+
+            if (!empty($faltam)) {
+                // Schema incompatível — dropar e recriar
+                $db->exec("DROP TABLE `$tabela`");
+                $db->exec($ddl);
+            }
+        } catch (\Exception $e) {
+            error_log("[Redirecionamento] garantirSchema($tabela): " . $e->getMessage());
+        }
+    }
+
     /** Adiciona colunas faltantes em uma tabela existente (best-effort) */
     private function migrarColunas(\PDO $db, string $tabela, array $colunas): void {
         try {
@@ -212,33 +238,151 @@ class AdminRedirecionamentoController extends Controller {
             INDEX idx_data (data_agendada)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        // ── Migração defensiva para tabelas que podem existir com schema antigo ──
-        // Para cada tabela, verifica colunas críticas e recria se incompatível.
-        $this->migrarColunas($db, 'redirecionamento_coletas', [
-            'redirecionador_id' => 'INT NOT NULL DEFAULT 0',
-            'data_agendada'     => 'DATE NOT NULL DEFAULT (CURRENT_DATE)',
-            'horario'           => "TIME NOT NULL DEFAULT '00:00:00'",
-            'status'            => "VARCHAR(30) NOT NULL DEFAULT 'agendado'",
-        ]);
-        $this->migrarColunas($db, 'redirecionamento_envios', [
-            'redirecionador_id'  => 'INT NOT NULL DEFAULT 0',
-            'status_pagamento'   => "VARCHAR(30) NOT NULL DEFAULT 'pendente'",
-            'valor_cobrado_usd'  => 'DECIMAL(10,2) DEFAULT NULL',
-            'valor_correto_usd'  => 'DECIMAL(10,2) DEFAULT NULL',
-            'peso_real_kg'       => 'DECIMAL(6,3) DEFAULT NULL',
-            'tracking_code'      => 'VARCHAR(100) DEFAULT NULL',
-            'etiqueta_url'       => 'TEXT DEFAULT NULL',
-        ]);
-        $this->migrarColunas($db, 'redirecionamento_pagamentos', [
-            'stripe_client_secret' => 'VARCHAR(500) DEFAULT NULL',
-            'comprovante_url'      => 'TEXT DEFAULT NULL',
-            'pago_em'              => 'TIMESTAMP NULL DEFAULT NULL',
-        ]);
-        $this->migrarColunas($db, 'redirecionadores', [
-            'suite'          => 'VARCHAR(50) DEFAULT NULL',
-            'conta_bancaria' => 'TEXT DEFAULT NULL',
-            'status'         => "VARCHAR(20) NOT NULL DEFAULT 'ativo'",
-        ]);
+        // ── Migração defensiva: dropar e recriar tabelas com schema incompatível ──
+        $schemas = [
+            'redirecionamento_coletas' => [
+                'colunas_obrigatorias' => ['envio_id', 'redirecionador_id', 'data_agendada', 'horario'],
+                'ddl' => "CREATE TABLE redirecionamento_coletas (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    envio_id INT NOT NULL,
+                    redirecionador_id INT NOT NULL,
+                    data_agendada DATE NOT NULL,
+                    horario TIME NOT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'agendado',
+                    observacoes TEXT DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_envio_id (envio_id),
+                    INDEX idx_data (data_agendada)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+            'redirecionamento_envios' => [
+                'colunas_obrigatorias' => ['redirecionador_id', 'status_pagamento', 'valor_cobrado_usd'],
+                'ddl' => "CREATE TABLE redirecionamento_envios (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    redirecionador_id INT NOT NULL,
+                    cliente_id INT DEFAULT NULL,
+                    id_pedido_cliente VARCHAR(100) DEFAULT NULL,
+                    destinatario_nome VARCHAR(200) DEFAULT NULL,
+                    destinatario_cpf VARCHAR(20) DEFAULT NULL,
+                    destinatario_email VARCHAR(200) DEFAULT NULL,
+                    destinatario_telefone VARCHAR(30) DEFAULT NULL,
+                    destinatario_data_nascimento DATE DEFAULT NULL,
+                    dest_logradouro VARCHAR(255) DEFAULT NULL,
+                    dest_numero VARCHAR(20) DEFAULT NULL,
+                    dest_complemento VARCHAR(100) DEFAULT NULL,
+                    dest_bairro VARCHAR(100) DEFAULT NULL,
+                    dest_cidade VARCHAR(100) DEFAULT NULL,
+                    dest_estado VARCHAR(2) DEFAULT NULL,
+                    dest_cep VARCHAR(10) DEFAULT NULL,
+                    moeda VARCHAR(3) NOT NULL DEFAULT 'USD',
+                    valor_frete_usd DECIMAL(10,2) DEFAULT NULL,
+                    peso_kg DECIMAL(6,3) DEFAULT NULL,
+                    largura_cm DECIMAL(6,2) DEFAULT NULL,
+                    altura_cm DECIMAL(6,2) DEFAULT NULL,
+                    comprimento_cm DECIMAL(6,2) DEFAULT NULL,
+                    peso_real_kg DECIMAL(6,3) DEFAULT NULL,
+                    largura_real_cm DECIMAL(6,2) DEFAULT NULL,
+                    altura_real_cm DECIMAL(6,2) DEFAULT NULL,
+                    comprimento_real_cm DECIMAL(6,2) DEFAULT NULL,
+                    valor_cobrado_usd DECIMAL(10,2) DEFAULT NULL,
+                    valor_correto_usd DECIMAL(10,2) DEFAULT NULL,
+                    status VARCHAR(50) NOT NULL DEFAULT 'rascunho',
+                    status_pagamento VARCHAR(30) NOT NULL DEFAULT 'pendente',
+                    stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+                    tracking_code VARCHAR(100) DEFAULT NULL,
+                    etiqueta_url TEXT DEFAULT NULL,
+                    observacoes TEXT DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_red_id (redirecionador_id),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+            'redirecionamento_pagamentos' => [
+                'colunas_obrigatorias' => ['envio_id', 'tipo', 'valor_usd', 'status'],
+                'ddl' => "CREATE TABLE redirecionamento_pagamentos (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    envio_id INT NOT NULL,
+                    tipo VARCHAR(20) NOT NULL DEFAULT 'envio',
+                    valor_usd DECIMAL(10,2) NOT NULL,
+                    stripe_payment_intent VARCHAR(255) DEFAULT NULL,
+                    stripe_client_secret VARCHAR(500) DEFAULT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'pendente',
+                    comprovante_url TEXT DEFAULT NULL,
+                    pago_em TIMESTAMP NULL DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_envio_id (envio_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+            'redirecionamento_produtos_envio' => [
+                'colunas_obrigatorias' => ['envio_id', 'descricao'],
+                'ddl' => "CREATE TABLE redirecionamento_produtos_envio (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    envio_id INT NOT NULL,
+                    ncm VARCHAR(20) DEFAULT NULL,
+                    descricao VARCHAR(255) NOT NULL,
+                    preco_usd DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    peso_kg DECIMAL(6,3) NOT NULL DEFAULT 0.000,
+                    quantidade INT NOT NULL DEFAULT 1,
+                    INDEX idx_envio_id (envio_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+            'redirecionamento_clientes' => [
+                'colunas_obrigatorias' => ['redirecionador_id', 'nome'],
+                'ddl' => "CREATE TABLE redirecionamento_clientes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    redirecionador_id INT NOT NULL,
+                    nome VARCHAR(200) NOT NULL,
+                    cpf VARCHAR(20) DEFAULT NULL,
+                    email VARCHAR(200) DEFAULT NULL,
+                    telefone VARCHAR(30) DEFAULT NULL,
+                    data_nascimento DATE DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_red_id (redirecionador_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+            'redirecionamento_enderecos' => [
+                'colunas_obrigatorias' => ['cliente_id', 'logradouro', 'cidade'],
+                'ddl' => "CREATE TABLE redirecionamento_enderecos (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    cliente_id INT NOT NULL,
+                    logradouro VARCHAR(255) NOT NULL,
+                    numero VARCHAR(20) DEFAULT NULL,
+                    complemento VARCHAR(100) DEFAULT NULL,
+                    bairro VARCHAR(100) DEFAULT NULL,
+                    cidade VARCHAR(100) NOT NULL,
+                    estado VARCHAR(2) NOT NULL,
+                    cep VARCHAR(10) NOT NULL,
+                    principal TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_cli_id (cliente_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+            'redirecionadores' => [
+                'colunas_obrigatorias' => ['nome', 'email', 'status'],
+                'ddl' => "CREATE TABLE redirecionadores (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    usuario_id INT DEFAULT NULL,
+                    nome VARCHAR(200) NOT NULL,
+                    email VARCHAR(200) NOT NULL,
+                    telefone VARCHAR(30) DEFAULT NULL,
+                    suite VARCHAR(50) DEFAULT NULL,
+                    conta_bancaria TEXT DEFAULT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'ativo',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_email (email),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            ],
+        ];
+
+        foreach ($schemas as $tabela => $cfg) {
+            $this->garantirSchema($db, $tabela, $cfg['colunas_obrigatorias'], $cfg['ddl']);
+        }
 
         // Seed da tabela de pesos se vazia
         try {
