@@ -33,6 +33,46 @@ class AdminRedirecionamentoController extends Controller {
     }
 
     /** Adiciona colunas faltantes em uma tabela existente (best-effort) */
+
+    /**
+     * Retorna o redirecionador vinculado ao usuário logado.
+     * Tenta por usuario_id primeiro, depois por email como fallback.
+     * Se perfil não for 'redirecionador', retorna null.
+     */
+    private function getRedirecionadorFixo(): ?array {
+        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+        if ($perfil !== 'redirecionador') return null;
+
+        $db  = $this->pdo();
+        $uid = (int)($_SESSION['usuario_id'] ?? 0);
+
+        // 1) por usuario_id
+        if ($uid > 0) {
+            $st = $db->prepare("SELECT id, nome FROM redirecionadores WHERE usuario_id=? AND status='ativo' LIMIT 1");
+            $st->execute([$uid]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($row) return $row;
+        }
+
+        // 2) fallback por email do usuário logado
+        $email = trim((string)($_SESSION['usuario_email'] ?? ''));
+        if ($email !== '') {
+            $st = $db->prepare("SELECT id, nome FROM redirecionadores WHERE email=? AND status='ativo' LIMIT 1");
+            $st->execute([$email]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($row) {
+                // Aproveita para vincular usuario_id para próximas vezes
+                if ($uid > 0) {
+                    try { $db->prepare("UPDATE redirecionadores SET usuario_id=? WHERE id=?")->execute([$uid, $row['id']]); } catch (\Exception $e) {}
+                }
+                return $row;
+            }
+        }
+
+        // 3) Se não achou vínculo, retorna um placeholder para esconder o campo
+        //    (o redirecionador existe mas ainda não foi vinculado — não deve ver o select)
+        return ['id' => 0, 'nome' => $_SESSION['usuario_nome'] ?? 'Você'];
+    }
     private function migrarColunas(\PDO $db, string $tabela, array $colunas): void {
         try {
             $existentes = $db->query("DESCRIBE `$tabela`")->fetchAll(\PDO::FETCH_COLUMN);
@@ -384,6 +424,12 @@ class AdminRedirecionamentoController extends Controller {
             $this->garantirSchema($db, $tabela, $cfg['colunas_obrigatorias'], $cfg['ddl']);
         }
 
+        // Garantir colunas adicionais que podem faltar em tabelas já existentes
+        $this->migrarColunas($db, 'redirecionadores', [
+            'usuario_id' => 'INT DEFAULT NULL',
+            'suite'      => 'VARCHAR(50) DEFAULT NULL',
+        ]);
+
         // Seed da tabela de pesos se vazia
         try {
             $count = (int) $db->query("SELECT COUNT(*) FROM redirecionamento_tabela_pesos")->fetchColumn();
@@ -562,8 +608,7 @@ class AdminRedirecionamentoController extends Controller {
     public function clientes(Request $request) {
         $this->auth(); $this->migrar();
         $db = $this->pdo();
-        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
-        $redirecionadorFixo = null;
+        $redirecionadorFixo = $this->getRedirecionadorFixo();
         $params = [];
         $busca = trim((string)$request->getParam('busca',''));
         $sql = "SELECT c.*, r.nome AS redirecionador_nome,
@@ -571,15 +616,9 @@ class AdminRedirecionamentoController extends Controller {
                 FROM redirecionamento_clientes c
                 LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id
                 WHERE 1=1";
-        if ($perfil === 'redirecionador') {
-            $uid = (int)($_SESSION['usuario_id'] ?? 0);
-            $st = $db->prepare("SELECT id,nome FROM redirecionadores WHERE usuario_id=? AND status='ativo' LIMIT 1");
-            $st->execute([$uid]);
-            $redirecionadorFixo = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
-            if ($redirecionadorFixo) {
-                $sql .= " AND c.redirecionador_id=?";
-                $params[] = $redirecionadorFixo['id'];
-            }
+        if ($redirecionadorFixo && $redirecionadorFixo['id'] > 0) {
+            $sql .= " AND c.redirecionador_id=?";
+            $params[] = $redirecionadorFixo['id'];
         }
         if ($busca!=='') { $sql.=" AND (c.nome LIKE ? OR c.cpf LIKE ? OR c.email LIKE ?)"; $params[]="%$busca%"; $params[]="%$busca%"; $params[]="%$busca%"; }
         $sql.=" ORDER BY c.nome ASC";
@@ -660,14 +699,7 @@ class AdminRedirecionamentoController extends Controller {
     public function envioNovo(Request $request) {
         $this->auth(); $this->migrar();
         $db = $this->pdo();
-        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
-        $redirecionadorFixo = null;
-        if ($perfil === 'redirecionador') {
-            $uid = (int)($_SESSION['usuario_id'] ?? 0);
-            $st = $db->prepare("SELECT id,nome FROM redirecionadores WHERE usuario_id=? AND status='ativo' LIMIT 1");
-            $st->execute([$uid]);
-            $redirecionadorFixo = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
-        }
+        $redirecionadorFixo = $this->getRedirecionadorFixo();
         $reds=$db->query("SELECT id,nome FROM redirecionadores WHERE status='ativo' ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $tabela=$db->query("SELECT peso_ate_kg,valor_usd FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $stripeKeys = $this->getStripeKeys();
