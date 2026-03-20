@@ -188,10 +188,20 @@ class AuthService {
             $docSess = preg_replace('/\D+/', '', (string) $usuario['cpf']);
         }
         $_SESSION['usuario_documento'] = $docSess;
-        $perfil = (string) ($usuario['perfil'] ?? '');
-        $role = (string) ($usuario['role'] ?? '');
+        $perfil = trim((string) ($usuario['perfil'] ?? ''));
+        $role = trim((string) ($usuario['role'] ?? ''));
+        if ($perfil === '' && $role === '') {
+            $perfil = 'cliente';
+            $role = 'cliente';
+        }
         $_SESSION['usuario_perfil'] = $perfil !== '' ? $perfil : $role;
         $_SESSION['usuario_role'] = $role !== '' ? $role : $perfil;
+        if (!is_string($_SESSION['usuario_perfil']) || trim((string) $_SESSION['usuario_perfil']) === '') {
+            $_SESSION['usuario_perfil'] = 'cliente';
+        }
+        if (!is_string($_SESSION['usuario_role']) || trim((string) $_SESSION['usuario_role']) === '') {
+            $_SESSION['usuario_role'] = (string) $_SESSION['usuario_perfil'];
+        }
         $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];
         $avatarUrl = null;
         foreach ($avatarCandidates as $c) {
@@ -262,10 +272,20 @@ class AuthService {
         }
         $_SESSION['usuario_documento'] = $docSess;
 
-        $perfil = (string) ($usuario['perfil'] ?? '');
-        $role = (string) ($usuario['role'] ?? '');
+        $perfil = trim((string) ($usuario['perfil'] ?? ''));
+        $role = trim((string) ($usuario['role'] ?? ''));
+        if ($perfil === '' && $role === '') {
+            $perfil = 'cliente';
+            $role = 'cliente';
+        }
         $_SESSION['usuario_perfil'] = $perfil !== '' ? $perfil : $role;
         $_SESSION['usuario_role'] = $role !== '' ? $role : $perfil;
+        if (!is_string($_SESSION['usuario_perfil']) || trim((string) $_SESSION['usuario_perfil']) === '') {
+            $_SESSION['usuario_perfil'] = 'cliente';
+        }
+        if (!is_string($_SESSION['usuario_role']) || trim((string) $_SESSION['usuario_role']) === '') {
+            $_SESSION['usuario_role'] = (string) $_SESSION['usuario_perfil'];
+        }
 
         $avatarCandidates = ['avatar', 'foto_perfil', 'imagem_perfil', 'foto', 'avatar_url', 'avatarUrl', 'profile_image', 'profileImage', 'foto_url'];
         $avatarUrl = null;

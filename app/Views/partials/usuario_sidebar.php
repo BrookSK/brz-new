@@ -38,8 +38,24 @@ if (empty($avatarUrl)) {
             </div>
             <h5 class="card-title"><?= htmlspecialchars((string) ($usuario['nome'] ?? '')) ?></h5>
             <p class="text-muted"><?= htmlspecialchars((string) ($usuario['email'] ?? '')) ?></p>
+            <?php
+                $perfilLabel = trim((string) ($usuario['perfil'] ?? ''));
+                if ($perfilLabel === '') {
+                    try {
+                        if (session_status() === PHP_SESSION_NONE) {
+                            session_start();
+                        }
+                        $perfilLabel = trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? '')));
+                    } catch (\Exception $e) {
+                        $perfilLabel = '';
+                    }
+                }
+                if ($perfilLabel === '') {
+                    $perfilLabel = 'cliente';
+                }
+            ?>
             <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: #0b1f3a;">
-                <?= ucfirst((string) ($usuario['perfil'] ?? '')) ?>
+                <?= ucfirst((string) $perfilLabel) ?>
             </span>
             <?php $suiteValue = $usuario['suite'] ?? ($usuario['switch'] ?? null); ?>
             <?php if (!empty($suiteValue)): ?>

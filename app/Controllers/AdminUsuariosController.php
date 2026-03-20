@@ -306,6 +306,11 @@ class AdminUsuariosController extends Controller {
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        $perfilAtual = strtolower(trim((string) ($usuario['perfil'] ?? ($usuario['role'] ?? 'cliente'))));
+        if ($perfilAtual === '') {
+            $perfilAtual = 'cliente';
+        }
+
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -365,13 +370,13 @@ class AdminUsuariosController extends Controller {
                             <div class="col-md-6">
                                 <label class="form-label">Perfil</label>
                                 <select class="form-select" name="perfil" required>
-                                    <option value="cliente" ' . ((($usuario['perfil'] ?? 'cliente') === 'cliente') ? 'selected' : '') . '>Cliente</option>
-                                    <option value="admin" ' . ((($usuario['perfil'] ?? '') === 'admin') ? 'selected' : '') . '>Administrador</option>
-                                    <option value="vendedor" ' . ((($usuario['perfil'] ?? '') === 'vendedor') ? 'selected' : '') . '>Vendedor</option>
-                                    <option value="conferente" ' . ((($usuario['perfil'] ?? '') === 'conferente') ? 'selected' : '') . '>Conferente</option>
-                                    <option value="suporte" ' . ((($usuario['perfil'] ?? '') === 'suporte') ? 'selected' : '') . '>Suporte</option>
-                                    <option value="representante" ' . ((($usuario['perfil'] ?? '') === 'representante') ? 'selected' : '') . '>Representante</option>
-                                    <option value="redirecionador" ' . ((($usuario['perfil'] ?? '') === 'redirecionador') ? 'selected' : '') . '>Redirecionador</option>
+                                    <option value="cliente" ' . ($perfilAtual === 'cliente' ? 'selected' : '') . '>Cliente</option>
+                                    <option value="admin" ' . ($perfilAtual === 'admin' ? 'selected' : '') . '>Administrador</option>
+                                    <option value="vendedor" ' . ($perfilAtual === 'vendedor' ? 'selected' : '') . '>Vendedor</option>
+                                    <option value="conferente" ' . ($perfilAtual === 'conferente' ? 'selected' : '') . '>Conferente</option>
+                                    <option value="suporte" ' . ($perfilAtual === 'suporte' ? 'selected' : '') . '>Suporte</option>
+                                    <option value="representante" ' . ($perfilAtual === 'representante' ? 'selected' : '') . '>Representante</option>
+                                    <option value="redirecionador" ' . ($perfilAtual === 'redirecionador' ? 'selected' : '') . '>Redirecionador</option>
                                 </select>
                             </div>
                             <div class="col-12">
