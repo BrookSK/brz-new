@@ -38,29 +38,155 @@ class AdminDashboardController extends Controller {
     public function index(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+
+        $u = [];
+        $isRedirecionador = false;
+        $adminUid = 0;
         try {
             $pdo = \Config\Database::getConnection();
+
+            $u = $auth->getUsuarioLogado();
+            $perfilAtual = strtolower(trim((string) ($u['perfil'] ?? '')));
+            $roleAtual = strtolower(trim((string) ($u['role'] ?? '')));
+            $isRedirecionador = ($perfilAtual === 'redirecionador' || $roleAtual === 'redirecionador');
+            $adminUid = (int) ($u['id'] ?? 0);
             
             // Estatísticas
             $stats = [];
 
-            $stats['produtos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM produtos");
+            $pedidoTotalCol = $this->columnExists($pdo, 'pedidos', 'valor_total')
+                ? 'valor_total'
+                : ($this->columnExists($pdo, 'pedidos', 'total')
+                    ? 'total'
+                    : ($this->columnExists($pdo, 'pedidos', 'valor') ? 'valor' : null));
 
-            $produtosAtivoCol = $this->columnExists($pdo, 'produtos', 'ativo') ? 'ativo' : ($this->columnExists($pdo, 'produtos', 'active') ? 'active' : null);
-            if ($produtosAtivoCol) {
-                $stats['produtos_ativos'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM produtos WHERE {$produtosAtivoCol} = 1");
+            $itensTable = $this->tableExists($pdo, 'pedido_itens')
+                ? 'pedido_itens'
+                : ($this->tableExists($pdo, 'itens_pedido')
+                    ? 'itens_pedido'
+                    : ($this->tableExists($pdo, 'pedido_items') ? 'pedido_items' : null));
+
+            $produtoNomeCol = $this->columnExists($pdo, 'produtos', 'nome') ? 'nome' : ($this->columnExists($pdo, 'produtos', 'name') ? 'name' : null);
+
+            $stats['faturamento_display'] = '';
+
+            if (!$isRedirecionador) {
+                $stats['produtos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM produtos");
+
+                $produtosAtivoCol = $this->columnExists($pdo, 'produtos', 'ativo') ? 'ativo' : ($this->columnExists($pdo, 'produtos', 'active') ? 'active' : null);
+                if ($produtosAtivoCol) {
+                    $stats['produtos_ativos'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM produtos WHERE {$produtosAtivoCol} = 1");
+                } else {
+                    $stats['produtos_ativos'] = 0;
+                }
+
+                $stats['pedidos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM pedidos");
+                $stats['usuarios_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM usuarios");
+
+                if ($pedidoTotalCol) {
+                    $stats['faturamento_total'] = $this->safeScalar($pdo, "SELECT COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago'");
+                } else {
+                    $stats['faturamento_total'] = 0;
+                }
+                $stats['faturamento_display'] = 'R$ ' . number_format((float) ($stats['faturamento_total'] ?? 0), 2, ',', '.');
             } else {
+                $colAdminCriador = null;
+                foreach (['admin_criador_id', 'admin_creator_id', 'created_by_admin_id', 'criador_admin_id', 'admin_id'] as $c) {
+                    if ($this->columnExists($pdo, 'pedidos', $c)) {
+                        $colAdminCriador = $c;
+                        break;
+                    }
+                }
+
+                $scopeWhere = '1=0';
+                $scopeParams = [];
+                if ($adminUid > 0 && $colAdminCriador) {
+                    $scopeWhere = 'p.' . $colAdminCriador . ' = :admin_uid';
+                    $scopeParams[':admin_uid'] = $adminUid;
+                }
+
+                $stats['pedidos_total'] = 0;
+                $stats['usuarios_total'] = 0;
+                $stats['produtos_total'] = 0;
                 $stats['produtos_ativos'] = 0;
-            }
-
-            $stats['pedidos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM pedidos");
-            $stats['usuarios_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM usuarios");
-
-            $pedidoTotalCol = $this->columnExists($pdo, 'pedidos', 'valor_total') ? 'valor_total' : ($this->columnExists($pdo, 'pedidos', 'total') ? 'total' : null);
-            if ($pedidoTotalCol) {
-                $stats['faturamento_total'] = $this->safeScalar($pdo, "SELECT COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago'");
-            } else {
                 $stats['faturamento_total'] = 0;
+
+                try {
+                    $st = $pdo->prepare('SELECT COUNT(*) as total FROM pedidos p WHERE ' . $scopeWhere);
+                    $st->execute($scopeParams);
+                    $stats['pedidos_total'] = (int) (($st->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+                } catch (\Exception $e) {
+                    $stats['pedidos_total'] = 0;
+                }
+
+                try {
+                    $st = $pdo->prepare('SELECT COUNT(DISTINCT p.usuario_id) as total FROM pedidos p WHERE ' . $scopeWhere);
+                    $st->execute($scopeParams);
+                    $stats['usuarios_total'] = (int) (($st->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+                } catch (\Exception $e) {
+                    $stats['usuarios_total'] = 0;
+                }
+
+                if ($itensTable) {
+                    try {
+                        $st = $pdo->prepare('SELECT COUNT(DISTINCT ip.produto_id) as total FROM ' . $itensTable . ' ip JOIN pedidos p ON ip.pedido_id = p.id WHERE ' . $scopeWhere);
+                        $st->execute($scopeParams);
+                        $stats['produtos_total'] = (int) (($st->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+                        $stats['produtos_ativos'] = (int) $stats['produtos_total'];
+                    } catch (\Exception $e) {
+                        $stats['produtos_total'] = 0;
+                        $stats['produtos_ativos'] = 0;
+                    }
+                }
+
+                $fatBrl = 0.0;
+                $fatUsd = 0.0;
+
+                if ($pedidoTotalCol) {
+                    $paidParts = [];
+                    if ($this->columnExists($pdo, 'pedidos', 'status')) {
+                        $paidParts[] = "LOWER(COALESCE(p.status,'')) IN ('pago','paid','approved','aprovado')";
+                    }
+                    if ($this->columnExists($pdo, 'pedidos', 'payment_status')) {
+                        $paidParts[] = "LOWER(COALESCE(p.payment_status,'')) IN ('approved','paid','pago','aprovado','confirmed','received','succeeded','success')";
+                    }
+                    $paidWhere = !empty($paidParts) ? (' AND (' . implode(' OR ', $paidParts) . ')') : '';
+
+                    $colMoeda = $this->columnExists($pdo, 'pedidos', 'moeda') ? 'moeda' : ($this->columnExists($pdo, 'pedidos', 'currency') ? 'currency' : null);
+                    if ($colMoeda) {
+                        try {
+                            $st = $pdo->prepare('SELECT UPPER(COALESCE(p.' . $colMoeda . ',\'BRL\')) as moeda, COALESCE(SUM(p.' . $pedidoTotalCol . '),0) as total FROM pedidos p WHERE ' . $scopeWhere . $paidWhere . ' GROUP BY UPPER(COALESCE(p.' . $colMoeda . ',\'BRL\'))');
+                            $st->execute($scopeParams);
+                            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($rows as $r) {
+                                $m = strtoupper(trim((string) ($r['moeda'] ?? '')));
+                                $v = (float) ($r['total'] ?? 0);
+                                if ($m === 'USD') {
+                                    $fatUsd += $v;
+                                } else {
+                                    $fatBrl += $v;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $fatBrl = 0.0;
+                            $fatUsd = 0.0;
+                        }
+                    } else {
+                        try {
+                            $st = $pdo->prepare('SELECT COALESCE(SUM(p.' . $pedidoTotalCol . '),0) as total FROM pedidos p WHERE ' . $scopeWhere . $paidWhere);
+                            $st->execute($scopeParams);
+                            $fatBrl = (float) (($st->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0));
+                        } catch (\Exception $e) {
+                            $fatBrl = 0.0;
+                        }
+                    }
+                }
+
+                $stats['faturamento_total'] = $fatBrl + $fatUsd;
+                $parts = [];
+                if ($fatBrl > 0) $parts[] = 'R$ ' . number_format($fatBrl, 2, ',', '.');
+                if ($fatUsd > 0) $parts[] = 'US$ ' . number_format($fatUsd, 2, ',', '.');
+                $stats['faturamento_display'] = !empty($parts) ? implode(' / ', $parts) : 'R$ 0,00';
             }
             
             // Pedidos recentes
@@ -71,25 +197,90 @@ class AdminDashboardController extends Controller {
             } else {
                 $pedidosSql .= ", '' as cliente_nome";
             }
-            $pedidosSql .= " FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id ORDER BY p.created_at DESC LIMIT 5";
-            $stmt = $pdo->query($pedidosSql);
-            $pedidos_recentes = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-            
-            // Produtos mais vendidos
-            $itensTable = $this->tableExists($pdo, 'pedido_itens') ? 'pedido_itens' : ($this->tableExists($pdo, 'itens_pedido') ? 'itens_pedido' : null);
-            $produtoNomeCol = $this->columnExists($pdo, 'produtos', 'nome') ? 'nome' : ($this->columnExists($pdo, 'produtos', 'name') ? 'name' : null);
+            if (!$isRedirecionador) {
+                $pedidosSql .= " FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id ORDER BY p.created_at DESC LIMIT 5";
+                $stmt = $pdo->query($pedidosSql);
+                $pedidos_recentes = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            } else {
+                $colAdminCriador = null;
+                foreach (['admin_criador_id', 'admin_creator_id', 'created_by_admin_id', 'criador_admin_id', 'admin_id'] as $c) {
+                    if ($this->columnExists($pdo, 'pedidos', $c)) {
+                        $colAdminCriador = $c;
+                        break;
+                    }
+                }
+                $scopeWhere = '1=0';
+                $scopeParams = [];
+                if ($adminUid > 0 && $colAdminCriador) {
+                    $scopeWhere = 'p.' . $colAdminCriador . ' = :admin_uid';
+                    $scopeParams[':admin_uid'] = $adminUid;
+                }
+
+                $pedidosSql .= ' FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE ' . $scopeWhere . ' ORDER BY p.created_at DESC LIMIT 5';
+                try {
+                    $stmt = $pdo->prepare($pedidosSql);
+                    $stmt->execute($scopeParams);
+                    $pedidos_recentes = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) {
+                    $pedidos_recentes = [];
+                }
+            }
+
             if ($itensTable && $produtoNomeCol) {
-                $stmt = $pdo->query("
-                    SELECT pr.{$produtoNomeCol} as nome, COUNT(ip.produto_id) as vendas, COALESCE(SUM(ip.quantidade),0) as quantidade
-                    FROM {$itensTable} ip
-                    JOIN produtos pr ON ip.produto_id = pr.id
-                    JOIN pedidos p ON ip.pedido_id = p.id
-                    WHERE p.status = 'pago'
-                    GROUP BY pr.id, pr.{$produtoNomeCol}
-                    ORDER BY vendas DESC
-                    LIMIT 5
-                ");
-                $produtos_mais_vendidos = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+                if (!$isRedirecionador) {
+                    $stmt = $pdo->query(" 
+                        SELECT pr.{$produtoNomeCol} as nome, COUNT(ip.produto_id) as vendas, COALESCE(SUM(ip.quantidade),0) as quantidade
+                        FROM {$itensTable} ip
+                        JOIN produtos pr ON ip.produto_id = pr.id
+                        JOIN pedidos p ON ip.pedido_id = p.id
+                        WHERE p.status = 'pago'
+                        GROUP BY pr.id, pr.{$produtoNomeCol}
+                        ORDER BY vendas DESC
+                        LIMIT 5
+                    ");
+                    $produtos_mais_vendidos = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+                } else {
+                    $colAdminCriador = null;
+                    foreach (['admin_criador_id', 'admin_creator_id', 'created_by_admin_id', 'criador_admin_id', 'admin_id'] as $c) {
+                        if ($this->columnExists($pdo, 'pedidos', $c)) {
+                            $colAdminCriador = $c;
+                            break;
+                        }
+                    }
+                    $scopeWhere = '1=0';
+                    $scopeParams = [];
+                    if ($adminUid > 0 && $colAdminCriador) {
+                        $scopeWhere = 'p.' . $colAdminCriador . ' = :admin_uid';
+                        $scopeParams[':admin_uid'] = $adminUid;
+                    }
+
+                    $paidParts = [];
+                    if ($this->columnExists($pdo, 'pedidos', 'status')) {
+                        $paidParts[] = "LOWER(COALESCE(p.status,'')) IN ('pago','paid','approved','aprovado')";
+                    }
+                    if ($this->columnExists($pdo, 'pedidos', 'payment_status')) {
+                        $paidParts[] = "LOWER(COALESCE(p.payment_status,'')) IN ('approved','paid','pago','aprovado','confirmed','received','succeeded','success')";
+                    }
+                    $paidWhere = !empty($paidParts) ? (' AND (' . implode(' OR ', $paidParts) . ')') : '';
+
+                    try {
+                        $sql = "
+                            SELECT pr.{$produtoNomeCol} as nome, COUNT(DISTINCT ip.pedido_id) as vendas, COALESCE(SUM(ip.quantidade),0) as quantidade
+                            FROM {$itensTable} ip
+                            JOIN produtos pr ON ip.produto_id = pr.id
+                            JOIN pedidos p ON ip.pedido_id = p.id
+                            WHERE {$scopeWhere}{$paidWhere}
+                            GROUP BY pr.id, pr.{$produtoNomeCol}
+                            ORDER BY quantidade DESC
+                            LIMIT 5
+                        ";
+                        $st = $pdo->prepare($sql);
+                        $st->execute($scopeParams);
+                        $produtos_mais_vendidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Exception $e) {
+                        $produtos_mais_vendidos = [];
+                    }
+                }
             } else {
                 $produtos_mais_vendidos = [];
             }
@@ -100,7 +291,7 @@ class AdminDashboardController extends Controller {
             $pendencias_pagamento = [];
             $pendencias_pagamento_total = 0;
             $pendencias_pagamento_valor = 0.0;
-            if ($this->tableExists($pdo, 'estoque_interno') && $produtoNomeCol) {
+            if (!$isRedirecionador && $this->tableExists($pdo, 'estoque_interno') && $produtoNomeCol) {
                 try {
                     $stmt = $pdo->prepare("\
                         SELECT\
@@ -165,6 +356,9 @@ class AdminDashboardController extends Controller {
 
             // Pendências de pagamento (diferença)
             try {
+                if ($isRedirecionador) {
+                    throw new \RuntimeException('skip');
+                }
                 if ($this->tableExists($pdo, 'pedidos')
                     && $this->columnExists($pdo, 'pedidos', 'payment_diferenca_id')
                     && $this->columnExists($pdo, 'pedidos', 'payment_diferenca_valor')
@@ -201,10 +395,222 @@ class AdminDashboardController extends Controller {
             $pendencias_pagamento = [];
             $pendencias_pagamento_total = 0;
             $pendencias_pagamento_valor = 0.0;
+
+            $isRedirecionador = false;
+            $adminUid = 0;
         }
         
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        if (!empty($isRedirecionador)) {
+            echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Braziliana Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+
+            renderAdminSidebarStyles();
+
+            echo '<style>
+        .stat-card { transition: none; }
+        .quick-action-card { transition: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">';
+
+            renderAdminSidebar('dashboard');
+
+            echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Dashboard</h1>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card stat-card border-left-primary shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Produtos</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . (int) ($stats['produtos_total'] ?? 0) . '</div>
+                                        <div class="text-xs text-muted">Nos seus pedidos</div>
+                                    </div>
+                                    <div class="col-auto"><i class="fas fa-box fa-2x text-gray-300"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card stat-card border-left-success shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Pedidos</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . (int) ($stats['pedidos_total'] ?? 0) . '</div>
+                                        <div class="text-xs text-muted">Total</div>
+                                    </div>
+                                    <div class="col-auto"><i class="fas fa-shopping-cart fa-2x text-gray-300"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card stat-card border-left-info shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Clientes</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . (int) ($stats['usuarios_total'] ?? 0) . '</div>
+                                        <div class="text-xs text-muted">Com pedidos</div>
+                                    </div>
+                                    <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6 mb-4">
+                        <div class="card stat-card border-left-warning shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Faturamento</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . htmlspecialchars((string) ($stats['faturamento_display'] ?? 'R$ 0,00')) . '</div>
+                                        <div class="text-xs text-muted">Pedidos pagos</div>
+                                    </div>
+                                    <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h3 class="h5 mb-3">Ações Rápidas</h3>
+                        <div class="row">
+                            <div class="col-lg-4 col-md-6 mb-3">
+                                <a href="/admin/correios-mundial" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-primary text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-globe fa-3x mb-3"></i>
+                                            <h5 class="card-title">Correios Mundial</h5>
+                                            <p class="card-text small">Gerar etiquetas PACKET</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            <div class="col-lg-4 col-md-6 mb-3">
+                                <a href="/meus-pedidos" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-success text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-shopping-bag fa-3x mb-3"></i>
+                                            <h5 class="card-title">Meus Pedidos</h5>
+                                            <p class="card-text small">Acompanhar pedidos</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            <div class="col-lg-4 col-md-6 mb-3">
+                                <a href="/meus-dados" class="text-decoration-none">
+                                    <div class="card quick-action-card bg-info text-white h-100">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-user fa-3x mb-3"></i>
+                                            <h5 class="card-title">Meus Dados</h5>
+                                            <p class="card-text small">Atualizar cadastro</p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-6 mb-4">
+                        <div class="card shadow">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">Pedidos Recentes</h6>
+                                <a href="/admin/correios-mundial" class="btn btn-sm btn-outline-primary">Correios Mundial</a>
+                            </div>
+                            <div class="card-body">';
+
+            if (!empty($pedidos_recentes)) {
+                foreach ($pedidos_recentes as $pedido) {
+                    $valorTotalPedido = 0;
+                    if (isset($pedido['valor_total'])) {
+                        $valorTotalPedido = floatval($pedido['valor_total']);
+                    } elseif (isset($pedido['total'])) {
+                        $valorTotalPedido = floatval($pedido['total']);
+                    } elseif (isset($pedido['valor'])) {
+                        $valorTotalPedido = floatval($pedido['valor']);
+                    }
+
+                    $pid = (int) ($pedido['id'] ?? 0);
+                    $hrefPedido = $pid > 0 ? ('/admin/correios-mundial/pedido/' . $pid) : '#';
+
+                    echo '<div class="d-flex justify-content-between align-items-center mb-2">'
+                        . '<div>'
+                        . '<strong><a class="text-decoration-none" href="' . htmlspecialchars($hrefPedido) . '">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</a></strong> - ' . htmlspecialchars((string) ($pedido['cliente_nome'] ?? 'Cliente'))
+                        . (!empty($pedido['created_at']) ? ('<br><small class="text-muted">' . date('d/m/Y H:i', strtotime((string) $pedido['created_at'])) . '</small>') : '')
+                        . '</div>'
+                        . '<div class="text-end">'
+                        . '<span class="badge bg-' . ((string) ($pedido['status'] ?? '') === 'pago' ? 'success' : 'warning') . '">' . htmlspecialchars(ucfirst((string) ($pedido['status'] ?? '-'))) . '</span>'
+                        . '<br><strong>R$ ' . number_format($valorTotalPedido, 2, ',', '.') . '</strong>'
+                        . '</div>'
+                        . '</div>';
+                }
+            } else {
+                echo '<p class="text-muted text-center">Nenhum pedido encontrado</p>';
+            }
+
+            echo '</div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6 mb-4">
+                        <div class="card shadow">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">Produtos Mais Vendidos</h6>
+                            </div>
+                            <div class="card-body">';
+
+            if (!empty($produtos_mais_vendidos)) {
+                foreach ($produtos_mais_vendidos as $produto) {
+                    echo '<div class="d-flex justify-content-between align-items-center mb-2">'
+                        . '<div>'
+                        . '<strong>' . htmlspecialchars((string) ($produto['nome'] ?? 'Produto')) . '</strong>'
+                        . '<br><small class="text-muted">' . (int) ($produto['vendas'] ?? 0) . ' pedido(s)</small>'
+                        . '</div>'
+                        . '<div class="text-end">'
+                        . '<span class="badge bg-info">' . (int) ($produto['quantidade'] ?? 0) . ' unidades</span>'
+                        . '</div>'
+                        . '</div>';
+                }
+            } else {
+                echo '<p class="text-muted text-center">Nenhuma venda encontrada</p>';
+            }
+
+            echo '</div>
+                        </div>
+                    </div>
+                </div>
+        </main>
+    </div>
+    </div>';
+
+            renderAdminScripts();
+
+            echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>';
+            exit;
+        }
 
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
