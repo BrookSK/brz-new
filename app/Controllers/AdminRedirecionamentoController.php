@@ -622,6 +622,15 @@ class AdminRedirecionamentoController extends Controller {
         $this->json($row ?: []);
     }
 
+    public function clientesLista(Request $request) {
+        $this->auth();
+        $redId = (int)$request->getParam('redirecionador_id', 0);
+        if (!$redId) { $this->json(['ok'=>false,'clientes'=>[]]); return; }
+        $st = $this->pdo()->prepare("SELECT id, nome FROM redirecionamento_clientes WHERE redirecionador_id=? ORDER BY nome ASC");
+        $st->execute([$redId]);
+        $this->json(['ok'=>true,'clientes'=>$st->fetchAll(\PDO::FETCH_ASSOC)?:[]]);
+    }
+
     // ─── ENVIOS ───────────────────────────────────────────────────────────────
 
     public function envios(Request $request) {
@@ -984,9 +993,30 @@ class AdminRedirecionamentoController extends Controller {
     public function coletas(Request $request) {
         $this->auth(); $this->migrar();
         $db=$this->pdo();
+        $perfil = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
         $st=$db->query("SELECT c.*,r.nome AS redirecionador_nome,e.id_pedido_cliente FROM redirecionamento_coletas c LEFT JOIN redirecionadores r ON r.id=c.redirecionador_id LEFT JOIN redirecionamento_envios e ON e.id=c.envio_id ORDER BY c.data_agendada ASC,c.horario ASC");
         $coletas=$st?$st->fetchAll(\PDO::FETCH_ASSOC):[];
-        $this->view('admin/redirecionamento/coletas',['coletas'=>$coletas]);
+
+        // Envios disponíveis para agendar (sem coleta pendente/confirmada)
+        $sqlEnvios = "SELECT e.id, e.id_pedido_cliente, r.nome AS redirecionador_nome
+            FROM redirecionamento_envios e
+            LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id
+            WHERE e.id NOT IN (
+                SELECT envio_id FROM redirecionamento_coletas WHERE status IN ('agendado','confirmado')
+            )";
+        $paramsEnvios = [];
+        if ($perfil === 'redirecionador') {
+            $uid = (int)($_SESSION['usuario_id'] ?? 0);
+            $stR = $db->prepare("SELECT id FROM redirecionadores WHERE usuario_id=? LIMIT 1");
+            $stR->execute([$uid]);
+            $redId = (int)($stR->fetchColumn() ?: 0);
+            if ($redId) { $sqlEnvios .= " AND e.redirecionador_id=?"; $paramsEnvios[] = $redId; }
+        }
+        $sqlEnvios .= " ORDER BY e.id DESC LIMIT 200";
+        $stE = $db->prepare($sqlEnvios); $stE->execute($paramsEnvios);
+        $enviosDisponiveis = $stE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $this->view('admin/redirecionamento/coletas',['coletas'=>$coletas,'enviosDisponiveis'=>$enviosDisponiveis]);
     }
 
     public function coletaAgendar(Request $request) {

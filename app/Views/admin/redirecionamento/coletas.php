@@ -2,6 +2,7 @@
 $sidebarActive = 'redirecionamento-coletas';
 $title = 'Coletas — Redirecionamento';
 $coletas = is_array($coletas ?? null) ? $coletas : [];
+$enviosDisponiveis = is_array($enviosDisponiveis ?? null) ? $enviosDisponiveis : [];
 $statusColors = ['agendado'=>'warning','confirmado'=>'info','coletado'=>'success','cancelado'=>'secondary'];
 $statusLabels = ['agendado'=>'Agendado','confirmado'=>'Confirmado','coletado'=>'Coletado','cancelado'=>'Cancelado'];
 
@@ -100,7 +101,21 @@ ksort($porDia);
             <div class="modal-header"><h5 class="modal-title">Agendar coleta</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="row g-3">
-                    <div class="col-12"><label class="form-label">ID do envio <span class="text-danger">*</span></label><input class="form-control" type="number" id="agEnvioId"></div>
+                    <div class="col-12">
+                        <label class="form-label">Envio <span class="text-danger">*</span></label>
+                        <select class="form-select" id="agEnvioId">
+                            <option value="">Selecione o envio...</option>
+                            <?php foreach ($enviosDisponiveis as $env): ?>
+                            <option value="<?= (int)$env['id'] ?>">
+                                #<?= (int)$env['id'] ?> — Pedido: <?= htmlspecialchars($env['id_pedido_cliente']??'',ENT_QUOTES,'UTF-8') ?>
+                                <?php if (!empty($env['redirecionador_nome'])): ?> (<?= htmlspecialchars($env['redirecionador_nome'],ENT_QUOTES,'UTF-8') ?>)<?php endif; ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if (empty($enviosDisponiveis)): ?>
+                        <div class="form-text text-muted">Nenhum envio disponível para agendar coleta.</div>
+                        <?php endif; ?>
+                    </div>
                     <div class="col-md-6"><label class="form-label">Data <span class="text-danger">*</span></label><input class="form-control" type="date" id="agData"></div>
                     <div class="col-md-6"><label class="form-label">Horário <span class="text-danger">*</span></label><input class="form-control" type="time" id="agHora"></div>
                     <div class="col-12"><label class="form-label">Observações</label><textarea class="form-control" id="agObs" rows="2"></textarea></div>
