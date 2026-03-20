@@ -238,15 +238,13 @@ function renderAdminSidebar($activePage = '') {
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
 
         // Módulo Redirecionamento (visível no admin/suporte)
-        'redirecionamento-dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.redirecionamento.dashboard', 'Dashboard de Redirecionamento'), 'url' => '/admin/redirecionamento/dashboard', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-redirecionadores' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.redirecionamento.redirecionadores', 'Redirecionadores'), 'url' => '/admin/redirecionamento/redirecionadores', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-envios' => ['icon' => 'fas fa-truck-fast', 'label' => __('admin.menu.redirecionamento.envios', 'Envios'), 'url' => '/admin/redirecionamento/envios', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-divergencias' => ['icon' => 'fas fa-scale-balanced', 'label' => __('admin.menu.redirecionamento.divergencias', 'Divergências e Ajustes'), 'url' => '/admin/redirecionamento/divergencias', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-clientes' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.redirecionamento.clientes', 'Clientes'), 'url' => '/admin/redirecionamento/clientes', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => __('admin.menu.redirecionamento.tabela_pesos', 'Tabela de Pesos e Preços'), 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.redirecionamento.pagamentos', 'Pagamentos'), 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => __('admin.menu.redirecionamento.comprovantes', 'Comprovantes'), 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => __('admin.menu.redirecionamento.coletas', 'Coletas'), 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']]
+        'redirecionamento-envios' => ['icon' => 'fas fa-truck-fast', 'label' => '(RED) Envios', 'url' => '/admin/redirecionamento/envios', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-divergencias' => ['icon' => 'fas fa-scale-balanced', 'label' => '(RED) Divergências e Ajustes', 'url' => '/admin/redirecionamento/divergencias', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-clientes' => ['icon' => 'fas fa-users', 'label' => '(RED) Clientes', 'url' => '/admin/redirecionamento/clientes', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => '(RED) Tabela de Pesos e Preços', 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => '(RED) Pagamentos', 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => '(RED) Comprovantes', 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
+        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => '(RED) Coletas', 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']]
     ];
 
     $unreadTickets = 0;
