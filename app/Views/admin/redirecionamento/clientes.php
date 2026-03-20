@@ -83,18 +83,32 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
                     </div>
                     <?php endif; ?>
                     <div class="<?= $redirecionadorFixo ? 'col-md-8' : 'col-md-6' ?>"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncNome"></div>
-                    <div class="col-md-4"><label class="form-label">CPF</label><input class="form-control" type="text" id="ncCpf"></div>
+                    <div class="col-md-4">
+                        <label class="form-label">CPF <span class="text-danger">*</span></label>
+                        <input class="form-control" type="text" id="ncCpf" placeholder="000.000.000-00" maxlength="14">
+                        <div class="invalid-feedback" id="ncCpfFeedback"></div>
+                    </div>
                     <div class="col-md-4"><label class="form-label">E-mail</label><input class="form-control" type="email" id="ncEmail"></div>
                     <div class="col-md-4"><label class="form-label">Telefone</label><input class="form-control" type="text" id="ncTel"></div>
-                    <div class="col-md-3"><label class="form-label">Data nascimento</label><input class="form-control" type="date" id="ncNasc"></div>
+                    <div class="col-md-3">
+                        <label class="form-label">Data nascimento <span class="text-danger">*</span></label>
+                        <input class="form-control" type="date" id="ncNasc">
+                        <div class="invalid-feedback" id="ncNascFeedback"></div>
+                    </div>
                     <div class="col-12"><hr class="my-1"><small class="text-muted fw-semibold">Endereço principal</small></div>
-                    <div class="col-md-7"><label class="form-label">Logradouro</label><input class="form-control" type="text" id="ncLogr"></div>
-                    <div class="col-md-2"><label class="form-label">Número</label><input class="form-control" type="text" id="ncNum"></div>
+                    <div class="col-md-3">
+                        <label class="form-label">CEP</label>
+                        <div class="input-group">
+                            <input class="form-control" type="text" id="ncCep" placeholder="00000-000" maxlength="9">
+                            <span class="input-group-text" id="ncCepSpinner" style="display:none"><i class="fas fa-spinner fa-spin"></i></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6"><label class="form-label">Logradouro</label><input class="form-control" type="text" id="ncLogr"></div>
+                    <div class="col-md-3"><label class="form-label">Número</label><input class="form-control" type="text" id="ncNum"></div>
                     <div class="col-md-3"><label class="form-label">Complemento</label><input class="form-control" type="text" id="ncComp"></div>
                     <div class="col-md-4"><label class="form-label">Bairro</label><input class="form-control" type="text" id="ncBairro"></div>
-                    <div class="col-md-4"><label class="form-label">Cidade</label><input class="form-control" type="text" id="ncCidade"></div>
+                    <div class="col-md-3"><label class="form-label">Cidade <span class="text-danger">*</span></label><input class="form-control" type="text" id="ncCidade"></div>
                     <div class="col-md-2"><label class="form-label">Estado</label><input class="form-control" type="text" id="ncEstado" maxlength="2"></div>
-                    <div class="col-md-2"><label class="form-label">CEP</label><input class="form-control" type="text" id="ncCep"></div>
                 </div>
                 <div id="msgCliente" class="mt-2"></div>
             </div>
@@ -105,12 +119,16 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
         </div>
     </div>
 </div>
+<script src="/js/cliente-form.js"></script>
 <script>
+const validarFormCliente = initModalNovoCliente({ prefixo: 'nc' });
+
 document.getElementById('btnSalvarCliente')?.addEventListener('click', async () => {
+    if (!validarFormCliente()) return;
     const fd = new FormData();
     fd.append('redirecionador_id', document.getElementById('ncRedId').value);
     fd.append('nome', document.getElementById('ncNome').value);
-    fd.append('cpf', document.getElementById('ncCpf').value);
+    fd.append('cpf', document.getElementById('ncCpf').value.replace(/\D/g,''));
     fd.append('email', document.getElementById('ncEmail').value);
     fd.append('telefone', document.getElementById('ncTel').value);
     fd.append('data_nascimento', document.getElementById('ncNasc').value);
@@ -120,7 +138,7 @@ document.getElementById('btnSalvarCliente')?.addEventListener('click', async () 
     fd.append('bairro', document.getElementById('ncBairro').value);
     fd.append('cidade', document.getElementById('ncCidade').value);
     fd.append('estado', document.getElementById('ncEstado').value);
-    fd.append('cep', document.getElementById('ncCep').value);
+    fd.append('cep', document.getElementById('ncCep').value.replace(/\D/g,''));
     const r = await fetch('/admin/redirecionamento/clientes/salvar',{method:'POST',body:fd});
     const j = await r.json();
     if (j.ok) { location.reload(); }
