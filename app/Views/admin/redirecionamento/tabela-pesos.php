@@ -2,6 +2,8 @@
 $sidebarActive = 'redirecionamento-tabela-pesos';
 $title = 'Tabela de Pesos e Preços';
 $tabela = is_array($tabela ?? null) ? $tabela : [];
+$_perfilAtual = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+$_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
 ?>
 <?php ob_start(); ?>
 <div class="container-fluid p-4">
@@ -39,7 +41,8 @@ $tabela = is_array($tabela ?? null) ? $tabela : [];
         </div>
     </div>
 
-    <!-- CRUD tabela -->
+    <?php if ($_isAdmin): ?>
+    <!-- CRUD tabela — somente admin/suporte -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <h5 class="mb-3">Adicionar / editar faixa</h5>
@@ -59,6 +62,7 @@ $tabela = is_array($tabela ?? null) ? $tabela : [];
             <div id="msgFaixa" class="mt-2"></div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Tabela -->
     <div class="card border-0 shadow-sm">
@@ -69,21 +73,23 @@ $tabela = is_array($tabela ?? null) ? $tabela : [];
                         <tr>
                             <th class="ps-3">Peso até (kg)</th>
                             <th>Valor (USD)</th>
-                            <th class="pe-3 text-end">Ações</th>
+                            <?php if ($_isAdmin): ?><th class="pe-3 text-end">Ações</th><?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($tabela)): ?>
-                        <tr><td colspan="3" class="text-center text-muted py-4">Tabela vazia.</td></tr>
+                        <tr><td colspan="<?= $_isAdmin ? 3 : 2 ?>" class="text-center text-muted py-4">Tabela vazia.</td></tr>
                         <?php else: foreach ($tabela as $row): ?>
                         <tr data-id="<?= (int)$row['id'] ?>">
                             <td class="ps-3"><?= number_format((float)$row['peso_ate_kg'],3,',','.') ?> kg</td>
                             <td>US$ <?= number_format((float)$row['valor_usd'],2,',','.') ?></td>
+                            <?php if ($_isAdmin): ?>
                             <td class="pe-3 text-end">
                                 <button type="button" class="btn btn-xs btn-outline-danger btn-excluir" data-id="<?= (int)$row['id'] ?>" style="font-size:.75rem;padding:2px 8px">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -110,6 +116,7 @@ document.getElementById('btnSimular').addEventListener('click', async () => {
     }
 });
 
+<?php if ($_isAdmin): ?>
 document.getElementById('btnSalvarFaixa').addEventListener('click', async () => {
     const peso = document.getElementById('novoPeso').value;
     const valor = document.getElementById('novoValor').value;
@@ -130,5 +137,6 @@ document.querySelectorAll('.btn-excluir').forEach(btn => {
         if (j.ok) btn.closest('tr').remove();
     });
 });
+<?php endif; ?>
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>
