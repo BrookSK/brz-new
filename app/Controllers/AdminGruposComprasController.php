@@ -214,6 +214,45 @@ class AdminGruposComprasController extends Controller {
         }
     }
 
+    // ── API: excluir produto completamente ────────────────────────────────────
+    public function excluirProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        try {
+            $pdo = $this->getPdo();
+            $pdo->prepare("DELETE FROM produtos WHERE id=?")->execute([$produtoId]);
+            echo json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    // ── Página pública: todos os grupos ──────────────────────────────────────
+    public function todosGrupos(Request $request) {
+        try {
+            $pdo = $this->getPdo();
+            $this->ensureTables($pdo);
+
+            $stmt = $pdo->query("
+                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua,
+                    (SELECT COUNT(*) FROM produtos p WHERE p.grupo_compras_id = g.id) AS qtd_produtos
+                FROM grupos_compras g
+                WHERE g.ativo = 1
+                ORDER BY g.nome ASC
+            ");
+            $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            $grupos = [];
+        }
+
+        $title = 'Grupos de Compras';
+        ob_start();
+        include __DIR__ . '/../Views/grupo-compras/todos.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/main.php';
+    }
+
     // ── Página pública do grupo ───────────────────────────────────────────────
     public function paginaPublica(Request $request) {
         $slug = (string) $request->getParam('slug', '');

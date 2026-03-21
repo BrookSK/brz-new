@@ -36,6 +36,7 @@ $router->post('/admin/grupos-compras/excluir/{id}', 'AdminGruposComprasControlle
 $router->get('/admin/grupos-compras/api/lista', 'AdminGruposComprasController', 'apiLista');
 $router->get('/admin/grupos-compras/api/produtos', 'AdminGruposComprasController', 'apiProdutos');
 $router->post('/admin/grupos-compras/api/remover-produto', 'AdminGruposComprasController', 'apiRemoverProduto');
+$router->post('/admin/grupos-compras/api/excluir-produto', 'AdminGruposComprasController', 'excluirProduto');
 
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');

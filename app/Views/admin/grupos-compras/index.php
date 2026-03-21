@@ -60,6 +60,9 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                         <a href="/grupo/<?= $slug ?>" target="_blank" class="btn btn-sm btn-outline-info" title="Ver página pública">
                             <i class="fas fa-external-link-alt"></i>
                         </a>
+                        <button class="btn btn-sm btn-outline-danger btn-excluir-grupo" data-id="<?= (int)$g['id'] ?>" data-nome="<?= htmlspecialchars($g['nome'], ENT_QUOTES, 'UTF-8') ?>" title="Excluir grupo">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -180,6 +183,18 @@ document.querySelectorAll('.btn-toggle').forEach(btn => {
     });
 });
 
+// ── Excluir grupo ──────────────────────────────────────────────────────────
+document.querySelectorAll('.btn-excluir-grupo').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        if (!confirm(`Excluir o grupo "${btn.dataset.nome}"? Os produtos serão desvinculados mas não excluídos.`)) return;
+        const fd = new FormData(); fd.append('id', btn.dataset.id);
+        const r = await fetch('/admin/grupos-compras/excluir/' + btn.dataset.id, {method:'POST', body:fd});
+        const j = await r.json();
+        if (j.ok) btn.closest('.grupo-card').remove();
+        else alert(j.msg || 'Erro ao excluir grupo.');
+    });
+});
+
 // ── Produtos do grupo ──────────────────────────────────────────────────────
 document.querySelectorAll('.btn-produtos').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -192,26 +207,40 @@ document.querySelectorAll('.btn-produtos').forEach(btn => {
             document.getElementById('modalProdutosBody').innerHTML = '<div class="text-center text-muted py-4">Nenhum produto neste grupo.</div>';
             return;
         }
-        let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Foto</th><th>Nome</th><th>Preço</th><th>Estoque</th><th></th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Foto</th><th>Nome</th><th>Preço</th><th>Estoque</th><th>Ações</th></tr></thead><tbody>';
         j.produtos.forEach(p => {
             const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
-            html += `<tr>
+            html += `<tr data-produto-id="${p.id}">
                 <td><img src="${foto}" style="width:40px;height:40px;object-fit:cover;border-radius:8px"></td>
                 <td>${p.nome||''}</td>
                 <td>US$ ${parseFloat(p.preco||0).toFixed(2)}</td>
                 <td>${p.estoque||0}</td>
-                <td><button class="btn btn-sm btn-outline-danger btn-rm-produto" data-id="${p.id}"><i class="fas fa-unlink"></i></button></td>
+                <td class="text-nowrap">
+                    <a href="/admin/produtos/editar/${p.id}" class="btn btn-xs btn-outline-primary me-1" style="font-size:.75rem;padding:2px 8px" title="Editar produto"><i class="fas fa-pen"></i></a>
+                    <button class="btn btn-xs btn-outline-warning btn-rm-produto me-1" data-id="${p.id}" style="font-size:.75rem;padding:2px 8px" title="Remover do grupo"><i class="fas fa-unlink"></i></button>
+                    <button class="btn btn-xs btn-outline-danger btn-del-produto" data-id="${p.id}" style="font-size:.75rem;padding:2px 8px" title="Excluir produto"><i class="fas fa-trash"></i></button>
+                </td>
             </tr>`;
         });
         html += '</tbody></table></div>';
         document.getElementById('modalProdutosBody').innerHTML = html;
         document.querySelectorAll('.btn-rm-produto').forEach(b => {
             b.addEventListener('click', async () => {
-                if (!confirm('Remover produto do grupo?')) return;
+                if (!confirm('Remover produto do grupo (produto continua existindo)?')) return;
                 const fd = new FormData(); fd.append('produto_id', b.dataset.id);
                 const r2 = await fetch('/admin/grupos-compras/api/remover-produto', {method:'POST', body:fd});
                 const j2 = await r2.json();
                 if (j2.ok) b.closest('tr').remove();
+            });
+        });
+        document.querySelectorAll('.btn-del-produto').forEach(b => {
+            b.addEventListener('click', async () => {
+                if (!confirm('Excluir este produto permanentemente? Esta ação não pode ser desfeita.')) return;
+                const fd = new FormData(); fd.append('produto_id', b.dataset.id);
+                const r2 = await fetch('/admin/grupos-compras/api/excluir-produto', {method:'POST', body:fd});
+                const j2 = await r2.json();
+                if (j2.ok) b.closest('tr').remove();
+                else alert(j2.msg || 'Erro ao excluir produto.');
             });
         });
     });

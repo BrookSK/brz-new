@@ -951,6 +951,9 @@
                         <a class="nav-link" href="/produtos"><i class="fas fa-box"></i> <?= __('nav.products', 'Produtos') ?></a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/grupos-compras"><i class="fas fa-store"></i> Grupos de Compras</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> <?= __('nav.how_it_works', 'Como Funciona') ?></a>
                     </li>
                     <li class="nav-item">

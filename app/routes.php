@@ -11,6 +11,7 @@ $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
 $router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');
 $router->get('/produtos/selecionar', 'ProdutoController', 'selecionar');
 $router->get('/grupo/{slug}', 'AdminGruposComprasController', 'paginaPublica');
+$router->get('/grupos-compras', 'AdminGruposComprasController', 'todosGrupos');
 $router->post('/produtos/carrinho', 'ProdutoController', 'adicionarAoCarrinho');
 $router->get('/clube-brasiliana', function($request) {
     header('Location: /como-funciona-clube');
