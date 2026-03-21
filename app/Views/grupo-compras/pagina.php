@@ -30,6 +30,15 @@ $buildUrl = static function (int $p) use ($slug): string {
         </div>
     </div>
 
+    <!-- Busca por nome -->
+    <div class="mb-4">
+        <div class="input-group" style="max-width:400px">
+            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+            <input type="text" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome...">
+        </div>
+        <div id="semResultados" class="text-muted small mt-2" style="display:none">Nenhum produto encontrado.</div>
+    </div>
+
     <!-- Grid de produtos -->
     <div class="row">
         <?php if (empty($produtos)): ?>
@@ -49,7 +58,7 @@ $buildUrl = static function (int $p) use ($slug): string {
             $temPromo   = ($precoPromo > 0 && $precoPromo < $precoBase);
             $precoExibir = $temPromo ? $precoPromo : $precoBase;
         ?>
-        <div class="col-lg-3 col-md-6 mb-4">
+        <div class="col-lg-3 col-md-6 mb-4 produto-item" data-nome="<?= strtolower(htmlspecialchars($produto['name'] ?? '', ENT_QUOTES, 'UTF-8')) ?>">
             <div class="card h-100 product-card-modern border-0 shadow-sm">
                 <div class="position-relative overflow-hidden product-image-frame">
                     <?php if (!empty($produto['foto_principal'])): ?>
@@ -218,6 +227,24 @@ document.addEventListener('DOMContentLoaded', function () {
             ? window.CurrencyConverter.currentCurrency
             : (localStorage.getItem('selected_currency') || 'BRL');
         window.updateProductPrices(cur);
+    }
+
+    // Filtro por nome
+    const filtro = document.getElementById('filtroProduto');
+    const semResultados = document.getElementById('semResultados');
+    if (filtro) {
+        filtro.addEventListener('input', function () {
+            const q = this.value.toLowerCase().trim();
+            const items = document.querySelectorAll('.produto-item');
+            let visiveis = 0;
+            items.forEach(item => {
+                const nome = item.dataset.nome || '';
+                const visivel = q === '' || nome.includes(q);
+                item.style.display = visivel ? '' : 'none';
+                if (visivel) visiveis++;
+            });
+            semResultados.style.display = (q !== '' && visiveis === 0) ? '' : 'none';
+        });
     }
 });
 </script>
