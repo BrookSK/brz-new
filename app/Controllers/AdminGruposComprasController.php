@@ -1,0 +1,240 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Request;
+use App\Services\AuthService;
+
+class AdminGruposComprasController extends Controller {
+
+    private function getPdo(): \PDO {
+        return new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+    }
+
+    private function ensureTables(\PDO $pdo): void {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS grupos_compras (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nome VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL UNIQUE,
+            descricao TEXT NULL,
+            cobra_imposto_eua TINYINT(1) NOT NULL DEFAULT 0,
+            ativo TINYINT(1) NOT NULL DEFAULT 1,
+            criado_por INT NULL,
+            criado_por_nome VARCHAR(255) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Coluna grupo_compras_id na tabela produtos
+        try {
+            $pdo->exec("ALTER TABLE produtos ADD COLUMN grupo_compras_id INT NULL DEFAULT NULL");
+        } catch (\Throwable $e) {}
+    }
+
+    private function slugify(string $v): string {
+        $v = mb_strtolower(trim($v));
+        $map = ['á'=>'a','à'=>'a','ã'=>'a','â'=>'a','é'=>'e','ê'=>'e','í'=>'i','ó'=>'o','ô'=>'o','õ'=>'o','ú'=>'u','ü'=>'u','ç'=>'c'];
+        $v = strtr($v, $map);
+        $v = preg_replace('/[^a-z0-9\s\-]/', '', $v);
+        $v = preg_replace('/[\s\-]+/', '-', $v);
+        return trim($v, '-');
+    }
+
+    private function uniqueSlug(\PDO $pdo, string $base, ?int $excludeId = null): string {
+        $slug = $base; $i = 2;
+        while (true) {
+            $st = $pdo->prepare("SELECT id FROM grupos_compras WHERE slug = ?" . ($excludeId ? " AND id != $excludeId" : ""));
+            $st->execute([$slug]);
+            if (!$st->fetchColumn()) break;
+            $slug = $base . '-' . $i++;
+        }
+        return $slug;
+    }
+
+    // ── Admin: lista ──────────────────────────────────────────────────────────
+    public function index(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        $grupos = [];
+        try {
+            $pdo = $this->getPdo();
+            $this->ensureTables($pdo);
+            $stmt = $pdo->query("
+                SELECT g.*,
+                    (SELECT COUNT(*) FROM produtos p WHERE p.grupo_compras_id = g.id) AS qtd_produtos,
+                    (SELECT COUNT(*) FROM pedidos pd
+                        INNER JOIN pedido_itens pi ON pi.pedido_id = pd.id
+                        INNER JOIN produtos pr ON pr.id = pi.produto_id
+                        WHERE pr.grupo_compras_id = g.id) AS qtd_pedidos
+                FROM grupos_compras g ORDER BY g.created_at DESC
+            ");
+            $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            try {
+                $pdo = $this->getPdo();
+                $this->ensureTables($pdo);
+                $stmt = $pdo->query("SELECT * FROM grupos_compras ORDER BY created_at DESC");
+                $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                foreach ($grupos as &$g) { $g['qtd_produtos'] = 0; $g['qtd_pedidos'] = 0; }
+            } catch (\Throwable $e2) {}
+        }
+
+        $sidebarActive = 'grupos-compras';
+        $title = 'Grupos de Compras';
+        ob_start();
+        include __DIR__ . '/../Views/admin/grupos-compras/index.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    // ── Admin: salvar (criar/editar) ──────────────────────────────────────────
+    public function salvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $id = (int) $request->getParam('id', 0);
+        $nome = trim((string) $request->getParam('nome', ''));
+        $descricao = trim((string) $request->getParam('descricao', ''));
+        $cobraImposto = $request->getParam('cobra_imposto_eua') ? 1 : 0;
+        $ativo = $request->getParam('ativo') !== null ? (int)$request->getParam('ativo') : 1;
+
+        if ($nome === '') {
+            echo json_encode(['ok' => false, 'msg' => 'Nome obrigatório.']);
+            return;
+        }
+
+        try {
+            $pdo = $this->getPdo();
+            $this->ensureTables($pdo);
+
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $userId = (int)($_SESSION['usuario_id'] ?? 0);
+            $userName = (string)($_SESSION['usuario_nome'] ?? '');
+
+            $slug = $this->uniqueSlug($pdo, $this->slugify($nome), $id ?: null);
+
+            if ($id > 0) {
+                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, ativo=?, updated_at=NOW() WHERE id=?");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $ativo, $id]);
+            } else {
+                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, ativo, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,NOW())");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, 1, $userId ?: null, $userName ?: null]);
+                $id = (int)$pdo->lastInsertId();
+            }
+
+            $st2 = $pdo->prepare("SELECT * FROM grupos_compras WHERE id=?");
+            $st2->execute([$id]);
+            $grupo = $st2->fetch(\PDO::FETCH_ASSOC);
+
+            echo json_encode(['ok' => true, 'grupo' => $grupo]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    // ── Admin: toggle ativo ───────────────────────────────────────────────────
+    public function toggleAtivo(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $id = (int) $request->getParam('id', 0);
+        try {
+            $pdo = $this->getPdo();
+            $st = $pdo->prepare("UPDATE grupos_compras SET ativo = 1 - ativo WHERE id=?");
+            $st->execute([$id]);
+            $st2 = $pdo->prepare("SELECT ativo FROM grupos_compras WHERE id=?");
+            $st2->execute([$id]);
+            $ativo = (int)$st2->fetchColumn();
+            echo json_encode(['ok' => true, 'ativo' => $ativo]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    // ── Admin: excluir ────────────────────────────────────────────────────────
+    public function excluir(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $id = (int) $request->getParam('id', 0);
+        try {
+            $pdo = $this->getPdo();
+            // Desvincula produtos antes de excluir
+            $pdo->prepare("UPDATE produtos SET grupo_compras_id = NULL WHERE grupo_compras_id=?")->execute([$id]);
+            $pdo->prepare("DELETE FROM grupos_compras WHERE id=?")->execute([$id]);
+            echo json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    // ── API: lista grupos (para cadastro rápido) ──────────────────────────────
+    public function apiLista(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        try {
+            $pdo = $this->getPdo();
+            $this->ensureTables($pdo);
+            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua, ativo FROM grupos_compras ORDER BY nome ASC");
+            $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => true, 'grupos' => $grupos]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'grupos' => []]);
+        }
+    }
+
+    // ── API: produtos do grupo ────────────────────────────────────────────────
+    public function apiProdutos(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $id = (int) $request->getParam('id', 0);
+        try {
+            $pdo = $this->getPdo();
+            $stmt = $pdo->prepare("SELECT id, name AS nome, price AS preco, stock AS estoque, foto_principal, status FROM produtos WHERE grupo_compras_id=? ORDER BY name ASC");
+            $stmt->execute([$id]);
+            $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => true, 'produtos' => $produtos]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'produtos' => []]);
+        }
+    }
+
+    // ── API: remover produto do grupo ─────────────────────────────────────────
+    public function apiRemoverProduto(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        try {
+            $pdo = $this->getPdo();
+            $pdo->prepare("UPDATE produtos SET grupo_compras_id = NULL WHERE id=?")->execute([$produtoId]);
+            echo json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    // ── Página pública do grupo ───────────────────────────────────────────────
+    public function paginaPublica(Request $request) {
+        $slug = (string) $request->getParam('slug', '');
+        try {
+            $pdo = $this->getPdo();
+            $st = $pdo->prepare("SELECT * FROM grupos_compras WHERE slug=? AND ativo=1 LIMIT 1");
+            $st->execute([$slug]);
+            $grupo = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$grupo) {
+                http_response_code(404);
+                echo '<h1>Grupo não encontrado ou inativo.</h1>';
+                return;
+            }
+            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=? AND status='published' ORDER BY name ASC");
+            $stP->execute([$grupo['id']]);
+            $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo '<h1>Erro ao carregar grupo.</h1>';
+            return;
+        }
+        include __DIR__ . '/../Views/grupo-compras/pagina.php';
+    }
+}

@@ -1620,7 +1620,7 @@ class AdminProdutosController extends Controller {
         if (!$this->ensureCadastroRapidoAccess($request)) {
             return;
         }
-        $this->renderCadastroRapido(null, null);
+        $this->renderCadastroRapidoGrupos(null, null);
     }
 
     public function cadastroRapidoSalvar(Request $request) {
@@ -1631,10 +1631,323 @@ class AdminProdutosController extends Controller {
         }
         try {
             $created = $this->salvarCadastroRapido($request);
-            $this->renderCadastroRapido($created, null);
+            $this->renderCadastroRapidoGrupos($created, null);
         } catch (\Exception $e) {
-            $this->renderCadastroRapido(null, $e->getMessage());
+            $this->renderCadastroRapidoGrupos(null, $e->getMessage());
         }
+    }
+
+    private function renderCadastroRapidoGrupos(?array $created, ?string $error): void {
+        $successHtml = '';
+        if (!empty($error)) {
+            $successHtml = '<div class="alert alert-danger" style="border-radius:14px;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div>';
+        } elseif (is_array($created) && !empty($created['id'])) {
+            $id = (int) $created['id'];
+            $nome = htmlspecialchars((string) ($created['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $foto = (string) ($created['foto_principal'] ?? '');
+            if ($foto === '') $foto = '/uploads/produtos/placeholder.jpg';
+            $fotoEsc = htmlspecialchars($foto, ENT_QUOTES, 'UTF-8');
+            $link = '/produto/detalhes/' . $id;
+            $linkEsc = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+            $successHtml = '<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius:14px;">'
+                . '<i class="fas fa-check-circle mt-1"></i>'
+                . '<div><div class="fw-bold">Produto salvo com sucesso.</div></div>'
+                . '</div>'
+                . '<div class="card border-0 shadow-sm mb-3" style="border-radius:18px;overflow:hidden;">'
+                . '<div class="row g-0"><div class="col-4"><img src="' . $fotoEsc . '" alt="' . $nome . '" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>'
+                . '<div class="col-8"><div class="card-body py-3"><div class="fw-bold">' . $nome . '</div>'
+                . '<div class="d-grid gap-2 mt-2">'
+                . '<a class="btn btn-outline-primary btn-sm" href="' . $linkEsc . '" target="_blank"><i class="fas fa-external-link-alt me-1"></i>Abrir produto</a>'
+                . '<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a>'
+                . '</div></div></div></div></div>';
+        }
+
+        // Buscar grupos existentes
+        $grupos = [];
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->exec("CREATE TABLE IF NOT EXISTS grupos_compras (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nome VARCHAR(255) NOT NULL,
+                slug VARCHAR(255) NOT NULL UNIQUE,
+                descricao TEXT NULL,
+                cobra_imposto_eua TINYINT(1) NOT NULL DEFAULT 0,
+                ativo TINYINT(1) NOT NULL DEFAULT 1,
+                criado_por INT NULL,
+                criado_por_nome VARCHAR(255) NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            try { $pdo->exec("ALTER TABLE produtos ADD COLUMN grupo_compras_id INT NULL DEFAULT NULL"); } catch (\Throwable $e) {}
+            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua FROM grupos_compras ORDER BY nome ASC");
+            $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {}
+
+        $gruposJson = json_encode($grupos);
+        $successHtmlJs = json_encode($successHtml);
+
+        echo '<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro Rápido</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #0b1f3a; --bg: #f6f8fb; --radius: 18px; --shadow: 0 12px 34px rgba(15,23,42,.10); }
+        body { background: var(--bg); }
+        .topbar { background: linear-gradient(180deg,rgba(11,31,58,.06),rgba(11,31,58,0)); padding: 16px 0 10px; }
+        .page-title { color: var(--primary); font-weight: 800; letter-spacing: -.02em; }
+        .subtle { color: rgba(15,23,42,.62); }
+        .glass { background: rgba(255,255,255,.86); border: 1px solid rgba(148,163,184,.24); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+        .form-control, .input-group-text, .btn, .form-select { border-radius: 14px; }
+        .input-group .input-group-text { border-top-right-radius:0; border-bottom-right-radius:0; }
+        .input-group .form-control { border-top-left-radius:0; border-bottom-left-radius:0; }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-outline-primary { border-color: rgba(11,31,58,.35); color: var(--primary); }
+        .grupo-card { cursor: pointer; border: 2px solid transparent; transition: border-color .15s, box-shadow .15s; }
+        .grupo-card:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(11,31,58,.12); }
+        .grupo-card.selected { border-color: var(--primary); background: rgba(11,31,58,.04); }
+        .step { display: none; }
+        .step.active { display: block; }
+        .step-indicator { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
+        .step-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(11,31,58,.2); transition: background .2s; }
+        .step-dot.active { background: var(--primary); }
+    </style>
+</head>
+<body>
+<div class="topbar">
+    <div class="container" style="max-width:560px;">
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="/admin/produtos" class="btn btn-outline-secondary btn-sm" style="border-radius:999px;"><i class="fas fa-arrow-left"></i></a>
+            <div class="text-center">
+                <div class="page-title">Cadastro rápido</div>
+                <div class="small subtle" id="stepSubtitle">Selecione ou crie um grupo</div>
+            </div>
+            <span style="width:40px;"></span>
+        </div>
+    </div>
+</div>
+<div class="container pb-4" style="max-width:560px;">
+    <div class="step-indicator mt-3">
+        <div class="step-dot active" id="dot1"></div>
+        <div class="step-dot" id="dot2"></div>
+        <div class="step-dot" id="dot3"></div>
+    </div>
+
+    <div id="successArea">' . ($successHtml ? $successHtml : '') . '</div>
+
+    <!-- STEP 1: Grupos -->
+    <div class="step active" id="step1">
+        <div class="glass p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="fw-semibold">Grupo de Compras</div>
+                <button class="btn btn-sm btn-primary" id="btnAbrirGrupo"><i class="fas fa-plus me-1"></i>Abrir Grupo</button>
+            </div>
+            <div id="listaGrupos" class="row g-2"></div>
+            <div id="emptyGrupos" class="text-center text-muted py-3 small" style="display:none">Nenhum grupo cadastrado. Crie o primeiro!</div>
+        </div>
+        <!-- Form novo grupo (inline) -->
+        <div class="glass p-3" id="formNovoGrupo" style="display:none">
+            <div class="fw-semibold mb-3">Novo grupo de compras</div>
+            <div class="mb-3"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ngNome" placeholder="Ex: Walmart"></div>
+            <div class="mb-3"><label class="form-label">Descrição</label><textarea class="form-control" id="ngDesc" rows="2" placeholder="Opcional"></textarea></div>
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="ngImposto" role="switch">
+                <label class="form-check-label" for="ngImposto">Cobrar imposto EUA (10%)</label>
+            </div>
+            <div id="msgNovoGrupo" class="mb-2"></div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary flex-fill" id="btnCancelarGrupo">Cancelar</button>
+                <button class="btn btn-primary flex-fill" id="btnSalvarNovoGrupo"><i class="fas fa-check me-1"></i>Criar grupo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2: Tipo de cadastro -->
+    <div class="step" id="step2">
+        <div class="glass p-3">
+            <div class="fw-semibold mb-1">Grupo selecionado: <span id="grupoSelecionadoNome" class="text-primary"></span></div>
+            <div class="small subtle mb-4">Como deseja cadastrar os produtos?</div>
+            <div class="d-grid gap-3">
+                <button class="btn btn-primary btn-lg" id="btnNovoProduto"><i class="fas fa-plus me-2"></i>Novo produto</button>
+                <button class="btn btn-outline-primary btn-lg" id="btnEmLote"><i class="fas fa-layer-group me-2"></i>Em lote (CSV)</button>
+            </div>
+            <div class="mt-3 text-center"><button class="btn btn-link btn-sm text-muted" id="btnVoltarStep1">← Voltar</button></div>
+        </div>
+    </div>
+
+    <!-- STEP 3: Formulário produto -->
+    <div class="step" id="step3">
+        <div class="glass p-3 p-sm-4">
+            <div class="fw-semibold mb-3">Novo produto — <span id="grupoNomeProduto" class="text-primary"></span></div>
+            <form method="POST" action="/admin/produtos/cadastro-rapido/salvar" enctype="multipart/form-data" id="formProduto">
+                <input type="hidden" name="grupo_compras_id" id="inputGrupoId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Foto do produto</label>
+                    <input type="file" class="form-control" name="capa" accept="image/*" id="capaInput">
+                    <div id="capaPreview" class="mt-2"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-lg" name="name" required autocomplete="off" placeholder="Ex: iPhone 15 Pro">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Valor (USD)</label>
+                        <div class="input-group input-group-lg"><span class="input-group-text">$</span><input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00"></div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Peso (kg)</label>
+                        <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Estoque</label>
+                    <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2">← Voltar</button>
+                    <button type="submit" class="btn btn-primary flex-fill btn-lg"><i class="fas fa-bolt me-2"></i>Salvar</button>
+                </div>
+            </form>
+        </div>
+        <!-- Lote (CSV) -->
+        <div class="glass p-3 mt-3" id="loteArea" style="display:none">
+            <div class="fw-semibold mb-2">Importar em lote (CSV)</div>
+            <div class="small text-muted mb-3">Baixe o modelo, preencha e envie.</div>
+            <a href="/admin/produtos/importar/modelo" class="btn btn-outline-primary btn-sm mb-2"><i class="fas fa-download me-1"></i>Baixar modelo CSV</a>
+            <form method="POST" action="/admin/produtos/importar/iniciar" enctype="multipart/form-data">
+                <input type="hidden" name="grupo_compras_id" id="inputGrupoIdLote">
+                <div class="mb-2"><input type="file" class="form-control" name="arquivo" accept=".csv,.xlsx"></div>
+                <button type="submit" class="btn btn-primary w-100">Importar</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const GRUPOS = ' . $gruposJson . ';
+let grupoSelecionado = null;
+let currentStep = 1;
+
+function showStep(n) {
+    document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
+    document.getElementById("step" + n).classList.add("active");
+    document.querySelectorAll(".step-dot").forEach((d,i) => d.classList.toggle("active", i < n));
+    const subtitles = ["Selecione ou crie um grupo","Como deseja cadastrar?","Dados do produto"];
+    document.getElementById("stepSubtitle").textContent = subtitles[n-1];
+    currentStep = n;
+}
+
+function renderGrupos() {
+    const lista = document.getElementById("listaGrupos");
+    const empty = document.getElementById("emptyGrupos");
+    lista.innerHTML = "";
+    if (!GRUPOS.length) { empty.style.display = ""; return; }
+    empty.style.display = "none";
+    GRUPOS.forEach(g => {
+        const div = document.createElement("div");
+        div.className = "col-12";
+        div.innerHTML = `<div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" data-id="${g.id}" data-nome="${g.nome}" data-imposto="${g.cobra_imposto_eua}">
+            <i class="fas fa-store fa-lg text-muted"></i>
+            <div class="flex-fill">
+                <div class="fw-semibold">${g.nome}</div>
+                ${g.cobra_imposto_eua ? \'<div class="small text-warning"><i class="fas fa-percent me-1"></i>Cobra imposto EUA</div>\' : ""}
+            </div>
+            <i class="fas fa-chevron-right text-muted"></i>
+        </div>`;
+        div.querySelector(".grupo-card").addEventListener("click", () => selecionarGrupo(g));
+        lista.appendChild(div);
+    });
+}
+
+function selecionarGrupo(g) {
+    grupoSelecionado = g;
+    document.getElementById("grupoSelecionadoNome").textContent = g.nome;
+    document.getElementById("grupoNomeProduto").textContent = g.nome;
+    document.getElementById("inputGrupoId").value = g.id;
+    document.getElementById("inputGrupoIdLote").value = g.id;
+    showStep(2);
+}
+
+// Abrir form novo grupo
+document.getElementById("btnAbrirGrupo").addEventListener("click", () => {
+    document.getElementById("formNovoGrupo").style.display = "";
+    document.getElementById("btnAbrirGrupo").style.display = "none";
+});
+document.getElementById("btnCancelarGrupo").addEventListener("click", () => {
+    document.getElementById("formNovoGrupo").style.display = "none";
+    document.getElementById("btnAbrirGrupo").style.display = "";
+});
+
+document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async () => {
+    const btn = document.getElementById("btnSalvarNovoGrupo");
+    const msg = document.getElementById("msgNovoGrupo");
+    const nome = document.getElementById("ngNome").value.trim();
+    if (!nome) { msg.innerHTML = \'<div class="alert alert-danger py-1 small">Nome obrigatório.</div>\'; return; }
+    btn.disabled = true; btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Criando...\';
+    const fd = new FormData();
+    fd.append("nome", nome);
+    fd.append("descricao", document.getElementById("ngDesc").value);
+    if (document.getElementById("ngImposto").checked) fd.append("cobra_imposto_eua", "1");
+    const r = await fetch("/admin/grupos-compras/salvar", {method:"POST", body:fd});
+    const j = await r.json();
+    btn.disabled = false; btn.innerHTML = \'<i class="fas fa-check me-1"></i>Criar grupo\';
+    if (j.ok) {
+        GRUPOS.push(j.grupo);
+        renderGrupos();
+        document.getElementById("formNovoGrupo").style.display = "none";
+        document.getElementById("btnAbrirGrupo").style.display = "";
+        document.getElementById("ngNome").value = "";
+        document.getElementById("ngDesc").value = "";
+        document.getElementById("ngImposto").checked = false;
+        selecionarGrupo(j.grupo);
+    } else { msg.innerHTML = \'<div class="alert alert-danger py-1 small">\' + (j.msg||"Erro") + \'</div>\'; }
+});
+
+// Tipo de cadastro
+document.getElementById("btnNovoProduto").addEventListener("click", () => {
+    document.getElementById("loteArea").style.display = "none";
+    document.getElementById("formProduto").style.display = "";
+    showStep(3);
+});
+document.getElementById("btnEmLote").addEventListener("click", () => {
+    document.getElementById("formProduto").style.display = "none";
+    document.getElementById("loteArea").style.display = "";
+    showStep(3);
+});
+
+document.getElementById("btnVoltarStep1").addEventListener("click", () => showStep(1));
+document.getElementById("btnVoltarStep2").addEventListener("click", () => showStep(2));
+
+// Preview foto
+document.getElementById("capaInput").addEventListener("change", function(e) {
+    const preview = document.getElementById("capaPreview");
+    preview.innerHTML = "";
+    const file = (e.target.files||[])[0];
+    if (file && file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const img = document.createElement("img");
+            img.src = ev.target.result;
+            img.style.cssText = "width:100%;max-height:200px;object-fit:cover;border-radius:14px;";
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+renderGrupos();
+</script>
+</body>
+</html>';
+        exit;
     }
 
     private function ensureCadastroRapidoAccess(Request $request): bool {
@@ -1929,6 +2242,11 @@ HTML;
         if (in_array('active', $cols, true)) $data['active'] = 1;
         if (in_array('ativo', $cols, true) && !isset($data['active'])) $data['ativo'] = 1;
         if (in_array('featured', $cols, true)) $data['featured'] = $featured;
+
+        $grupoId = (int) $request->getParam('grupo_compras_id', 0);
+        if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
+            $data['grupo_compras_id'] = $grupoId;
+        }
 
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
         if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');

@@ -28,6 +28,15 @@ $router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'impo
 $router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');
 $router->post('/admin/produtos/importar/processar', 'AdminProdutosController', 'importarProdutosProcessar');
 
+// Grupos de Compras
+$router->get('/admin/grupos-compras', 'AdminGruposComprasController', 'index');
+$router->post('/admin/grupos-compras/salvar', 'AdminGruposComprasController', 'salvar');
+$router->post('/admin/grupos-compras/toggle-ativo', 'AdminGruposComprasController', 'toggleAtivo');
+$router->post('/admin/grupos-compras/excluir/{id}', 'AdminGruposComprasController', 'excluir');
+$router->get('/admin/grupos-compras/api/lista', 'AdminGruposComprasController', 'apiLista');
+$router->get('/admin/grupos-compras/api/produtos', 'AdminGruposComprasController', 'apiProdutos');
+$router->post('/admin/grupos-compras/api/remover-produto', 'AdminGruposComprasController', 'apiRemoverProduto');
+
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');
 $router->get('/admin/pedidos/export-xlsx', 'AdminPedidosController', 'exportXlsx');
