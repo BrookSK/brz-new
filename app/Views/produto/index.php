@@ -106,7 +106,8 @@
 
 <style>
 .product-image-container {
-    height: 200px;
+    width: 100%;
+    aspect-ratio: 3 / 4;
     overflow: hidden;
     position: relative;
 }

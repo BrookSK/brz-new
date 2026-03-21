@@ -107,7 +107,7 @@
     <?php if (!empty($layoutBanners)): ?>
         <div class="container">
             <div class="hero-image" data-aos="fade-left">
-                <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel">
+                <div id="homeHeroBanners" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000">
                     <div class="carousel-inner" style="overflow: hidden;">
                         <?php foreach ($layoutBanners as $i => $banner): ?>
                             <?php

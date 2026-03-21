@@ -161,7 +161,7 @@ $buildUrl = static function (int $p) use ($slug): string {
 
 <style>
 .product-card-modern { transition: none; border-radius: 15px; }
-.product-image-frame { aspect-ratio: 1 / 1; }
+.product-image-frame { aspect-ratio: 3 / 4; }
 .product-image-modern { width: 100%; height: 100%; object-fit: cover; }
 </style>
 

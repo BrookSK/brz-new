@@ -3149,7 +3149,8 @@ JS;
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Loja *</label>
-                                        <select class="form-select" name="loja" required>
+                                        <input type="text" class="form-control mb-2" id="lojaSearch" placeholder="Pesquisar loja...">
+                                        <select class="form-select" name="loja" id="lojaSelect" required>
                                             <option value="">Selecione...</option>
 HTML;
 
@@ -3337,6 +3338,22 @@ HTML;
         (function() {
             const input = document.getElementById('ncmSearch');
             const select = document.getElementById('ncmSelect');
+            if (!input || !select) return;
+
+            input.addEventListener('input', function() {
+                const q = (input.value || '').toLowerCase().trim();
+                Array.from(select.options).forEach((opt) => {
+                    if (opt.value === '') return;
+                    const text = (opt.text || '').toLowerCase();
+                    opt.hidden = q !== '' && !text.includes(q);
+                });
+            });
+        })();
+
+        // Busca no select de Loja
+        (function() {
+            const input = document.getElementById('lojaSearch');
+            const select = document.getElementById('lojaSelect');
             if (!input || !select) return;
 
             input.addEventListener('input', function() {
@@ -3693,7 +3710,8 @@ HTML;
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Loja *</label>
-                                        <select class="form-select" name="loja" required>
+                                        <input type="text" class="form-control mb-2" id="lojaSearch" placeholder="Pesquisar loja...">
+                                        <select class="form-select" name="loja" id="lojaSelect" required>
                                             <option value="">Selecione...</option>';
 
         if (!empty($lojas)) {
@@ -4089,6 +4107,22 @@ HTML;
         (function() {
             const input = document.getElementById("ncmSearch");
             const select = document.getElementById("ncmSelect");
+            if (!input || !select) return;
+
+            input.addEventListener("input", function() {
+                const q = (input.value || "").toLowerCase().trim();
+                Array.from(select.options).forEach((opt) => {
+                    if (opt.value === "") return;
+                    const text = (opt.text || "").toLowerCase();
+                    opt.hidden = q !== "" && !text.includes(q);
+                });
+            });
+        })();
+
+        // Busca no select de Loja
+        (function() {
+            const input = document.getElementById("lojaSearch");
+            const select = document.getElementById("lojaSelect");
             if (!input || !select) return;
 
             input.addEventListener("input", function() {
