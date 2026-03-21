@@ -238,13 +238,24 @@ class AdminGruposComprasController extends Controller {
                 return;
             }
 
-            $total = (int) $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=? AND status='published'")->execute([$grupo['id']]) ? 0 : 0;
-            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=? AND status='published'");
+            // Detectar coluna de status disponível
+            $colsStmt = $pdo->query("DESCRIBE produtos");
+            $cols = $colsStmt ? $colsStmt->fetchAll(\PDO::FETCH_COLUMN) : [];
+            $hasStatus = in_array('status', $cols, true);
+            $hasAtivo  = in_array('ativo', $cols, true);
+            $hasActive = in_array('active', $cols, true);
+
+            $whereAtivo = '';
+            if ($hasStatus)      $whereAtivo = " AND (status = 'published' OR status = 'active' OR status = '1')";
+            elseif ($hasAtivo)   $whereAtivo = " AND ativo = 1";
+            elseif ($hasActive)  $whereAtivo = " AND active = 1";
+
+            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=?" . $whereAtivo);
             $stCount->execute([$grupo['id']]);
             $total = (int) $stCount->fetchColumn();
 
-            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=? AND status='published' ORDER BY name ASC LIMIT ? OFFSET ?");
-            $stP->execute([$grupo['id'], $limit, $offset]);
+            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . " ORDER BY name ASC LIMIT " . $limit . " OFFSET " . $offset);
+            $stP->execute([$grupo['id']]);
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);
 
             // Normalizar foto_principal
@@ -284,8 +295,9 @@ class AdminGruposComprasController extends Controller {
         } catch (\Throwable $e) {
             http_response_code(500);
             $title = 'Erro';
+            $errMsg = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
             ob_start();
-            echo '<div class="container py-5 text-center"><h2>Erro ao carregar grupo.</h2></div>';
+            echo '<div class="container py-5 text-center"><h2>Erro ao carregar grupo.</h2><p class="text-muted small">' . $errMsg . '</p></div>';
             $content = ob_get_clean();
             include __DIR__ . '/../Views/layouts/main.php';
             return;
