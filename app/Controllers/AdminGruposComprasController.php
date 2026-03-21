@@ -217,24 +217,86 @@ class AdminGruposComprasController extends Controller {
     // ── Página pública do grupo ───────────────────────────────────────────────
     public function paginaPublica(Request $request) {
         $slug = (string) $request->getParam('slug', '');
+        $page = max(1, (int) $request->getParam('page', 1));
+        $limit = 20;
+        $offset = ($page - 1) * $limit;
+
         try {
             $pdo = $this->getPdo();
+            $this->ensureTables($pdo);
+
             $st = $pdo->prepare("SELECT * FROM grupos_compras WHERE slug=? AND ativo=1 LIMIT 1");
             $st->execute([$slug]);
             $grupo = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$grupo) {
                 http_response_code(404);
-                echo '<h1>Grupo não encontrado ou inativo.</h1>';
+                $title = 'Grupo não encontrado';
+                ob_start();
+                echo '<div class="container py-5 text-center"><h2>Grupo não encontrado ou inativo.</h2><a href="/produtos" class="btn btn-primary mt-3">Ver produtos</a></div>';
+                $content = ob_get_clean();
+                include __DIR__ . '/../Views/layouts/main.php';
                 return;
             }
-            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=? AND status='published' ORDER BY name ASC");
-            $stP->execute([$grupo['id']]);
+
+            $total = (int) $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=? AND status='published'")->execute([$grupo['id']]) ? 0 : 0;
+            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=? AND status='published'");
+            $stCount->execute([$grupo['id']]);
+            $total = (int) $stCount->fetchColumn();
+
+            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=? AND status='published' ORDER BY name ASC LIMIT ? OFFSET ?");
+            $stP->execute([$grupo['id'], $limit, $offset]);
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Normalizar foto_principal
+            foreach ($produtos as &$p) {
+                $foto = trim((string) ($p['foto_principal'] ?? ''));
+                if ($foto !== '' && !str_starts_with($foto, 'http')) {
+                    $foto = '/' . ltrim($foto, '/');
+                }
+                $p['foto_principal'] = $foto ?: null;
+                // Campos de compatibilidade
+                $p['sale_price'] = $p['sale_price'] ?? 0;
+                $p['short_description'] = $p['short_description'] ?? $p['excerpt'] ?? '';
+                $p['featured'] = $p['featured'] ?? 0;
+                $p['stock'] = $p['stock'] ?? $p['estoque'] ?? 0;
+                $p['price'] = $p['price'] ?? $p['valor'] ?? 0;
+                $p['name'] = $p['name'] ?? $p['nome'] ?? '';
+                $p['categoria'] = $p['categoria'] ?? '';
+                $p['is_variavel'] = false;
+            }
+            unset($p);
+
+            // Verificar variações
+            try {
+                $ids = array_column($produtos, 'id');
+                if (!empty($ids)) {
+                    $in = implode(',', array_fill(0, count($ids), '?'));
+                    $stV = $pdo->prepare("SELECT produto_id FROM produto_variacoes WHERE produto_id IN ($in) GROUP BY produto_id");
+                    $stV->execute($ids);
+                    $variaveis = array_flip($stV->fetchAll(\PDO::FETCH_COLUMN));
+                    foreach ($produtos as &$p) {
+                        $p['is_variavel'] = isset($variaveis[$p['id']]);
+                    }
+                    unset($p);
+                }
+            } catch (\Throwable $e) {}
+
         } catch (\Throwable $e) {
             http_response_code(500);
-            echo '<h1>Erro ao carregar grupo.</h1>';
+            $title = 'Erro';
+            ob_start();
+            echo '<div class="container py-5 text-center"><h2>Erro ao carregar grupo.</h2></div>';
+            $content = ob_get_clean();
+            include __DIR__ . '/../Views/layouts/main.php';
             return;
         }
+
+        $totalPages = max(1, (int) ceil($total / $limit));
+        $title = htmlspecialchars($grupo['nome'], ENT_QUOTES, 'UTF-8');
+
+        ob_start();
         include __DIR__ . '/../Views/grupo-compras/pagina.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/main.php';
     }
 }
