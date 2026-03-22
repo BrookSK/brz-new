@@ -816,7 +816,7 @@ class AssessoriaController extends Controller {
     }
 
     private function truncateForPrompt($value, int $depth = 0) {
-        if ($depth > 4) {
+        if ($depth > 6) {
             return null;
         }
 
@@ -824,7 +824,7 @@ class AssessoriaController extends Controller {
             $out = [];
             $i = 0;
             foreach ($value as $k => $v) {
-                if ($i >= 40) {
+                if ($i >= 60) {
                     break;
                 }
                 $out[$k] = $this->truncateForPrompt($v, $depth + 1);
@@ -835,8 +835,8 @@ class AssessoriaController extends Controller {
 
         if (is_string($value)) {
             $v = $this->cleanJsonText($value);
-            if (strlen($v) > 800) {
-                $v = substr($v, 0, 800);
+            if (strlen($v) > 1200) {
+                $v = substr($v, 0, 1200);
             }
             return $v;
         }
@@ -850,9 +850,30 @@ class AssessoriaController extends Controller {
 
     private function reduceScrapingBeePayload(array $dadosBrutos): array {
         $picked = [];
-        foreach (['title', 'name', 'product', 'product_name', 'price', 'prices', 'images', 'image', 'variants', 'variation', 'variations', 'offers', 'url'] as $k) {
+        $keys = [
+            'title', 'name', 'product', 'product_name',
+            'price', 'prices', 'images', 'image',
+            'variants', 'variation', 'variations', 'offers',
+            'options', 'availableVariations', 'variantCriteria',
+            'url', 'description',
+            // Campos de especificações e peso
+            'specifications', 'specs', 'weight', 'shipping_weight',
+            'product_weight', 'dimensions', 'details', 'features',
+            'attributes', 'product_details', 'product_specifications',
+            // Dados extras do scraping complementar
+            'html_extra',
+        ];
+        foreach ($keys as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
                 $picked[$k] = $dadosBrutos[$k];
+            }
+        }
+        // Busca recursiva rasa: se product é array, incluir sub-campos relevantes
+        if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
+            foreach (['specifications', 'specs', 'weight', 'details', 'features', 'attributes'] as $sk) {
+                if (isset($dadosBrutos['product'][$sk]) && !isset($picked[$sk])) {
+                    $picked['product_' . $sk] = $dadosBrutos['product'][$sk];
+                }
             }
         }
         if (empty($picked)) {
@@ -971,13 +992,41 @@ class AssessoriaController extends Controller {
             header('X-Assessoria-Variacoes-Fallback-Keys: ' . $this->headerSafeValue(implode(',', array_keys($attrKeys)), 200));
         }
 
+        // Estimar peso baseado no nome (nunca usar 1kg genérico)
+        $nomeLower = strtolower((string) $nome);
+        $pesoEstimado = 2.0;
+        if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
+            $pesoEstimado = 35.0;
+        } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
+            $pesoEstimado = 40.0;
+        } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
+            $pesoEstimado = 3.5;
+        } elseif (preg_match('/pillow|travesseiro/', $nomeLower)) {
+            $pesoEstimado = 1.5;
+        } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
+            $pesoEstimado = 15.0;
+        } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
+            $pesoEstimado = 2.5;
+        } elseif (preg_match('/phone|celular|smartphone/', $nomeLower)) {
+            $pesoEstimado = 0.3;
+        } elseif (preg_match('/shoe|sapato|tênis|sneaker|boot/', $nomeLower)) {
+            $pesoEstimado = 1.2;
+        } elseif (preg_match('/shirt|camiseta|blouse|dress|vestido|jacket|jaqueta/', $nomeLower)) {
+            $pesoEstimado = 0.5;
+        } elseif (preg_match('/toy|brinquedo/', $nomeLower)) {
+            $pesoEstimado = 1.5;
+        } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
+            $pesoEstimado = 15.0;
+        } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
+            $pesoEstimado = 20.0;
+        }
+
         return [
             'sku' => '',
             'nome' => $nome,
             'descricao' => $descricao,
             'valor' => floatval($valor),
-            // Regra: se não encontrar peso, usar sempre 1kg
-            'peso' => 1.0,
+            'peso' => round($pesoEstimado * 1.15, 2),
             'imagens' => $img ? [$img] : [],
             'variacoes' => $variacoes,
             'url_original' => $urlOriginal
@@ -1081,8 +1130,8 @@ class AssessoriaController extends Controller {
                 }
             }
 
-            if ($peso === null || floatval($peso) <= 0) {
-                $peso = 1.0;
+            if ($peso !== null && floatval($peso) <= 0) {
+                $peso = null; // herdar peso base do produto
             }
 
             $label = $this->stringifyVariationLabel(is_array($atributos) ? $atributos : []);
@@ -1096,7 +1145,7 @@ class AssessoriaController extends Controller {
                 'label' => $label,
                 'atributos' => is_array($atributos) ? $atributos : [],
                 'valor' => $valor !== null ? floatval($valor) : null,
-                'peso' => floatval($peso)
+                'peso' => $peso !== null ? floatval($peso) : null
             ];
         }
 
@@ -1735,13 +1784,11 @@ class AssessoriaController extends Controller {
                 'url' => $url,
                 'stealth_proxy' => 'true',
                 'country_code' => 'us',
-                // Timeout do lado do ScrapingBee (em ms)
                 'timeout' => '120000',
-                // Default mais rápido para evitar timeout no proxy
-                'wait_browser' => 'domcontentloaded',
+                // networkidle2 espera JS carregar (specs, variações dinâmicas)
+                'wait_browser' => 'networkidle2',
                 'block_ads' => 'true',
-                // Limite do ScrapingBee: ai_query <= 300 chars
-                'ai_query' => 'Extract ALL product data as JSON: name, all image URLs, base price, and EVERY variant/option combination (color, size, style, theme, etc). For each variant include: id or sku, all attribute names and values, and its specific price in USD. Return complete variants list even if there are many.'
+                'ai_query' => 'Extract ALL product data as JSON: name, images, base price, weight in lbs or kg from specifications, and EVERY variant with id, attributes, price. Include specifications table with weights per size.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -1966,13 +2013,43 @@ class AssessoriaController extends Controller {
             $poucasVariacoes = ($varCount <= 1);
             
             if ($pesoSuspeito || $poucasVariacoes) {
-                error_log('[ScrapingBee] Resultado incompleto: variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping direto complementar');
+                error_log('[ScrapingBee] Resultado incompleto: variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping complementar via ScrapingBee HTML');
                 
-                // Scraping direto para obter dados extras (especificações, variações do HTML)
-                $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
+                // Segunda chamada ScrapingBee SEM ai_query para obter HTML renderizado (JS-loaded specs)
+                $htmlUrl = $buildUrl([
+                    'ai_query' => null,
+                    'render_js' => 'true',
+                    'wait_browser' => 'networkidle2',
+                    'timeout' => '90000',
+                ]);
+                // Remover ai_query= vazio da URL
+                $htmlUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $htmlUrl);
+                $htmlUrl = rtrim($htmlUrl, '&?');
+                
+                [$htmlResp, $htmlCode, $htmlErrno, $htmlErr] = $doRequest($htmlUrl, 100);
+                
+                $dadosExtras = [];
+                if (!$htmlErr && $htmlCode === 200 && !empty($htmlResp)) {
+                    // Se a resposta é HTML (não JSON), extrair specs do HTML
+                    $isHtml = (strpos(trim($htmlResp), '<') === 0 || stripos($htmlResp, '<!doctype') !== false || stripos($htmlResp, '<html') !== false);
+                    if ($isHtml) {
+                        $dadosExtras = $this->extrairDadosDoHtml($htmlResp, $url);
+                        error_log('[ScrapingBee] HTML complementar extraído: ' . json_encode(array_keys($dadosExtras)));
+                    } else {
+                        // Pode ser JSON — tentar decodificar e mesclar
+                        $htmlJson = json_decode($htmlResp, true);
+                        if (is_array($htmlJson)) {
+                            $dadosExtras = $htmlJson;
+                            error_log('[ScrapingBee] JSON complementar: ' . json_encode(array_keys($dadosExtras)));
+                        }
+                    }
+                } else {
+                    error_log('[ScrapingBee] Scraping complementar falhou: code=' . $htmlCode . ' err=' . $htmlErr);
+                    // Fallback: tentar cURL direto (funciona para sites sem JS)
+                    $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
+                }
                 
                 if (!empty($dadosExtras)) {
-                    // Mesclar dados do ScrapingBee com dados do scraping direto
                     $dadosCombinados = array_merge($decodedResponse, ['html_extra' => $dadosExtras]);
                     
                     try {
@@ -1988,8 +2065,40 @@ class AssessoriaController extends Controller {
                         }
                     } catch (\Exception $e) {
                         error_log('[ScrapingBee] Erro no complemento ChatGPT: ' . $e->getMessage());
-                        // Manter resultado original
                     }
+                }
+                
+                // Se AINDA peso <= 1.5, aplicar estimativa baseada no nome
+                if (floatval($produto['peso'] ?? 0) <= 1.5) {
+                    $nomeLower = strtolower((string)($produto['nome'] ?? ''));
+                    $pesoEstimado = 2.0;
+                    if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
+                        $pesoEstimado = 35.0;
+                    } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
+                        $pesoEstimado = 40.0;
+                    } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
+                        $pesoEstimado = 3.5;
+                    } elseif (preg_match('/pillow|travesseiro/', $nomeLower)) {
+                        $pesoEstimado = 1.5;
+                    } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
+                        $pesoEstimado = 15.0;
+                    } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
+                        $pesoEstimado = 2.5;
+                    } elseif (preg_match('/phone|celular|smartphone/', $nomeLower)) {
+                        $pesoEstimado = 0.3;
+                    } elseif (preg_match('/shoe|sapato|tênis|sneaker|boot/', $nomeLower)) {
+                        $pesoEstimado = 1.2;
+                    } elseif (preg_match('/shirt|camiseta|blouse|dress|vestido|jacket|jaqueta/', $nomeLower)) {
+                        $pesoEstimado = 0.5;
+                    } elseif (preg_match('/toy|brinquedo/', $nomeLower)) {
+                        $pesoEstimado = 1.5;
+                    } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
+                        $pesoEstimado = 15.0;
+                    } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
+                        $pesoEstimado = 20.0;
+                    }
+                    $produto['peso'] = round($pesoEstimado * 1.15, 2);
+                    error_log('[ScrapingBee] Peso estimado pelo nome: ' . $produto['peso'] . 'kg para "' . ($produto['nome'] ?? '') . '"');
                 }
             }
             
@@ -2925,6 +3034,18 @@ class AssessoriaController extends Controller {
             $stmt->execute([$sku]);
             $existingId = $stmt->fetchColumn();
             if ($existingId) {
+                // Atualizar produto existente com dados novos (peso, preço, variações podem ter mudado)
+                try {
+                    $stmtUpd = $db->prepare('UPDATE produtos SET price = ?, weight = ?, description = ?, updated_at = NOW() WHERE id = ?');
+                    $stmtUpd->execute([
+                        floatval($produto['valor'] ?? 0),
+                        floatval($produto['peso'] ?? 1.0),
+                        (string) ($produto['descricao'] ?? ''),
+                        (int) $existingId
+                    ]);
+                } catch (\Exception $e) {
+                    error_log('[Assessoria] Erro ao atualizar produto existente #' . $existingId . ': ' . $e->getMessage());
+                }
                 return (int) $existingId;
             }
         } catch (\Exception $e) {
@@ -3027,6 +3148,7 @@ class AssessoriaController extends Controller {
         }
         
         $reduced = $this->reduceScrapingBeePayload($dadosBrutos);
+        error_log('[ChatGPT] Payload keys for prompt: ' . json_encode(array_keys($reduced)) . ' | Total size: ' . strlen(json_encode($reduced)));
         $prompt = $this->gerarPromptChatGPT($reduced, $urlOriginal);
         
         if (headers_sent() === false) {
@@ -3280,7 +3402,14 @@ class AssessoriaController extends Controller {
                 'variacoes_count' => is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0
             ]));
         }
-        error_log('[ChatGPT] Product extracted: ' . ($produtoData['nome'] ?? '?') . ' | Variations: ' . (is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0));
+        error_log('[ChatGPT] Product extracted: ' . ($produtoData['nome'] ?? '?') . ' | Variations: ' . (is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0) . ' | Peso: ' . ($produtoData['peso'] ?? '?') . 'kg');
+        
+        // Log detalhado das variações para debug
+        if (is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
+            foreach (array_slice($produtoData['variacoes'], 0, 5) as $vi => $vv) {
+                error_log('[ChatGPT] Var[' . $vi . ']: ' . ($vv['label'] ?? '?') . ' | valor=' . ($vv['valor'] ?? 'null') . ' | peso=' . ($vv['peso'] ?? 'null'));
+            }
+        }
         
         return $produtoData;
     }
@@ -3289,11 +3418,23 @@ class AssessoriaController extends Controller {
      * Gera o prompt para o ChatGPT
      */
     private function gerarPromptChatGPT(array $dadosBrutos, string $urlOriginal): string {
+        $hasHtmlExtra = isset($dadosBrutos['html_extra']) && is_array($dadosBrutos['html_extra']) && !empty($dadosBrutos['html_extra']);
+        $extraInstructions = '';
+        if ($hasHtmlExtra) {
+            $extraInstructions = "
+ATENÇÃO: O campo 'html_extra' contém dados complementares extraídos do HTML da página (especificações, pesos, opções de variação).
+- 'weights_found': pesos encontrados no HTML (já convertidos para kg). USE ESTES VALORES.
+- 'specifications': tabela de especificações do produto. PROCURE peso/weight aqui.
+- 'options_found': opções de variação encontradas (tamanhos, cores, etc.)
+- 'jsonld_product': dados estruturados JSON-LD do produto.
+";
+        }
+
         return "Analise os dados brutos abaixo extraídos da URL: {$urlOriginal}
 
 DADOS BRUTOS:
 " . json_encode($dadosBrutos, JSON_PRETTY_PRINT) . "
-
+{$extraInstructions}
 EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON VÁLIDO (SEM TEXTO, SEM MARKDOWN, SEM ```), COM ESTA ESTRUTURA EXATA E SOMENTE ESTES CAMPOS:
 
 {
