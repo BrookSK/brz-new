@@ -1741,7 +1741,7 @@ class AssessoriaController extends Controller {
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
                 // Limite do ScrapingBee: ai_query <= 300 chars
-                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.'
+                'ai_query' => 'Extract ALL product data as JSON: name, all image URLs, base price, and EVERY variant/option combination (color, size, style, theme, etc). For each variant include: id or sku, all attribute names and values, and its specific price in USD. Return complete variants list even if there are many.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -1947,6 +1947,14 @@ class AssessoriaController extends Controller {
             header('X-ScrapingBee-JSON-Keys: ' . json_encode(array_keys(is_array($decodedResponse) ? $decodedResponse : [])));
             header('X-ScrapingBee-JSON-Type: ' . gettype($decodedResponse));
         }
+        // Log detalhado para debug de variações
+        $varKeys = [];
+        foreach (['variants', 'variations', 'offers', 'options', 'variantCriteria', 'availableVariations'] as $vk) {
+            if (isset($decodedResponse[$vk])) {
+                $varKeys[] = $vk . '(' . (is_array($decodedResponse[$vk]) ? count($decodedResponse[$vk]) : 'non-array') . ')';
+            }
+        }
+        error_log('[ScrapingBee] Response keys: ' . json_encode(array_keys(is_array($decodedResponse) ? $decodedResponse : [])) . ' | Variation fields: ' . (empty($varKeys) ? 'NONE' : implode(', ', $varKeys)));
         
         try {
             // Usar ChatGPT para analisar os dados brutos
@@ -3102,9 +3110,11 @@ class AssessoriaController extends Controller {
                 'valor' => $produtoData['valor'],
                 'peso' => $produtoData['peso'],
                 'descricao' => $produtoData['descricao'],
-                'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0
+                'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0,
+                'variacoes_count' => is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0
             ]));
         }
+        error_log('[ChatGPT] Product extracted: ' . ($produtoData['nome'] ?? '?') . ' | Variations: ' . (is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0));
         
         return $produtoData;
     }
@@ -3127,42 +3137,45 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"valor\": 99.99,
     \"peso\": 1.5,
     \"imagens\": [\"url1\", \"url2\"],
-    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0}],
+    \"variacoes\": [{\"id\": \"var-1\", \"label\": \"Color: Gray | Size: King 90x100\", \"atributos\": {\"Color\": \"Gray\", \"Size\": \"King 90x100\"}, \"valor\": 45.99, \"peso\": 1.5}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
 REGRAS ESPECÍFICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
-1.1 VARIAÇÕES:
-   - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
-   - Cada variação deve ter pelo menos: id (ou string vazia), atributos (mapa), e valor quando houver.
+
+2. VARIAÇÕES (MUITO IMPORTANTE):
+   - Analise TODOS os dados brutos cuidadosamente para encontrar variações/opções do produto
+   - Variações podem estar em campos como: variants, variations, options, offers, availableVariations, variantCriteria, etc.
+   - Cada COMBINAÇÃO de opções (ex: cada cor + cada tamanho) deve gerar uma entrada separada em \"variacoes\"
+   - Se o produto tem 4 cores e 5 tamanhos, deve haver até 20 variações (4x5)
+   - Cada variação DEVE ter: id (string), label (legível), atributos (mapa chave:valor), valor (preço USD), peso (kg)
+   - Se uma variação não tem preço próprio, use o preço base do produto
    - Se não existirem variações, retorne \"variacoes\": []
-2. PESO (kg): 
+   - NÃO IGNORE variações. Se os dados brutos contêm opções/variantes, EXTRAIA TODAS.
+
+3. PESO (kg): 
    - Se não encontrar o peso exato, ESTIME com base no tipo de produto
    - Adicione 15% de margem de segurança sobre o peso estimado
-   - Ex: se estimar 1kg, use 1.15kg
    - Use sempre casas decimais (ex: 1.15)
 
-3. DESCRIÇÃO:
+4. DESCRIÇÃO:
    - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
-   - Inclua informações relevantes sobre o produto
-   - Seja específico e útil para o cliente
 
-4. IMAGEM:
+5. IMAGEM:
    - Extraia todas as URLs de imagens disponíveis
    - Se não encontrar, use array vazio []
 
-5. VALOR: Use número decimal com 2 casas (ex: 99.99)
+6. VALOR: Use número decimal com 2 casas (ex: 99.99). Este é o preço BASE.
 
-6. NOME: Use o nome completo do produto
+7. NOME: Use o nome completo do produto
 
 IMPORTANTE:
 - Retorne APENAS o JSON, sem texto adicional
 - Para peso, SEMPRE inclua a margem de 15% se precisar estimar
 - Para descrição, CRIE uma se não encontrar
-- SKU pode ser gerado baseado no nome se não existir
-- Use kg para peso, cm para dimensões
+- Use kg para peso
 
 RETORNE APENAS O JSON:";
     }
