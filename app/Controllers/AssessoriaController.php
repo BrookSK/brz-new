@@ -811,8 +811,92 @@ class AssessoriaController extends Controller {
             }
         }
 
+        // Tentar reparar JSON truncado (resposta cortada no meio)
+        $repaired = $this->repairTruncatedJson($candidate);
+        if ($repaired !== null) {
+            $data3 = json_decode($repaired, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($data3)) {
+                error_log('[ChatGPT] JSON reparado com sucesso (truncamento)');
+                return $data3;
+            }
+        }
+
         $err = json_last_error_msg();
         throw new \Exception('ChatGPT não retornou JSON válido: ' . $err);
+    }
+
+    /**
+     * Tenta reparar JSON truncado fechando brackets/braces abertos
+     */
+    private function repairTruncatedJson(string $json): ?string {
+        $json = trim($json);
+        if ($json === '' || $json[0] !== '{') {
+            return null;
+        }
+
+        // Contar brackets abertos
+        $stack = [];
+        $inString = false;
+        $escape = false;
+        $len = strlen($json);
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $json[$i];
+
+            if ($escape) {
+                $escape = false;
+                continue;
+            }
+
+            if ($ch === '\\' && $inString) {
+                $escape = true;
+                continue;
+            }
+
+            if ($ch === '"') {
+                $inString = !$inString;
+                continue;
+            }
+
+            if ($inString) {
+                continue;
+            }
+
+            if ($ch === '{' || $ch === '[') {
+                $stack[] = $ch;
+            } elseif ($ch === '}') {
+                if (!empty($stack) && end($stack) === '{') {
+                    array_pop($stack);
+                }
+            } elseif ($ch === ']') {
+                if (!empty($stack) && end($stack) === '[') {
+                    array_pop($stack);
+                }
+            }
+        }
+
+        if (empty($stack)) {
+            return null; // Já está balanceado, o erro é outro
+        }
+
+        // Se estava no meio de uma string, fechar a string
+        if ($inString) {
+            $json .= '"';
+        }
+
+        // Remover última vírgula ou valor parcial antes de fechar
+        $json = preg_replace('/,\s*"[^"]*$/', '', $json); // chave parcial
+        $json = preg_replace('/,\s*\d+\.?\d*$/', '', $json); // número parcial
+        $json = preg_replace('/,\s*$/', '', $json); // vírgula solta
+        $json = preg_replace('/:\s*$/', ': null', $json); // valor faltando
+
+        // Fechar brackets na ordem inversa
+        while (!empty($stack)) {
+            $open = array_pop($stack);
+            $json .= ($open === '{') ? '}' : ']';
+        }
+
+        return $json;
     }
 
     private function truncateForPrompt($value, int $depth = 0) {
@@ -881,7 +965,28 @@ class AssessoriaController extends Controller {
         if (empty($picked)) {
             $picked = $dadosBrutos;
         }
-        return (array) $this->truncateForPrompt($picked, 0);
+        $result = (array) $this->truncateForPrompt($picked, 0);
+        
+        // Limitar tamanho total do payload para evitar truncamento do ChatGPT
+        $jsonSize = strlen(json_encode($result));
+        if ($jsonSize > 30000) {
+            // Remover campos menos importantes para reduzir tamanho
+            foreach (['description', 'details', 'features', 'images', 'image'] as $dropKey) {
+                if (isset($result[$dropKey])) {
+                    unset($result[$dropKey]);
+                    $jsonSize = strlen(json_encode($result));
+                    if ($jsonSize <= 30000) break;
+                }
+            }
+            // Se ainda grande, truncar html_extra
+            if ($jsonSize > 30000 && isset($result['html_extra']) && is_array($result['html_extra'])) {
+                // Manter apenas campos essenciais do html_extra
+                $essentialKeys = ['weights_found', 'specifications', 'variant_offers', 'variant_prices_found', 'variant_price_data', 'options_found', 'prices_found', 'jsonld_product'];
+                $result['html_extra'] = array_intersect_key($result['html_extra'], array_flip($essentialKeys));
+            }
+        }
+        
+        return $result;
     }
 
     private function findFirstNumeric($value, int $depth = 0): ?float {
@@ -1257,6 +1362,96 @@ class AssessoriaController extends Controller {
             }
         }
         return array_values($unique);
+    }
+
+    /**
+     * Mescla dados de preço/peso por variação obtidos da segunda chamada ScrapingBee
+     * diretamente nas variações existentes do produto (sem re-chamar ChatGPT).
+     */
+    private function mergeVariantPriceData(array $produto, array $variantData): array {
+        if (!is_array($produto['variacoes']) || empty($produto['variacoes'])) {
+            return $produto;
+        }
+
+        // Normalizar variantData: pode ser array de objetos ou objeto com chaves
+        $priceMap = []; // label_lower => ['price' => float, 'weight_lbs' => float]
+        
+        // Se é array sequencial de objetos [{size: "Twin", price: 299.99, weight_lbs: 60}, ...]
+        if (isset($variantData[0]) && is_array($variantData[0])) {
+            foreach ($variantData as $item) {
+                if (!is_array($item)) continue;
+                $size = strtolower(trim((string)($item['size'] ?? $item['name'] ?? $item['variant'] ?? $item['label'] ?? '')));
+                if ($size === '') continue;
+                $priceMap[$size] = [
+                    'price' => $this->findFirstNumeric($item['price'] ?? $item['valor'] ?? null),
+                    'weight_lbs' => $this->findFirstNumeric($item['weight_lbs'] ?? $item['weight'] ?? $item['peso'] ?? null),
+                ];
+            }
+        }
+        // Se é objeto com chaves {Twin: {price: 299.99}, King: {price: 499.99}}
+        elseif (!isset($variantData[0])) {
+            foreach ($variantData as $key => $val) {
+                $size = strtolower(trim((string)$key));
+                if (is_array($val)) {
+                    $priceMap[$size] = [
+                        'price' => $this->findFirstNumeric($val['price'] ?? $val['valor'] ?? null),
+                        'weight_lbs' => $this->findFirstNumeric($val['weight_lbs'] ?? $val['weight'] ?? $val['peso'] ?? null),
+                    ];
+                } elseif (is_numeric($val)) {
+                    $priceMap[$size] = ['price' => floatval($val), 'weight_lbs' => null];
+                }
+            }
+        }
+
+        if (empty($priceMap)) {
+            error_log('[mergeVariantPriceData] Nenhum dado de preço extraído do variantData');
+            return $produto;
+        }
+
+        error_log('[mergeVariantPriceData] Price map: ' . json_encode($priceMap));
+
+        $anyPriceChanged = false;
+        $anyWeightChanged = false;
+
+        foreach ($produto['variacoes'] as &$var) {
+            if (!is_array($var)) continue;
+            
+            $label = strtolower(trim((string)($var['label'] ?? '')));
+            $attrs = $var['atributos'] ?? [];
+            $sizeVal = strtolower(trim((string)($attrs['Bed Size'] ?? $attrs['Size'] ?? $attrs['Tamanho'] ?? '')));
+            
+            // Tentar match por label ou atributo de tamanho
+            $matched = null;
+            foreach ($priceMap as $mapKey => $mapVal) {
+                if ($mapKey === $label || $mapKey === $sizeVal
+                    || stripos($label, $mapKey) !== false
+                    || ($sizeVal !== '' && stripos($sizeVal, $mapKey) !== false)
+                    || stripos($mapKey, $label) !== false
+                    || ($sizeVal !== '' && stripos($mapKey, $sizeVal) !== false)) {
+                    $matched = $mapVal;
+                    break;
+                }
+            }
+
+            if ($matched === null) continue;
+
+            // Aplicar preço se encontrado e diferente
+            if ($matched['price'] !== null && $matched['price'] > 0) {
+                $var['valor'] = round($matched['price'], 2);
+                $anyPriceChanged = true;
+            }
+
+            // Aplicar peso se encontrado (converter lbs para kg)
+            if ($matched['weight_lbs'] !== null && $matched['weight_lbs'] > 0) {
+                $var['peso'] = round($matched['weight_lbs'] * 0.4536, 2);
+                $anyWeightChanged = true;
+            }
+        }
+        unset($var);
+
+        error_log('[mergeVariantPriceData] Preços alterados: ' . ($anyPriceChanged ? 'sim' : 'nao') . ' | Pesos alterados: ' . ($anyWeightChanged ? 'sim' : 'nao'));
+
+        return $produto;
     }
 
     private function extractOptionNamesFromScrapingBee(array $dadosBrutos): array {
@@ -2050,99 +2245,46 @@ class AssessoriaController extends Controller {
                 if ($poucasVariacoes) $reason[] = 'poucas_variacoes';
                 if ($variacoesComMesmoPreco) $reason[] = 'mesmo_preco_todas_variacoes';
                 if ($variacoesComMesmoPeso) $reason[] = 'mesmo_peso_todas_variacoes';
-                error_log('[ScrapingBee] Resultado incompleto (' . implode(', ', $reason) . '): variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping complementar via ScrapingBee HTML');
+                error_log('[ScrapingBee] Resultado incompleto (' . implode(', ', $reason) . '): variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping complementar');
                 
                 // Segunda chamada ScrapingBee com ai_query focado em preços/pesos por variação
                 $priceUrl = $buildUrl([
-                    'ai_query' => 'For each product size/variant (Twin, Full, Queen, King, etc), extract: size name, price in USD, weight in lbs. Return as JSON array with fields: size, price, weight_lbs. Include specification table data.',
+                    'ai_query' => 'For each product size/variant (Twin, Full, Queen, King, etc), extract: size name, price in USD, weight in lbs. Return as JSON array with fields: size, price, weight_lbs.',
                     'wait_browser' => 'networkidle2',
                     'timeout' => '90000',
                 ]);
                 
                 [$priceResp, $priceCode, $priceErrno, $priceErr] = $doRequest($priceUrl, 100);
                 
-                $dadosExtras = [];
+                $variantPriceData = null;
                 if (!$priceErr && $priceCode === 200 && !empty($priceResp)) {
                     $priceJson = json_decode($priceResp, true);
                     if (is_array($priceJson)) {
-                        $dadosExtras = ['variant_price_data' => $priceJson];
+                        $variantPriceData = $priceJson;
                         error_log('[ScrapingBee] Dados de preço por variação: ' . substr(json_encode($priceJson), 0, 500));
-                    } else {
-                        // Pode ser HTML — extrair specs
-                        $isHtml = (strpos(trim($priceResp), '<') === 0 || stripos($priceResp, '<!doctype') !== false || stripos($priceResp, '<html') !== false);
-                        if ($isHtml) {
-                            $dadosExtras = $this->extrairDadosDoHtml($priceResp, $url);
-                            error_log('[ScrapingBee] HTML complementar extraído: ' . json_encode(array_keys($dadosExtras)));
-                        }
                     }
                 }
                 
-                // Se não conseguiu dados de preço, tentar sem ai_query para pegar HTML renderizado
-                if (empty($dadosExtras)) {
-                    $htmlUrl = $buildUrl([
-                        'ai_query' => null,
-                        'render_js' => 'true',
-                        'wait_browser' => 'networkidle2',
-                        'timeout' => '90000',
-                    ]);
-                    $htmlUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $htmlUrl);
-                    $htmlUrl = rtrim($htmlUrl, '&?');
-                    
-                    [$htmlResp, $htmlCode, $htmlErrno, $htmlErr] = $doRequest($htmlUrl, 100);
-                    
-                    if (!$htmlErr && $htmlCode === 200 && !empty($htmlResp)) {
-                        $isHtml = (strpos(trim($htmlResp), '<') === 0 || stripos($htmlResp, '<!doctype') !== false || stripos($htmlResp, '<html') !== false);
-                        if ($isHtml) {
-                            $dadosExtras = $this->extrairDadosDoHtml($htmlResp, $url);
-                            error_log('[ScrapingBee] HTML complementar extraído: ' . json_encode(array_keys($dadosExtras)));
-                        } else {
-                            $htmlJson = json_decode($htmlResp, true);
-                            if (is_array($htmlJson)) {
-                                $dadosExtras = $htmlJson;
-                                error_log('[ScrapingBee] JSON complementar: ' . json_encode(array_keys($dadosExtras)));
+                // Tentar mesclar preços/pesos diretamente nas variações existentes (sem re-chamar ChatGPT)
+                if ($variantPriceData !== null && is_array($produto['variacoes']) && count($produto['variacoes']) > 0) {
+                    $produto = $this->mergeVariantPriceData($produto, $variantPriceData);
+                } else {
+                    // Fallback: tentar cURL direto para sites sem JS
+                    $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
+                    if (!empty($dadosExtras)) {
+                        // Mesclar dados extras com dados originais e re-analisar com ChatGPT
+                        $dadosCombinados = array_merge($decodedResponse, ['html_extra' => $dadosExtras]);
+                        try {
+                            $produtoComplementado = $this->analisarComChatGPT($dadosCombinados, $url);
+                            $varCountNovo = is_array($produtoComplementado['variacoes'] ?? null) ? count($produtoComplementado['variacoes']) : 0;
+                            $pesoNovo = floatval($produtoComplementado['peso'] ?? 0);
+                            
+                            if ($varCountNovo > $varCount || $pesoNovo > floatval($produto['peso'] ?? 0)) {
+                                $produto = $produtoComplementado;
                             }
+                        } catch (\Exception $e) {
+                            error_log('[ScrapingBee] Erro no complemento ChatGPT: ' . $e->getMessage());
                         }
-                    } else {
-                        error_log('[ScrapingBee] Scraping complementar falhou: code=' . ($htmlCode ?? '?') . ' err=' . ($htmlErr ?? '?'));
-                        $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
-                    }
-                }
-                
-                if (!empty($dadosExtras)) {
-                    $dadosCombinados = array_merge($decodedResponse, ['html_extra' => $dadosExtras]);
-                    
-                    try {
-                        $produtoComplementado = $this->analisarComChatGPT($dadosCombinados, $url);
-                        
-                        $varCountNovo = is_array($produtoComplementado['variacoes'] ?? null) ? count($produtoComplementado['variacoes']) : 0;
-                        $pesoNovo = floatval($produtoComplementado['peso'] ?? 0);
-                        
-                        // Usar resultado complementado se trouxe mais dados
-                        // Verificar se preços/pesos das variações ficaram mais diversificados
-                        $precosNovos = [];
-                        $pesosNovos = [];
-                        if (is_array($produtoComplementado['variacoes'] ?? null)) {
-                            foreach ($produtoComplementado['variacoes'] as $vvv) {
-                                if (is_array($vvv)) {
-                                    $precosNovos[] = floatval($vvv['valor'] ?? 0);
-                                    $pesosNovos[] = floatval($vvv['peso'] ?? 0);
-                                }
-                            }
-                        }
-                        $precosNovosDiversos = count(array_unique($precosNovos)) > 1;
-                        $pesosNovosDiversos = count(array_unique($pesosNovos)) > 1;
-                        
-                        $melhorou = ($varCountNovo > $varCount)
-                            || ($pesoNovo > floatval($produto['peso'] ?? 0))
-                            || ($precosNovosDiversos && $variacoesComMesmoPreco)
-                            || ($pesosNovosDiversos && $variacoesComMesmoPeso);
-                        
-                        if ($melhorou) {
-                            error_log('[ScrapingBee] Complemento melhorou: variacoes=' . $varCountNovo . ' peso=' . $pesoNovo . ' precos_diversos=' . ($precosNovosDiversos ? 'sim' : 'nao') . ' pesos_diversos=' . ($pesosNovosDiversos ? 'sim' : 'nao'));
-                            $produto = $produtoComplementado;
-                        }
-                    } catch (\Exception $e) {
-                        error_log('[ScrapingBee] Erro no complemento ChatGPT: ' . $e->getMessage());
                     }
                 }
                 
@@ -3329,11 +3471,16 @@ class AssessoriaController extends Controller {
         try {
             $produtoData = $this->decodeJsonResilient((string) $content);
         } catch (\Exception $e) {
+            error_log('[ChatGPT] JSON parse failed: ' . $e->getMessage() . ' | Content prefix: ' . substr((string) $content, 0, 200));
+            
             // Retry 1: prompt menor para evitar truncamento / syntax error
+            // Usar apenas dados essenciais (sem html_extra que pode ser muito grande)
+            $retryData = $reduced;
+            unset($retryData['html_extra'], $retryData['description'], $retryData['details'], $retryData['features']);
             $retryReduced = [
-                'hint' => 'extract only essential fields',
+                'hint' => 'extract only essential fields: nome, valor, peso, variacoes. Keep response SHORT.',
                 'url' => $urlOriginal,
-                'data' => $reduced
+                'data' => $retryData
             ];
             $retryPrompt = $this->gerarPromptChatGPT($retryReduced, $urlOriginal);
             [$resp2, $code2, $err2] = $this->callChatGPT($chatGptApiKey, $retryPrompt, true);
