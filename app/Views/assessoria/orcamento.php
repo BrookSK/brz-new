@@ -496,8 +496,27 @@ $(document).ready(function() {
         const data = resolveVariant(index);
         const valorEl = container.querySelector('.valor-text');
         const pesoEl = container.querySelector('.peso-text');
-        if (valorEl) valorEl.textContent = (data.valor || 0).toFixed(2);
-        if (pesoEl) pesoEl.textContent = (data.peso || 0).toFixed(2);
+        if (valorEl) {
+            const oldVal = parseFloat(valorEl.textContent) || 0;
+            const newVal = data.valor || 0;
+            valorEl.textContent = newVal.toFixed(2);
+            // Feedback visual quando preço muda
+            if (Math.abs(oldVal - newVal) > 0.01) {
+                valorEl.closest('.fw-bold').style.transition = 'color 0.3s';
+                valorEl.closest('.fw-bold').style.color = '#198754';
+                setTimeout(() => { valorEl.closest('.fw-bold').style.color = ''; }, 1000);
+            }
+        }
+        if (pesoEl) {
+            const oldPeso = parseFloat(pesoEl.textContent) || 0;
+            const newPeso = data.peso || 0;
+            pesoEl.textContent = newPeso.toFixed(2);
+            if (Math.abs(oldPeso - newPeso) > 0.01) {
+                pesoEl.parentElement.style.transition = 'color 0.3s';
+                pesoEl.parentElement.style.color = '#198754';
+                setTimeout(() => { pesoEl.parentElement.style.color = ''; }, 1000);
+            }
+        }
     }
 
     // Calcular totais baseado nos produtos selecionados
