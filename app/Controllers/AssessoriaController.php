@@ -1960,6 +1960,39 @@ class AssessoriaController extends Controller {
             // Usar ChatGPT para analisar os dados brutos
             $produto = $this->analisarComChatGPT($decodedResponse, $url);
             
+            // Verificar se o resultado está incompleto (sem variações ou peso genérico)
+            $varCount = is_array($produto['variacoes'] ?? null) ? count($produto['variacoes']) : 0;
+            $pesoSuspeito = (floatval($produto['peso'] ?? 0) <= 1.5);
+            $poucasVariacoes = ($varCount <= 1);
+            
+            if ($pesoSuspeito || $poucasVariacoes) {
+                error_log('[ScrapingBee] Resultado incompleto: variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping direto complementar');
+                
+                // Scraping direto para obter dados extras (especificações, variações do HTML)
+                $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
+                
+                if (!empty($dadosExtras)) {
+                    // Mesclar dados do ScrapingBee com dados do scraping direto
+                    $dadosCombinados = array_merge($decodedResponse, ['html_extra' => $dadosExtras]);
+                    
+                    try {
+                        $produtoComplementado = $this->analisarComChatGPT($dadosCombinados, $url);
+                        
+                        $varCountNovo = is_array($produtoComplementado['variacoes'] ?? null) ? count($produtoComplementado['variacoes']) : 0;
+                        $pesoNovo = floatval($produtoComplementado['peso'] ?? 0);
+                        
+                        // Usar resultado complementado se trouxe mais dados
+                        if ($varCountNovo > $varCount || $pesoNovo > floatval($produto['peso'] ?? 0)) {
+                            error_log('[ScrapingBee] Complemento melhorou: variacoes=' . $varCountNovo . ' peso=' . $pesoNovo);
+                            $produto = $produtoComplementado;
+                        }
+                    } catch (\Exception $e) {
+                        error_log('[ScrapingBee] Erro no complemento ChatGPT: ' . $e->getMessage());
+                        // Manter resultado original
+                    }
+                }
+            }
+            
             return [
                 'success' => true,
                 'data' => $produto
@@ -2166,6 +2199,36 @@ class AssessoriaController extends Controller {
     }
 
     /**
+     * Faz cURL direto na URL e extrai dados estruturados do HTML.
+     */
+    private function extrairDadosDoHtmlViaUrl(string $url): array {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            CURLOPT_HTTPHEADER     => [
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language: en-US,en;q=0.9',
+            ],
+            CURLOPT_ENCODING       => '',
+        ]);
+        $html = curl_exec($ch);
+        $err  = curl_error($ch);
+        curl_close($ch);
+
+        if ($err || !$html) {
+            return [];
+        }
+        return $this->extrairDadosDoHtml($html, $url);
+    }
+
+    /**
      * Extrai dados estruturados de um HTML: JSON-LD, Open Graph, meta tags e texto visível.
      */
     private function extrairDadosDoHtml(string $html, string $url): array {
@@ -2176,7 +2239,6 @@ class AssessoriaController extends Controller {
             foreach ($m[1] as $blob) {
                 $json = json_decode(trim($blob), true);
                 if (!is_array($json)) continue;
-                // Pode ser array de schemas
                 $items = isset($json['@type']) ? [$json] : (isset($json['@graph']) ? $json['@graph'] : (array_values($json) === $json ? $json : [$json]));
                 foreach ($items as $item) {
                     if (!is_array($item)) continue;
@@ -2211,7 +2273,7 @@ class AssessoriaController extends Controller {
             $data['prices_found'] = array_unique(array_slice($prices[1], 0, 10));
         }
 
-        // 6) Imagens de produto (og:image ou primeiras imagens grandes)
+        // 6) Imagens de produto
         $images = [];
         if (!empty($data['og_image'])) {
             $images[] = $data['og_image'];
@@ -2219,7 +2281,6 @@ class AssessoriaController extends Controller {
         if (preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*/i', $html, $imgs)) {
             foreach ($imgs[1] as $src) {
                 if (count($images) >= 8) break;
-                // Filtrar imagens pequenas/icons
                 if (preg_match('/\.(svg|gif|ico)(\?|$)/i', $src)) continue;
                 if (stripos($src, 'icon') !== false || stripos($src, 'logo') !== false) continue;
                 if (stripos($src, 'pixel') !== false || stripos($src, '1x1') !== false) continue;
@@ -2228,6 +2289,83 @@ class AssessoriaController extends Controller {
         }
         if (!empty($images)) {
             $data['images'] = array_values(array_unique($images));
+        }
+
+        // 7) Especificações / tabelas de specs (peso, dimensões, etc.)
+        $specs = [];
+        // Padrão: <th>Label</th><td>Value</td> ou <td>Label</td><td>Value</td>
+        if (preg_match_all('/<t[hd][^>]*>(.*?)<\/t[hd]>\s*<td[^>]*>(.*?)<\/td>/si', $html, $specMatches, PREG_SET_ORDER)) {
+            foreach ($specMatches as $sm) {
+                $label = trim(strip_tags($sm[1]));
+                $value = trim(strip_tags($sm[2]));
+                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
+                    $specs[$label] = $value;
+                }
+            }
+        }
+        // Padrão alternativo: <dt>Label</dt><dd>Value</dd>
+        if (preg_match_all('/<dt[^>]*>(.*?)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/si', $html, $dtMatches, PREG_SET_ORDER)) {
+            foreach ($dtMatches as $dm2) {
+                $label = trim(strip_tags($dm2[1]));
+                $value = trim(strip_tags($dm2[2]));
+                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
+                    $specs[$label] = $value;
+                }
+            }
+        }
+        if (!empty($specs)) {
+            $data['specifications'] = $specs;
+        }
+
+        // 8) Pesos encontrados no HTML (padrões: XX lb, XX lbs, XX pounds, XX kg)
+        $weights = [];
+        if (preg_match_all('/(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?)\b/i', $html, $wm)) {
+            foreach ($wm[0] as $i => $full) {
+                $weights[] = ['raw' => trim($full), 'value_lbs' => floatval($wm[1][$i]), 'value_kg' => round(floatval($wm[1][$i]) * 0.4536, 2)];
+            }
+        }
+        if (preg_match_all('/(\d+(?:\.\d+)?)\s*kg\b/i', $html, $wkg)) {
+            foreach ($wkg[0] as $i => $full) {
+                $weights[] = ['raw' => trim($full), 'value_kg' => floatval($wkg[1][$i])];
+            }
+        }
+        if (!empty($weights)) {
+            $data['weights_found'] = array_values(array_unique($weights, SORT_REGULAR));
+        }
+
+        // 9) Variações/opções visíveis (botões, selects, etc.)
+        $options = [];
+        // Botões de variação (ex: Costco bed size buttons)
+        if (preg_match_all('/<(?:button|a|span|div)[^>]*(?:data-(?:value|option|variant|size|color)|class=["\'][^"\']*(?:option|variant|swatch|size-btn)[^"\']*["\'])[^>]*>(.*?)<\/(?:button|a|span|div)>/si', $html, $optMatches)) {
+            foreach ($optMatches[1] as $opt) {
+                $val = trim(strip_tags($opt));
+                if ($val !== '' && strlen($val) < 50) {
+                    $options[] = $val;
+                }
+            }
+        }
+        // Select options
+        if (preg_match_all('/<option[^>]+value=["\']([^"\']+)["\'][^>]*>(.*?)<\/option>/si', $html, $selMatches, PREG_SET_ORDER)) {
+            foreach ($selMatches as $sel) {
+                $val = trim(strip_tags($sel[2]));
+                if ($val !== '' && strlen($val) < 50 && strtolower($val) !== 'select') {
+                    $options[] = $val;
+                }
+            }
+        }
+        if (!empty($options)) {
+            $data['options_found'] = array_values(array_unique($options));
+        }
+
+        // 10) JavaScript data (inline product JSON)
+        if (preg_match_all('/(?:product|item|variant)(?:Data|Info|Details|Config)\s*[:=]\s*(\{[^;]{50,5000}\})/i', $html, $jsData)) {
+            foreach ($jsData[1] as $jsBlob) {
+                $parsed = @json_decode($jsBlob, true);
+                if (is_array($parsed) && !empty($parsed)) {
+                    $data['inline_product_json'] = $parsed;
+                    break;
+                }
+            }
         }
 
         return $data;
