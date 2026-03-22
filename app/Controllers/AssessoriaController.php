@@ -1753,17 +1753,27 @@ class AssessoriaController extends Controller {
             header('X-ScrapingBee-Request-URL: ' . $this->headerSafeValue(substr($fullUrl, 0, 200), 200));
         }
         
-        $doRequest = function(string $targetUrl, int $timeoutSeconds) {
+        // Resolver DNS de app.scrapingbee.com antecipadamente (evita "Could not resolve host")
+        $resolvedIp = $this->resolverDnsScrapingBee();
+
+        $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
             $ch = curl_init();
-            curl_setopt_array($ch, [
+            $opts = [
                 CURLOPT_URL => $targetUrl,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CUSTOMREQUEST => 'GET',
                 CURLOPT_TIMEOUT => $timeoutSeconds,
-                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            ]);
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                // Forçar DNS via Google/Cloudflare caso o resolver local falhe
+                CURLOPT_DNS_SERVERS => '8.8.8.8,1.1.1.1,8.8.4.4',
+            ];
+            // Se conseguimos resolver o IP, forçar via CURLOPT_RESOLVE
+            if ($resolvedIp) {
+                $opts[CURLOPT_RESOLVE] = ['app.scrapingbee.com:443:' . $resolvedIp];
+            }
+            curl_setopt_array($ch, $opts);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1776,6 +1786,37 @@ class AssessoriaController extends Controller {
 
         // 1 tentativa (até 150s) por produto (cURL deve ser > timeout do ScrapingBee)
         [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 150);
+
+        // Se DNS falhou mesmo com CURLOPT_DNS_SERVERS, tentar resolver manualmente e refazer
+        if ($curlErrno === 6 && !$resolvedIp) {
+            // errno 6 = CURLE_COULDNT_RESOLVE_HOST
+            $resolvedIp = $this->resolverDnsScrapingBee(true);
+            if ($resolvedIp) {
+                if (headers_sent() === false) {
+                    header('X-ScrapingBee-DNS-Retry: ' . $resolvedIp);
+                }
+                $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
+                    $ch = curl_init();
+                    curl_setopt_array($ch, [
+                        CURLOPT_URL => $targetUrl,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_CUSTOMREQUEST => 'GET',
+                        CURLOPT_TIMEOUT => $timeoutSeconds,
+                        CURLOPT_CONNECTTIMEOUT => 15,
+                        CURLOPT_SSL_VERIFYPEER => true,
+                        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        CURLOPT_RESOLVE => ['app.scrapingbee.com:443:' . $resolvedIp],
+                    ]);
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curlErrno = curl_errno($ch);
+                    $curlError = curl_error($ch);
+                    curl_close($ch);
+                    return [$response, $httpCode, $curlErrno, $curlError];
+                };
+                [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 150);
+            }
+        }
 
         // Se ai_query falhar (tamanho/validação), refazer sem ai_query
         if (!$curlError && (int) $httpCode === 400 && is_string($response) && stripos($response, 'ai_query') !== false) {
@@ -1845,12 +1886,8 @@ class AssessoriaController extends Controller {
                 header('X-ScrapingBee-CURL-Error: ' . $curlError);
             }
             
-            // Mensagem amigável para timeout
             $errorMessage = 'Erro na requisição cURL: ' . $curlError;
             if ($curlErrno === 28 || strpos($curlError, 'timeout') !== false) {
-                if (headers_sent() === false) {
-                    header('X-ScrapingBee-Timeout: true');
-                }
                 $errorMessage = 'Timeout ao processar este site. Tente novamente (1 link por vez) ou use outro link.';
             }
             
@@ -2064,6 +2101,197 @@ class AssessoriaController extends Controller {
         return [];
     }
     
+    /**
+     * Fallback: scraping direto via cURL quando ScrapingBee está inacessível.
+     * Extrai HTML, JSON-LD e meta tags, depois envia ao ChatGPT para análise.
+     */
+    private function processarLinkDireto(string $url): array {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            CURLOPT_HTTPHEADER     => [
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language: en-US,en;q=0.9,pt-BR;q=0.8',
+            ],
+            CURLOPT_ENCODING       => '', // aceita gzip
+        ]);
+
+        $html = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr || !$html || $httpCode >= 400) {
+            return [
+                'success' => false,
+                'error'   => 'Não foi possível acessar o site diretamente' . ($curlErr ? ': ' . $curlErr : " (HTTP {$httpCode})"),
+            ];
+        }
+
+        // Extrair dados estruturados do HTML
+        $extracted = $this->extrairDadosDoHtml($html, $url);
+
+        if (empty($extracted)) {
+            return [
+                'success' => false,
+                'error'   => 'Não foi possível extrair dados do produto neste site.',
+            ];
+        }
+
+        // Enviar ao ChatGPT para análise (mesmo fluxo do ScrapingBee)
+        try {
+            $produto = $this->analisarComChatGPT($extracted, $url);
+            return ['success' => true, 'data' => $produto];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Extrai dados estruturados de um HTML: JSON-LD, Open Graph, meta tags e texto visível.
+     */
+    private function extrairDadosDoHtml(string $html, string $url): array {
+        $data = ['url' => $url];
+
+        // 1) JSON-LD (schema.org Product)
+        if (preg_match_all('/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/si', $html, $m)) {
+            foreach ($m[1] as $blob) {
+                $json = json_decode(trim($blob), true);
+                if (!is_array($json)) continue;
+                // Pode ser array de schemas
+                $items = isset($json['@type']) ? [$json] : (isset($json['@graph']) ? $json['@graph'] : (array_values($json) === $json ? $json : [$json]));
+                foreach ($items as $item) {
+                    if (!is_array($item)) continue;
+                    $type = strtolower((string)($item['@type'] ?? ''));
+                    if (in_array($type, ['product', 'indivproduct', 'productgroup'], true)) {
+                        $data['jsonld_product'] = $item;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        // 2) Open Graph tags
+        if (preg_match_all('/<meta\s+(?:property|name)=["\']og:([^"\']+)["\']\s+content=["\']([^"\']*)["\'][^>]*>/i', $html, $og, PREG_SET_ORDER)) {
+            foreach ($og as $tag) {
+                $data['og_' . $tag[1]] = html_entity_decode($tag[2], ENT_QUOTES, 'UTF-8');
+            }
+        }
+
+        // 3) Title
+        if (preg_match('/<title[^>]*>(.*?)<\/title>/si', $html, $tm)) {
+            $data['title'] = html_entity_decode(trim($tm[1]), ENT_QUOTES, 'UTF-8');
+        }
+
+        // 4) Meta description
+        if (preg_match('/<meta\s+name=["\']description["\']\s+content=["\']([^"\']*)["\'][^>]*>/i', $html, $dm)) {
+            $data['description'] = html_entity_decode($dm[1], ENT_QUOTES, 'UTF-8');
+        }
+
+        // 5) Preço visível no HTML (padrões comuns)
+        if (preg_match_all('/\$\s?(\d{1,6}[.,]\d{2})/', $html, $prices)) {
+            $data['prices_found'] = array_unique(array_slice($prices[1], 0, 10));
+        }
+
+        // 6) Imagens de produto (og:image ou primeiras imagens grandes)
+        $images = [];
+        if (!empty($data['og_image'])) {
+            $images[] = $data['og_image'];
+        }
+        if (preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*/i', $html, $imgs)) {
+            foreach ($imgs[1] as $src) {
+                if (count($images) >= 8) break;
+                // Filtrar imagens pequenas/icons
+                if (preg_match('/\.(svg|gif|ico)(\?|$)/i', $src)) continue;
+                if (stripos($src, 'icon') !== false || stripos($src, 'logo') !== false) continue;
+                if (stripos($src, 'pixel') !== false || stripos($src, '1x1') !== false) continue;
+                $images[] = $src;
+            }
+        }
+        if (!empty($images)) {
+            $data['images'] = array_values(array_unique($images));
+        }
+
+        return $data;
+    }
+
+    /**
+     * Resolve o IP de app.scrapingbee.com usando DNS público (Google/Cloudflare).
+     * Evita falhas quando o resolver DNS local do servidor está com problema.
+     */
+    private function resolverDnsScrapingBee(bool $forceExternal = false): ?string {
+        $host = 'app.scrapingbee.com';
+
+        // Tentar resolver via sistema operacional primeiro (rápido)
+        if (!$forceExternal) {
+            $ip = gethostbyname($host);
+            if ($ip !== $host && filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+
+        // Fallback: consultar DNS do Google via HTTPS (DNS-over-HTTPS)
+        $dohServers = [
+            'https://dns.google/resolve?name=' . urlencode($host) . '&type=A',
+            'https://cloudflare-dns.com/dns-query?name=' . urlencode($host) . '&type=A',
+        ];
+
+        foreach ($dohServers as $dohUrl) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $dohUrl,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_HTTPHEADER     => ['Accept: application/dns-json'],
+            ]);
+            $resp = curl_exec($ch);
+            $err  = curl_errno($ch);
+            curl_close($ch);
+
+            if ($err || !$resp) continue;
+
+            $json = json_decode($resp, true);
+            if (!is_array($json)) continue;
+
+            $answers = $json['Answer'] ?? [];
+            foreach ($answers as $ans) {
+                $type = (int)($ans['type'] ?? 0);
+                $data = (string)($ans['data'] ?? '');
+                if ($type === 1 && filter_var($data, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    if (headers_sent() === false) {
+                        header('X-ScrapingBee-DNS-Resolved: ' . $data . ' via DoH');
+                    }
+                    return $data;
+                }
+            }
+        }
+
+        // Fallback: dns_get_record nativo do PHP
+        try {
+            $records = @dns_get_record($host, DNS_A);
+            if (is_array($records)) {
+                foreach ($records as $rec) {
+                    if (!empty($rec['ip']) && filter_var($rec['ip'], FILTER_VALIDATE_IP)) {
+                        return $rec['ip'];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignorar
+        }
+
+        return null;
+    }
+
     /**
      * Obtém a API Key do ScrapingBee
      */
