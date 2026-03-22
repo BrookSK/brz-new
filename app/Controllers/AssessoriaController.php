@@ -2632,6 +2632,21 @@ class AssessoriaController extends Controller {
             
             $orcamento = $_SESSION['assessoria_orcamento'];
             $produtosAdicionados = 0;
+
+            // Detectar se o usuário está logado para persistir no DB
+            $auth = new AuthService();
+            $uid = $auth->estaLogado() ? (int) ($auth->getUsuarioLogado()['id'] ?? 0) : 0;
+            $cartId = 0;
+            $carrinhoModel = null;
+            if ($uid > 0) {
+                try {
+                    $carrinhoModel = new \App\Models\Carrinho();
+                    $cart = $carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                } catch (\Throwable $e) {
+                    $cartId = 0;
+                }
+            }
             
             foreach ($produtosSelecionados as $produtoIndex) {
                 $index = null;
@@ -2682,6 +2697,19 @@ class AssessoriaController extends Controller {
                     $itemKey = (string) $produtoId;
                     if (!empty($produto['variacao_selecionada']['id'])) {
                         $itemKey = $itemKey . ':' . (string) $produto['variacao_selecionada']['id'];
+                    }
+
+                    // Persistir no DB para usuários logados
+                    if ($cartId > 0 && $carrinhoModel !== null) {
+                        try {
+                            $varDesc = null;
+                            if (!empty($produto['variacao_selecionada']['label'])) {
+                                $varDesc = (string) $produto['variacao_selecionada']['label'];
+                            }
+                            $carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, null, $varDesc);
+                        } catch (\Throwable $e) {
+                            error_log('[Assessoria] Erro ao persistir item no carrinho DB: ' . $e->getMessage());
+                        }
                     }
 
                     if (isset($_SESSION['carrinho'][$itemKey])) {
