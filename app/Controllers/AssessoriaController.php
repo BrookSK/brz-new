@@ -1157,14 +1157,14 @@ class AssessoriaController extends Controller {
                     $v['valor'] = null;
                 }
                 if (!isset($v['peso']) || floatval($v['peso']) <= 0) {
-                    $v['peso'] = 1.0;
+                    $v['peso'] = null; // herdar peso base do produto
                 }
                 $out[] = [
                     'id' => (string) ($v['id'] ?? ''),
                     'label' => (string) ($v['label'] ?? ''),
                     'atributos' => $v['atributos'],
                     'valor' => ($v['valor'] === null ? null : floatval($v['valor'])),
-                    'peso' => floatval($v['peso'])
+                    'peso' => ($v['peso'] === null ? null : floatval($v['peso']))
                 ];
             }
             return $this->mergeNormalizedVariacoes($out);
@@ -3033,9 +3033,37 @@ class AssessoriaController extends Controller {
                     }
                 }
 
-                // Regra: se não encontrar peso, usar sempre 1kg
+                // Fallback peso: estimar baseado no nome do produto (nunca usar 1kg genérico)
                 if ($campo === 'peso') {
-                    $produtoData['peso'] = 1.0;
+                    $nomeLower = strtolower((string)($produtoData['nome'] ?? ''));
+                    $pesoEstimado = 2.0; // default genérico mínimo
+                    if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
+                        $pesoEstimado = 35.0;
+                    } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
+                        $pesoEstimado = 40.0;
+                    } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
+                        $pesoEstimado = 3.5;
+                    } elseif (preg_match('/pillow|travesseiro/', $nomeLower)) {
+                        $pesoEstimado = 1.5;
+                    } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
+                        $pesoEstimado = 15.0;
+                    } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
+                        $pesoEstimado = 2.5;
+                    } elseif (preg_match('/phone|celular|smartphone/', $nomeLower)) {
+                        $pesoEstimado = 0.3;
+                    } elseif (preg_match('/shoe|sapato|tênis|sneaker|boot/', $nomeLower)) {
+                        $pesoEstimado = 1.2;
+                    } elseif (preg_match('/shirt|camiseta|blouse|dress|vestido|jacket|jaqueta/', $nomeLower)) {
+                        $pesoEstimado = 0.5;
+                    } elseif (preg_match('/toy|brinquedo/', $nomeLower)) {
+                        $pesoEstimado = 1.5;
+                    } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
+                        $pesoEstimado = 15.0;
+                    } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
+                        $pesoEstimado = 20.0;
+                    }
+                    // Margem de 15%
+                    $produtoData['peso'] = round($pesoEstimado * 1.15, 2);
                     continue;
                 }
 
@@ -3135,9 +3163,9 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"nome\": \"Nome completo do produto\",
     \"descricao\": \"Descrição detalhada do produto\",
     \"valor\": 99.99,
-    \"peso\": 1.5,
+    \"peso\": 52.16,
     \"imagens\": [\"url1\", \"url2\"],
-    \"variacoes\": [{\"id\": \"var-1\", \"label\": \"Color: Gray | Size: King 90x100\", \"atributos\": {\"Color\": \"Gray\", \"Size\": \"King 90x100\"}, \"valor\": 45.99, \"peso\": 1.5}],
+    \"variacoes\": [{\"id\": \"var-1\", \"label\": \"Color: Gray | Size: King 90x100\", \"atributos\": {\"Color\": \"Gray\", \"Size\": \"King 90x100\"}, \"valor\": 45.99, \"peso\": 52.16}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
@@ -3154,11 +3182,23 @@ REGRAS ESPECÍFICAS:
    - Se uma variação não tem preço próprio, use o preço base do produto
    - Se não existirem variações, retorne \"variacoes\": []
    - NÃO IGNORE variações. Se os dados brutos contêm opções/variantes, EXTRAIA TODAS.
+   - Se cada variação/tamanho tem peso diferente, use o peso ESPECÍFICO daquela variação (convertido para kg).
 
-3. PESO (kg): 
-   - Se não encontrar o peso exato, ESTIME com base no tipo de produto
-   - Adicione 15% de margem de segurança sobre o peso estimado
-   - Use sempre casas decimais (ex: 1.15)
+3. PESO (kg) — REGRA CRÍTICA:
+   - O peso DEVE ser em quilogramas (kg). NUNCA retorne 1.0 kg como padrão sem verificar.
+   - Se o peso estiver em LIBRAS (lbs/pounds), CONVERTA: 1 lb = 0.4536 kg. Ex: 115 lbs = 52.16 kg.
+   - Se o peso estiver em ONÇAS (oz/ounces), CONVERTA: 1 oz = 0.02835 kg.
+   - Procure o peso em: specifications, specs, weight, shipping weight, product weight, peso, libras, lbs, pounds, oz.
+   - Se cada variação/tamanho tem peso diferente (ex: Twin=79 lbs, King=116 lbs), use o peso ESPECÍFICO de cada variação.
+   - O peso BASE do produto deve ser o peso da variação padrão ou o maior peso listado.
+   - Se NÃO encontrar peso nos dados, ESTIME de forma REALISTA baseado no tipo de produto:
+     * Colchão: 25-55 kg dependendo do tamanho
+     * Cobertor/manta: 2-5 kg
+     * Roupas: 0.3-1 kg
+     * Eletrônicos pequenos: 0.5-3 kg
+     * Brinquedos: 0.5-3 kg
+   - Adicione 15% de margem de segurança sobre o peso estimado.
+   - NUNCA use 1.0 kg como peso padrão genérico. Sempre estime realisticamente.
 
 4. DESCRIÇÃO:
    - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
@@ -3173,7 +3213,7 @@ REGRAS ESPECÍFICAS:
 
 IMPORTANTE:
 - Retorne APENAS o JSON, sem texto adicional
-- Para peso, SEMPRE inclua a margem de 15% se precisar estimar
+- CONVERTA libras para kg (1 lb = 0.4536 kg)
 - Para descrição, CRIE uma se não encontrar
 - Use kg para peso
 
