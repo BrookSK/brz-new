@@ -731,12 +731,7 @@ HTML;
             }
 
             $skuInput = trim((string) $request->getParam('sku', ''));
-            if (in_array('sku', $cols, true) && $skuInput === '') {
-                $_SESSION['message'] = 'Informe o SKU do produto.';
-                $_SESSION['message_type'] = 'danger';
-                header('Location: /admin/produtos/novo');
-                exit;
-            }
+            $skuInput = ($skuInput !== '') ? $skuInput : null;
 
             $pdo->beginTransaction();
 

@@ -3416,7 +3416,10 @@ HTML;
                 $data['nome'] = $request->getParam('name');
             }
 
-            if (in_array('sku', $cols, true)) $data['sku'] = $request->getParam('sku');
+            if (in_array('sku', $cols, true)) {
+                $skuVal = trim((string) $request->getParam('sku'));
+                $data['sku'] = ($skuVal !== '') ? $skuVal : null;
+            }
             $lojaParam = $request->getParam('loja');
             $lojaId = is_numeric($lojaParam) ? (int) $lojaParam : 0;
             if (in_array('loja_id', $cols, true) && $lojaId > 0) {
@@ -4388,6 +4391,9 @@ HTMLSCRIPT;
                 }
             }
 
+            $skuVal = trim((string) $request->getParam('sku'));
+            $skuVal = ($skuVal !== '') ? $skuVal : null;
+
             $stmt = $pdo->prepare("
                 UPDATE produtos SET 
                     name = ?, sku = ?, loja = ?, ncm = ?, description = ?, short_description = ?, category_id = ?, 
@@ -4398,7 +4404,7 @@ HTMLSCRIPT;
             
             $stmt->execute([
                 $request->getParam('name'),
-                $request->getParam('sku'),
+                $skuVal,
                 $lojaSlug,
                 $request->getParam('ncm'),
                 $request->getParam('description'),
