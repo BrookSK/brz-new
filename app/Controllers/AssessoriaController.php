@@ -863,7 +863,7 @@ class AssessoriaController extends Controller {
             // Dados extras do scraping complementar
             'html_extra',
             // Dados de variações com preços do HTML
-            'variant_offers', 'variant_prices_found',
+            'variant_offers', 'variant_prices_found', 'variant_price_data',
         ];
         foreach ($keys as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
@@ -2052,38 +2052,60 @@ class AssessoriaController extends Controller {
                 if ($variacoesComMesmoPeso) $reason[] = 'mesmo_peso_todas_variacoes';
                 error_log('[ScrapingBee] Resultado incompleto (' . implode(', ', $reason) . '): variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping complementar via ScrapingBee HTML');
                 
-                // Segunda chamada ScrapingBee SEM ai_query para obter HTML renderizado (JS-loaded specs)
-                $htmlUrl = $buildUrl([
-                    'ai_query' => null,
-                    'render_js' => 'true',
+                // Segunda chamada ScrapingBee com ai_query focado em preços/pesos por variação
+                $priceUrl = $buildUrl([
+                    'ai_query' => 'For each product size/variant (Twin, Full, Queen, King, etc), extract: size name, price in USD, weight in lbs. Return as JSON array with fields: size, price, weight_lbs. Include specification table data.',
                     'wait_browser' => 'networkidle2',
                     'timeout' => '90000',
                 ]);
-                // Remover ai_query= vazio da URL
-                $htmlUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $htmlUrl);
-                $htmlUrl = rtrim($htmlUrl, '&?');
                 
-                [$htmlResp, $htmlCode, $htmlErrno, $htmlErr] = $doRequest($htmlUrl, 100);
+                [$priceResp, $priceCode, $priceErrno, $priceErr] = $doRequest($priceUrl, 100);
                 
                 $dadosExtras = [];
-                if (!$htmlErr && $htmlCode === 200 && !empty($htmlResp)) {
-                    // Se a resposta é HTML (não JSON), extrair specs do HTML
-                    $isHtml = (strpos(trim($htmlResp), '<') === 0 || stripos($htmlResp, '<!doctype') !== false || stripos($htmlResp, '<html') !== false);
-                    if ($isHtml) {
-                        $dadosExtras = $this->extrairDadosDoHtml($htmlResp, $url);
-                        error_log('[ScrapingBee] HTML complementar extraído: ' . json_encode(array_keys($dadosExtras)));
+                if (!$priceErr && $priceCode === 200 && !empty($priceResp)) {
+                    $priceJson = json_decode($priceResp, true);
+                    if (is_array($priceJson)) {
+                        $dadosExtras = ['variant_price_data' => $priceJson];
+                        error_log('[ScrapingBee] Dados de preço por variação: ' . substr(json_encode($priceJson), 0, 500));
                     } else {
-                        // Pode ser JSON — tentar decodificar e mesclar
-                        $htmlJson = json_decode($htmlResp, true);
-                        if (is_array($htmlJson)) {
-                            $dadosExtras = $htmlJson;
-                            error_log('[ScrapingBee] JSON complementar: ' . json_encode(array_keys($dadosExtras)));
+                        // Pode ser HTML — extrair specs
+                        $isHtml = (strpos(trim($priceResp), '<') === 0 || stripos($priceResp, '<!doctype') !== false || stripos($priceResp, '<html') !== false);
+                        if ($isHtml) {
+                            $dadosExtras = $this->extrairDadosDoHtml($priceResp, $url);
+                            error_log('[ScrapingBee] HTML complementar extraído: ' . json_encode(array_keys($dadosExtras)));
                         }
                     }
-                } else {
-                    error_log('[ScrapingBee] Scraping complementar falhou: code=' . $htmlCode . ' err=' . $htmlErr);
-                    // Fallback: tentar cURL direto (funciona para sites sem JS)
-                    $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
+                }
+                
+                // Se não conseguiu dados de preço, tentar sem ai_query para pegar HTML renderizado
+                if (empty($dadosExtras)) {
+                    $htmlUrl = $buildUrl([
+                        'ai_query' => null,
+                        'render_js' => 'true',
+                        'wait_browser' => 'networkidle2',
+                        'timeout' => '90000',
+                    ]);
+                    $htmlUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $htmlUrl);
+                    $htmlUrl = rtrim($htmlUrl, '&?');
+                    
+                    [$htmlResp, $htmlCode, $htmlErrno, $htmlErr] = $doRequest($htmlUrl, 100);
+                    
+                    if (!$htmlErr && $htmlCode === 200 && !empty($htmlResp)) {
+                        $isHtml = (strpos(trim($htmlResp), '<') === 0 || stripos($htmlResp, '<!doctype') !== false || stripos($htmlResp, '<html') !== false);
+                        if ($isHtml) {
+                            $dadosExtras = $this->extrairDadosDoHtml($htmlResp, $url);
+                            error_log('[ScrapingBee] HTML complementar extraído: ' . json_encode(array_keys($dadosExtras)));
+                        } else {
+                            $htmlJson = json_decode($htmlResp, true);
+                            if (is_array($htmlJson)) {
+                                $dadosExtras = $htmlJson;
+                                error_log('[ScrapingBee] JSON complementar: ' . json_encode(array_keys($dadosExtras)));
+                            }
+                        }
+                    } else {
+                        error_log('[ScrapingBee] Scraping complementar falhou: code=' . ($htmlCode ?? '?') . ' err=' . ($htmlErr ?? '?'));
+                        $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
+                    }
                 }
                 
                 if (!empty($dadosExtras)) {
@@ -3585,6 +3607,23 @@ class AssessoriaController extends Controller {
             'variacoes' => is_array($produtoData['variacoes'] ?? null) ? $produtoData['variacoes'] : [],
             'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
         ];
+
+        // Preencher valor/peso null das variações com o valor/peso base do produto
+        $baseValor = $produtoData['valor'];
+        $basePesoFinal = $produtoData['peso'];
+        if (is_array($produtoData['variacoes'])) {
+            foreach ($produtoData['variacoes'] as &$vFill) {
+                if (!is_array($vFill)) continue;
+                if (!isset($vFill['valor']) || $vFill['valor'] === null || floatval($vFill['valor']) <= 0) {
+                    $vFill['valor'] = $baseValor;
+                }
+                if (!isset($vFill['peso']) || $vFill['peso'] === null || floatval($vFill['peso']) <= 0) {
+                    $vFill['peso'] = $basePesoFinal;
+                }
+            }
+            unset($vFill);
+            $produtoData['variacoes'] = array_values($produtoData['variacoes']);
+        }
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Success: true');
@@ -3624,8 +3663,10 @@ ATENÇÃO: O campo 'html_extra' contém dados complementares extraídos do HTML 
 - 'jsonld_product': dados estruturados JSON-LD do produto.
 - 'variant_offers': ofertas/variações com preços extraídos do JSON-LD. USE ESTES PREÇOS para cada variação.
 - 'variant_prices_found': preços associados a tamanhos encontrados no HTML. USE ESTES PREÇOS.
+- 'variant_price_data': dados de preço por variação extraídos via AI. USE ESTES PREÇOS E PESOS.
 - 'prices_found': todos os preços encontrados no HTML.
 PRIORIZE os dados de html_extra para preços e pesos por variação, pois são mais precisos que os dados do ai_query.
+CADA VARIAÇÃO DEVE TER SEU PRÓPRIO PREÇO E PESO. NÃO USE O MESMO VALOR PARA TODAS.
 ";
         }
 
