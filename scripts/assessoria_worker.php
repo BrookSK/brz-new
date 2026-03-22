@@ -48,9 +48,12 @@ spl_autoload_register(function ($class) {
 });
 
 try {
+    error_log('[assessoria_worker] Starting job: ' . $jobId);
     $controller = new \App\Controllers\AssessoriaController();
     $controller->processarJobPorId($jobId);
+    error_log('[assessoria_worker] Finished job: ' . $jobId);
     exit(0);
 } catch (\Throwable $e) {
+    error_log('[assessoria_worker] FATAL: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     exit(1);
 }

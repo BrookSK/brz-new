@@ -1755,6 +1755,7 @@ class AssessoriaController extends Controller {
         
         // Resolver DNS de app.scrapingbee.com antecipadamente (evita "Could not resolve host")
         $resolvedIp = $this->resolverDnsScrapingBee();
+        error_log('[ScrapingBee] DNS resolved IP: ' . ($resolvedIp ?: 'FAILED'));
 
         $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
             $ch = curl_init();
@@ -1766,13 +1767,14 @@ class AssessoriaController extends Controller {
                 CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                // Forçar DNS via Google/Cloudflare caso o resolver local falhe
-                CURLOPT_DNS_SERVERS => '8.8.8.8,1.1.1.1,8.8.4.4',
             ];
             // Se conseguimos resolver o IP, forçar via CURLOPT_RESOLVE
             if ($resolvedIp) {
                 $opts[CURLOPT_RESOLVE] = ['app.scrapingbee.com:443:' . $resolvedIp];
+                error_log('[ScrapingBee] Using CURLOPT_RESOLVE: app.scrapingbee.com:443:' . $resolvedIp);
             }
+            // Tentar CURLOPT_DNS_SERVERS (só funciona se cURL compilado com c-ares)
+            @curl_setopt($ch, CURLOPT_DNS_SERVERS, '8.8.8.8,1.1.1.1');
             curl_setopt_array($ch, $opts);
 
             $response = curl_exec($ch);
@@ -1882,6 +1884,7 @@ class AssessoriaController extends Controller {
         }
         
         if ($curlError) {
+            error_log('[ScrapingBee] cURL error: errno=' . $curlErrno . ' error=' . $curlError . ' resolvedIp=' . ($resolvedIp ?: 'null'));
             if (headers_sent() === false) {
                 header('X-ScrapingBee-CURL-Error: ' . $curlError);
             }
@@ -2229,29 +2232,42 @@ class AssessoriaController extends Controller {
     private function resolverDnsScrapingBee(bool $forceExternal = false): ?string {
         $host = 'app.scrapingbee.com';
 
-        // Tentar resolver via sistema operacional primeiro (rápido)
+        // 1) Cache em arquivo (válido por 1h) — evita resolver DNS toda vez
+        $cacheFile = sys_get_temp_dir() . '/scrapingbee_ip_cache.json';
+        if (!$forceExternal && file_exists($cacheFile)) {
+            $cache = @json_decode((string)@file_get_contents($cacheFile), true);
+            if (is_array($cache) && !empty($cache['ip']) && ($cache['ts'] ?? 0) > (time() - 3600)) {
+                return $cache['ip'];
+            }
+        }
+
+        // 2) Tentar resolver via sistema operacional (rápido)
         if (!$forceExternal) {
-            $ip = gethostbyname($host);
+            $ip = @gethostbyname($host);
             if ($ip !== $host && filter_var($ip, FILTER_VALIDATE_IP)) {
+                @file_put_contents($cacheFile, json_encode(['ip' => $ip, 'ts' => time()]));
                 return $ip;
             }
         }
 
-        // Fallback: consultar DNS do Google via HTTPS (DNS-over-HTTPS)
-        $dohServers = [
-            'https://dns.google/resolve?name=' . urlencode($host) . '&type=A',
-            'https://cloudflare-dns.com/dns-query?name=' . urlencode($host) . '&type=A',
+        // 3) DNS-over-HTTPS usando IPs hardcoded (bypassa DNS local completamente)
+        //    Google DNS: 8.8.8.8, Cloudflare DNS: 1.1.1.1
+        $dohEndpoints = [
+            ['ip' => '8.8.8.8', 'host' => 'dns.google', 'path' => '/resolve?name=' . urlencode($host) . '&type=A'],
+            ['ip' => '1.1.1.1', 'host' => 'cloudflare-dns.com', 'path' => '/dns-query?name=' . urlencode($host) . '&type=A'],
         ];
 
-        foreach ($dohServers as $dohUrl) {
+        foreach ($dohEndpoints as $ep) {
             $ch = curl_init();
             curl_setopt_array($ch, [
-                CURLOPT_URL            => $dohUrl,
+                CURLOPT_URL            => 'https://' . $ep['host'] . $ep['path'],
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT        => 5,
                 CURLOPT_CONNECTTIMEOUT => 3,
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_HTTPHEADER     => ['Accept: application/dns-json'],
+                // Forçar IP hardcoded para o servidor DoH (bypassa DNS local)
+                CURLOPT_RESOLVE        => [$ep['host'] . ':443:' . $ep['ip']],
             ]);
             $resp = curl_exec($ch);
             $err  = curl_errno($ch);
@@ -2267,30 +2283,29 @@ class AssessoriaController extends Controller {
                 $type = (int)($ans['type'] ?? 0);
                 $data = (string)($ans['data'] ?? '');
                 if ($type === 1 && filter_var($data, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                    if (headers_sent() === false) {
-                        header('X-ScrapingBee-DNS-Resolved: ' . $data . ' via DoH');
-                    }
+                    @file_put_contents($cacheFile, json_encode(['ip' => $data, 'ts' => time()]));
                     return $data;
                 }
             }
         }
 
-        // Fallback: dns_get_record nativo do PHP
+        // 4) dns_get_record nativo do PHP
         try {
             $records = @dns_get_record($host, DNS_A);
             if (is_array($records)) {
                 foreach ($records as $rec) {
                     if (!empty($rec['ip']) && filter_var($rec['ip'], FILTER_VALIDATE_IP)) {
+                        @file_put_contents($cacheFile, json_encode(['ip' => $rec['ip'], 'ts' => time()]));
                         return $rec['ip'];
                     }
                 }
             }
         } catch (\Throwable $e) {
-            // ignorar
         }
 
         return null;
     }
+
 
     /**
      * Obtém a API Key do ScrapingBee
