@@ -97,7 +97,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                 </div>
                 <div class="mb-3" id="grupoImpostoPercentWrap" style="display:none">
                     <label class="form-label">Percentual do imposto local (%)</label>
-                    <input class="form-control" type="number" id="grupoImpostoPercent" step="0.1" min="0" max="99" value="7" placeholder="Ex: 7">
+                    <input class="form-control" type="number" id="grupoImpostoPercent" step="0.1" min="0" max="99" value="8" placeholder="Ex: 8">
                 </div>
                 <div class="form-check form-switch" id="grupoAtivoWrap">
                     <input class="form-check-input" type="checkbox" id="grupoAtivo" role="switch" checked>
@@ -138,7 +138,7 @@ document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     document.getElementById('grupoNome').value = '';
     document.getElementById('grupoDescricao').value = '';
     document.getElementById('grupoImposto').checked = false;
-    document.getElementById('grupoImpostoPercent').value = '7';
+    document.getElementById('grupoImpostoPercent').value = '8';
     document.getElementById('grupoImpostoPercentWrap').style.display = 'none';
     document.getElementById('grupoAtivo').checked = true;
     document.getElementById('grupoAtivoWrap').style.display = 'none';
@@ -158,7 +158,7 @@ document.querySelectorAll('.btn-editar').forEach(btn => {
         document.getElementById('grupoDescricao').value = btn.dataset.descricao;
         const impostoLocal = parseFloat(btn.dataset.impostoLocal || '0');
         document.getElementById('grupoImposto').checked = impostoLocal > 0;
-        document.getElementById('grupoImpostoPercent').value = impostoLocal > 0 ? impostoLocal : '7';
+        document.getElementById('grupoImpostoPercent').value = impostoLocal > 0 ? impostoLocal : '8';
         document.getElementById('grupoImpostoPercentWrap').style.display = impostoLocal > 0 ? '' : 'none';
         document.getElementById('grupoAtivo').checked = btn.dataset.ativo === '1';
         document.getElementById('grupoAtivoWrap').style.display = '';
@@ -180,7 +180,7 @@ document.getElementById('btnSalvarGrupo').addEventListener('click', async () => 
     fd.append('descricao', document.getElementById('grupoDescricao').value);
     if (document.getElementById('grupoImposto').checked) {
         fd.append('cobra_imposto_eua', '1');
-        fd.append('imposto_local_percent', document.getElementById('grupoImpostoPercent').value || '7');
+        fd.append('imposto_local_percent', document.getElementById('grupoImpostoPercent').value || '8');
     } else {
         fd.append('imposto_local_percent', '0');
     }

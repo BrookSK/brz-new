@@ -1873,7 +1873,7 @@ class AdminProdutosController extends Controller {
             </div>
             <div class="mb-3" id="ngImpostoPercentWrap" style="display:none">
                 <label class="form-label">Percentual (%)</label>
-                <input class="form-control" type="number" id="ngImpostoPercent" step="0.1" min="0" max="99" value="7" placeholder="Ex: 7">
+                <input class="form-control" type="number" id="ngImpostoPercent" step="0.1" min="0" max="99" value="8" placeholder="Ex: 8">
             </div>
             <div id="msgNovoGrupo" class="mb-2"></div>
             <div class="d-flex gap-2">
@@ -2064,7 +2064,7 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
     fd.append("descricao", document.getElementById("ngDesc").value);
     if (document.getElementById("ngImposto").checked) {
         fd.append("cobra_imposto_eua", "1");
-        fd.append("imposto_local_percent", document.getElementById("ngImpostoPercent").value || "7");
+        fd.append("imposto_local_percent", document.getElementById("ngImpostoPercent").value || "8");
     } else {
         fd.append("imposto_local_percent", "0");
     }
