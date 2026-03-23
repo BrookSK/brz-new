@@ -2524,6 +2524,27 @@ class AdminConfiguracoesController extends Controller {
                                                     <label class="form-check-label">Ativar senha no site</label>
                                                 </div>
 
+                                                <div class="mb-3">
+                                                    <label class="form-label">Modo de bloqueio</label>
+                                                    <select class="form-select" name="sistema_site_lock_mode" id="siteLockMode">
+                                                        <option value="total" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'total' ? 'selected' : '') . '>Bloquear todo o site</option>
+                                                        <option value="parcial" ' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'parcial' ? 'selected' : '') . '>Bloquear somente páginas específicas</option>
+                                                    </select>
+                                                    <small class="text-muted">Total: exige senha pra acessar qualquer página. Parcial: só bloqueia as rotas listadas abaixo.</small>
+                                                </div>
+
+                                                <div class="mb-3" id="siteLockBlockedPathsWrapper" style="' . ($this->getConfigValue($config, 'sistema', 'site_lock_mode', 'total') === 'parcial' ? '' : 'display:none') . '">
+                                                    <label class="form-label">Páginas bloqueadas</label>
+                                                    <input type="text" class="form-control" name="sistema_site_lock_blocked_paths" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'site_lock_blocked_paths', '/assessoria,/status-pedido'), ENT_QUOTES, 'UTF-8') . '" placeholder="/assessoria,/status-pedido">
+                                                    <small class="text-muted">Rotas separadas por vírgula. Ex: <code>/assessoria,/status-pedido,/redirecionamento</code></small>
+                                                </div>
+
+                                                <script>
+                                                document.getElementById("siteLockMode").addEventListener("change", function(){
+                                                    document.getElementById("siteLockBlockedPathsWrapper").style.display = this.value === "parcial" ? "" : "none";
+                                                });
+                                                </script>
+
                                                 <div class="mb-0">
                                                     <label class="form-label">Senha do site</label>
                                                     <input type="password" class="form-control" name="sistema_site_lock_password" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'site_lock_password', ''), ENT_QUOTES, 'UTF-8') . '" placeholder="********">
@@ -4263,6 +4284,20 @@ HTML;
                         } catch (\Exception $e) {
                         }
                     }
+                    if (!in_array('sistema_site_lock_mode', $cols, true) && !in_array('site_lock_mode', $cols, true)) {
+                        try {
+                            $pdo->exec('ALTER TABLE ' . $table . ' ADD COLUMN sistema_site_lock_mode VARCHAR(20) NOT NULL DEFAULT \'total\'');
+                            $addedAny = true;
+                        } catch (\Exception $e) {
+                        }
+                    }
+                    if (!in_array('sistema_site_lock_blocked_paths', $cols, true) && !in_array('site_lock_blocked_paths', $cols, true)) {
+                        try {
+                            $pdo->exec('ALTER TABLE ' . $table . ' ADD COLUMN sistema_site_lock_blocked_paths TEXT DEFAULT NULL');
+                            $addedAny = true;
+                        } catch (\Exception $e) {
+                        }
+                    }
 
                     if ($addedAny) {
                         $tableInfo = $this->getConfigTableInfo($pdo);
@@ -4303,7 +4338,7 @@ HTML;
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'correios_packet_ambiente', 'correios_packet_login', 'correios_packet_password', 'correios_packet_cartao_postagem', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],
                 'seo' => ['title', 'description', 'keywords', 'google_analytics', 'google_tag_manager', 'sitemap_gerado'],
-                'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'site_lock_password'],
+                'sistema' => ['timezone', 'idioma', 'moeda', 'usd_brl_rate', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'site_lock_password', 'site_lock_mode', 'site_lock_blocked_paths'],
                 'wordpress' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'wordpress_br' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
                 'wordpress_red' => ['db_host', 'db_name', 'db_user', 'db_pass', 'table_prefix'],
@@ -6655,6 +6690,30 @@ HTML;
                         }
                         if ($colPass) {
                             $columnMap['sistema']['site_lock_password'] = $colPass;
+                        }
+                    }
+
+                    $colMode = null;
+                    foreach (['sistema_site_lock_mode', 'site_lock_mode'] as $c) {
+                        if (in_array($c, $cols, true)) {
+                            $colMode = $c;
+                            break;
+                        }
+                    }
+                    $colBlocked = null;
+                    foreach (['sistema_site_lock_blocked_paths', 'site_lock_blocked_paths'] as $c) {
+                        if (in_array($c, $cols, true)) {
+                            $colBlocked = $c;
+                            break;
+                        }
+                    }
+                    if ($colMode || $colBlocked) {
+                        $columnMap['sistema'] = $columnMap['sistema'] ?? [];
+                        if ($colMode) {
+                            $columnMap['sistema']['site_lock_mode'] = $colMode;
+                        }
+                        if ($colBlocked) {
+                            $columnMap['sistema']['site_lock_blocked_paths'] = $colBlocked;
                         }
                     }
                 } catch (\Exception $e) {

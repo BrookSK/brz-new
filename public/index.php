@@ -265,6 +265,65 @@ function _siteLockIsBypassPath(string $path): bool {
     return false;
 }
 
+function _siteLockIsBlockedPartial(string $path): bool {
+    $p = strtolower(trim((string) $path));
+    if ($p === '') return false;
+    $raw = trim((string) _siteLockGetConfig('sistema', 'site_lock_blocked_paths', ''));
+    if ($raw === '') return false;
+    $paths = array_filter(array_map('trim', explode(',', $raw)), fn($v) => $v !== '');
+    foreach ($paths as $blocked) {
+        $blocked = strtolower($blocked);
+        if ($blocked !== '' && strpos($p, $blocked) === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+$request = new Request();
+$router = new Router();
+
+try {
+    $path = $request->getPath();
+    $enabled = trim((string) _siteLockGetConfig('sistema', 'site_lock_enabled', '0'));
+    $pwd = (string) _siteLockGetConfig('sistema', 'site_lock_password', '');
+    $enabledBool = ($enabled === '1' || strtolower($enabled) === 'true');
+
+    if ($enabledBool && $pwd !== '') {
+        $mode = trim((string) _siteLockGetConfig('sistema', 'site_lock_mode', 'total'));
+        if ($mode === '' || !in_array($mode, ['total', 'parcial'], true)) {
+            $mode = 'total';
+        }
+
+        if ($mode === 'total') {
+            // Modo total: bloqueia tudo exceto bypass paths (comportamento original)
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $ok = !empty($_SESSION['site_lock_ok']);
+            if (!$ok && !_siteLockIsBypassPath($path)) {
+                $next = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+                header('Location: /site-lock?next=' . urlencode($next));
+                exit;
+            }
+        } else {
+            // Modo parcial: bloqueia somente as rotas configuradas em site_lock_blocked_paths
+            if (_siteLockIsBlockedPartial($path)) {
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+                $ok = !empty($_SESSION['site_lock_ok']);
+                if (!$ok) {
+                    $next = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+                    header('Location: /site-lock?next=' . urlencode($next));
+                    exit;
+                }
+            }
+        }
+    }
+} catch (\Throwable $e) {
+}
+
 $request = new Request();
 $router = new Router();
 
