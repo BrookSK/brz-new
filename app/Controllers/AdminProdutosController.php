@@ -2021,7 +2021,7 @@ function renderGrupos() {
             <i class="fas fa-store fa-lg text-muted"></i>
             <div class="flex-fill">
                 <div class="fw-semibold">${g.nome}</div>
-                ${parseFloat(g.imposto_local_percent || 0) > 0 ? \'<div class="small text-warning"><i class="fas fa-percent me-1"></i>Imposto local \' + parseFloat(g.imposto_local_percent).toFixed(0) + \'%</div>\' : ""}
+                ${parseFloat(g.imposto_local_percent || 0) > 0 ? \'<div class="small text-warning">Imposto local \' + parseFloat(g.imposto_local_percent).toFixed(0) + \'%</div>\' : ""}
             </div>
             <i class="fas fa-chevron-right text-muted"></i>
         </div>`;

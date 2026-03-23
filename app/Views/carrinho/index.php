@@ -254,7 +254,7 @@
                     <div class="card-body">
                         <h6 class="card-title"><i class="fas fa-info-circle"></i> <?= __('cart.important_info', 'Informações Importantes') ?></h6>
                         <ul class="small text-muted mb-0">
-                            <li><?= __('cart.info.delivery_time', 'Prazo de entrega: 15-30 dias') ?></li>
+                            <!-- <li><?= __('cart.info.delivery_time', 'Prazo de entrega: 15-30 dias') ?></li> -->
                             <li><?= __('cart.info.taxes_included', 'Impostos inclusos no valor final') ?></li>
                             <li><?= __('cart.info.service_fee', 'Taxa de serviço: US$ 39/kg (arredondado para cima)') ?></li>
                             <li><?= __('cart.info.shipping_calc', 'Frete calculado pelo peso total arredondado') ?></li>
@@ -319,7 +319,7 @@
 
                     <?php if (($imposto_local ?? 0) > 0): ?>
                     <div class="d-flex justify-content-between mb-2">
-                        <span><i class="fas fa-percent me-1 text-warning"></i>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%)</span>
+                        <span>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%)</span>
                         <span class="cart-currency imposto-local-value" data-original-value="<?= $imposto_local ?>"><?= number_format($imposto_local, 2, ',', '.') ?></span>
                     </div>
                     <?php endif; ?>
@@ -355,7 +355,7 @@
                     <div class="card-body">
                         <h6 class="card-title"><i class="fas fa-info-circle"></i> <?= __('cart.important_info', 'Informações Importantes') ?></h6>
                         <ul class="small text-muted mb-0">
-                            <li><?= __('cart.info.delivery_time', 'Prazo de entrega: 15-30 dias') ?></li>
+                            <!-- <li><?= __('cart.info.delivery_time', 'Prazo de entrega: 15-30 dias') ?></li> -->
                             <li><?= __('cart.info.taxes_included', 'Impostos inclusos no valor final') ?></li>
                             <li><?= __('cart.info.service_fee', 'Taxa de serviço: US$ 39/kg (arredondado para cima)') ?></li>
                             <li><?= __('cart.info.shipping_calc', 'Frete calculado pelo peso total arredondado') ?></li>

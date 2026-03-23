@@ -45,7 +45,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             </span>
                             <?php if ($impostoLocal > 0): ?>
                             <span class="badge bg-warning text-dark">
-                                <i class="fas fa-percent me-1"></i>Imposto local <?= number_format($impostoLocal, 0) ?>%
+                                Imposto local <?= number_format($impostoLocal, 0) ?>%
                             </span>
                             <?php endif; ?>
                         </div>

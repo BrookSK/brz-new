@@ -26,7 +26,7 @@ $buildUrl = static function (int $p) use ($slug): string {
             $impostoLocalPercent = (float)($grupo['imposto_local_percent'] ?? 0);
             if ($impostoLocalPercent > 0): ?>
             <span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">
-                <i class="fas fa-percent me-1"></i>Inclui imposto local (<?= number_format($impostoLocalPercent, 0) ?>%)
+                Inclui imposto local (<?= number_format($impostoLocalPercent, 0) ?>%)
             </span>
             <?php endif; ?>
         </div>
@@ -110,7 +110,7 @@ $buildUrl = static function (int $p) use ($slug): string {
                             </small>
                             <?php endif; ?>
                             <?php if ($impostoLocalGrupo > 0): ?>
-                            <div class="small text-warning mt-1"><i class="fas fa-percent me-1"></i>Incl. imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
+                            <div class="small text-warning mt-1">Incl. imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
                             <?php endif; ?>
                         </div>
                         <div>

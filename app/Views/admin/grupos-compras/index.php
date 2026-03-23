@@ -37,7 +37,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                         </div>
                         <span class="badge <?= $ativo ? 'bg-success' : 'bg-secondary' ?> ms-2"><?= $ativo ? 'Ativo' : 'Inativo' ?></span>
                     </div>
-                    <div class="small mb-1"><i class="fas fa-percent me-1 text-muted"></i>Imposto local: <strong><?= $impostoLocal > 0 ? number_format($impostoLocal, 1) . '%' : 'Não' ?></strong></div>
+                    <div class="small mb-1">Imposto local: <strong><?= $impostoLocal > 0 ? number_format($impostoLocal, 1) . '%' : 'Não' ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-box me-1 text-muted"></i>Produtos: <strong><?= $qtdProdutos ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-shopping-cart me-1 text-muted"></i>Pedidos: <strong><?= $qtdPedidos ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-user me-1 text-muted"></i>Cadastrado por: <strong><?= $criadoPor ?></strong></div>

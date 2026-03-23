@@ -157,7 +157,7 @@
                         if ($impostoLocalPct > 0): ?>
                         <div class="mb-2">
                             <span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">
-                                <i class="fas fa-percent me-1"></i>Inclui imposto local (<?= number_format($impostoLocalPct, 0) ?>%)
+                                Inclui imposto local (<?= number_format($impostoLocalPct, 0) ?>%)
                             </span>
                         </div>
                         <?php endif; ?>
