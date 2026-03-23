@@ -2823,129 +2823,43 @@ class CheckoutController extends Controller {
                             if ($valorImpostoLocal < 0) $valorImpostoLocal = 0.0;
                             $valorImpostoLocal = round((float) $valorImpostoLocal, 2);
 
-                            // Obter subtotal dos produtos.
-                            $subtotalProdutos = 0.0;
-                            $hasSubtotalProdutos = false;
-
-                            // 1) Ler subtotal direto da tabela pedidos
-                            try {
-                                $dbSub = \Config\Database::getConnection();
-                                $colsSub = [];
-                                $stColsSub = $dbSub->query('DESCRIBE pedidos');
-                                $colsSub = $stColsSub ? ($stColsSub->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                                $colSubtotal = '';
-                                foreach (['subtotal', 'subtotal_produtos', 'valor_produtos'] as $c) {
-                                    if (in_array($c, $colsSub, true)) {
-                                        $colSubtotal = $c;
-                                        break;
-                                    }
-                                }
-                                if ($colSubtotal !== '') {
-                                    $stSub = $dbSub->prepare('SELECT ' . $colSubtotal . ' AS sub FROM pedidos WHERE id = ? LIMIT 1');
-                                    $stSub->execute([(int) $pedidoId]);
-                                    $vSub = (float) ($stSub->fetchColumn() ?: 0);
-                                    if ($vSub > 0) {
-                                        $subtotalProdutos = $vSub;
-                                        $hasSubtotalProdutos = true;
-
-                                        // Se o subtotal parece estar em USD (muito menor que o total),
-                                        // converter para BRL usando a taxa de conversão do pedido.
-                                        // Ex: subtotal=2.49 USD, total=257 BRL → 2.49 é claramente USD.
-                                        if ($totalBrl > 0 && $subtotalProdutos > 0 && $subtotalProdutos < $totalBrl * 0.02) {
-                                            $txConvSub = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                                            if ($txConvSub <= 1.01) {
-                                                try {
-                                                    $dbTxSub = \Config\Database::getConnection();
-                                                    $stTxSub = $dbTxSub->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                                    $stTxSub->execute();
-                                                    $txConvSub = (float) ($stTxSub->fetchColumn() ?: 0);
-                                                } catch (\Exception $e) {}
-                                            }
-                                            if ($txConvSub > 1.01) {
-                                                $subtotalProdutos = round($subtotalProdutos * $txConvSub, 2);
-                                                error_log('[SPLIT_BRL_SUB_CONV] pedido=' . $pedidoId . ' subtotalOriginal=' . $vSub . ' taxa=' . $txConvSub . ' subtotalBrl=' . $subtotalProdutos);
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (\Exception $e) {
-                                $hasSubtotalProdutos = false;
-                            }
-
-                            // 2) Fallback: calcular a partir dos itens do pedido
-                            if (!$hasSubtotalProdutos) {
-                                try {
-                                    $dbItens = \Config\Database::getConnection();
-                                    $itensTable = '';
-                                    $stmtT = $dbItens->query("SHOW TABLES LIKE 'pedido_itens'");
-                                    $has1 = $stmtT ? ($stmtT->fetchColumn() !== false) : false;
-                                    if ($has1) {
-                                        $itensTable = 'pedido_itens';
-                                    } else {
-                                        $stmtT2 = $dbItens->query("SHOW TABLES LIKE 'pedido_items'");
-                                        $has2 = $stmtT2 ? ($stmtT2->fetchColumn() !== false) : false;
-                                        if ($has2) {
-                                            $itensTable = 'pedido_items';
-                                        }
-                                    }
-
-                                    if ($itensTable !== '') {
-                                        $cols = [];
-                                        $stColsItens = $dbItens->query('DESCRIBE ' . $itensTable);
-                                        $cols = $stColsItens ? ($stColsItens->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-
-                                        $colPedidoId = in_array('pedido_id', $cols, true) ? 'pedido_id' : '';
-                                        $colQtd = '';
-                                        foreach (['quantidade', 'qty', 'qtd'] as $c) {
-                                            if ($colQtd === '' && in_array($c, $cols, true)) $colQtd = $c;
-                                        }
-                                        $colValor = '';
-                                        foreach (['valor', 'preco', 'preco_unitario', 'price', 'unit_price'] as $c) {
-                                            if ($colValor === '' && in_array($c, $cols, true)) $colValor = $c;
-                                        }
-
-                                        if ($colPedidoId !== '' && $colQtd !== '' && $colValor !== '') {
-                                            $stSum = $dbItens->prepare('SELECT SUM(COALESCE(' . $colValor . ',0) * COALESCE(' . $colQtd . ',0)) AS subtotal FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
-                                            $stSum->execute([(int) $pedidoId]);
-                                            $sv = $stSum->fetchColumn();
-                                            $subtotalProdutos = (float) ($sv ?: 0);
-                                            if ($subtotalProdutos > 0) {
-                                                $hasSubtotalProdutos = true;
-
-                                                // Se o subtotal dos itens parece estar em USD, converter
-                                                if ($totalBrl > 0 && $subtotalProdutos < $totalBrl * 0.02) {
-                                                    $txConvIt = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                                                    if ($txConvIt <= 1.01) {
-                                                        try {
-                                                            $dbTxIt = \Config\Database::getConnection();
-                                                            $stTxIt = $dbTxIt->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                                            $stTxIt->execute();
-                                                            $txConvIt = (float) ($stTxIt->fetchColumn() ?: 0);
-                                                        } catch (\Exception $e) {}
-                                                    }
-                                                    if ($txConvIt > 1.01) {
-                                                        $subtotalProdutos = round($subtotalProdutos * $txConvIt, 2);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch (\Exception $e) {
-                                    $hasSubtotalProdutos = false;
-                                }
-                            }
-
-                            if ($hasSubtotalProdutos) {
-                                $valorProduto = round(max(0.0, $subtotalProdutos), 2);
-                            } else {
-                                $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto), 2);
-                            }
+                            // Calcular valor dos produtos como: total - taxaServico - impostos - impostoLocal
+                            // Todos os valores do banco estão na mesma moeda (USD internamente).
+                            $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto - $valorImpostoLocal), 2);
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
                             $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
+                            // Converter USD → BRL se necessário.
+                            // Os valores no banco estão em USD mesmo quando moeda='BRL'.
+                            // O frontend multiplica pela taxa_conversao para exibir em BRL.
+                            // Precisamos fazer o mesmo aqui para enviar valores em BRL aos gateways.
+                            $txConvSplit = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                            if ($txConvSplit <= 1.01) {
+                                try {
+                                    $dbTxSplit = \Config\Database::getConnection();
+                                    $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                    $stTxSplit->execute();
+                                    $txConvSplit = (float) ($stTxSplit->fetchColumn() ?: 0);
+                                } catch (\Exception $e) {}
+                            }
+                            $moedaPedidoSplit = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+
+                            // Log dos valores brutos do banco ANTES de qualquer conversão
+                            error_log('[SPLIT_RAW] pedido=' . $pedidoId . ' moeda=' . $moedaPedidoSplit . ' taxa_conversao=' . $txConvSplit . ' total_db=' . $totalBrl . ' taxaServico_db=' . $taxaServico . ' impostos_db=' . $valorImposto . ' impostoLocal_db=' . $valorImpostoLocal . ' valorProduto_calc=' . $valorProduto . ' valorAppmax_calc=' . $valorAppmax);
+
+                            if ($moedaPedidoSplit === 'BRL' && $txConvSplit > 1.01) {
+                                $valorProduto   = round($valorProduto * $txConvSplit, 2);
+                                $valorTaxa      = round($valorTaxa * $txConvSplit, 2);
+                                $valorAppmax    = round($valorAppmax * $txConvSplit, 2);
+                                $valorImposto   = round($valorImposto * $txConvSplit, 2);
+                                $valorImpostoLocal = round($valorImpostoLocal * $txConvSplit, 2);
+                                $totalBrl       = round($totalBrl * $txConvSplit, 2);
+                                error_log('[SPLIT_BRL_CONV] pedido=' . $pedidoId . ' taxa=' . $txConvSplit . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' valorAppmax=' . $valorAppmax);
+                            }
+
                             // Log de debug para diagnóstico do split BRL
                             try {
-                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' taxaServico=' . $taxaServico . ' impostos=' . $valorImposto . ' impostoLocal=' . $valorImpostoLocal . ' valorAppmax=' . $valorAppmax . ' hasSubtotal=' . ($hasSubtotalProdutos ? 'Y' : 'N'));
+                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' taxaServico=' . (isset($taxaServico) ? $taxaServico : $valorTaxa) . ' impostos=' . $valorImposto . ' impostoLocal=' . $valorImpostoLocal . ' valorAppmax=' . $valorAppmax);
                             } catch (\Exception $e) {}
 
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
