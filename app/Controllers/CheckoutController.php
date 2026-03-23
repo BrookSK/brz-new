@@ -2824,42 +2824,14 @@ class CheckoutController extends Controller {
                             $valorImpostoLocal = round((float) $valorImpostoLocal, 2);
 
                             // Calcular valor dos produtos como: total - taxaServico - impostos - impostoLocal
-                            // Todos os valores do banco estão na mesma moeda (USD internamente).
+                            // Os valores no banco já estão em BRL (convertidos na criação do pedido).
                             $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto - $valorImpostoLocal), 2);
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
                             $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
-                            // Converter USD → BRL se necessário.
-                            // Os valores no banco estão em USD mesmo quando moeda='BRL'.
-                            // O frontend multiplica pela taxa_conversao para exibir em BRL.
-                            // Precisamos fazer o mesmo aqui para enviar valores em BRL aos gateways.
-                            $txConvSplit = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                            if ($txConvSplit <= 1.01) {
-                                try {
-                                    $dbTxSplit = \Config\Database::getConnection();
-                                    $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                    $stTxSplit->execute();
-                                    $txConvSplit = (float) ($stTxSplit->fetchColumn() ?: 0);
-                                } catch (\Exception $e) {}
-                            }
-                            $moedaPedidoSplit = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
-
-                            // Log dos valores brutos do banco ANTES de qualquer conversão
-                            error_log('[SPLIT_RAW] pedido=' . $pedidoId . ' moeda=' . $moedaPedidoSplit . ' taxa_conversao=' . $txConvSplit . ' total_db=' . $totalBrl . ' taxaServico_db=' . $taxaServico . ' impostos_db=' . $valorImposto . ' impostoLocal_db=' . $valorImpostoLocal . ' valorProduto_calc=' . $valorProduto . ' valorAppmax_calc=' . $valorAppmax);
-
-                            if ($moedaPedidoSplit === 'BRL' && $txConvSplit > 1.01) {
-                                $valorProduto   = round($valorProduto * $txConvSplit, 2);
-                                $valorTaxa      = round($valorTaxa * $txConvSplit, 2);
-                                $valorAppmax    = round($valorAppmax * $txConvSplit, 2);
-                                $valorImposto   = round($valorImposto * $txConvSplit, 2);
-                                $valorImpostoLocal = round($valorImpostoLocal * $txConvSplit, 2);
-                                $totalBrl       = round($totalBrl * $txConvSplit, 2);
-                                error_log('[SPLIT_BRL_CONV] pedido=' . $pedidoId . ' taxa=' . $txConvSplit . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' valorAppmax=' . $valorAppmax);
-                            }
-
                             // Log de debug para diagnóstico do split BRL
                             try {
-                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' taxaServico=' . (isset($taxaServico) ? $taxaServico : $valorTaxa) . ' impostos=' . $valorImposto . ' impostoLocal=' . $valorImpostoLocal . ' valorAppmax=' . $valorAppmax);
+                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' taxaServico=' . $taxaServico . ' impostos=' . $valorImposto . ' impostoLocal=' . $valorImpostoLocal . ' valorAppmax=' . $valorAppmax);
                             } catch (\Exception $e) {}
 
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
