@@ -394,12 +394,13 @@ $(document).ready(function() {
 
         // Preço base corrigido: se p.valor < 2 e variações têm preço real, usar menor preço real
         let baseValor = p.valor;
-        if (baseValor < 2) {
-            const varPrecos = p.variacoes
-                .filter(v => v && typeof v === 'object' && v.valor !== null && v.valor !== undefined && parseFloat(v.valor) >= 2)
-                .map(v => parseFloat(v.valor));
-            if (varPrecos.length > 0) {
-                baseValor = Math.min(...varPrecos);
+        const varPrecosReais = p.variacoes
+            .filter(v => v && typeof v === 'object' && v.valor !== null && v.valor !== undefined && parseFloat(v.valor) >= 2)
+            .map(v => parseFloat(v.valor));
+        if (varPrecosReais.length > 0) {
+            const menorPrecoReal = Math.min(...varPrecosReais);
+            if (baseValor < 2) {
+                baseValor = menorPrecoReal;
             }
         }
 
@@ -435,7 +436,7 @@ $(document).ready(function() {
                 return acc;
             }, null);
 
-            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : baseValor;
+            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) >= 2 ? parseFloat(best.valor) : baseValor;
             const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
             return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
         }

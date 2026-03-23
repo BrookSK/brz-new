@@ -3207,7 +3207,7 @@ class AssessoriaController extends Controller {
                     if ($variacaoId !== null && isset($produto['variacoes']) && is_array($produto['variacoes'])) {
                         foreach ($produto['variacoes'] as $v) {
                             if (is_array($v) && (string) ($v['id'] ?? '') === (string) $variacaoId) {
-                                if (isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) > 0) {
+                                if (isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) >= 2.0) {
                                     $produto['valor'] = floatval($v['valor']);
                                 }
                                 if (isset($v['peso']) && floatval($v['peso']) > 0) {
@@ -3794,7 +3794,7 @@ class AssessoriaController extends Controller {
         if (is_array($produtoData['variacoes'])) {
             foreach ($produtoData['variacoes'] as &$vFill) {
                 if (!is_array($vFill)) continue;
-                if (!isset($vFill['valor']) || $vFill['valor'] === null || floatval($vFill['valor']) <= 0) {
+                if (!isset($vFill['valor']) || $vFill['valor'] === null || floatval($vFill['valor']) < 2.0) {
                     $vFill['valor'] = $baseValor;
                 }
                 if (!isset($vFill['peso']) || $vFill['peso'] === null || floatval($vFill['peso']) <= 0) {
