@@ -1637,6 +1637,120 @@ class AdminProdutosController extends Controller {
         }
     }
 
+    public function cadastroRapidoSalvarLote(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=UTF-8');
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        if (empty($_SESSION['cadastro_rapido_autorizado'])) {
+            echo json_encode(['ok' => false, 'error' => 'Não autorizado.']);
+            exit;
+        }
+
+        try {
+            $reutilizarFoto = (string) ($request->getParam('reutilizar_foto') ?? '');
+
+            $created = $this->salvarCadastroRapidoLoteItem($request, $reutilizarFoto);
+            echo json_encode(['ok' => true, 'id' => $created['id'], 'name' => $created['name'], 'foto_principal' => $created['foto_principal']]);
+        } catch (\Exception $e) {
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function salvarCadastroRapidoLoteItem(Request $request, string $reutilizarFoto = ''): array {
+        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo->beginTransaction();
+
+        $cols = $this->getTableColumns($pdo, 'produtos');
+
+        $name = (string) $request->getParam('name');
+        $price = $this->parseMoneyToDb($request->getParam('price'));
+        $weight = str_replace([','], ['.'], (string) $request->getParam('weight'));
+        $stock = (int) $request->getParam('stock', 999);
+        $featured = $request->getParam('featured') ? 1 : 0;
+
+        if (trim($name) === '') {
+            throw new \Exception('Nome/descrição é obrigatório');
+        }
+
+        $data = [];
+        if (in_array('name', $cols, true)) {
+            $data['name'] = $name;
+        } elseif (in_array('nome', $cols, true)) {
+            $data['nome'] = $name;
+        }
+
+        if (in_array('price', $cols, true)) $data['price'] = $price;
+        if (in_array('valor', $cols, true) && !isset($data['price'])) $data['valor'] = $price;
+
+        if (in_array('weight', $cols, true)) $data['weight'] = $weight;
+        if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;
+
+        if (in_array('stock', $cols, true)) $data['stock'] = $stock;
+        if (in_array('estoque', $cols, true) && !isset($data['stock'])) $data['estoque'] = $stock;
+
+        if (in_array('status', $cols, true)) $data['status'] = 'published';
+        if (in_array('active', $cols, true)) $data['active'] = 1;
+        if (in_array('ativo', $cols, true) && !isset($data['active'])) $data['ativo'] = 1;
+        if (in_array('featured', $cols, true)) $data['featured'] = $featured;
+
+        $grupoId = (int) $request->getParam('grupo_compras_id', 0);
+        if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
+            $data['grupo_compras_id'] = $grupoId;
+        }
+
+        if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
+        if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
+
+        $columnsSql = implode(', ', array_keys($data));
+        $placeholders = ':' . implode(', :', array_keys($data));
+        $stmt = $pdo->prepare("INSERT INTO produtos ({$columnsSql}) VALUES ({$placeholders})");
+        foreach ($data as $k => $v) {
+            $stmt->bindValue(':' . $k, $v);
+        }
+        $stmt->execute();
+
+        $produtoId = (int) $pdo->lastInsertId();
+        $fotoWebPath = '';
+
+        // Reutilizar foto de outro produto do lote
+        if ($reutilizarFoto !== '' && in_array('foto_principal', $cols, true)) {
+            $fotoWebPath = $reutilizarFoto;
+            $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+            $stmtCover->execute([$fotoWebPath, $produtoId]);
+        } elseif (isset($_FILES['capa']) && !empty($_FILES['capa']['name']) && ($_FILES['capa']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $uploadDir = $this->getProdutoUploadsDir();
+            $webDir = '/uploads/produtos/';
+            $this->ensureDir($uploadDir);
+
+            $orig = (string) $_FILES['capa']['name'];
+            $fileName = preg_replace('/[^A-Za-z0-9\-_\.]/', '', $orig);
+            $fileName = time() . '_' . $fileName;
+            $filePath = $uploadDir . $fileName;
+            $fotoWebPath = $webDir . $fileName;
+
+            if (move_uploaded_file($_FILES['capa']['tmp_name'], $filePath)) {
+                if (in_array('foto_principal', $cols, true)) {
+                    $stmtCover = $pdo->prepare('UPDATE produtos SET foto_principal = ? WHERE id = ?');
+                    $stmtCover->execute([$fotoWebPath, $produtoId]);
+                }
+            }
+        }
+
+        $pdo->commit();
+
+        return [
+            'id' => $produtoId,
+            'name' => $name,
+            'foto_principal' => $fotoWebPath,
+        ];
+    }
+
     private function renderCadastroRapidoGrupos(?array $created, ?string $error): void {
         $successHtml = '';
         if (!empty($error)) {
@@ -1772,7 +1886,7 @@ class AdminProdutosController extends Controller {
             <div class="small subtle mb-4">Como deseja cadastrar os produtos?</div>
             <div class="d-grid gap-3">
                 <button class="btn btn-primary btn-lg" id="btnNovoProduto"><i class="fas fa-plus me-2"></i>Novo produto</button>
-                <button class="btn btn-outline-primary btn-lg" id="btnEmLote"><i class="fas fa-layer-group me-2"></i>Em lote (CSV)</button>
+                <button class="btn btn-outline-primary btn-lg" id="btnEmLote"><i class="fas fa-layer-group me-2"></i>Em lote (variantes)</button>
             </div>
             <div class="mt-3 text-center"><button class="btn btn-link btn-sm text-muted" id="btnVoltarStep1">← Voltar</button></div>
         </div>
@@ -1817,15 +1931,60 @@ class AdminProdutosController extends Controller {
                 </div>
             </form>
         </div>
-        <!-- Lote (CSV) -->
-        <div class="glass p-3 mt-3" id="loteArea" style="display:none">
-            <div class="fw-semibold mb-2">Importar em lote (CSV)</div>
-            <div class="small text-muted mb-3">Baixe o modelo, preencha e envie.</div>
-            <a href="/admin/produtos/importar/modelo" class="btn btn-outline-primary btn-sm mb-2"><i class="fas fa-download me-1"></i>Baixar modelo CSV</a>
-            <form method="POST" action="/admin/produtos/importar/iniciar" enctype="multipart/form-data">
+        <!-- Lote (variantes) -->
+        <div class="glass p-3 p-sm-4 mt-3" id="loteArea" style="display:none">
+            <div class="fw-semibold mb-2">Cadastro em lote — <span id="grupoNomeLote" class="text-primary"></span></div>
+            <div class="small text-muted mb-3">Mesma foto, peso, preço e estoque para todos. Só muda a descrição.</div>
+            <form id="formLote" enctype="multipart/form-data">
                 <input type="hidden" name="grupo_compras_id" id="inputGrupoIdLote">
-                <div class="mb-2"><input type="file" class="form-control" name="arquivo" accept=".csv,.xlsx"></div>
-                <button type="submit" class="btn btn-primary w-100">Importar</button>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Foto do produto</label>
+                    <input type="file" class="form-control" name="capa" accept="image/*" id="capaInputLote">
+                    <div id="capaPreviewLote" class="mt-2"></div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Valor (USD)</label>
+                        <div class="input-group input-group-lg"><span class="input-group-text">$</span><input type="text" class="form-control" name="price" required inputmode="decimal" placeholder="0,00" id="lotePriceInput"></div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Peso (kg)</label>
+                        <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000" id="loteWeightInput">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Estoque</label>
+                        <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0" id="loteStockInput">
+                    </div>
+                    <div class="col-6 d-flex align-items-end">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="loteFeaturedSwitch" name="featured" value="1" checked>
+                            <label class="form-check-label fw-semibold" for="loteFeaturedSwitch">Destaque</label>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="fw-semibold mb-2"><i class="fas fa-list me-1"></i>Descrições (variantes)</div>
+                <div class="small text-muted mb-3">Adicione uma descrição para cada variante do produto.</div>
+                <div id="loteDescricoes">
+                    <div class="input-group mb-2 lote-desc-row">
+                        <span class="input-group-text" style="border-top-right-radius:0;border-bottom-right-radius:0;min-width:36px;justify-content:center;">1</span>
+                        <input type="text" class="form-control" name="descricoes[]" required placeholder="Ex: iPhone 15 Pro - Azul 128GB" autocomplete="off">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="btnAddDescricao"><i class="fas fa-plus me-1"></i>Adicionar descrição</button>
+                <div id="loteMsg"></div>
+                <div id="loteProgress" style="display:none" class="mb-3">
+                    <div class="progress" style="height:24px;border-radius:12px;">
+                        <div class="progress-bar" id="loteProgressBar" role="progressbar" style="width:0%">0%</div>
+                    </div>
+                    <div class="small text-muted mt-1" id="loteProgressLabel">Salvando...</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2Lote">← Voltar</button>
+                    <button type="submit" class="btn btn-primary flex-fill btn-lg" id="btnSalvarLote"><i class="fas fa-bolt me-2"></i>Salvar todos</button>
+                </div>
             </form>
         </div>
     </div>
@@ -1871,6 +2030,7 @@ function selecionarGrupo(g) {
     grupoSelecionado = g;
     document.getElementById("grupoSelecionadoNome").textContent = g.nome;
     document.getElementById("grupoNomeProduto").textContent = g.nome;
+    document.getElementById("grupoNomeLote").textContent = g.nome;
     document.getElementById("inputGrupoId").value = g.id;
     document.getElementById("inputGrupoIdLote").value = g.id;
     showStep(2);
@@ -1925,8 +2085,9 @@ document.getElementById("btnEmLote").addEventListener("click", () => {
 
 document.getElementById("btnVoltarStep1").addEventListener("click", () => showStep(1));
 document.getElementById("btnVoltarStep2").addEventListener("click", () => showStep(2));
+document.getElementById("btnVoltarStep2Lote").addEventListener("click", () => showStep(2));
 
-// Preview foto
+// Preview foto (produto individual)
 document.getElementById("capaInput").addEventListener("change", function(e) {
     const preview = document.getElementById("capaPreview");
     preview.innerHTML = "";
@@ -1940,6 +2101,143 @@ document.getElementById("capaInput").addEventListener("change", function(e) {
             preview.appendChild(img);
         };
         reader.readAsDataURL(file);
+    }
+});
+
+// Preview foto (lote)
+document.getElementById("capaInputLote").addEventListener("change", function(e) {
+    const preview = document.getElementById("capaPreviewLote");
+    preview.innerHTML = "";
+    const file = (e.target.files||[])[0];
+    if (file && file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const img = document.createElement("img");
+            img.src = ev.target.result;
+            img.style.cssText = "width:100%;max-height:200px;object-fit:cover;border-radius:14px;";
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Lote: adicionar/remover descrições
+let descCount = 1;
+function renumerarDescricoes() {
+    const rows = document.querySelectorAll("#loteDescricoes .lote-desc-row");
+    rows.forEach((row, i) => {
+        row.querySelector(".input-group-text").textContent = i + 1;
+    });
+    descCount = rows.length;
+    // Mostrar/esconder botão remover
+    rows.forEach(row => {
+        const btn = row.querySelector(".btn-remove-desc");
+        if (btn) btn.style.display = rows.length > 1 ? "" : "none";
+    });
+}
+
+function criarLinhaDescricao() {
+    descCount++;
+    const div = document.createElement("div");
+    div.className = "input-group mb-2 lote-desc-row";
+    div.innerHTML = \'<span class="input-group-text" style="border-top-right-radius:0;border-bottom-right-radius:0;min-width:36px;justify-content:center;">\' + descCount + \'</span>\'
+        + \'<input type="text" class="form-control" name="descricoes[]" required placeholder="Descrição da variante" autocomplete="off">\'
+        + \'<button type="button" class="btn btn-outline-danger btn-remove-desc" style="border-top-left-radius:0;border-bottom-left-radius:0;"><i class="fas fa-times"></i></button>\';
+    div.querySelector(".btn-remove-desc").addEventListener("click", () => {
+        div.remove();
+        renumerarDescricoes();
+    });
+    document.getElementById("loteDescricoes").appendChild(div);
+    renumerarDescricoes();
+    div.querySelector("input").focus();
+}
+
+document.getElementById("btnAddDescricao").addEventListener("click", criarLinhaDescricao);
+
+// Lote: submit via AJAX
+document.getElementById("formLote").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const msg = document.getElementById("loteMsg");
+    const progress = document.getElementById("loteProgress");
+    const bar = document.getElementById("loteProgressBar");
+    const label = document.getElementById("loteProgressLabel");
+    const btn = document.getElementById("btnSalvarLote");
+
+    const descInputs = document.querySelectorAll(\'#loteDescricoes input[name="descricoes[]"]\');
+    const descricoes = [];
+    descInputs.forEach(inp => { const v = inp.value.trim(); if (v) descricoes.push(v); });
+
+    if (!descricoes.length) {
+        msg.innerHTML = \'<div class="alert alert-danger py-1 small">Adicione pelo menos uma descrição.</div>\';
+        return;
+    }
+
+    const price = document.getElementById("lotePriceInput").value.trim();
+    const weight = document.getElementById("loteWeightInput").value.trim();
+    if (!price || !weight) {
+        msg.innerHTML = \'<div class="alert alert-danger py-1 small">Preencha valor e peso.</div>\';
+        return;
+    }
+
+    btn.disabled = true;
+    msg.innerHTML = "";
+    progress.style.display = "";
+    bar.style.width = "0%";
+    bar.textContent = "0%";
+    label.textContent = "Salvando 0 de " + descricoes.length + "...";
+
+    let okCount = 0;
+    let failCount = 0;
+    const total = descricoes.length;
+    const resultados = [];
+
+    for (let i = 0; i < total; i++) {
+        const fd = new FormData();
+        fd.append("grupo_compras_id", document.getElementById("inputGrupoIdLote").value);
+        fd.append("price", price);
+        fd.append("weight", weight);
+        fd.append("stock", document.getElementById("loteStockInput").value);
+        fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
+        fd.append("name", descricoes[i]);
+
+        // Enviar foto apenas no primeiro produto, depois reutilizar o path
+        const capaFile = document.getElementById("capaInputLote").files[0];
+        if (capaFile) fd.append("capa", capaFile);
+
+        // Se já temos foto do primeiro produto, enviar o path pra reutilizar
+        if (i > 0 && resultados.length > 0 && resultados[0].foto_principal) {
+            fd.append("reutilizar_foto", resultados[0].foto_principal);
+        }
+
+        try {
+            const resp = await fetch("/admin/produtos/cadastro-rapido/salvar-lote", { method: "POST", body: fd });
+            const json = await resp.json();
+            if (json.ok) {
+                okCount++;
+                resultados.push(json);
+            } else {
+                failCount++;
+            }
+        } catch (err) {
+            failCount++;
+        }
+
+        const pct = Math.round(((i + 1) / total) * 100);
+        bar.style.width = pct + "%";
+        bar.textContent = pct + "%";
+        label.textContent = "Salvando " + (i + 1) + " de " + total + "...";
+    }
+
+    progress.style.display = "none";
+    btn.disabled = false;
+
+    if (okCount > 0 && failCount === 0) {
+        msg.innerHTML = \'<div class="alert alert-success" style="border-radius:14px;"><i class="fas fa-check-circle me-2"></i>\' + okCount + \' produto(s) cadastrado(s) com sucesso.</div>\'
+            + \'<div class="d-grid gap-2 mt-2"><a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo cadastro</a></div>\';
+    } else if (okCount > 0) {
+        msg.innerHTML = \'<div class="alert alert-warning" style="border-radius:14px;"><i class="fas fa-exclamation-triangle me-2"></i>\' + okCount + \' salvo(s), \' + failCount + \' com falha.</div>\';
+    } else {
+        msg.innerHTML = \'<div class="alert alert-danger" style="border-radius:14px;"><i class="fas fa-times-circle me-2"></i>Nenhum produto foi salvo. Verifique os dados.</div>\';
     }
 });
 

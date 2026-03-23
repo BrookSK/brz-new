@@ -11,6 +11,7 @@ $router->get('/admin/produtos/novo', 'AdminProdutosController', 'novo');
 $router->get('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cadastroRapido');
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
+$router->post('/admin/produtos/cadastro-rapido/salvar-lote', 'AdminProdutosController', 'cadastroRapidoSalvarLote');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
