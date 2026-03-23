@@ -152,6 +152,16 @@
                             </div>
                         </div>
 
+                        <?php
+                        $impostoLocalPct = (float) ($imposto_local_percent ?? 0);
+                        if ($impostoLocalPct > 0): ?>
+                        <div class="mb-2">
+                            <span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">
+                                <i class="fas fa-percent me-1"></i>Inclui imposto local (<?= number_format($impostoLocalPct, 0) ?>%)
+                            </span>
+                        </div>
+                        <?php endif; ?>
+
                         <div id="variacoes-card" class="mb-3" style="<?= $variacoesEnabled ? '' : 'display:none;' ?>">
                             <div class="fw-semibold mb-2"><?= __('product_details.variations', 'Variações') ?></div>
                             <div id="variacoes-selectors"></div>

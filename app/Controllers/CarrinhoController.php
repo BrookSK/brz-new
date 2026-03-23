@@ -468,6 +468,31 @@ class CarrinhoController extends Controller {
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
 
+        // Calcular imposto local do grupo de compras
+        $impostoLocal = 0.0;
+        $impostoLocalPercent = 0.0;
+        try {
+            $dbImpLocal = \Config\Database::getConnection();
+            $pidsForTax = [];
+            foreach ($carrinho as $ck => $cItem) {
+                $ativoCheck = $this->getItemAtivoFromSession((string) $ck);
+                if (!$ativoCheck) continue;
+                $cpid = (int) ($cItem['produto_id'] ?? 0);
+                if ($cpid > 0) $pidsForTax[$cpid] = true;
+            }
+            $pidsForTax = array_keys($pidsForTax);
+            if (!empty($pidsForTax)) {
+                $in = implode(',', array_fill(0, count($pidsForTax), '?'));
+                $stImpL = $dbImpLocal->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                $stImpL->execute($pidsForTax);
+                $impostoLocalPercent = (float) ($stImpL->fetchColumn() ?: 0);
+                if ($impostoLocalPercent > 0) {
+                    $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
+                    $total = $total + $impostoLocal;
+                }
+            }
+        } catch (\Throwable $e) {}
+
         // Se o carrinho estiver no DB, usar os totais persistidos (inclui desconto/cashback do Clube)
         if ($uid > 0 && $cartId > 0) {
             try {
@@ -562,6 +587,8 @@ class CarrinhoController extends Controller {
             'cashback_clube_estimado' => $cashbackClubeEstimado,
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
+            'imposto_local' => $impostoLocal,
+            'imposto_local_percent' => $impostoLocalPercent,
             'frete' => $frete,
             'peso_total' => $pesoTotal,
             'total' => $total,

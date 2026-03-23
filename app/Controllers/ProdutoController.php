@@ -382,7 +382,8 @@ class ProdutoController extends Controller {
             'fotos' => $fotos,
             'fotoPrincipal' => $fotoPrincipal,
             'produtosRelacionados' => array_slice($produtosRelacionados, 0, 4),
-            'variacoesUi' => $variacoesUi
+            'variacoesUi' => $variacoesUi,
+            'imposto_local_percent' => $this->getImpostoLocalPercentForProduct($produto),
         ]);
     }
 
@@ -919,5 +920,18 @@ class ProdutoController extends Controller {
             file_exists($docRoot . $rel) ||
             file_exists($docRoot . '/public' . $rel)
         );
+    }
+
+    private function getImpostoLocalPercentForProduct(array $produto): float {
+        try {
+            $pid = (int) ($produto['id'] ?? 0);
+            if ($pid <= 0) return 0.0;
+            $pdo = $this->getDirectPdo();
+            $st = $pdo->prepare("SELECT g.imposto_local_percent FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id = ? AND g.imposto_local_percent > 0 LIMIT 1");
+            $st->execute([$pid]);
+            return (float) ($st->fetchColumn() ?: 0);
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
     }
 }

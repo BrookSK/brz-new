@@ -2052,6 +2052,7 @@ class CheckoutController extends Controller {
             // Buscar detalhes do produto
             $produto = [
                 'id' => $pidReal,
+                'produto_id' => $pidReal,
                 'nome' => $nomeProduto,
                 'preco' => $precoUnitario,
                 'quantidade' => $quantidade,
@@ -2211,6 +2212,11 @@ class CheckoutController extends Controller {
         try {
             $dbImpLocal = \Config\Database::getConnection();
             $produtoIds = [];
+            // Usar $carrinho original (tem produto_id) e $items processado (tem id) como fallback
+            foreach ($carrinho as $ck => $cItem) {
+                $cpid = (int) ($cItem['produto_id'] ?? 0);
+                if ($cpid > 0) $produtoIds[$cpid] = true;
+            }
             foreach ($items as $cItem) {
                 $pid = (int) ($cItem['produto_id'] ?? ($cItem['id'] ?? 0));
                 if ($pid > 0) $produtoIds[$pid] = true;

@@ -316,6 +316,13 @@
                         <span><?= __('cart.taxes_brazil', 'Impostos do Brasil') ?></span>
                         <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
+
+                    <?php if (($imposto_local ?? 0) > 0): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="fas fa-percent me-1 text-warning"></i>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%)</span>
+                        <span class="cart-currency imposto-local-value" data-original-value="<?= $imposto_local ?>"><?= number_format($imposto_local, 2, ',', '.') ?></span>
+                    </div>
+                    <?php endif; ?>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
