@@ -8,6 +8,22 @@ class CpfValidator {
         return preg_replace('/\D+/', '', $v) ?? '';
     }
 
+    /**
+     * Formata CPF (11 dígitos) ou CNPJ (14 dígitos) com máscara.
+     * Retorna o valor original se não for CPF nem CNPJ.
+     */
+    public static function format(?string $value): string {
+        $digits = self::onlyDigits($value);
+        if (strlen($digits) === 11) {
+            return substr($digits, 0, 3) . '.' . substr($digits, 3, 3) . '.' . substr($digits, 6, 3) . '-' . substr($digits, 9, 2);
+        }
+        if (strlen($digits) === 14) {
+            return substr($digits, 0, 2) . '.' . substr($digits, 2, 3) . '.' . substr($digits, 5, 3) . '/' . substr($digits, 8, 4) . '-' . substr($digits, 12, 2);
+        }
+        return (string) ($value ?? '');
+    }
+
+
     public static function isValid(?string $cpf): bool {
         $cpf = self::onlyDigits($cpf);
         if ($cpf === '' || strlen($cpf) !== 11) {

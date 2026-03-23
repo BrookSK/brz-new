@@ -253,6 +253,9 @@ class AdminUsuariosHelper {
             $colunas = $this->getColunasUsuarios();
 
             $documento = $dados['documento'] ?? ($dados['cpf'] ?? null);
+            if ($documento !== null && $documento !== '') {
+                $documento = preg_replace('/\D+/', '', (string) $documento);
+            }
             $allowMissingDocumento = !empty($dados['_allow_missing_documento']);
             if (in_array('documento', $colunas) && empty($documento) && !$allowMissingDocumento) {
                 throw new \Exception('Documento é obrigatório');
@@ -266,7 +269,8 @@ class AdminUsuariosHelper {
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'email', $dados['email'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'senha', !empty($dados['senha']) ? password_hash($dados['senha'], PASSWORD_DEFAULT) : null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
-            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
+            $cpfNorm = isset($dados['cpf']) ? preg_replace('/\D+/', '', (string) $dados['cpf']) : null;
+            $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $cpfNorm !== '' ? $cpfNorm : null);
             if (!empty($documento)) {
                 $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'documento', $documento);
             } elseif ($allowMissingDocumento) {
@@ -338,11 +342,13 @@ class AdminUsuariosHelper {
             $this->setIfColumnExists($setParts, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
 
             if (in_array('cpf', $colunas)) {
-                $this->setIfColumnExists($setParts, $params, $colunas, 'cpf', $dados['cpf'] ?? null);
+                $cpfNorm = isset($dados['cpf']) ? preg_replace('/\D+/', '', (string) $dados['cpf']) : null;
+                $this->setIfColumnExists($setParts, $params, $colunas, 'cpf', $cpfNorm !== '' ? $cpfNorm : null);
             }
             if (in_array('documento', $colunas)) {
                 $documento = $dados['documento'] ?? ($dados['cpf'] ?? null);
                 if (!empty($documento)) {
+                    $documento = preg_replace('/\D+/', '', (string) $documento);
                     $this->setIfColumnExists($setParts, $params, $colunas, 'documento', $documento);
                 }
             }

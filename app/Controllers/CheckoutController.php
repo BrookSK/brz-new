@@ -3991,7 +3991,7 @@ class CheckoutController extends Controller {
 
                 if (!empty($dados['documento']) && is_array($colsU) && in_array('documento', $colsU, true)) {
                     $setU[] = 'documento = :documento';
-                    $paramsU['documento'] = $dados['documento'];
+                    $paramsU['documento'] = preg_replace('/\D+/', '', (string) $dados['documento']);
                 }
 
                 if (!empty($dados['data_nascimento']) && is_array($colsU) && in_array('data_nascimento', $colsU, true)) {
@@ -4048,12 +4048,13 @@ class CheckoutController extends Controller {
                 }
 
                 if (!empty($dados['documento'])) {
+                    $docNorm = preg_replace('/\D+/', '', (string) $dados['documento']);
                     if (is_array($colsC) && in_array('cpf_cnpj', $colsC, true)) {
                         $setC[] = 'cpf_cnpj = :documento';
-                        $paramsC['documento'] = $dados['documento'];
+                        $paramsC['documento'] = $docNorm;
                     } elseif (is_array($colsC) && in_array('documento', $colsC, true)) {
                         $setC[] = 'documento = :documento';
-                        $paramsC['documento'] = $dados['documento'];
+                        $paramsC['documento'] = $docNorm;
                     }
                 }
 

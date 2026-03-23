@@ -1754,7 +1754,7 @@ class UsuarioController extends Controller {
                 }
 
                 if ($docCol) {
-                    $sql = 'SELECT id FROM usuarios WHERE ' . $docCol . ' = :doc';
+                    $sql = "SELECT id FROM usuarios WHERE REPLACE(REPLACE(REPLACE(" . $docCol . ", '.', ''), '-', ''), '/', '') = :doc";
                     if ($usuarioAtualId > 0) {
                         $sql .= ' AND id != :id';
                     }

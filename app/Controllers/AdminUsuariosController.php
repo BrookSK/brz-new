@@ -350,7 +350,7 @@ class AdminUsuariosController extends Controller {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">CPF</label>
-                                <input type="text" class="form-control" name="cpf" value="' . htmlspecialchars(($usuario['cpf'] ?? '') !== '' ? ($usuario['cpf'] ?? '') : ($usuario['documento'] ?? '')) . '">
+                                <input type="text" class="form-control" name="cpf" value="' . htmlspecialchars(\App\Services\CpfValidator::format(($usuario['cpf'] ?? '') !== '' ? ($usuario['cpf'] ?? '') : ($usuario['documento'] ?? ''))) . '">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Telefone</label>

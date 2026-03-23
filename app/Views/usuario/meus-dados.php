@@ -372,7 +372,7 @@
                             <div class="col-md-6">
                                 <label for="documento" class="form-label" id="label-documento">CPF</label>
                                 <input type="text" class="form-control" id="documento" name="documento" 
-                                       value="<?= htmlspecialchars($usuario['documento'] ?? '') ?>" 
+                                       value="<?= htmlspecialchars(\App\Services\CpfValidator::format($usuario['documento'] ?? '')) ?>" 
                                        placeholder="000.000.000-00">
                                 <small class="text-muted" id="hint-documento" style="display:none;"><?= __('auth.document_br_required_hint', 'Obrigatório apenas para residentes no Brasil.') ?></small>
                             </div>

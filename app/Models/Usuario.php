@@ -149,7 +149,8 @@ class Usuario extends Model {
             return false;
         }
 
-        $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE documento = :documento");
+        // Comparar ignorando máscara: busca tanto com quanto sem formatação
+        $stmt = $this->connection->prepare("SELECT * FROM {$this->table} WHERE REPLACE(REPLACE(REPLACE(documento, '.', ''), '-', ''), '/', '') = :documento LIMIT 1");
         $stmt->bindParam(':documento', $documento);
         $stmt->execute();
         return $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -457,6 +458,11 @@ class Usuario extends Model {
             
             foreach ($mapeamentoColunas as $campoForm => $colunaBanco) {
                 if (in_array($colunaBanco, $colunas) && array_key_exists($colunaBanco, $data)) {
+                    // Normalizar documento: salvar sempre só dígitos
+                    if ($colunaBanco === 'documento') {
+                        $docVal = preg_replace('/\D+/', '', (string) ($data[$colunaBanco] ?? ''));
+                        $data[$colunaBanco] = $docVal === '' ? null : $docVal;
+                    }
                     $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
                     $params[$colunaBanco] = $data[$colunaBanco];
                 }
