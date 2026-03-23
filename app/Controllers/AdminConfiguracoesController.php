@@ -4468,24 +4468,51 @@ HTML;
                             }
 
                             if (!$exists) {
+                                // Detectar colunas NOT NULL sem default para evitar erros de INSERT
+                                $extraCols = '';
+                                $extraPlaceholders = '';
+                                $extraVals = [];
+                                try {
+                                    $stDesc = $pdo->query("DESCRIBE {$table}");
+                                    $descRows = $stDesc ? $stDesc->fetchAll(\PDO::FETCH_ASSOC) : [];
+                                    foreach ($descRows as $dr) {
+                                        $colName = (string) ($dr['Field'] ?? '');
+                                        $nullable = strtoupper((string) ($dr['Null'] ?? 'YES'));
+                                        $defaultVal = $dr['Default'] ?? null;
+                                        $extra = strtolower((string) ($dr['Extra'] ?? ''));
+                                        if ($colName === '' || strpos($extra, 'auto_increment') !== false) continue;
+                                        // Pular colunas que já estamos inserindo
+                                        if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                                            if (in_array($colName, [$tableInfo['categoriaCol'], $tableInfo['chaveCol'], $valueCol, $updatedAtCol], true)) continue;
+                                        } else {
+                                            if (in_array($colName, [$tableInfo['keyCol'], $valueCol, $updatedAtCol], true)) continue;
+                                        }
+                                        if ($nullable === 'NO' && $defaultVal === null) {
+                                            $extraCols .= ', ' . $colName;
+                                            $extraPlaceholders .= ', ?';
+                                            $extraVals[] = '';
+                                        }
+                                    }
+                                } catch (\Exception $e) {}
+
                                 if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
                                     $catCol = $tableInfo['categoriaCol'];
                                     $keyCol = $tableInfo['chaveCol'];
                                     if (!empty($updatedAtCol)) {
-                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, ?, NOW())");
-                                        $stmtInsert->execute([$categoria, $chave, $valor]);
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}, {$updatedAtCol}{$extraCols}) VALUES (?, ?, ?, NOW(){$extraPlaceholders})");
+                                        $stmtInsert->execute(array_merge([$categoria, $chave, $valor], $extraVals));
                                     } else {
-                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}) VALUES (?, ?, ?)");
-                                        $stmtInsert->execute([$categoria, $chave, $valor]);
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$catCol}, {$keyCol}, {$valueCol}{$extraCols}) VALUES (?, ?, ?{$extraPlaceholders})");
+                                        $stmtInsert->execute(array_merge([$categoria, $chave, $valor], $extraVals));
                                     }
                                 } else {
                                     $keyCol = $tableInfo['keyCol'];
                                     if (!empty($updatedAtCol)) {
-                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}) VALUES (?, ?, NOW())");
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}, {$updatedAtCol}{$extraCols}) VALUES (?, ?, NOW(){$extraPlaceholders})");
                                     } else {
-                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}) VALUES (?, ?)");
+                                        $stmtInsert = $pdo->prepare("INSERT INTO {$table} ({$keyCol}, {$valueCol}{$extraCols}) VALUES (?, ?{$extraPlaceholders})");
                                     }
-                                    $stmtInsert->execute([$fullKey, $valor]);
+                                    $stmtInsert->execute(array_merge([$fullKey, $valor], $extraVals));
                                 }
                             }
                         }
