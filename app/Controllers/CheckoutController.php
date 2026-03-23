@@ -2947,7 +2947,7 @@ class CheckoutController extends Controller {
                                             'number' => (string) ($dados['numero'] ?? ''),
                                         ],
                                     ];
-                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $client);
+                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProdutoBrl, (string) $descricaoProduto, $client);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar boleto Câmbio Real (produto)'));
                                     }

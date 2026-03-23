@@ -141,9 +141,9 @@ class PaymentService {
         $payload = [
             'order_id' => (string) $pedidoId,
             // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
-            // Enviamos em USD para que o gateway converta para BRL no boleto.
+            // Enviamos em BRL para que o gateway gere o boleto no valor correto em reais.
             'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'USD',
+            'currency' => 'BRL',
             'payment_method' => 'boleto',
             'client' => [
                 'name' => $clientName,
@@ -638,9 +638,9 @@ class PaymentService {
         $payload = [
             'order_id' => $orderId,
             // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
-            // Enviamos em USD para que o gateway converta para BRL.
-            'amount' => round($amountUsdCalc, 2),
-            'currency' => 'USD',
+            // Enviamos em BRL para que o gateway processe o cartão no valor correto em reais.
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
             'payment_method' => $paymentMethod,
             'client' => [
                 'name' => $clientName,
@@ -673,8 +673,8 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao,
-                    'base_value' => round($amountUsdCalc, 2),
-                    'valor' => round($amountUsdCalc, 2),
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
@@ -860,10 +860,9 @@ class PaymentService {
         $payload = [
             'order_id' => $orderId,
             // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
-            // Quando currency='USD', amount é em USD. Quando currency='BRL', amount é em BRL.
-            // Enviamos em USD para que o gateway converta para BRL no PIX.
-            'amount' => round($amountUsd, 2),
-            'currency' => 'USD',
+            // Enviamos em BRL para que o gateway gere o PIX no valor correto em reais.
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
             'payment_method' => 'pix',
             'client' => (array) $customer,
             // Em reemissões/novas tentativas, o gateway pode ter o client.email já cadastrado.
@@ -875,15 +874,15 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
-                    'base_value' => round($amountUsd, 2),
-                    'valor' => round($amountUsd, 2),
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
             ],
         ];
 
-        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountUsd=' . round($amountUsd, 2) . ' valorBrlOriginal=' . round($valorBrlOriginal, 2) . ' currency=BRL orderId=' . $orderId);
+        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountBrl=' . round($valorBrlOriginal, 2) . ' amountUsd=' . round($amountUsd, 2) . ' currency=BRL orderId=' . $orderId);
 
         $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
             $msg = (string) ($resp['message'] ?? $defaultMsg);
