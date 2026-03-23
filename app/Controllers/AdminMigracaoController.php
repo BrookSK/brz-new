@@ -239,8 +239,8 @@ class AdminMigracaoController extends Controller
                         $existing = $stmt->fetchColumn();
                     }
                     if (!$existing && $nome !== '') {
-                        $stmt = $pdo->prepare("SELECT id FROM categorias WHERE nome = ? OR name = ? LIMIT 1");
-                        $stmt->execute([$nome, $nome]);
+                        $stmt = $pdo->prepare("SELECT id FROM categorias WHERE name = ? LIMIT 1");
+                        $stmt->execute([$nome]);
                         $existing = $stmt->fetchColumn();
                     }
 
