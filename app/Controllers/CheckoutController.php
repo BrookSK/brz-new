@@ -2839,7 +2839,15 @@ class CheckoutController extends Controller {
                                     $txConvSplit = (float) ($stTxSplit->fetchColumn() ?: 0);
                                 } catch (\Exception $e) {}
                             }
-                            if ($txConvSplit <= 1.01) $txConvSplit = 1.0;
+                            // Fallback: usar taxa do window.exchangeRates ou valor padrão
+                            if ($txConvSplit <= 1.01) {
+                                try {
+                                    $dbTxSplit2 = \Config\Database::getConnection();
+                                    $stTxSplit2 = $dbTxSplit2->query("SELECT valor FROM configuracoes_sistema WHERE chave = 'taxa_conversao_usd_brl' LIMIT 1");
+                                    $txConvSplit = (float) ($stTxSplit2 ? ($stTxSplit2->fetchColumn() ?: 0) : 0);
+                                } catch (\Exception $e) {}
+                            }
+                            if ($txConvSplit <= 1.01) $txConvSplit = 5.85; // fallback seguro
 
                             // Detectar se os valores do banco estão em BRL ou USD.
                             // Se moeda='BRL' e taxa_conversao > 1, os valores já estão em BRL.
@@ -2873,7 +2881,7 @@ class CheckoutController extends Controller {
 
                             // Log de debug para diagnóstico do split
                             try {
-                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' moeda=' . $moedaPedidoSplit . ' valoresJaEmBrl=' . ($valoresJaEmBrl ? '1' : '0') . ' totalDb=' . $totalBrl . ' taxaServicoDb=' . $taxaServico . ' impostosDb=' . $valorImposto . ' impostoLocalDb=' . $valorImpostoLocal . ' valorProdutoBruto=' . $valorProdutoBruto . ' valorProdutoUsd=' . $valorProdutoUsd . ' txConv=' . $txConvSplit . ' valorAppmaxBrl=' . $valorAppmax);
+                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' moeda=' . $moedaPedidoSplit . ' valoresJaEmBrl=' . ($valoresJaEmBrl ? '1' : '0') . ' totalDb=' . $totalBrl . ' taxaServicoDb=' . $taxaServico . ' impostosDb=' . $valorImposto . ' impostoLocalDb=' . $valorImpostoLocal . ' valorProdutoBruto=' . $valorProdutoBruto . ' valorProdutoUsd=' . $valorProdutoUsd . ' valorProdutoBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit . ' valorAppmaxBrl=' . $valorAppmax . ' pedidoTaxaConv=' . ($pedidoRowPay['taxa_conversao'] ?? 'NULL'));
                             } catch (\Exception $e) {}
 
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
@@ -2928,7 +2936,7 @@ class CheckoutController extends Controller {
                                     $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProdutoBrl, (string) $descricaoProduto, $client);
                                     error_log('[SPLIT_PIX_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit);
                                     if (empty($cr['success'])) {
-                                        throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
+                                        throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)') . ' [DEBUG: amountUsd=' . $amountUsd . ' valorBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit . ' totalDb=' . $totalBrl . ' taxaDb=' . $taxaServico . ' moeda=' . $moedaPedidoSplit . ' jaEmBrl=' . ($valoresJaEmBrl ? '1' : '0') . ']');
                                     }
                                 } elseif ($formaSelecionada === 'boleto') {
                                     $client = [
