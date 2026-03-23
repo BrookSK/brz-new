@@ -536,6 +536,10 @@ class AdminPedidosManualController extends Controller {
                                     <span class="text-muted">Impostos</span>
                                     <span><span id="resumoMoedaSymbol4">$</span> <span id="resumoImpostos">0.00</span></span>
                                 </div>
+                                <div class="d-flex justify-content-between py-1" id="impostoLocalRow" style="display:none;">
+                                    <span class="text-muted">Imposto local (<span id="resumoImpostoLocalPct">0</span>%)</span>
+                                    <span><span id="resumoMoedaSymbol7">$</span> <span id="resumoImpostoLocal">0.00</span></span>
+                                </div>
                                 <div class="d-flex justify-content-between py-1">
                                     <span class="text-muted">Frete</span>
                                     <span id="resumoFreteWrap"><span id="resumoMoedaSymbol5">$</span> <span id="resumoFrete">0.00</span></span>
@@ -552,6 +556,7 @@ class AdminPedidosManualController extends Controller {
                         <input type="hidden" name="peso_total" id="peso_total" value="0">
                         <input type="hidden" name="taxa_servico" id="taxa_servico" value="0">
                         <input type="hidden" name="valor_impostos" id="valor_impostos" value="0">
+                        <input type="hidden" name="imposto_local" id="imposto_local" value="0">
                         <input type="hidden" name="valor_frete" id="valor_frete" value="0">
                         <input type="hidden" name="valor_total" id="valor_total" value="0">
                     </div>
@@ -1074,7 +1079,7 @@ function calcTotal(){
     document.getElementById('resumoQtdItens').textContent = String(qtdItens);
     document.getElementById('resumoPeso').textContent = formatPeso(pesoTotal);
     const setSym = (id) => { const el = document.getElementById(id); if (el) el.textContent = sym; };
-    ['resumoMoedaSymbol','resumoMoedaSymbol2','resumoMoedaSymbol3','resumoMoedaSymbol4','resumoMoedaSymbol5','resumoMoedaSymbol6'].forEach(setSym);
+    ['resumoMoedaSymbol','resumoMoedaSymbol2','resumoMoedaSymbol3','resumoMoedaSymbol4','resumoMoedaSymbol5','resumoMoedaSymbol6','resumoMoedaSymbol7'].forEach(setSym);
     document.getElementById('resumoSubtotal').textContent = formatForDisplay(subtotal, moeda);
 
     // Chama backend para calcular taxa/impostos/frete/total com a mesma regra do carrinho/checkout
@@ -1097,6 +1102,8 @@ function calcTotal(){
             const frete = Number(data.frete || 0);
             const taxaServico = Number(data.taxa_servico || 0);
             const impostos = Number(data.impostos || 0);
+            const impostoLocal = Number(data.imposto_local || 0);
+            const impostoLocalPct = Number(data.imposto_local_percent || 0);
             const total = Number(data.total || 0);
 
             const pixPct = getPixPct();
@@ -1121,6 +1128,18 @@ function calcTotal(){
             document.getElementById('resumoTaxaServico').textContent = formatForDisplay(taxaServicoShown, moeda);
             document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
 
+            // Imposto local
+            const ilRow = document.getElementById('impostoLocalRow');
+            if (ilRow) {
+                if (impostoLocal > 0) {
+                    ilRow.style.display = '';
+                    document.getElementById('resumoImpostoLocal').textContent = formatForDisplay(impostoLocal, moeda);
+                    document.getElementById('resumoImpostoLocalPct').textContent = String(impostoLocalPct);
+                } else {
+                    ilRow.style.display = 'none';
+                }
+            }
+
             const freteWrap = document.getElementById('resumoFreteWrap');
             if (Number(frete) <= 0) {
                 if (freteWrap) freteWrap.textContent = 'Frete grátis';
@@ -1141,6 +1160,7 @@ function calcTotal(){
             setVal('peso_total', Number(data.peso_total || pesoTotal).toFixed(3));
             setVal('taxa_servico', taxaServicoShown.toFixed(2));
             setVal('valor_impostos', impostos.toFixed(2));
+            setVal('imposto_local', impostoLocal.toFixed(2));
             setVal('valor_frete', frete.toFixed(2));
             setVal('valor_total', totalShown.toFixed(2));
 
@@ -1166,6 +1186,8 @@ function calcTotal(){
             document.getElementById('resumoImpostos').textContent = formatForDisplay(impostos, moeda);
             document.getElementById('resumoTotal').textContent = formatForDisplay(total, moeda);
             document.getElementById('resumoTotal2').textContent = formatForDisplay(total, moeda);
+            const ilRowFb = document.getElementById('impostoLocalRow');
+            if (ilRowFb) ilRowFb.style.display = 'none';
             const setVal = (id, v) => {
                 const el = document.getElementById(id);
                 if (el) el.value = String(v);
@@ -1227,6 +1249,7 @@ function gerarMensagemOrcamento(){
     const pesoTotal = Number(document.getElementById('peso_total')?.value || 0);
     const taxaServico = Number(document.getElementById('taxa_servico')?.value || 0);
     const impostos = Number(document.getElementById('valor_impostos')?.value || 0);
+    const impostoLocal = Number(document.getElementById('imposto_local')?.value || 0);
     const frete = Number(document.getElementById('valor_frete')?.value || 0);
     const total = Number(document.getElementById('valor_total')?.value || 0);
 
@@ -1258,6 +1281,11 @@ function gerarMensagemOrcamento(){
         msg += `- PIX: desconto de ${pixPct.toFixed(2)}% na taxa de serviço (taxa com desconto: ${formatBRL(taxaPix)})\n`;
     }
     msg += `- Impostos: ${formatBRL(impostos)}\n`;
+    if (impostoLocal > 0) {
+        const ilPctEl = document.getElementById('resumoImpostoLocalPct');
+        const ilPctTxt = ilPctEl ? ilPctEl.textContent : '';
+        msg += `- Imposto local${ilPctTxt ? ' (' + ilPctTxt + '%)' : ''}: ${formatBRL(impostoLocal)}\n`;
+    }
     msg += `- Frete: ${Number(frete || 0) <= 0 ? 'Frete grátis' : formatBRL(frete)}\n`;
     msg += `- Total: ${formatBRL(total)}\n\n`;
     msg += `Se desejar, posso gerar o link de pagamento e te enviar aqui.\n`;
@@ -1994,6 +2022,7 @@ JS;
                 'peso_total' => (float) str_replace(',', '.', (string) $request->getParam('peso_total', '0')),
                 'taxa_servico' => (float) str_replace(',', '.', (string) $request->getParam('taxa_servico', '0')),
                 'valor_impostos' => (float) str_replace(',', '.', (string) $request->getParam('valor_impostos', '0')),
+                'imposto_local' => (float) str_replace(',', '.', (string) $request->getParam('imposto_local', '0')),
                 'valor_frete' => (float) str_replace(',', '.', (string) $request->getParam('valor_frete', '0')),
                 'valor_total' => (float) str_replace(',', '.', (string) $request->getParam('valor_total', '0')),
             ];
@@ -2094,6 +2123,7 @@ JS;
                 'peso_total' => (float) str_replace(',', '.', (string) $request->getParam('peso_total', '0')),
                 'taxa_servico' => (float) str_replace(',', '.', (string) $request->getParam('taxa_servico', '0')),
                 'valor_impostos' => (float) str_replace(',', '.', (string) $request->getParam('valor_impostos', '0')),
+                'imposto_local' => (float) str_replace(',', '.', (string) $request->getParam('imposto_local', '0')),
                 'valor_frete' => (float) str_replace(',', '.', (string) $request->getParam('valor_frete', '0')),
                 'valor_total' => (float) str_replace(',', '.', (string) $request->getParam('valor_total', '0')),
             ];
@@ -2313,6 +2343,29 @@ JS;
                 $total = $subtotal + $frete + $taxaServico + $impostos;
             }
 
+            // Imposto local do grupo de compras
+            $impostoLocal = 0.0;
+            $impostoLocalPercent = 0.0;
+            try {
+                $pids = [];
+                foreach ($itens as $it) {
+                    if (!is_array($it)) continue;
+                    $pid = (int) ($it['produto_id'] ?? 0);
+                    if ($pid > 0) $pids[$pid] = true;
+                }
+                $pids = array_keys($pids);
+                if (!empty($pids)) {
+                    $in = implode(',', array_fill(0, count($pids), '?'));
+                    $stImpL = $db->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                    $stImpL->execute($pids);
+                    $impostoLocalPercent = (float) ($stImpL->fetchColumn() ?: 0);
+                    if ($impostoLocalPercent > 0) {
+                        $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
+                        $total = $total + $impostoLocal;
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             $this->json([
                 'success' => true,
                 'moeda' => $moeda,
@@ -2320,6 +2373,8 @@ JS;
                 'peso_total' => round($pesoTotal, 3),
                 'taxa_servico' => round((float) $taxaServico, 2),
                 'impostos' => round((float) $impostos, 2),
+                'imposto_local' => round((float) $impostoLocal, 2),
+                'imposto_local_percent' => round((float) $impostoLocalPercent, 2),
                 'frete' => round((float) $frete, 2),
                 'total' => round((float) $total, 2),
             ]);

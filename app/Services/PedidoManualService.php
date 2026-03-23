@@ -864,13 +864,37 @@ class PedidoManualService {
         }
 
         $impostos = $this->calcularImpostosPadrao($subtotal, $valorFrete);
-        $total = $subtotal + $valorFrete + $taxaServico + $impostos;
+
+        // Imposto local do grupo de compras
+        $impostoLocal = 0.0;
+        $impostoLocalPercent = 0.0;
+        try {
+            $pids = [];
+            foreach ($itens as $it) {
+                $pid = (int) ($it['produto_id'] ?? 0);
+                if ($pid > 0) $pids[$pid] = true;
+            }
+            $pids = array_keys($pids);
+            if (!empty($pids)) {
+                $in = implode(',', array_fill(0, count($pids), '?'));
+                $st = $this->db->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                $st->execute($pids);
+                $impostoLocalPercent = (float) ($st->fetchColumn() ?: 0);
+                if ($impostoLocalPercent > 0) {
+                    $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $total = $subtotal + $valorFrete + $taxaServico + $impostos + $impostoLocal;
 
         return [
             'subtotal_produtos' => round($subtotal, 2),
             'peso_total' => round($pesoTotal, 3),
             'taxa_servico' => round($taxaServico, 2),
             'valor_impostos' => round($impostos, 2),
+            'imposto_local' => round($impostoLocal, 2),
+            'imposto_local_percent' => round($impostoLocalPercent, 2),
             'valor_frete' => round($valorFrete, 2),
             'valor_total' => round($total, 2),
         ];
@@ -1110,9 +1134,31 @@ class PedidoManualService {
             'peso_total' => ['peso_total'],
             'taxa_servico' => ['taxa_servico', 'servicos'],
             'valor_impostos' => ['valor_impostos', 'impostos'],
+            'imposto_local' => ['imposto_local'],
             'valor_frete' => ['valor_frete', 'frete'],
             'valor_total' => ['valor_total', 'total'],
         ];
+
+        // Garantir que imposto_local esteja no resumo (recalcular se necessário)
+        if (!array_key_exists('imposto_local', $resumo) || (float) ($resumo['imposto_local'] ?? 0) <= 0) {
+            try {
+                $pids = [];
+                foreach ($itens as $it) {
+                    $pid = (int) ($it['produto_id'] ?? 0);
+                    if ($pid > 0) $pids[$pid] = true;
+                }
+                $pids = array_keys($pids);
+                if (!empty($pids)) {
+                    $in = implode(',', array_fill(0, count($pids), '?'));
+                    $stIL = $this->db->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                    $stIL->execute($pids);
+                    $ilPct = (float) ($stIL->fetchColumn() ?: 0);
+                    if ($ilPct > 0) {
+                        $resumo['imposto_local'] = round($subtotalItens * ($ilPct / 100.0), 2);
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
         foreach ($mapResumo as $k => $cands) {
             if (!array_key_exists($k, $resumo)) {
                 continue;
