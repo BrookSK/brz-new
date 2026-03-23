@@ -140,10 +140,10 @@ class PaymentService {
 
         $payload = [
             'order_id' => (string) $pedidoId,
-            // O Câmbio Real interpreta 'amount' como USD.
-            // Enviar o valor em USD e deixar o gateway converter para BRL.
+            // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
+            // Enviamos em USD para que o gateway converta para BRL no boleto.
             'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'BRL',
+            'currency' => 'USD',
             'payment_method' => 'boleto',
             'client' => [
                 'name' => $clientName,
@@ -637,10 +637,10 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // O Câmbio Real interpreta 'amount' como USD.
-            // Enviar o valor em USD e deixar o gateway converter para BRL.
+            // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
+            // Enviamos em USD para que o gateway converta para BRL.
             'amount' => round($amountUsdCalc, 2),
-            'currency' => 'BRL',
+            'currency' => 'USD',
             'payment_method' => $paymentMethod,
             'client' => [
                 'name' => $clientName,
@@ -859,10 +859,11 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // O Câmbio Real interpreta 'amount' sempre como USD.
-            // Enviar o valor em USD e deixar o gateway converter para BRL no PIX.
+            // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
+            // Quando currency='USD', amount é em USD. Quando currency='BRL', amount é em BRL.
+            // Enviamos em USD para que o gateway converta para BRL no PIX.
             'amount' => round($amountUsd, 2),
-            'currency' => 'BRL',
+            'currency' => 'USD',
             'payment_method' => 'pix',
             'client' => (array) $customer,
             // Em reemissões/novas tentativas, o gateway pode ter o client.email já cadastrado.
