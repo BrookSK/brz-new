@@ -70,6 +70,8 @@ class CheckoutController extends Controller {
             'discount_value_cents' => 0,
         ], $valor, 'BRL', $descricao);
 
+        error_log('[APPMAX_SPLIT_CALL] pedido=' . $pedidoId . ' valor=' . $valor . ' productsValueCents=' . $productsValueCents . ' billingType=' . $billingType);
+
         if (empty($result['success'])) {
             return $result;
         }
@@ -2901,6 +2903,7 @@ class CheckoutController extends Controller {
                                     ];
 
                                     $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProduto, (string) $descricaoProduto, $client);
+                                    error_log('[SPLIT_PIX_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorProduto . ' tx=' . $tx);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
                                     }
@@ -3016,6 +3019,7 @@ class CheckoutController extends Controller {
                                     $clienteSplit['card_cvv'] = (string) ($dados['card_cvv'] ?? '');
                                 }
 
+                                error_log('[SPLIT_APPMAX_CALL] pedido=' . $pedidoId . ' billingType=' . $billingType . ' valorAppmax=' . $valorAppmax);
                                 $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico');
                                 if (empty($taxa['success'])) {
                                     throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));

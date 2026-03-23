@@ -878,6 +878,8 @@ class PaymentService {
             ],
         ];
 
+        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amount=' . round($valorBrlOriginal, 2) . ' currency=BRL amountUsd=' . $amountUsd . ' orderId=' . $orderId);
+
         $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
             $msg = (string) ($resp['message'] ?? $defaultMsg);
             $details = '';
