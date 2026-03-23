@@ -2897,7 +2897,9 @@ class CheckoutController extends Controller {
                                         $tx = 1.0;
                                     }
 
-                                    $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                    // $valorProduto já está em USD (lido do banco).
+                                    $amountUsd = round((float) $valorProduto, 2);
+                                    $valorBrlProduto = round((float) $valorProduto * (float) $tx, 2);
                                     if ($amountUsd <= 0) {
                                         throw new \Exception('Valor inválido para Câmbio Real (USD)');
                                     }
@@ -2919,8 +2921,8 @@ class CheckoutController extends Controller {
                                         ],
                                     ];
 
-                                    $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProduto, (string) $descricaoProduto, $client);
-                                    error_log('[SPLIT_PIX_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorProduto . ' tx=' . $tx);
+                                    $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorBrlProduto, (string) $descricaoProduto, $client);
+                                    error_log('[SPLIT_PIX_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorBrlProduto . ' tx=' . $tx);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
                                     }
@@ -2970,7 +2972,9 @@ class CheckoutController extends Controller {
                                         $tx = 1.0;
                                     }
 
-                                    $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                    // $valorProduto já está em USD (lido do banco).
+                                    $amountUsd = round((float) $valorProduto, 2);
+                                    $valorBrlProdutoCartao = round((float) $valorProduto * (float) $tx, 2);
                                     if ($amountUsd <= 0) {
                                         throw new \Exception('Valor inválido para Câmbio Real (USD)');
                                     }
@@ -3007,7 +3011,8 @@ class CheckoutController extends Controller {
                                         'type' => $cardType,
                                     ];
 
-                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $valorProduto, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
+                                    error_log('[SPLIT_CARTAO_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorBrlProdutoCartao . ' tx=' . $tx);
+                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $valorBrlProdutoCartao, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar pagamento Câmbio Real (produto)'));
                                     }
