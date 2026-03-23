@@ -2596,6 +2596,20 @@ class CheckoutController extends Controller {
             ], 500);
             return;
         }
+
+        // Validar valor mínimo de produtos (USD 5.00)
+        $subtotalCheck = 0;
+        foreach ($carrinho as $cItem) {
+            $p = $cItem['preco_unitario'] ?? $cItem['price'] ?? $cItem['preco'] ?? 0;
+            $q = $cItem['quantidade'] ?? 1;
+            $subtotalCheck += (float) $p * (int) $q;
+        }
+        if ($subtotalCheck < 5.00) {
+            $this->json([
+                'error' => 'O valor mínimo de produtos para processamento é de $5.00 (USD). Seu subtotal atual é $' . number_format($subtotalCheck, 2, '.', ',') . '.'
+            ], 400);
+            return;
+        }
         
         try {
             // Obter usuário logado
