@@ -811,96 +811,12 @@ class AssessoriaController extends Controller {
             }
         }
 
-        // Tentar reparar JSON truncado (resposta cortada no meio)
-        $repaired = $this->repairTruncatedJson($candidate);
-        if ($repaired !== null) {
-            $data3 = json_decode($repaired, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($data3)) {
-                error_log('[ChatGPT] JSON reparado com sucesso (truncamento)');
-                return $data3;
-            }
-        }
-
         $err = json_last_error_msg();
         throw new \Exception('ChatGPT não retornou JSON válido: ' . $err);
     }
 
-    /**
-     * Tenta reparar JSON truncado fechando brackets/braces abertos
-     */
-    private function repairTruncatedJson(string $json): ?string {
-        $json = trim($json);
-        if ($json === '' || $json[0] !== '{') {
-            return null;
-        }
-
-        // Contar brackets abertos
-        $stack = [];
-        $inString = false;
-        $escape = false;
-        $len = strlen($json);
-
-        for ($i = 0; $i < $len; $i++) {
-            $ch = $json[$i];
-
-            if ($escape) {
-                $escape = false;
-                continue;
-            }
-
-            if ($ch === '\\' && $inString) {
-                $escape = true;
-                continue;
-            }
-
-            if ($ch === '"') {
-                $inString = !$inString;
-                continue;
-            }
-
-            if ($inString) {
-                continue;
-            }
-
-            if ($ch === '{' || $ch === '[') {
-                $stack[] = $ch;
-            } elseif ($ch === '}') {
-                if (!empty($stack) && end($stack) === '{') {
-                    array_pop($stack);
-                }
-            } elseif ($ch === ']') {
-                if (!empty($stack) && end($stack) === '[') {
-                    array_pop($stack);
-                }
-            }
-        }
-
-        if (empty($stack)) {
-            return null; // Já está balanceado, o erro é outro
-        }
-
-        // Se estava no meio de uma string, fechar a string
-        if ($inString) {
-            $json .= '"';
-        }
-
-        // Remover última vírgula ou valor parcial antes de fechar
-        $json = preg_replace('/,\s*"[^"]*$/', '', $json); // chave parcial
-        $json = preg_replace('/,\s*\d+\.?\d*$/', '', $json); // número parcial
-        $json = preg_replace('/,\s*$/', '', $json); // vírgula solta
-        $json = preg_replace('/:\s*$/', ': null', $json); // valor faltando
-
-        // Fechar brackets na ordem inversa
-        while (!empty($stack)) {
-            $open = array_pop($stack);
-            $json .= ($open === '{') ? '}' : ']';
-        }
-
-        return $json;
-    }
-
     private function truncateForPrompt($value, int $depth = 0) {
-        if ($depth > 6) {
+        if ($depth > 4) {
             return null;
         }
 
@@ -908,7 +824,7 @@ class AssessoriaController extends Controller {
             $out = [];
             $i = 0;
             foreach ($value as $k => $v) {
-                if ($i >= 60) {
+                if ($i >= 40) {
                     break;
                 }
                 $out[$k] = $this->truncateForPrompt($v, $depth + 1);
@@ -919,8 +835,8 @@ class AssessoriaController extends Controller {
 
         if (is_string($value)) {
             $v = $this->cleanJsonText($value);
-            if (strlen($v) > 1200) {
-                $v = substr($v, 0, 1200);
+            if (strlen($v) > 800) {
+                $v = substr($v, 0, 800);
             }
             return $v;
         }
@@ -934,59 +850,15 @@ class AssessoriaController extends Controller {
 
     private function reduceScrapingBeePayload(array $dadosBrutos): array {
         $picked = [];
-        $keys = [
-            'title', 'name', 'product', 'product_name',
-            'price', 'prices', 'images', 'image',
-            'variants', 'variation', 'variations', 'offers',
-            'options', 'availableVariations', 'variantCriteria',
-            'url', 'description',
-            // Campos de especificações e peso
-            'specifications', 'specs', 'weight', 'shipping_weight',
-            'product_weight', 'dimensions', 'details', 'features',
-            'attributes', 'product_details', 'product_specifications',
-            // Dados extras do scraping complementar
-            'html_extra',
-            // Dados de variações com preços do HTML
-            'variant_offers', 'variant_prices_found', 'variant_price_data',
-        ];
-        foreach ($keys as $k) {
+        foreach (['title', 'name', 'product', 'product_name', 'price', 'prices', 'images', 'image', 'variants', 'variation', 'variations', 'offers', 'url'] as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
                 $picked[$k] = $dadosBrutos[$k];
-            }
-        }
-        // Busca recursiva rasa: se product é array, incluir sub-campos relevantes
-        if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
-            foreach (['specifications', 'specs', 'weight', 'details', 'features', 'attributes'] as $sk) {
-                if (isset($dadosBrutos['product'][$sk]) && !isset($picked[$sk])) {
-                    $picked['product_' . $sk] = $dadosBrutos['product'][$sk];
-                }
             }
         }
         if (empty($picked)) {
             $picked = $dadosBrutos;
         }
-        $result = (array) $this->truncateForPrompt($picked, 0);
-        
-        // Limitar tamanho total do payload para evitar truncamento do ChatGPT
-        $jsonSize = strlen(json_encode($result));
-        if ($jsonSize > 30000) {
-            // Remover campos menos importantes para reduzir tamanho
-            foreach (['description', 'details', 'features', 'images', 'image'] as $dropKey) {
-                if (isset($result[$dropKey])) {
-                    unset($result[$dropKey]);
-                    $jsonSize = strlen(json_encode($result));
-                    if ($jsonSize <= 30000) break;
-                }
-            }
-            // Se ainda grande, truncar html_extra
-            if ($jsonSize > 30000 && isset($result['html_extra']) && is_array($result['html_extra'])) {
-                // Manter apenas campos essenciais do html_extra
-                $essentialKeys = ['weights_found', 'specifications', 'variant_offers', 'variant_prices_found', 'variant_price_data', 'options_found', 'prices_found', 'jsonld_product'];
-                $result['html_extra'] = array_intersect_key($result['html_extra'], array_flip($essentialKeys));
-            }
-        }
-        
-        return $result;
+        return (array) $this->truncateForPrompt($picked, 0);
     }
 
     private function findFirstNumeric($value, int $depth = 0): ?float {
@@ -1099,41 +971,13 @@ class AssessoriaController extends Controller {
             header('X-Assessoria-Variacoes-Fallback-Keys: ' . $this->headerSafeValue(implode(',', array_keys($attrKeys)), 200));
         }
 
-        // Estimar peso baseado no nome (nunca usar 1kg genérico)
-        $nomeLower = strtolower((string) $nome);
-        $pesoEstimado = 2.0;
-        if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
-            $pesoEstimado = 35.0;
-        } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
-            $pesoEstimado = 40.0;
-        } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
-            $pesoEstimado = 3.5;
-        } elseif (preg_match('/pillow|travesseiro/', $nomeLower)) {
-            $pesoEstimado = 1.5;
-        } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
-            $pesoEstimado = 15.0;
-        } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
-            $pesoEstimado = 2.5;
-        } elseif (preg_match('/phone|celular|smartphone/', $nomeLower)) {
-            $pesoEstimado = 0.3;
-        } elseif (preg_match('/shoe|sapato|tênis|sneaker|boot/', $nomeLower)) {
-            $pesoEstimado = 1.2;
-        } elseif (preg_match('/shirt|camiseta|blouse|dress|vestido|jacket|jaqueta/', $nomeLower)) {
-            $pesoEstimado = 0.5;
-        } elseif (preg_match('/toy|brinquedo/', $nomeLower)) {
-            $pesoEstimado = 1.5;
-        } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
-            $pesoEstimado = 15.0;
-        } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
-            $pesoEstimado = 20.0;
-        }
-
         return [
             'sku' => '',
             'nome' => $nome,
             'descricao' => $descricao,
             'valor' => floatval($valor),
-            'peso' => round($pesoEstimado * 1.15, 2),
+            // Regra: se não encontrar peso, usar sempre 1kg
+            'peso' => 1.0,
             'imagens' => $img ? [$img] : [],
             'variacoes' => $variacoes,
             'url_original' => $urlOriginal
@@ -1237,8 +1081,8 @@ class AssessoriaController extends Controller {
                 }
             }
 
-            if ($peso !== null && floatval($peso) <= 0) {
-                $peso = null; // herdar peso base do produto
+            if ($peso === null || floatval($peso) <= 0) {
+                $peso = 1.0;
             }
 
             $label = $this->stringifyVariationLabel(is_array($atributos) ? $atributos : []);
@@ -1252,7 +1096,7 @@ class AssessoriaController extends Controller {
                 'label' => $label,
                 'atributos' => is_array($atributos) ? $atributos : [],
                 'valor' => $valor !== null ? floatval($valor) : null,
-                'peso' => $peso !== null ? floatval($peso) : null
+                'peso' => floatval($peso)
             ];
         }
 
@@ -1313,14 +1157,14 @@ class AssessoriaController extends Controller {
                     $v['valor'] = null;
                 }
                 if (!isset($v['peso']) || floatval($v['peso']) <= 0) {
-                    $v['peso'] = null; // herdar peso base do produto
+                    $v['peso'] = 1.0;
                 }
                 $out[] = [
                     'id' => (string) ($v['id'] ?? ''),
                     'label' => (string) ($v['label'] ?? ''),
                     'atributos' => $v['atributos'],
                     'valor' => ($v['valor'] === null ? null : floatval($v['valor'])),
-                    'peso' => ($v['peso'] === null ? null : floatval($v['peso']))
+                    'peso' => floatval($v['peso'])
                 ];
             }
             return $this->mergeNormalizedVariacoes($out);
@@ -1363,169 +1207,6 @@ class AssessoriaController extends Controller {
         }
         return array_values($unique);
     }
-
-    /**
-     * Mescla dados de preço/peso por variação obtidos da segunda chamada ScrapingBee
-     * diretamente nas variações existentes do produto (sem re-chamar ChatGPT).
-     */
-    private function mergeVariantPriceData(array $produto, array $variantData): array {
-        // Normalizar variantData: pode ser array de objetos ou objeto com chaves
-        $priceMap = []; // label_lower => ['price' => float, 'weight_lbs' => float, 'original_name' => string]
-
-        // Se é array sequencial de objetos [{size: "Twin", price: 299.99, weight_lbs: 60}, ...]
-        if (isset($variantData[0]) && is_array($variantData[0])) {
-            foreach ($variantData as $item) {
-                if (!is_array($item)) continue;
-                $size = trim((string)($item['variant_name'] ?? $item['size'] ?? $item['name'] ?? $item['variant'] ?? $item['label'] ?? ''));
-                // Se variant_name contém contexto como "Queen $1,359.99", extrair só o nome
-                if ($size !== '' && preg_match('/^(.*?)\s*[\$\-]\s*[\d,]+/', $size, $nameMatch)) {
-                    $extracted = trim($nameMatch[1]);
-                    if ($extracted !== '') {
-                        $size = $extracted;
-                    }
-                }
-                if ($size === '') continue;
-                $priceMap[strtolower($size)] = [
-                    'price' => $this->findFirstNumeric($item['price'] ?? $item['valor'] ?? null),
-                    'weight_lbs' => $this->findFirstNumeric($item['weight_lbs'] ?? $item['weight'] ?? $item['peso'] ?? null),
-                    'original_name' => $size,
-                ];
-            }
-        }
-        // Se é objeto com chaves {Twin: {price: 299.99}, King: {price: 499.99}}
-        elseif (!isset($variantData[0])) {
-            foreach ($variantData as $key => $val) {
-                $size = trim((string)$key);
-                if (is_array($val)) {
-                    $priceMap[strtolower($size)] = [
-                        'price' => $this->findFirstNumeric($val['price'] ?? $val['valor'] ?? null),
-                        'weight_lbs' => $this->findFirstNumeric($val['weight_lbs'] ?? $val['weight'] ?? $val['peso'] ?? null),
-                        'original_name' => $size,
-                    ];
-                } elseif (is_numeric($val)) {
-                    $priceMap[strtolower($size)] = ['price' => floatval($val), 'weight_lbs' => null, 'original_name' => $size];
-                }
-            }
-        }
-
-        if (empty($priceMap)) {
-            error_log('[mergeVariantPriceData] Nenhum dado de preço extraído do variantData');
-            return $produto;
-        }
-
-        error_log('[mergeVariantPriceData] Price map: ' . json_encode($priceMap));
-
-        $anyPriceChanged = false;
-        $anyWeightChanged = false;
-        $matchedMapKeys = [];
-
-        if (!is_array($produto['variacoes'])) {
-            $produto['variacoes'] = [];
-        }
-
-        foreach ($produto['variacoes'] as &$var) {
-            if (!is_array($var)) continue;
-
-            $label = strtolower(trim((string)($var['label'] ?? '')));
-            $attrs = $var['atributos'] ?? [];
-            $sizeVal = strtolower(trim((string)($attrs['Bed Size'] ?? $attrs['Size'] ?? $attrs['Tamanho'] ?? '')));
-
-            // Tentar match por label ou atributo de tamanho
-            // Priorizar match exato, depois match mais longo (evitar "King" matchando "Split King")
-            $matched = null;
-            $matchedKey = null;
-            $bestMatchScore = -1;
-            foreach ($priceMap as $mapKey => $mapVal) {
-                $score = -1;
-                // Match exato = maior prioridade
-                if ($mapKey === $label || $mapKey === $sizeVal) {
-                    $score = 1000;
-                }
-                // Match parcial: priorizar o match mais longo (mais específico)
-                elseif ($label !== '' && stripos($label, $mapKey) !== false) {
-                    $score = strlen($mapKey);
-                } elseif ($sizeVal !== '' && stripos($sizeVal, $mapKey) !== false) {
-                    $score = strlen($mapKey);
-                } elseif ($label !== '' && stripos($mapKey, $label) !== false) {
-                    $score = strlen($label);
-                } elseif ($sizeVal !== '' && stripos($mapKey, $sizeVal) !== false) {
-                    $score = strlen($sizeVal);
-                }
-                if ($score > $bestMatchScore) {
-                    $bestMatchScore = $score;
-                    $matched = $mapVal;
-                    $matchedKey = $mapKey;
-                }
-            }
-            // Verificar que não houve match ambíguo: se o mapKey matchou parcialmente,
-            // garantir que não existe um match mais específico no priceMap
-            // Ex: variação "King" não deve matchar "Split King" se "King" existe no priceMap
-            if ($matched !== null && $bestMatchScore < 1000 && $matchedKey !== null) {
-                // Verificar se existe um match exato no priceMap para este label/sizeVal
-                $exactExists = isset($priceMap[$label]) || isset($priceMap[$sizeVal]);
-                if (!$exactExists) {
-                    // Aceitar o match parcial, mas verificar se o mapKey é muito mais longo que o label
-                    // (indica match falso, ex: label="king" matchando mapKey="split king")
-                    $labelLen = max(strlen($label), strlen($sizeVal));
-                    if ($labelLen > 0 && strlen($matchedKey) > $labelLen * 2) {
-                        // Match suspeito - o mapKey é muito mais longo, provavelmente falso positivo
-                        $matched = null;
-                        $matchedKey = null;
-                    }
-                }
-            }
-
-            if ($matched === null) continue;
-            $matchedMapKeys[] = $matchedKey;
-
-            // Aplicar preço se encontrado e diferente
-            if ($matched['price'] !== null && $matched['price'] > 0) {
-                $var['valor'] = round($matched['price'], 2);
-                $anyPriceChanged = true;
-            }
-
-            // Aplicar peso se encontrado (converter lbs para kg)
-            if ($matched['weight_lbs'] !== null && $matched['weight_lbs'] > 0) {
-                $var['peso'] = round($matched['weight_lbs'] * 0.4536, 2);
-                $anyWeightChanged = true;
-            }
-        }
-        unset($var);
-
-        // Adicionar variações que existem no priceMap mas não nas variações atuais
-        $attrKeyName = 'Size';
-        if (!empty($produto['variacoes'])) {
-            foreach ($produto['variacoes'] as $vCheck) {
-                if (is_array($vCheck) && is_array($vCheck['atributos'] ?? null)) {
-                    foreach (array_keys($vCheck['atributos']) as $ak) {
-                        if (stripos($ak, 'size') !== false || stripos($ak, 'bed') !== false || stripos($ak, 'tamanho') !== false) {
-                            $attrKeyName = $ak;
-                            break 2;
-                        }
-                    }
-                }
-            }
-        }
-
-        foreach ($priceMap as $mapKey => $mapVal) {
-            if (in_array($mapKey, $matchedMapKeys, true)) continue;
-            $originalName = $mapVal['original_name'] ?? ucfirst($mapKey);
-            $newVar = [
-                'id' => 'merged-' . md5($mapKey),
-                'label' => $originalName,
-                'atributos' => [$attrKeyName => $originalName],
-                'valor' => ($mapVal['price'] !== null && $mapVal['price'] > 0) ? round($mapVal['price'], 2) : null,
-                'peso' => ($mapVal['weight_lbs'] !== null && $mapVal['weight_lbs'] > 0) ? round($mapVal['weight_lbs'] * 0.4536, 2) : null,
-            ];
-            $produto['variacoes'][] = $newVar;
-            error_log('[mergeVariantPriceData] Nova variação adicionada: ' . $originalName . ' | price=' . ($newVar['valor'] ?? 'null'));
-        }
-
-        error_log('[mergeVariantPriceData] Preços alterados: ' . ($anyPriceChanged ? 'sim' : 'nao') . ' | Pesos alterados: ' . ($anyWeightChanged ? 'sim' : 'nao') . ' | Total variações: ' . count($produto['variacoes']));
-
-        return $produto;
-    }
-
 
     private function extractOptionNamesFromScrapingBee(array $dadosBrutos): array {
         $candidates = [];
@@ -2054,11 +1735,13 @@ class AssessoriaController extends Controller {
                 'url' => $url,
                 'stealth_proxy' => 'true',
                 'country_code' => 'us',
+                // Timeout do lado do ScrapingBee (em ms)
                 'timeout' => '120000',
-                // networkidle2 espera JS carregar (specs, variações dinâmicas)
-                'wait_browser' => 'networkidle2',
+                // Default mais rápido para evitar timeout no proxy
+                'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                'ai_query' => 'Extract ALL product data as JSON: name, images, base price, weight in lbs or kg from specifications, and EVERY variant with id, attributes, price. Include specifications table with weights per size.'
+                // Limite do ScrapingBee: ai_query <= 300 chars
+                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -2264,187 +1947,10 @@ class AssessoriaController extends Controller {
             header('X-ScrapingBee-JSON-Keys: ' . json_encode(array_keys(is_array($decodedResponse) ? $decodedResponse : [])));
             header('X-ScrapingBee-JSON-Type: ' . gettype($decodedResponse));
         }
-        // Log detalhado para debug de variações
-        $varKeys = [];
-        foreach (['variants', 'variations', 'offers', 'options', 'variantCriteria', 'availableVariations'] as $vk) {
-            if (isset($decodedResponse[$vk])) {
-                $varKeys[] = $vk . '(' . (is_array($decodedResponse[$vk]) ? count($decodedResponse[$vk]) : 'non-array') . ')';
-            }
-        }
-        error_log('[ScrapingBee] Response keys: ' . json_encode(array_keys(is_array($decodedResponse) ? $decodedResponse : [])) . ' | Variation fields: ' . (empty($varKeys) ? 'NONE' : implode(', ', $varKeys)));
-        
-        // Log detalhado: primeiras variações do ScrapingBee para debug de preço/peso
-        foreach (['variants', 'variations', 'offers'] as $vField) {
-            if (isset($decodedResponse[$vField]) && is_array($decodedResponse[$vField])) {
-                foreach (array_slice($decodedResponse[$vField], 0, 2) as $vi => $vv) {
-                    if (is_array($vv)) {
-                        error_log('[ScrapingBee] ' . $vField . '[' . $vi . ']: ' . substr(json_encode($vv), 0, 500));
-                    }
-                }
-                break;
-            }
-        }
         
         try {
             // Usar ChatGPT para analisar os dados brutos
             $produto = $this->analisarComChatGPT($decodedResponse, $url);
-            
-            // Verificar se o resultado está incompleto (sem variações ou peso genérico)
-            $varCount = is_array($produto['variacoes'] ?? null) ? count($produto['variacoes']) : 0;
-            $pesoSuspeito = (floatval($produto['peso'] ?? 0) <= 1.5);
-            $poucasVariacoes = ($varCount <= 1);
-            
-            // Verificar se todas as variações têm o mesmo preço (indica que preços individuais não foram extraídos)
-            $variacoesComMesmoPreco = false;
-            $variacoesComMesmoPeso = false;
-            if ($varCount > 1) {
-                $precos = [];
-                $pesos = [];
-                foreach ($produto['variacoes'] as $vv) {
-                    if (is_array($vv)) {
-                        $precos[] = floatval($vv['valor'] ?? $vv['price'] ?? 0);
-                        $pesos[] = floatval($vv['peso'] ?? $vv['weight'] ?? 0);
-                    }
-                }
-                $precosUnicos = array_unique($precos);
-                $pesosUnicos = array_unique($pesos);
-                $variacoesComMesmoPreco = (count($precosUnicos) <= 1);
-                $variacoesComMesmoPeso = (count($pesosUnicos) <= 1);
-            }
-            
-            if ($pesoSuspeito || $poucasVariacoes || $variacoesComMesmoPreco || $variacoesComMesmoPeso) {
-                $reason = [];
-                if ($pesoSuspeito) $reason[] = 'peso_suspeito';
-                if ($poucasVariacoes) $reason[] = 'poucas_variacoes';
-                if ($variacoesComMesmoPreco) $reason[] = 'mesmo_preco_todas_variacoes';
-                if ($variacoesComMesmoPeso) $reason[] = 'mesmo_peso_todas_variacoes';
-                error_log('[ScrapingBee] Resultado incompleto (' . implode(', ', $reason) . '): variacoes=' . $varCount . ' peso=' . ($produto['peso'] ?? 0) . ' — tentando scraping complementar');
-                
-                // Segunda chamada ScrapingBee com ai_query focado em preços/pesos por variação
-                // Usar js_scenario para clicar em CADA botão de variação sequencialmente
-                $jsInstructions = [];
-                // Clicar em cada botão de variação e esperar o preço atualizar
-                $variantSelectors = [
-                    'button[data-automation-id*="variant"]',
-                    'button[data-automation-id*="size"]',
-                    '[class*="variant-option"]',
-                    '[class*="size-option"]',
-                    '[class*="swatch-button"]',
-                    '[role="radio"][aria-label]',
-                    'label[class*="variant"]',
-                    'label[class*="size"]',
-                ];
-                $selectorStr = implode(', ', $variantSelectors);
-                // Clicar em todos os botões de variação para forçar carregamento de preços
-                for ($clickIdx = 0; $clickIdx < 8; $clickIdx++) {
-                    $jsInstructions[] = ['click' => $selectorStr, 'index' => $clickIdx];
-                    $jsInstructions[] = ['wait' => 1500];
-                }
-                $priceUrl = $buildUrl([
-                    'ai_query' => 'Extract ALL product variants/sizes with their INDIVIDUAL prices. IMPORTANT: Each variant may have a DIFFERENT price - do NOT assume they are all the same. For each variant, return the exact variant_name text and its specific price. Return a JSON array like [{"variant_name":"Queen","price":1359.99,"weight_lbs":90},{"variant_name":"King","price":1599.99,"weight_lbs":110}]. Include ALL variants visible on the page, even those that require clicking buttons to reveal their price.',
-                    'wait_browser' => 'networkidle2',
-                    'timeout' => '100000',
-                    'js_scenario' => json_encode([
-                        'instructions' => $jsInstructions,
-                    ]),
-                ]);
-                
-                [$priceResp, $priceCode, $priceErrno, $priceErr] = $doRequest($priceUrl, 100);
-                
-                $variantPriceData = null;
-                if (!$priceErr && $priceCode === 200 && !empty($priceResp)) {
-                    $priceJson = json_decode($priceResp, true);
-                    if (is_array($priceJson)) {
-                        $variantPriceData = $priceJson;
-                        error_log('[ScrapingBee] Dados de preço por variação: ' . substr(json_encode($priceJson), 0, 500));
-                    }
-                }
-                
-                // Tentar mesclar preços/pesos diretamente nas variações existentes (sem re-chamar ChatGPT)
-                if ($variantPriceData !== null && is_array($produto['variacoes']) && count($produto['variacoes']) > 0) {
-                    $produto = $this->mergeVariantPriceData($produto, $variantPriceData);
-                    
-                    // Verificar se o merge realmente diferenciou os preços
-                    if (count($produto['variacoes']) > 1) {
-                        $mergedPrecos = [];
-                        foreach ($produto['variacoes'] as $vv) {
-                            if (is_array($vv)) {
-                                $mergedPrecos[] = floatval($vv['valor'] ?? 0);
-                            }
-                        }
-                        $mergedPrecosUnicos = array_unique($mergedPrecos);
-                        if (count($mergedPrecosUnicos) <= 1) {
-                            error_log('[ScrapingBee] Merge não diferenciou preços, tentando HTML fallback');
-                            // Tentar HTML direto como fallback adicional
-                            $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
-                            if (!empty($dadosExtras) && !empty($dadosExtras['variant_prices_found'])) {
-                                $htmlPriceMap = [];
-                                foreach ($dadosExtras['variant_prices_found'] as $vpf) {
-                                    $ctx = strtolower(trim($vpf['context'] ?? ''));
-                                    $price = floatval(str_replace(',', '', $vpf['price'] ?? '0'));
-                                    if ($ctx !== '' && $price > 0) {
-                                        $htmlPriceMap[] = ['variant_name' => $ctx, 'price' => $price];
-                                    }
-                                }
-                                if (!empty($htmlPriceMap)) {
-                                    $produto = $this->mergeVariantPriceData($produto, $htmlPriceMap);
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Fallback: tentar cURL direto para sites sem JS
-                    $dadosExtras = $this->extrairDadosDoHtmlViaUrl($url);
-                    if (!empty($dadosExtras)) {
-                        // Mesclar dados extras com dados originais e re-analisar com ChatGPT
-                        $dadosCombinados = array_merge($decodedResponse, ['html_extra' => $dadosExtras]);
-                        try {
-                            $produtoComplementado = $this->analisarComChatGPT($dadosCombinados, $url);
-                            $varCountNovo = is_array($produtoComplementado['variacoes'] ?? null) ? count($produtoComplementado['variacoes']) : 0;
-                            $pesoNovo = floatval($produtoComplementado['peso'] ?? 0);
-                            
-                            if ($varCountNovo > $varCount || $pesoNovo > floatval($produto['peso'] ?? 0)) {
-                                $produto = $produtoComplementado;
-                            }
-                        } catch (\Exception $e) {
-                            error_log('[ScrapingBee] Erro no complemento ChatGPT: ' . $e->getMessage());
-                        }
-                    }
-                }
-                
-                // Se AINDA peso <= 1.5, aplicar estimativa baseada no nome
-                if (floatval($produto['peso'] ?? 0) <= 1.5) {
-                    $nomeLower = strtolower((string)($produto['nome'] ?? ''));
-                    $pesoEstimado = 2.0;
-                    if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
-                        $pesoEstimado = 35.0;
-                    } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
-                        $pesoEstimado = 40.0;
-                    } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
-                        $pesoEstimado = 3.5;
-                    } elseif (preg_match('/pillow|travesseiro/', $nomeLower)) {
-                        $pesoEstimado = 1.5;
-                    } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
-                        $pesoEstimado = 15.0;
-                    } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
-                        $pesoEstimado = 2.5;
-                    } elseif (preg_match('/phone|celular|smartphone/', $nomeLower)) {
-                        $pesoEstimado = 0.3;
-                    } elseif (preg_match('/shoe|sapato|tênis|sneaker|boot/', $nomeLower)) {
-                        $pesoEstimado = 1.2;
-                    } elseif (preg_match('/shirt|camiseta|blouse|dress|vestido|jacket|jaqueta/', $nomeLower)) {
-                        $pesoEstimado = 0.5;
-                    } elseif (preg_match('/toy|brinquedo/', $nomeLower)) {
-                        $pesoEstimado = 1.5;
-                    } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
-                        $pesoEstimado = 15.0;
-                    } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
-                        $pesoEstimado = 20.0;
-                    }
-                    $produto['peso'] = round($pesoEstimado * 1.15, 2);
-                    error_log('[ScrapingBee] Peso estimado pelo nome: ' . $produto['peso'] . 'kg para "' . ($produto['nome'] ?? '') . '"');
-                }
-            }
             
             return [
                 'success' => true,
@@ -2652,36 +2158,6 @@ class AssessoriaController extends Controller {
     }
 
     /**
-     * Faz cURL direto na URL e extrai dados estruturados do HTML.
-     */
-    private function extrairDadosDoHtmlViaUrl(string $url): array {
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS      => 5,
-            CURLOPT_TIMEOUT        => 20,
-            CURLOPT_CONNECTTIMEOUT => 8,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            CURLOPT_HTTPHEADER     => [
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language: en-US,en;q=0.9',
-            ],
-            CURLOPT_ENCODING       => '',
-        ]);
-        $html = curl_exec($ch);
-        $err  = curl_error($ch);
-        curl_close($ch);
-
-        if ($err || !$html) {
-            return [];
-        }
-        return $this->extrairDadosDoHtml($html, $url);
-    }
-
-    /**
      * Extrai dados estruturados de um HTML: JSON-LD, Open Graph, meta tags e texto visível.
      */
     private function extrairDadosDoHtml(string $html, string $url): array {
@@ -2692,6 +2168,7 @@ class AssessoriaController extends Controller {
             foreach ($m[1] as $blob) {
                 $json = json_decode(trim($blob), true);
                 if (!is_array($json)) continue;
+                // Pode ser array de schemas
                 $items = isset($json['@type']) ? [$json] : (isset($json['@graph']) ? $json['@graph'] : (array_values($json) === $json ? $json : [$json]));
                 foreach ($items as $item) {
                     if (!is_array($item)) continue;
@@ -2726,7 +2203,7 @@ class AssessoriaController extends Controller {
             $data['prices_found'] = array_unique(array_slice($prices[1], 0, 10));
         }
 
-        // 6) Imagens de produto
+        // 6) Imagens de produto (og:image ou primeiras imagens grandes)
         $images = [];
         if (!empty($data['og_image'])) {
             $images[] = $data['og_image'];
@@ -2734,6 +2211,7 @@ class AssessoriaController extends Controller {
         if (preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*/i', $html, $imgs)) {
             foreach ($imgs[1] as $src) {
                 if (count($images) >= 8) break;
+                // Filtrar imagens pequenas/icons
                 if (preg_match('/\.(svg|gif|ico)(\?|$)/i', $src)) continue;
                 if (stripos($src, 'icon') !== false || stripos($src, 'logo') !== false) continue;
                 if (stripos($src, 'pixel') !== false || stripos($src, '1x1') !== false) continue;
@@ -2742,156 +2220,6 @@ class AssessoriaController extends Controller {
         }
         if (!empty($images)) {
             $data['images'] = array_values(array_unique($images));
-        }
-
-        // 7) Especificações / tabelas de specs (peso, dimensões, etc.)
-        $specs = [];
-        // Padrão: <th>Label</th><td>Value</td> ou <td>Label</td><td>Value</td>
-        if (preg_match_all('/<t[hd][^>]*>(.*?)<\/t[hd]>\s*<td[^>]*>(.*?)<\/td>/si', $html, $specMatches, PREG_SET_ORDER)) {
-            foreach ($specMatches as $sm) {
-                $label = trim(strip_tags($sm[1]));
-                $value = trim(strip_tags($sm[2]));
-                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
-                    $specs[$label] = $value;
-                }
-            }
-        }
-        // Padrão alternativo: <dt>Label</dt><dd>Value</dd>
-        if (preg_match_all('/<dt[^>]*>(.*?)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/si', $html, $dtMatches, PREG_SET_ORDER)) {
-            foreach ($dtMatches as $dm2) {
-                $label = trim(strip_tags($dm2[1]));
-                $value = trim(strip_tags($dm2[2]));
-                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
-                    $specs[$label] = $value;
-                }
-            }
-        }
-        if (!empty($specs)) {
-            $data['specifications'] = $specs;
-        }
-
-        // 8) Pesos encontrados no HTML (padrões: XX lb, XX lbs, XX pounds, XX kg)
-        $weights = [];
-        if (preg_match_all('/(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?)\b/i', $html, $wm)) {
-            foreach ($wm[0] as $i => $full) {
-                $weights[] = ['raw' => trim($full), 'value_lbs' => floatval($wm[1][$i]), 'value_kg' => round(floatval($wm[1][$i]) * 0.4536, 2)];
-            }
-        }
-        if (preg_match_all('/(\d+(?:\.\d+)?)\s*kg\b/i', $html, $wkg)) {
-            foreach ($wkg[0] as $i => $full) {
-                $weights[] = ['raw' => trim($full), 'value_kg' => floatval($wkg[1][$i])];
-            }
-        }
-        if (!empty($weights)) {
-            $data['weights_found'] = array_values(array_unique($weights, SORT_REGULAR));
-        }
-
-        // 9) Variações/opções visíveis (botões, selects, etc.)
-        $options = [];
-        // Botões de variação (ex: Costco bed size buttons)
-        if (preg_match_all('/<(?:button|a|span|div)[^>]*(?:data-(?:value|option|variant|size|color)|class=["\'][^"\']*(?:option|variant|swatch|size-btn)[^"\']*["\'])[^>]*>(.*?)<\/(?:button|a|span|div)>/si', $html, $optMatches)) {
-            foreach ($optMatches[1] as $opt) {
-                $val = trim(strip_tags($opt));
-                if ($val !== '' && strlen($val) < 50) {
-                    $options[] = $val;
-                }
-            }
-        }
-        // Select options
-        if (preg_match_all('/<option[^>]+value=["\']([^"\']+)["\'][^>]*>(.*?)<\/option>/si', $html, $selMatches, PREG_SET_ORDER)) {
-            foreach ($selMatches as $sel) {
-                $val = trim(strip_tags($sel[2]));
-                if ($val !== '' && strlen($val) < 50 && strtolower($val) !== 'select') {
-                    $options[] = $val;
-                }
-            }
-        }
-        if (!empty($options)) {
-            $data['options_found'] = array_values(array_unique($options));
-        }
-
-        // 10) JavaScript data (inline product JSON)
-        if (preg_match_all('/(?:product|item|variant)(?:Data|Info|Details|Config)\s*[:=]\s*(\{[^;]{50,5000}\})/i', $html, $jsData)) {
-            foreach ($jsData[1] as $jsBlob) {
-                $parsed = @json_decode($jsBlob, true);
-                if (is_array($parsed) && !empty($parsed)) {
-                    $data['inline_product_json'] = $parsed;
-                    break;
-                }
-            }
-        }
-
-        // 11) Tentar extrair JSON-LD offers com preços por variação
-        if (isset($data['jsonld_product']) && is_array($data['jsonld_product'])) {
-            $jld = $data['jsonld_product'];
-            $offers = $jld['offers'] ?? $jld['hasVariant'] ?? [];
-            if (is_array($offers) && !empty($offers)) {
-                // Se offers é um único objeto, wrappear em array
-                if (isset($offers['@type'])) {
-                    $offers = [$offers];
-                }
-                $variantOffers = [];
-                foreach ($offers as $offer) {
-                    if (!is_array($offer)) continue;
-                    $name = (string)($offer['name'] ?? $offer['sku'] ?? '');
-                    $price = $offer['price'] ?? $offer['lowPrice'] ?? null;
-                    $weight = $offer['weight'] ?? null;
-                    if ($name !== '' || $price !== null) {
-                        $entry = ['name' => $name];
-                        if ($price !== null) $entry['price'] = $price;
-                        if ($weight !== null) $entry['weight'] = $weight;
-                        // Procurar atributos adicionais
-                        foreach (['size', 'color', 'sku'] as $ak) {
-                            if (isset($offer[$ak])) $entry[$ak] = $offer[$ak];
-                        }
-                        $variantOffers[] = $entry;
-                    }
-                }
-                if (!empty($variantOffers)) {
-                    $data['variant_offers'] = $variantOffers;
-                }
-            }
-        }
-
-        // 12) Tentar extrair preços associados a tamanhos/variações do HTML
-        // Padrão: "Twin $299.99" ou "King - $499.99" ou data-price="499.99"
-        // Ordem importa: padrões mais longos primeiro para evitar match parcial
-        $variantPrices = [];
-        if (preg_match_all('/(?:Split California King|Split Cal King|California King|Cal King|Twin XL|Split King|Twin|Full|Queen|King|Double|Single)[^$\n]{0,30}\$\s?(\d{1,6}[.,]\d{2})/i', $html, $vpMatches, PREG_SET_ORDER)) {
-            foreach ($vpMatches as $vpm) {
-                $variantPrices[] = ['context' => trim(substr($vpm[0], 0, 80)), 'price' => $vpm[1]];
-            }
-        }
-        if (!empty($variantPrices)) {
-            $data['variant_prices_found'] = $variantPrices;
-        }
-
-        // 13) Costco-specific: extrair dados de variação de data-automation-id e scripts inline
-        // Costco armazena preços de variação em objetos JS como variantCriteria, availableVariations, etc.
-        if (stripos($url, 'costco.com') !== false) {
-            // Tentar extrair JSON de variações do Costco (variantCriteria, availableVariations)
-            if (preg_match_all('/(?:variantCriteria|availableVariations|productVariants|variantData)\s*[:=]\s*(\[[\s\S]{50,10000}?\])\s*[;,]/i', $html, $costcoVars)) {
-                foreach ($costcoVars[1] as $blob) {
-                    $parsed = @json_decode($blob, true);
-                    if (is_array($parsed) && !empty($parsed)) {
-                        $data['costco_variant_data'] = $parsed;
-                        break;
-                    }
-                }
-            }
-            // Extrair botões de variação com data-automation-id e aria-label
-            $costcoOptions = [];
-            if (preg_match_all('/<(?:button|label|div|span)[^>]*(?:data-automation-id|aria-label)=["\']([^"\']*)["\'][^>]*>/si', $html, $costcoMatches)) {
-                foreach ($costcoMatches[1] as $opt) {
-                    $val = trim(strip_tags($opt));
-                    if ($val !== '' && strlen($val) < 80 && preg_match('/(?:twin|full|queen|king|split|california|cal|single|double)/i', $val)) {
-                        $costcoOptions[] = $val;
-                    }
-                }
-            }
-            if (!empty($costcoOptions)) {
-                $data['costco_size_options'] = array_values(array_unique($costcoOptions));
-            }
         }
 
         return $data;
@@ -3097,25 +2425,8 @@ class AssessoriaController extends Controller {
         $pesoTotal = 0;
         
         foreach ($produtos as $produto) {
-            $valor = floatval($produto['valor'] ?? 0);
-            $peso = floatval($produto['peso'] ?? 0);
-
-            // Se preço base é suspeitamente baixo e existem variações com preço real,
-            // usar o menor preço real das variações como referência
-            if ($valor < 2.0 && !empty($produto['variacoes']) && is_array($produto['variacoes'])) {
-                $varPrecos = [];
-                foreach ($produto['variacoes'] as $v) {
-                    if (is_array($v) && isset($v['valor']) && floatval($v['valor']) >= 2.0) {
-                        $varPrecos[] = floatval($v['valor']);
-                    }
-                }
-                if (!empty($varPrecos)) {
-                    $valor = min($varPrecos);
-                }
-            }
-
-            $subtotal += $valor;
-            $pesoTotal += $peso;
+            $subtotal += $produto['valor'];
+            $pesoTotal += $produto['peso'];
         }
         
         // Reutiliza funções de cálculo existentes
@@ -3360,7 +2671,7 @@ class AssessoriaController extends Controller {
                     if ($variacaoId !== null && isset($produto['variacoes']) && is_array($produto['variacoes'])) {
                         foreach ($produto['variacoes'] as $v) {
                             if (is_array($v) && (string) ($v['id'] ?? '') === (string) $variacaoId) {
-                                if (isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) >= 2.0) {
+                                if (isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) > 0) {
                                     $produto['valor'] = floatval($v['valor']);
                                 }
                                 if (isset($v['peso']) && floatval($v['peso']) > 0) {
@@ -3468,18 +2779,6 @@ class AssessoriaController extends Controller {
             $stmt->execute([$sku]);
             $existingId = $stmt->fetchColumn();
             if ($existingId) {
-                // Atualizar produto existente com dados novos (peso, preço, variações podem ter mudado)
-                try {
-                    $stmtUpd = $db->prepare('UPDATE produtos SET price = ?, weight = ?, description = ?, updated_at = NOW() WHERE id = ?');
-                    $stmtUpd->execute([
-                        floatval($produto['valor'] ?? 0),
-                        floatval($produto['peso'] ?? 1.0),
-                        (string) ($produto['descricao'] ?? ''),
-                        (int) $existingId
-                    ]);
-                } catch (\Exception $e) {
-                    error_log('[Assessoria] Erro ao atualizar produto existente #' . $existingId . ': ' . $e->getMessage());
-                }
                 return (int) $existingId;
             }
         } catch (\Exception $e) {
@@ -3582,7 +2881,6 @@ class AssessoriaController extends Controller {
         }
         
         $reduced = $this->reduceScrapingBeePayload($dadosBrutos);
-        error_log('[ChatGPT] Payload keys for prompt: ' . json_encode(array_keys($reduced)) . ' | Total size: ' . strlen(json_encode($reduced)));
         $prompt = $this->gerarPromptChatGPT($reduced, $urlOriginal);
         
         if (headers_sent() === false) {
@@ -3641,16 +2939,11 @@ class AssessoriaController extends Controller {
         try {
             $produtoData = $this->decodeJsonResilient((string) $content);
         } catch (\Exception $e) {
-            error_log('[ChatGPT] JSON parse failed: ' . $e->getMessage() . ' | Content prefix: ' . substr((string) $content, 0, 200));
-            
             // Retry 1: prompt menor para evitar truncamento / syntax error
-            // Usar apenas dados essenciais (sem html_extra que pode ser muito grande)
-            $retryData = $reduced;
-            unset($retryData['html_extra'], $retryData['description'], $retryData['details'], $retryData['features']);
             $retryReduced = [
-                'hint' => 'extract only essential fields: nome, valor, peso, variacoes. Keep response SHORT.',
+                'hint' => 'extract only essential fields',
                 'url' => $urlOriginal,
-                'data' => $retryData
+                'data' => $reduced
             ];
             $retryPrompt = $this->gerarPromptChatGPT($retryReduced, $urlOriginal);
             [$resp2, $code2, $err2] = $this->callChatGPT($chatGptApiKey, $retryPrompt, true);
@@ -3732,37 +3025,9 @@ class AssessoriaController extends Controller {
                     }
                 }
 
-                // Fallback peso: estimar baseado no nome do produto (nunca usar 1kg genérico)
+                // Regra: se não encontrar peso, usar sempre 1kg
                 if ($campo === 'peso') {
-                    $nomeLower = strtolower((string)($produtoData['nome'] ?? ''));
-                    $pesoEstimado = 2.0; // default genérico mínimo
-                    if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
-                        $pesoEstimado = 35.0;
-                    } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
-                        $pesoEstimado = 40.0;
-                    } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
-                        $pesoEstimado = 3.5;
-                    } elseif (preg_match('/pillow|travesseiro/', $nomeLower)) {
-                        $pesoEstimado = 1.5;
-                    } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
-                        $pesoEstimado = 15.0;
-                    } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
-                        $pesoEstimado = 2.5;
-                    } elseif (preg_match('/phone|celular|smartphone/', $nomeLower)) {
-                        $pesoEstimado = 0.3;
-                    } elseif (preg_match('/shoe|sapato|tênis|sneaker|boot/', $nomeLower)) {
-                        $pesoEstimado = 1.2;
-                    } elseif (preg_match('/shirt|camiseta|blouse|dress|vestido|jacket|jaqueta/', $nomeLower)) {
-                        $pesoEstimado = 0.5;
-                    } elseif (preg_match('/toy|brinquedo/', $nomeLower)) {
-                        $pesoEstimado = 1.5;
-                    } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
-                        $pesoEstimado = 15.0;
-                    } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
-                        $pesoEstimado = 20.0;
-                    }
-                    // Margem de 15%
-                    $produtoData['peso'] = round($pesoEstimado * 1.15, 2);
+                    $produtoData['peso'] = 1.0;
                     continue;
                 }
 
@@ -3788,105 +3053,9 @@ class AssessoriaController extends Controller {
             $produtoData['variacoes'] = $this->extractVariacoesFromScrapingBee($dadosBrutos);
         }
 
-        // Log variações ANTES da normalização para debug
-        if (is_array($produtoData['variacoes'])) {
-            foreach (array_slice($produtoData['variacoes'], 0, 3) as $vi => $vv) {
-                if (is_array($vv)) {
-                    error_log('[ChatGPT] PRE-NORM Var[' . $vi . ']: ' . json_encode(array_intersect_key($vv, array_flip(['label', 'valor', 'peso', 'price', 'weight', 'id']))));
-                }
-            }
-        }
-
         // Normalizar variacoes para o formato esperado pelo orçamento (atributos)
         if (isset($produtoData['variacoes']) && is_array($produtoData['variacoes'])) {
             $produtoData['variacoes'] = $this->normalizeVariacoesForOrcamento($produtoData['variacoes'], $dadosBrutos);
-        }
-
-        // Pós-processamento: se todas as variações têm o mesmo peso (ou null), estimar por tamanho
-        if (is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 1) {
-            $allSamePeso = true;
-            $firstPeso = null;
-            foreach ($produtoData['variacoes'] as $vv) {
-                $vPeso = $vv['peso'] ?? null;
-                if ($firstPeso === null) {
-                    $firstPeso = $vPeso;
-                } elseif ($vPeso !== $firstPeso) {
-                    $allSamePeso = false;
-                    break;
-                }
-            }
-            
-            if ($allSamePeso) {
-                $nomeLower = strtolower((string)($produtoData['nome'] ?? ''));
-                $isColchao = (bool) preg_match('/mattress|colch[aã]o/', $nomeLower);
-                
-                // Mapa de pesos estimados por tamanho de colchão (kg)
-                $sizeWeights = [
-                    'twin' => 27.0, 'twin xl' => 29.0,
-                    'full' => 32.0, 'double' => 32.0,
-                    'queen' => 38.0,
-                    'split king' => 50.0, 'split california king' => 50.0, 'split cal king' => 50.0,
-                    'king' => 45.0, 'cal king' => 45.0, 'california king' => 45.0,
-                ];
-                
-                // Para produtos genéricos com tamanhos (S/M/L/XL), escalar proporcionalmente
-                $genericSizeScale = [
-                    'xs' => 0.8, 'extra small' => 0.8,
-                    's' => 0.85, 'small' => 0.85,
-                    'm' => 1.0, 'medium' => 1.0, 'regular' => 1.0,
-                    'l' => 1.1, 'large' => 1.1,
-                    'xl' => 1.2, 'extra large' => 1.2,
-                    'xxl' => 1.3, '2xl' => 1.3,
-                    'xxxl' => 1.4, '3xl' => 1.4,
-                ];
-                
-                $basePeso = floatval($produtoData['peso'] ?? 0);
-                $anyChanged = false;
-                
-                foreach ($produtoData['variacoes'] as &$vRef) {
-                    $label = strtolower((string)($vRef['label'] ?? ''));
-                    $attrs = $vRef['atributos'] ?? [];
-                    $sizeVal = strtolower((string)($attrs['Bed Size'] ?? $attrs['Size'] ?? $attrs['Tamanho'] ?? $label));
-                    
-                    if ($isColchao) {
-                        // Tentar encontrar peso estimado pelo tamanho de colchão
-                        // Priorizar match mais longo primeiro (ex: "cal king" antes de "king")
-                        $estimatedWeight = null;
-                        $bestMatchLen = 0;
-                        foreach ($sizeWeights as $sizeKey => $sizeKg) {
-                            if ((stripos($sizeVal, $sizeKey) !== false || stripos($label, $sizeKey) !== false) && strlen($sizeKey) > $bestMatchLen) {
-                                $estimatedWeight = $sizeKg;
-                                $bestMatchLen = strlen($sizeKey);
-                            }
-                        }
-                        
-                        if ($estimatedWeight !== null) {
-                            $vRef['peso'] = round($estimatedWeight * 1.15, 2); // +15% margem
-                            $anyChanged = true;
-                        }
-                    } elseif ($basePeso > 0) {
-                        // Para outros produtos, escalar pelo tamanho genérico
-                        foreach ($genericSizeScale as $sizeKey => $scale) {
-                            // Comparação exata ou como palavra inteira para evitar falsos positivos
-                            $matched = ($sizeVal === $sizeKey);
-                            if (!$matched && strlen($sizeKey) > 2) {
-                                // Só usar stripos para chaves com mais de 2 chars (evitar 's', 'm', 'l')
-                                $matched = (stripos($sizeVal, $sizeKey) !== false || stripos($label, $sizeKey) !== false);
-                            }
-                            if ($matched) {
-                                $vRef['peso'] = round($basePeso * $scale, 2);
-                                $anyChanged = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                unset($vRef);
-                
-                if ($anyChanged) {
-                    error_log('[Assessoria] Pesos estimados por tamanho aplicados às variações');
-                }
-            }
         }
 
         if (headers_sent() === false) {
@@ -3925,39 +3094,7 @@ class AssessoriaController extends Controller {
             'variacoes' => is_array($produtoData['variacoes'] ?? null) ? $produtoData['variacoes'] : [],
             'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
         ];
-
-        // Se o preço base é suspeitamente baixo (< $2) e alguma variação tem preço real,
-        // corrigir o preço base usando o menor preço real das variações
-        $baseValor = $produtoData['valor'];
-        $basePesoFinal = $produtoData['peso'];
-        if ($baseValor < 2.0 && is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
-            $varPrecos = [];
-            foreach ($produtoData['variacoes'] as $vCheck) {
-                if (is_array($vCheck) && isset($vCheck['valor']) && $vCheck['valor'] !== null && floatval($vCheck['valor']) >= 2.0) {
-                    $varPrecos[] = floatval($vCheck['valor']);
-                }
-            }
-            if (!empty($varPrecos)) {
-                $produtoData['valor'] = min($varPrecos);
-                $baseValor = $produtoData['valor'];
-                error_log('[ChatGPT] Preço base corrigido de $' . number_format(floatval($produtoData['valor']), 2) . ' usando menor preço das variações: $' . number_format($baseValor, 2));
-            }
-        }
-
-        // Preencher valor/peso null das variações com o valor/peso base do produto
-        if (is_array($produtoData['variacoes'])) {
-            foreach ($produtoData['variacoes'] as &$vFill) {
-                if (!is_array($vFill)) continue;
-                if (!isset($vFill['valor']) || $vFill['valor'] === null || floatval($vFill['valor']) < 2.0) {
-                    $vFill['valor'] = $baseValor;
-                }
-                if (!isset($vFill['peso']) || $vFill['peso'] === null || floatval($vFill['peso']) <= 0) {
-                    $vFill['peso'] = $basePesoFinal;
-                }
-            }
-            unset($vFill);
-            $produtoData['variacoes'] = array_values($produtoData['variacoes']);
-        }        
+        
         if (headers_sent() === false) {
             header('X-ChatGPT-Success: true');
             header('X-ChatGPT-Product-Data: ' . json_encode([
@@ -3965,17 +3102,8 @@ class AssessoriaController extends Controller {
                 'valor' => $produtoData['valor'],
                 'peso' => $produtoData['peso'],
                 'descricao' => $produtoData['descricao'],
-                'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0,
-                'variacoes_count' => is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0
+                'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0
             ]));
-        }
-        error_log('[ChatGPT] Product extracted: ' . ($produtoData['nome'] ?? '?') . ' | Variations: ' . (is_array($produtoData['variacoes']) ? count($produtoData['variacoes']) : 0) . ' | Peso: ' . ($produtoData['peso'] ?? '?') . 'kg');
-        
-        // Log detalhado das variações para debug
-        if (is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
-            foreach (array_slice($produtoData['variacoes'], 0, 5) as $vi => $vv) {
-                error_log('[ChatGPT] Var[' . $vi . ']: ' . ($vv['label'] ?? '?') . ' | valor=' . ($vv['valor'] ?? 'null') . ' | peso=' . ($vv['peso'] ?? 'null'));
-            }
         }
         
         return $produtoData;
@@ -3985,29 +3113,11 @@ class AssessoriaController extends Controller {
      * Gera o prompt para o ChatGPT
      */
     private function gerarPromptChatGPT(array $dadosBrutos, string $urlOriginal): string {
-        $hasHtmlExtra = isset($dadosBrutos['html_extra']) && is_array($dadosBrutos['html_extra']) && !empty($dadosBrutos['html_extra']);
-        $extraInstructions = '';
-        if ($hasHtmlExtra) {
-            $extraInstructions = "
-ATENÇÃO: O campo 'html_extra' contém dados complementares extraídos do HTML da página (especificações, pesos, opções de variação).
-- 'weights_found': pesos encontrados no HTML (já convertidos para kg). USE ESTES VALORES para o peso de cada variação.
-- 'specifications': tabela de especificações do produto. PROCURE peso/weight aqui.
-- 'options_found': opções de variação encontradas (tamanhos, cores, etc.)
-- 'jsonld_product': dados estruturados JSON-LD do produto.
-- 'variant_offers': ofertas/variações com preços extraídos do JSON-LD. USE ESTES PREÇOS para cada variação.
-- 'variant_prices_found': preços associados a tamanhos encontrados no HTML. USE ESTES PREÇOS.
-- 'variant_price_data': dados de preço por variação extraídos via AI. USE ESTES PREÇOS E PESOS.
-- 'prices_found': todos os preços encontrados no HTML.
-PRIORIZE os dados de html_extra para preços e pesos por variação, pois são mais precisos que os dados do ai_query.
-CADA VARIAÇÃO DEVE TER SEU PRÓPRIO PREÇO E PESO. NÃO USE O MESMO VALOR PARA TODAS.
-";
-        }
-
         return "Analise os dados brutos abaixo extraídos da URL: {$urlOriginal}
 
 DADOS BRUTOS:
 " . json_encode($dadosBrutos, JSON_PRETTY_PRINT) . "
-{$extraInstructions}
+
 EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON VÁLIDO (SEM TEXTO, SEM MARKDOWN, SEM ```), COM ESTA ESTRUTURA EXATA E SOMENTE ESTES CAMPOS:
 
 {
@@ -4015,61 +3125,44 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"nome\": \"Nome completo do produto\",
     \"descricao\": \"Descrição detalhada do produto\",
     \"valor\": 99.99,
-    \"peso\": 52.16,
+    \"peso\": 1.5,
     \"imagens\": [\"url1\", \"url2\"],
-    \"variacoes\": [{\"id\": \"var-1\", \"label\": \"Color: Gray | Size: King 90x100\", \"atributos\": {\"Color\": \"Gray\", \"Size\": \"King 90x100\"}, \"valor\": 45.99, \"peso\": 52.16}],
+    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
 REGRAS ESPECÍFICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
-
-2. VARIAÇÕES (MUITO IMPORTANTE — LEIA COM ATENÇÃO):
-   - Analise TODOS os dados brutos cuidadosamente para encontrar variações/opções do produto
-   - Variações podem estar em campos como: variants, variations, options, offers, availableVariations, variantCriteria, etc.
-   - Cada COMBINAÇÃO de opções (ex: cada cor + cada tamanho) deve gerar uma entrada separada em \"variacoes\"
-   - Se o produto tem 4 cores e 5 tamanhos, deve haver até 20 variações (4x5)
-   - Cada variação DEVE ter: id (string), label (legível), atributos (mapa chave:valor), valor (preço USD), peso (kg)
-   - PREÇO POR VARIAÇÃO: Se os dados contêm preços diferentes por variação/tamanho, CADA variação DEVE ter seu preço específico no campo \"valor\". NÃO use o mesmo preço para todas. Se Twin=$299 e King=$499, retorne esses valores específicos.
-   - Se uma variação NÃO tem preço próprio nos dados, aí sim use o preço base do produto.
+1.1 VARIAÇÕES:
+   - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
+   - Cada variação deve ter pelo menos: id (ou string vazia), atributos (mapa), e valor quando houver.
    - Se não existirem variações, retorne \"variacoes\": []
-   - NÃO IGNORE variações. Se os dados brutos contêm opções/variantes, EXTRAIA TODAS.
-   - PESO POR VARIAÇÃO: Se cada variação/tamanho tem peso diferente (ex: Twin=60 lbs, King=116 lbs), CADA variação DEVE ter seu peso ESPECÍFICO (convertido para kg). NÃO use o mesmo peso para todas.
-   - Se não encontrar peso específico por variação, ESTIME baseado no tamanho (ex: Twin < Full < Queen < King < Cal King).
+2. PESO (kg): 
+   - Se não encontrar o peso exato, ESTIME com base no tipo de produto
+   - Adicione 15% de margem de segurança sobre o peso estimado
+   - Ex: se estimar 1kg, use 1.15kg
+   - Use sempre casas decimais (ex: 1.15)
 
-3. PESO (kg) — REGRA CRÍTICA:
-   - O peso DEVE ser em quilogramas (kg). NUNCA retorne 1.0 kg como padrão sem verificar.
-   - Se o peso estiver em LIBRAS (lbs/pounds), CONVERTA: 1 lb = 0.4536 kg. Ex: 115 lbs = 52.16 kg.
-   - Se o peso estiver em ONÇAS (oz/ounces), CONVERTA: 1 oz = 0.02835 kg.
-   - Procure o peso em: specifications, specs, weight, shipping weight, product weight, peso, libras, lbs, pounds, oz, html_extra.weights_found, html_extra.specifications.
-   - Se cada variação/tamanho tem peso diferente (ex: Twin=79 lbs, King=116 lbs), use o peso ESPECÍFICO de cada variação.
-   - O peso BASE do produto deve ser o peso da variação padrão ou o maior peso listado.
-   - Se NÃO encontrar peso nos dados, ESTIME de forma REALISTA baseado no tipo de produto:
-     * Colchão Twin: ~27 kg, Full: ~32 kg, Queen: ~38 kg, King: ~45 kg, Cal King: ~45 kg
-     * Cobertor/manta: 2-5 kg
-     * Roupas: 0.3-1 kg
-     * Eletrônicos pequenos: 0.5-3 kg
-     * Brinquedos: 0.5-3 kg
-   - Adicione 15% de margem de segurança sobre o peso estimado.
-   - NUNCA use 1.0 kg como peso padrão genérico. Sempre estime realisticamente.
-
-4. DESCRIÇÃO:
+3. DESCRIÇÃO:
    - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
+   - Inclua informações relevantes sobre o produto
+   - Seja específico e útil para o cliente
 
-5. IMAGEM:
+4. IMAGEM:
    - Extraia todas as URLs de imagens disponíveis
    - Se não encontrar, use array vazio []
 
-6. VALOR: Use número decimal com 2 casas (ex: 99.99). Este é o preço BASE.
+5. VALOR: Use número decimal com 2 casas (ex: 99.99)
 
-7. NOME: Use o nome completo do produto
+6. NOME: Use o nome completo do produto
 
 IMPORTANTE:
 - Retorne APENAS o JSON, sem texto adicional
-- CONVERTA libras para kg (1 lb = 0.4536 kg)
+- Para peso, SEMPRE inclua a margem de 15% se precisar estimar
 - Para descrição, CRIE uma se não encontrar
-- Use kg para peso
+- SKU pode ser gerado baseado no nome se não existir
+- Use kg para peso, cm para dimensões
 
 RETORNE APENAS O JSON:";
     }

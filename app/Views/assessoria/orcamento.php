@@ -392,18 +392,6 @@ $(document).ready(function() {
             return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true };
         }
 
-        // Preço base corrigido: se p.valor < 2 e variações têm preço real, usar menor preço real
-        let baseValor = p.valor;
-        const varPrecosReais = p.variacoes
-            .filter(v => v && typeof v === 'object' && v.valor !== null && v.valor !== undefined && parseFloat(v.valor) >= 2)
-            .map(v => parseFloat(v.valor));
-        if (varPrecosReais.length > 0) {
-            const menorPrecoReal = Math.min(...varPrecosReais);
-            if (baseValor < 2) {
-                baseValor = menorPrecoReal;
-            }
-        }
-
         const sel = selections[index] || {};
         const complete = keys.every(k => sel[k] !== undefined && sel[k] !== null && String(sel[k]).trim() !== '');
         const matches = p.variacoes.filter(v => {
@@ -419,7 +407,7 @@ $(document).ready(function() {
         });
 
         if (!complete) {
-            return { variacao_id: null, valor: baseValor, peso: p.peso, complete: false };
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
         }
 
         if (matches.length >= 1) {
@@ -436,12 +424,12 @@ $(document).ready(function() {
                 return acc;
             }, null);
 
-            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) >= 2 ? parseFloat(best.valor) : baseValor;
+            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : p.valor;
             const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
             return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
         }
 
-        return { variacao_id: null, valor: baseValor, peso: p.peso, complete: false };
+        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
     }
 
     function updateComboUI(index) {
@@ -508,27 +496,8 @@ $(document).ready(function() {
         const data = resolveVariant(index);
         const valorEl = container.querySelector('.valor-text');
         const pesoEl = container.querySelector('.peso-text');
-        if (valorEl) {
-            const oldVal = parseFloat(valorEl.textContent) || 0;
-            const newVal = data.valor || 0;
-            valorEl.textContent = newVal.toFixed(2);
-            // Feedback visual quando preço muda
-            if (Math.abs(oldVal - newVal) > 0.01) {
-                valorEl.closest('.fw-bold').style.transition = 'color 0.3s';
-                valorEl.closest('.fw-bold').style.color = '#198754';
-                setTimeout(() => { valorEl.closest('.fw-bold').style.color = ''; }, 1000);
-            }
-        }
-        if (pesoEl) {
-            const oldPeso = parseFloat(pesoEl.textContent) || 0;
-            const newPeso = data.peso || 0;
-            pesoEl.textContent = newPeso.toFixed(2);
-            if (Math.abs(oldPeso - newPeso) > 0.01) {
-                pesoEl.parentElement.style.transition = 'color 0.3s';
-                pesoEl.parentElement.style.color = '#198754';
-                setTimeout(() => { pesoEl.parentElement.style.color = ''; }, 1000);
-            }
-        }
+        if (valorEl) valorEl.textContent = (data.valor || 0).toFixed(2);
+        if (pesoEl) pesoEl.textContent = (data.peso || 0).toFixed(2);
     }
 
     // Calcular totais baseado nos produtos selecionados
