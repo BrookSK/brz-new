@@ -1468,6 +1468,18 @@ class PedidoEcommerce {
             if ($colSku) $selectParts[] = 'pi.' . $colSku . ' AS nome_produto_sku';
             if ($colUrlOriginalItem) $selectParts[] = 'pi.' . $colUrlOriginalItem . ' AS url_original';
             if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
+
+            // Fallback: buscar nome do produto na tabela produtos quando nome_produto do item estiver vazio
+            if ($colProdutoId) {
+                try {
+                    $colsProdNome = $this->getTableColumns('produtos');
+                    $colNomeProd = $this->pickColumn($colsProdNome, ['name', 'nome', 'titulo', 'title']);
+                    if ($colNomeProd) {
+                        $selectParts[] = '(SELECT pr2.' . $colNomeProd . ' FROM produtos pr2 WHERE pr2.id = pi.' . $colProdutoId . ' LIMIT 1) AS nome_produto_fallback';
+                    }
+                } catch (\Exception $e) {}
+            }
+
             if ($ncmCol && $colProdutoId) {
                 $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
             } else {
@@ -1589,7 +1601,8 @@ class PedidoEcommerce {
                 $item['url_original'] = trim((string) $item['url_original']);
                 $pid = (int) ($item['produto_id'] ?? 0);
                 if (empty($item['nome_produto'])) {
-                    $item['nome_produto'] = $pid > 0 ? ('Produto #' . $pid) : 'Produto';
+                    $fallbackNome = trim((string) ($item['nome_produto_fallback'] ?? ''));
+                    $item['nome_produto'] = $fallbackNome !== '' ? $fallbackNome : ($pid > 0 ? ('Produto #' . $pid) : 'Produto');
                 }
 
                 // Alias usado por checkout/conclusao.php
