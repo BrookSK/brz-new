@@ -2385,8 +2385,35 @@ class CheckoutController extends Controller {
             try {
                 $usuarioCompleto = $this->usuarioModel->find((int) $usuario['id']);
                 if (is_array($usuarioCompleto) && !empty($usuarioCompleto)) {
-                    $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioCompleto);
+                    // Mesclar dados do formulário do checkout no perfil para não bloquear
+                    // quando o usuário preencheu os campos no próprio checkout.
+                    $usuarioParaValidar = $usuarioCompleto;
+                    $camposCheckout = [
+                        'telefone' => ['telefone'],
+                        'nome' => ['nome'],
+                        'email' => ['email'],
+                        'data_nascimento' => ['data_nascimento'],
+                        'documento' => ['documento', 'cpf_cnpj', 'cpf'],
+                    ];
+                    foreach ($camposCheckout as $chave => $colunas) {
+                        $valorForm = trim((string) ($dados[$chave] ?? ''));
+                        if ($valorForm !== '') {
+                            foreach ($colunas as $col) {
+                                $valorAtual = trim((string) ($usuarioParaValidar[$col] ?? ''));
+                                if ($valorAtual === '') {
+                                    $usuarioParaValidar[$col] = $valorForm;
+                                }
+                            }
+                        }
+                    }
+
+                    $faltando = $this->usuarioModel->getMissingRequiredFields($usuarioParaValidar);
+
+                    // Considerar termos aceitos se o checkbox do checkout foi marcado
                     $termosOk = $this->usuarioModel->hasAcceptedTerms($usuarioCompleto);
+                    if (!$termosOk && !empty($dados['consentimento_legal'])) {
+                        $termosOk = true;
+                    }
 
                     // Se existe endereço selecionado/preenchido no checkout e ele está completo,
                     // não bloquear o checkout por pendências de endereço no perfil do usuário.
