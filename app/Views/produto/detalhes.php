@@ -281,7 +281,7 @@
                             <div class="accordion-body">
                                 <ul class="mb-0 small text-muted">
                                     <li><?= __('product_details.import.from_us', 'Produto importado dos EUA') ?></li>
-                                    <li><?= __('product_details.import.delivery_time', 'Tempo estimado de entrega: 15-30 dias') ?></li>
+                                    <!-- <li><?= __('product_details.import.delivery_time', 'Tempo estimado de entrega: 15-30 dias') ?></li> -->
                                     <li><?= __('product_details.import.taxes_included', 'Impostos inclusos no preço final') ?></li>
                                     <li><?= __('product_details.import.service_fee', 'Taxa de serviço: US$ 39/kg') ?></li>
                                 </ul>
