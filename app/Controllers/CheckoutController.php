@@ -4561,7 +4561,7 @@ class CheckoutController extends Controller {
 
             // Se não encontrou por e-mail, tentar por documento (CPF/CNPJ) pois pode ser UNIQUE
             if ((!$existingUser || empty($existingUser['id'])) && !empty($usuario['documento'])) {
-                $stmtDoc = $db->prepare("SELECT id, email, name, password, senha, role, perfil FROM usuarios WHERE documento = ? LIMIT 1");
+                $stmtDoc = $db->prepare("SELECT id, email, name, password, senha, role, perfil FROM usuarios WHERE REPLACE(REPLACE(REPLACE(documento, '.', ''), '-', ''), '/', '') = ? LIMIT 1");
                 $stmtDoc->execute([$usuario['documento']]);
                 $existingUserByDoc = $stmtDoc->fetch(\PDO::FETCH_ASSOC);
                 if ($existingUserByDoc && !empty($existingUserByDoc['id'])) {
@@ -4679,6 +4679,32 @@ class CheckoutController extends Controller {
             $stmt = $db->prepare("SELECT id FROM clientes WHERE email = ?");
             $stmt->execute([$usuario['email']]);
             $existingClient = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            // Se não encontrou por email, tentar por documento (cpf_cnpj pode ter UNIQUE)
+            if ((!$existingClient || empty($existingClient['id'])) && !empty($usuario['documento'])) {
+                try {
+                    $stmtCliDoc = $db->prepare("SELECT id FROM clientes WHERE REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', '') = ? LIMIT 1");
+                    $stmtCliDoc->execute([$usuario['documento']]);
+                    $existingClientByDoc = $stmtCliDoc->fetch(\PDO::FETCH_ASSOC);
+                    if ($existingClientByDoc && !empty($existingClientByDoc['id'])) {
+                        $existingClient = $existingClientByDoc;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            // Se não encontrou por email nem documento, tentar por usuario_id
+            if ((!$existingClient || empty($existingClient['id'])) && !empty($usuarioId)) {
+                try {
+                    $stmtCliUid = $db->prepare("SELECT id FROM clientes WHERE usuario_id = ? LIMIT 1");
+                    $stmtCliUid->execute([$usuarioId]);
+                    $existingClientByUid = $stmtCliUid->fetch(\PDO::FETCH_ASSOC);
+                    if ($existingClientByUid && !empty($existingClientByUid['id'])) {
+                        $existingClient = $existingClientByUid;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
             
             if ($existingClient && !empty($existingClient['id'])) {
                 $clienteId = $existingClient['id'];
