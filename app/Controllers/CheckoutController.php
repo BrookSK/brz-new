@@ -2826,14 +2826,31 @@ class CheckoutController extends Controller {
                             $valorImpostoLocal = round((float) $valorImpostoLocal, 2);
 
                             // Calcular valor dos produtos como: total - taxaServico - impostos - impostoLocal
-                            // Os valores no banco já estão em BRL (convertidos na criação do pedido).
+                            // Os valores no banco estão em USD. O Câmbio Real espera USD.
+                            // O AppMax espera BRL, então convertemos apenas o que vai para o AppMax.
                             $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto - $valorImpostoLocal), 2);
-                            $valorTaxa = round(max(0.0, $taxaServico), 2);
-                            $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
-                            // Log de debug para diagnóstico do split BRL
+                            // Obter taxa de conversão para converter valores do AppMax para BRL
+                            $txConvSplit = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                            if ($txConvSplit <= 1.01) {
+                                try {
+                                    $dbTxSplit = \Config\Database::getConnection();
+                                    $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                    $stTxSplit->execute();
+                                    $txConvSplit = (float) ($stTxSplit->fetchColumn() ?: 0);
+                                } catch (\Exception $e) {}
+                            }
+                            if ($txConvSplit <= 1.01) $txConvSplit = 1.0;
+
+                            // AppMax recebe valores em BRL (convertidos de USD)
+                            $valorTaxaBrl = round(max(0.0, $taxaServico * $txConvSplit), 2);
+                            $valorImpostoBrl = round(max(0.0, $valorImposto * $txConvSplit), 2);
+                            $valorImpostoLocalBrl = round(max(0.0, $valorImpostoLocal * $txConvSplit), 2);
+                            $valorAppmax = round(max(0.0, $valorTaxaBrl + $valorImpostoBrl + $valorImpostoLocalBrl), 2);
+
+                            // Log de debug para diagnóstico do split
                             try {
-                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' totalBrl=' . $totalBrl . ' valorProduto=' . $valorProduto . ' taxaServico=' . $taxaServico . ' impostos=' . $valorImposto . ' impostoLocal=' . $valorImpostoLocal . ' valorAppmax=' . $valorAppmax);
+                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' totalUsd=' . $totalBrl . ' valorProdutoUsd=' . $valorProduto . ' taxaServicoUsd=' . $taxaServico . ' impostosUsd=' . $valorImposto . ' impostoLocalUsd=' . $valorImpostoLocal . ' txConv=' . $txConvSplit . ' valorAppmaxBrl=' . $valorAppmax);
                             } catch (\Exception $e) {}
 
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
@@ -3026,27 +3043,27 @@ class CheckoutController extends Controller {
                                 }
 
                                 $appmaxPaymentId = (string) ($taxa['payment_id'] ?? '');
-                                if ($appmaxPaymentId !== '' && $valorImposto > 0) {
+                                if ($appmaxPaymentId !== '' && $valorImpostoBrl > 0) {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
                                         'pedido_id' => (int) $pedidoId,
                                         'componente' => 'imposto',
                                         'gateway' => 'appmax',
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
-                                        'valor' => (float) $valorImposto,
+                                        'valor' => (float) $valorImpostoBrl,
                                         'payment_id' => $appmaxPaymentId,
                                         'status' => 'pending',
                                         'gateway_status' => 'SPLIT_ITEM',
                                     ]);
                                 }
-                                if ($appmaxPaymentId !== '' && $valorImpostoLocal > 0) {
+                                if ($appmaxPaymentId !== '' && $valorImpostoLocalBrl > 0) {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
                                         'pedido_id' => (int) $pedidoId,
                                         'componente' => 'imposto_local',
                                         'gateway' => 'appmax',
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
-                                        'valor' => (float) $valorImpostoLocal,
+                                        'valor' => (float) $valorImpostoLocalBrl,
                                         'payment_id' => $appmaxPaymentId,
                                         'status' => 'pending',
                                         'gateway_status' => 'SPLIT_ITEM',
@@ -3065,7 +3082,7 @@ class CheckoutController extends Controller {
                                     'gateway' => 'appmax',
                                     'metodo' => $formaSelecionada,
                                     'moeda' => 'BRL',
-                                    'valor' => (float) $valorImposto,
+                                    'valor' => (float) $valorImpostoBrl,
                                     'payment_id' => (string) (is_array($taxa) ? ($taxa['payment_id'] ?? '') : ''),
                                     'status' => 'pending',
                                 ],

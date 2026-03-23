@@ -140,6 +140,8 @@ class PaymentService {
 
         $payload = [
             'order_id' => (string) $pedidoId,
+            // O Câmbio Real interpreta 'amount' como USD.
+            // Enviar o valor em USD e deixar o gateway converter para BRL.
             'amount' => round($valorBrlOriginal, 2),
             'currency' => 'BRL',
             'payment_method' => 'boleto',
@@ -635,7 +637,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            'amount' => round($valorBrlOriginal, 2),
+            // O Câmbio Real interpreta 'amount' como USD.
+            // Enviar o valor em USD e deixar o gateway converter para BRL.
+            'amount' => round($amountUsdCalc, 2),
             'currency' => 'BRL',
             'payment_method' => $paymentMethod,
             'client' => [
@@ -669,8 +673,8 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao,
-                    'base_value' => round($valorBrlOriginal, 2),
-                    'valor' => round($valorBrlOriginal, 2),
+                    'base_value' => round($amountUsdCalc, 2),
+                    'valor' => round($amountUsdCalc, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
@@ -855,9 +859,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // Para PIX, queremos que o QR gere exatamente o valor em BRL do seu checkout.
-            // Se enviar USD, o gateway converte com a taxa dele e o valor em BRL pode divergir.
-            'amount' => round($valorBrlOriginal, 2),
+            // O Câmbio Real interpreta 'amount' sempre como USD.
+            // Enviar o valor em USD e deixar o gateway converter para BRL no PIX.
+            'amount' => round($amountUsd, 2),
             'currency' => 'BRL',
             'payment_method' => 'pix',
             'client' => (array) $customer,
@@ -870,15 +874,15 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
-                    'base_value' => round($valorBrlOriginal, 2),
-                    'valor' => round($valorBrlOriginal, 2),
+                    'base_value' => round($amountUsd, 2),
+                    'valor' => round($amountUsd, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
             ],
         ];
 
-        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amount=' . round($valorBrlOriginal, 2) . ' currency=BRL amountUsd=' . $amountUsd . ' orderId=' . $orderId);
+        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountUsd=' . round($amountUsd, 2) . ' valorBrlOriginal=' . round($valorBrlOriginal, 2) . ' currency=BRL orderId=' . $orderId);
 
         $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
             $msg = (string) ($resp['message'] ?? $defaultMsg);
