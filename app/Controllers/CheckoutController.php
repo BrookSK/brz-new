@@ -2823,29 +2823,7 @@ class CheckoutController extends Controller {
                             if ($valorImpostoLocal < 0) $valorImpostoLocal = 0.0;
                             $valorImpostoLocal = round((float) $valorImpostoLocal, 2);
 
-                            // ── Conversão USD → BRL ──────────────────────────────────
-                            // Todos os valores no banco estão em USD mesmo quando moeda='BRL'.
-                            // O frontend multiplica pela taxa_conversao para exibir em BRL.
-                            // Precisamos fazer o mesmo aqui antes de enviar ao Câmbio Real.
-                            $txConvPedido = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                            if ($txConvPedido <= 1.01) {
-                                try {
-                                    $dbTxConv = \Config\Database::getConnection();
-                                    $stTxConv = $dbTxConv->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                    $stTxConv->execute();
-                                    $txConvPedido = (float) ($stTxConv->fetchColumn() ?: 0);
-                                } catch (\Exception $e) {}
-                            }
-                            $moedaPedido = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
-                            if ($moedaPedido === 'BRL' && $txConvPedido > 1.01) {
-                                $totalBrl       = round($totalBrl * $txConvPedido, 2);
-                                $taxaServico    = round($taxaServico * $txConvPedido, 2);
-                                $valorImposto   = round($valorImposto * $txConvPedido, 2);
-                                $valorImpostoLocal = round($valorImpostoLocal * $txConvPedido, 2);
-                                error_log('[SPLIT_BRL_CONV] pedido=' . $pedidoId . ' taxa=' . $txConvPedido . ' totalBrl=' . $totalBrl . ' taxaServico=' . $taxaServico . ' impostos=' . $valorImposto . ' impostoLocal=' . $valorImpostoLocal);
-                            }
-
-                            // Obter subtotal dos produtos (já convertido para BRL se necessário).
+                            // Obter subtotal dos produtos.
                             $subtotalProdutos = 0.0;
                             $hasSubtotalProdutos = false;
 
@@ -2867,13 +2845,27 @@ class CheckoutController extends Controller {
                                     $stSub->execute([(int) $pedidoId]);
                                     $vSub = (float) ($stSub->fetchColumn() ?: 0);
                                     if ($vSub > 0) {
-                                        // Valor do banco está em USD — converter para BRL usando a mesma taxa
-                                        if ($moedaPedido === 'BRL' && $txConvPedido > 1.01) {
-                                            $subtotalProdutos = round($vSub * $txConvPedido, 2);
-                                        } else {
-                                            $subtotalProdutos = $vSub;
-                                        }
+                                        $subtotalProdutos = $vSub;
                                         $hasSubtotalProdutos = true;
+
+                                        // Se o subtotal parece estar em USD (muito menor que o total),
+                                        // converter para BRL usando a taxa de conversão do pedido.
+                                        // Ex: subtotal=2.49 USD, total=257 BRL → 2.49 é claramente USD.
+                                        if ($totalBrl > 0 && $subtotalProdutos > 0 && $subtotalProdutos < $totalBrl * 0.02) {
+                                            $txConvSub = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                            if ($txConvSub <= 1.01) {
+                                                try {
+                                                    $dbTxSub = \Config\Database::getConnection();
+                                                    $stTxSub = $dbTxSub->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                                    $stTxSub->execute();
+                                                    $txConvSub = (float) ($stTxSub->fetchColumn() ?: 0);
+                                                } catch (\Exception $e) {}
+                                            }
+                                            if ($txConvSub > 1.01) {
+                                                $subtotalProdutos = round($subtotalProdutos * $txConvSub, 2);
+                                                error_log('[SPLIT_BRL_SUB_CONV] pedido=' . $pedidoId . ' subtotalOriginal=' . $vSub . ' taxa=' . $txConvSub . ' subtotalBrl=' . $subtotalProdutos);
+                                            }
+                                        }
                                     }
                                 }
                             } catch (\Exception $e) {
@@ -2918,11 +2910,23 @@ class CheckoutController extends Controller {
                                             $sv = $stSum->fetchColumn();
                                             $subtotalProdutos = (float) ($sv ?: 0);
                                             if ($subtotalProdutos > 0) {
-                                                // Converter de USD para BRL
-                                                if ($moedaPedido === 'BRL' && $txConvPedido > 1.01) {
-                                                    $subtotalProdutos = round($subtotalProdutos * $txConvPedido, 2);
-                                                }
                                                 $hasSubtotalProdutos = true;
+
+                                                // Se o subtotal dos itens parece estar em USD, converter
+                                                if ($totalBrl > 0 && $subtotalProdutos < $totalBrl * 0.02) {
+                                                    $txConvIt = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                                    if ($txConvIt <= 1.01) {
+                                                        try {
+                                                            $dbTxIt = \Config\Database::getConnection();
+                                                            $stTxIt = $dbTxIt->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                                            $stTxIt->execute();
+                                                            $txConvIt = (float) ($stTxIt->fetchColumn() ?: 0);
+                                                        } catch (\Exception $e) {}
+                                                    }
+                                                    if ($txConvIt > 1.01) {
+                                                        $subtotalProdutos = round($subtotalProdutos * $txConvIt, 2);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
