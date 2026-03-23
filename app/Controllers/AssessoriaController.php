@@ -2222,6 +2222,57 @@ class AssessoriaController extends Controller {
             $data['images'] = array_values(array_unique($images));
         }
 
+        // 7) Pesos encontrados no HTML (lbs, kg, oz)
+        $weights = [];
+        if (preg_match_all('/(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?)\b/i', $html, $wm)) {
+            foreach ($wm[0] as $i => $full) {
+                $weights[] = ['raw' => trim($full), 'value_lbs' => floatval($wm[1][$i]), 'value_kg' => round(floatval($wm[1][$i]) * 0.4536, 2)];
+            }
+        }
+        if (preg_match_all('/(\d+(?:\.\d+)?)\s*kg\b/i', $html, $wkg)) {
+            foreach ($wkg[0] as $i => $full) {
+                $weights[] = ['raw' => trim($full), 'value_kg' => floatval($wkg[1][$i])];
+            }
+        }
+        if (!empty($weights)) {
+            $data['weights_found'] = array_values(array_unique($weights, SORT_REGULAR));
+        }
+
+        // 8) Especificações / tabelas de specs (peso, dimensões, etc.)
+        $specs = [];
+        if (preg_match_all('/<t[hd][^>]*>(.*?)<\/t[hd]>\s*<td[^>]*>(.*?)<\/td>/si', $html, $specMatches, PREG_SET_ORDER)) {
+            foreach ($specMatches as $sm) {
+                $label = trim(strip_tags($sm[1]));
+                $value = trim(strip_tags($sm[2]));
+                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
+                    $specs[$label] = $value;
+                }
+            }
+        }
+        if (preg_match_all('/<dt[^>]*>(.*?)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/si', $html, $dtMatches, PREG_SET_ORDER)) {
+            foreach ($dtMatches as $dm2) {
+                $label = trim(strip_tags($dm2[1]));
+                $value = trim(strip_tags($dm2[2]));
+                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
+                    $specs[$label] = $value;
+                }
+            }
+        }
+        if (!empty($specs)) {
+            $data['specifications'] = $specs;
+        }
+
+        // 9) Preços associados a tamanhos/variações no HTML
+        $variantPrices = [];
+        if (preg_match_all('/(?:Split California King|Split Cal King|California King|Cal King|Twin XL|Split King|Twin|Full|Queen|King|Double|Single)[^$\n]{0,30}\$\s?(\d{1,6}[.,]\d{2})/i', $html, $vpMatches, PREG_SET_ORDER)) {
+            foreach ($vpMatches as $vpm) {
+                $variantPrices[] = ['context' => trim(substr($vpm[0], 0, 80)), 'price' => $vpm[1]];
+            }
+        }
+        if (!empty($variantPrices)) {
+            $data['variant_prices_found'] = $variantPrices;
+        }
+
         return $data;
     }
 
@@ -3134,35 +3185,36 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
 REGRAS ESPECÍFICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
-1.1 VARIAÇÕES:
+
+2. VARIAÇÕES (IMPORTANTE):
    - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
-   - Cada variação deve ter pelo menos: id (ou string vazia), atributos (mapa), e valor quando houver.
+   - Cada variação deve ter: id (ou string vazia), label, atributos (mapa chave:valor), valor, peso.
+   - PREÇO POR VARIAÇÃO: Se os dados contêm preços diferentes por variação/tamanho, CADA variação DEVE ter seu preço específico. NÃO copie o mesmo preço para todas.
+   - PESO POR VARIAÇÃO: Se os dados contêm pesos diferentes por variação (ex: weights_found), converta de lbs para kg (1 lb = 0.4536 kg) e atribua a cada variação.
    - Se não existirem variações, retorne \"variacoes\": []
-2. PESO (kg): 
-   - Se não encontrar o peso exato, ESTIME com base no tipo de produto
-   - Adicione 15% de margem de segurança sobre o peso estimado
-   - Ex: se estimar 1kg, use 1.15kg
-   - Use sempre casas decimais (ex: 1.15)
 
-3. DESCRIÇÃO:
+3. PESO (kg):
+   - Se o peso estiver em LIBRAS (lbs/pounds), CONVERTA: 1 lb = 0.4536 kg.
+   - Procure peso em: specifications, weights_found, shipping weight, product weight.
+   - Se não encontrar o peso exato, ESTIME com base no tipo de produto.
+   - Adicione 15% de margem de segurança sobre o peso estimado.
+
+4. DESCRIÇÃO:
    - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
-   - Inclua informações relevantes sobre o produto
-   - Seja específico e útil para o cliente
 
-4. IMAGEM:
+5. IMAGEM:
    - Extraia todas as URLs de imagens disponíveis
    - Se não encontrar, use array vazio []
 
-5. VALOR: Use número decimal com 2 casas (ex: 99.99)
+6. VALOR: Use número decimal com 2 casas (ex: 99.99). Preço em USD.
 
-6. NOME: Use o nome completo do produto
+7. NOME: Use o nome completo do produto
 
 IMPORTANTE:
 - Retorne APENAS o JSON, sem texto adicional
-- Para peso, SEMPRE inclua a margem de 15% se precisar estimar
+- CONVERTA libras para kg (1 lb = 0.4536 kg)
 - Para descrição, CRIE uma se não encontrar
-- SKU pode ser gerado baseado no nome se não existir
-- Use kg para peso, cm para dimensões
+- Use kg para peso
 
 RETORNE APENAS O JSON:";
     }
