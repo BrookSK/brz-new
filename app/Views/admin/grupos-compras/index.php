@@ -20,6 +20,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         <?php
             $ativo = (int)($g['ativo'] ?? 1);
             $cobraImposto = (int)($g['cobra_imposto_eua'] ?? 0);
+            $impostoLocal = (float)($g['imposto_local_percent'] ?? 0);
             $qtdPedidos = (int)($g['qtd_pedidos'] ?? 0);
             $qtdProdutos = (int)($g['qtd_produtos'] ?? 0);
             $criadoPor = htmlspecialchars($g['criado_por_nome'] ?? '—', ENT_QUOTES, 'UTF-8');
@@ -36,7 +37,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                         </div>
                         <span class="badge <?= $ativo ? 'bg-success' : 'bg-secondary' ?> ms-2"><?= $ativo ? 'Ativo' : 'Inativo' ?></span>
                     </div>
-                    <div class="small mb-1"><i class="fas fa-percent me-1 text-muted"></i>Imposto EUA: <strong><?= $cobraImposto ? 'Sim (10%)' : 'Não' ?></strong></div>
+                    <div class="small mb-1"><i class="fas fa-percent me-1 text-muted"></i>Imposto local: <strong><?= $impostoLocal > 0 ? number_format($impostoLocal, 1) . '%' : 'Não' ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-box me-1 text-muted"></i>Produtos: <strong><?= $qtdProdutos ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-shopping-cart me-1 text-muted"></i>Pedidos: <strong><?= $qtdPedidos ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-user me-1 text-muted"></i>Cadastrado por: <strong><?= $criadoPor ?></strong></div>
@@ -50,6 +51,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             data-nome="<?= htmlspecialchars($g['nome'], ENT_QUOTES, 'UTF-8') ?>"
                             data-descricao="<?= htmlspecialchars($g['descricao'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                             data-imposto="<?= $cobraImposto ?>"
+                            data-imposto-local="<?= $impostoLocal ?>"
                             data-ativo="<?= $ativo ?>"
                             title="Editar">
                             <i class="fas fa-pen"></i>
@@ -91,7 +93,11 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                 </div>
                 <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox" id="grupoImposto" role="switch">
-                    <label class="form-check-label" for="grupoImposto">Cobrar imposto EUA (10%) neste grupo</label>
+                    <label class="form-check-label" for="grupoImposto">Cobrar imposto local neste grupo</label>
+                </div>
+                <div class="mb-3" id="grupoImpostoPercentWrap" style="display:none">
+                    <label class="form-label">Percentual do imposto local (%)</label>
+                    <input class="form-control" type="number" id="grupoImpostoPercent" step="0.1" min="0" max="99" value="7" placeholder="Ex: 7">
                 </div>
                 <div class="form-check form-switch" id="grupoAtivoWrap">
                     <input class="form-check-input" type="checkbox" id="grupoAtivo" role="switch" checked>
@@ -132,6 +138,8 @@ document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     document.getElementById('grupoNome').value = '';
     document.getElementById('grupoDescricao').value = '';
     document.getElementById('grupoImposto').checked = false;
+    document.getElementById('grupoImpostoPercent').value = '7';
+    document.getElementById('grupoImpostoPercentWrap').style.display = 'none';
     document.getElementById('grupoAtivo').checked = true;
     document.getElementById('grupoAtivoWrap').style.display = 'none';
     document.getElementById('modalGrupoTitulo').textContent = 'Novo grupo de compras';
@@ -139,12 +147,19 @@ document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     new bootstrap.Modal(document.getElementById('modalGrupo')).show();
 });
 
+document.getElementById('grupoImposto').addEventListener('change', function() {
+    document.getElementById('grupoImpostoPercentWrap').style.display = this.checked ? '' : 'none';
+});
+
 document.querySelectorAll('.btn-editar').forEach(btn => {
     btn.addEventListener('click', () => {
         document.getElementById('grupoId').value = btn.dataset.id;
         document.getElementById('grupoNome').value = btn.dataset.nome;
         document.getElementById('grupoDescricao').value = btn.dataset.descricao;
-        document.getElementById('grupoImposto').checked = btn.dataset.imposto === '1';
+        const impostoLocal = parseFloat(btn.dataset.impostoLocal || '0');
+        document.getElementById('grupoImposto').checked = impostoLocal > 0;
+        document.getElementById('grupoImpostoPercent').value = impostoLocal > 0 ? impostoLocal : '7';
+        document.getElementById('grupoImpostoPercentWrap').style.display = impostoLocal > 0 ? '' : 'none';
         document.getElementById('grupoAtivo').checked = btn.dataset.ativo === '1';
         document.getElementById('grupoAtivoWrap').style.display = '';
         document.getElementById('modalGrupoTitulo').textContent = 'Editar grupo';
@@ -163,7 +178,12 @@ document.getElementById('btnSalvarGrupo').addEventListener('click', async () => 
     fd.append('id', document.getElementById('grupoId').value);
     fd.append('nome', nome);
     fd.append('descricao', document.getElementById('grupoDescricao').value);
-    if (document.getElementById('grupoImposto').checked) fd.append('cobra_imposto_eua', '1');
+    if (document.getElementById('grupoImposto').checked) {
+        fd.append('cobra_imposto_eua', '1');
+        fd.append('imposto_local_percent', document.getElementById('grupoImpostoPercent').value || '7');
+    } else {
+        fd.append('imposto_local_percent', '0');
+    }
     fd.append('ativo', document.getElementById('grupoAtivo').checked ? '1' : '0');
     const r = await fetch('/admin/grupos-compras/salvar', {method:'POST', body:fd});
     const j = await r.json();

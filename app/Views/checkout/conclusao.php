@@ -146,6 +146,12 @@
                         <span><?= __('checkout_done.taxes_brazil', 'Impostos do Brasil') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
                     </div>
+                    <?php if (((float) ($pedido['imposto_local'] ?? 0)) > 0): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="fas fa-percent me-1 text-warning"></i><?= __('checkout_done.local_tax', 'Imposto local') ?>:</span>
+                        <span><?= $simboloMoeda ?> <?= number_format((float) $pedido['imposto_local'], 2, ',', '.') ?></span>
+                    </div>
+                    <?php endif; ?>
                     <hr>
                     <div class="d-flex justify-content-between">
                         <strong>Total:</strong>

@@ -388,13 +388,9 @@
                 }
 
                 var baseSubtotal = (window.checkoutBaseValues.subtotal || 0);
-                if (us) {
-                    window.checkoutOriginalValues.subtotal = baseSubtotal * 1.10;
-                    if (subtotalLabel) subtotalLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.subtotal_products_us_tax) ? window.CHECKOUT_I18N.subtotal_products_us_tax : 'Subtotal Produtos (incl. imposto EUA 10%):';
-                } else {
-                    window.checkoutOriginalValues.subtotal = baseSubtotal;
-                    if (subtotalLabel) subtotalLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.subtotal_products) ? window.CHECKOUT_I18N.subtotal_products : 'Subtotal Produtos:';
-                }
+                // Imposto local é calculado no backend, não mais no frontend
+                window.checkoutOriginalValues.subtotal = baseSubtotal;
+                if (subtotalLabel) subtotalLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.subtotal_products) ? window.CHECKOUT_I18N.subtotal_products : 'Subtotal Produtos:';
 
                 if (br) {
                     window.checkoutOriginalValues.impostos = (window.checkoutBaseValues.impostos || 0);
@@ -407,7 +403,7 @@
                     }
                 } else {
                     window.checkoutOriginalValues.impostos = 0;
-                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0) + (window.checkoutBaseValues.impostoLocal || 0);
                     if (impostosEl) {
                         impostosEl.setAttribute('data-original-value', '0');
                         impostosEl.textContent = '0';
@@ -776,6 +772,12 @@
                                     <div class="d-flex justify-content-between d-none" id="impostos-row">
                                         <span><?= __('cart.taxes', 'Impostos') ?>:</span>
                                         <span id="impostos" class="cart-currency" data-original-value="0">0</span>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (($imposto_local ?? 0) > 0): ?>
+                                    <div class="d-flex justify-content-between" id="imposto-local-row">
+                                        <span><i class="fas fa-percent me-1 text-warning"></i>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%):</span>
+                                        <span id="imposto-local" class="cart-currency" data-original-value="<?= $imposto_local ?>"><?= number_format($imposto_local, 2, '.', ',') ?></span>
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
@@ -2081,6 +2083,7 @@ function updatePrices(currency) {
             frete: <?= ($frete ?? 0) ?>,
             taxaServico: <?= ($taxa_servico ?? 0) ?>,
             impostos: <?= ($impostos ?? 0) ?>,
+            impostoLocal: <?= ($imposto_local ?? 0) ?>,
             total: <?= ($total ?? 0) ?>
         };
     }
@@ -2097,6 +2100,7 @@ function updatePrices(currency) {
         frete: originalValues.frete * rate,
         taxaServico: originalValues.taxaServico * rate,
         impostos: originalValues.impostos * rate,
+        impostoLocal: (originalValues.impostoLocal || 0) * rate,
         total: originalValues.total * rate
     };
     
@@ -2109,6 +2113,7 @@ function updatePrices(currency) {
             frete: document.getElementById('frete'),
             taxaServico: document.getElementById('taxa-servico'),
             impostos: document.getElementById('impostos'),
+            impostoLocal: document.getElementById('imposto-local'),
             total: document.getElementById('total')
         };
 

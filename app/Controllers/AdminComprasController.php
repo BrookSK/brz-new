@@ -212,7 +212,7 @@ class AdminComprasController extends Controller {
     private function recalcularTotaisPedido(int $pedidoId, string $moeda = 'BRL'): array {
         $itensTable = $this->findPedidoItensTable();
         if (!$itensTable || $pedidoId <= 0) {
-            return ['subtotal' => 0.0, 'frete' => 0.0, 'taxa_servico' => 0.0, 'impostos' => 0.0, 'total' => 0.0];
+            return ['subtotal' => 0.0, 'frete' => 0.0, 'taxa_servico' => 0.0, 'impostos' => 0.0, 'imposto_local' => 0.0, 'total' => 0.0];
         }
 
         // subtotal
@@ -252,13 +252,31 @@ class AdminComprasController extends Controller {
         $taxaServico = ceil($pesoTotal) * $this->getTaxaServicoPorKg();
         $frete = $this->calcularFrete($subtotal, $pesoTotal, $moeda);
         $impostos = $subtotal * 0.80;
-        $total = $subtotal + $taxaServico + $impostos + $frete;
+
+        // Imposto local do grupo de compras
+        $impostoLocal = 0.0;
+        try {
+            $stImpL = $this->connection->prepare(
+                "SELECT MAX(g.imposto_local_percent) FROM grupos_compras g
+                 INNER JOIN produtos p ON p.grupo_compras_id = g.id
+                 INNER JOIN {$itensTable} i ON i.produto_id = p.id
+                 WHERE i.pedido_id = :pedido_id AND g.imposto_local_percent > 0"
+            );
+            $stImpL->execute([':pedido_id' => $pedidoId]);
+            $maxPercent = (float) ($stImpL->fetchColumn() ?: 0);
+            if ($maxPercent > 0) {
+                $impostoLocal = $subtotal * ($maxPercent / 100.0);
+            }
+        } catch (\Exception $e) {}
+
+        $total = $subtotal + $taxaServico + $impostos + $frete + $impostoLocal;
 
         return [
             'subtotal' => $subtotal,
             'peso' => $pesoTotal,
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
+            'imposto_local' => $impostoLocal,
             'frete' => $frete,
             'total' => $total,
         ];
@@ -2177,6 +2195,11 @@ class AdminComprasController extends Controller {
             if (in_array('peso_total', $colsPedidos, true)) {
                 $set[] = 'peso_total = :peso';
                 $params[':peso'] = (float) ($novos['peso'] ?? 0);
+            }
+
+            if (in_array('imposto_local', $colsPedidos, true)) {
+                $set[] = 'imposto_local = :imp_local';
+                $params[':imp_local'] = (float) ($novos['imposto_local'] ?? 0);
             }
 
             if (in_array('valor_total', $colsPedidos, true)) {

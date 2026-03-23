@@ -1793,7 +1793,7 @@ class AdminProdutosController extends Controller {
                 updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             try { $pdo->exec("ALTER TABLE produtos ADD COLUMN grupo_compras_id INT NULL DEFAULT NULL"); } catch (\Throwable $e) {}
-            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua FROM grupos_compras ORDER BY nome ASC");
+            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua, imposto_local_percent FROM grupos_compras ORDER BY nome ASC");
             $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {}
 
@@ -1867,9 +1867,13 @@ class AdminProdutosController extends Controller {
             <div class="fw-semibold mb-3">Novo grupo de compras</div>
             <div class="mb-3"><label class="form-label">Nome <span class="text-danger">*</span></label><input class="form-control" type="text" id="ngNome" placeholder="Ex: Walmart"></div>
             <div class="mb-3"><label class="form-label">Descrição</label><textarea class="form-control" id="ngDesc" rows="2" placeholder="Opcional"></textarea></div>
-            <div class="form-check form-switch mb-3">
+            <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" id="ngImposto" role="switch">
-                <label class="form-check-label" for="ngImposto">Cobrar imposto EUA (10%)</label>
+                <label class="form-check-label" for="ngImposto">Cobrar imposto local</label>
+            </div>
+            <div class="mb-3" id="ngImpostoPercentWrap" style="display:none">
+                <label class="form-label">Percentual (%)</label>
+                <input class="form-control" type="number" id="ngImpostoPercent" step="0.1" min="0" max="99" value="7" placeholder="Ex: 7">
             </div>
             <div id="msgNovoGrupo" class="mb-2"></div>
             <div class="d-flex gap-2">
@@ -2013,11 +2017,11 @@ function renderGrupos() {
     GRUPOS.forEach(g => {
         const div = document.createElement("div");
         div.className = "col-12";
-        div.innerHTML = `<div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" data-id="${g.id}" data-nome="${g.nome}" data-imposto="${g.cobra_imposto_eua}">
+        div.innerHTML = `<div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" data-id="${g.id}" data-nome="${g.nome}" data-imposto-local="${g.imposto_local_percent || 0}">
             <i class="fas fa-store fa-lg text-muted"></i>
             <div class="flex-fill">
                 <div class="fw-semibold">${g.nome}</div>
-                ${g.cobra_imposto_eua ? \'<div class="small text-warning"><i class="fas fa-percent me-1"></i>Cobra imposto EUA</div>\' : ""}
+                ${parseFloat(g.imposto_local_percent || 0) > 0 ? \'<div class="small text-warning"><i class="fas fa-percent me-1"></i>Imposto local \' + parseFloat(g.imposto_local_percent).toFixed(0) + \'%</div>\' : ""}
             </div>
             <i class="fas fa-chevron-right text-muted"></i>
         </div>`;
@@ -2041,6 +2045,9 @@ document.getElementById("btnAbrirGrupo").addEventListener("click", () => {
     document.getElementById("formNovoGrupo").style.display = "";
     document.getElementById("btnAbrirGrupo").style.display = "none";
 });
+document.getElementById("ngImposto").addEventListener("change", function() {
+    document.getElementById("ngImpostoPercentWrap").style.display = this.checked ? "" : "none";
+});
 document.getElementById("btnCancelarGrupo").addEventListener("click", () => {
     document.getElementById("formNovoGrupo").style.display = "none";
     document.getElementById("btnAbrirGrupo").style.display = "";
@@ -2055,7 +2062,12 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
     const fd = new FormData();
     fd.append("nome", nome);
     fd.append("descricao", document.getElementById("ngDesc").value);
-    if (document.getElementById("ngImposto").checked) fd.append("cobra_imposto_eua", "1");
+    if (document.getElementById("ngImposto").checked) {
+        fd.append("cobra_imposto_eua", "1");
+        fd.append("imposto_local_percent", document.getElementById("ngImpostoPercent").value || "7");
+    } else {
+        fd.append("imposto_local_percent", "0");
+    }
     const r = await fetch("/admin/grupos-compras/salvar", {method:"POST", body:fd});
     const j = await r.json();
     btn.disabled = false; btn.innerHTML = \'<i class="fas fa-check me-1"></i>Criar grupo\';
@@ -2067,6 +2079,8 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
         document.getElementById("ngNome").value = "";
         document.getElementById("ngDesc").value = "";
         document.getElementById("ngImposto").checked = false;
+        document.getElementById("ngImpostoPercentWrap").style.display = "none";
+        document.getElementById("ngImpostoPercent").value = "7";
         selecionarGrupo(j.grupo);
     } else { msg.innerHTML = \'<div class="alert alert-danger py-1 small">\' + (j.msg||"Erro") + \'</div>\'; }
 });

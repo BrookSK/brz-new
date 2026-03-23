@@ -17,6 +17,7 @@ class AdminGruposComprasController extends Controller {
             slug VARCHAR(255) NOT NULL UNIQUE,
             descricao TEXT NULL,
             cobra_imposto_eua TINYINT(1) NOT NULL DEFAULT 0,
+            imposto_local_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
             ativo TINYINT(1) NOT NULL DEFAULT 1,
             criado_por INT NULL,
             criado_por_nome VARCHAR(255) NULL,
@@ -27,6 +28,16 @@ class AdminGruposComprasController extends Controller {
         // Coluna grupo_compras_id na tabela produtos
         try {
             $pdo->exec("ALTER TABLE produtos ADD COLUMN grupo_compras_id INT NULL DEFAULT NULL");
+        } catch (\Throwable $e) {}
+
+        // Coluna imposto_local_percent (migração)
+        try {
+            $pdo->exec("ALTER TABLE grupos_compras ADD COLUMN imposto_local_percent DECIMAL(5,2) NOT NULL DEFAULT 0");
+        } catch (\Throwable $e) {}
+
+        // Coluna imposto_local no pedido
+        try {
+            $pdo->exec("ALTER TABLE pedidos ADD COLUMN imposto_local DECIMAL(10,2) NOT NULL DEFAULT 0");
         } catch (\Throwable $e) {}
     }
 
@@ -97,6 +108,9 @@ class AdminGruposComprasController extends Controller {
         $nome = trim((string) $request->getParam('nome', ''));
         $descricao = trim((string) $request->getParam('descricao', ''));
         $cobraImposto = $request->getParam('cobra_imposto_eua') ? 1 : 0;
+        $impostoLocalPercent = (float) str_replace(',', '.', (string) $request->getParam('imposto_local_percent', '0'));
+        if ($impostoLocalPercent < 0) $impostoLocalPercent = 0;
+        if ($impostoLocalPercent > 99) $impostoLocalPercent = 99;
         $ativo = $request->getParam('ativo') !== null ? (int)$request->getParam('ativo') : 1;
 
         if ($nome === '') {
@@ -115,11 +129,11 @@ class AdminGruposComprasController extends Controller {
             $slug = $this->uniqueSlug($pdo, $this->slugify($nome), $id ?: null);
 
             if ($id > 0) {
-                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, ativo=?, updated_at=NOW() WHERE id=?");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, $ativo, $id]);
+                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, imposto_local_percent=?, ativo=?, updated_at=NOW() WHERE id=?");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $id]);
             } else {
-                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, ativo, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,NOW())");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, 1, $userId ?: null, $userName ?: null]);
+                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, imposto_local_percent, ativo, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, 1, $userId ?: null, $userName ?: null]);
                 $id = (int)$pdo->lastInsertId();
             }
 
@@ -176,7 +190,7 @@ class AdminGruposComprasController extends Controller {
         try {
             $pdo = $this->getPdo();
             $this->ensureTables($pdo);
-            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua, ativo FROM grupos_compras ORDER BY nome ASC");
+            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua, imposto_local_percent, ativo FROM grupos_compras ORDER BY nome ASC");
             $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             echo json_encode(['ok' => true, 'grupos' => $grupos]);
         } catch (\Throwable $e) {
@@ -235,7 +249,7 @@ class AdminGruposComprasController extends Controller {
             $this->ensureTables($pdo);
 
             $stmt = $pdo->query("
-                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua,
+                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua, g.imposto_local_percent,
                     (SELECT COUNT(*) FROM produtos p WHERE p.grupo_compras_id = g.id) AS qtd_produtos
                 FROM grupos_compras g
                 WHERE g.ativo = 1

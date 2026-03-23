@@ -23,6 +23,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
             $descricao = htmlspecialchars($g['descricao'] ?? '', ENT_QUOTES, 'UTF-8');
             $qtd = (int)($g['qtd_produtos'] ?? 0);
             $cobraImposto = (int)($g['cobra_imposto_eua'] ?? 0);
+            $impostoLocal = (float)($g['imposto_local_percent'] ?? 0);
         ?>
         <div class="col-lg-3 col-md-4 col-sm-6">
             <a href="/grupo/<?= $slug ?>" class="text-decoration-none">
@@ -42,9 +43,9 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             <span class="badge bg-light text-secondary border">
                                 <i class="fas fa-box me-1"></i><?= $qtd ?> produto<?= $qtd !== 1 ? 's' : '' ?>
                             </span>
-                            <?php if ($cobraImposto): ?>
+                            <?php if ($impostoLocal > 0): ?>
                             <span class="badge bg-warning text-dark">
-                                <i class="fas fa-percent me-1"></i>Imposto EUA
+                                <i class="fas fa-percent me-1"></i>Imposto local <?= number_format($impostoLocal, 0) ?>%
                             </span>
                             <?php endif; ?>
                         </div>

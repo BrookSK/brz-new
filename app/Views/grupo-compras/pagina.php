@@ -22,9 +22,11 @@ $buildUrl = static function (int $p) use ($slug): string {
         <?php endif; ?>
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <span class="text-muted small"><i class="fas fa-box me-1"></i><?= $total ?> produto(s)</span>
-            <?php if (!empty($grupo['cobra_imposto_eua'])): ?>
+            <?php
+            $impostoLocalPercent = (float)($grupo['imposto_local_percent'] ?? 0);
+            if ($impostoLocalPercent > 0): ?>
             <span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">
-                <i class="fas fa-percent me-1"></i>Inclui imposto EUA (10%)
+                <i class="fas fa-percent me-1"></i>Inclui imposto local (<?= number_format($impostoLocalPercent, 0) ?>%)
             </span>
             <?php endif; ?>
         </div>
@@ -57,6 +59,10 @@ $buildUrl = static function (int $p) use ($slug): string {
             $precoPromo = (float) ($produto['sale_price'] ?? 0);
             $temPromo   = ($precoPromo > 0 && $precoPromo < $precoBase);
             $precoExibir = $temPromo ? $precoPromo : $precoBase;
+            // Aplicar imposto local do grupo no preço exibido
+            $impostoLocalGrupo = (float)($grupo['imposto_local_percent'] ?? 0);
+            $precoComImposto = $impostoLocalGrupo > 0 ? $precoExibir * (1 + $impostoLocalGrupo / 100) : $precoExibir;
+            $precoBaseComImposto = $impostoLocalGrupo > 0 ? $precoBase * (1 + $impostoLocalGrupo / 100) : $precoBase;
         ?>
         <div class="col-lg-3 col-md-6 mb-4 produto-item" data-nome="<?= strtolower(htmlspecialchars($produto['name'] ?? '', ENT_QUOTES, 'UTF-8')) ?>">
             <div class="card h-100 product-card-modern border-0 shadow-sm">
@@ -94,14 +100,17 @@ $buildUrl = static function (int $p) use ($slug): string {
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="price-section">
                             <span class="h4 text-primary fw-bold mb-0 product-price"
-                                  data-original-price="<?= $precoExibir ?>">
-                                <?= number_format($precoExibir, 2, ',', '.') ?>
+                                  data-original-price="<?= $precoComImposto ?>">
+                                <?= number_format($precoComImposto, 2, ',', '.') ?>
                             </span>
                             <?php if ($temPromo): ?>
                             <small class="text-decoration-line-through text-muted product-original-price"
-                                   data-original-original-price="<?= $precoBase ?>">
-                                <?= number_format($precoBase, 2, ',', '.') ?>
+                                   data-original-original-price="<?= $precoBaseComImposto ?>">
+                                <?= number_format($precoBaseComImposto, 2, ',', '.') ?>
                             </small>
+                            <?php endif; ?>
+                            <?php if ($impostoLocalGrupo > 0): ?>
+                            <div class="small text-warning mt-1"><i class="fas fa-percent me-1"></i>Incl. imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
                             <?php endif; ?>
                         </div>
                         <div>

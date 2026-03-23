@@ -2205,6 +2205,29 @@ class CheckoutController extends Controller {
             $total = (float) $subtotal + (float) $frete + (float) $taxaServico;
         }
 
+        // Calcular imposto local do grupo de compras
+        $impostoLocal = 0.0;
+        $impostoLocalPercent = 0.0;
+        try {
+            $dbImpLocal = \Config\Database::getConnection();
+            $produtoIds = [];
+            foreach ($items as $cItem) {
+                $pid = (int) ($cItem['produto_id'] ?? ($cItem['id'] ?? 0));
+                if ($pid > 0) $produtoIds[$pid] = true;
+            }
+            $produtoIds = array_keys($produtoIds);
+            if (!empty($produtoIds)) {
+                $in = implode(',', array_fill(0, count($produtoIds), '?'));
+                $stImpL = $dbImpLocal->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                $stImpL->execute($produtoIds);
+                $impostoLocalPercent = (float) ($stImpL->fetchColumn() ?: 0);
+                if ($impostoLocalPercent > 0) {
+                    $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
+                    $total = $total + $impostoLocal;
+                }
+            }
+        } catch (\Throwable $e) {}
+
         $rateBRL = 5.5;
         try {
             $r = (float) $this->carrinhoModel->getTaxaConversao('BRL');
@@ -2229,10 +2252,12 @@ class CheckoutController extends Controller {
             'campos_faltando' => $faltando,
             'enderecos' => $enderecos,
             'endereco_prefill' => $enderecoPrefill,
-            'moeda' => $_GET['moeda'] ?? 'BRL', // Obter moeda da URL ou padrão BRL
+            'moeda' => $_GET['moeda'] ?? 'BRL',
             'frete' => $frete,
             'taxa_servico' => $taxaServico,
             'impostos' => $impostos,
+            'imposto_local' => $impostoLocal,
+            'imposto_local_percent' => $impostoLocalPercent,
             'total' => $total,
             'pix_desconto_taxa_servico_percent' => (float) $this->getPixDescontoTaxaServicoPercent(),
             'cobra_impostos_br' => $cobraImpostosBR,
@@ -2728,6 +2753,20 @@ class CheckoutController extends Controller {
                             if ($valorImposto < 0) $valorImposto = 0.0;
                             $valorImposto = round((float) $valorImposto, 2);
 
+                            // Incluir imposto local do grupo de compras no valor enviado ao AppMax
+                            $valorImpostoLocal = 0.0;
+                            try {
+                                if (is_array($colsPed) && in_array('imposto_local', $colsPed, true)) {
+                                    $stImpLocal = $dbCols->prepare('SELECT imposto_local FROM pedidos WHERE id = ? LIMIT 1');
+                                    $stImpLocal->execute([(int) $pedidoId]);
+                                    $valorImpostoLocal = (float) ($stImpLocal->fetchColumn() ?: 0);
+                                }
+                            } catch (\Exception $e) {
+                                $valorImpostoLocal = 0.0;
+                            }
+                            if ($valorImpostoLocal < 0) $valorImpostoLocal = 0.0;
+                            $valorImpostoLocal = round((float) $valorImpostoLocal, 2);
+
                             // Tenta obter subtotal real dos produtos (sem taxa/impostos), pois em alguns cenários
                             // o campo 'total' do pedido pode já ser o subtotal, e subtrair taxa/impostos gera valor menor.
                             $subtotalProdutos = 0.0;
@@ -2802,7 +2841,7 @@ class CheckoutController extends Controller {
                                 $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto), 2);
                             }
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
-                            $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto), 2);
+                            $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
                                 throw new \Exception('Valores inválidos para split');
@@ -3000,6 +3039,19 @@ class CheckoutController extends Controller {
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
                                         'valor' => (float) $valorImposto,
+                                        'payment_id' => $appmaxPaymentId,
+                                        'status' => 'pending',
+                                        'gateway_status' => 'SPLIT_ITEM',
+                                    ]);
+                                }
+                                if ($appmaxPaymentId !== '' && $valorImpostoLocal > 0) {
+                                    $this->paymentService->registrarPedidoPagamentoSplit([
+                                        'pedido_id' => (int) $pedidoId,
+                                        'componente' => 'imposto_local',
+                                        'gateway' => 'appmax',
+                                        'metodo' => strtolower((string) $billingType),
+                                        'moeda' => 'BRL',
+                                        'valor' => (float) $valorImpostoLocal,
                                         'payment_id' => $appmaxPaymentId,
                                         'status' => 'pending',
                                         'gateway_status' => 'SPLIT_ITEM',
@@ -4735,17 +4787,35 @@ class CheckoutController extends Controller {
                 $impostosUsd = 0.0;
             }
 
-            // Imposto de compra nos EUA (10%) embutido no subtotal dos produtos.
-            if ($paisEntrega === 'US') {
-                $subtotal = (float) $subtotal * 1.10;
-            }
+            // Imposto local do grupo de compras (baseado no grupo dos produtos no carrinho)
+            $impostoLocalUsd = 0.0;
+            try {
+                $dbImp = \Config\Database::getConnection();
+                // Buscar o maior imposto_local_percent dos grupos dos produtos no carrinho
+                $produtoIds = [];
+                foreach ($carrinho as $cItem) {
+                    $pid = (int) ($cItem['produto_id'] ?? ($cItem['id'] ?? 0));
+                    if ($pid > 0) $produtoIds[$pid] = true;
+                }
+                $produtoIds = array_keys($produtoIds);
+                if (!empty($produtoIds)) {
+                    $in = implode(',', array_fill(0, count($produtoIds), '?'));
+                    $stImp = $dbImp->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
+                    $stImp->execute($produtoIds);
+                    $maxImpLocal = (float) ($stImp->fetchColumn() ?: 0);
+                    if ($maxImpLocal > 0) {
+                        $impostoLocalUsd = $subtotal * ($maxImpLocal / 100.0);
+                    }
+                }
+            } catch (\Throwable $e) {}
 
-            $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd;
+            $totalUsd = $subtotal + $taxaServicoUsd + $impostosUsd + $freteUsd + $impostoLocalUsd;
 
             if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
                 $taxaServico = $taxaServicoUsd * $taxaConversao;
                 $impostos = $impostosUsd * $taxaConversao;
                 $frete = $freteUsd * $taxaConversao;
+                $impostoLocal = $impostoLocalUsd * $taxaConversao;
                 $subtotal = $subtotal * $taxaConversao;
                 $total = $totalUsd * $taxaConversao;
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em BRL (convertido de USD) - Taxa conversao: ' . $taxaConversao);
@@ -4753,6 +4823,7 @@ class CheckoutController extends Controller {
                 $taxaServico = $taxaServicoUsd;
                 $impostos = $impostosUsd;
                 $frete = $freteUsd;
+                $impostoLocal = $impostoLocalUsd;
                 $total = $totalUsd;
                 $this->debugLog('[CRIAR_PEDIDO] Calculo em USD - Taxa conversao: ' . $taxaConversao);
             }
@@ -4836,6 +4907,12 @@ class CheckoutController extends Controller {
                 if (is_array($colsPed) && !empty($colsPed)) {
                     $set = [];
                     $p = [];
+
+                    // Salvar imposto local do grupo de compras
+                    if (in_array('imposto_local', $colsPed, true) && isset($impostoLocal)) {
+                        $set[] = 'imposto_local = :imposto_local';
+                        $p[':imposto_local'] = (float) $impostoLocal;
+                    }
 
                     foreach ([
                         'cliente_nome' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? '')),

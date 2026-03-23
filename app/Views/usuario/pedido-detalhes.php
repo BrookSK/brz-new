@@ -354,6 +354,12 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <span><?= __('checkout.brazil_taxes', 'Impostos do Brasil') ?>:</span>
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['valor_impostos'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
+                                    <?php if (((float) ($pedido['imposto_local'] ?? 0)) > 0): ?>
+                                    <div class="price-row">
+                                        <span><i class="fas fa-percent me-1 text-warning"></i><?= __('checkout.local_tax', 'Imposto local') ?>:</span>
+                                        <span><?= $simboloMoeda ?> <?= number_format((float) $pedido['imposto_local'], 2, ',', '.') ?></span>
+                                    </div>
+                                    <?php endif; ?>
                                     <hr>
                                     <div class="price-row">
                                         <span><?= __('checkout.total', 'Total') ?>:</span>
