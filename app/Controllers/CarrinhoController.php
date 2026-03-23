@@ -571,6 +571,11 @@ class CarrinhoController extends Controller {
                     } else {
                         $total = (float) $subtotal + (float) $taxaServico + (float) $impostos + (float) $frete;
                     }
+
+                    // Re-adicionar imposto local ao total (DB não persiste imposto local no carrinho)
+                    if ($impostoLocal > 0) {
+                        $total = (float) $total + (float) $impostoLocal;
+                    }
                 }
             } catch (\Throwable $e) {
             }

@@ -2159,6 +2159,8 @@ class CheckoutController extends Controller {
             $total = (float) $subtotal + (float) $frete + (float) $taxaServico + (float) $impostos;
         }
         
+        // Nota: imposto local será adicionado ao total mais abaixo, após o cálculo do grupo de compras
+        
         $enderecos = $usuario ? $this->usuarioModel->getEnderecos($usuario['id']) : [];
         $enderecoPrincipal = null;
         if (is_array($enderecos) && !empty($enderecos)) {

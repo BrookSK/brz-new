@@ -792,7 +792,7 @@
 
                             <div class="d-flex justify-content-between mb-3">
                                 <h6><?= __('cart.total', 'Total') ?>:</h6>
-                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0))), 2, '.', ',') ?></h6>
+                                <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0))), 2, '.', ',') ?></h6>
                             </div>
 
                             <?php if (!$isPaymentLink): ?>
