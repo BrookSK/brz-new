@@ -140,10 +140,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => (string) $pedidoId,
-            // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
-            // Enviamos em BRL para que o gateway gere o boleto no valor correto em reais.
+            // Enviar amount em USD. O Câmbio Real converte para BRL internamente.
             'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'BRL',
+            'currency' => 'USD',
             'payment_method' => 'boleto',
             'client' => [
                 'name' => $clientName,
@@ -637,10 +636,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
-            // Enviamos em BRL para que o gateway processe o cartão no valor correto em reais.
-            'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'BRL',
+            // Enviar amount em USD. O Câmbio Real converte para BRL internamente.
+            'amount' => round($amountUsdCalc, 2),
+            'currency' => 'USD',
             'payment_method' => $paymentMethod,
             'client' => [
                 'name' => $clientName,
@@ -673,8 +671,8 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao,
-                    'base_value' => round($valorBrlOriginal, 2),
-                    'valor' => round($valorBrlOriginal, 2),
+                    'base_value' => round($amountUsdCalc, 2),
+                    'valor' => round($amountUsdCalc, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
@@ -859,30 +857,25 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // O Câmbio Real interpreta 'amount' de acordo com 'currency'.
-            // Enviamos em BRL para que o gateway gere o PIX no valor correto em reais.
-            'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'BRL',
+            // Enviar amount em USD. O Câmbio Real converte para BRL internamente.
+            'amount' => round($amountUsd, 2),
+            'currency' => 'USD',
             'payment_method' => 'pix',
             'client' => (array) $customer,
-            // Em reemissões/novas tentativas, o gateway pode ter o client.email já cadastrado.
-            // duplicate=1 permite reaproveitar o cliente/evitar bloqueio por dados repetidos.
             'duplicate' => 1,
-            // Garante que taxas/custos/IOF não sejam repassados ao cliente via acréscimo no PIX.
-            // Quando take_rates=0, o comportamento pode seguir o padrão do Painel e aumentar o valor cobrado.
             'take_rates' => 1,
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
-                    'base_value' => round($valorBrlOriginal, 2),
-                    'valor' => round($valorBrlOriginal, 2),
+                    'base_value' => round($amountUsd, 2),
+                    'valor' => round($amountUsd, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
             ],
         ];
 
-        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountBrl=' . round($valorBrlOriginal, 2) . ' amountUsd=' . round($amountUsd, 2) . ' currency=BRL orderId=' . $orderId);
+        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountUsd=' . round($amountUsd, 2) . ' valorBrlOriginal=' . round($valorBrlOriginal, 2) . ' currency=USD orderId=' . $orderId);
 
         $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
             $msg = (string) ($resp['message'] ?? $defaultMsg);

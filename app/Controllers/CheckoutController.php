@@ -70,8 +70,6 @@ class CheckoutController extends Controller {
             'discount_value_cents' => 0,
         ], $valor, 'BRL', $descricao);
 
-        error_log('[APPMAX_SPLIT_CALL] pedido=' . $pedidoId . ' valor=' . $valor . ' productsValueCents=' . $productsValueCents . ' billingType=' . $billingType);
-
         if (empty($result['success'])) {
             return $result;
         }
@@ -2760,29 +2758,8 @@ class CheckoutController extends Controller {
                                 $pedidoNorm = [];
                             }
 
-                            // Ler total e taxa_servico direto do banco para o split
-                            $totalBrl = (float) ($pedidoRowPay['total'] ?? 0);
-                            $taxaServico = 0.0;
-                            try {
-                                $dbDirect = \Config\Database::getConnection();
-                                $colsPedDirect = [];
-                                $stColsDirect = $dbDirect->query('DESCRIBE pedidos');
-                                $colsPedDirect = $stColsDirect ? ($stColsDirect->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                                $colTaxa = '';
-                                foreach (['taxa_servico', 'servicos', 'service_fee'] as $c) {
-                                    if (in_array($c, $colsPedDirect, true)) {
-                                        $colTaxa = $c;
-                                        break;
-                                    }
-                                }
-                                if ($colTaxa !== '') {
-                                    $stTaxa = $dbDirect->prepare('SELECT ' . $colTaxa . ' AS taxa FROM pedidos WHERE id = ? LIMIT 1');
-                                    $stTaxa->execute([(int) $pedidoId]);
-                                    $taxaServico = (float) ($stTaxa->fetchColumn() ?: 0);
-                                }
-                            } catch (\Exception $e) {
-                                $taxaServico = 0.0;
-                            }
+                            $totalBrl = (float) (($pedidoNorm['total'] ?? null) !== null ? $pedidoNorm['total'] : ($pedidoRowPay['total'] ?? 0));
+                            $taxaServico = (float) ($pedidoNorm['taxa_servico'] ?? 0);
                             if ($taxaServico < 0) $taxaServico = 0.0;
                             $valorImposto = 0.0;
                             try {
@@ -2825,64 +2802,81 @@ class CheckoutController extends Controller {
                             if ($valorImpostoLocal < 0) $valorImpostoLocal = 0.0;
                             $valorImpostoLocal = round((float) $valorImpostoLocal, 2);
 
-                            // Calcular valor dos produtos como: total - taxaServico - impostos - impostoLocal
-                            // Os valores no banco podem estar em BRL ou USD dependendo da moeda do pedido.
-                            $valorProdutoBruto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto - $valorImpostoLocal), 2);
-
-                            // Obter taxa de conversão USD→BRL
-                            $txConvSplit = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                            if ($txConvSplit <= 1.01) {
-                                try {
-                                    $dbTxSplit = \Config\Database::getConnection();
-                                    $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                    $stTxSplit->execute();
-                                    $txConvSplit = (float) ($stTxSplit->fetchColumn() ?: 0);
-                                } catch (\Exception $e) {}
-                            }
-                            // Fallback: usar taxa do window.exchangeRates ou valor padrão
-                            if ($txConvSplit <= 1.01) {
-                                try {
-                                    $dbTxSplit2 = \Config\Database::getConnection();
-                                    $stTxSplit2 = $dbTxSplit2->query("SELECT valor FROM configuracoes_sistema WHERE chave = 'taxa_conversao_usd_brl' LIMIT 1");
-                                    $txConvSplit = (float) ($stTxSplit2 ? ($stTxSplit2->fetchColumn() ?: 0) : 0);
-                                } catch (\Exception $e) {}
-                            }
-                            if ($txConvSplit <= 1.01) $txConvSplit = 5.85; // fallback seguro
-
-                            // Detectar se os valores do banco estão em BRL ou USD.
-                            // Se moeda='BRL' e taxa_conversao > 1, os valores já estão em BRL.
-                            $moedaPedidoSplit = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
-                            $valoresJaEmBrl = ($moedaPedidoSplit === 'BRL' && $txConvSplit > 1.01);
-
-                            if ($valoresJaEmBrl) {
-                                // Valores do banco já estão em BRL
-                                // Câmbio Real precisa de USD → dividir pela taxa
-                                $valorProdutoUsd = round(max(0.0, $valorProdutoBruto / $txConvSplit), 2);
-                                // AppMax precisa de BRL → usar direto
-                                $valorTaxaBrl = round(max(0.0, $taxaServico), 2);
-                                $valorImpostoBrl = round(max(0.0, $valorImposto), 2);
-                                $valorImpostoLocalBrl = round(max(0.0, $valorImpostoLocal), 2);
-                            } else {
-                                // Valores do banco estão em USD
-                                // Câmbio Real precisa de USD → usar direto
-                                $valorProdutoUsd = round(max(0.0, $valorProdutoBruto), 2);
-                                // AppMax precisa de BRL → multiplicar pela taxa
-                                $valorTaxaBrl = round(max(0.0, $taxaServico * $txConvSplit), 2);
-                                $valorImpostoBrl = round(max(0.0, $valorImposto * $txConvSplit), 2);
-                                $valorImpostoLocalBrl = round(max(0.0, $valorImpostoLocal * $txConvSplit), 2);
-                            }
-
-                            // valorProduto em USD para o Câmbio Real
-                            $valorProduto = $valorProdutoUsd;
-                            // valorProduto em BRL para referência
-                            $valorProdutoBrl = round(max(0.0, $valorProdutoUsd * $txConvSplit), 2);
-
-                            $valorAppmax = round(max(0.0, $valorTaxaBrl + $valorImpostoBrl + $valorImpostoLocalBrl), 2);
-
-                            // Log de debug para diagnóstico do split
+                            // Tenta obter subtotal real dos produtos (sem taxa/impostos), pois em alguns cenários
+                            // o campo 'total' do pedido pode já ser o subtotal, e subtrair taxa/impostos gera valor menor.
+                            $subtotalProdutos = 0.0;
+                            $hasSubtotalProdutos = false;
                             try {
-                                error_log('[SPLIT_BRL] pedido=' . $pedidoId . ' moeda=' . $moedaPedidoSplit . ' valoresJaEmBrl=' . ($valoresJaEmBrl ? '1' : '0') . ' totalDb=' . $totalBrl . ' taxaServicoDb=' . $taxaServico . ' impostosDb=' . $valorImposto . ' impostoLocalDb=' . $valorImpostoLocal . ' valorProdutoBruto=' . $valorProdutoBruto . ' valorProdutoUsd=' . $valorProdutoUsd . ' valorProdutoBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit . ' valorAppmaxBrl=' . $valorAppmax . ' pedidoTaxaConv=' . ($pedidoRowPay['taxa_conversao'] ?? 'NULL'));
-                            } catch (\Exception $e) {}
+                                foreach (['subtotal', 'subtotal_produtos', 'valor_produtos', 'total_produtos'] as $k) {
+                                    if (!$hasSubtotalProdutos && array_key_exists($k, $pedidoNorm) && $pedidoNorm[$k] !== null) {
+                                        $v = (float) $pedidoNorm[$k];
+                                        if ($v > 0) {
+                                            $subtotalProdutos = $v;
+                                            $hasSubtotalProdutos = true;
+                                        }
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                $hasSubtotalProdutos = false;
+                            }
+
+                            if (!$hasSubtotalProdutos) {
+                                try {
+                                    $dbItens = \Config\Database::getConnection();
+                                    $itensTable = '';
+                                    $stmtT = $dbItens->query("SHOW TABLES LIKE 'pedido_itens'");
+                                    $has1 = $stmtT ? ((int) $stmtT->fetchColumn() > 0) : false;
+                                    if ($has1) {
+                                        $itensTable = 'pedido_itens';
+                                    } else {
+                                        $stmtT2 = $dbItens->query("SHOW TABLES LIKE 'pedido_items'");
+                                        $has2 = $stmtT2 ? ((int) $stmtT2->fetchColumn() > 0) : false;
+                                        if ($has2) {
+                                            $itensTable = 'pedido_items';
+                                        }
+                                    }
+
+                                    if ($itensTable !== '') {
+                                        $cols = [];
+                                        $stColsItens = $dbItens->query('DESCRIBE ' . $itensTable);
+                                        $cols = $stColsItens ? ($stColsItens->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                                        $colPedidoId = in_array('pedido_id', $cols, true) ? 'pedido_id' : '';
+                                        $colQtd = '';
+                                        foreach (['quantidade', 'qty', 'qtd'] as $c) {
+                                            if ($colQtd === '' && in_array($c, $cols, true)) {
+                                                $colQtd = $c;
+                                            }
+                                        }
+                                        $colValor = '';
+                                        foreach (['valor', 'preco', 'preco_unitario', 'price', 'unit_price'] as $c) {
+                                            if ($colValor === '' && in_array($c, $cols, true)) {
+                                                $colValor = $c;
+                                            }
+                                        }
+
+                                        if ($colPedidoId !== '' && $colQtd !== '' && $colValor !== '') {
+                                            $stSum = $dbItens->prepare('SELECT SUM(COALESCE(' . $colValor . ',0) * COALESCE(' . $colQtd . ',0)) AS subtotal FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                                            $stSum->execute([(int) $pedidoId]);
+                                            $sv = $stSum->fetchColumn();
+                                            $subtotalProdutos = (float) ($sv ?: 0);
+                                            if ($subtotalProdutos > 0) {
+                                                $hasSubtotalProdutos = true;
+                                            }
+                                        }
+                                    }
+                                } catch (\Exception $e) {
+                                    $hasSubtotalProdutos = false;
+                                }
+                            }
+
+                            if ($hasSubtotalProdutos) {
+                                $valorProduto = round(max(0.0, $subtotalProdutos), 2);
+                            } else {
+                                $valorProduto = round(max(0.0, $totalBrl - $taxaServico - $valorImposto), 2);
+                            }
+                            $valorTaxa = round(max(0.0, $taxaServico), 2);
+                            $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
                                 throw new \Exception('Valores inválidos para split');
@@ -2910,8 +2904,25 @@ class CheckoutController extends Controller {
                             $cr = null;
                             if ($valorProduto > 0) {
                                 if ($formaSelecionada === 'pix') {
-                                    // $valorProduto já está em USD, $valorProdutoBrl já calculado acima
-                                    $amountUsd = round((float) $valorProduto, 2);
+                                    $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                    if ($tx <= 1.01) {
+                                        try {
+                                            $dbTx = \Config\Database::getConnection();
+                                            $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                            $stTx->execute();
+                                            $v = (string) ($stTx->fetchColumn() ?: '0');
+                                            $tx2 = (float) str_replace(',', '.', $v);
+                                            if ($tx2 > 1.01) {
+                                                $tx = $tx2;
+                                            }
+                                        } catch (\Exception $e) {
+                                        }
+                                    }
+                                    if ($tx <= 0) {
+                                        $tx = 1.0;
+                                    }
+
+                                    $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
                                     if ($amountUsd <= 0) {
                                         throw new \Exception('Valor inválido para Câmbio Real (USD)');
                                     }
@@ -2933,10 +2944,9 @@ class CheckoutController extends Controller {
                                         ],
                                     ];
 
-                                    $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProdutoBrl, (string) $descricaoProduto, $client);
-                                    error_log('[SPLIT_PIX_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit);
+                                    $cr = $this->paymentService->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProduto, (string) $descricaoProduto, $client);
                                     if (empty($cr['success'])) {
-                                        throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)') . ' [DEBUG: amountUsd=' . $amountUsd . ' valorBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit . ' totalDb=' . $totalBrl . ' taxaDb=' . $taxaServico . ' moeda=' . $moedaPedidoSplit . ' jaEmBrl=' . ($valoresJaEmBrl ? '1' : '0') . ']');
+                                        throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
                                     }
                                 } elseif ($formaSelecionada === 'boleto') {
                                     $client = [
@@ -2955,7 +2965,7 @@ class CheckoutController extends Controller {
                                             'number' => (string) ($dados['numero'] ?? ''),
                                         ],
                                     ];
-                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProdutoBrl, (string) $descricaoProduto, $client);
+                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $client);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar boleto Câmbio Real (produto)'));
                                     }
@@ -2966,8 +2976,25 @@ class CheckoutController extends Controller {
                                     $dfpId = (string) ($dados['cambioreal_card_dfp_id'] ?? '');
                                     $cardType = (string) ($dados['cambioreal_card_type'] ?? 'credit');
 
-                                    // $valorProduto já está em USD, $valorProdutoBrl já calculado acima
-                                    $amountUsd = round((float) $valorProduto, 2);
+                                    $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                    if ($tx <= 1.01) {
+                                        try {
+                                            $dbTx = \Config\Database::getConnection();
+                                            $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                            $stTx->execute();
+                                            $v = (string) ($stTx->fetchColumn() ?: '0');
+                                            $tx2 = (float) str_replace(',', '.', $v);
+                                            if ($tx2 > 1.01) {
+                                                $tx = $tx2;
+                                            }
+                                        } catch (\Exception $e) {
+                                        }
+                                    }
+                                    if ($tx <= 0) {
+                                        $tx = 1.0;
+                                    }
+
+                                    $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
                                     if ($amountUsd <= 0) {
                                         throw new \Exception('Valor inválido para Câmbio Real (USD)');
                                     }
@@ -3004,8 +3031,7 @@ class CheckoutController extends Controller {
                                         'type' => $cardType,
                                     ];
 
-                                    error_log('[SPLIT_CARTAO_CALL] pedido=' . $pedidoId . ' amountUsd=' . $amountUsd . ' valorBrl=' . $valorProdutoBrl . ' txConv=' . $txConvSplit);
-                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $valorProdutoBrl, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
+                                    $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $valorProduto, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar pagamento Câmbio Real (produto)'));
                                     }
@@ -3034,34 +3060,33 @@ class CheckoutController extends Controller {
                                     $clienteSplit['card_cvv'] = (string) ($dados['card_cvv'] ?? '');
                                 }
 
-                                error_log('[SPLIT_APPMAX_CALL] pedido=' . $pedidoId . ' billingType=' . $billingType . ' valorAppmax=' . $valorAppmax);
                                 $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico');
                                 if (empty($taxa['success'])) {
                                     throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
                                 }
 
                                 $appmaxPaymentId = (string) ($taxa['payment_id'] ?? '');
-                                if ($appmaxPaymentId !== '' && $valorImpostoBrl > 0) {
+                                if ($appmaxPaymentId !== '' && $valorImposto > 0) {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
                                         'pedido_id' => (int) $pedidoId,
                                         'componente' => 'imposto',
                                         'gateway' => 'appmax',
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
-                                        'valor' => (float) $valorImpostoBrl,
+                                        'valor' => (float) $valorImposto,
                                         'payment_id' => $appmaxPaymentId,
                                         'status' => 'pending',
                                         'gateway_status' => 'SPLIT_ITEM',
                                     ]);
                                 }
-                                if ($appmaxPaymentId !== '' && $valorImpostoLocalBrl > 0) {
+                                if ($appmaxPaymentId !== '' && $valorImpostoLocal > 0) {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
                                         'pedido_id' => (int) $pedidoId,
                                         'componente' => 'imposto_local',
                                         'gateway' => 'appmax',
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
-                                        'valor' => (float) $valorImpostoLocalBrl,
+                                        'valor' => (float) $valorImpostoLocal,
                                         'payment_id' => $appmaxPaymentId,
                                         'status' => 'pending',
                                         'gateway_status' => 'SPLIT_ITEM',
@@ -3080,7 +3105,7 @@ class CheckoutController extends Controller {
                                     'gateway' => 'appmax',
                                     'metodo' => $formaSelecionada,
                                     'moeda' => 'BRL',
-                                    'valor' => (float) $valorImpostoBrl,
+                                    'valor' => (float) $valorImposto,
                                     'payment_id' => (string) (is_array($taxa) ? ($taxa['payment_id'] ?? '') : ''),
                                     'status' => 'pending',
                                 ],
