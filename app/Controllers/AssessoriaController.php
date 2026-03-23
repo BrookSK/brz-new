@@ -3156,6 +3156,46 @@ class AssessoriaController extends Controller {
                 'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0
             ]));
         }
+
+        // Pós-processamento: se peso é suspeitamente baixo, estimar pelo tipo de produto
+        if (floatval($produtoData['peso']) <= 1.5) {
+            $nomeLower = strtolower((string) $produtoData['nome']);
+            $pesoEstimado = null;
+            if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
+                $pesoEstimado = 38.0;
+            } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
+                $pesoEstimado = 40.0;
+            } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
+                $pesoEstimado = 3.5;
+            } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
+                $pesoEstimado = 15.0;
+            } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
+                $pesoEstimado = 2.5;
+            } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
+                $pesoEstimado = 15.0;
+            } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
+                $pesoEstimado = 20.0;
+            } elseif (preg_match('/refrigerator|geladeira|fridge/', $nomeLower)) {
+                $pesoEstimado = 70.0;
+            } elseif (preg_match('/washer|dryer|lavadora|secadora/', $nomeLower)) {
+                $pesoEstimado = 60.0;
+            }
+            if ($pesoEstimado !== null) {
+                $produtoData['peso'] = round($pesoEstimado * 1.15, 2); // +15% margem
+                error_log('[Assessoria] Peso corrigido de <=1.5kg para ' . $produtoData['peso'] . 'kg baseado no nome: ' . $produtoData['nome']);
+            }
+        }
+
+        // Pós-processamento: preencher peso null das variações com peso base
+        if (is_array($produtoData['variacoes'])) {
+            foreach ($produtoData['variacoes'] as &$vFill) {
+                if (!is_array($vFill)) continue;
+                if (!isset($vFill['peso']) || $vFill['peso'] === null || floatval($vFill['peso']) <= 0) {
+                    $vFill['peso'] = $produtoData['peso'];
+                }
+            }
+            unset($vFill);
+        }
         
         return $produtoData;
     }
