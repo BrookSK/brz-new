@@ -392,6 +392,17 @@ $(document).ready(function() {
             return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true };
         }
 
+        // Preço base corrigido: se p.valor < 2 e variações têm preço real, usar menor preço real
+        let baseValor = p.valor;
+        if (baseValor < 2) {
+            const varPrecos = p.variacoes
+                .filter(v => v && typeof v === 'object' && v.valor !== null && v.valor !== undefined && parseFloat(v.valor) >= 2)
+                .map(v => parseFloat(v.valor));
+            if (varPrecos.length > 0) {
+                baseValor = Math.min(...varPrecos);
+            }
+        }
+
         const sel = selections[index] || {};
         const complete = keys.every(k => sel[k] !== undefined && sel[k] !== null && String(sel[k]).trim() !== '');
         const matches = p.variacoes.filter(v => {
@@ -407,7 +418,7 @@ $(document).ready(function() {
         });
 
         if (!complete) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+            return { variacao_id: null, valor: baseValor, peso: p.peso, complete: false };
         }
 
         if (matches.length >= 1) {
@@ -424,12 +435,12 @@ $(document).ready(function() {
                 return acc;
             }, null);
 
-            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : p.valor;
+            const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : baseValor;
             const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
             return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
         }
 
-        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+        return { variacao_id: null, valor: baseValor, peso: p.peso, complete: false };
     }
 
     function updateComboUI(index) {

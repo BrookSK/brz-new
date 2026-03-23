@@ -2944,8 +2944,25 @@ class AssessoriaController extends Controller {
         $pesoTotal = 0;
         
         foreach ($produtos as $produto) {
-            $subtotal += $produto['valor'];
-            $pesoTotal += $produto['peso'];
+            $valor = floatval($produto['valor'] ?? 0);
+            $peso = floatval($produto['peso'] ?? 0);
+
+            // Se preço base é suspeitamente baixo e existem variações com preço real,
+            // usar o menor preço real das variações como referência
+            if ($valor < 2.0 && !empty($produto['variacoes']) && is_array($produto['variacoes'])) {
+                $varPrecos = [];
+                foreach ($produto['variacoes'] as $v) {
+                    if (is_array($v) && isset($v['valor']) && floatval($v['valor']) >= 2.0) {
+                        $varPrecos[] = floatval($v['valor']);
+                    }
+                }
+                if (!empty($varPrecos)) {
+                    $valor = min($varPrecos);
+                }
+            }
+
+            $subtotal += $valor;
+            $pesoTotal += $peso;
         }
         
         // Reutiliza funções de cálculo existentes
@@ -3755,9 +3772,25 @@ class AssessoriaController extends Controller {
             'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
         ];
 
-        // Preencher valor/peso null das variações com o valor/peso base do produto
+        // Se o preço base é suspeitamente baixo (< $2) e alguma variação tem preço real,
+        // corrigir o preço base usando o menor preço real das variações
         $baseValor = $produtoData['valor'];
         $basePesoFinal = $produtoData['peso'];
+        if ($baseValor < 2.0 && is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
+            $varPrecos = [];
+            foreach ($produtoData['variacoes'] as $vCheck) {
+                if (is_array($vCheck) && isset($vCheck['valor']) && $vCheck['valor'] !== null && floatval($vCheck['valor']) >= 2.0) {
+                    $varPrecos[] = floatval($vCheck['valor']);
+                }
+            }
+            if (!empty($varPrecos)) {
+                $produtoData['valor'] = min($varPrecos);
+                $baseValor = $produtoData['valor'];
+                error_log('[ChatGPT] Preço base corrigido de $' . number_format(floatval($produtoData['valor']), 2) . ' usando menor preço das variações: $' . number_format($baseValor, 2));
+            }
+        }
+
+        // Preencher valor/peso null das variações com o valor/peso base do produto
         if (is_array($produtoData['variacoes'])) {
             foreach ($produtoData['variacoes'] as &$vFill) {
                 if (!is_array($vFill)) continue;
@@ -3770,8 +3803,7 @@ class AssessoriaController extends Controller {
             }
             unset($vFill);
             $produtoData['variacoes'] = array_values($produtoData['variacoes']);
-        }
-        
+        }        
         if (headers_sent() === false) {
             header('X-ChatGPT-Success: true');
             header('X-ChatGPT-Product-Data: ' . json_encode([
