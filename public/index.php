@@ -265,10 +265,10 @@ function _siteLockIsBypassPath(string $path): bool {
     return false;
 }
 
-function _siteLockIsBlockedPartial(string $path): bool {
+function _siteLockIsBlockedPartial(string $path, string $blockedPathsRaw = ''): bool {
     $p = strtolower(trim((string) $path));
     if ($p === '') return false;
-    $raw = trim((string) _siteLockGetConfig('sistema', 'site_lock_blocked_paths', ''));
+    $raw = $blockedPathsRaw !== '' ? $blockedPathsRaw : trim((string) _siteLockGetConfig('sistema', 'site_lock_blocked_paths', ''));
     if ($raw === '') return false;
     $paths = array_filter(array_map('trim', explode(',', $raw)), fn($v) => $v !== '');
     foreach ($paths as $blocked) {
@@ -290,7 +290,13 @@ try {
     $enabledBool = ($enabled === '1' || strtolower($enabled) === 'true');
 
     if ($enabledBool && $pwd !== '') {
-        $mode = trim((string) _siteLockGetConfig('sistema', 'site_lock_mode', 'total'));
+        $mode = trim((string) _siteLockGetConfig('sistema', 'site_lock_mode', ''));
+        $blockedPaths = trim((string) _siteLockGetConfig('sistema', 'site_lock_blocked_paths', ''));
+
+        // Se mode não foi encontrado mas blocked_paths tem valor, assumir parcial
+        if ($mode === '' && $blockedPaths !== '') {
+            $mode = 'parcial';
+        }
         if ($mode === '' || !in_array($mode, ['total', 'parcial'], true)) {
             $mode = 'total';
         }
@@ -308,7 +314,7 @@ try {
             }
         } else {
             // Modo parcial: bloqueia somente as rotas configuradas em site_lock_blocked_paths
-            if (_siteLockIsBlockedPartial($path)) {
+            if (_siteLockIsBlockedPartial($path, $blockedPaths)) {
                 if (session_status() === PHP_SESSION_NONE) {
                     session_start();
                 }
@@ -319,29 +325,6 @@ try {
                     exit;
                 }
             }
-        }
-    }
-} catch (\Throwable $e) {
-}
-
-$request = new Request();
-$router = new Router();
-
-try {
-    $path = $request->getPath();
-    $enabled = trim((string) _siteLockGetConfig('sistema', 'site_lock_enabled', '0'));
-    $pwd = (string) _siteLockGetConfig('sistema', 'site_lock_password', '');
-    $enabledBool = ($enabled === '1' || strtolower($enabled) === 'true');
-
-    if ($enabledBool && $pwd !== '') {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        $ok = !empty($_SESSION['site_lock_ok']);
-        if (!$ok && !_siteLockIsBypassPath($path)) {
-            $next = (string) ($_SERVER['REQUEST_URI'] ?? '/');
-            header('Location: /site-lock?next=' . urlencode($next));
-            exit;
         }
     }
 } catch (\Throwable $e) {
