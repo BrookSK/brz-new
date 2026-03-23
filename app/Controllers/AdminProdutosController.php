@@ -1704,6 +1704,15 @@ class AdminProdutosController extends Controller {
             $data['grupo_compras_id'] = $grupoId;
         }
 
+        $ncm = trim((string) $request->getParam('ncm', ''));
+        if ($ncm !== '') {
+            $ncmCol = null;
+            foreach (['ncm', 'codigo_ncm', 'ncm_code', 'tariff_code'] as $c) {
+                if (in_array($c, $cols, true)) { $ncmCol = $c; break; }
+            }
+            if ($ncmCol) $data[$ncmCol] = $ncm;
+        }
+
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
         if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
 
@@ -1775,6 +1784,11 @@ class AdminProdutosController extends Controller {
                 . '<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a>'
                 . '</div></div></div></div></div>';
         }
+
+        $ncmOptions = $this->getNcmOptions();
+        $ncmOptionsJson = json_encode(array_map(function($code, $label) {
+            return ['code' => $code, 'label' => $label];
+        }, array_keys($ncmOptions), array_values($ncmOptions)));
 
         // Buscar grupos existentes
         $grupos = [];
@@ -1925,6 +1939,14 @@ class AdminProdutosController extends Controller {
                     <label class="form-label fw-semibold">Estoque</label>
                     <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
                 </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">NCM</label>
+                    <input type="text" class="form-control" id="ncmSearchSingle" placeholder="Pesquisar NCM (código ou descrição)..." autocomplete="off">
+                    <select class="form-select mt-2" name="ncm" id="ncmSelectSingle">
+                        <option value="">Selecione...</option>
+                    </select>
+                    <small class="text-muted">Opcional</small>
+                </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
                     <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
@@ -1968,6 +1990,14 @@ class AdminProdutosController extends Controller {
                         </div>
                     </div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">NCM</label>
+                    <input type="text" class="form-control" id="ncmSearchLote" placeholder="Pesquisar NCM (código ou descrição)..." autocomplete="off">
+                    <select class="form-select mt-2" name="ncm" id="ncmSelectLote">
+                        <option value="">Selecione...</option>
+                    </select>
+                    <small class="text-muted">Opcional — aplicado a todos os itens do lote</small>
+                </div>
                 <hr>
                 <div class="fw-semibold mb-2"><i class="fas fa-list me-1"></i>Descrições (variantes)</div>
                 <div class="small text-muted mb-3">Adicione uma descrição para cada variante do produto.</div>
@@ -1996,8 +2026,40 @@ class AdminProdutosController extends Controller {
 
 <script>
 const GRUPOS = ' . $gruposJson . ';
+const NCM_OPTIONS = ' . $ncmOptionsJson . ';
 let grupoSelecionado = null;
 let currentStep = 1;
+
+// Popular selects de NCM
+function populateNcmSelect(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    NCM_OPTIONS.forEach(n => {
+        const opt = document.createElement("option");
+        opt.value = n.code;
+        opt.textContent = n.code + " - " + n.label;
+        sel.appendChild(opt);
+    });
+}
+populateNcmSelect("ncmSelectSingle");
+populateNcmSelect("ncmSelectLote");
+
+// Filtro de pesquisa NCM
+function setupNcmFilter(inputId, selectId) {
+    const input = document.getElementById(inputId);
+    const select = document.getElementById(selectId);
+    if (!input || !select) return;
+    input.addEventListener("input", function() {
+        const q = (input.value || "").toLowerCase().trim();
+        Array.from(select.options).forEach(opt => {
+            if (opt.value === "") return;
+            const text = (opt.text || "").toLowerCase();
+            opt.hidden = q !== "" && !text.includes(q);
+        });
+    });
+}
+setupNcmFilter("ncmSearchSingle", "ncmSelectSingle");
+setupNcmFilter("ncmSearchLote", "ncmSelectLote");
 
 function showStep(n) {
     document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
@@ -2213,6 +2275,8 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         fd.append("stock", document.getElementById("loteStockInput").value);
         fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
         fd.append("name", descricoes[i]);
+        const ncmLoteVal = document.getElementById("ncmSelectLote").value;
+        if (ncmLoteVal) fd.append("ncm", ncmLoteVal);
 
         // Enviar foto apenas no primeiro produto, depois reutilizar o path
         const capaFile = document.getElementById("capaInputLote").files[0];
@@ -2558,6 +2622,15 @@ HTML;
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
             $data['grupo_compras_id'] = $grupoId;
+        }
+
+        $ncm = trim((string) $request->getParam('ncm', ''));
+        if ($ncm !== '') {
+            $ncmCol = null;
+            foreach (['ncm', 'codigo_ncm', 'ncm_code', 'tariff_code'] as $c) {
+                if (in_array($c, $cols, true)) { $ncmCol = $c; break; }
+            }
+            if ($ncmCol) $data[$ncmCol] = $ncm;
         }
 
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
