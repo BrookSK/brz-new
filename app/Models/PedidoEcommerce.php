@@ -1600,9 +1600,11 @@ class PedidoEcommerce {
                 }
                 $item['url_original'] = trim((string) $item['url_original']);
                 $pid = (int) ($item['produto_id'] ?? 0);
-                if (empty($item['nome_produto'])) {
+                $nomeAtual = trim((string) ($item['nome_produto'] ?? ''));
+                $ehFallbackGenerico = $nomeAtual === '' || ($pid > 0 && $nomeAtual === 'Produto #' . $pid) || $nomeAtual === 'Produto';
+                if ($ehFallbackGenerico) {
                     $fallbackNome = trim((string) ($item['nome_produto_fallback'] ?? ''));
-                    $item['nome_produto'] = $fallbackNome !== '' ? $fallbackNome : ($pid > 0 ? ('Produto #' . $pid) : 'Produto');
+                    $item['nome_produto'] = $fallbackNome !== '' ? $fallbackNome : ($nomeAtual !== '' ? $nomeAtual : ($pid > 0 ? ('Produto #' . $pid) : 'Produto'));
                 }
 
                 // Alias usado por checkout/conclusao.php

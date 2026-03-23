@@ -3601,9 +3601,22 @@ class CheckoutController extends Controller {
             // Buscar dados do produto para persistir no pedido
             $produtoRow = null;
             try {
-                $select = ['id', 'name', 'nome', 'sku', 'url_original'];
-                if (!empty($prodControlaCol)) {
+                $colsProd = [];
+                try {
+                    $stDesc = $db->query('DESCRIBE produtos');
+                    $colsProd = $stDesc ? ($stDesc->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) { $colsProd = []; }
+
+                $select = ['id'];
+                if (in_array('name', $colsProd, true)) $select[] = 'name';
+                if (in_array('nome', $colsProd, true)) $select[] = 'nome';
+                if (in_array('sku', $colsProd, true)) $select[] = 'sku';
+                if (in_array('url_original', $colsProd, true)) $select[] = 'url_original';
+                if (!empty($prodControlaCol) && in_array($prodControlaCol, $colsProd, true)) {
                     $select[] = $prodControlaCol;
+                }
+                if (!empty($prodStockCol) && in_array($prodStockCol, $colsProd, true) && !in_array($prodStockCol, $select, true)) {
+                    $select[] = $prodStockCol;
                 }
                 $stmtP = $db->prepare('SELECT ' . implode(', ', array_values(array_unique($select))) . ' FROM produtos WHERE id = ? LIMIT 1');
                 $stmtP->execute([$produtoId]);
