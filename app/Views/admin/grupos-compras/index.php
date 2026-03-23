@@ -227,7 +227,8 @@ document.querySelectorAll('.btn-produtos').forEach(btn => {
             document.getElementById('modalProdutosBody').innerHTML = '<div class="text-center text-muted py-4">Nenhum produto neste grupo.</div>';
             return;
         }
-        let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Foto</th><th>Nome</th><th>Preço</th><th>Estoque</th><th>Ações</th></tr></thead><tbody>';
+        let html = '<div class="mb-3"><input type="text" class="form-control form-control-sm" id="buscaProdutoGrupo" placeholder="Pesquisar produto..." autocomplete="off"></div>';
+        html += '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Foto</th><th>Nome</th><th>Preço</th><th>Estoque</th><th>Ações</th></tr></thead><tbody>';
         j.produtos.forEach(p => {
             const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
             html += `<tr data-produto-id="${p.id}">
@@ -244,6 +245,13 @@ document.querySelectorAll('.btn-produtos').forEach(btn => {
         });
         html += '</tbody></table></div>';
         document.getElementById('modalProdutosBody').innerHTML = html;
+        document.getElementById('buscaProdutoGrupo').addEventListener('input', function() {
+            const termo = this.value.toLowerCase().trim();
+            document.querySelectorAll('#modalProdutosBody tbody tr').forEach(tr => {
+                const nome = (tr.children[1]?.textContent || '').toLowerCase();
+                tr.style.display = nome.includes(termo) ? '' : 'none';
+            });
+        });
         document.querySelectorAll('.btn-rm-produto').forEach(b => {
             b.addEventListener('click', async () => {
                 if (!confirm('Remover produto do grupo (produto continua existindo)?')) return;
