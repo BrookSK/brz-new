@@ -2195,8 +2195,8 @@ JS;
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
-                                <div class="row align-items-center">
-                                    <div class="col-md-2">
+                                <div class="row align-items-center gy-3">
+                                    <div class="col-6 col-lg-2">
                                         <div class="text-center">
                                             <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
                                                 <i class="' . $statusIcon . '"></i>
@@ -2205,7 +2205,7 @@ JS;
                                             <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-12 col-lg-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
@@ -2216,22 +2216,22 @@ JS;
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-primary">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
+                                            <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
                                             <small class="text-muted">Total do Pedido</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
-                                        <div class="d-flex justify-content-end gap-2">
+                                    <div class="col-12 col-lg-3">
+                                        <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
-                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                            <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                                 <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
@@ -2326,8 +2326,8 @@ JS;
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
-                                <div class="row align-items-center">
-                                    <div class="col-md-2">
+                                <div class="row align-items-center gy-3">
+                                    <div class="col-6 col-lg-2">
                                         <div class="text-center">
                                             <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
                                                 <i class="' . $statusIcon . '"></i>
@@ -2336,7 +2336,7 @@ JS;
                                             <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-12 col-lg-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
@@ -2347,22 +2347,22 @@ JS;
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-success">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
+                                            <h5 class="mb-0 text-success text-nowrap">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
                                             <small class="text-muted">Total (USD)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
-                                        <div class="d-flex justify-content-end gap-2">
+                                    <div class="col-12 col-lg-3">
+                                        <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
-                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                            <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                                 <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
@@ -2456,8 +2456,8 @@ JS;
                     echo '<div class="col-12 mb-3">
                         <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
                             <div class="card-body">
-                                <div class="row align-items-center">
-                                    <div class="col-md-2">
+                                <div class="row align-items-center gy-3">
+                                    <div class="col-6 col-lg-2">
                                         <div class="text-center">
                                             <div class="badge bg-' . $statusColor . ' fs-6 mb-2">
                                                 <i class="' . $statusIcon . '"></i>
@@ -2466,7 +2466,7 @@ JS;
                                             <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-12 col-lg-4">
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
@@ -2477,22 +2477,22 @@ JS;
                                             <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-6 col-lg-3">
                                         <div class="text-center">
-                                            <h5 class="mb-0 text-info">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
+                                            <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
                                             <small class="text-muted">Total (BRL)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
-                                        <div class="d-flex justify-content-end gap-2">
+                                    <div class="col-12 col-lg-3">
+                                        <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
                                                 <i class="fas fa-trash"></i>
                                             </button>
-                                            <select class="form-select form-select-sm" style="width: auto;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
+                                            <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
                                                 <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
                                                 <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
