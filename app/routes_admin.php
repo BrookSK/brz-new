@@ -177,5 +177,11 @@ $router->post('/admin/redirecionamento/coletas/reagendar',              'AdminRe
 $router->post('/admin/redirecionamento/pagamento/criar-intent',         'AdminRedirecionamentoController', 'criarIntentPagamento');
 $router->post('/admin/redirecionamento/pagamento/confirmar',            'AdminRedirecionamentoController', 'confirmarPagamento');
 
+// Migração de Produtos (exportar/importar entre servidores)
+$router->get('/admin/migracao', 'AdminMigracaoController', 'index');
+$router->get('/admin/migracao/exportar', 'AdminMigracaoController', 'exportar');
+$router->get('/admin/migracao/exportar-imagens', 'AdminMigracaoController', 'exportarImagens');
+$router->post('/admin/migracao/importar', 'AdminMigracaoController', 'importar');
+
 // Webhooks
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
