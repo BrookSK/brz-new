@@ -205,7 +205,7 @@ class AdminGruposComprasController extends Controller {
         $id = (int) $request->getParam('id', 0);
         try {
             $pdo = $this->getPdo();
-            $stmt = $pdo->prepare("SELECT id, name AS nome, price AS preco, stock AS estoque, foto_principal, status FROM produtos WHERE grupo_compras_id=? ORDER BY name ASC");
+            $stmt = $pdo->prepare("SELECT id, name AS nome, price AS preco, weight AS peso, stock AS estoque, foto_principal, status FROM produtos WHERE grupo_compras_id=? ORDER BY name ASC");
             $stmt->execute([$id]);
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             echo json_encode(['ok' => true, 'produtos' => $produtos]);

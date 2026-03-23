@@ -228,13 +228,15 @@ document.querySelectorAll('.btn-produtos').forEach(btn => {
             return;
         }
         let html = '<div class="mb-3"><input type="text" class="form-control form-control-sm" id="buscaProdutoGrupo" placeholder="Pesquisar produto..." autocomplete="off"></div>';
-        html += '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Foto</th><th>Nome</th><th>Preço</th><th>Estoque</th><th>Ações</th></tr></thead><tbody>';
+        html += '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Foto</th><th>Nome</th><th>Preço</th><th>Peso</th><th>Estoque</th><th>Ações</th></tr></thead><tbody>';
         j.produtos.forEach(p => {
             const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
+            const peso = parseFloat(p.peso || p.weight || 0);
             html += `<tr data-produto-id="${p.id}">
                 <td><img src="${foto}" style="width:40px;height:40px;object-fit:cover;border-radius:8px"></td>
                 <td>${p.nome||''}</td>
                 <td>US$ ${parseFloat(p.preco||0).toFixed(2)}</td>
+                <td>${peso > 0 ? peso.toFixed(3) + ' kg' : '—'}</td>
                 <td>${p.estoque||0}</td>
                 <td class="text-nowrap">
                     <a href="/admin/produtos/editar/${p.id}" class="btn btn-xs btn-outline-primary me-1" style="font-size:.75rem;padding:2px 8px" title="Editar produto"><i class="fas fa-pen"></i></a>
