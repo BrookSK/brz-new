@@ -25,6 +25,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
             $cobraImposto = (int)($g['cobra_imposto_eua'] ?? 0);
             $impostoLocal = (float)($g['imposto_local_percent'] ?? 0);
             $banner = trim((string)($g['banner'] ?? ''));
+            $clubeOnly = (int)($g['clube_only'] ?? 0);
         ?>
         <div class="col-lg-3 col-md-4 col-sm-6">
             <a href="/grupo/<?= $slug ?>" class="text-decoration-none">
@@ -51,6 +52,11 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             <?php if ($impostoLocal > 0): ?>
                             <span class="badge bg-warning text-dark">
                                 Imposto local <?= number_format($impostoLocal, 0) ?>%
+                            </span>
+                            <?php endif; ?>
+                            <?php if ($clubeOnly): ?>
+                            <span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">
+                                <i class="fas fa-crown me-1"></i>Clube
                             </span>
                             <?php endif; ?>
                         </div>

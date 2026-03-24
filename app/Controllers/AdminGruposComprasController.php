@@ -40,6 +40,11 @@ class AdminGruposComprasController extends Controller {
             $pdo->exec("ALTER TABLE grupos_compras ADD COLUMN banner VARCHAR(500) NULL DEFAULT NULL");
         } catch (\Throwable $e) {}
 
+        // Coluna clube_only (grupo exclusivo do Clube Braziliana)
+        try {
+            $pdo->exec("ALTER TABLE grupos_compras ADD COLUMN clube_only TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (\Throwable $e) {}
+
         // Coluna imposto_local no pedido
         try {
             $pdo->exec("ALTER TABLE pedidos ADD COLUMN imposto_local DECIMAL(10,2) NOT NULL DEFAULT 0");
@@ -117,6 +122,7 @@ class AdminGruposComprasController extends Controller {
         if ($impostoLocalPercent < 0) $impostoLocalPercent = 0;
         if ($impostoLocalPercent > 99) $impostoLocalPercent = 99;
         $ativo = $request->getParam('ativo') !== null ? (int)$request->getParam('ativo') : 1;
+        $clubeOnly = $request->getParam('clube_only') ? 1 : 0;
 
         if ($nome === '') {
             echo json_encode(['ok' => false, 'msg' => 'Nome obrigatório.']);
@@ -160,11 +166,11 @@ class AdminGruposComprasController extends Controller {
             $slug = $this->uniqueSlug($pdo, $this->slugify($nome), $id ?: null);
 
             if ($id > 0) {
-                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, imposto_local_percent=?, ativo=?, banner=?, updated_at=NOW() WHERE id=?");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $bannerUrl, $id]);
+                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, imposto_local_percent=?, ativo=?, banner=?, clube_only=?, updated_at=NOW() WHERE id=?");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $bannerUrl, $clubeOnly, $id]);
             } else {
-                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, imposto_local_percent, ativo, banner, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, 1, $bannerUrl, $userId ?: null, $userName ?: null]);
+                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, imposto_local_percent, ativo, banner, clube_only, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,NOW())");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, 1, $bannerUrl, $clubeOnly, $userId ?: null, $userName ?: null]);
                 $id = (int)$pdo->lastInsertId();
             }
 
@@ -303,7 +309,7 @@ class AdminGruposComprasController extends Controller {
             $this->ensureTables($pdo);
 
             $stmt = $pdo->query("
-                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua, g.imposto_local_percent, g.banner,
+                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua, g.imposto_local_percent, g.banner, g.clube_only,
                     (SELECT COUNT(*) FROM produtos p WHERE p.grupo_compras_id = g.id) AS qtd_produtos
                 FROM grupos_compras g
                 WHERE g.ativo = 1
@@ -412,6 +418,33 @@ class AdminGruposComprasController extends Controller {
 
         $totalPages = max(1, (int) ceil($total / $limit));
         $title = htmlspecialchars($grupo['nome'], ENT_QUOTES, 'UTF-8');
+
+        // Verificar restrição do Clube Braziliana
+        $clubeOnly = (int) ($grupo['clube_only'] ?? 0);
+        $clubeAcessoLiberado = true;
+        $clubeSaldoUsd = 0.0;
+        $clubeMinimo = 39.00;
+        $clubeLogado = false;
+
+        if ($clubeOnly) {
+            $clubeAcessoLiberado = false;
+            $auth = new \App\Services\AuthService();
+            if ($auth->estaLogado()) {
+                $clubeLogado = true;
+                $usuarioLogado = $auth->getUsuarioLogado();
+                $uid = (int) ($usuarioLogado['id'] ?? 0);
+                if ($uid > 0) {
+                    try {
+                        $stW = $pdo->prepare('SELECT saldo_usd FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                        $stW->execute([$uid]);
+                        $clubeSaldoUsd = (float) ($stW->fetchColumn() ?: 0);
+                        if ($clubeSaldoUsd >= $clubeMinimo) {
+                            $clubeAcessoLiberado = true;
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+        }
 
         ob_start();
         include __DIR__ . '/../Views/grupo-compras/pagina.php';

@@ -16,7 +16,14 @@ $buildUrl = static function (int $p) use ($slug): string {
 
     <!-- Cabeçalho do grupo -->
     <div class="mb-4">
-        <h1 class="h3 fw-bold mb-1"><?= htmlspecialchars($grupo['nome'] ?? '', ENT_QUOTES, 'UTF-8') ?></h1>
+        <h1 class="h3 fw-bold mb-1">
+            <?= htmlspecialchars($grupo['nome'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+            <?php if (!empty($clubeOnly)): ?>
+            <span class="badge align-middle ms-2" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.55em;vertical-align:middle;">
+                <i class="fas fa-crown me-1"></i>Clube Braziliana
+            </span>
+            <?php endif; ?>
+        </h1>
         <?php if (!empty($grupo['descricao'])): ?>
         <p class="text-muted mb-2"><?= htmlspecialchars($grupo['descricao'], ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
@@ -41,7 +48,32 @@ $buildUrl = static function (int $p) use ($slug): string {
         <div id="semResultados" class="text-muted small mt-2" style="display:none">Nenhum produto encontrado.</div>
     </div>
 
+    <!-- Bloqueio Clube Braziliana -->
+    <?php if (!empty($clubeOnly) && empty($clubeAcessoLiberado)): ?>
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:16px;overflow:hidden;">
+        <div class="card-body text-center py-5" style="background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);">
+            <i class="fas fa-crown fa-3x mb-3" style="color:#d97706;"></i>
+            <h3 class="fw-bold mb-2" style="color:#92400e;">Grupo exclusivo do Clube Braziliana</h3>
+            <p class="text-muted mb-3">
+                Para acessar os produtos deste grupo, você precisa ser membro do Clube Braziliana
+                com saldo mínimo de <strong>US$ <?= number_format($clubeMinimo, 2, ',', '.') ?></strong> na carteira.
+            </p>
+            <?php if (empty($clubeLogado)): ?>
+                <a href="/login" class="btn btn-primary me-2"><i class="fas fa-sign-in-alt me-1"></i>Fazer login</a>
+                <a href="/registro" class="btn btn-outline-primary"><i class="fas fa-user-plus me-1"></i>Criar conta</a>
+            <?php else: ?>
+                <p class="small text-muted mb-2">Seu saldo atual: <strong>US$ <?= number_format($clubeSaldoUsd, 2, ',', '.') ?></strong></p>
+                <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i>Recarregar carteira</a>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Grid de produtos -->
+    <?php if (!empty($clubeOnly) && empty($clubeAcessoLiberado)): ?>
+    <div style="position:relative;">
+        <div style="filter:blur(6px);pointer-events:none;user-select:none;opacity:.4;">
+    <?php endif; ?>
     <div class="row">
         <?php if (empty($produtos)): ?>
         <div class="col-12">
@@ -145,6 +177,11 @@ $buildUrl = static function (int $p) use ($slug): string {
         <?php endforeach; ?>
         <?php endif; ?>
     </div>
+
+    <?php if (!empty($clubeOnly) && empty($clubeAcessoLiberado)): ?>
+        </div><!-- /blur -->
+    </div><!-- /position-relative -->
+    <?php endif; ?>
 
     <!-- Paginação -->
     <?php if ($totalPages > 1): ?>

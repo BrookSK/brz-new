@@ -21,6 +21,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
             $ativo = (int)($g['ativo'] ?? 1);
             $cobraImposto = (int)($g['cobra_imposto_eua'] ?? 0);
             $impostoLocal = (float)($g['imposto_local_percent'] ?? 0);
+            $clubeOnly = (int)($g['clube_only'] ?? 0);
             $qtdPedidos = (int)($g['qtd_pedidos'] ?? 0);
             $qtdProdutos = (int)($g['qtd_produtos'] ?? 0);
             $criadoPor = htmlspecialchars($g['criado_por_nome'] ?? '—', ENT_QUOTES, 'UTF-8');
@@ -36,6 +37,9 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             <div class="small text-muted">/grupo/<?= $slug ?></div>
                         </div>
                         <span class="badge <?= $ativo ? 'bg-success' : 'bg-secondary' ?> ms-2"><?= $ativo ? 'Ativo' : 'Inativo' ?></span>
+                        <?php if ($clubeOnly): ?>
+                        <span class="badge ms-1" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);"><i class="fas fa-crown me-1"></i>Clube</span>
+                        <?php endif; ?>
                     </div>
                     <div class="small mb-1">Imposto local: <strong><?= $impostoLocal > 0 ? number_format($impostoLocal, 1) . '%' : 'Não' ?></strong></div>
                     <div class="small mb-1"><i class="fas fa-box me-1 text-muted"></i>Produtos: <strong><?= $qtdProdutos ?></strong></div>
@@ -54,6 +58,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             data-imposto-local="<?= $impostoLocal ?>"
                             data-ativo="<?= $ativo ?>"
                             data-banner="<?= htmlspecialchars($g['banner'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                            data-clube-only="<?= (int)($g['clube_only'] ?? 0) ?>"
                             title="Editar">
                             <i class="fas fa-pen"></i>
                         </button>
@@ -104,6 +109,13 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                     <input class="form-check-input" type="checkbox" id="grupoAtivo" role="switch" checked>
                     <label class="form-check-label" for="grupoAtivo">Grupo ativo</label>
                 </div>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="grupoClubeOnly" role="switch">
+                    <label class="form-check-label" for="grupoClubeOnly">
+                        <i class="fas fa-crown text-warning me-1"></i>Exclusivo do Clube Braziliana
+                    </label>
+                    <div class="form-text small text-muted">Somente membros do clube (saldo mínimo de US$ 39 na carteira) poderão acessar os produtos.</div>
+                </div>
                 <hr>
                 <div class="mb-3">
                     <label class="form-label">Banner do grupo</label>
@@ -153,6 +165,7 @@ document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     document.getElementById('grupoImpostoPercentWrap').style.display = 'none';
     document.getElementById('grupoAtivo').checked = true;
     document.getElementById('grupoAtivoWrap').style.display = 'none';
+    document.getElementById('grupoClubeOnly').checked = false;
     document.getElementById('grupoBanner').value = '';
     document.getElementById('grupoBannerKeep').value = '';
     document.getElementById('grupoBannerPreview').style.display = 'none';
@@ -176,6 +189,7 @@ document.querySelectorAll('.btn-editar').forEach(btn => {
         document.getElementById('grupoImpostoPercentWrap').style.display = impostoLocal > 0 ? '' : 'none';
         document.getElementById('grupoAtivo').checked = btn.dataset.ativo === '1';
         document.getElementById('grupoAtivoWrap').style.display = '';
+        document.getElementById('grupoClubeOnly').checked = btn.dataset.clubeOnly === '1';
         document.getElementById('grupoBanner').value = '';
         const bannerVal = btn.dataset.banner || '';
         document.getElementById('grupoBannerKeep').value = bannerVal;
@@ -208,6 +222,9 @@ document.getElementById('btnSalvarGrupo').addEventListener('click', async () => 
         fd.append('imposto_local_percent', '0');
     }
     fd.append('ativo', document.getElementById('grupoAtivo').checked ? '1' : '0');
+    if (document.getElementById('grupoClubeOnly').checked) {
+        fd.append('clube_only', '1');
+    }
     fd.append('banner_keep', document.getElementById('grupoBannerKeep').value);
     const bannerFile = document.getElementById('grupoBanner').files[0];
     if (bannerFile) fd.append('banner', bannerFile);
