@@ -103,18 +103,18 @@
                         <div class="col-md-6">
                             <h6><i class="fas fa-user"></i> <?= __('checkout_done.customer_data', 'Dados do Cliente') ?></h6>
                             <p class="mb-1">
-                                <strong><?= __('checkout_done.name', 'Nome') ?>:</strong> <?= htmlspecialchars($pedido['cliente_nome']) ?><br>
-                                <strong><?= __('checkout_done.email', 'Email') ?>:</strong> <?= htmlspecialchars($pedido['cliente_email']) ?><br>
-                                <strong><?= __('checkout_done.phone', 'Telefone') ?>:</strong> <?= htmlspecialchars($pedido['cliente_telefone']) ?>
+                                <strong><?= __('checkout_done.name', 'Nome') ?>:</strong> <?= htmlspecialchars((string)($pedido['cliente_nome'] ?? '')) ?><br>
+                                <strong><?= __('checkout_done.email', 'Email') ?>:</strong> <?= htmlspecialchars((string)($pedido['cliente_email'] ?? '')) ?><br>
+                                <strong><?= __('checkout_done.phone', 'Telefone') ?>:</strong> <?= htmlspecialchars((string)($pedido['cliente_telefone'] ?? '')) ?>
                             </p>
                         </div>
                         <div class="col-md-6">
                             <h6><i class="fas fa-truck"></i> <?= __('checkout_done.shipping_address', 'Endereço de Entrega') ?></h6>
                             <p class="mb-1">
-                                <?= htmlspecialchars($pedido['endereco']) ?>, <?= htmlspecialchars($pedido['numero']) ?><br>
-                                <?= htmlspecialchars($pedido['bairro']) ?><br>
-                                <?= htmlspecialchars($pedido['cidade']) ?> - <?= htmlspecialchars($pedido['estado']) ?><br>
-                                <?= __('auth.zip', 'CEP') ?>: <?= htmlspecialchars($pedido['cep']) ?>
+                                <?= htmlspecialchars((string)($pedido['endereco'] ?? '')) ?>, <?= htmlspecialchars((string)($pedido['numero'] ?? '')) ?><br>
+                                <?= htmlspecialchars((string)($pedido['bairro'] ?? '')) ?><br>
+                                <?= htmlspecialchars((string)($pedido['cidade'] ?? '')) ?> - <?= htmlspecialchars((string)($pedido['estado'] ?? '')) ?><br>
+                                <?= __('auth.zip', 'CEP') ?>: <?= htmlspecialchars((string)($pedido['cep'] ?? '')) ?>
                             </p>
                         </div>
                     </div>

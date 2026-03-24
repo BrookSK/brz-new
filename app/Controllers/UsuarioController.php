@@ -841,6 +841,7 @@ class UsuarioController extends Controller {
             'cidade' => ['cidade'],
             'estado' => ['estado', 'uf'],
             'pais' => ['pais', 'country'],
+            'nome' => ['nome', 'name'],
         ];
 
         $payload = [];
@@ -856,6 +857,22 @@ class UsuarioController extends Controller {
             }
             if ($colFound !== null) {
                 $payload[$colFound] = $val;
+            }
+        }
+
+        // Garantir nome no endereço (NOT NULL em alguns schemas)
+        $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : '');
+        if ($nomeCol !== '' && empty($payload[$nomeCol])) {
+            try {
+                $colsUsr = $db->query('DESCRIBE usuarios')->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                $usrNomeCol = in_array('nome', $colsUsr, true) ? 'nome' : (in_array('name', $colsUsr, true) ? 'name' : '');
+                if ($usrNomeCol !== '') {
+                    $stNome = $db->prepare('SELECT ' . $usrNomeCol . ' FROM usuarios WHERE id = ? LIMIT 1');
+                    $stNome->execute([$usuarioId]);
+                    $payload[$nomeCol] = (string) ($stNome->fetchColumn() ?: '');
+                }
+            } catch (\Exception $e) {
+                $payload[$nomeCol] = '';
             }
         }
 
@@ -972,6 +989,7 @@ class UsuarioController extends Controller {
                 'bairro' => ['bairro'],
                 'cidade' => ['cidade'],
                 'estado' => ['estado', 'uf'],
+                'nome' => ['nome', 'name'],
             ];
 
             $payload = [];
@@ -991,6 +1009,13 @@ class UsuarioController extends Controller {
 
             if (empty($payload['pais']) && in_array('pais', $cols, true)) {
                 $payload['pais'] = 'BR';
+            }
+
+            // Garantir nome no endereço (NOT NULL em alguns schemas)
+            $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : '');
+            if ($nomeCol !== '' && empty($payload[$nomeCol])) {
+                $usuario = $this->authService->getUsuarioLogado();
+                $payload[$nomeCol] = (string) ($usuario['nome'] ?? $usuario['name'] ?? '');
             }
 
             if ($enderecoId > 0) {
