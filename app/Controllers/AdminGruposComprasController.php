@@ -205,7 +205,7 @@ class AdminGruposComprasController extends Controller {
         $id = (int) $request->getParam('id', 0);
         try {
             $pdo = $this->getPdo();
-            $stmt = $pdo->prepare("SELECT id, name AS nome, price AS preco, weight AS peso, stock AS estoque, foto_principal, status FROM produtos WHERE grupo_compras_id=? ORDER BY name ASC");
+            $stmt = $pdo->prepare("SELECT id, name AS nome, price AS preco, weight AS peso, stock AS estoque, foto_principal, status FROM produtos WHERE grupo_compras_id=? ORDER BY id DESC");
             $stmt->execute([$id]);
             $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             echo json_encode(['ok' => true, 'produtos' => $produtos]);
@@ -307,7 +307,7 @@ class AdminGruposComprasController extends Controller {
             $stCount->execute([$grupo['id']]);
             $total = (int) $stCount->fetchColumn();
 
-            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . " ORDER BY name ASC LIMIT " . $limit . " OFFSET " . $offset);
+            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . " ORDER BY id DESC LIMIT " . $limit . " OFFSET " . $offset);
             $stP->execute([$grupo['id']]);
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);
 

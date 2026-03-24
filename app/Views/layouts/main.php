@@ -1596,8 +1596,44 @@
 
 <!-- Pop-up de boas-vindas (exibido apenas na primeira visita) -->
 <?php
+$welcomePopupEnabled = '1';
+try {
+    $pdoWp = \App\Core\Database::getConnection();
+    $tablesToTryWp = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+    foreach ($tablesToTryWp as $tWp) {
+        try {
+            $stTWp = $pdoWp->prepare('SHOW TABLES LIKE ?');
+            $stTWp->execute([$tWp]);
+            if (!$stTWp->fetchColumn()) continue;
+            $stColsWp = $pdoWp->query('DESCRIBE ' . $tWp);
+            $colsWp = $stColsWp ? $stColsWp->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (!is_array($colsWp)) $colsWp = [];
+
+            // schema categoria+chave
+            if (in_array('categoria', $colsWp, true) && in_array('chave', $colsWp, true)) {
+                $vcWp = in_array('valor', $colsWp, true) ? 'valor' : (in_array('value', $colsWp, true) ? 'value' : '');
+                if ($vcWp !== '') {
+                    $stWp = $pdoWp->prepare('SELECT ' . $vcWp . ' FROM ' . $tWp . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                    $stWp->execute(['sistema', 'welcome_popup_enabled']);
+                    $rWp = $stWp->fetchColumn();
+                    if ($rWp !== false) { $welcomePopupEnabled = (string) $rWp; break; }
+                }
+            }
+
+            // schema single_row
+            foreach (['sistema_welcome_popup_enabled', 'welcome_popup_enabled'] as $cWp) {
+                if (in_array($cWp, $colsWp, true)) {
+                    $stWp2 = $pdoWp->query('SELECT ' . $cWp . ' FROM ' . $tWp . ' LIMIT 1');
+                    $rWp2 = $stWp2 ? $stWp2->fetchColumn() : false;
+                    if ($rWp2 !== false) { $welcomePopupEnabled = (string) $rWp2; break 2; }
+                }
+            }
+        } catch (\Exception $e) {}
+    }
+} catch (\Exception $e) {}
 $popupLogo = !empty($siteLogo) ? $siteLogo : '';
 ?>
+<?php if ($welcomePopupEnabled === '1'): ?>
 <div id="welcomePopupOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99999; align-items:center; justify-content:center;">
     <div style="background:#fff; border-radius:16px; max-width:520px; width:92%; padding:40px 32px 32px; text-align:center; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.25); animation: welcomePopIn 0.35s ease-out;">
         <button onclick="fecharWelcomePopup()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; color:#999; cursor:pointer; line-height:1;" aria-label="Fechar">&times;</button>
@@ -1643,5 +1679,6 @@ $popupLogo = !empty($siteLogo) ? $siteLogo : '';
     });
 })();
 </script>
+<?php endif; ?>
 
 </html>
