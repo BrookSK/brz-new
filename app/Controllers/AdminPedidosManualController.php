@@ -580,7 +580,7 @@ class AdminPedidosManualController extends Controller {
             <div class="card mb-4" id="linkPagamentoCard">
                 <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Câmbio Real + AppMax</span>)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + PIX AppMax (taxas/impostos). Copie e envie para o cliente.</small></div>
+                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento AppMax (taxas/impostos). Copie e envie para o cliente.</small></div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4" id="billingTypeWrap" style="display:none;">
                             <input type="hidden" id="billingType" value="PIX">
@@ -1050,7 +1050,7 @@ function updateLinkVisibility(){
             linkInfo.style.display = 'none';
         } else {
             linkInfo.style.display = '';
-            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + PIX AppMax (taxas/impostos). Copie e envie para o cliente.</small>';
+            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento AppMax (taxas/impostos). Copie e envie para o cliente.</small>';
         }
     }
     if (linkResult && !canShowLinkCard) {
@@ -1553,10 +1553,10 @@ function gerarLinkPagamento(){
                     const taxa = data.taxa || null;
 
                     el.innerHTML = `<div class="alert alert-success">
-                        <strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + PIX AppMax para taxas).
+                        <strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + link de pagamento AppMax para taxas).
                     </div>
                     ${buildSection('Pagamento 1: Produtos (Câmbio Real — Link de Checkout)', produto)}
-                    ${buildSection('Pagamento 2: Taxas e Impostos (AppMax — PIX)', taxa)}
+                    ${buildSection('Pagamento 2: Taxas e Impostos (AppMax — Link de Pagamento)', taxa)}
                     <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar novamente.</div>`;
                 } else {
                     const url = String(data.invoiceUrl || '').trim();
