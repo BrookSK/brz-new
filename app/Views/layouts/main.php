@@ -1593,4 +1593,55 @@
         // Sistema antigo de moeda removido - usando sistema exclusivo
         console.log('Sistema de moedas antigo removido. Usando currency-converter.js');
     </script>
+
+<!-- Pop-up de boas-vindas (exibido apenas na primeira visita) -->
+<?php
+$popupLogo = !empty($siteLogo) ? $siteLogo : '';
+?>
+<div id="welcomePopupOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; max-width:520px; width:92%; padding:40px 32px 32px; text-align:center; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.25); animation: welcomePopIn 0.35s ease-out;">
+        <button onclick="fecharWelcomePopup()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; color:#999; cursor:pointer; line-height:1;" aria-label="Fechar">&times;</button>
+        <?php if (!empty($popupLogo)): ?>
+            <img src="<?= htmlspecialchars($popupLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height:54px; width:auto; margin-bottom:20px;">
+        <?php else: ?>
+            <div style="font-size:36px; color:#0d6efd; margin-bottom:16px;"><i class="fas fa-globe-americas"></i></div>
+        <?php endif; ?>
+        <h4 style="margin:0 0 12px; font-weight:700; color:#1a1a2e;">Bem-vindo à Braziliana!</h4>
+        <p style="color:#555; font-size:15px; line-height:1.65; margin:0 0 10px;">
+            A Braziliana está de cara nova! Repaginamos toda a nossa plataforma para oferecer uma experiência mais moderna, rápida e completa para você.
+        </p>
+        <p style="color:#555; font-size:15px; line-height:1.65; margin:0 0 10px;">
+            Agora você encontra tudo em um só lugar: compras, redirecionamento, acompanhamento de pedidos, carteira digital e muito mais — tudo centralizado e pensado para facilitar o seu dia a dia.
+        </p>
+        <p style="color:#555; font-size:14px; line-height:1.6; margin:0 0 22px;">
+            Explore o novo sistema e aproveite todas as novidades. Estamos sempre evoluindo para atender você cada vez melhor.
+        </p>
+        <button onclick="fecharWelcomePopup()" style="background:#0d6efd; color:#fff; border:none; border-radius:8px; padding:10px 36px; font-size:15px; font-weight:600; cursor:pointer; transition:background 0.2s;">
+            Explorar agora
+        </button>
+    </div>
+</div>
+<style>
+@keyframes welcomePopIn {
+    from { opacity:0; transform:scale(0.92) translateY(20px); }
+    to { opacity:1; transform:scale(1) translateY(0); }
+}
+</style>
+<script>
+(function(){
+    var KEY = 'brz_welcome_seen';
+    if (localStorage.getItem(KEY)) return;
+    var overlay = document.getElementById('welcomePopupOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    window.fecharWelcomePopup = function(){
+        overlay.style.display = 'none';
+        localStorage.setItem(KEY, '1');
+    };
+    overlay.addEventListener('click', function(e){
+        if (e.target === overlay) fecharWelcomePopup();
+    });
+})();
+</script>
+
 </html>
