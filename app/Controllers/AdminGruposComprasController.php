@@ -101,6 +101,47 @@ class AdminGruposComprasController extends Controller {
             } catch (\Throwable $e2) {}
         }
 
+        // ── Sync em batch: associar loja a produtos antigos que estão em grupo mas sem loja ──
+        try {
+            $colsProd = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            if (in_array('loja_id', $colsProd, true) && in_array('grupo_compras_id', $colsProd, true)) {
+                // Buscar produtos que têm grupo mas não têm loja
+                $stOrfaos = $pdo->query("
+                    SELECT DISTINCT p.grupo_compras_id, g.nome AS grupo_nome
+                    FROM produtos p
+                    INNER JOIN grupos_compras g ON g.id = p.grupo_compras_id
+                    WHERE p.grupo_compras_id IS NOT NULL
+                      AND (p.loja_id IS NULL OR p.loja_id = 0)
+                ");
+                $orfaos = $stOrfaos ? $stOrfaos->fetchAll(\PDO::FETCH_ASSOC) : [];
+
+                foreach ($orfaos as $orf) {
+                    $gNome = trim((string) ($orf['grupo_nome'] ?? ''));
+                    $gId = (int) ($orf['grupo_compras_id'] ?? 0);
+                    if ($gNome === '' || $gId <= 0) continue;
+
+                    // Buscar ou criar loja com o nome do grupo
+                    $stFL = $pdo->prepare("SELECT id FROM lojas WHERE LOWER(nome) = LOWER(?) LIMIT 1");
+                    $stFL->execute([$gNome]);
+                    $lojaId = (int) ($stFL->fetchColumn() ?: 0);
+
+                    if ($lojaId <= 0) {
+                        $sL = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $gNome), '-'));
+                        if ($sL === '') $sL = 'loja-' . time();
+                        $chk = $pdo->prepare("SELECT id FROM lojas WHERE slug = ? LIMIT 1");
+                        $chk->execute([$sL]);
+                        if ($chk->fetchColumn()) $sL .= '-' . bin2hex(random_bytes(2));
+                        $pdo->prepare("INSERT INTO lojas (nome, slug, ativo, created_at) VALUES (?, ?, 1, NOW())")->execute([$gNome, $sL]);
+                        $lojaId = (int) $pdo->lastInsertId();
+                    }
+
+                    if ($lojaId > 0) {
+                        $pdo->prepare("UPDATE produtos SET loja_id = ? WHERE grupo_compras_id = ? AND (loja_id IS NULL OR loja_id = 0)")->execute([$lojaId, $gId]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
         $sidebarActive = 'grupos-compras';
         $title = 'Grupos de Compras';
         ob_start();
