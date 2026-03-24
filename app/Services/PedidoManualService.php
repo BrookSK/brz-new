@@ -975,7 +975,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null, int $semComissao = 0): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -1191,6 +1191,23 @@ class PedidoManualService {
             $cols[] = 'admin_criador_id';
             $vals[] = ':admin_criador_id';
             $params[':admin_criador_id'] = (int) $adminCriadorId;
+        }
+
+        // Sem comissão (já lançado no vendas.braziliana)
+        try {
+            $this->db->exec("ALTER TABLE pedidos ADD COLUMN sem_comissao TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (\Throwable $e) {}
+
+        if ($semComissao) {
+            // Recheck column existence after ALTER
+            try {
+                $stChk = $this->db->query("SHOW COLUMNS FROM pedidos LIKE 'sem_comissao'");
+                if ($stChk && $stChk->fetchColumn()) {
+                    $cols[] = 'sem_comissao';
+                    $vals[] = ':sem_comissao';
+                    $params[':sem_comissao'] = 1;
+                }
+            } catch (\Throwable $e) {}
         }
 
         // Buscar nome e email do cliente para preencher campos NOT NULL

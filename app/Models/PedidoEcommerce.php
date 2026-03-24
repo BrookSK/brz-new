@@ -55,6 +55,12 @@ class PedidoEcommerce {
                 $where[] = '(' . implode(' OR ', $paidParts) . ')';
             }
 
+            // Excluir pedidos marcados como "já lançado no vendas" (sem comissão)
+            $colSemComissao = $this->pickColumn($cols, ['sem_comissao']);
+            if ($colSemComissao) {
+                $where[] = '(p.' . $colSemComissao . ' IS NULL OR p.' . $colSemComissao . ' = 0)';
+            }
+
             if (empty($where)) {
                 return $resumoBase;
             }
@@ -598,6 +604,12 @@ class PedidoEcommerce {
             }
             if (!empty($paidParts)) {
                 $where[] = '(' . implode(' OR ', $paidParts) . ')';
+            }
+
+            // Excluir pedidos marcados como "já lançado no vendas" (sem comissão)
+            $colSemComissao = $this->pickColumn($cols, ['sem_comissao']);
+            if ($colSemComissao) {
+                $where[] = '(p.' . $colSemComissao . ' IS NULL OR p.' . $colSemComissao . ' = 0)';
             }
 
             $select = ['p.id'];

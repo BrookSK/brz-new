@@ -2743,6 +2743,11 @@ HTML;
                 echo '<div class="alert alert-warning">Falha ao sincronizar pagamentos: ' . htmlspecialchars($syncErr) . '</div>';
             }
 
+            // Badge: sem comissão (já lançado no vendas.braziliana)
+            if (!empty($pedido['sem_comissao'])) {
+                echo '<div class="alert alert-info py-2 px-3 d-inline-block mb-3"><i class="fas fa-store me-1"></i> Já lançado no vendas.braziliana <span class="badge bg-secondary ms-1">Sem comissão</span></div>';
+            }
+
             // Destaque: pendência de pagamento (diferença)
             $colsPedido = [];
             try {

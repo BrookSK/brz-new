@@ -469,6 +469,13 @@ class AdminPedidosManualController extends Controller {
                                 <div class="alert alert-warning mb-0" id="offlineInfoBox"></div>
                             </div>
                         </div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" value="1" id="sem_comissao" name="sem_comissao">
+                            <label class="form-check-label" for="sem_comissao">
+                                <i class="fas fa-store me-1 text-muted"></i> Já lançado no vendas.braziliana
+                            </label>
+                            <div class="form-text">Se marcado, este pedido não será contabilizado nas comissões.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -2147,7 +2154,8 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
+            $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao);
 
             $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
             $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
@@ -2248,7 +2256,8 @@ JS;
             }
 
             $svc = new PedidoManualService();
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra);
+            $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao);
 
             $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
             $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
