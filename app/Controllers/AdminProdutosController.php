@@ -3051,7 +3051,7 @@ HTML;
             . '<thead><tr>'
             . '<th style="width:72px">Imagem</th>'
             . '<th>Nome</th>'
-            . '<th style="width:160px">SKU</th>'
+            . '<th style="width:120px">Peso (kg)</th>'
             . '<th style="width:140px">Preço</th>'
             . '<th style="width:110px">Status</th>'
             . '<th style="width:150px">Ações</th>'
@@ -3061,7 +3061,7 @@ HTML;
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
             $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
-            $sku = htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8');
+            $peso = number_format((float) ($produto['weight'] ?? $produto['peso'] ?? 0), 2, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
             $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
@@ -3069,7 +3069,7 @@ HTML;
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
                 . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
-                . '<td><span class="text-muted small">' . $sku . '</span></td>'
+                . '<td><span class="text-muted small">' . $peso . ' kg</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
                 . '<td>'
@@ -3318,7 +3318,7 @@ HTML;
             . '<thead><tr>'
             . '<th style="width:72px">Imagem</th>'
             . '<th>Nome</th>'
-            . '<th style="width:160px">SKU</th>'
+            . '<th style="width:120px">Peso (kg)</th>'
             . '<th style="width:140px">Preço</th>'
             . '<th style="width:110px">Status</th>'
             . '<th style="width:90px">Ações</th>'
@@ -3328,7 +3328,7 @@ HTML;
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
             $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
-            $sku = htmlspecialchars((string) $produto['sku'], ENT_QUOTES, 'UTF-8');
+            $peso = number_format((float) ($produto['weight'] ?? $produto['peso'] ?? 0), 2, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
             $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
@@ -3336,7 +3336,7 @@ HTML;
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
                 . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
-                . '<td><span class="text-muted small">' . $sku . '</span></td>'
+                . '<td><span class="text-muted small">' . $peso . ' kg</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
                 . '<td>'

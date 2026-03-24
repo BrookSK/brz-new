@@ -581,6 +581,7 @@ class AdminCorreiosMundialController extends Controller {
         $this->view('admin/correios-mundial', [
             'pedidos' => $pedidos,
             'etiquetas' => $etiquetas,
+            'sidebarActive' => 'correios-mundial',
         ]);
     }
 
@@ -735,6 +736,7 @@ class AdminCorreiosMundialController extends Controller {
             'defaults' => $defaults,
             'existingEtiqueta' => $existingEtiqueta,
             'pageError' => $pageError,
+            'sidebarActive' => 'correios-mundial',
         ]);
     }
 
@@ -1204,6 +1206,7 @@ class AdminCorreiosMundialController extends Controller {
             'containers' => $containers,
             'flashError' => (string) ($request->getParam('error') ?? ''),
             'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+            'sidebarActive' => 'correios-mundial',
         ]);
     }
 
@@ -1227,6 +1230,7 @@ class AdminCorreiosMundialController extends Controller {
             'bills' => $bills,
             'flashError' => (string) ($request->getParam('error') ?? ''),
             'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+            'sidebarActive' => 'correios-mundial',
         ]);
     }
 
@@ -1267,6 +1271,7 @@ class AdminCorreiosMundialController extends Controller {
             'balance' => $balance,
             'flashError' => (string) ($request->getParam('error') ?? ''),
             'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+            'sidebarActive' => 'correios-mundial',
         ]);
     }
 
@@ -1968,6 +1973,7 @@ class AdminCorreiosMundialController extends Controller {
             'bulkResult' => $bulkResult,
             'flashError' => (string) ($request->getParam('error') ?? ''),
             'flashSuccess' => (string) ($request->getParam('success') ?? ''),
+            'sidebarActive' => 'correios-mundial',
         ]);
     }
 

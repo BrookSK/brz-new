@@ -89,6 +89,7 @@ class AdminClubeRecargasController extends Controller {
         $this->view('admin/clube-recargas', [
             'recargas' => $rows,
             'stats' => $stats,
+            'sidebarActive' => 'clube-recargas',
         ]);
     }
 }
