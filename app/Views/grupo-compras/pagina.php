@@ -7,9 +7,14 @@ $totalPages = (int) ($totalPages ?? 1);
 $total     = (int) ($total ?? 0);
 $slug      = htmlspecialchars($grupo['slug'] ?? '', ENT_QUOTES, 'UTF-8');
 
-$buildUrl = static function (int $p) use ($slug): string {
-    return '/grupo/' . $slug . ($p > 1 ? '?page=' . $p : '');
+$buildUrl = static function (int $p) use ($slug, $busca): string {
+    $url = '/grupo/' . $slug;
+    $qs = [];
+    if ($p > 1) $qs[] = 'page=' . $p;
+    if (($busca ?? '') !== '') $qs[] = 'q=' . urlencode($busca);
+    return $url . (!empty($qs) ? '?' . implode('&', $qs) : '');
 };
+$busca = $busca ?? '';
 ?>
 
 <div class="container py-4">
@@ -41,11 +46,18 @@ $buildUrl = static function (int $p) use ($slug): string {
 
     <!-- Busca por nome -->
     <div class="mb-4">
-        <div class="input-group" style="max-width:400px">
-            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-            <input type="text" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome...">
-        </div>
-        <div id="semResultados" class="text-muted small mt-2" style="display:none">Nenhum produto encontrado.</div>
+        <form method="GET" action="/grupo/<?= $slug ?>" class="d-flex" style="max-width:400px">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                <input type="text" name="q" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome..." value="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>">
+                <?php if ($busca !== ''): ?>
+                <a href="/grupo/<?= $slug ?>" class="btn btn-outline-secondary" title="Limpar"><i class="fas fa-times"></i></a>
+                <?php endif; ?>
+            </div>
+        </form>
+        <?php if ($busca !== '' && empty($produtos)): ?>
+        <div class="text-muted small mt-2">Nenhum produto encontrado para "<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>".</div>
+        <?php endif; ?>
     </div>
 
     <!-- Bloqueio Clube Braziliana -->
@@ -281,21 +293,16 @@ document.addEventListener('DOMContentLoaded', function () {
         window.updateProductPrices(cur);
     }
 
-    // Filtro por nome
+    // Filtro client-side adicional (dentro da página atual)
     const filtro = document.getElementById('filtroProduto');
-    const semResultados = document.getElementById('semResultados');
     if (filtro) {
         filtro.addEventListener('input', function () {
             const q = this.value.toLowerCase().trim();
             const items = document.querySelectorAll('.produto-item');
-            let visiveis = 0;
             items.forEach(item => {
                 const nome = item.dataset.nome || '';
-                const visivel = q === '' || nome.includes(q);
-                item.style.display = visivel ? '' : 'none';
-                if (visivel) visiveis++;
+                item.style.display = (q === '' || nome.includes(q)) ? '' : 'none';
             });
-            semResultados.style.display = (q !== '' && visiveis === 0) ? '' : 'none';
         });
     }
 });

@@ -372,6 +372,7 @@ class AdminGruposComprasController extends Controller {
     public function paginaPublica(Request $request) {
         $slug = (string) $request->getParam('slug', '');
         $page = max(1, (int) $request->getParam('page', 1));
+        $busca = trim((string) $request->getParam('q', ''));
         $limit = 20;
         $offset = ($page - 1) * $limit;
 
@@ -404,12 +405,22 @@ class AdminGruposComprasController extends Controller {
             elseif ($hasAtivo)   $whereAtivo = " AND ativo = 1";
             elseif ($hasActive)  $whereAtivo = " AND active = 1";
 
-            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=?" . $whereAtivo);
-            $stCount->execute([$grupo['id']]);
+            // Detectar coluna de nome
+            $nameCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
+
+            $whereBusca = '';
+            $buscaParams = [$grupo['id']];
+            if ($busca !== '') {
+                $whereBusca = " AND " . $nameCol . " LIKE ?";
+                $buscaParams[] = '%' . $busca . '%';
+            }
+
+            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca);
+            $stCount->execute($buscaParams);
             $total = (int) $stCount->fetchColumn();
 
-            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . " ORDER BY id DESC LIMIT " . $limit . " OFFSET " . $offset);
-            $stP->execute([$grupo['id']]);
+            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC LIMIT " . $limit . " OFFSET " . $offset);
+            $stP->execute($buscaParams);
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);
 
             // Normalizar foto_principal
