@@ -465,6 +465,41 @@ class CarrinhoController extends Controller {
         // Mesma regra do checkout (Model Carrinho): taxa por kg configurada + impostos (Receita Federal)
         $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
+
+        // Detectar país do usuário para isenção de impostos BR
+        $entregaForaBR = false;
+        if ($uid > 0) {
+            try {
+                $dbPais = \Config\Database::getConnection();
+                // Verificar endereço de entrega principal e pais_residencia
+                $paisUsuario = '';
+                $stPais = $dbPais->prepare('SELECT pais_residencia, pais FROM usuarios WHERE id = ? LIMIT 1');
+                $stPais->execute([$uid]);
+                $rowPais = $stPais->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $paisUsuario = strtoupper(trim((string) ($rowPais['pais_residencia'] ?? ($rowPais['pais'] ?? ''))));
+
+                // Verificar também endereço de entrega cadastrado
+                if ($paisUsuario === '' || $paisUsuario === 'BR') {
+                    try {
+                        $stEnd = $dbPais->prepare("SELECT pais FROM enderecos WHERE usuario_id = ? AND tipo = 'entrega' ORDER BY id DESC LIMIT 1");
+                        $stEnd->execute([$uid]);
+                        $paisEntrega = strtoupper(trim((string) ($stEnd->fetchColumn() ?: '')));
+                        if ($paisEntrega !== '' && $paisEntrega !== 'BR') {
+                            $entregaForaBR = true;
+                        }
+                    } catch (\Throwable $e) {}
+                }
+
+                if ($paisUsuario !== '' && $paisUsuario !== 'BR') {
+                    $entregaForaBR = true;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // Impostos BR só para entrega no Brasil (mesma regra do checkout)
+        if ($entregaForaBR) {
+            $impostos = 0.0;
+        }
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
 
@@ -560,11 +595,15 @@ class CarrinhoController extends Controller {
                         if (isset($taxaServicoFromDb) && (float) $taxaServicoFromDb > 0) {
                             $taxaServico = (float) $taxaServicoFromDb;
                         }
-                        if (isset($impostosFromDb) && (float) $impostosFromDb > 0) {
+                        if (isset($impostosFromDb) && (float) $impostosFromDb > 0 && !$entregaForaBR) {
                             $impostos = (float) $impostosFromDb;
                         }
                         if (isset($totalFromDb) && (float) $totalFromDb > 0) {
                             $total = (float) $totalFromDb;
+                            // Se entrega fora do BR, subtrair impostos BR que o DB pode ter incluído
+                            if ($entregaForaBR && isset($impostosFromDb) && (float) $impostosFromDb > 0) {
+                                $total = $total - (float) $impostosFromDb;
+                            }
                         } else {
                             $total = (float) $subtotal + (float) $taxaServico + (float) $impostos + (float) $frete;
                         }
@@ -600,6 +639,7 @@ class CarrinhoController extends Controller {
             'total_itens' => $totalItensAtivos,
             'peso_max_kg' => $pesoMaxKg,
             'excede_peso' => $excedePeso,
+            'entrega_fora_br' => $entregaForaBR,
         ]);
     }
 

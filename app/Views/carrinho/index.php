@@ -274,6 +274,12 @@
                                 <?= __('cart.max_weight_disable_items', 'Peso máximo é {kg}kg. Desative itens para continuar.', ['kg' => number_format((float) ($peso_max_kg ?? 30), 0, ',', '.')]) ?>
                             </div>
                         <?php endif; ?>
+                        <?php if (!empty($entrega_fora_br)): ?>
+                            <div class="alert alert-info mb-3">
+                                <i class="fas fa-globe-americas me-1"></i>
+                                Entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.
+                            </div>
+                        <?php endif; ?>
                         <hr>
                         
                         <div class="d-flex justify-content-between mb-2">
@@ -314,7 +320,11 @@
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('cart.taxes_brazil', 'Impostos do Brasil') ?></span>
-                        <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
+                        <?php if (!empty($entrega_fora_br)): ?>
+                            <span class="text-muted">Isento</span>
+                        <?php else: ?>
+                            <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
+                        <?php endif; ?>
                     </div>
 
                     <?php if (($imposto_local ?? 0) > 0): ?>
