@@ -612,72 +612,75 @@ class AdminPedidosManualController extends Controller {
         echo 'const ALIQUOTA_ICMS = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('icms_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
 
         echo "\n";
-        echo 'function initClienteBusca(){\n'
-            . '    const input = document.getElementById(\'cliente_busca\');\n'
-            . '    const results = document.getElementById(\'cliente_busca_results\');\n'
-            . '    const sel = document.getElementById(\'cliente_id\');\n'
-            . '    if (!input || !results || !sel) return;\n'
-            . '    let lastQ = \'\';\n'
-            . '    let t = null;\n'
-            . '    function hide(){ results.style.display = \'none\'; results.innerHTML = \'\'; }\n'
-            . '    function ensureOption(id, text){\n'
-            . '        const v = String(id || \'\');\n'
-            . '        if (!v) return;\n'
-            . '        let opt = null;\n'
-            . '        for (let i=0;i<sel.options.length;i++){ if (sel.options[i].value === v){ opt = sel.options[i]; break; } }\n'
-            . '        if (!opt){ opt = document.createElement(\'option\'); opt.value = v; sel.appendChild(opt); }\n'
-            . '        opt.text = String(text || (\'Cliente #\' + v));\n'
-            . '        sel.value = v;\n'
-            . '        const ev = new Event(\'change\', { bubbles: true });\n'
-            . '        sel.dispatchEvent(ev);\n'
-            . '    }\n'
-            . '    function render(items){\n'
-            . '        results.innerHTML = \'\';\n'
-            . '        if (!items || !items.length){ hide(); return; }\n'
-            . '        items.forEach(it => {\n'
-            . '            const a = document.createElement(\'button\');\n'
-            . '            a.type = \'button\';\n'
-            . '            a.className = \'list-group-item list-group-item-action\';\n'
-            . '            a.textContent = String(it.text || \'\');\n'
-            . '            a.dataset.id = String(it.id || \'\');\n'
-            . '            a.addEventListener(\'click\', function(){\n'
-            . '                const id = this.dataset.id;\n'
-            . '                const text = this.textContent || (\'Cliente #\' + id);\n'
-            . '                ensureOption(id, text);\n'
-            . '                input.value = text;\n'
-            . '                input.dataset.selectedId = String(id || \'\');\n'
-            . '                hide();\n'
-            . '            });\n'
-            . '            results.appendChild(a);\n'
-            . '        });\n'
-            . '        results.style.display = \'block\';\n'
-            . '    }\n'
-            . '    function search(q){\n'
-            . '        const qq = String(q || \'\').trim();\n'
-            . '        lastQ = qq;\n'
-            . '        if (qq.length < 2){ hide(); return; }\n'
-            . '        fetch(\'/admin/pedidos/novo-manual/clientes?q=\' + encodeURIComponent(qq) + \'&limit=20\')\n'
-            . '            .then(r => r.json())\n'
-            . '            .then(j => {\n'
-            . '                if (!j || !j.ok) { hide(); return; }\n'
-            . '                if (String(input.value || \'\').trim() !== lastQ) return;\n'
-            . '                render(j.items || []);\n'
-            . '            })\n'
-            . '            .catch(() => { hide(); });\n'
-            . '    }\n'
-            . '    input.addEventListener(\'input\', function(){\n'
-            . '        const q = String(this.value || \'\');\n'
-            . '        this.dataset.selectedId = \'\';\n'
-            . '        if (t) clearTimeout(t);\n'
-            . '        t = setTimeout(() => search(q), 220);\n'
-            . '    });\n'
-            . '    input.addEventListener(\'focus\', function(){\n'
-            . '        const q = String(this.value || \'\').trim();\n'
-            . '        if (q.length >= 2) search(q);\n'
-            . '    });\n'
-            . '    input.addEventListener(\'blur\', function(){ setTimeout(hide, 180); });\n'
-            . '    window.__ensureClienteOption = ensureOption;\n'
-            . '}\n';
+        echo <<<'JSCB'
+function initClienteBusca(){
+    const input = document.getElementById('cliente_busca');
+    const results = document.getElementById('cliente_busca_results');
+    const sel = document.getElementById('cliente_id');
+    if (!input || !results || !sel) return;
+    let lastQ = '';
+    let t = null;
+    function hide(){ results.style.display = 'none'; results.innerHTML = ''; }
+    function ensureOption(id, text){
+        const v = String(id || '');
+        if (!v) return;
+        let opt = null;
+        for (let i=0;i<sel.options.length;i++){ if (sel.options[i].value === v){ opt = sel.options[i]; break; } }
+        if (!opt){ opt = document.createElement('option'); opt.value = v; sel.appendChild(opt); }
+        opt.text = String(text || ('Cliente #' + v));
+        sel.value = v;
+        const ev = new Event('change', { bubbles: true });
+        sel.dispatchEvent(ev);
+    }
+    function render(items){
+        results.innerHTML = '';
+        if (!items || !items.length){ hide(); return; }
+        items.forEach(it => {
+            const a = document.createElement('button');
+            a.type = 'button';
+            a.className = 'list-group-item list-group-item-action';
+            a.textContent = String(it.text || '');
+            a.dataset.id = String(it.id || '');
+            a.addEventListener('click', function(){
+                const id = this.dataset.id;
+                const text = this.textContent || ('Cliente #' + id);
+                ensureOption(id, text);
+                input.value = text;
+                input.dataset.selectedId = String(id || '');
+                hide();
+            });
+            results.appendChild(a);
+        });
+        results.style.display = 'block';
+    }
+    function search(q){
+        const qq = String(q || '').trim();
+        lastQ = qq;
+        if (qq.length < 2){ hide(); return; }
+        fetch('/admin/pedidos/novo-manual/clientes?q=' + encodeURIComponent(qq) + '&limit=20')
+            .then(r => r.json())
+            .then(j => {
+                if (!j || !j.ok) { hide(); return; }
+                if (String(input.value || '').trim() !== lastQ) return;
+                render(j.items || []);
+            })
+            .catch(() => { hide(); });
+    }
+    input.addEventListener('input', function(){
+        const q = String(this.value || '');
+        this.dataset.selectedId = '';
+        if (t) clearTimeout(t);
+        t = setTimeout(() => search(q), 220);
+    });
+    input.addEventListener('focus', function(){
+        const q = String(this.value || '').trim();
+        if (q.length >= 2) search(q);
+    });
+    input.addEventListener('blur', function(){ setTimeout(hide, 180); });
+    window.__ensureClienteOption = ensureOption;
+}
+JSCB;
+        echo "\n";
         echo 'const ALIQUOTA_IPI = ' . json_encode((float) (new \App\Services\PedidoManualService())->getAliquota('ipi_aliquota'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
 
         echo <<<'JS'

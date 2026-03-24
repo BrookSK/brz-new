@@ -2893,6 +2893,7 @@ HTML;
         if ($dir !== 'ASC' && $dir !== 'DESC') {
             $dir = 'ASC';
         }
+        $lojaFiltro = (string) $request->getParam('loja_filtro', '');
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -2926,6 +2927,7 @@ HTML;
                 'peso' => !empty($colNames['weight']) ? 'weight' : (!empty($colNames['peso']) ? 'peso' : 'name'),
                 'preco' => !empty($colNames['price']) ? 'price' : (!empty($colNames['preco']) ? 'preco' : (!empty($colNames['valor']) ? 'valor' : 'name')),
                 'status' => !empty($colNames['status']) ? 'status' : (!empty($colNames['active']) ? 'active' : 'name'),
+                'loja' => !empty($colNames['loja_id']) ? 'loja_id' : (!empty($colNames['loja']) ? 'loja' : 'name'),
                 'cadastro' => $createdCol ?: 'id',
                 'id' => 'id',
             ];
@@ -2939,6 +2941,20 @@ HTML;
             } else {
                 $orderBy .= ', p.id ASC';
             }
+
+            // Mapa de lojas (id => nome)
+            $lojaMap = [];
+            try {
+                $stmtLj = $pdo->query("SHOW TABLES LIKE 'lojas'");
+                if ($stmtLj && $stmtLj->fetchColumn()) {
+                    $stmtLojas = $pdo->query("SELECT id, nome FROM lojas ORDER BY nome ASC");
+                    if ($stmtLojas) {
+                        foreach ($stmtLojas->fetchAll(\PDO::FETCH_ASSOC) as $lj) {
+                            $lojaMap[(int) $lj['id']] = (string) $lj['nome'];
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
 
             $params = [];
             $where = ' WHERE 1=1 ';
@@ -2954,6 +2970,13 @@ HTML;
             if (trim($busca) !== '') {
                 $where .= ' AND (p.name LIKE :busca OR p.sku LIKE :busca) ';
                 $params[':busca'] = '%' . $busca . '%';
+            }
+            if ($lojaFiltro !== '' && is_numeric($lojaFiltro)) {
+                $lojaCol = !empty($colNames['loja_id']) ? 'loja_id' : (!empty($colNames['loja']) ? 'loja' : '');
+                if ($lojaCol !== '') {
+                    $where .= " AND p.{$lojaCol} = :loja_filtro ";
+                    $params[':loja_filtro'] = $lojaFiltro;
+                }
             }
 
             $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
@@ -2998,8 +3021,17 @@ HTML;
                     'weight' => $r['weight'] ?? $r['peso'] ?? 0,
                     'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
                     'imagem' => $img,
+                    'loja_id' => (int) ($r['loja_id'] ?? 0),
+                    'loja_nome' => '',
                 ];
             }
+            // Resolver nomes de loja
+            foreach ($produtos as &$_p) {
+                if ($_p['loja_id'] > 0 && isset($lojaMap[$_p['loja_id']])) {
+                    $_p['loja_nome'] = $lojaMap[$_p['loja_id']];
+                }
+            }
+            unset($_p);
 
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
@@ -3024,8 +3056,17 @@ HTML;
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
-            . '<div class="col-md-8">'
+            . '<div class="col-md-5">'
             . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '</div>'
+            . '<div class="col-md-2">'
+            . '<select class="form-select" name="loja_filtro">'
+            . '<option value="">Todas as lojas</option>';
+        foreach ($lojaMap as $_lid => $_lnome) {
+            $selLoja = ((string) $lojaFiltro === (string) $_lid) ? ' selected' : '';
+            echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+        echo '</select>'
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
@@ -3033,6 +3074,7 @@ HTML;
             . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
             . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
+            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>Loja</option>'
             . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
             . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
@@ -3054,6 +3096,7 @@ HTML;
             . '<thead><tr>'
             . '<th style="width:72px">Imagem</th>'
             . '<th>Nome</th>'
+            . '<th style="width:130px">Loja</th>'
             . '<th style="width:120px">Peso (kg)</th>'
             . '<th style="width:140px">Preço</th>'
             . '<th style="width:110px">Status</th>'
@@ -3064,6 +3107,7 @@ HTML;
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
             $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
+            $lojaNome = htmlspecialchars((string) $produto['loja_nome'], ENT_QUOTES, 'UTF-8');
             $pesoRaw = (!empty($produto['weight']) ? $produto['weight'] : (!empty($produto['peso']) ? $produto['peso'] : 0));
             if (is_string($pesoRaw)) $pesoRaw = str_replace(',', '.', trim($pesoRaw));
             $peso = number_format((float) $pesoRaw, 3, '.', ',');
@@ -3074,6 +3118,7 @@ HTML;
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
                 . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><span class="text-muted small">' . ($lojaNome !== '' ? $lojaNome : '<em class="text-secondary">—</em>') . '</span></td>'
                 . '<td><span class="text-muted small">' . $peso . ' kg</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
@@ -3092,7 +3137,7 @@ HTML;
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
@@ -3102,6 +3147,9 @@ HTML;
                 }
                 if (trim($dir) !== '') {
                     $url .= "&dir=" . urlencode($dir);
+                }
+                if (trim($lojaFiltro) !== '') {
+                    $url .= "&loja_filtro=" . urlencode($lojaFiltro);
                 }
                 return $url;
             };
@@ -3167,6 +3215,7 @@ HTML;
         if ($dir !== 'ASC' && $dir !== 'DESC') {
             $dir = 'ASC';
         }
+        $lojaFiltro = (string) $request->getParam('loja_filtro', '');
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -3200,6 +3249,7 @@ HTML;
                 'peso' => !empty($colNames['weight']) ? 'weight' : (!empty($colNames['peso']) ? 'peso' : 'name'),
                 'preco' => !empty($colNames['price']) ? 'price' : (!empty($colNames['preco']) ? 'preco' : (!empty($colNames['valor']) ? 'valor' : 'name')),
                 'status' => !empty($colNames['status']) ? 'status' : (!empty($colNames['active']) ? 'active' : 'name'),
+                'loja' => !empty($colNames['loja_id']) ? 'loja_id' : (!empty($colNames['loja']) ? 'loja' : 'name'),
                 'cadastro' => $createdCol ?: 'id',
                 'id' => 'id',
             ];
@@ -3213,6 +3263,20 @@ HTML;
             } else {
                 $orderBy .= ', p.id ASC';
             }
+
+            // Mapa de lojas (id => nome)
+            $lojaMap = [];
+            try {
+                $stmtLj = $pdo->query("SHOW TABLES LIKE 'lojas'");
+                if ($stmtLj && $stmtLj->fetchColumn()) {
+                    $stmtLojas = $pdo->query("SELECT id, nome FROM lojas ORDER BY nome ASC");
+                    if ($stmtLojas) {
+                        foreach ($stmtLojas->fetchAll(\PDO::FETCH_ASSOC) as $lj) {
+                            $lojaMap[(int) $lj['id']] = (string) $lj['nome'];
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
 
             $params = [];
             $where = ' WHERE (LOWER(COALESCE(p.status,\'\')) = \'archived\' OR p.active = 0) ';
@@ -3228,8 +3292,15 @@ HTML;
                 $where .= ' AND (p.name LIKE :busca OR p.sku LIKE :busca) ';
                 $params[':busca'] = '%' . $busca . '%';
             }
+            if ($lojaFiltro !== '' && is_numeric($lojaFiltro)) {
+                $lojaCol = !empty($colNames['loja_id']) ? 'loja_id' : (!empty($colNames['loja']) ? 'loja' : '');
+                if ($lojaCol !== '') {
+                    $where .= " AND p.{$lojaCol} = :loja_filtro ";
+                    $params[':loja_filtro'] = $lojaFiltro;
+                }
+            }
 
-            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY p.name ASC, p.id ASC LIMIT :limite OFFSET :offset';
+            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
             $stmt = $pdo->prepare($sql);
             foreach ($params as $k => $v) {
                 if ($k === ':rep_id') {
@@ -3271,8 +3342,17 @@ HTML;
                     'weight' => $r['weight'] ?? $r['peso'] ?? 0,
                     'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
                     'imagem' => $img,
+                    'loja_id' => (int) ($r['loja_id'] ?? 0),
+                    'loja_nome' => '',
                 ];
             }
+            // Resolver nomes de loja
+            foreach ($produtos as &$_p) {
+                if ($_p['loja_id'] > 0 && isset($lojaMap[$_p['loja_id']])) {
+                    $_p['loja_nome'] = $lojaMap[$_p['loja_id']];
+                }
+            }
+            unset($_p);
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
@@ -3296,8 +3376,17 @@ HTML;
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
-            . '<div class="col-md-8">'
+            . '<div class="col-md-5">'
             . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
+            . '</div>'
+            . '<div class="col-md-2">'
+            . '<select class="form-select" name="loja_filtro">'
+            . '<option value="">Todas as lojas</option>';
+        foreach ($lojaMap as $_lid => $_lnome) {
+            $selLoja = ((string) $lojaFiltro === (string) $_lid) ? ' selected' : '';
+            echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+        echo '</select>'
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
@@ -3305,6 +3394,7 @@ HTML;
             . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
             . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
+            . '<option value="loja"' . ($sort === 'loja' ? ' selected' : '') . '>Loja</option>'
             . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
             . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
@@ -3326,6 +3416,7 @@ HTML;
             . '<thead><tr>'
             . '<th style="width:72px">Imagem</th>'
             . '<th>Nome</th>'
+            . '<th style="width:130px">Loja</th>'
             . '<th style="width:120px">Peso (kg)</th>'
             . '<th style="width:140px">Preço</th>'
             . '<th style="width:110px">Status</th>'
@@ -3336,6 +3427,7 @@ HTML;
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
             $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
+            $lojaNome = htmlspecialchars((string) $produto['loja_nome'], ENT_QUOTES, 'UTF-8');
             $pesoRaw = (!empty($produto['weight']) ? $produto['weight'] : (!empty($produto['peso']) ? $produto['peso'] : 0));
             if (is_string($pesoRaw)) $pesoRaw = str_replace(',', '.', trim($pesoRaw));
             $peso = number_format((float) $pesoRaw, 3, '.', ',');
@@ -3346,6 +3438,7 @@ HTML;
             echo '<tr>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
                 . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
+                . '<td><span class="text-muted small">' . ($lojaNome !== '' ? $lojaNome : '<em class="text-secondary">—</em>') . '</span></td>'
                 . '<td><span class="text-muted small">' . $peso . ' kg</span></td>'
                 . '<td><span class="fw-semibold">' . htmlspecialchars($preco, ENT_QUOTES, 'UTF-8') . '</span></td>'
                 . '<td><span class="badge ' . $badge . '">' . $label . '</span></td>'
@@ -3359,7 +3452,7 @@ HTML;
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos/arquivados' : '/admin/produtos/arquivados';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
@@ -3369,6 +3462,9 @@ HTML;
                 }
                 if (trim($dir) !== '') {
                     $url .= "&dir=" . urlencode($dir);
+                }
+                if (trim($lojaFiltro) !== '') {
+                    $url .= "&loja_filtro=" . urlencode($lojaFiltro);
                 }
                 return $url;
             };
