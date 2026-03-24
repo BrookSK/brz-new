@@ -85,6 +85,14 @@ class AdminPedidosController extends Controller {
             $addSet($colCidade, trim((string) $request->getParam('cidade')));
             $addSet($colEstado, trim((string) $request->getParam('estado')));
 
+            // Destinatário (entrega para outra pessoa)
+            $colDestNome = $pickCol(['destinatario_nome']);
+            $colDestDoc = $pickCol(['destinatario_documento']);
+            $colDestTel = $pickCol(['destinatario_telefone']);
+            $addSet($colDestNome, trim((string) $request->getParam('destinatario_nome')));
+            $addSet($colDestDoc, trim((string) $request->getParam('destinatario_documento')));
+            $addSet($colDestTel, trim((string) $request->getParam('destinatario_telefone')));
+
             $set = array_values(array_filter($set, static function($x){ return is_string($x) && trim($x) !== ''; }));
 
             if (empty($set)) {
@@ -107,7 +115,7 @@ class AdminPedidosController extends Controller {
                     $newRow = [];
                 }
 
-                $keys = ['cliente_nome','customer_name','nome','name','cliente_email','customer_email','email','cliente_telefone','customer_phone','telefone','phone','celular','cliente_documento','cliente_cpf_cnpj','cpf_cnpj','documento','customer_document','cpf','pais_entrega','country_entrega','pais','country','customer_country','cep','zipcode','zip_code','customer_zipcode','endereco','logradouro','address','customer_address','numero','address_number','customer_address_number','complemento','address_complement','customer_address_complement','bairro','province','district','customer_province','cidade','city','customer_city','estado','state','customer_state'];
+                $keys = ['cliente_nome','customer_name','nome','name','cliente_email','customer_email','email','cliente_telefone','customer_phone','telefone','phone','celular','cliente_documento','cliente_cpf_cnpj','cpf_cnpj','documento','customer_document','cpf','pais_entrega','country_entrega','pais','country','customer_country','cep','zipcode','zip_code','customer_zipcode','endereco','logradouro','address','customer_address','numero','address_number','customer_address_number','complemento','address_complement','customer_address_complement','bairro','province','district','customer_province','cidade','city','customer_city','estado','state','customer_state','destinatario_nome','destinatario_documento','destinatario_telefone'];
                 $oldPick = [];
                 $newPick = [];
                 foreach ($keys as $k) {
@@ -3387,6 +3395,12 @@ HTML;
                         . '<div class="col-md-4"><label class="form-label">Cidade</label><input type="text" class="form-control" id="editClienteCidade" value="' . htmlspecialchars($cidade, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-4"><label class="form-label">Estado</label><input type="text" class="form-control" id="editClienteEstado" value="' . htmlspecialchars($estado, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '</div>'
+                        . '<hr class="mt-3 mb-2"><h6 class="mb-2"><i class="fas fa-user-friends me-1"></i>Destinatário (entrega para outra pessoa)</h6>'
+                        . '<div class="row g-3">'
+                        . '<div class="col-md-4"><label class="form-label">Nome destinatário</label><input type="text" class="form-control" id="editDestinatarioNome" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_nome'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">CPF/Doc destinatário</label><input type="text" class="form-control" id="editDestinatarioDocumento" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_documento'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">Telefone destinatário</label><input type="text" class="form-control" id="editDestinatarioTelefone" value="' . htmlspecialchars(trim((string) ($pedido['destinatario_telefone'] ?? '')), ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '</div>'
                         . '</div>'
                         . '<div class="modal-footer">'
                         . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
@@ -3449,6 +3463,9 @@ HTML;
             body.set('bairro', (qs('#editClienteBairro')||{}).value || '');
             body.set('cidade', (qs('#editClienteCidade')||{}).value || '');
             body.set('estado', (qs('#editClienteEstado')||{}).value || '');
+            body.set('destinatario_nome', (qs('#editDestinatarioNome')||{}).value || '');
+            body.set('destinatario_documento', (qs('#editDestinatarioDocumento')||{}).value || '');
+            body.set('destinatario_telefone', (qs('#editDestinatarioTelefone')||{}).value || '');
 
             fetch('/admin/pedidos/atualizar-cliente/' + encodeURIComponent(String(pedidoId)), {
                 method: 'POST',
@@ -4038,7 +4055,25 @@ HTML;
                                             (!empty($pedido['cep_entrega']) ? ' - CEP: ' . $pedido['cep_entrega'] : '')
                                         )
                                     ) .
-                                '</p>
+                                '</p>';
+
+        // Destinatário (entrega para outra pessoa)
+        $destNome = trim((string) ($pedido['destinatario_nome'] ?? ''));
+        $destDoc = trim((string) ($pedido['destinatario_documento'] ?? ''));
+        $destTel = trim((string) ($pedido['destinatario_telefone'] ?? ''));
+        $temDestinatario = ($destNome !== '' || $destDoc !== '' || $destTel !== '');
+
+        if ($temDestinatario) {
+            echo '<hr>
+                                <div class="mb-0">
+                                    <span class="badge bg-info text-dark mb-2"><i class="fas fa-user-friends me-1"></i>Entrega para outra pessoa</span>
+                                    <p class="mb-1"><strong>Destinatário:</strong> ' . htmlspecialchars($destNome ?: 'N/A') . '</p>'
+                                    . ($destDoc !== '' ? '<p class="mb-1"><strong>CPF/Doc:</strong> ' . htmlspecialchars($destDoc) . '</p>' : '')
+                                    . ($destTel !== '' ? '<p class="mb-0"><strong>Telefone:</strong> ' . htmlspecialchars($destTel) . '</p>' : '')
+                                . '</div>';
+        }
+
+        echo '
                             </div>
                         </div>
                     </div>

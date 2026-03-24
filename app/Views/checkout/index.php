@@ -138,7 +138,8 @@
                             </div>
                         </div>
 
-                        <div class="mb-4">
+                        <!-- OCULTO TEMPORARIAMENTE - Entregar para outra pessoa -->
+                        <div class="mb-4" style="display:none !important;">
                             <h6 class="mb-3"><i class="fas fa-truck"></i> <?= __('checkout.delivery', 'Entrega') ?></h6>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" value="1" id="entrega_para_outro" name="entrega_para_outro">
@@ -163,6 +164,7 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- FIM OCULTO TEMPORARIAMENTE -->
 
                         <!-- Endereço de Entrega -->
                         <div class="mb-4">
