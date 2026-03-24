@@ -6078,6 +6078,52 @@ HTMLSCRIPT;
         ]);
     }
 
+    public function custoAtualizar(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
+
+        $id = $id ?? $request->getParam('id');
+        $produtoId = (int) $id;
+        if ($produtoId <= 0) {
+            $this->json(['success' => false, 'error' => 'Produto inválido'], 400);
+        }
+
+        $custo = trim((string) $request->getParam('custo'));
+        $custoVal = (float) $custo;
+        if ($custoVal < 0) {
+            $this->json(['success' => false, 'error' => 'Custo inválido'], 400);
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
+
+            $cols = $this->getTableColumns($pdo, 'produtos');
+            $colCusto = null;
+            foreach (['preco_custo', 'custo', 'cost_price', 'valor_custo'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $colCusto = $c;
+                    break;
+                }
+            }
+            if (!$colCusto) {
+                $this->json(['success' => false, 'error' => 'Coluna de custo não encontrada em produtos'], 500);
+            }
+
+            $st = $pdo->prepare('UPDATE produtos SET ' . $colCusto . ' = ? WHERE id = ?');
+            $st->execute([$custoVal, (int) $produtoId]);
+
+            $this->json([
+                'success' => true,
+                'produto_id' => $produtoId,
+                'custo' => $custoVal,
+                'custo_fmt' => number_format($custoVal, 2, ',', '.'),
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function ncmAtualizar(Request $request, $id = null) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);

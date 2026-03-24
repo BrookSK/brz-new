@@ -24,6 +24,9 @@ $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'exclui
 $router->post('/admin/produtos/ncm/search', 'AdminProdutosController', 'ncmSearch');
 $router->post('/admin/produtos/ncm/atualizar/{id}', 'AdminProdutosController', 'ncmAtualizar');
 
+// Custo (atalho AJAX)
+$router->post('/admin/produtos/custo/atualizar/{id}', 'AdminProdutosController', 'custoAtualizar');
+
 // Importação de produtos (CSV)
 $router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'importarProdutosModelo');
 $router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');

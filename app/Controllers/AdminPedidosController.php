@@ -3067,7 +3067,7 @@ HTML;
                                                 <th>Produto</th>
                                                 <th>ID Produto</th>
                                                 <th>NCM</th>
-                                                <th>Referência</th>
+                                                <th>Custo</th>
                                                 <th>Quantidade</th>
                                                 <th>Preço Unitário</th>
                                                 <th>Subtotal</th>
@@ -3187,7 +3187,22 @@ HTML;
                                                 <td>' . $nomeHtml . $extraHtml . '</td>
                                                 <td>' . $item['produto_id'] . '</td>
                                                 <td>' . $ncmHtml . '</td>
-                                                <td>' . htmlspecialchars($item['nome_produto_sku'] ?? $item['referencia'] ?? 'N/A') . '</td>
+                                                <td>';
+                                            // Custo do produto com edição rápida
+                                            $custoDisplay = ($custoProd !== null && (float) $custoProd > 0) ? number_format((float) $custoProd, 2, ',', '.') : '';
+                                            if ($custoDisplay !== '') {
+                                                echo '<span>' . htmlspecialchars($custoDisplay, ENT_QUOTES, 'UTF-8') . '</span>'
+                                                    . ' <a href="#" class="text-muted js-custo-quick" data-produto-id="' . (int) $pidItem . '" data-custo-current="' . htmlspecialchars(number_format((float) $custoProd, 2, '.', ''), ENT_QUOTES, 'UTF-8') . '" title="Editar Custo" style="text-decoration:none;">'
+                                                    . '<i class="fas fa-pen-to-square"></i>'
+                                                    . '</a>';
+                                            } else {
+                                                if ($pidItem > 0) {
+                                                    echo '<a href="#" class="badge bg-warning text-dark js-custo-quick" data-produto-id="' . (int) $pidItem . '" data-custo-current="" style="text-decoration:none;">Sem custo</a>';
+                                                } else {
+                                                    echo '<span class="text-muted">-</span>';
+                                                }
+                                            }
+                                            echo '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
                                                 <td>' . $this->formatarMoeda($item['subtotal'], $pedido['moeda']) . '</td>
@@ -3363,6 +3378,95 @@ HTML;
     }
 })();</script>
 HTML;
+
+                    // Modal de edição rápida de custo
+                    echo '<div class="modal fade" id="modalCustoQuick" tabindex="-1" aria-hidden="true">'
+                        . '<div class="modal-dialog modal-sm">'
+                        . '<div class="modal-content">'
+                        . '<div class="modal-header">'
+                        . '<h5 class="modal-title"><i class="fas fa-dollar-sign me-1"></i>Editar Custo</h5>'
+                        . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
+                        . '</div>'
+                        . '<div class="modal-body">'
+                        . '<div id="custoQuickAlert" class="alert alert-info" style="display:none;"></div>'
+                        . '<input type="hidden" id="custoQuickProdutoId" value="" />'
+                        . '<label class="form-label">Custo do produto (R$)</label>'
+                        . '<input type="number" step="0.01" min="0" class="form-control" id="custoQuickInput" placeholder="0.00" />'
+                        . '</div>'
+                        . '<div class="modal-footer">'
+                        . '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>'
+                        . '<button type="button" class="btn btn-primary" id="btnCustoQuickSalvar">Salvar Custo</button>'
+                        . '</div>'
+                        . '</div>'
+                        . '</div>'
+                        . '</div>';
+
+                    echo <<<'CUSTOSCRIPT'
+<script>(function(){
+    var cState = { produtoId: 0, triggerEl: null };
+    function qs(s){ return document.querySelector(s); }
+    function custoAlert(msg, cls){
+        var el = qs("#custoQuickAlert");
+        if(!el) return;
+        el.style.display = msg ? "block" : "none";
+        el.className = "alert " + (cls||"alert-info");
+        el.textContent = msg||"";
+    }
+    document.addEventListener("click", function(ev){
+        var a = ev.target && ev.target.closest ? ev.target.closest(".js-custo-quick") : null;
+        if(!a) return;
+        ev.preventDefault();
+        cState.triggerEl = a;
+        cState.produtoId = parseInt(a.getAttribute("data-produto-id")||"0", 10) || 0;
+        var cur = a.getAttribute("data-custo-current") || "";
+        qs("#custoQuickProdutoId").value = String(cState.produtoId);
+        qs("#custoQuickInput").value = cur;
+        custoAlert("", "");
+        var el = qs("#modalCustoQuick");
+        if(el && window.bootstrap && window.bootstrap.Modal){
+            window.bootstrap.Modal.getOrCreateInstance(el).show();
+        }
+        setTimeout(function(){ try{ qs("#custoQuickInput").focus(); } catch(e){} }, 200);
+    });
+    var btnSave = qs("#btnCustoQuickSalvar");
+    if(btnSave){
+        btnSave.addEventListener("click", function(){
+            if(!cState.produtoId) return;
+            var val = parseFloat(qs("#custoQuickInput").value || "0");
+            if(isNaN(val) || val < 0){ custoAlert("Informe um valor válido.", "alert-warning"); return; }
+            custoAlert("Salvando...", "alert-info");
+            btnSave.disabled = true;
+            var body = new URLSearchParams();
+            body.set("custo", String(val));
+            fetch("/admin/produtos/custo/atualizar/" + encodeURIComponent(String(cState.produtoId)), {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: body.toString()
+            }).then(function(r){ return r.json(); }).then(function(j){
+                if(!j || !j.success){
+                    custoAlert((j && j.error) ? j.error : "Falha ao salvar", "alert-warning");
+                    btnSave.disabled = false;
+                    return;
+                }
+                custoAlert("Custo atualizado!", "alert-success");
+                btnSave.disabled = false;
+                try {
+                    var td = cState.triggerEl && cState.triggerEl.closest ? cState.triggerEl.closest("td") : null;
+                    if(td){
+                        var fmt = j.custo_fmt || String(val.toFixed(2)).replace(".", ",");
+                        td.innerHTML = '<span>' + fmt + '</span> ' +
+                            '<a href="#" class="text-muted js-custo-quick" data-produto-id="' + String(cState.produtoId) + '" data-custo-current="' + String(val) + '" title="Editar Custo" style="text-decoration:none;">' +
+                            '<i class="fas fa-pen-to-square"></i></a>';
+                    }
+                } catch(e) {}
+            }).catch(function(){
+                custoAlert("Erro de rede.", "alert-warning");
+                btnSave.disabled = false;
+            });
+        });
+    }
+})();</script>
+CUSTOSCRIPT;
 
                     $clienteNome = (string) ($pedido['cliente_nome'] ?? ($pedido['nome'] ?? ''));
                     $clienteEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ($pedido['customer_email'] ?? '')));
