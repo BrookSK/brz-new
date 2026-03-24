@@ -280,6 +280,10 @@ class AdminUsuariosHelper {
             }
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'email', $dados['email'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'senha', !empty($dados['senha']) ? password_hash($dados['senha'], PASSWORD_DEFAULT) : null);
+            // Compatibilidade: tabela pode ter coluna 'password' (NOT NULL) além de ou em vez de 'senha'
+            if (in_array('password', $colunas, true)) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'password', !empty($dados['senha']) ? password_hash($dados['senha'], PASSWORD_DEFAULT) : password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT));
+            }
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
             $cpfNorm = isset($dados['cpf']) ? preg_replace('/\D+/', '', (string) $dados['cpf']) : null;
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'cpf', $cpfNorm !== '' ? $cpfNorm : null);
