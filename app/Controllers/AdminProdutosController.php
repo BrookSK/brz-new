@@ -2923,6 +2923,7 @@ HTML;
             $sortMap = [
                 'nome' => 'name',
                 'sku' => 'sku',
+                'peso' => !empty($colNames['weight']) ? 'weight' : (!empty($colNames['peso']) ? 'peso' : 'name'),
                 'preco' => !empty($colNames['price']) ? 'price' : (!empty($colNames['preco']) ? 'preco' : (!empty($colNames['valor']) ? 'valor' : 'name')),
                 'status' => !empty($colNames['status']) ? 'status' : (!empty($colNames['active']) ? 'active' : 'name'),
                 'cadastro' => $createdCol ?: 'id',
@@ -3031,6 +3032,7 @@ HTML;
             . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
             . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
+            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
             . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
             . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
@@ -3195,6 +3197,7 @@ HTML;
             $sortMap = [
                 'nome' => 'name',
                 'sku' => 'sku',
+                'peso' => !empty($colNames['weight']) ? 'weight' : (!empty($colNames['peso']) ? 'peso' : 'name'),
                 'preco' => !empty($colNames['price']) ? 'price' : (!empty($colNames['preco']) ? 'preco' : (!empty($colNames['valor']) ? 'valor' : 'name')),
                 'status' => !empty($colNames['status']) ? 'status' : (!empty($colNames['active']) ? 'active' : 'name'),
                 'cadastro' => $createdCol ?: 'id',
@@ -3301,6 +3304,7 @@ HTML;
             . '<option value="nome"' . ($sort === 'nome' ? ' selected' : '') . '>Nome</option>'
             . '<option value="cadastro"' . ($sort === 'cadastro' ? ' selected' : '') . '>Cadastro</option>'
             . '<option value="sku"' . ($sort === 'sku' ? ' selected' : '') . '>SKU</option>'
+            . '<option value="peso"' . ($sort === 'peso' ? ' selected' : '') . '>Peso</option>'
             . '<option value="preco"' . ($sort === 'preco' ? ' selected' : '') . '>Preço</option>'
             . '<option value="status"' . ($sort === 'status' ? ' selected' : '') . '>Status</option>'
             . '<option value="id"' . ($sort === 'id' ? ' selected' : '') . '>ID</option>'
