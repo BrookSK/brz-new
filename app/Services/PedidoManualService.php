@@ -1214,6 +1214,53 @@ class PedidoManualService {
             $params[':admin_criador_id'] = (int) $adminCriadorId;
         }
 
+        // Buscar nome e email do cliente para preencher campos NOT NULL
+        try {
+            $colsUsuarios = $this->getCols('usuarios');
+            $nomeClienteCol = '';
+            foreach (['nome', 'name', 'nome_completo'] as $nc) {
+                if (in_array($nc, $colsUsuarios, true)) { $nomeClienteCol = $nc; break; }
+            }
+            $emailClienteCol = '';
+            foreach (['email', 'email_address'] as $ec) {
+                if (in_array($ec, $colsUsuarios, true)) { $emailClienteCol = $ec; break; }
+            }
+            $selectCli = [];
+            if ($nomeClienteCol !== '') $selectCli[] = $nomeClienteCol . ' AS cli_nome';
+            if ($emailClienteCol !== '') $selectCli[] = $emailClienteCol . ' AS cli_email';
+            if (!empty($selectCli)) {
+                $stCli = $this->db->prepare('SELECT ' . implode(', ', $selectCli) . ' FROM usuarios WHERE id = ? LIMIT 1');
+                $stCli->execute([$clienteId]);
+                $cli = $stCli->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $nomeCliente = trim((string) ($cli['cli_nome'] ?? ''));
+                if ($nomeCliente !== '') {
+                    foreach (['nome', 'cliente_nome', 'name'] as $cn) {
+                        if (in_array($cn, $colsPedidos, true) && !in_array($cn, $cols, true)) {
+                            $cols[] = $cn;
+                            $vals[] = ':nome_cliente';
+                            $params[':nome_cliente'] = $nomeCliente;
+                            break;
+                        }
+                    }
+                }
+
+                $emailCliente = trim((string) ($cli['cli_email'] ?? ''));
+                if ($emailCliente !== '') {
+                    foreach (['email', 'cliente_email', 'email_address'] as $ce) {
+                        if (in_array($ce, $colsPedidos, true) && !in_array($ce, $cols, true)) {
+                            $cols[] = $ce;
+                            $vals[] = ':email_cliente';
+                            $params[':email_cliente'] = $emailCliente;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Se não conseguir buscar, continua sem — o banco pode aceitar
+        }
+
         $this->db->beginTransaction();
         try {
             $sql = 'INSERT INTO pedidos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
