@@ -1,237 +1,217 @@
-<?php
-$siteLogo = '';
-try {
-    $raw = '';
-    $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
-    foreach ($tablesToTry as $t) {
-        if ($raw !== '') break;
-        try {
-            $pdo = \Config\Database::getConnection();
-            $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
-            $stmtT->execute([$t]);
-            if (!$stmtT->fetchColumn()) {
-                continue;
-            }
-            $stmtCols = $pdo->query('DESCRIBE ' . $t);
-            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            if (!is_array($cols)) {
-                $cols = [];
-            }
-            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
-                $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
-                if ($valCol !== '') {
-                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
-                    $stmt->execute(['layout', 'logo']);
-                    $raw = (string) ($stmt->fetchColumn() ?: '');
-                    if ($raw !== '') break;
-                }
-            }
-            $keyCol = '';
-            if (in_array('chave', $cols, true)) $keyCol = 'chave';
-            elseif (in_array('key', $cols, true)) $keyCol = 'key';
-            elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
-            elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
-            $valCol = '';
-            if (in_array('valor', $cols, true)) $valCol = 'valor';
-            elseif (in_array('value', $cols, true)) $valCol = 'value';
-            elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
-            if ($keyCol !== '' && $valCol !== '') {
-                $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
-                $stmt->execute(['layout_logo']);
-                $raw = (string) ($stmt->fetchColumn() ?: '');
-                if ($raw !== '') break;
-            }
-            if (in_array('layout_logo', $cols, true)) {
-                $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
-                $stmt2 = $pdo->query('SELECT layout_logo AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
-                $raw = (string) ($stmt2 ? ($stmt2->fetchColumn() ?: '') : '');
-                if ($raw !== '') break;
-            }
-        } catch (\Exception $e) {
-        }
-    }
-    $siteLogo = is_string($raw) ? trim($raw) : '';
-} catch (\Exception $e) {
-    $siteLogo = '';
-}
-?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Como funciona o Clube Braziliana</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f6f8fb; }
-    </style>
-</head>
-<body>
-
-<div class="container" style="padding: 22px 0 0;">
-    <div class="text-center mb-3">
-        <?php if (!empty($siteLogo)): ?>
-            <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height: 52px; max-width: 100%; object-fit: contain;">
-        <?php else: ?>
-            <div style="font-weight:800; color:#0b1f3a; font-size: 20px;">Braziliana</div>
-        <?php endif; ?>
-    </div>
-</div>
-
+<?php ob_start(); ?>
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-9">
-            <h1 class="h3 mb-3" style="color:#0b1f3a; font-weight: 800;">Como funciona o Clube Braziliana</h1>
 
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <div class="text-muted mb-2">Visão geral</div>
-                    <div class="fw-semibold">O Clube Braziliana é um programa de benefícios baseado em créditos internos da plataforma, destinado a oferecer vantagens aos usuários em compras e serviços disponíveis no sistema. Ao participar, você aceita integralmente as regras abaixo.</div>
+            <!-- Hero -->
+            <div class="text-center mb-5">
+                <div class="mb-3"><i class="fas fa-crown fa-3x" style="color:#c8860a;"></i></div>
+                <h1 class="fw-bold" style="color:#0b1f3a;">Clube Braziliana</h1>
+                <p class="lead text-muted">Programa de Benefícios</p>
+                <p class="text-muted mx-auto" style="max-width:600px;">O Clube Braziliana é um programa de benefícios baseado em créditos internos da plataforma, destinado a oferecer vantagens exclusivas aos membros em compras e serviços disponíveis no sistema.</p>
+                <div class="d-flex gap-2 justify-content-center mt-4">
+                    <a href="/clube/recarga" class="btn btn-lg" style="background:#0b1f3a;color:#fff;"><i class="fas fa-wallet me-2"></i>Ativar meu Clube</a>
+                    <a href="/grupos-compras" class="btn btn-outline-secondary btn-lg"><i class="fas fa-store me-2"></i>Ver Grupos</a>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.1. Ativação e participação</h2>
-                    <div class="text-muted">
-                        <div class="mb-2">Para participar do Clube Braziliana, o usuário deverá realizar um depósito mínimo de <strong>US$ 39,00</strong> (ou equivalente em USD) em créditos dentro de sua carteira interna na plataforma.</div>
-                        <div class="mb-2">Esse valor corresponde ao depósito mínimo para ativação do programa.</div>
-                        <div class="mb-2">Enquanto o saldo mínimo estiver mantido, o usuário poderá acessar os benefícios disponíveis dentro do Clube.</div>
-                        <div>Caso o saldo fique abaixo do valor mínimo exigido, o acesso a determinadas funcionalidades e benefícios poderá ser temporariamente suspenso até a regularização do saldo.</div>
+            <!-- Destaques rápidos -->
+            <div class="row g-3 mb-5">
+                <div class="col-md-3 col-6">
+                    <div class="card border-0 shadow-sm text-center p-3 h-100">
+                        <div class="mb-2"><i class="fas fa-dollar-sign fa-2x" style="color:#0b1f3a;"></i></div>
+                        <div class="fw-bold">US$ 39</div>
+                        <div class="small text-muted">Depósito mínimo</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card border-0 shadow-sm text-center p-3 h-100">
+                        <div class="mb-2"><i class="fas fa-percentage fa-2x" style="color:#0b1f3a;"></i></div>
+                        <div class="fw-bold">Até 10%/mês</div>
+                        <div class="small text-muted">Créditos adicionais</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card border-0 shadow-sm text-center p-3 h-100">
+                        <div class="mb-2"><i class="fas fa-gift fa-2x" style="color:#0b1f3a;"></i></div>
+                        <div class="fw-bold">Cashback</div>
+                        <div class="small text-muted">Em créditos internos</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card border-0 shadow-sm text-center p-3 h-100">
+                        <div class="mb-2"><i class="fas fa-trophy fa-2x" style="color:#0b1f3a;"></i></div>
+                        <div class="fw-bold">Sorteios</div>
+                        <div class="small text-muted">Exclusivos para membros</div>
                     </div>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-3">
+
+            <!-- Seções detalhadas -->
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
                 <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.2. Limite máximo do Clube</h2>
-                    <div class="text-muted">
-                        <div class="mb-3">O Clube Braziliana possui um limite máximo de participação equivalente a <strong>R$ 150.000,00</strong> em créditos totais depositados pelos participantes.</div>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">1</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Ativação e Participação</h2>
+                    </div>
+                    <p>Para participar do Clube Braziliana, realize um depósito mínimo de <strong>US$ 39,00</strong> em créditos dentro da sua carteira interna na plataforma.</p>
+                    <p>Enquanto o saldo mínimo estiver mantido, você terá acesso a todos os benefícios disponíveis. Caso o saldo fique abaixo do valor mínimo, o acesso poderá ser temporariamente suspenso até a regularização.</p>
+                </div>
+            </div>
 
-                        <div class="fw-semibold" style="color:#0b1f3a;">Quando esse limite for atingido:</div>
-                        <ul class="mb-3">
-                            <li>Novos depósitos no Clube poderão ser temporariamente suspensos</li>
-                            <li>Novos participantes poderão ficar em lista de espera</li>
-                            <li>Depósitos adicionais poderão não ser aceitos</li>
-                        </ul>
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">2</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Limite Máximo do Clube</h2>
+                    </div>
+                    <p>O Clube possui um limite máximo de participação equivalente a <strong>R$ 150.000,00</strong> em créditos totais depositados pelos participantes.</p>
+                    <p class="fw-semibold mb-2" style="color:#0b1f3a;">Quando esse limite for atingido:</p>
+                    <ul>
+                        <li>Novos depósitos poderão ser temporariamente suspensos</li>
+                        <li>Novos participantes poderão ficar em lista de espera</li>
+                        <li>Depósitos adicionais poderão não ser aceitos</li>
+                    </ul>
+                    <p class="mb-0">A liberação ocorre quando o saldo total voltar a ficar abaixo do limite. A Braziliana poderá alterar esse limite a qualquer momento.</p>
+                </div>
+            </div>
 
-                        <div class="mb-2">A liberação para novos depósitos poderá ocorrer novamente caso o saldo total do Clube volte a ficar abaixo do limite estabelecido.</div>
-                        <div>A Braziliana poderá, a seu critério, alterar o limite máximo de participação do Clube a qualquer momento, conforme necessidades operacionais do sistema.</div>
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">3</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Prazo de Permanência</h2>
+                    </div>
+                    <p>Os créditos depositados ficam vinculados ao programa por um prazo mínimo de <strong>6 meses</strong>, contados a partir da data do primeiro depósito.</p>
+                    <p class="fw-semibold mb-2" style="color:#0b1f3a;">Durante esse período:</p>
+                    <ul>
+                        <li>Os créditos permanecem ativos na sua carteira</li>
+                        <li>Os benefícios do Clube permanecem válidos</li>
+                        <li>O saldo poderá ter restrições de utilização até o término do prazo</li>
+                    </ul>
+                    <p class="mb-0">Após os 6 meses, os créditos poderão ser utilizados normalmente na plataforma.</p>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">4</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Produtos Elegíveis</h2>
+                    </div>
+                    <p class="mb-0">Os benefícios do Clube são aplicáveis exclusivamente a produtos ou serviços identificados na plataforma como <strong>"Clube Ativo"</strong>. Produtos que não possuam essa identificação não participam das vantagens do programa.</p>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">5</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Benefícios do Clube</h2>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-tags text-success me-2 mt-1"></i>
+                                <div><strong>Descontos</strong><br><span class="small text-muted">Em produtos e serviços elegíveis</span></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-undo text-primary me-2 mt-1"></i>
+                                <div><strong>Cashback</strong><br><span class="small text-muted">Em créditos internos, direto na carteira</span></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-coins me-2 mt-1" style="color:#c8860a;"></i>
+                                <div><strong>Créditos adicionais</strong><br><span class="small text-muted">Gerados mensalmente pelo sistema</span></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-trophy text-warning me-2 mt-1"></i>
+                                <div><strong>Sorteios exclusivos</strong><br><span class="small text-muted">Gratificações para membros</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="mb-0 small text-muted">Os benefícios podem variar de acordo com campanhas promocionais e regras operacionais do sistema.</p>
+                </div>
+            </div>
+
+
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">6</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Sorteios e Gratificações</h2>
+                    </div>
+                    <p>Durante o período mínimo de 6 meses de participação, os membros poderão participar de sorteios promocionais, campanhas de gratificação e benefícios exclusivos.</p>
+                    <p class="mb-0">Essas ações são eventuais e opcionais, podendo ocorrer em datas específicas ou campanhas internas. As regras de cada sorteio serão divulgadas pela plataforma.</p>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">7</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Créditos Adicionais</h2>
+                    </div>
+                    <p>Enquanto o saldo mínimo estiver ativo e respeitado o prazo de permanência, o sistema poderá gerar créditos adicionais mensais de até <strong>10% ao mês</strong>, calculados sobre o saldo elegível.</p>
+                    <p class="fw-semibold mb-2" style="color:#0b1f3a;">Esses créditos:</p>
+                    <ul>
+                        <li>São gerados exclusivamente dentro do sistema</li>
+                        <li>Possuem natureza promocional</li>
+                        <li>Não são transferíveis para fora da plataforma</li>
+                        <li>Não são saqueáveis</li>
+                        <li>Podem ser utilizados para pagamentos de serviços ou produtos na plataforma</li>
+                    </ul>
+                    <p class="mb-0 small text-muted">A Braziliana poderá alterar, reduzir, suspender ou encerrar a geração desses créditos a qualquer momento.</p>
+                </div>
+            </div>
+
+            <!-- Aviso importante -->
+            <div class="p-4 mb-3" style="background:rgba(11,31,58,0.04);border:1px solid rgba(11,31,58,0.12);border-radius:14px;">
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-exclamation-circle me-3 mt-1" style="color:#0b1f3a;font-size:1.3rem;"></i>
+                    <div>
+                        <div class="fw-bold mb-2" style="color:#0b1f3a;">Importante: Natureza dos Créditos</div>
+                        <div class="row g-2">
+                            <div class="col-md-6"><i class="fas fa-times text-danger me-1"></i> A Braziliana <strong>não é</strong> instituição financeira</div>
+                            <div class="col-md-6"><i class="fas fa-times text-danger me-1"></i> O Clube <strong>não constitui</strong> investimento</div>
+                            <div class="col-md-6"><i class="fas fa-times text-danger me-1"></i> Os créditos <strong>não representam</strong> dinheiro</div>
+                            <div class="col-md-6"><i class="fas fa-times text-danger me-1"></i> Os créditos <strong>não são</strong> saqueáveis</div>
+                            <div class="col-md-6"><i class="fas fa-times text-danger me-1"></i> <strong>Sem garantia</strong> de rendimento</div>
+                            <div class="col-md-6"><i class="fas fa-times text-danger me-1"></i> <strong>Sem conversão</strong> em moeda fiduciária</div>
+                        </div>
+                        <p class="mt-2 mb-0 small text-muted">Todos os valores do Clube são créditos internos utilizados exclusivamente dentro do ecossistema da plataforma.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-3">
+            <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
                 <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.3. Prazo de permanência e liberação de utilização</h2>
-                    <div class="text-muted">
-                        <div class="mb-3">Os créditos depositados para participação no Clube Braziliana ficam vinculados ao programa por um prazo mínimo de <strong>6 (seis) meses</strong>, contados a partir da data do primeiro depósito.</div>
-
-                        <div class="fw-semibold" style="color:#0b1f3a;">Durante esse período:</div>
-                        <ul class="mb-3">
-                            <li>Os créditos permanecem ativos dentro da carteira do usuário</li>
-                            <li>Os benefícios do Clube permanecem válidos</li>
-                            <li>O saldo poderá ter restrições de utilização até o término do prazo mínimo</li>
-                        </ul>
-
-                        <div>Após o período mínimo de 6 meses, os créditos poderão ser utilizados normalmente dentro das funcionalidades disponíveis na plataforma.</div>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3"><span class="badge rounded-pill fs-6" style="background:#0b1f3a;">8</span></div>
+                        <h2 class="h5 mb-0" style="color:#0b1f3a;">Auditoria e Alterações</h2>
                     </div>
+                    <p>Os créditos e benefícios podem ser auditados automaticamente pelo sistema a qualquer momento. A Braziliana se reserva o direito de alterar regras, modificar benefícios, ajustar percentuais, suspender funcionalidades ou encerrar o programa sempre que necessário.</p>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.4. Produtos elegíveis</h2>
-                    <div class="text-muted">Os benefícios do Clube são aplicáveis exclusivamente a produtos ou serviços identificados na plataforma como <strong>“Clube Ativo”</strong>. Produtos que não possuam essa identificação não participam das vantagens do programa.</div>
+            <!-- CTA final -->
+            <div class="text-center py-4">
+                <h3 class="fw-bold mb-3" style="color:#0b1f3a;">Pronto para participar?</h3>
+                <p class="text-muted mb-4">Ative seu Clube Braziliana com um depósito mínimo de US$ 39,00 e comece a aproveitar os benefícios.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <a href="/clube/recarga" class="btn btn-lg" style="background:#0b1f3a;color:#fff;"><i class="fas fa-crown me-2"></i>Ativar meu Clube</a>
+                    <a href="/produtos" class="btn btn-outline-primary btn-lg"><i class="fas fa-shopping-bag me-2"></i>Ver Produtos</a>
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.5. Benefícios do Clube</h2>
-                    <div class="text-muted">
-                        <div class="mb-2">Os participantes do Clube poderão receber benefícios como:</div>
-                        <ul class="mb-3">
-                            <li>Descontos em produtos ou serviços elegíveis</li>
-                            <li>Cashback em créditos internos</li>
-                            <li>Créditos adicionais gerados pelo sistema</li>
-                            <li>Participação em sorteios e gratificações exclusivas para membros do Clube</li>
-                        </ul>
-                        <div class="mb-2">O cashback recebido retorna automaticamente para a carteira interna do usuário, na mesma moeda utilizada na operação.</div>
-                        <div class="mb-2">Os benefícios podem variar de acordo com:</div>
-                        <ul class="mb-0">
-                            <li>Campanhas promocionais</li>
-                            <li>Regras operacionais do sistema</li>
-                            <li>Alterações realizadas pela plataforma</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.6. Sorteios e gratificações exclusivas</h2>
-                    <div class="text-muted">
-                        <div class="mb-2">Durante o período mínimo de 6 (seis) meses de participação no Clube, contados a partir do primeiro depósito, os membros poderão participar de:</div>
-                        <ul class="mb-3">
-                            <li>Sorteios promocionais</li>
-                            <li>Campanhas de gratificação</li>
-                            <li>Benefícios exclusivos para participantes do Clube</li>
-                        </ul>
-                        <div class="mb-2">Essas ações promocionais são eventuais e opcionais, podendo ocorrer em datas específicas ou campanhas internas.</div>
-                        <div>A participação e as regras de cada sorteio ou gratificação poderão ser definidas em regulamentos próprios divulgados pela plataforma.</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.7. Créditos adicionais do Clube</h2>
-                    <div class="text-muted">
-                        <div class="mb-3">Enquanto o saldo mínimo do Clube estiver ativo e respeitado o prazo mínimo de permanência, o sistema poderá gerar créditos adicionais mensais.</div>
-                        <div class="mb-3">O Clube poderá gerar até <strong>10% ao mês</strong> em créditos internos, calculados sobre o saldo elegível mantido na carteira.</div>
-
-                        <div class="fw-semibold" style="color:#0b1f3a;">Esses créditos:</div>
-                        <ul class="mb-3">
-                            <li>São gerados exclusivamente dentro do sistema</li>
-                            <li>Possuem natureza promocional</li>
-                            <li>Não são transferíveis para fora da plataforma</li>
-                            <li>Não são saqueáveis</li>
-                            <li>Podem ser utilizados para pagamentos de serviços ou produtos disponíveis na plataforma, incluindo redirecionamentos</li>
-                        </ul>
-
-                        <div>A Braziliana poderá alterar, reduzir, suspender ou encerrar a geração desses créditos adicionais a qualquer momento, sem necessidade de aviso prévio.</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="alert alert-info" style="border-radius:14px;">
-                <div class="fw-bold">18.8. Natureza dos créditos (importante)</div>
-                <div class="small">O Clube Braziliana é exclusivamente um programa de benefícios internos da plataforma. A Braziliana não é instituição financeira. O Clube não constitui investimento. Os créditos não representam dinheiro. Os créditos não possuem garantia de rendimento. Os créditos não são saqueáveis. Os créditos não possuem conversão direta em moeda fiduciária. Todos os valores do Clube são créditos internos utilizados exclusivamente dentro do ecossistema da plataforma.</div>
-            </div>
-
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-4">
-                    <h2 class="h5" style="color:#0b1f3a; font-weight: 800;">18.9. Auditoria e alterações</h2>
-                    <div class="text-muted">
-                        <div class="mb-2">Os créditos e benefícios do Clube podem ser auditados automaticamente pelo sistema a qualquer momento, com o objetivo de garantir o funcionamento correto do programa.</div>
-                        <div class="mb-2">A Braziliana se reserva o direito de:</div>
-                        <ul class="mb-0">
-                            <li>Alterar regras do Clube</li>
-                            <li>Modificar benefícios</li>
-                            <li>Ajustar percentuais</li>
-                            <li>Suspender funcionalidades</li>
-                            <li>Encerrar o programa</li>
-                            <li>Sempre que necessário para manutenção do sistema ou adequação às políticas operacionais</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
-
-</body>
-</html>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>

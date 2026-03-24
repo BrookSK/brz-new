@@ -17,7 +17,7 @@
                 <h4>Produto exclusivo do Clube Braziliana</h4>
                 <p class="text-muted">Este produto está disponível apenas para membros do Clube Braziliana com saldo mínimo de US$ 39,00 na carteira.</p>
                 <div class="d-grid gap-2 mt-3" style="max-width:300px;margin:0 auto;">
-                    <a href="/grupos-compras" class="btn btn-primary"><i class="fas fa-crown me-2"></i>Conhecer o Clube</a>
+                    <a href="/como-funciona-clube" class="btn btn-primary"><i class="fas fa-crown me-2"></i>Conhecer o Clube</a>
                     <a href="/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar aos Produtos</a>
                 </div>
             </div>

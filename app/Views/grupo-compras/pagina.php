@@ -59,11 +59,17 @@ $buildUrl = static function (int $p) use ($slug): string {
                 com saldo mínimo de <strong>US$ <?= number_format($clubeMinimo, 2, ',', '.') ?></strong> na carteira.
             </p>
             <?php if (empty($clubeLogado)): ?>
-                <a href="/login" class="btn btn-primary me-2"><i class="fas fa-sign-in-alt me-1"></i>Fazer login</a>
-                <a href="/registro" class="btn btn-outline-primary"><i class="fas fa-user-plus me-1"></i>Criar conta</a>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a href="/login" class="btn btn-primary"><i class="fas fa-sign-in-alt me-1"></i>Fazer login</a>
+                    <a href="/registro" class="btn btn-outline-primary"><i class="fas fa-user-plus me-1"></i>Criar conta</a>
+                    <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i>Saiba mais</a>
+                </div>
             <?php else: ?>
                 <p class="small text-muted mb-2">Seu saldo atual: <strong>US$ <?= number_format($clubeSaldoUsd, 2, ',', '.') ?></strong></p>
-                <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i>Recarregar carteira</a>
+                <div class="d-flex gap-2 justify-content-center flex-wrap">
+                    <a href="/minha-conta" class="btn btn-primary"><i class="fas fa-wallet me-1"></i>Recarregar carteira</a>
+                    <a href="/como-funciona-clube" class="btn btn-outline-secondary"><i class="fas fa-info-circle me-1"></i>Saiba mais</a>
+                </div>
             <?php endif; ?>
         </div>
     </div>

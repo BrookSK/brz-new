@@ -141,7 +141,7 @@
                     <div class="card-footer bg-transparent border-top-0">
                         <div class="d-grid gap-2">
                             <?php if (!empty($isClubeBlocked)): ?>
-                                <a href="/grupos-compras" class="btn btn-outline-secondary btn-sm">
+                                <a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm">
                                     <i class="fas fa-crown me-2"></i>Saiba mais sobre o Clube
                                 </a>
                             <?php else: ?>
