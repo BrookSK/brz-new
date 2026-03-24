@@ -4098,11 +4098,11 @@ HTML;
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <label class="form-label">Nome *</label>
-                                        <input type="text" class="form-control" name="name" value="' . htmlspecialchars($produto['name']) . '" required>
+                                        <input type="text" class="form-control" name="name" value="' . htmlspecialchars((string) ($produto['name'] ?? '')) . '" required>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">SKU</label>
-                                        <input type="text" class="form-control" name="sku" value="' . htmlspecialchars($produto['sku']) . '">
+                                        <input type="text" class="form-control" name="sku" value="' . htmlspecialchars((string) ($produto['sku'] ?? '')) . '">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Loja *</label>
