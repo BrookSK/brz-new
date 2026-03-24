@@ -42,7 +42,12 @@ class Endereco extends Model {
         $insert = [];
         foreach ($allowedMap as $key => $col) {
             if (isset($dataNormalized[$key]) && (empty($cols) || in_array($col, $cols, true))) {
-                $insert[$col] = $dataNormalized[$key];
+                $val = $dataNormalized[$key];
+                // Normalizar estado para UF de 2 letras
+                if ($col === 'estado') {
+                    $val = \App\Models\Usuario::normalizeEstado((string) $val);
+                }
+                $insert[$col] = $val;
             }
         }
 
@@ -84,6 +89,11 @@ class Endereco extends Model {
     }
     
     public function update($id, $data) {
+        // Normalizar estado para UF de 2 letras
+        if (isset($data['estado'])) {
+            $data['estado'] = \App\Models\Usuario::normalizeEstado((string) $data['estado']);
+        }
+
         $sql = "UPDATE {$this->table} SET 
                 tipo = :tipo, 
                 cep = :cep, 

@@ -1433,7 +1433,12 @@ class AuthController extends Controller {
                             ];
                             foreach ($map as $k => $col) {
                                 if (is_array($colsU) && in_array($col, $colsU, true) && isset($dados[$k])) {
-                                    $upd[$col] = $dados[$k];
+                                    $val = $dados[$k];
+                                    // Normalizar estado para UF de 2 letras
+                                    if ($col === 'estado') {
+                                        $val = \App\Models\Usuario::normalizeEstado((string) $val);
+                                    }
+                                    $upd[$col] = $val;
                                 }
                             }
 

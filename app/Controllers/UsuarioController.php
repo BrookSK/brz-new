@@ -856,6 +856,10 @@ class UsuarioController extends Controller {
                 }
             }
             if ($colFound !== null) {
+                // Normalizar estado para UF de 2 letras
+                if ($inputKey === 'estado') {
+                    $val = \App\Models\Usuario::normalizeEstado($val);
+                }
                 $payload[$colFound] = $val;
             }
         }
@@ -1008,6 +1012,10 @@ class UsuarioController extends Controller {
                     }
                 }
                 if ($colFound !== null) {
+                    // Normalizar estado para UF de 2 letras
+                    if ($inputKey === 'estado') {
+                        $val = \App\Models\Usuario::normalizeEstado($val);
+                    }
                     $payload[$colFound] = $val;
                 }
             }
@@ -1519,6 +1527,10 @@ class UsuarioController extends Controller {
             if ($campoForm === 'documento') {
                 $doc = preg_replace('/\D+/', '', (string) ($val ?? ''));
                 $val = $doc === '' ? null : $doc;
+            }
+            // Normalizar estado para UF de 2 letras
+            if ($campoForm === 'estado') {
+                $val = \App\Models\Usuario::normalizeEstado((string) ($val ?? ''));
             }
             $dadosAtualizacao[$colunaBanco] = $val;
         }

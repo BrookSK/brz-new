@@ -373,6 +373,13 @@ class Usuario extends Model {
             $data['documento'] = $doc === '' ? null : $doc;
         }
 
+        // Normalizar estado para caber na coluna (VARCHAR(2) para BR)
+        foreach (['estado', 'state'] as $estCol) {
+            if (array_key_exists($estCol, $data) && $data[$estCol] !== null && $data[$estCol] !== '') {
+                $data[$estCol] = self::normalizeEstado((string) $data[$estCol]);
+            }
+        }
+
         // Compatibilidade: garantir que colunas alternativas (name, password, etc.) sejam preenchidas
         try {
             $stmtCols = $this->getConnection()->query("DESCRIBE {$this->table}");
@@ -518,6 +525,10 @@ class Usuario extends Model {
                     if ($colunaBanco === 'documento') {
                         $docVal = preg_replace('/\D+/', '', (string) ($data[$colunaBanco] ?? ''));
                         $data[$colunaBanco] = $docVal === '' ? null : $docVal;
+                    }
+                    // Normalizar estado para caber na coluna (VARCHAR(2) para BR)
+                    if ($colunaBanco === 'estado' || $colunaBanco === 'state') {
+                        $data[$colunaBanco] = self::normalizeEstado((string) ($data[$colunaBanco] ?? ''));
                     }
                     $setParts[] = "{$colunaBanco} = :{$colunaBanco}";
                     $params[$colunaBanco] = $data[$colunaBanco];
@@ -764,6 +775,55 @@ class Usuario extends Model {
         }
 
         return $missing;
+    }
+
+    /**
+     * Normaliza valor de estado/UF para caber na coluna (VARCHAR(2) para BR).
+     * Converte nomes completos de estados brasileiros para sigla UF.
+     * Para outros países ou valores curtos, trunca para o tamanho da coluna.
+     */
+    public static function normalizeEstado(?string $valor, int $maxLen = 2): string {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return '';
+        }
+
+        // Mapa de nomes completos → UF (Brasil)
+        static $estadosBR = [
+            'acre' => 'AC', 'alagoas' => 'AL', 'amapa' => 'AP', 'amazonas' => 'AM',
+            'bahia' => 'BA', 'ceara' => 'CE', 'distrito federal' => 'DF',
+            'espirito santo' => 'ES', 'goias' => 'GO', 'maranhao' => 'MA',
+            'mato grosso' => 'MT', 'mato grosso do sul' => 'MS', 'minas gerais' => 'MG',
+            'para' => 'PA', 'paraiba' => 'PB', 'parana' => 'PR', 'pernambuco' => 'PE',
+            'piaui' => 'PI', 'rio de janeiro' => 'RJ', 'rio grande do norte' => 'RN',
+            'rio grande do sul' => 'RS', 'rondonia' => 'RO', 'roraima' => 'RR',
+            'santa catarina' => 'SC', 'sao paulo' => 'SP', 'sergipe' => 'SE',
+            'tocantins' => 'TO',
+            // Variantes com acento removido via iconv
+        ];
+
+        // Se já é UF de 2 letras, retorna em maiúsculo
+        if (strlen($valor) <= $maxLen) {
+            return strtoupper($valor);
+        }
+
+        // Tentar converter nome completo → UF
+        $normalized = mb_strtolower($valor, 'UTF-8');
+        // Remover acentos
+        if (function_exists('iconv')) {
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $normalized);
+            if (is_string($ascii) && $ascii !== '') {
+                $normalized = $ascii;
+            }
+        }
+        $normalized = strtolower(trim($normalized));
+
+        if (isset($estadosBR[$normalized])) {
+            return $estadosBR[$normalized];
+        }
+
+        // Truncar como último recurso
+        return mb_substr($valor, 0, $maxLen, 'UTF-8');
     }
 
     public function hasAcceptedTerms(array $usuario): bool {
