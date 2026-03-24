@@ -455,11 +455,14 @@ class AdminPedidosManualController extends Controller {
                             <div class="col-md-6">
                                 <label class="form-label">Método de Pagamento</label>
                                 <select class="form-select" name="forma_pagamento" id="forma_pagamento">
-                                    <option value="" selected>Online</option>
+                                    <option value="pix" selected>PIX (Câmbio Real + AppMax)</option>
+                                    <option value="boleto">Boleto (Câmbio Real + AppMax)</option>
+                                    <option value="cartao_credito">Cartão de Crédito</option>
+                                    <option value="cartao_debito">Cartão de Débito</option>
                                     <option value="carteira">Carteira</option>
                                     <option value="pagdev">PagDev (offline)</option>
                                 </select>
-                                <div class="form-text">Para pagamentos offline, será necessário anexar o comprovante no pedido.</div>
+                                <div class="form-text">BRL: valor dos produtos via Câmbio Real, taxas/impostos via AppMax. Para pagamentos offline, será necessário anexar o comprovante no pedido.</div>
                             </div>
                             <div class="col-md-6" id="offlineInfoWrap" style="display:none;">
                                 <label class="form-label">Instruções</label>
@@ -575,9 +578,9 @@ class AdminPedidosManualController extends Controller {
             </form>
 
             <div class="card mb-4" id="linkPagamentoCard">
-                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">AppMax</span>)</strong></div>
+                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Câmbio Real + AppMax</span>)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.</div>
+                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.<br><small class="text-muted">BRL: valor dos produtos via Câmbio Real, taxas/impostos via AppMax</small></div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4" id="billingTypeWrap">
                             <label class="form-label">Billing Type</label>
@@ -963,16 +966,39 @@ function updateLinkVisibility(){
     const linkInfo = document.getElementById('linkPagamentoInfo');
     const linkResult = document.getElementById('linkResult');
     const billingWrap = document.getElementById('billingTypeWrap');
+    const billingType = document.getElementById('billingType');
+    const gatewayLabel = document.getElementById('gatewayLabel');
 
     const v = fpSel ? String(fpSel.value || '') : '';
     const isOffline = (v === 'pagdev');
+    const isCarteira = (v === 'carteira');
 
     // Regras:
-    // - Offline (PagDev): não gera link
-    // - Online BRL: AppMax (gera link)
-    // - Online USD: Stripe (gera link de checkout)
-    const canShowLinkCard = (!isOffline && (moeda === 'BRL' || moeda === 'USD'));
-    const shouldShowBillingType = (!isOffline && moeda === 'BRL');
+    // - Offline (PagDev) ou Carteira: não gera link
+    // - BRL pix/boleto: Câmbio Real (produtos) + AppMax (taxas) - gera link split
+    // - BRL cartao: não gera link (precisa dados do cartão)
+    // - USD: Stripe (gera link de checkout)
+    const isCartao = (v === 'cartao_credito' || v === 'cartao_debito');
+    const canShowLinkCard = (!isOffline && !isCarteira && !isCartao && (moeda === 'BRL' || moeda === 'USD'));
+    const shouldShowBillingType = (!isOffline && !isCarteira && moeda === 'BRL' && !isCartao);
+
+    // Sincronizar billingType com forma de pagamento
+    if (billingType && moeda === 'BRL') {
+        if (v === 'pix') {
+            billingType.value = 'PIX';
+        } else if (v === 'boleto') {
+            billingType.value = 'BOLETO';
+        }
+    }
+
+    // Atualizar gateway label
+    if (gatewayLabel) {
+        if (moeda === 'BRL') {
+            gatewayLabel.textContent = 'Câmbio Real + AppMax';
+        } else {
+            gatewayLabel.textContent = 'Stripe';
+        }
+    }
 
     if (billingWrap) {
         billingWrap.style.display = shouldShowBillingType ? '' : 'none';
@@ -982,7 +1008,15 @@ function updateLinkVisibility(){
         linkCard.style.display = canShowLinkCard ? '' : 'none';
     }
     if (linkInfo) {
-        linkInfo.style.display = isOffline ? 'none' : '';
+        if (isOffline || isCarteira) {
+            linkInfo.style.display = 'none';
+        } else if (isCartao) {
+            linkInfo.style.display = '';
+            linkInfo.innerHTML = '<i class="fas fa-info-circle"></i> Para cartão de crédito/débito, o pagamento será processado diretamente no checkout do cliente.';
+        } else {
+            linkInfo.style.display = '';
+            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.';
+        }
     }
     if (linkResult && !canShowLinkCard) {
         linkResult.style.display = 'none';
@@ -1484,10 +1518,10 @@ function gerarLinkPagamento(){
                     const taxa = data.taxa || null;
 
                     el.innerHTML = `<div class="alert alert-info">
-                        <strong>Split gerado.</strong> Envie os dois pagamentos para o cliente (produto + taxa).
+                        <strong>Split gerado.</strong> Envie os dois pagamentos para o cliente (produto via Câmbio Real + taxas via AppMax).
                     </div>
-                    ${buildSection('Pagamento 1: Produtos (Mercado Pago)', produto)}
-                    ${buildSection('Pagamento 2: Taxa de serviço (AppMax)', taxa)}
+                    ${buildSection('Pagamento 1: Produtos (Câmbio Real)', produto)}
+                    ${buildSection('Pagamento 2: Taxas e Impostos (AppMax)', taxa)}
                     <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar novamente.</div>`;
                 } else {
                     const url = String(data.invoiceUrl || '').trim();
@@ -1693,11 +1727,18 @@ document.addEventListener('DOMContentLoaded', function(){
             const prev = String(fpSel.value || '');
             const moeda = getSelectedMoeda();
             fpSel.innerHTML = '';
-            fpSel.appendChild(new Option(moeda === 'BRL' ? 'Online (AppMax)' : 'Online (Stripe)', ''));
+            if (moeda === 'BRL') {
+                fpSel.appendChild(new Option('PIX (Câmbio Real + AppMax)', 'pix'));
+                fpSel.appendChild(new Option('Boleto (Câmbio Real + AppMax)', 'boleto'));
+                fpSel.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
+                fpSel.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
+            } else {
+                fpSel.appendChild(new Option('Online (Stripe)', ''));
+            }
             fpSel.appendChild(new Option('Carteira', 'carteira'));
             fpSel.appendChild(new Option('PagDev (offline)', 'pagdev'));
             const stillValid = Array.from(fpSel.options).some(o => o.value === prev);
-            fpSel.value = stillValid ? prev : '';
+            fpSel.value = stillValid ? prev : fpSel.options[0].value;
         }
     }
 
@@ -1712,7 +1753,7 @@ document.addEventListener('DOMContentLoaded', function(){
             this.__prevMoeda = moedaNow;
             const g = document.getElementById('gatewayLabel');
             if (g) {
-                g.textContent = (moedaNow === 'BRL') ? 'AppMax' : 'Stripe';
+                g.textContent = (moedaNow === 'BRL') ? 'Câmbio Real + AppMax' : 'Stripe';
             }
             updateManualPaymentMethodsForCurrency();
             updateLinkVisibility();
@@ -1771,7 +1812,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     const g = document.getElementById('gatewayLabel');
-    if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'AppMax' : 'Stripe';
+    if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Câmbio Real + AppMax' : 'Stripe';
     if (EXISTING_PEDIDO && Number(EXISTING_PEDIDO.cliente_id || 0) > 0) {
         const sel = document.getElementById('cliente_id');
         if (sel) {
