@@ -3755,16 +3755,16 @@ HTML;
                                                 $metNorm = strtolower(trim((string) $met));
                                                 $gwStatusNorm = strtoupper(trim((string) $gwStatus));
                                                 $isExpired = ($gwStatusNorm === 'EXPIRED') || (strpos($gwStatusNorm, 'EXPIR') !== false);
-                                                $podeGerarNovoPix = ($metNorm === 'pix') && in_array($gw, ['appmax', 'cambioreal'], true) && ($stNorm === 'rejected' || $stNorm === 'expired' || $isExpired);
+                                                $isPending = in_array($stNorm, ['pending', 'rejected', 'expired'], true) || $isExpired;
+                                                $podeGerarNovoLink = $isPending && in_array($gw, ['appmax', 'cambioreal'], true);
                                                 $pedidoEmail = (string) ($pedido['cliente_email'] ?? ($pedido['email'] ?? ($pedido['customer_email'] ?? '')));
-                                                $acoes = $podeGerarNovoPix
-                                                    ? ('<button type="button" class="btn btn-sm btn-outline-primary js-gerar-novo-pix"'
+                                                $acoes = $podeGerarNovoLink
+                                                    ? ('<button type="button" class="btn btn-sm btn-outline-primary js-gerar-novo-link"'
                                                         . ' data-pedido-id="' . (int) $pedido['id'] . '"'
                                                         . ' data-componente="' . htmlspecialchars(strtolower(trim((string) ($r['componente'] ?? '')))) . '"'
                                                         . ' data-gateway="' . htmlspecialchars($gw) . '"'
-                                                        . ' data-metodo="' . htmlspecialchars($metNorm) . '"'
                                                         . ' data-email="' . htmlspecialchars($pedidoEmail) . '">' 
-                                                        . '<i class="fas fa-qrcode me-1"></i>Gerar PIX</button>')
+                                                        . '<i class="fas fa-link me-1"></i>Gerar Link</button>')
                                                     : '';
 
                                                 echo '<tr>'
@@ -3780,35 +3780,26 @@ HTML;
 
                                             echo '</tbody></table></div>';
 
-                                            echo '<div class="modal fade" id="modalNovoPix" tabindex="-1" aria-hidden="true">'
-                                                . '<div class="modal-dialog modal-lg">'
+                                            echo '<div class="modal fade" id="modalNovoLink" tabindex="-1" aria-hidden="true">'
+                                                . '<div class="modal-dialog">'
                                                 . '<div class="modal-content">'
                                                 . '<div class="modal-header">'
-                                                . '<h5 class="modal-title">Novo PIX</h5>'
+                                                . '<h5 class="modal-title"><i class="fas fa-link me-1"></i>Gerar Link de Pagamento</h5>'
                                                 . '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
                                                 . '</div>'
                                                 . '<div class="modal-body">'
-                                                . '<div id="novoPixAlert" class="alert alert-info" style="display:none;"></div>'
-                                                . '<div class="row g-3">'
-                                                . '<div class="col-md-5">'
-                                                . '<div class="border rounded p-2 text-center" style="min-height:220px;">'
-                                                . '<img id="novoPixQrImg" src="" alt="QR Code" style="max-width:100%; display:none;" />'
-                                                . '<div id="novoPixQrPlaceholder" class="text-muted small" style="padding-top: 90px;">QR Code</div>'
+                                                . '<div id="novoLinkAlert" class="alert alert-info" style="display:none;"></div>'
+                                                . '<label class="form-label">E-mail do cliente</label>'
+                                                . '<input type="email" id="novoLinkEmail" class="form-control mb-3" value="' . htmlspecialchars($pedidoEmail) . '" autocomplete="email" />'
+                                                . '<div class="form-text mb-3">Confirme/ajuste o e-mail antes de gerar.</div>'
+                                                . '<label class="form-label">Link de pagamento</label>'
+                                                . '<div class="input-group">'
+                                                . '<input type="text" id="novoLinkUrl" class="form-control" readonly placeholder="Clique em Gerar Link..." />'
+                                                . '<button type="button" class="btn btn-outline-secondary" id="btnCopiarLink" disabled><i class="fas fa-copy"></i></button>'
                                                 . '</div>'
-                                                . '</div>'
-                                                . '<div class="col-md-7">'
-                                                . '<label class="form-label">E-mail</label>'
-                                                . '<input type="email" id="novoPixEmail" class="form-control" value="' . htmlspecialchars($pedidoEmail) . '" autocomplete="email" />'
-                                                . '<div class="form-text">Confirme/ajuste o e-mail antes de gerar.</div>'
-                                                . '<label class="form-label mt-3">Copia e cola</label>'
-                                                . '<textarea id="novoPixPayload" class="form-control" rows="8" readonly></textarea>'
-                                                . '<div class="d-flex gap-2 mt-2">'
-                                                . '<button type="button" class="btn btn-success" id="btnGerarPixConfirm">Gerar PIX</button>'
-                                                . '<button type="button" class="btn btn-primary" id="btnCopiarPix" disabled>Copiar</button>'
-                                                . '<a href="#" class="btn btn-outline-secondary" id="btnAbrirLinkPix" target="_blank" rel="noopener" style="display:none;">Abrir link</a>'
-                                                . '</div>'
-                                                . '<div class="small text-muted mt-2">Envie o QR ou o código copia-e-cola para o cliente.</div>'
-                                                . '</div>'
+                                                . '<div class="d-flex gap-2 mt-3">'
+                                                . '<button type="button" class="btn btn-primary" id="btnGerarLinkConfirm"><i class="fas fa-link me-1"></i>Gerar Link</button>'
+                                                . '<a href="#" class="btn btn-outline-success" id="btnAbrirLink" target="_blank" rel="noopener" style="display:none;"><i class="fas fa-external-link-alt me-1"></i>Abrir</a>'
                                                 . '</div>'
                                                 . '</div>'
                                                 . '<div class="modal-footer">'
@@ -3818,160 +3809,101 @@ HTML;
                                                 . '</div>'
                                                 . '</div>';
 
-                                            echo <<<HTML
+                                            echo <<<'LINKSCRIPT'
 <script>(function(){
-                                                function qs(sel, root){ return (root||document).querySelector(sel); }
-                                                var pendingArgs = {pedidoId:"", componente:"", gateway:"", email:""};
-                                                function setAlert(msg, cls){
-                                                    var el = qs("#novoPixAlert");
-                                                    if(!el) return;
-                                                    el.style.display = msg ? "block" : "none";
-                                                    el.className = "alert " + (cls||"alert-info");
-                                                    el.textContent = msg||"";
-                                                }
-                                                function setEmail(v){
-                                                    var i = qs("#novoPixEmail");
-                                                    if(i) i.value = v||"";
-                                                }
-                                                function setQr(base64){
-                                                    var img = qs("#novoPixQrImg");
-                                                    var ph = qs("#novoPixQrPlaceholder");
-                                                    if(!img || !ph) return;
-                                                    if(base64){
-                                                        base64 = String(base64||"").trim();
-                                                        // Pode vir como data URI completo ou apenas base64.
-                                                        if(base64.indexOf("data:image/") === 0){
-                                                            img.src = base64;
-                                                        } else {
-                                                            // Câmbio Real costuma retornar QR em SVG base64.
-                                                            // Base64 de <svg geralmente começa com PHN2Zy.
-                                                            var mime = (base64.indexOf("PHN2Zy") === 0 || base64.indexOf("PD94bW") === 0)
-                                                                ? "image/svg+xml"
-                                                                : "image/png";
-                                                            img.src = "data:" + mime + ";base64," + base64;
-                                                        }
-                                                        img.style.display = "block";
-                                                        ph.style.display = "none";
-                                                    } else {
-                                                        img.src = "";
-                                                        img.style.display = "none";
-                                                        ph.style.display = "block";
-                                                    }
-                                                }
-                                                function setPayload(v){
-                                                    var ta = qs("#novoPixPayload");
-                                                    if(ta) ta.value = v||"";
-                                                }
-                                                function setLink(url){
-                                                    var a = qs("#btnAbrirLinkPix");
-                                                    if(!a) return;
-                                                    if(url){
-                                                        a.href = url;
-                                                        a.style.display = "inline-block";
-                                                    } else {
-                                                        a.href = "#";
-                                                        a.style.display = "none";
-                                                    }
-                                                }
-                                                function setCopiarEnabled(on){
-                                                    var b = qs("#btnCopiarPix");
-                                                    if(b) b.disabled = !on;
-                                                }
-
-                                                function validarEmail(v){
-                                                    v = String(v||"").trim();
-                                                    if(!v) return false;
-                                                    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-                                                }
-
-                                                function openModal(){
-                                                    var el = qs("#modalNovoPix");
-                                                    if(!el || !window.bootstrap || !window.bootstrap.Modal) return;
-                                                    var m = window.bootstrap.Modal.getOrCreateInstance(el);
-                                                    m.show();
-                                                }
-
-                                                document.addEventListener("click", function(ev){
-                                                    var btn = ev.target && ev.target.closest ? ev.target.closest(".js-gerar-novo-pix") : null;
-                                                    if(!btn) return;
-
-                                                    var pedidoId = btn.getAttribute("data-pedido-id")||"";
-                                                    var componente = btn.getAttribute("data-componente")||"";
-                                                    var gateway = btn.getAttribute("data-gateway")||"";
-                                                    var email = btn.getAttribute("data-email")||"";
-
-                                                    pendingArgs = {pedidoId: pedidoId, componente: componente, gateway: gateway, email: email};
-
-                                                    setAlert("Confirme o e-mail e clique em Gerar PIX.", "alert-info");
-                                                    setQr("");
-                                                    setPayload("");
-                                                    setLink("");
-                                                    setEmail(email);
-                                                    setCopiarEnabled(false);
-                                                    openModal();
-                                                });
-
-                                                var btnGerar = qs("#btnGerarPixConfirm");
-                                                if(btnGerar){
-                                                    btnGerar.addEventListener("click", function(){
-                                                        var email = (qs("#novoPixEmail") && qs("#novoPixEmail").value) ? qs("#novoPixEmail").value : "";
-                                                        if(!validarEmail(email)){
-                                                            setAlert("Informe um e-mail válido.", "alert-warning");
-                                                            return;
-                                                        }
-
-                                                        if(!pendingArgs || !pendingArgs.pedidoId){
-                                                            setAlert("Pedido inválido.", "alert-warning");
-                                                            return;
-                                                        }
-
-                                                        setAlert("Gerando novo PIX...", "alert-info");
-                                                        setQr("");
-                                                        setPayload("");
-                                                        setLink("");
-                                                        setCopiarEnabled(false);
-
-                                                        var body = new URLSearchParams();
-                                                        body.set("componente", pendingArgs.componente||"");
-                                                        body.set("gateway", pendingArgs.gateway||"");
-                                                        body.set("email", String(email||"").trim());
-
-                                                        fetch("/admin/pedidos/gerar-novo-pix/" + encodeURIComponent(pendingArgs.pedidoId), {
-                                                            method: "POST",
-                                                            headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                                                            body: body.toString()
-                                                        }).then(function(r){ return r.json(); })
-                                                        .then(function(data){
-                                                            if(!data || !data.success){
-                                                                setAlert((data && data.error) ? data.error : "Falha ao gerar PIX", "alert-warning");
-                                                                return;
-                                                            }
-                                                            setAlert("PIX gerado. Copie e envie ao cliente.", "alert-success");
-                                                            setQr(data.qr_base64 || "");
-                                                            setPayload(data.payload || "");
-                                                            setLink(data.invoice_url || "");
-                                                            setCopiarEnabled(!!(data.payload));
-                                                        }).catch(function(){
-                                                            setAlert("Erro de rede ao gerar PIX", "alert-warning");
-                                                        });
-                                                    });
-                                                }
-
-                                                var copiar = qs("#btnCopiarPix");
-                                                if(copiar){
-                                                    copiar.addEventListener("click", function(){
-                                                        var v = (qs("#novoPixPayload") && qs("#novoPixPayload").value) ? qs("#novoPixPayload").value : "";
-                                                        if(!v) return;
-                                                        if(navigator.clipboard && navigator.clipboard.writeText){
-                                                            navigator.clipboard.writeText(v).then(function(){ setAlert("Copiado!", "alert-success"); });
-                                                        } else {
-                                                            var ta = qs("#novoPixPayload");
-                                                            if(ta){ ta.focus(); ta.select(); try{ document.execCommand("copy"); setAlert("Copiado!", "alert-success"); } catch(e){} }
-                                                        }
-                                                    });
-                                                }
-                                            })();</script>
-HTML;
+    function qs(s){ return document.querySelector(s); }
+    var pending = {pedidoId:"", componente:"", gateway:"", email:""};
+    function linkAlert(msg, cls){
+        var el = qs("#novoLinkAlert");
+        if(!el) return;
+        el.style.display = msg ? "block" : "none";
+        el.className = "alert " + (cls||"alert-info");
+        el.textContent = msg||"";
+    }
+    document.addEventListener("click", function(ev){
+        var btn = ev.target && ev.target.closest ? ev.target.closest(".js-gerar-novo-link") : null;
+        if(!btn) return;
+        pending = {
+            pedidoId: btn.getAttribute("data-pedido-id")||"",
+            componente: btn.getAttribute("data-componente")||"",
+            gateway: btn.getAttribute("data-gateway")||"",
+            email: btn.getAttribute("data-email")||""
+        };
+        linkAlert("Confirme o e-mail e clique em Gerar Link.", "alert-info");
+        var emailInput = qs("#novoLinkEmail");
+        if(emailInput) emailInput.value = pending.email;
+        var urlInput = qs("#novoLinkUrl");
+        if(urlInput) urlInput.value = "";
+        var btnCopy = qs("#btnCopiarLink");
+        if(btnCopy) btnCopy.disabled = true;
+        var btnOpen = qs("#btnAbrirLink");
+        if(btnOpen){ btnOpen.style.display = "none"; btnOpen.href = "#"; }
+        var el = qs("#modalNovoLink");
+        if(el && window.bootstrap && window.bootstrap.Modal){
+            window.bootstrap.Modal.getOrCreateInstance(el).show();
+        }
+    });
+    var btnGerar = qs("#btnGerarLinkConfirm");
+    if(btnGerar){
+        btnGerar.addEventListener("click", function(){
+            var email = (qs("#novoLinkEmail")||{}).value||"";
+            if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+                linkAlert("Informe um e-mail válido.", "alert-warning");
+                return;
+            }
+            if(!pending.pedidoId){
+                linkAlert("Pedido inválido.", "alert-warning");
+                return;
+            }
+            linkAlert("Gerando link de pagamento...", "alert-info");
+            btnGerar.disabled = true;
+            var body = new URLSearchParams();
+            body.set("componente", pending.componente);
+            body.set("gateway", pending.gateway);
+            body.set("email", email.trim());
+            fetch("/admin/pedidos/gerar-novo-pix/" + encodeURIComponent(pending.pedidoId), {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: body.toString()
+            }).then(function(r){ return r.json(); })
+            .then(function(data){
+                btnGerar.disabled = false;
+                if(!data || !data.success){
+                    linkAlert((data && data.error) ? data.error : "Falha ao gerar link", "alert-warning");
+                    return;
+                }
+                var link = data.payment_link || "";
+                linkAlert("Link gerado! Copie e envie ao cliente.", "alert-success");
+                var urlInput = qs("#novoLinkUrl");
+                if(urlInput) urlInput.value = link;
+                var btnCopy = qs("#btnCopiarLink");
+                if(btnCopy) btnCopy.disabled = !link;
+                var btnOpen = qs("#btnAbrirLink");
+                if(btnOpen && link){
+                    btnOpen.href = link;
+                    btnOpen.style.display = "inline-block";
+                }
+            }).catch(function(){
+                btnGerar.disabled = false;
+                linkAlert("Erro de rede ao gerar link.", "alert-warning");
+            });
+        });
+    }
+    var btnCopy = qs("#btnCopiarLink");
+    if(btnCopy){
+        btnCopy.addEventListener("click", function(){
+            var v = (qs("#novoLinkUrl")||{}).value||"";
+            if(!v) return;
+            if(navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(v).then(function(){ linkAlert("Link copiado!", "alert-success"); });
+            } else {
+                var inp = qs("#novoLinkUrl");
+                if(inp){ inp.focus(); inp.select(); try{ document.execCommand("copy"); linkAlert("Link copiado!", "alert-success"); } catch(e){} }
+            }
+        });
+    }
+})();</script>
+LINKSCRIPT;
                                         }
                                     } catch (\Exception $e) {
                                     }
@@ -6138,13 +6070,12 @@ HTML;
             }
             $valor = (float) ($row['valor'] ?? 0);
             $moeda = strtoupper(trim((string) ($row['moeda'] ?? 'BRL')));
-            $metodo = strtolower(trim((string) ($row['metodo'] ?? 'pix')));
             if ($valor <= 0) {
-                $this->json(['success' => false, 'error' => 'Valor inválido para gerar PIX'], 400);
+                $this->json(['success' => false, 'error' => 'Valor inválido'], 400);
                 return;
             }
             if ($moeda !== 'BRL') {
-                $this->json(['success' => false, 'error' => 'Somente BRL suportado para reemitir PIX'], 400);
+                $this->json(['success' => false, 'error' => 'Somente BRL suportado'], 400);
                 return;
             }
 
@@ -6170,156 +6101,65 @@ HTML;
             $clienteNasc = (string) ($pedido['cliente_data_nascimento'] ?? ($pedido['data_nascimento'] ?? ''));
             $clienteTel = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ($pedido['celular'] ?? '')));
 
-            $desc = 'Pedido #' . (string) ($pedido['codigo_pedido'] ?? $pedidoId) . ' (' . $componente . ')';
+            $codigoPedido = (string) ($pedido['codigo_pedido'] ?? $pedidoId);
+            $desc = 'Pedido #' . $codigoPedido . ' (' . $componente . ')';
 
+            // ---- Câmbio Real: gerar link de checkout ----
             if ($gateway === 'cambioreal') {
-                if ($componente !== 'produto') {
-                    $this->json(['success' => false, 'error' => 'Câmbio Real: somente componente produto suportado'], 400);
-                    return;
-                }
-
-                // Fallback: se faltar algum dado obrigatório no pedido, tentar completar com dados atuais do usuário
+                // Fallback: completar dados do usuário se necessário
                 $uid = (int) ($pedido['usuario_id'] ?? 0);
                 $uRow = [];
                 $eRow = [];
                 try {
                     if ($uid > 0) {
-                        $db = \Config\Database::getConnection();
-                        // usuário
                         try {
                             $colsU = $db->query('DESCRIBE usuarios');
                             $uCols = $colsU ? ($colsU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
                             if (!empty($uCols)) {
                                 $pick = function(array $cands) use ($uCols) {
-                                    foreach ($cands as $c) {
-                                        if (in_array($c, $uCols, true)) return $c;
-                                    }
+                                    foreach ($cands as $c) { if (in_array($c, $uCols, true)) return $c; }
                                     return null;
                                 };
-                                $colNome = $pick(['nome', 'name', 'full_name']);
-                                $colEmail = $pick(['email']);
-                                $colTel = $pick(['telefone', 'celular', 'phone', 'mobile', 'whatsapp']);
-                                $colDoc = $pick(['cpf_cnpj', 'documento', 'cpf', 'cnpj', 'document']);
-                                $colNasc = $pick(['data_nascimento', 'nascimento', 'birth_date', 'dob', 'date_of_birth']);
                                 $sel = ['id'];
-                                if ($colNome) $sel[] = $colNome . ' AS nome';
-                                if ($colEmail) $sel[] = $colEmail . ' AS email';
-                                if ($colTel) $sel[] = $colTel . ' AS telefone';
-                                if ($colDoc) $sel[] = $colDoc . ' AS documento';
-                                if ($colNasc) $sel[] = $colNasc . ' AS nascimento';
+                                $colNome = $pick(['nome', 'name', 'full_name']); if ($colNome) $sel[] = $colNome . ' AS nome';
+                                $colEmail = $pick(['email']); if ($colEmail) $sel[] = $colEmail . ' AS email';
+                                $colTel = $pick(['telefone', 'celular', 'phone', 'mobile', 'whatsapp']); if ($colTel) $sel[] = $colTel . ' AS telefone';
+                                $colDoc = $pick(['cpf_cnpj', 'documento', 'cpf', 'cnpj', 'document']); if ($colDoc) $sel[] = $colDoc . ' AS documento';
+                                $colNasc = $pick(['data_nascimento', 'nascimento', 'birth_date', 'dob']); if ($colNasc) $sel[] = $colNasc . ' AS nascimento';
                                 $stU = $db->prepare('SELECT ' . implode(', ', $sel) . ' FROM usuarios WHERE id = ? LIMIT 1');
                                 $stU->execute([$uid]);
                                 $uRow = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
                             }
-                        } catch (\Exception $e) {
-                            $uRow = [];
-                        }
-
-                        // endereço principal
+                        } catch (\Exception $e) { $uRow = []; }
                         try {
                             $colsE = $db->query('DESCRIBE enderecos');
                             $eCols = $colsE ? ($colsE->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
                             if (!empty($eCols) && in_array('usuario_id', $eCols, true)) {
-                                $orderBy = 'id DESC';
-                                if (in_array('principal', $eCols, true)) {
-                                    $orderBy = 'principal DESC, id DESC';
-                                }
+                                $orderBy = in_array('principal', $eCols, true) ? 'principal DESC, id DESC' : 'id DESC';
                                 $stE = $db->prepare('SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
                                 $stE->execute([$uid]);
                                 $eRow = $stE->fetch(\PDO::FETCH_ASSOC) ?: [];
                             }
-                        } catch (\Exception $e) {
-                            $eRow = [];
-                        }
+                        } catch (\Exception $e) { $eRow = []; }
                     }
-                } catch (\Exception $e) {
-                    $uRow = [];
-                    $eRow = [];
-                }
+                } catch (\Exception $e) { $uRow = []; $eRow = []; }
 
-                $erros = [];
-                if (trim($clienteNome) === '' && !empty($uRow['nome'])) {
-                    $clienteNome = (string) $uRow['nome'];
-                }
-                if (trim($clienteEmail) === '' && !empty($uRow['email'])) {
-                    $clienteEmail = (string) $uRow['email'];
-                }
-                if (trim($clienteDoc) === '' && !empty($uRow['documento'])) {
-                    $clienteDoc = (string) $uRow['documento'];
-                }
-                if (trim($clienteTel) === '' && !empty($uRow['telefone'])) {
-                    $clienteTel = (string) $uRow['telefone'];
-                }
-                if (trim($clienteNasc) === '' && !empty($uRow['nascimento'])) {
-                    $clienteNasc = (string) $uRow['nascimento'];
-                }
+                if (trim($clienteNome) === '' && !empty($uRow['nome'])) $clienteNome = (string) $uRow['nome'];
+                if (trim($clienteEmail) === '' && !empty($uRow['email'])) $clienteEmail = (string) $uRow['email'];
+                if (trim($clienteDoc) === '' && !empty($uRow['documento'])) $clienteDoc = (string) $uRow['documento'];
+                if (trim($clienteTel) === '' && !empty($uRow['telefone'])) $clienteTel = (string) $uRow['telefone'];
+                if (trim($clienteNasc) === '' && !empty($uRow['nascimento'])) $clienteNasc = (string) $uRow['nascimento'];
 
-                if (trim($clienteNome) === '') {
-                    $erros[] = 'Nome do cliente é obrigatório';
-                }
-                if (trim($clienteEmail) === '' || filter_var($clienteEmail, FILTER_VALIDATE_EMAIL) === false) {
-                    $erros[] = 'E-mail inválido';
-                }
                 $docDigits = preg_replace('/\D+/', '', (string) $clienteDoc);
-                if ($docDigits === '') {
-                    $erros[] = 'Documento (CPF/CNPJ) é obrigatório';
-                }
                 $telDigits = preg_replace('/\D+/', '', (string) $clienteTel);
-                if ($telDigits === '') {
-                    $erros[] = 'Telefone é obrigatório';
-                }
                 $birth = trim((string) $clienteNasc);
-                if ($birth === '') {
-                    $birth = trim((string) ($pedido['data_nascimento'] ?? ($pedido['cliente_nascimento'] ?? '')));
-                }
-                // Normalizar data de nascimento (Câmbio Real costuma exigir YYYY-MM-DD)
-                if ($birth !== '') {
-                    $b = preg_replace('/\s+/', '', (string) $birth);
-                    // dd/mm/yyyy -> yyyy-mm-dd
-                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $b, $m)) {
-                        $birth = $m[3] . '-' . $m[2] . '-' . $m[1];
-                    } elseif (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $b, $m)) {
-                        $birth = $m[1] . '-' . $m[2] . '-' . $m[3];
-                    }
-                }
-                if ($birth === '') {
-                    $erros[] = 'Data de nascimento é obrigatória';
+                if ($birth !== '' && preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $birth, $m)) {
+                    $birth = $m[3] . '-' . $m[2] . '-' . $m[1];
                 }
 
-                $estado = (string) ($pedido['estado_entrega'] ?? ($pedido['cliente_estado'] ?? ($pedido['estado'] ?? '')));
-                $cidade = (string) ($pedido['cidade_entrega'] ?? ($pedido['cliente_cidade'] ?? ($pedido['cidade'] ?? '')));
-                $cep = (string) ($pedido['cep_entrega'] ?? ($pedido['cliente_cep'] ?? ($pedido['cep'] ?? '')));
-                $bairro = (string) ($pedido['bairro_entrega'] ?? ($pedido['cliente_bairro'] ?? ($pedido['bairro'] ?? '')));
-                $rua = (string) ($pedido['endereco_entrega'] ?? ($pedido['cliente_endereco'] ?? ($pedido['endereco'] ?? '')));
-                $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['cliente_numero'] ?? ($pedido['numero'] ?? '')));
-
-                // fallback de endereço pela conta/endereço principal
-                if (trim($estado) === '' && isset($eRow['estado'])) $estado = (string) $eRow['estado'];
-                if (trim($cidade) === '' && isset($eRow['cidade'])) $cidade = (string) $eRow['cidade'];
-                if (trim($cep) === '' && isset($eRow['cep'])) $cep = (string) $eRow['cep'];
-                if (trim($bairro) === '' && isset($eRow['bairro'])) $bairro = (string) $eRow['bairro'];
-                if (trim($rua) === '' && isset($eRow['endereco'])) $rua = (string) $eRow['endereco'];
-                if (trim($rua) === '' && isset($eRow['logradouro'])) $rua = (string) $eRow['logradouro'];
-                if (trim($numero) === '' && isset($eRow['numero'])) $numero = (string) $eRow['numero'];
-
-                $cepDigits = preg_replace('/\D+/', '', (string) $cep);
-                if ($cepDigits !== '') {
-                    $cep = $cepDigits;
-                }
-
-                if (trim($estado) === '' || trim($cidade) === '' || trim($cep) === '' || trim($bairro) === '' || trim($rua) === '' || trim($numero) === '') {
-                    $erros[] = 'Endereço incompleto (estado/cidade/CEP/bairro/rua/número)';
-                }
-
-                if (!empty($erros)) {
-                    $this->json(['success' => false, 'error' => implode(' | ', $erros)], 400);
-                    return;
-                }
-
-                $tx = (float) ($pedido['taxa_conversao'] ?? 0);
-                if ($tx <= 1.01) $tx = 1.0;
-                $amountUsd = round($valor / $tx, 2);
-                if ($amountUsd <= 0) $amountUsd = 1.0;
+                $base = \App\Core\Url::base();
+                $successUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal=success';
+                $errorUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal=error';
 
                 $client = [
                     'name' => $clienteNome,
@@ -6327,47 +6167,27 @@ HTML;
                     'document' => $docDigits,
                     'birth_date' => $birth,
                     'phone' => $telDigits,
+                    'cpf' => $docDigits,
+                    'phone_number' => $telDigits,
                     'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
                     'address' => [
-                        'state' => $estado,
-                        'city' => $cidade,
-                        'zip_code' => $cep,
-                        'district' => $bairro,
-                        'street' => $rua,
-                        'number' => $numero,
+                        'state' => (string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ($eRow['estado'] ?? ''))),
+                        'city' => (string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ($eRow['cidade'] ?? ''))),
+                        'zip_code' => (string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ($eRow['cep'] ?? ''))),
+                        'district' => (string) ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ($eRow['bairro'] ?? ''))),
+                        'street' => (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ($eRow['endereco'] ?? ($eRow['logradouro'] ?? '')))),
+                        'number' => (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ($eRow['numero'] ?? ''))),
                     ],
                 ];
 
-                $cr = $paymentService->createCambioRealPixPaymentProduto($pedidoId, $amountUsd, $valor, $desc, $client);
+                $cr = $paymentService->createCambioRealCheckoutRequestProduto($pedidoId, $valor, $desc, $client, $successUrl, $errorUrl);
                 if (empty($cr['success'])) {
-                    $this->json([
-                        'success' => false,
-                        'error' => (string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real'),
-                        'order_id' => (string) ($cr['order_id'] ?? ''),
-                        'email_used' => (string) ($cr['email_used'] ?? ''),
-                    ], 400);
+                    $this->json(['success' => false, 'error' => (string) ($cr['error'] ?? 'Falha ao gerar link Câmbio Real')], 400);
                     return;
                 }
-                $pix = (isset($cr['pix']) && is_array($cr['pix'])) ? $cr['pix'] : [];
-                $qr = (string) ($pix['encodedImage'] ?? '');
-                $payload = (string) ($pix['payload'] ?? '');
+
                 $invoiceUrl = (string) ($cr['invoice_url'] ?? '');
                 $paymentId = (string) ($cr['payment_id'] ?? '');
-
-                $paymentService->registrarPedidoPagamentoSplit([
-                    'pedido_id' => $pedidoId,
-                    'componente' => $componente,
-                    'gateway' => 'cambioreal',
-                    'metodo' => 'pix',
-                    'moeda' => 'BRL',
-                    'valor' => $valor,
-                    'payment_id' => $paymentId,
-                    'status' => 'pending',
-                    'invoice_url' => $invoiceUrl,
-                    'pix_encoded_image' => $qr,
-                    'pix_payload' => $payload,
-                    'gateway_status' => 'AGUARDANDO_CLIENTE',
-                ]);
 
                 $this->json([
                     'success' => true,
@@ -6375,70 +6195,50 @@ HTML;
                     'pedido_id' => $pedidoId,
                     'componente' => $componente,
                     'payment_id' => $paymentId,
-                    'invoice_url' => $invoiceUrl,
-                    'order_id' => (string) ($cr['order_id'] ?? ''),
-                    'email_used' => (string) ($cr['email_used'] ?? ''),
-                    'qr_base64' => $qr,
-                    'payload' => $payload,
+                    'payment_link' => $invoiceUrl,
                 ]);
                 return;
             }
 
-            // AppMax
-            $productsValueCents = (int) round($valor * 100);
-            $products = [
-                [
-                    'sku' => strtoupper($componente) . '_' . (string) $pedidoId,
-                    'name' => $desc,
-                    'quantity' => 1,
-                    'unit_value' => $productsValueCents,
-                    'type' => ($componente === 'produto' ? 'product' : 'service'),
-                    'freight_type' => 'normal',
-                ]
-            ];
-            $payload = [
-                'billingType' => 'PIX',
-                'force_gateway' => 'appmax',
-                'customer_name' => $clienteNome,
-                'customer_email' => $clienteEmail,
-                'customer_phone' => $clienteTel,
-                'customer_document' => $clienteDoc,
-                'externalReference' => (string) $pedidoId,
-                'products' => $products,
-                'products_value_cents' => $productsValueCents,
-                'shipping_value_cents' => 0,
-                'discount_value_cents' => 0,
-            ];
+            // ---- AppMax: gerar link de pagamento interno (/pagar/{token}) ----
+            if (session_status() === PHP_SESSION_NONE) {
+                @session_start();
+            }
+            $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
 
-            $res = $paymentService->processarPagamento($payload, $valor, 'BRL', $desc);
-            if (empty($res['success'])) {
-                $this->json(['success' => false, 'error' => (string) ($res['error'] ?? 'Falha ao gerar PIX AppMax')], 500);
+            $linkSvc = new \App\Services\PaymentLinkService();
+            $linkResult = $linkSvc->createLink([
+                'currency' => 'BRL',
+                'produto_valor' => 0,
+                'taxa_servico_valor' => (string) round($valor, 2),
+                'impostos_valor' => 0,
+                'descricao' => $desc,
+                'products' => [
+                    ['name' => $desc, 'value' => round($valor, 2)],
+                ],
+            ], $adminId);
+
+            if (empty($linkResult['success'])) {
+                $this->json(['success' => false, 'error' => (string) ($linkResult['error'] ?? 'Falha ao criar link de pagamento AppMax')], 500);
                 return;
             }
-            $paymentId = (string) ($res['payment_id'] ?? '');
-            if ($paymentId === '') {
-                $this->json(['success' => false, 'error' => 'AppMax: payment_id não retornado'], 500);
-                return;
-            }
-            $pix = (isset($res['pix']) && is_array($res['pix'])) ? $res['pix'] : [];
-            $qr = (string) ($pix['encodedImage'] ?? '');
-            $payloadPix = (string) ($pix['payload'] ?? '');
-            $invoiceUrl = (string) ($res['invoiceUrl'] ?? '');
+
+            $token = (string) ($linkResult['token'] ?? '');
+            $linkId = (int) ($linkResult['id'] ?? 0);
+            $publicPath = (string) ($linkResult['public_url'] ?? ('/pagar/' . $token));
+            $base = \App\Core\Url::base();
+            $publicUrl = rtrim($base, '/') . $publicPath;
 
             $paymentService->registrarPedidoPagamentoSplit([
                 'pedido_id' => $pedidoId,
                 'componente' => $componente,
                 'gateway' => 'appmax',
-                'metodo' => 'pix',
+                'metodo' => 'payment_link',
                 'moeda' => 'BRL',
                 'valor' => $valor,
-                'payment_id' => $paymentId,
+                'payment_id' => 'PAYLINK_' . $linkId,
                 'status' => 'pending',
-                'invoice_url' => $invoiceUrl,
-                'pix_encoded_image' => $qr,
-                'pix_payload' => $payloadPix,
-                'gateway_status' => 'PENDING',
-                'metadata' => json_encode(['raw' => $res], JSON_UNESCAPED_UNICODE),
+                'invoice_url' => $publicUrl,
             ]);
 
             $this->json([
@@ -6446,10 +6246,8 @@ HTML;
                 'gateway' => 'appmax',
                 'pedido_id' => $pedidoId,
                 'componente' => $componente,
-                'payment_id' => $paymentId,
-                'invoice_url' => $invoiceUrl,
-                'qr_base64' => $qr,
-                'payload' => $payloadPix,
+                'payment_id' => 'PAYLINK_' . $linkId,
+                'payment_link' => $publicUrl,
             ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
