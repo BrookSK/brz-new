@@ -724,7 +724,7 @@ class UsuarioController extends Controller {
                     } elseif (stripos($msg, 'Duplicate entry') !== false && stripos($msg, 'email') !== false) {
                         $_SESSION['message'] = 'Não foi possível salvar: este e-mail já está cadastrado em outra conta.';
                     } else {
-                        $_SESSION['message'] = 'Não foi possível atualizar seus dados agora. Tente novamente em alguns minutos.';
+                        $_SESSION['message'] = 'Não foi possível atualizar seus dados: ' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8');
                     }
                     $_SESSION['message_type'] = 'danger';
                     error_log('Erro em meusDados: ' . $msg);
