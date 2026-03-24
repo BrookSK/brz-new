@@ -1592,8 +1592,8 @@ class AdminRelatoriosController extends Controller {
                                             $status = $produto['quantidade_estoque'] == 0 ? 'Esgotado' : 'Crítico';
                                             echo '<tr>
                                                 <td>
-                                                    <strong>' . htmlspecialchars($produto['produto_nome']) . '</strong>
-                                                    <br><small class="text-muted">' . htmlspecialchars($produto['sku']) . '</small>
+                                                    <strong>' . htmlspecialchars((string) ($produto['produto_nome'] ?? '')) . '</strong>
+                                                    <br><small class="text-muted">' . htmlspecialchars((string) ($produto['sku'] ?? '')) . '</small>
                                                 </td>
                                                 <td><span class="badge bg-danger">' . $produto['quantidade_estoque'] . '</span></td>
                                                 <td>' . $produto['estoque_minimo'] . '</td>
