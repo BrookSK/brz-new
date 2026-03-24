@@ -1485,6 +1485,10 @@ class AdminProdutosController extends Controller {
         return $cols;
     }
 
+    public function getPublicNcmOptions(): array {
+        return $this->getNcmOptions();
+    }
+
     private function getNcmOptions(): array {
         return [
             '09019000' => 'Cafés',

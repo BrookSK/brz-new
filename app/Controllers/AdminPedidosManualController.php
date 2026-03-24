@@ -608,6 +608,14 @@ class AdminPedidosManualController extends Controller {
         echo 'let PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
         echo 'const EXISTING_PEDIDO = ' . json_encode($existingPedido, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+
+        // NCM options para o select de NCM no pedido manual
+        $ncmOptions = (new \App\Controllers\AdminProdutosController())->getPublicNcmOptions();
+        $ncmOptionsJson = json_encode(array_map(function($code, $label) {
+            return ['code' => $code, 'label' => $label . ' (' . $code . ')'];
+        }, array_keys($ncmOptions), array_values($ncmOptions)), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo 'const NCM_OPTIONS = ' . $ncmOptionsJson . ';' . "\n";
+
         echo 'const TAXA_SERVICO_POR_KG_BRL = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgBRL(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const TAXA_SERVICO_POR_KG_USD = ' . json_encode((float) (new \App\Services\PedidoManualService())->getTaxaServicoPorKgUSD(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const PIX_DESCONTO_TAXA_SERVICO_PERCENT = ' . json_encode((float) (new \App\Services\PedidoManualService())->getPixDescontoTaxaServicoPercent(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
@@ -815,7 +823,7 @@ function updateExtraCamposProduto(tr, prod){
     if (!wrap) return;
 
     const custoInp = wrap.querySelector('.custoInp');
-    const ncmInp = wrap.querySelector('.ncmInp');
+    let ncmInp = wrap.querySelector('.ncmInp');
 
     const custoAtual = prod ? Number(prod.custo || prod.cost || prod.custo_produto || prod.valor_custo || 0) : 0;
     const ncmAtual = prod ? String(prod.ncm || prod.ncm_code || '').trim() : '';
@@ -830,18 +838,61 @@ function updateExtraCamposProduto(tr, prod){
         } else {
             custoInp.style.display = 'none';
             custoInp.required = false;
-            custoInp.value = '';
+            custoInp.value = String(custoAtual);
         }
+    }
+
+    // Substituir input por select com opções de NCM se ainda não foi feito
+    if (ncmInp && ncmInp.tagName !== 'SELECT' && typeof NCM_OPTIONS !== 'undefined' && NCM_OPTIONS.length > 0) {
+        const sel = document.createElement('select');
+        sel.className = ncmInp.className;
+        sel.name = ncmInp.name;
+        // Copiar atributos
+        sel.innerHTML = '<option value="">Selecione NCM...</option>';
+        NCM_OPTIONS.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n.code;
+            opt.textContent = n.label;
+            sel.appendChild(opt);
+        });
+        // Adicionar campo de busca antes do select
+        const searchInp = document.createElement('input');
+        searchInp.type = 'text';
+        searchInp.className = 'form-control form-control-sm mb-1';
+        searchInp.placeholder = 'Buscar NCM...';
+        searchInp.addEventListener('input', function(){
+            const term = this.value.toLowerCase().trim();
+            let firstVisible = null;
+            for (let i = 1; i < sel.options.length; i++) {
+                const opt = sel.options[i];
+                const match = !term || opt.textContent.toLowerCase().includes(term) || opt.value.includes(term);
+                opt.style.display = match ? '' : 'none';
+                if (match && !firstVisible) firstVisible = opt;
+            }
+            if (firstVisible && term) {
+                sel.value = firstVisible.value;
+            }
+        });
+        ncmInp.parentNode.insertBefore(searchInp, ncmInp);
+        ncmInp.parentNode.replaceChild(sel, ncmInp);
+        ncmInp = sel;
     }
 
     if (ncmInp) {
         if (precisaNcm) {
             ncmInp.style.display = '';
             ncmInp.required = true;
+            ncmInp.value = '';
+            // Mostrar campo de busca
+            const searchEl = ncmInp.previousElementSibling;
+            if (searchEl && searchEl.placeholder === 'Buscar NCM...') searchEl.style.display = '';
         } else {
             ncmInp.style.display = 'none';
             ncmInp.required = false;
-            ncmInp.value = '';
+            ncmInp.value = ncmAtual;
+            // Esconder campo de busca
+            const searchEl = ncmInp.previousElementSibling;
+            if (searchEl && searchEl.placeholder === 'Buscar NCM...') searchEl.style.display = 'none';
         }
     }
 
