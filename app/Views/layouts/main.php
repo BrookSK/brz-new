@@ -1598,7 +1598,7 @@
 <?php
 $welcomePopupEnabled = '1';
 try {
-    $pdoWp = \App\Core\Database::getConnection();
+    $pdoWp = \Config\Database::getConnection();
     $tablesToTryWp = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
     foreach ($tablesToTryWp as $tWp) {
         try {
