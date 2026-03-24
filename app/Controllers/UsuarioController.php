@@ -880,6 +880,11 @@ class UsuarioController extends Controller {
             $payload[$principalCol] = 1;
         }
 
+        // Garantir tipo válido (coluna pode ser ENUM)
+        if (in_array('tipo', $cols, true) && (empty($payload['tipo']) || trim((string)($payload['tipo'] ?? '')) === '')) {
+            $payload['tipo'] = 'entrega';
+        }
+
         try {
             $stmt = $db->prepare('SELECT id FROM enderecos WHERE ' . $usuarioCol . ' = :uid' . ($principalCol !== '' ? (' AND ' . $principalCol . ' = 1') : '') . ' ORDER BY id DESC LIMIT 1');
             $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);

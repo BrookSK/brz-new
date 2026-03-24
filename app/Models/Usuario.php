@@ -492,6 +492,7 @@ class Usuario extends Model {
             $sql = "UPDATE {$this->table} SET " . implode(', ', $setParts) . " WHERE id = :id";
             $params['id'] = $id;
             
+            $this->getConnection()->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $stmt = $this->getConnection()->prepare($sql);
             
             foreach ($params as $key => $value) {
@@ -501,7 +502,7 @@ class Usuario extends Model {
             return $stmt->execute();
             
         } catch (\Exception $e) {
-            error_log('Erro no update de usuário: ' . $e->getMessage());
+            error_log('Erro no update de usuário [SQL=' . ($sql ?? '?') . '] [params=' . json_encode($params ?? []) . ']: ' . $e->getMessage());
             throw $e;
         }
     }
