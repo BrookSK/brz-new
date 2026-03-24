@@ -35,6 +35,11 @@ class AdminGruposComprasController extends Controller {
             $pdo->exec("ALTER TABLE grupos_compras ADD COLUMN imposto_local_percent DECIMAL(5,2) NOT NULL DEFAULT 0");
         } catch (\Throwable $e) {}
 
+        // Coluna banner (imagem do grupo)
+        try {
+            $pdo->exec("ALTER TABLE grupos_compras ADD COLUMN banner VARCHAR(500) NULL DEFAULT NULL");
+        } catch (\Throwable $e) {}
+
         // Coluna imposto_local no pedido
         try {
             $pdo->exec("ALTER TABLE pedidos ADD COLUMN imposto_local DECIMAL(10,2) NOT NULL DEFAULT 0");
@@ -118,6 +123,32 @@ class AdminGruposComprasController extends Controller {
             return;
         }
 
+        // Upload do banner
+        $bannerUrl = null;
+        $bannerKeep = trim((string) $request->getParam('banner_keep', ''));
+        if ($bannerKeep !== '') {
+            $bannerUrl = $bannerKeep;
+        }
+        if (isset($_FILES['banner']) && is_array($_FILES['banner'])) {
+            $fName = (string) ($_FILES['banner']['name'] ?? '');
+            $fTmp  = (string) ($_FILES['banner']['tmp_name'] ?? '');
+            $fErr  = (int) ($_FILES['banner']['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($fErr === UPLOAD_ERR_OK && $fTmp !== '' && $fName !== '') {
+                $ext = strtolower(pathinfo($fName, PATHINFO_EXTENSION));
+                if (in_array($ext, ['jpg','jpeg','png','webp','gif'], true)) {
+                    $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                    $uploadDir = $docRoot . '/uploads/grupos/';
+                    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+                    if (is_dir($uploadDir) && is_writable($uploadDir)) {
+                        $fileName = 'grupo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                        if (@move_uploaded_file($fTmp, $uploadDir . $fileName)) {
+                            $bannerUrl = '/uploads/grupos/' . $fileName;
+                        }
+                    }
+                }
+            }
+        }
+
         try {
             $pdo = $this->getPdo();
             $this->ensureTables($pdo);
@@ -129,11 +160,11 @@ class AdminGruposComprasController extends Controller {
             $slug = $this->uniqueSlug($pdo, $this->slugify($nome), $id ?: null);
 
             if ($id > 0) {
-                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, imposto_local_percent=?, ativo=?, updated_at=NOW() WHERE id=?");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $id]);
+                $st = $pdo->prepare("UPDATE grupos_compras SET nome=?, slug=?, descricao=?, cobra_imposto_eua=?, imposto_local_percent=?, ativo=?, banner=?, updated_at=NOW() WHERE id=?");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $bannerUrl, $id]);
             } else {
-                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, imposto_local_percent, ativo, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,?,NOW())");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, 1, $userId ?: null, $userName ?: null]);
+                $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, imposto_local_percent, ativo, banner, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,?,?,NOW())");
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, 1, $bannerUrl, $userId ?: null, $userName ?: null]);
                 $id = (int)$pdo->lastInsertId();
             }
 
