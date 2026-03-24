@@ -172,6 +172,29 @@ class AdminGruposComprasController extends Controller {
             $st2->execute([$id]);
             $grupo = $st2->fetch(\PDO::FETCH_ASSOC);
 
+            // Sincronizar loja_id dos produtos deste grupo
+            try {
+                $colsProd = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                if (in_array('loja_id', $colsProd, true) && in_array('grupo_compras_id', $colsProd, true)) {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                    $stFL = $pdo->prepare("SELECT id FROM lojas WHERE LOWER(nome) = LOWER(?) LIMIT 1");
+                    $stFL->execute([$nome]);
+                    $lojaIdSync = (int) ($stFL->fetchColumn() ?: 0);
+                    if ($lojaIdSync <= 0) {
+                        $sL = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $nome), '-'));
+                        if ($sL === '') $sL = 'loja-' . time();
+                        $chk = $pdo->prepare("SELECT id FROM lojas WHERE slug = ? LIMIT 1");
+                        $chk->execute([$sL]);
+                        if ($chk->fetchColumn()) $sL .= '-' . bin2hex(random_bytes(2));
+                        $pdo->prepare("INSERT INTO lojas (nome, slug, ativo, created_at) VALUES (?, ?, 1, NOW())")->execute([$nome, $sL]);
+                        $lojaIdSync = (int) $pdo->lastInsertId();
+                    }
+                    if ($lojaIdSync > 0) {
+                        $pdo->prepare("UPDATE produtos SET loja_id = ? WHERE grupo_compras_id = ?")->execute([$lojaIdSync, $id]);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             echo json_encode(['ok' => true, 'grupo' => $grupo]);
         } catch (\Throwable $e) {
             echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
@@ -280,7 +303,7 @@ class AdminGruposComprasController extends Controller {
             $this->ensureTables($pdo);
 
             $stmt = $pdo->query("
-                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua, g.imposto_local_percent,
+                SELECT g.id, g.nome, g.slug, g.descricao, g.cobra_imposto_eua, g.imposto_local_percent, g.banner,
                     (SELECT COUNT(*) FROM produtos p WHERE p.grupo_compras_id = g.id) AS qtd_produtos
                 FROM grupos_compras g
                 WHERE g.ativo = 1

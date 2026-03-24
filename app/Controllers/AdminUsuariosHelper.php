@@ -274,6 +274,10 @@ class AdminUsuariosHelper {
             $params = [];
 
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'nome', $dados['nome'] ?? null);
+            // Compatibilidade: tabela pode ter coluna 'name' (NOT NULL) além de ou em vez de 'nome'
+            if (in_array('name', $colunas, true)) {
+                $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'name', $dados['nome'] ?? null);
+            }
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'email', $dados['email'] ?? null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'senha', !empty($dados['senha']) ? password_hash($dados['senha'], PASSWORD_DEFAULT) : null);
             $this->addIfColumnExists($insertCols, $placeholders, $params, $colunas, 'telefone', $dados['telefone'] ?? null);

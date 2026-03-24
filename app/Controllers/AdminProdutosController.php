@@ -1706,6 +1706,30 @@ class AdminProdutosController extends Controller {
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
             $data['grupo_compras_id'] = $grupoId;
+            // Auto-associar loja pelo nome do grupo
+            if (in_array('loja_id', $cols, true)) {
+                try {
+                    $stGN = $pdo->prepare("SELECT nome FROM grupos_compras WHERE id = ? LIMIT 1");
+                    $stGN->execute([$grupoId]);
+                    $gNome = trim((string) ($stGN->fetchColumn() ?: ''));
+                    if ($gNome !== '') {
+                        $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                        $stFL = $pdo->prepare("SELECT id FROM lojas WHERE LOWER(nome) = LOWER(?) LIMIT 1");
+                        $stFL->execute([$gNome]);
+                        $autoLojaId = (int) ($stFL->fetchColumn() ?: 0);
+                        if ($autoLojaId <= 0) {
+                            $sL = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $gNome), '-'));
+                            if ($sL === '') $sL = 'loja-' . time();
+                            $chk = $pdo->prepare("SELECT id FROM lojas WHERE slug = ? LIMIT 1");
+                            $chk->execute([$sL]);
+                            if ($chk->fetchColumn()) $sL .= '-' . bin2hex(random_bytes(2));
+                            $pdo->prepare("INSERT INTO lojas (nome, slug, ativo, created_at) VALUES (?, ?, 1, NOW())")->execute([$gNome, $sL]);
+                            $autoLojaId = (int) $pdo->lastInsertId();
+                        }
+                        if ($autoLojaId > 0) $data['loja_id'] = $autoLojaId;
+                    }
+                } catch (\Throwable $e) {}
+            }
         }
 
         $ncm = trim((string) $request->getParam('ncm', ''));
@@ -2634,6 +2658,30 @@ HTML;
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
             $data['grupo_compras_id'] = $grupoId;
+            // Auto-associar loja pelo nome do grupo
+            if (in_array('loja_id', $cols, true)) {
+                try {
+                    $stGN2 = $pdo->prepare("SELECT nome FROM grupos_compras WHERE id = ? LIMIT 1");
+                    $stGN2->execute([$grupoId]);
+                    $gNome2 = trim((string) ($stGN2->fetchColumn() ?: ''));
+                    if ($gNome2 !== '') {
+                        $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                        $stFL2 = $pdo->prepare("SELECT id FROM lojas WHERE LOWER(nome) = LOWER(?) LIMIT 1");
+                        $stFL2->execute([$gNome2]);
+                        $autoLojaId2 = (int) ($stFL2->fetchColumn() ?: 0);
+                        if ($autoLojaId2 <= 0) {
+                            $sL2 = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $gNome2), '-'));
+                            if ($sL2 === '') $sL2 = 'loja-' . time();
+                            $chk2 = $pdo->prepare("SELECT id FROM lojas WHERE slug = ? LIMIT 1");
+                            $chk2->execute([$sL2]);
+                            if ($chk2->fetchColumn()) $sL2 .= '-' . bin2hex(random_bytes(2));
+                            $pdo->prepare("INSERT INTO lojas (nome, slug, ativo, created_at) VALUES (?, ?, 1, NOW())")->execute([$gNome2, $sL2]);
+                            $autoLojaId2 = (int) $pdo->lastInsertId();
+                        }
+                        if ($autoLojaId2 > 0) $data['loja_id'] = $autoLojaId2;
+                    }
+                } catch (\Throwable $e) {}
+            }
         }
 
         $ncm = trim((string) $request->getParam('ncm', ''));

@@ -53,6 +53,7 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                             data-imposto="<?= $cobraImposto ?>"
                             data-imposto-local="<?= $impostoLocal ?>"
                             data-ativo="<?= $ativo ?>"
+                            data-banner="<?= htmlspecialchars($g['banner'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                             title="Editar">
                             <i class="fas fa-pen"></i>
                         </button>
@@ -103,6 +104,16 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                     <input class="form-check-input" type="checkbox" id="grupoAtivo" role="switch" checked>
                     <label class="form-check-label" for="grupoAtivo">Grupo ativo</label>
                 </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label">Banner do grupo</label>
+                    <input class="form-control" type="file" id="grupoBanner" accept="image/*">
+                    <input type="hidden" id="grupoBannerKeep" value="">
+                    <div id="grupoBannerPreview" class="mt-2" style="display:none">
+                        <img id="grupoBannerImg" src="" style="max-height:100px;border-radius:8px" alt="Banner">
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="grupoBannerRemover"><i class="fas fa-times"></i> Remover</button>
+                    </div>
+                </div>
                 <div id="msgGrupo" class="mt-2"></div>
             </div>
             <div class="modal-footer">
@@ -142,6 +153,9 @@ document.getElementById('btnNovoGrupo').addEventListener('click', () => {
     document.getElementById('grupoImpostoPercentWrap').style.display = 'none';
     document.getElementById('grupoAtivo').checked = true;
     document.getElementById('grupoAtivoWrap').style.display = 'none';
+    document.getElementById('grupoBanner').value = '';
+    document.getElementById('grupoBannerKeep').value = '';
+    document.getElementById('grupoBannerPreview').style.display = 'none';
     document.getElementById('modalGrupoTitulo').textContent = 'Novo grupo de compras';
     document.getElementById('msgGrupo').innerHTML = '';
     new bootstrap.Modal(document.getElementById('modalGrupo')).show();
@@ -162,6 +176,15 @@ document.querySelectorAll('.btn-editar').forEach(btn => {
         document.getElementById('grupoImpostoPercentWrap').style.display = impostoLocal > 0 ? '' : 'none';
         document.getElementById('grupoAtivo').checked = btn.dataset.ativo === '1';
         document.getElementById('grupoAtivoWrap').style.display = '';
+        document.getElementById('grupoBanner').value = '';
+        const bannerVal = btn.dataset.banner || '';
+        document.getElementById('grupoBannerKeep').value = bannerVal;
+        if (bannerVal) {
+            document.getElementById('grupoBannerImg').src = bannerVal;
+            document.getElementById('grupoBannerPreview').style.display = '';
+        } else {
+            document.getElementById('grupoBannerPreview').style.display = 'none';
+        }
         document.getElementById('modalGrupoTitulo').textContent = 'Editar grupo';
         document.getElementById('msgGrupo').innerHTML = '';
         new bootstrap.Modal(document.getElementById('modalGrupo')).show();
@@ -185,6 +208,9 @@ document.getElementById('btnSalvarGrupo').addEventListener('click', async () => 
         fd.append('imposto_local_percent', '0');
     }
     fd.append('ativo', document.getElementById('grupoAtivo').checked ? '1' : '0');
+    fd.append('banner_keep', document.getElementById('grupoBannerKeep').value);
+    const bannerFile = document.getElementById('grupoBanner').files[0];
+    if (bannerFile) fd.append('banner', bannerFile);
     const r = await fetch('/admin/grupos-compras/salvar', {method:'POST', body:fd});
     const j = await r.json();
     btn.disabled = false; btn.innerHTML = 'Salvar';
@@ -193,6 +219,23 @@ document.getElementById('btnSalvarGrupo').addEventListener('click', async () => 
 });
 
 // ── Toggle ativo ───────────────────────────────────────────────────────────
+document.getElementById('grupoBannerRemover').addEventListener('click', () => {
+    document.getElementById('grupoBanner').value = '';
+    document.getElementById('grupoBannerKeep').value = '';
+    document.getElementById('grupoBannerPreview').style.display = 'none';
+});
+document.getElementById('grupoBanner').addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('grupoBannerImg').src = e.target.result;
+            document.getElementById('grupoBannerPreview').style.display = '';
+            document.getElementById('grupoBannerKeep').value = '';
+        };
+        reader.readAsDataURL(this.files[0]);
+    }
+});
+
 document.querySelectorAll('.btn-toggle').forEach(btn => {
     btn.addEventListener('click', async () => {
         if (!confirm('Confirmar alteração de status?')) return;

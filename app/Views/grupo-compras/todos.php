@@ -24,13 +24,18 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
             $qtd = (int)($g['qtd_produtos'] ?? 0);
             $cobraImposto = (int)($g['cobra_imposto_eua'] ?? 0);
             $impostoLocal = (float)($g['imposto_local_percent'] ?? 0);
+            $banner = trim((string)($g['banner'] ?? ''));
         ?>
         <div class="col-lg-3 col-md-4 col-sm-6">
             <a href="/grupo/<?= $slug ?>" class="text-decoration-none">
                 <div class="card border-0 shadow-sm h-100 grupo-card-public">
                     <!-- Imagem / ícone do grupo -->
-                    <div class="grupo-card-img d-flex align-items-center justify-content-center">
-                        <i class="fas fa-store fa-3x text-white opacity-75"></i>
+                    <div class="grupo-card-img d-flex align-items-center justify-content-center" <?php if ($banner !== ''): ?>style="background:none;padding:0;overflow:hidden"<?php endif; ?>>
+                        <?php if ($banner !== ''): ?>
+                            <img src="<?= htmlspecialchars($banner, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $nome ?>" style="width:100%;height:100%;object-fit:cover;">
+                        <?php else: ?>
+                            <i class="fas fa-store fa-3x text-white opacity-75"></i>
+                        <?php endif; ?>
                     </div>
                     <div class="card-body text-center">
                         <h5 class="fw-bold mb-1 text-dark"><?= $nome ?></h5>
