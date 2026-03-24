@@ -580,13 +580,10 @@ class AdminPedidosManualController extends Controller {
             <div class="card mb-4" id="linkPagamentoCard">
                 <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Câmbio Real + AppMax</span>)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.<br><small class="text-muted">BRL: valor dos produtos via Câmbio Real, taxas/impostos via AppMax</small></div>
+                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + PIX AppMax (taxas/impostos). Copie e envie para o cliente.</small></div>
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-4" id="billingTypeWrap">
-                            <label class="form-label">Billing Type</label>
-                            <select id="billingType" class="form-select">
-                                <option value="PIX" selected>PIX</option>
-                            </select>
+                        <div class="col-md-4" id="billingTypeWrap" style="display:none;">
+                            <input type="hidden" id="billingType" value="PIX">
                         </div>
                         <div class="col-md-4">
                             <button type="button" class="btn btn-primary" id="btnGerarLinkPagamento" onclick="gerarLinkPagamento()" disabled>
@@ -1025,19 +1022,12 @@ function updateLinkVisibility(){
 
     // Regras:
     // - Offline (PagDev) ou Carteira: não gera link
-    // - BRL pix/boleto: Câmbio Real (produtos) + AppMax (taxas) - gera link split
-    // - BRL cartao: não gera link (precisa dados do cartão)
+    // - BRL: Câmbio Real (link checkout produtos) + AppMax PIX (taxas) - gera link split
+    // - BRL cartao: também gera link (Câmbio Real checkout aceita cartão)
     // - USD: Stripe (gera link de checkout)
     const isCartao = (v === 'cartao_credito' || v === 'cartao_debito');
-    const canShowLinkCard = (!isOffline && !isCarteira && !isCartao && (moeda === 'BRL' || moeda === 'USD'));
-    const shouldShowBillingType = (!isOffline && !isCarteira && moeda === 'BRL' && !isCartao);
-
-    // Sincronizar billingType com forma de pagamento
-    if (billingType && moeda === 'BRL') {
-        if (v === 'pix') {
-            billingType.value = 'PIX';
-        }
-    }
+    const canShowLinkCard = (!isOffline && !isCarteira && (moeda === 'BRL' || moeda === 'USD'));
+    const shouldShowBillingType = false; // billingType não é mais necessário
 
     // Atualizar gateway label
     if (gatewayLabel) {
@@ -1049,7 +1039,7 @@ function updateLinkVisibility(){
     }
 
     if (billingWrap) {
-        billingWrap.style.display = shouldShowBillingType ? '' : 'none';
+        billingWrap.style.display = 'none';
     }
 
     if (linkCard) {
@@ -1058,12 +1048,9 @@ function updateLinkVisibility(){
     if (linkInfo) {
         if (isOffline || isCarteira) {
             linkInfo.style.display = 'none';
-        } else if (isCartao) {
-            linkInfo.style.display = '';
-            linkInfo.innerHTML = '<i class="fas fa-info-circle"></i> Para cartão de crédito/débito, o pagamento será processado diretamente no checkout do cliente.';
         } else {
             linkInfo.style.display = '';
-            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para emitir a cobrança.';
+            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + PIX AppMax (taxas/impostos). Copie e envie para o cliente.</small>';
         }
     }
     if (linkResult && !canShowLinkCard) {
@@ -1565,11 +1552,11 @@ function gerarLinkPagamento(){
                     const produto = data.produto || null;
                     const taxa = data.taxa || null;
 
-                    el.innerHTML = `<div class="alert alert-info">
-                        <strong>Split gerado.</strong> Envie os dois pagamentos para o cliente (produto via Câmbio Real + taxas via AppMax).
+                    el.innerHTML = `<div class="alert alert-success">
+                        <strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + PIX AppMax para taxas).
                     </div>
-                    ${buildSection('Pagamento 1: Produtos (Câmbio Real)', produto)}
-                    ${buildSection('Pagamento 2: Taxas e Impostos (AppMax)', taxa)}
+                    ${buildSection('Pagamento 1: Produtos (Câmbio Real — Link de Checkout)', produto)}
+                    ${buildSection('Pagamento 2: Taxas e Impostos (AppMax — PIX)', taxa)}
                     <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar novamente.</div>`;
                 } else {
                     const url = String(data.invoiceUrl || '').trim();
@@ -2275,7 +2262,7 @@ JS;
     public function gerarLink(Request $request) {
         try {
             $pedidoId = (int) $request->getParam('pedido_id', 0);
-            $billingType = (string) $request->getParam('billingType', 'BOLETO');
+            $billingType = (string) $request->getParam('billingType', 'PIX');
 
             $svc = new PedidoManualService();
             $result = $svc->gerarLinkPagamentoPedidoManual($pedidoId, $billingType);

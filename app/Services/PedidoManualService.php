@@ -262,7 +262,7 @@ class PedidoManualService {
         }
     }
 
-    public function gerarLinkPagamentoPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+    public function gerarLinkPagamentoPedidoManual(int $pedidoId, string $billingType = 'PIX'): array {
         if ($pedidoId <= 0) {
             throw new \Exception('Pedido inválido');
         }
@@ -292,19 +292,16 @@ class PedidoManualService {
         return $this->gerarLinkPagamentoStripePedidoManual($pedidoId);
     }
 
-    private function gerarLinkPagamentoSplitBrlPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+    private function gerarLinkPagamentoSplitBrlPedidoManual(int $pedidoId, string $billingType = 'PIX'): array {
         if ($pedidoId <= 0) {
             throw new \Exception('Pedido inválido');
         }
 
+        // billingType não é mais relevante: Câmbio Real gera link de checkout (cliente escolhe),
+        // AppMax sempre gera PIX. Mantemos o parâmetro por compatibilidade.
         $billingType = strtoupper(trim($billingType));
-        if (!in_array($billingType, ['BOLETO', 'PIX', 'CREDIT_CARD'], true)) {
-            $billingType = 'BOLETO';
-        }
-
-        // AppMax no fluxo atual não gera link de cartão sem dados do cartão.
-        if ($billingType === 'CREDIT_CARD') {
-            throw new \Exception('Para pedido manual BRL no split, selecione PIX ou BOLETO (a taxa é cobrada via AppMax).');
+        if ($billingType === '' || !in_array($billingType, ['PIX', 'BOLETO', 'CREDIT_CARD'], true)) {
+            $billingType = 'PIX';
         }
 
         $colsPedidos = $this->getCols('pedidos');
@@ -409,7 +406,7 @@ class PedidoManualService {
 
         $pg = new PaymentService();
 
-        // 1) Produto via Câmbio Real (PIX/BOLETO) (igual checkout)
+        // 1) Produto via Câmbio Real — Checkout API (gera link hospedado para o cliente pagar)
         $cr = null;
         if ($valorProduto > 0) {
             $descricaoProduto = 'Pedido manual #' . $codigoPedido . ' (produtos)';
@@ -418,39 +415,32 @@ class PedidoManualService {
                 'email' => $email,
                 'document' => $documento,
                 'phone' => $telefone,
+                'phone_number' => $telefone,
+                'cpf' => $documento,
                 'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
             ];
 
-            if ($billingType === 'PIX') {
-                $tx = (float) ($pedido['taxa_conversao'] ?? 0);
-                if ($tx <= 1.01) {
-                    $tx = $this->getTaxaConversaoUSDBRL();
-                }
-                if ($tx <= 0) {
-                    $tx = 1.0;
-                }
+            $base = \App\Core\Url::base();
+            $successUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal=success';
+            $errorUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal=error';
 
-                $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
-                if ($amountUsd <= 0) {
-                    throw new \Exception('Valor inválido para Câmbio Real (USD)');
-                }
-
-                $cr = $pg->createCambioRealPixPaymentProduto((int) $pedidoId, (float) $amountUsd, (float) $valorProduto, (string) $descricaoProduto, $client);
-                if (empty($cr['success'])) {
-                    throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar PIX Câmbio Real (produto)'));
-                }
-            } else {
-                $cr = $pg->createCambioRealDirectPaymentProdutoBoleto((int) $pedidoId, (float) $valorProduto, (string) $descricaoProduto, $client);
-                if (empty($cr['success'])) {
-                    throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar boleto Câmbio Real (produto)'));
-                }
+            $cr = $pg->createCambioRealCheckoutRequestProduto(
+                (int) $pedidoId,
+                (float) $valorProduto,
+                (string) $descricaoProduto,
+                $client,
+                $successUrl,
+                $errorUrl
+            );
+            if (empty($cr['success'])) {
+                throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar link Câmbio Real (produto)'));
             }
         }
 
-        // 2) Taxas + impostos via AppMax (PIX/BOLETO) (igual checkout)
+        // 2) Taxas + impostos via AppMax (PIX) — gera PIX com payload copiável para o vendedor enviar
         $taxa = null;
         if ($valorAppmax > 0) {
-            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, $billingType, $valorAppmax, $nome, $email, $telefone, $documento, $codigoPedido);
+            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, 'PIX', $valorAppmax, $nome, $email, $telefone, $documento, $codigoPedido);
             if (empty($taxa['success'])) {
                 throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança AppMax (taxa)'));
             }
@@ -477,7 +467,9 @@ class PedidoManualService {
             'split' => true,
             'pedido_id' => $pedidoId,
             'moeda' => 'BRL',
-            'produto' => $cr,
+            'produto' => is_array($cr) ? array_merge($cr, [
+                'invoiceUrl' => (string) ($cr['invoice_url'] ?? ($cr['invoiceUrl'] ?? '')),
+            ]) : $cr,
             'taxa' => $taxa,
             'imposto' => [
                 'success' => true,
@@ -926,7 +918,7 @@ class PedidoManualService {
         return 'pedido_itens';
     }
 
-    public function gerarLinkPagamentoAppMaxPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+    public function gerarLinkPagamentoAppMaxPedidoManual(int $pedidoId, string $billingType = 'PIX'): array {
         return $this->gerarLinkPagamentoAsaasPedidoManual($pedidoId, $billingType);
     }
 
@@ -1430,14 +1422,14 @@ class PedidoManualService {
         }
     }
 
-    public function gerarLinkPagamentoAsaasPedidoManual(int $pedidoId, string $billingType = 'BOLETO'): array {
+    public function gerarLinkPagamentoAsaasPedidoManual(int $pedidoId, string $billingType = 'PIX'): array {
         if ($pedidoId <= 0) {
             throw new \Exception('Pedido inválido');
         }
 
         $billingType = strtoupper(trim($billingType));
         if (!in_array($billingType, ['BOLETO', 'PIX'], true)) {
-            $billingType = 'BOLETO';
+            $billingType = 'PIX';
         }
 
         $colsPedidos = $this->getCols('pedidos');
