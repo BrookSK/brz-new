@@ -745,6 +745,7 @@ class CheckoutController extends Controller {
         if ($paisEntrega !== 'BR') {
             $remove[] = 'numero';
             $remove[] = 'bairro';
+            $remove[] = 'documento'; // CPF não é obrigatório para entregas fora do Brasil
         }
         if (!in_array($paisEntrega, ['BR', 'US', 'CA'], true)) {
             $remove[] = 'estado';

@@ -1814,8 +1814,8 @@ class UsuarioController extends Controller {
 
         if (empty($dados['cep'])) $erros[] = 'CEP é obrigatório';
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
-        if ($paisEntrega === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
-        if ($paisEntrega === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
+        if ($paisResidencia === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
+        if ($paisResidencia === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
         if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
 
         $estado = '';
@@ -1826,7 +1826,7 @@ class UsuarioController extends Controller {
         } elseif (isset($dados['estado_ui']) && trim((string) $dados['estado_ui']) !== '') {
             $estado = trim((string) $dados['estado_ui']);
         }
-        if (($paisEntrega === 'BR' || $paisEntrega === 'US' || $paisEntrega === 'CA') && $estado === '') {
+        if (($paisResidencia === 'BR' || $paisResidencia === 'US' || $paisResidencia === 'CA') && $estado === '') {
             $erros[] = 'Estado é obrigatório';
         }
         

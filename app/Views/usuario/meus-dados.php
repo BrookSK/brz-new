@@ -60,7 +60,7 @@
                     if (!paisRes || !docEl || !labelEl) return;
                     var br = ((paisRes.value || '').toString().toUpperCase() === 'BR');
                     var cpf = (window.MYDATA_I18N && window.MYDATA_I18N.cpf) ? window.MYDATA_I18N.cpf : 'CPF';
-                    labelEl.textContent = br ? (cpf + ' *') : cpf;
+                    labelEl.textContent = br ? (cpf + ' *') : (cpf + ' (opcional)');
                     docEl.required = br;
                     if (hintEl) {
                         hintEl.style.display = br ? 'none' : 'block';
@@ -441,7 +441,7 @@
                                 <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.type_to_filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
                             </div>
                             <div class="col-md-6">
-                                <label for="cep" class="form-label"><?= __('auth.cep', 'CEP') ?> *</label>
+                                <label for="cep" class="form-label" id="label-cep"><?= __('auth.cep', 'CEP') ?> *</label>
                                 <input type="text" class="form-control" id="cep" name="cep" 
                                        value="<?= htmlspecialchars((string) ($ee['cep'] ?? ($usuario['cep'] ?? ''))) ?>" 
                                        placeholder="00000-000" required>
@@ -634,10 +634,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Máscara para CEP
+    // Máscara para CEP (apenas para Brasil)
     const cepInput = document.getElementById('cep');
     if (cepInput) {
         cepInput.addEventListener('input', function(e) {
+            const paisSel = document.getElementById('pais');
+            const pais = (paisSel && paisSel.value ? String(paisSel.value) : 'BR').toUpperCase();
+            if (pais !== 'BR') return; // Não aplicar máscara numérica para outros países
             let value = e.target.value.replace(/\D/g, '');
             if (value.length <= 8) {
                 value = value.replace(/^(\d{5})(\d{3}).*/, '$1-$2');
@@ -702,15 +705,19 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         if (cep) {
+            const cepLabel = document.getElementById('label-cep');
             if (pais === 'BR') {
                 cep.placeholder = '00000-000';
                 cep.maxLength = 9;
+                if (cepLabel) cepLabel.textContent = (window.MYDATA_I18N && window.MYDATA_I18N.cep_br) ? window.MYDATA_I18N.cep_br + ' *' : 'CEP *';
             } else if (pais === 'US') {
                 cep.placeholder = '00000';
                 cep.maxLength = 10;
+                if (cepLabel) cepLabel.textContent = 'Zip Code *';
             } else {
                 cep.placeholder = '';
                 cep.maxLength = 12;
+                if (cepLabel) cepLabel.textContent = 'Postal Code *';
             }
         }
 

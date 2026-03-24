@@ -759,6 +759,19 @@ class Usuario extends Model {
         if (in_array('pais_residencia', $cols, true)) {
             $pais = strtoupper(trim((string) ($usuario['pais_residencia'] ?? '')));
         }
+
+        // Para países fora do BR, remover campos específicos do Brasil
+        if ($pais !== '' && $pais !== 'BR') {
+            $removeFora = ['numero', 'bairro'];
+            // Estado só é obrigatório para BR, US, CA
+            if (!in_array($pais, ['BR', 'US', 'CA'], true)) {
+                $removeFora[] = 'estado';
+            }
+            $missing = array_values(array_filter($missing, static function ($it) use ($removeFora) {
+                return !in_array((string) $it, $removeFora, true);
+            }));
+        }
+
         if ($pais === 'BR' || $pais === '') {
             $doc = '';
             foreach (['documento', 'cpf_cnpj', 'cpf'] as $c) {
