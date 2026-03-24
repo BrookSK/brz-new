@@ -2994,6 +2994,7 @@ HTML;
                     'name' => (string) ($r['name'] ?? ($r['nome'] ?? '')),
                     'sku' => (string) ($r['sku'] ?? ''),
                     'price' => (float) ($r['price'] ?? ($r['preco'] ?? ($r['valor'] ?? 0))),
+                    'weight' => $r['weight'] ?? $r['peso'] ?? 0,
                     'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
                     'imagem' => $img,
                 ];
@@ -3061,7 +3062,9 @@ HTML;
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
             $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
-            $peso = number_format((float) ($produto['weight'] ?? $produto['peso'] ?? 0), 2, '.', ',');
+            $pesoRaw = (!empty($produto['weight']) ? $produto['weight'] : (!empty($produto['peso']) ? $produto['peso'] : 0));
+            if (is_string($pesoRaw)) $pesoRaw = str_replace(',', '.', trim($pesoRaw));
+            $peso = number_format((float) $pesoRaw, 3, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
             $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
@@ -3262,6 +3265,7 @@ HTML;
                     'name' => (string) ($r['name'] ?? ($r['nome'] ?? '')),
                     'sku' => (string) ($r['sku'] ?? ''),
                     'price' => (float) ($r['price'] ?? ($r['preco'] ?? ($r['valor'] ?? 0))),
+                    'weight' => $r['weight'] ?? $r['peso'] ?? 0,
                     'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
                     'imagem' => $img,
                 ];
@@ -3328,7 +3332,9 @@ HTML;
             $urlEditar = $isRepresentante ? ('/admin/representante/produtos/editar/' . (int) $produto['id']) : ('/admin/produtos/editar/' . (int) $produto['id']);
             $img = htmlspecialchars((string) $produto['imagem'], ENT_QUOTES, 'UTF-8');
             $nome = htmlspecialchars((string) $produto['name'], ENT_QUOTES, 'UTF-8');
-            $peso = number_format((float) ($produto['weight'] ?? $produto['peso'] ?? 0), 2, '.', ',');
+            $pesoRaw = (!empty($produto['weight']) ? $produto['weight'] : (!empty($produto['peso']) ? $produto['peso'] : 0));
+            if (is_string($pesoRaw)) $pesoRaw = str_replace(',', '.', trim($pesoRaw));
+            $peso = number_format((float) $pesoRaw, 3, '.', ',');
             $preco = '$' . number_format((float) $produto['price'], 2, '.', ',');
             $badge = ((int) $produto['active'] ? 'bg-success' : 'bg-danger');
             $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
