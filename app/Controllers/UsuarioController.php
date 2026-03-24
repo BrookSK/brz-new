@@ -1011,6 +1011,11 @@ class UsuarioController extends Controller {
                 $payload['pais'] = 'BR';
             }
 
+            // Garantir tipo válido (coluna pode ser ENUM)
+            if (in_array('tipo', $cols, true) && (empty($payload['tipo']) || trim((string)($payload['tipo'] ?? '')) === '')) {
+                $payload['tipo'] = 'entrega';
+            }
+
             // Garantir nome no endereço (NOT NULL em alguns schemas)
             $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : '');
             if ($nomeCol !== '' && empty($payload[$nomeCol])) {
@@ -1513,16 +1518,7 @@ class UsuarioController extends Controller {
             $dadosAtualizacao[$colunaBanco] = $val;
         }
         
-        // Adicionar campos obrigatórios se existirem
-        if (in_array('perfil', $colunas)) {
-            $dadosAtualizacao['perfil'] = 'cliente';
-        }
-        if (in_array('status', $colunas)) {
-            $dadosAtualizacao['status'] = 'ativo';
-        }
-        if (in_array('creditos_disponiveis', $colunas)) {
-            $dadosAtualizacao['creditos_disponiveis'] = 0;
-        }
+        // Não sobrescrever perfil, status ou créditos na atualização de dados pessoais
         
         return $dadosAtualizacao;
     }
