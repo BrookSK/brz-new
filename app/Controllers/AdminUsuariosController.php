@@ -83,7 +83,7 @@ class AdminUsuariosController extends Controller {
                 
         echo '<form method="GET" class="row g-3 mb-4">
                     <div class="col-md-5">
-                        <input type="text" class="form-control" name="busca" placeholder="Buscar usuário por nome, email ou CPF..." value="' . htmlspecialchars($busca) . '">
+                        <input type="text" class="form-control" name="busca" placeholder="Buscar por nome, email, CPF ou suite..." value="' . htmlspecialchars($busca) . '">
                     </div>
                     <div class="col-md-3">
                         <select class="form-select" name="ordem" onchange="this.form.submit()">

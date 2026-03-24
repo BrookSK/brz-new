@@ -64,6 +64,9 @@ class AdminUsuariosHelper {
         if (is_array($colunasUsuarios) && in_array('documento', $colunasUsuarios, true)) {
             $buscaCols[] = 'u.documento';
         }
+        if (is_array($colunasUsuarios) && in_array('suite', $colunasUsuarios, true)) {
+            $buscaCols[] = 'u.suite';
+        }
 
         $sql = "SELECT u.*, 
                        COALESCE(w.saldo_usd, 0) as carteira_usd,
@@ -124,6 +127,9 @@ class AdminUsuariosHelper {
         }
         if (is_array($colunasUsuarios) && in_array('documento', $colunasUsuarios, true)) {
             $buscaCols[] = 'documento';
+        }
+        if (is_array($colunasUsuarios) && in_array('suite', $colunasUsuarios, true)) {
+            $buscaCols[] = 'suite';
         }
 
         $sql = "SELECT COUNT(*) as total FROM usuarios u";
