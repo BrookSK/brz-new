@@ -422,7 +422,7 @@ $(document).ready(function() {
                         ? '<span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>'
                         : '<span class="h5 mb-0 text-primary">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
                     var btnHtml = isClubeBlocked
-                        ? '<a href="/grupo-compras" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais sobre o Clube</a>'
+                        ? '<a href="/grupos-compras" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais sobre o Clube</a>'
                         : '<a href="/produto/detalhes/' + produto.id + '" class="btn btn-outline-primary btn-sm w-100">' + UI.details + '</a>';
                     html += `
                         <div class="col-lg-3 col-md-6">
