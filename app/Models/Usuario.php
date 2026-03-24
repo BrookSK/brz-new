@@ -373,6 +373,50 @@ class Usuario extends Model {
             $data['documento'] = $doc === '' ? null : $doc;
         }
 
+        // Compatibilidade: garantir que colunas alternativas (name, password, etc.) sejam preenchidas
+        try {
+            $stmtCols = $this->getConnection()->query("DESCRIBE {$this->table}");
+            $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($cols)) {
+                // name <-> nome
+                if (in_array('name', $cols, true) && !array_key_exists('name', $data) && isset($data['nome'])) {
+                    $data['name'] = $data['nome'];
+                }
+                if (in_array('nome', $cols, true) && !array_key_exists('nome', $data) && isset($data['name'])) {
+                    $data['nome'] = $data['name'];
+                }
+                // password <-> senha
+                if (in_array('password', $cols, true) && !array_key_exists('password', $data) && isset($data['senha'])) {
+                    $data['password'] = $data['senha'];
+                }
+                if (in_array('senha', $cols, true) && !array_key_exists('senha', $data) && isset($data['password'])) {
+                    $data['senha'] = $data['password'];
+                }
+                // phone <-> telefone
+                if (in_array('phone', $cols, true) && !array_key_exists('phone', $data) && isset($data['telefone'])) {
+                    $data['phone'] = $data['telefone'];
+                }
+                // cpf <-> documento
+                if (in_array('cpf', $cols, true) && !array_key_exists('cpf', $data) && isset($data['documento'])) {
+                    $data['cpf'] = $data['documento'];
+                }
+                if (in_array('documento', $cols, true) && !array_key_exists('documento', $data) && isset($data['cpf'])) {
+                    $data['documento'] = $data['cpf'];
+                }
+                // role <-> perfil
+                if (in_array('role', $cols, true) && !array_key_exists('role', $data) && isset($data['perfil'])) {
+                    $data['role'] = $data['perfil'];
+                }
+
+                // Remover chaves que não existem como colunas na tabela
+                foreach (array_keys($data) as $k) {
+                    if (!in_array($k, $cols, true)) {
+                        unset($data[$k]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {}
+
         $id = parent::create($data);
 
         try {

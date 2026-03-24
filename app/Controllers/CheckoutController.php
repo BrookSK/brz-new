@@ -4612,14 +4612,40 @@ class CheckoutController extends Controller {
                     }
                 }
             } else {
-                $stmt = $db->prepare("INSERT INTO usuarios (name, email, password, documento, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
+                // Detectar colunas da tabela para compatibilidade
+                $colsUsr = [];
+                try {
+                    $stCols = $db->query('DESCRIBE usuarios');
+                    $colsUsr = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) { $colsUsr = []; }
+
+                $nomeVal = $usuario['nome'] ?? 'Cliente';
+                $emailVal = $usuario['email'];
                 $senhaPlano = $usuario['senha'] ?? 'temp123';
-                $stmt->execute([
-                    $usuario['nome'] ?? 'Cliente',
-                    $usuario['email'],
-                    password_hash((string) $senhaPlano, PASSWORD_DEFAULT),
-                    $usuario['documento']
-                ]);
+                $senhaHash = password_hash((string) $senhaPlano, PASSWORD_DEFAULT);
+                $docVal = $usuario['documento'] ?? null;
+
+                $insCols = [];
+                $insPlc = [];
+                $insVals = [];
+
+                // nome / name
+                if (in_array('name', $colsUsr, true)) { $insCols[] = 'name'; $insPlc[] = '?'; $insVals[] = $nomeVal; }
+                if (in_array('nome', $colsUsr, true)) { $insCols[] = 'nome'; $insPlc[] = '?'; $insVals[] = $nomeVal; }
+                // email
+                $insCols[] = 'email'; $insPlc[] = '?'; $insVals[] = $emailVal;
+                // senha / password
+                if (in_array('password', $colsUsr, true)) { $insCols[] = 'password'; $insPlc[] = '?'; $insVals[] = $senhaHash; }
+                if (in_array('senha', $colsUsr, true)) { $insCols[] = 'senha'; $insPlc[] = '?'; $insVals[] = $senhaHash; }
+                // documento / cpf
+                if (in_array('documento', $colsUsr, true)) { $insCols[] = 'documento'; $insPlc[] = '?'; $insVals[] = $docVal; }
+                if (in_array('cpf', $colsUsr, true) && !in_array('documento', $colsUsr, true)) { $insCols[] = 'cpf'; $insPlc[] = '?'; $insVals[] = $docVal; }
+                // timestamps
+                if (in_array('created_at', $colsUsr, true)) { $insCols[] = 'created_at'; $insPlc[] = 'NOW()'; }
+                if (in_array('updated_at', $colsUsr, true)) { $insCols[] = 'updated_at'; $insPlc[] = 'NOW()'; }
+
+                $stmt = $db->prepare("INSERT INTO usuarios (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insPlc) . ")");
+                $stmt->execute($insVals);
                 $usuarioId = $db->lastInsertId();
                 $this->debugLog('[CRIAR_PEDIDO] Usuario criado: ' . $usuarioId);
             }
