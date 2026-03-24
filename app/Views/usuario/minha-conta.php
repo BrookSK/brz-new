@@ -325,7 +325,7 @@
                 </div>
             </div>
             
-            <!-- Orçamentos da Assessoria -->
+            <!-- OCULTO TEMPORARIAMENTE - Orçamentos do Redirecionamento
             <div class="card shadow-sm mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Orçamentos do Redirecionamento</h5>
@@ -446,6 +446,7 @@
                 setInterval(tick, 1000);
             })();
             </script>
+            -->
 
             <script src="https://js.stripe.com/v3/"></script>
 

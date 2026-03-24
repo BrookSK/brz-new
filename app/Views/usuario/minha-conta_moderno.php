@@ -192,6 +192,7 @@
             </div>
             
             <!-- Orçamentos da Assessoria -->
+            <!-- OCULTO TEMPORARIAMENTE - Orçamentos do Redirecionamento
             <div class="card border-0 shadow-sm mt-4">
                 <div class="card-header bg-white border-0 pt-4 pb-3">
                     <div class="d-flex justify-content-between align-items-center">
@@ -205,6 +206,7 @@
                     <!-- Conteúdo do orçamento -->
                 </div>
             </div>
+            -->
             
             <!-- Quick Actions -->
             <div class="row g-4 mt-4">
