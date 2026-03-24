@@ -1917,6 +1917,10 @@ class AdminProdutosController extends Controller {
                 <label class="form-label">Percentual (%)</label>
                 <input class="form-control" type="number" id="ngImpostoPercent" step="0.1" min="0" max="99" value="8" placeholder="Ex: 8">
             </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="ngClubeOnly" role="switch">
+                <label class="form-check-label" for="ngClubeOnly">Exclusivo do Clube Braziliana</label>
+            </div>
             <div id="msgNovoGrupo" class="mb-2"></div>
             <div class="d-flex gap-2">
                 <button class="btn btn-outline-secondary flex-fill" id="btnCancelarGrupo">Cancelar</button>
@@ -2166,6 +2170,9 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
     } else {
         fd.append("imposto_local_percent", "0");
     }
+    if (document.getElementById("ngClubeOnly").checked) {
+        fd.append("clube_only", "1");
+    }
     const r = await fetch("/admin/grupos-compras/salvar", {method:"POST", body:fd});
     const j = await r.json();
     btn.disabled = false; btn.innerHTML = \'<i class="fas fa-check me-1"></i>Criar grupo\';
@@ -2179,6 +2186,7 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
         document.getElementById("ngImposto").checked = false;
         document.getElementById("ngImpostoPercentWrap").style.display = "none";
         document.getElementById("ngImpostoPercent").value = "7";
+        document.getElementById("ngClubeOnly").checked = false;
         selecionarGrupo(j.grupo);
     } else { msg.innerHTML = \'<div class="alert alert-danger py-1 small">\' + (j.msg||"Erro") + \'</div>\'; }
 });
