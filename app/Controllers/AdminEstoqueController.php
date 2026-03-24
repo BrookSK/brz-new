@@ -1515,7 +1515,7 @@ class AdminEstoqueController extends Controller {
                         <div class="card card-stats bg-danger text-white">
                             <div class="card-body">
                                 <h5 class="card-title">Estoque Crítico</h5>
-                                <h3>' . number_format($estatisticas['criticos']) . '</h3>
+                                <h3>' . number_format((float) ($estatisticas['criticos'] ?? 0)) . '</h3>
                                 <small>Abaixo do mínimo</small>
                             </div>
                         </div>
@@ -1524,7 +1524,7 @@ class AdminEstoqueController extends Controller {
                         <div class="card card-stats bg-warning text-dark">
                             <div class="card-body">
                                 <h5 class="card-title">Estoque Baixo</h5>
-                                <h3>' . number_format($estatisticas['baixos']) . '</h3>
+                                <h3>' . number_format((float) ($estatisticas['baixos'] ?? 0)) . '</h3>
                                 <small>Abaixo do ideal</small>
                             </div>
                         </div>
@@ -1533,7 +1533,7 @@ class AdminEstoqueController extends Controller {
                         <div class="card card-stats bg-success text-white">
                             <div class="card-body">
                                 <h5 class="card-title">Estoque Normal</h5>
-                                <h3>' . number_format($estatisticas['normais']) . '</h3>
+                                <h3>' . number_format((float) ($estatisticas['normais'] ?? 0)) . '</h3>
                                 <small>Níveis adequados</small>
                             </div>
                         </div>
