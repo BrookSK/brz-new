@@ -456,7 +456,7 @@ class AdminPedidosManualController extends Controller {
                                 <label class="form-label">Método de Pagamento</label>
                                 <select class="form-select" name="forma_pagamento" id="forma_pagamento">
                                     <option value="pix" selected>PIX (Câmbio Real + AppMax)</option>
-                                    <option value="boleto">Boleto (Câmbio Real + AppMax)</option>
+                                    <!-- <option value="boleto">Boleto (Câmbio Real + AppMax)</option> <!-- OCULTO TEMPORARIAMENTE -->
                                     <option value="cartao_credito">Cartão de Crédito</option>
                                     <option value="cartao_debito">Cartão de Débito</option>
                                     <option value="carteira">Carteira</option>
@@ -585,8 +585,7 @@ class AdminPedidosManualController extends Controller {
                         <div class="col-md-4" id="billingTypeWrap">
                             <label class="form-label">Billing Type</label>
                             <select id="billingType" class="form-select">
-                                <option value="BOLETO">BOLETO</option>
-                                <option value="PIX">PIX</option>
+                                <option value="PIX" selected>PIX</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -1037,8 +1036,6 @@ function updateLinkVisibility(){
     if (billingType && moeda === 'BRL') {
         if (v === 'pix') {
             billingType.value = 'PIX';
-        } else if (v === 'boleto') {
-            billingType.value = 'BOLETO';
         }
     }
 
@@ -1506,7 +1503,7 @@ function gerarLinkPagamento(){
     let bt = 'CREDIT_CARD';
     if (moeda === 'BRL') {
         const sel = document.getElementById('billingType');
-        bt = sel ? String(sel.value || 'BOLETO') : 'BOLETO';
+        bt = sel ? String(sel.value || 'PIX') : 'PIX';
     }
 
     // Garantir que os hidden inputs estejam atualizados
@@ -1780,7 +1777,7 @@ document.addEventListener('DOMContentLoaded', function(){
             fpSel.innerHTML = '';
             if (moeda === 'BRL') {
                 fpSel.appendChild(new Option('PIX (Câmbio Real + AppMax)', 'pix'));
-                fpSel.appendChild(new Option('Boleto (Câmbio Real + AppMax)', 'boleto'));
+                // fpSel.appendChild(new Option('Boleto (Câmbio Real + AppMax)', 'boleto')); // OCULTO TEMPORARIAMENTE
                 fpSel.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
                 fpSel.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
             } else {

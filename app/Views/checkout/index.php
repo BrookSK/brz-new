@@ -608,7 +608,7 @@
                                                 <option value="cartao_credito"><?= __('checkout.payment.credit_card', 'Cartão de Crédito') ?></option>
                                                 <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
                                                 <option value="pix">PIX</option>
-                                                <option value="boleto">Boleto</option>
+                                                <!-- <option value="boleto">Boleto</option> <!-- OCULTO TEMPORARIAMENTE -->
                                                 <option value="transferencia">Transferência</option>
                                                 <option value="pagamento_entrega"><?= __('checkout.payment.cash_on_delivery', 'Pagamento na Entrega') ?></option>
                                             </select>
@@ -695,10 +695,12 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <!-- OCULTO TEMPORARIAMENTE - Boleto
                                         <div class="col-12" id="campos-boleto" style="display: none;">
                                             <label class="form-label"><?= __('checkout.holder_document', 'CPF/CNPJ do Titular') ?></label>
                                             <input type="text" name="boleto_cpf" class="form-control" placeholder="000.000.000-00">
                                         </div>
+                                        -->
                                         <div class="col-12" id="campos-transferencia" style="display: none;">
                                             <label class="form-label"><?= __('checkout.bank', 'Banco') ?></label>
                                             <select name="banco" class="form-select">
@@ -1787,14 +1789,7 @@ function atualizarFormaPagamento() {
                 console.error('❌ [ERRO] Elemento campos-cartao não encontrado');
             }
             break;
-        case 'boleto':
-            if (camposBoleto) {
-                camposBoleto.style.display = 'block';
-                console.log('🔍 [PAGAMENTO] Campos de boleto exibidos');
-            } else {
-                console.error('❌ [ERRO] Elemento campos-boleto não encontrado');
-            }
-            break;
+        // case 'boleto': // OCULTO TEMPORARIAMENTE
         case 'pix':
             if (camposPix) {
                 camposPix.style.display = 'block';
@@ -1841,10 +1836,7 @@ function atualizarFormaPagamento() {
                 botaoFinalizar.innerHTML = '<i class="fas fa-credit-card"></i> Finalizar com Cartão de Crédito';
                 console.log('🔍 [BOTÃO] Texto atualizado para cartão de crédito');
                 break;
-            case 'boleto':
-                botaoFinalizar.innerHTML = '<i class="fas fa-barcode"></i> Gerar Boleto';
-                console.log('🔍 [BOTÃO] Texto atualizado para boleto');
-                break;
+            // case 'boleto': // OCULTO TEMPORARIAMENTE
             case 'pix':
                 botaoFinalizar.innerHTML = '<i class="fas fa-qrcode"></i> Gerar PIX';
                 console.log('🔍 [BOTÃO] Texto atualizado para PIX');
@@ -2277,7 +2269,7 @@ function updatePaymentMethodsForCurrency(currency) {
 
     if (isBRL) {
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
-        select.appendChild(new Option('Boleto Bancário', 'boleto'));
+        // select.appendChild(new Option('Boleto Bancário', 'boleto')); // OCULTO TEMPORARIAMENTE
         select.appendChild(new Option('PIX', 'pix'));
     } else {
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
