@@ -1,6 +1,29 @@
 <?php ob_start(); ?>
 <?php use App\Core\Url; ?>
 <div class="container py-5">
+    <?php if (!empty($clube_bloqueado)): ?>
+    <!-- Produto exclusivo do Clube Braziliana - acesso bloqueado -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/"><?= __('nav.home', 'Início') ?></a></li>
+            <li class="breadcrumb-item"><a href="/produtos"><?= __('nav.products', 'Produtos') ?></a></li>
+            <li class="breadcrumb-item active"><?= htmlspecialchars($produto['nome']) ?></li>
+        </ol>
+    </nav>
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm text-center p-5">
+                <div class="mb-3"><i class="fas fa-crown fa-3x" style="color:#0b1f3a;"></i></div>
+                <h4>Produto exclusivo do Clube Braziliana</h4>
+                <p class="text-muted">Este produto está disponível apenas para membros do Clube Braziliana com saldo mínimo de US$ 39,00 na carteira.</p>
+                <div class="d-grid gap-2 mt-3" style="max-width:300px;margin:0 auto;">
+                    <a href="/grupo-compras" class="btn btn-primary"><i class="fas fa-crown me-2"></i>Conhecer o Clube</a>
+                    <a href="/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar aos Produtos</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
@@ -319,6 +342,7 @@
         </div>
     </div>
     <?php endif; ?>
+    <?php endif; /* clube_bloqueado */ ?>
 </div>
 
 <style>

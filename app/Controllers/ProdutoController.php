@@ -23,6 +23,56 @@ class ProdutoController extends Controller {
         $this->produtoFotoModel = new ProdutoFoto();
     }
 
+    /**
+     * Verifica se o usuário logado tem acesso ao Clube Braziliana (saldo >= US$39).
+     * Retorna [logado, acesso_liberado, saldo_usd].
+     */
+    private function checkClubeAccess(): array {
+        $auth = new AuthService();
+        if (!$auth->estaLogado()) {
+            return ['logado' => false, 'acesso' => false, 'saldo' => 0.0];
+        }
+        $usuario = $auth->getUsuarioLogado();
+        $uid = (int) ($usuario['id'] ?? 0);
+        if ($uid <= 0) {
+            return ['logado' => true, 'acesso' => false, 'saldo' => 0.0];
+        }
+        try {
+            $pdo = $this->getDirectPdo();
+            $st = $pdo->prepare('SELECT saldo_usd FROM carteiras WHERE usuario_id = ? LIMIT 1');
+            $st->execute([$uid]);
+            $saldo = (float) ($st->fetchColumn() ?: 0);
+            return ['logado' => true, 'acesso' => ($saldo >= 39.00), 'saldo' => $saldo];
+        } catch (\Throwable $e) {
+            return ['logado' => true, 'acesso' => false, 'saldo' => 0.0];
+        }
+    }
+
+    /**
+     * Marca produtos com flag clube_only baseado no grupo de compras.
+     */
+    private function markClubeOnly(array &$produtos): void {
+        if (empty($produtos)) return;
+        try {
+            $pdo = $this->getDirectPdo();
+            $ids = array_values(array_filter(array_map(fn($p) => (int) ($p['id'] ?? 0), $produtos)));
+            if (empty($ids)) return;
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $st = $pdo->prepare("SELECT p.id FROM produtos p INNER JOIN grupos_compras g ON g.id = p.grupo_compras_id WHERE p.id IN ($in) AND g.clube_only = 1");
+            $st->execute($ids);
+            $clubeIds = array_flip($st->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+            foreach ($produtos as &$p) {
+                $p['clube_only'] = isset($clubeIds[(int) ($p['id'] ?? 0)]);
+            }
+            unset($p);
+        } catch (\Throwable $e) {
+            foreach ($produtos as &$p) {
+                $p['clube_only'] = false;
+            }
+            unset($p);
+        }
+    }
+
     public function index(Request $request) {
         $search = $request->getParam('search');
         $categoria = $request->getParam('categoria');
@@ -117,6 +167,10 @@ class ProdutoController extends Controller {
         }
         
         $categorias = $this->produtoModel->getCategorias();
+
+        // Marcar produtos de grupos exclusivos do Clube Braziliana
+        $this->markClubeOnly($produtos);
+        $clubeAccess = $this->checkClubeAccess();
         
         $this->view('produto/index_moderno', [
             'produtos' => $produtos,
@@ -127,6 +181,7 @@ class ProdutoController extends Controller {
             'limit' => $limit,
             'total' => $total,
             'totalPages' => $totalPages,
+            'clube_acesso' => $clubeAccess['acesso'],
         ]);
     }
 
@@ -299,6 +354,21 @@ class ProdutoController extends Controller {
             $this->view('errors/404');
             return;
         }
+
+        // Verificar se produto pertence a grupo exclusivo do Clube Braziliana
+        $clubeOnly = false;
+        try {
+            $grupoId = (int) ($produto['grupo_compras_id'] ?? 0);
+            if ($grupoId > 0) {
+                $pdo = $this->getDirectPdo();
+                $st = $pdo->prepare('SELECT clube_only FROM grupos_compras WHERE id = ? LIMIT 1');
+                $st->execute([$grupoId]);
+                $clubeOnly = ((int) ($st->fetchColumn() ?: 0)) === 1;
+            }
+        } catch (\Throwable $e) {}
+
+        $clubeAccess = $this->checkClubeAccess();
+        $clubeBloqueado = $clubeOnly && !$clubeAccess['acesso'];
         
         $fotos = $this->produtoModel->getImagens($produtoId);
 
@@ -384,6 +454,8 @@ class ProdutoController extends Controller {
             'produtosRelacionados' => array_slice($produtosRelacionados, 0, 4),
             'variacoesUi' => $variacoesUi,
             'imposto_local_percent' => $this->getImpostoLocalPercentForProduct($produto),
+            'clube_only' => $clubeOnly,
+            'clube_bloqueado' => $clubeBloqueado,
         ]);
     }
 

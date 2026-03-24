@@ -165,10 +165,43 @@ class ApiController extends Controller {
         }
 
         unset($produto);
+
+        // Marcar produtos de grupos exclusivos do Clube Braziliana
+        try {
+            $pdo = $this->produtoModel->getConnection();
+            $ids = array_values(array_filter(array_map(fn($p) => (int) ($p['id'] ?? 0), $produtos)));
+            if (!empty($ids)) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $stClube = $pdo->prepare("SELECT p.id FROM produtos p INNER JOIN grupos_compras g ON g.id = p.grupo_compras_id WHERE p.id IN ($in) AND g.clube_only = 1");
+                $stClube->execute($ids);
+                $clubeIds = array_flip($stClube->fetchAll(\PDO::FETCH_COLUMN) ?: []);
+                foreach ($produtos as &$produto) {
+                    $produto['clube_only'] = isset($clubeIds[(int) ($produto['id'] ?? 0)]);
+                }
+                unset($produto);
+            }
+        } catch (\Throwable $e) {}
+
+        // Verificar acesso do usuário ao clube
+        $clubeAcesso = false;
+        try {
+            $auth = new \App\Services\AuthService();
+            if ($auth->estaLogado()) {
+                $u = $auth->getUsuarioLogado();
+                $uid = (int) ($u['id'] ?? 0);
+                if ($uid > 0) {
+                    $pdo = $this->produtoModel->getConnection();
+                    $stW = $pdo->prepare('SELECT saldo_usd FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                    $stW->execute([$uid]);
+                    $clubeAcesso = ((float) ($stW->fetchColumn() ?: 0)) >= 39.00;
+                }
+            }
+        } catch (\Throwable $e) {}
         
         $this->json([
             'success' => true,
-            'produtos' => $produtos
+            'produtos' => $produtos,
+            'clube_acesso' => $clubeAcesso,
         ]);
     }
 

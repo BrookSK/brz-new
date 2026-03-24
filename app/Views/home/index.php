@@ -414,8 +414,16 @@ $(document).ready(function() {
         method: 'GET',
         success: function(response) {
             if (response.produtos && response.produtos.length > 0) {
+                var clubeAcesso = response.clube_acesso || false;
                 let html = '';
                 response.produtos.forEach(function(produto) {
+                    var isClubeBlocked = produto.clube_only && !clubeAcesso;
+                    var precoHtml = isClubeBlocked
+                        ? '<span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>'
+                        : '<span class="h5 mb-0 text-primary">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
+                    var btnHtml = isClubeBlocked
+                        ? '<a href="/grupo-compras" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais sobre o Clube</a>'
+                        : '<a href="/produto/detalhes/' + produto.id + '" class="btn btn-outline-primary btn-sm w-100">' + UI.details + '</a>';
                     html += `
                         <div class="col-lg-3 col-md-6">
                             <div class="product-card card h-100">
@@ -423,18 +431,16 @@ $(document).ready(function() {
                                     <img src="${produto.foto_principal || '/uploads/produtos/placeholder.jpg'}" 
                                          alt="${produto.nome}" 
                                          class="product-image card-img-top">
-                                    ${produto.estoque <= 5 ? '<span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">' + UI.badge_last_units + '</span>' : ''}
+                                    ${produto.estoque <= 5 && !isClubeBlocked ? '<span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">' + UI.badge_last_units + '</span>' : ''}
                                 </div>
                                 <div class="card-body">
                                     <h6 class="card-title">${produto.nome}</h6>
                                     <p class="text-muted small">${produto.categoria}</p>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="h5 mb-0 text-primary">${produto.moeda} ${formatMoney(produto.valor)}</span>
-                                        <small class="text-muted">${produto.estoque} ${UI.units_short}</small>
+                                        ${precoHtml}
+                                        ${!isClubeBlocked ? '<small class="text-muted">' + produto.estoque + ' ' + UI.units_short + '</small>' : ''}
                                     </div>
-                                    <a href="/produto/detalhes/${produto.id}" class="btn btn-outline-primary btn-sm w-100">
-                                        ${UI.details}
-                                    </a>
+                                    ${btnHtml}
                                 </div>
                             </div>
                         </div>

@@ -107,7 +107,11 @@
                                     $precoPromo = (float) ($produto['sale_price'] ?? 0);
                                     $temPromo = ($precoPromo > 0 && $precoPromo < $precoBase);
                                     $precoExibir = $temPromo ? $precoPromo : $precoBase;
+                                    $isClubeBlocked = !empty($produto['clube_only']) && empty($clube_acesso);
                                 ?>
+                                <?php if ($isClubeBlocked): ?>
+                                    <span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>
+                                <?php else: ?>
                                 <span class="h4 text-primary fw-bold mb-0 product-price" 
                                       data-original-price="<?= $precoExibir ?>">
                                     <?= number_format($precoExibir, 2, ',', '.') ?>
@@ -117,6 +121,7 @@
                                           data-original-original-price="<?= $precoBase ?>">
                                         <?= number_format($precoBase, 2, ',', '.') ?>
                                     </small>
+                                <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                             <div class="stock-info">
@@ -135,6 +140,11 @@
                     
                     <div class="card-footer bg-transparent border-top-0">
                         <div class="d-grid gap-2">
+                            <?php if (!empty($isClubeBlocked)): ?>
+                                <a href="/grupo-compras" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-crown me-2"></i>Saiba mais sobre o Clube
+                                </a>
+                            <?php else: ?>
                             <a href="/produto/detalhes/<?= $produto['id'] ?>" 
                                class="btn btn-outline-primary btn-sm">
                                 <i class="fas fa-eye me-2"></i><?= __('products.view_details', 'Ver Detalhes') ?>
@@ -148,6 +158,7 @@
                                 <i class="fas fa-cart-plus me-2"></i>
                                 <?= $produto['stock'] > 0 ? __('products.add_to_cart', 'Adicionar ao Carrinho') : __('products.unavailable', 'Indisponível') ?>
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>

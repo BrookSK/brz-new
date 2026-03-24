@@ -1668,6 +1668,12 @@ class AdminProdutosController extends Controller {
 
     private function salvarCadastroRapidoLoteItem(Request $request, string $reutilizarFoto = ''): array {
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+        // DDL (CREATE TABLE) faz commit implícito no MySQL, então executar ANTES da transação
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Throwable $e) {}
+
         $pdo->beginTransaction();
 
         $cols = $this->getTableColumns($pdo, 'produtos');
@@ -1713,7 +1719,6 @@ class AdminProdutosController extends Controller {
                     $stGN->execute([$grupoId]);
                     $gNome = trim((string) ($stGN->fetchColumn() ?: ''));
                     if ($gNome !== '') {
-                        $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
                         $stFL = $pdo->prepare("SELECT id FROM lojas WHERE LOWER(nome) = LOWER(?) LIMIT 1");
                         $stFL->execute([$gNome]);
                         $autoLojaId = (int) ($stFL->fetchColumn() ?: 0);
@@ -2628,6 +2633,12 @@ HTML;
 
     private function salvarCadastroRapido(Request $request): array {
         $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+        // DDL (CREATE TABLE) faz commit implícito no MySQL, então executar ANTES da transação
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Throwable $e) {}
+
         $pdo->beginTransaction();
 
         $cols = $this->getTableColumns($pdo, 'produtos');
@@ -2673,7 +2684,6 @@ HTML;
                     $stGN2->execute([$grupoId]);
                     $gNome2 = trim((string) ($stGN2->fetchColumn() ?: ''));
                     if ($gNome2 !== '') {
-                        $pdo->exec("CREATE TABLE IF NOT EXISTS lojas (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(120) NOT NULL, slug VARCHAR(120) NOT NULL UNIQUE, ativo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
                         $stFL2 = $pdo->prepare("SELECT id FROM lojas WHERE LOWER(nome) = LOWER(?) LIMIT 1");
                         $stFL2->execute([$gNome2]);
                         $autoLojaId2 = (int) ($stFL2->fetchColumn() ?: 0);
