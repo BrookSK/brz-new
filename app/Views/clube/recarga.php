@@ -1,85 +1,8 @@
 <?php
-$siteLogo = '';
-try {
-    $raw = '';
-    $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
-    foreach ($tablesToTry as $t) {
-        if ($raw !== '') break;
-        try {
-            $pdo = \Config\Database::getConnection();
-            $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
-            $stmtT->execute([$t]);
-            if (!$stmtT->fetchColumn()) {
-                continue;
-            }
-            $stmtCols = $pdo->query('DESCRIBE ' . $t);
-            $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            if (!is_array($cols)) {
-                $cols = [];
-            }
-            if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
-                $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
-                if ($valCol !== '') {
-                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
-                    $stmt->execute(['layout', 'logo']);
-                    $raw = (string) ($stmt->fetchColumn() ?: '');
-                    if ($raw !== '') break;
-                }
-            }
-            $keyCol = '';
-            if (in_array('chave', $cols, true)) $keyCol = 'chave';
-            elseif (in_array('key', $cols, true)) $keyCol = 'key';
-            elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
-            elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
-            $valCol = '';
-            if (in_array('valor', $cols, true)) $valCol = 'valor';
-            elseif (in_array('value', $cols, true)) $valCol = 'value';
-            elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
-            if ($keyCol !== '' && $valCol !== '') {
-                $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
-                $stmt->execute(['layout_logo']);
-                $raw = (string) ($stmt->fetchColumn() ?: '');
-                if ($raw !== '') break;
-            }
-            if (in_array('layout_logo', $cols, true)) {
-                $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
-                $stmt2 = $pdo->query('SELECT layout_logo AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
-                $raw = (string) ($stmt2 ? ($stmt2->fetchColumn() ?: '') : '');
-                if ($raw !== '') break;
-            }
-        } catch (\Exception $e) {
-        }
-    }
-    $siteLogo = is_string($raw) ? trim($raw) : '';
-} catch (\Exception $e) {
-    $siteLogo = '';
-}
+$loggedUser = $logged_user ?? null;
+$isLogged = is_array($loggedUser) && !empty($loggedUser['id']);
+ob_start();
 ?>
-
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recarga do Clube</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f6f8fb; }
-    </style>
-</head>
-<body>
-
-<div class="container" style="padding: 22px 0 0;">
-    <div class="text-center mb-3">
-        <?php if (!empty($siteLogo)): ?>
-            <img src="<?= htmlspecialchars($siteLogo, ENT_QUOTES, 'UTF-8') ?>" alt="Braziliana" style="max-height: 52px; max-width: 100%; object-fit: contain;">
-        <?php else: ?>
-            <div style="font-weight:800; color:#0b1f3a; font-size: 20px;">Braziliana</div>
-        <?php endif; ?>
-    </div>
-</div>
-
 <div class="container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-10">
@@ -92,7 +15,6 @@ try {
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                 <div>
                     <h1 class="h4 mb-1" style="color:#0b1f3a; font-weight: 800;">Recarga do Clube</h1>
-                    <div class="text-muted">Checkout rápido (sem login)</div>
                 </div>
                 <div class="small text-muted">
                     <a href="/como-funciona-clube" class="text-decoration-none">Como funciona o Clube</a>
@@ -105,18 +27,29 @@ try {
                         <div class="card-body p-4">
                             <div class="mb-3">
                                 <label class="form-label">E-mail *</label>
-                                <input type="email" class="form-control" id="qc_email" placeholder="seuemail@exemplo.com" required>
-                                <div class="form-text" id="qc_email_hint"></div>
+                                <input type="email" class="form-control" id="qc_email" placeholder="seuemail@exemplo.com" required
+                                    <?php if ($isLogged && !empty($loggedUser['email'])): ?>
+                                        value="<?= htmlspecialchars((string) $loggedUser['email'], ENT_QUOTES, 'UTF-8') ?>"
+                                    <?php endif; ?>>
+                                <div class="form-text" id="qc_email_hint">
+                                    <?php if ($isLogged): ?>Conta encontrada. A recarga vai cair na sua carteira.<?php endif; ?>
+                                </div>
                             </div>
 
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Nome *</label>
-                                    <input type="text" class="form-control" id="qc_nome" placeholder="Nome" required>
+                                    <input type="text" class="form-control" id="qc_nome" placeholder="Nome" required
+                                        <?php if ($isLogged && !empty($loggedUser['nome'])): ?>
+                                            value="<?= htmlspecialchars((string) $loggedUser['nome'], ENT_QUOTES, 'UTF-8') ?>"
+                                        <?php endif; ?>>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Sobrenome *</label>
-                                    <input type="text" class="form-control" id="qc_sobrenome" placeholder="Sobrenome" required>
+                                    <input type="text" class="form-control" id="qc_sobrenome" placeholder="Sobrenome" required
+                                        <?php if ($isLogged && !empty($loggedUser['sobrenome'])): ?>
+                                            value="<?= htmlspecialchars((string) $loggedUser['sobrenome'], ENT_QUOTES, 'UTF-8') ?>"
+                                        <?php endif; ?>>
                                 </div>
                             </div>
 
@@ -138,7 +71,10 @@ try {
                                             <option value="57">+57</option>
                                             <option value="0">Outro</option>
                                         </select>
-                                        <input type="text" class="form-control" id="qc_telefone_numero" placeholder="Número" required>
+                                        <input type="text" class="form-control" id="qc_telefone_numero" placeholder="Número" required
+                                            <?php if ($isLogged && !empty($loggedUser['telefone'])): ?>
+                                                value="<?= htmlspecialchars((string) $loggedUser['telefone'], ENT_QUOTES, 'UTF-8') ?>"
+                                            <?php endif; ?>>
                                     </div>
                                     <div class="input-group mt-2" id="qc_telefone_ddi_outro_box" style="display:none;">
                                         <span class="input-group-text">DDI</span>
@@ -147,7 +83,10 @@ try {
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Data de nascimento *</label>
-                                    <input type="date" class="form-control" id="qc_data_nascimento" required>
+                                    <input type="date" class="form-control" id="qc_data_nascimento" required
+                                        <?php if ($isLogged && !empty($loggedUser['data_nascimento'])): ?>
+                                            value="<?= htmlspecialchars((string) $loggedUser['data_nascimento'], ENT_QUOTES, 'UTF-8') ?>"
+                                        <?php endif; ?>>
                                 </div>
                             </div>
 
@@ -155,21 +94,25 @@ try {
                                 <div class="col-md-6">
                                     <label class="form-label">País *</label>
                                     <?php require __DIR__ . '/../_countries.php'; ?>
+                                    <?php $userPais = ($isLogged && !empty($loggedUser['pais_residencia'])) ? strtoupper($loggedUser['pais_residencia']) : 'BR'; ?>
                                     <select class="form-select" id="qc_pais" required>
                                         <?php foreach ($countries as $code => $name): ?>
-                                            <option value="<?= htmlspecialchars($code) ?>" <?= strtoupper((string) ($code ?? '')) === 'BR' ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                            <option value="<?= htmlspecialchars($code) ?>" <?= strtoupper((string) ($code ?? '')) === $userPais ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                     <input type="text" class="form-control mt-2" id="qc_pais_search" placeholder="Digite para filtrar países...">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" id="qc_label_documento">CPF/CNPJ *</label>
-                                    <input type="text" class="form-control" id="qc_documento" placeholder="CPF ou CNPJ">
+                                    <input type="text" class="form-control" id="qc_documento" placeholder="CPF ou CNPJ"
+                                        <?php if ($isLogged && !empty($loggedUser['documento'])): ?>
+                                            value="<?= htmlspecialchars((string) $loggedUser['documento'], ENT_QUOTES, 'UTF-8') ?>"
+                                        <?php endif; ?>>
                                     <div class="form-text" id="qc_hint_documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</div>
                                 </div>
                             </div>
 
-                            <div class="mt-3" id="qc_senha_wrap" style="display:none;">
+                            <div class="mt-3" id="qc_senha_wrap" style="display:<?= $isLogged ? 'none' : 'none' ?>;">
                                 <div class="alert alert-info mb-3">Não encontramos uma conta com este e-mail. Crie uma senha para finalizar.</div>
                                 <label class="form-label">Senha *</label>
                                 <input type="password" class="form-control" id="qc_senha" minlength="6" placeholder="Mínimo 6 caracteres">
@@ -262,12 +205,12 @@ try {
     const USD_BRL_RATE = <?= json_encode((float) ($usd_brl_rate ?? 5.5)) ?>;
     const STRIPE_ENABLED = <?= json_encode((bool) ($stripe_enabled ?? false)) ?>;
     const STRIPE_PUBLISHABLE_KEY = <?= json_encode((string) ($stripe_publishable_key ?? '')) ?>;
+    const IS_LOGGED = <?= json_encode($isLogged) ?>;
 
     let metodo = 'pix';
     let stripe = null;
     let elements = null;
     let cardEl = null;
-
     let recargaPollTimer = null;
     let paymentLocked = false;
 
@@ -282,27 +225,16 @@ try {
     }
 
     function startRecargaPolling(recargaId, token){
-        if(recargaPollTimer) {
-            clearInterval(recargaPollTimer);
-            recargaPollTimer = null;
-        }
+        if(recargaPollTimer) { clearInterval(recargaPollTimer); recargaPollTimer = null; }
         if(!recargaId || !token) return;
-
         lockPaymentUi();
-
         const btn = document.getElementById('qc_btn_pagar');
-        if(btn){
-            btn.disabled = true;
-            btn.textContent = 'Aguardando confirmação';
-        }
-
+        if(btn){ btn.disabled = true; btn.textContent = 'Aguardando confirmação'; }
         recargaPollTimer = setInterval(async function(){
             try{
                 const r = await fetch('/clube/recarga/status?recarga_id=' + encodeURIComponent(recargaId) + '&token=' + encodeURIComponent(token));
                 const data = await r.json();
-                if(data && data.success && data.is_paid && data.redirect_url){
-                    window.location.href = data.redirect_url;
-                }
+                if(data && data.success && data.is_paid && data.redirect_url){ window.location.href = data.redirect_url; }
             }catch(e){}
         }, 4000);
     }
@@ -325,9 +257,7 @@ try {
         const sel = document.getElementById('qc_telefone_ddi');
         if(!sel) return '';
         let ddi = (sel.value || '').toString();
-        if(ddi === '0'){
-            ddi = (document.getElementById('qc_telefone_ddi_outro')?.value || '').toString();
-        }
+        if(ddi === '0'){ ddi = (document.getElementById('qc_telefone_ddi_outro')?.value || '').toString(); }
         return ddi.replace(/\D/g,'');
     }
 
@@ -339,8 +269,7 @@ try {
             const o = opts[i];
             const txt = (o.textContent || '').toString().toLowerCase();
             const val = (o.value || '').toString().toLowerCase();
-            const match = (query === '') || (txt.indexOf(query) !== -1) || (val.indexOf(query) !== -1);
-            o.style.display = match ? '' : 'none';
+            o.style.display = (query === '' || txt.indexOf(query) !== -1 || val.indexOf(query) !== -1) ? '' : 'none';
         }
     }
 
@@ -363,7 +292,6 @@ try {
         const y = parts[0], m = parts[1], d = parts[2];
         if(!y || !m || !d) return null;
         const dt = new Date(Date.UTC(y, m - 1, d));
-        // valida se não virou (ex: 2025-02-31)
         if(dt.getUTCFullYear() !== y || (dt.getUTCMonth() + 1) !== m || dt.getUTCDate() !== d) return null;
         return dt;
     }
@@ -372,11 +300,8 @@ try {
         const dt = parseDateYmd(ymd);
         if(!dt) return { ok:false, error:'Data de nascimento inválida' };
         const now = new Date();
-        const year = dt.getUTCFullYear();
-        if(year < 1900) return { ok:false, error:'Data de nascimento inválida' };
-        if(dt.getTime() > now.getTime()) return { ok:false, error:'Data de nascimento inválida' };
-
-        let age = now.getFullYear() - year;
+        if(dt.getUTCFullYear() < 1900 || dt.getTime() > now.getTime()) return { ok:false, error:'Data de nascimento inválida' };
+        let age = now.getFullYear() - dt.getUTCFullYear();
         const m = (now.getMonth() + 1) - (dt.getUTCMonth() + 1);
         if(m < 0 || (m === 0 && now.getDate() < dt.getUTCDate())) age--;
         if(age < 18) return { ok:false, error:'Você precisa ter no mínimo 18 anos' };
@@ -385,37 +310,31 @@ try {
 
     function isValidCpf(cpf){
         cpf = (cpf || '').toString().replace(/\D/g,'');
-        if(cpf.length !== 11) return false;
-        if(/^([0-9])\1{10}$/.test(cpf)) return false;
+        if(cpf.length !== 11 || /^([0-9])\1{10}$/.test(cpf)) return false;
         const nums = cpf.split('').map(n => parseInt(n,10));
         let sum = 0;
         for(let i=0, w=10; i<9; i++, w--) sum += nums[i] * w;
-        let d1 = 11 - (sum % 11);
-        if(d1 >= 10) d1 = 0;
+        let d1 = 11 - (sum % 11); if(d1 >= 10) d1 = 0;
         if(nums[9] !== d1) return false;
         sum = 0;
         for(let i=0, w=11; i<10; i++, w--) sum += nums[i] * w;
-        let d2 = 11 - (sum % 11);
-        if(d2 >= 10) d2 = 0;
+        let d2 = 11 - (sum % 11); if(d2 >= 10) d2 = 0;
         return nums[10] === d2;
     }
 
     function isValidCnpj(cnpj){
         cnpj = (cnpj || '').toString().replace(/\D/g,'');
-        if(cnpj.length !== 14) return false;
-        if(/^([0-9])\1{13}$/.test(cnpj)) return false;
+        if(cnpj.length !== 14 || /^([0-9])\1{13}$/.test(cnpj)) return false;
         const nums = cnpj.split('').map(n => parseInt(n,10));
         const w1 = [5,4,3,2,9,8,7,6,5,4,3,2];
         let sum = 0;
         for(let i=0;i<12;i++) sum += nums[i] * w1[i];
-        let r = sum % 11;
-        let d1 = (r < 2) ? 0 : (11 - r);
+        let r = sum % 11; let d1 = (r < 2) ? 0 : (11 - r);
         if(nums[12] !== d1) return false;
         const w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
         sum = 0;
         for(let i=0;i<13;i++) sum += nums[i] * w2[i];
-        r = sum % 11;
-        let d2 = (r < 2) ? 0 : (11 - r);
+        r = sum % 11; let d2 = (r < 2) ? 0 : (11 - r);
         return nums[13] === d2;
     }
 
@@ -444,13 +363,12 @@ try {
         const inputEl = document.getElementById('qc_valor_usd');
         if(!inputEl) return;
         let v = parseFloat((inputEl.value || '0').toString().replace(',','.')) || 0;
-        if(v + 0.00001 < MIN_USD){
-            inputEl.value = MIN_USD.toFixed(2);
-        }
+        if(v + 0.00001 < MIN_USD){ inputEl.value = MIN_USD.toFixed(2); }
         updateEquiv();
     }
 
     async function emailCheck(){
+        if(IS_LOGGED) return; // Usuário logado já tem dados preenchidos
         const email = (document.getElementById('qc_email')?.value || '').toString().trim();
         if(!email) return;
         try{
@@ -461,20 +379,15 @@ try {
                 document.getElementById('qc_senha_wrap').style.display = 'none';
                 return;
             }
-
             const has = !!data.has_internal_account;
             document.getElementById('qc_email_hint').textContent = has ? 'Conta encontrada. A recarga vai cair na sua carteira.' : 'Nenhuma conta encontrada. Você vai criar uma conta agora.';
             document.getElementById('qc_senha_wrap').style.display = has ? 'none' : '';
 
-            // Prefill quando vier do WP
             const prof = data.wp_profile || {};
             if(prof.first_name && !document.getElementById('qc_nome').value) document.getElementById('qc_nome').value = prof.first_name;
             if(prof.last_name && !document.getElementById('qc_sobrenome').value) document.getElementById('qc_sobrenome').value = prof.last_name;
             if(prof.birth_date && !document.getElementById('qc_data_nascimento').value){
-                // aceita YYYY-MM-DD
-                if(/^\d{4}-\d{2}-\d{2}$/.test(prof.birth_date)){
-                    document.getElementById('qc_data_nascimento').value = prof.birth_date;
-                }
+                if(/^\d{4}-\d{2}-\d{2}$/.test(prof.birth_date)) document.getElementById('qc_data_nascimento').value = prof.birth_date;
             }
             if(prof.country){
                 const c = (prof.country || '').toString().toUpperCase();
@@ -483,35 +396,23 @@ try {
             }
             if(prof.cpf && !document.getElementById('qc_documento').value) document.getElementById('qc_documento').value = prof.cpf;
             syncDocumentoRules();
-        }catch(e){
-        }
+        }catch(e){}
     }
 
     function setMetodo(next){
-        if(paymentLocked) {
-            return;
-        }
+        if(paymentLocked) return;
         metodo = next;
         document.getElementById('qc_metodo_pix').className = (metodo==='pix') ? 'btn btn-primary' : 'btn btn-outline-primary';
         document.getElementById('qc_metodo_card').className = (metodo==='card') ? 'btn btn-primary' : 'btn btn-outline-secondary';
         document.getElementById('qc_pix_box').style.display = (metodo==='pix') ? '' : 'none';
         document.getElementById('qc_card_box').style.display = (metodo==='card') ? '' : 'none';
-
-        if(metodo==='card'){
-            ensureStripe();
-        }
+        if(metodo==='card') ensureStripe();
     }
 
     function ensureStripe(){
         if(stripe) return true;
-        if(!STRIPE_ENABLED || !STRIPE_PUBLISHABLE_KEY) {
-            setError('Stripe não configurado.');
-            return false;
-        }
-        if(typeof Stripe !== 'function') {
-            setError('Falha ao carregar Stripe.');
-            return false;
-        }
+        if(!STRIPE_ENABLED || !STRIPE_PUBLISHABLE_KEY){ setError('Stripe não configurado.'); return false; }
+        if(typeof Stripe !== 'function'){ setError('Falha ao carregar Stripe.'); return false; }
         stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
         elements = stripe.elements();
         cardEl = elements.create('card', { hidePostalCode: true });
@@ -521,7 +422,6 @@ try {
 
     async function pagar(){
         setError('');
-
         const email = (document.getElementById('qc_email')?.value || '').toString().trim();
         const nome = (document.getElementById('qc_nome')?.value || '').toString().trim();
         const sobrenome = (document.getElementById('qc_sobrenome')?.value || '').toString().trim();
@@ -534,12 +434,7 @@ try {
         const aceitou_termos = !!document.getElementById('qc_termos')?.checked;
 
         let valor = parseFloat((document.getElementById('qc_valor_usd')?.value || '0').toString().replace(',','.')) || 0;
-        if(valor + 0.00001 < MIN_USD){
-            clampValorMinimo();
-            setError('O valor mínimo é $' + MIN_USD.toFixed(2));
-            return;
-        }
-
+        if(valor + 0.00001 < MIN_USD){ clampValorMinimo(); setError('O valor mínimo é $' + MIN_USD.toFixed(2)); return; }
         if(!email){ setError('Informe o e-mail'); return; }
         if(!nome || !sobrenome){ setError('Informe nome e sobrenome'); return; }
         if(!telefone_numero){ setError('Informe o telefone'); return; }
@@ -552,91 +447,42 @@ try {
             if(!docDigits || docDigits.length < 11){ setError('CPF/CNPJ é obrigatório para Brasil'); return; }
             if(!validateCpfCnpj(docDigits)){ setError('CPF/CNPJ inválido'); return; }
         }
+        if(metodo==='card'){ if(!ensureStripe()) return; }
 
-        if(metodo==='card'){
-            if(!ensureStripe()) return;
-        }
-
-        const payload = {
-            email,
-            nome,
-            sobrenome,
-            telefone_ddi,
-            telefone_numero,
-            data_nascimento,
-            pais,
-            documento,
-            senha,
-            aceitou_termos,
-            metodo,
-            valor_usd: valor,
-            usd_brl_rate: USD_BRL_RATE
-        };
-
-        const r = await fetch('/clube/recarga/criar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const payload = { email, nome, sobrenome, telefone_ddi, telefone_numero, data_nascimento, pais, documento, senha, aceitou_termos, metodo, valor_usd: valor, usd_brl_rate: USD_BRL_RATE };
+        const r = await fetch('/clube/recarga/criar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const data = await r.json();
-        if(!data || !data.success){
-            setError(data && (data.error || data.message) ? (data.error || data.message) : 'Falha ao iniciar pagamento');
-            return;
-        }
+        if(!data || !data.success){ setError(data && (data.error || data.message) ? (data.error || data.message) : 'Falha ao iniciar pagamento'); return; }
 
         if(metodo==='pix'){
             const pix = data.pix || {};
-            document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Faça o Pix para concluir.';
+            document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Após você pagar o Pix, esta página vai confirmar automaticamente e abrir o comprovante.';
             document.getElementById('qc_pix_qr').style.display = '';
             const imgUrl = (pix.image_url_png || pix.image_url_svg || '').toString();
             const imgWrap = document.getElementById('qc_pix_img_wrap');
             const imgEl = document.getElementById('qc_pix_img');
             if(imgWrap && imgEl){
-                if(imgUrl){
-                    imgEl.src = imgUrl;
-                    imgWrap.style.display = '';
-                } else {
-                    imgEl.removeAttribute('src');
-                    imgWrap.style.display = 'none';
-                }
+                if(imgUrl){ imgEl.src = imgUrl; imgWrap.style.display = ''; }
+                else { imgEl.removeAttribute('src'); imgWrap.style.display = 'none'; }
             }
             document.getElementById('qc_pix_copypaste').value = (pix.copy_paste || '').toString();
-
-            document.getElementById('qc_pix_status').textContent = 'Pagamento gerado. Após você pagar o Pix, esta página vai confirmar automaticamente e abrir o comprovante.';
             startRecargaPolling(data.recarga_id, data.public_token);
             return;
         }
 
-        // Cartão: confirmar no frontend
+        // Cartão
         const cs = (data.client_secret || '').toString();
-        if(!cs){
-            setError('Stripe: client_secret ausente');
-            return;
-        }
-
+        if(!cs){ setError('Stripe: client_secret ausente'); return; }
         const confirmRes = await stripe.confirmCardPayment(cs, {
-            payment_method: { 
-                card: cardEl,
-                billing_details: {
-                    name: (nome + ' ' + sobrenome).trim(),
-                    email: email
-                }
-            }
+            payment_method: { card: cardEl, billing_details: { name: (nome + ' ' + sobrenome).trim(), email: email } }
         });
         if(confirmRes.error){
             const errEl = document.getElementById('qc_stripe_errors');
-            if(errEl){
-                errEl.textContent = confirmRes.error.message || 'Pagamento não autorizado';
-                errEl.style.display = '';
-            }
+            if(errEl){ errEl.textContent = confirmRes.error.message || 'Pagamento não autorizado'; errEl.style.display = ''; }
             return;
         }
-
-        // Sucesso: o webhook credita automaticamente
         const okMsg = document.getElementById('qc_pix_status');
-        if(okMsg){
-            okMsg.textContent = 'Pagamento aprovado no cartão. Estamos confirmando e vamos abrir o comprovante automaticamente.';
-        }
+        if(okMsg) okMsg.textContent = 'Pagamento aprovado no cartão. Estamos confirmando e vamos abrir o comprovante automaticamente.';
         startRecargaPolling(data.recarga_id, data.public_token);
     }
 
@@ -644,10 +490,7 @@ try {
         const CAP_REACHED = <?= json_encode(!empty($clube_cap_reached)) ?>;
         if(CAP_REACHED){
             const btn = document.getElementById('qc_btn_pagar');
-            if(btn){
-                btn.disabled = true;
-                btn.textContent = 'Recargas suspensas';
-            }
+            if(btn){ btn.disabled = true; btn.textContent = 'Recargas suspensas'; }
         }
         updateEquiv();
         setMetodo('pix');
@@ -661,13 +504,11 @@ try {
         document.getElementById('qc_email')?.addEventListener('blur', emailCheck);
         document.getElementById('qc_metodo_pix')?.addEventListener('click', function(){ setMetodo('pix'); });
         document.getElementById('qc_btn_pagar')?.addEventListener('click', pagar);
-
         document.getElementById('qc_pais_search')?.addEventListener('input', function(e){
             filterSelectOptions(document.getElementById('qc_pais'), e.target.value);
         });
     });
 })();
 </script>
-
-</body>
-</html>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>

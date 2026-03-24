@@ -333,6 +333,66 @@ class ClubeRecargaController extends Controller {
         }
 
         $capUsdEquiv = $rate > 0 ? ($capBrl / $rate) : 0.0;
+
+        // Detectar usuário logado e puxar dados
+        $loggedUser = null;
+        try {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $isLogged = !empty($_SESSION['logado']) && !empty($_SESSION['usuario_id']);
+            if ($isLogged) {
+                $uid = (int) $_SESSION['usuario_id'];
+                $db = \Config\Database::getConnection();
+
+                $stmtU = $db->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                $stmtU->execute([$uid]);
+                $uRow = $stmtU->fetch(\PDO::FETCH_ASSOC);
+
+                if (is_array($uRow) && !empty($uRow['id'])) {
+                    $nome = '';
+                    $sobrenome = '';
+                    $nomeCompleto = trim((string) ($uRow['nome'] ?? $uRow['name'] ?? ''));
+                    if ($nomeCompleto !== '') {
+                        $parts = explode(' ', $nomeCompleto, 2);
+                        $nome = $parts[0] ?? '';
+                        $sobrenome = $parts[1] ?? '';
+                    }
+
+                    $email = trim((string) ($uRow['email'] ?? ''));
+                    $telefone = trim((string) ($uRow['telefone'] ?? $uRow['phone'] ?? ''));
+                    $documento = trim((string) ($uRow['documento'] ?? $uRow['cpf'] ?? ''));
+                    $dataNascimento = trim((string) ($uRow['data_nascimento'] ?? ''));
+                    $paisResidencia = strtoupper(trim((string) ($uRow['pais_residencia'] ?? '')));
+
+                    // Tentar pegar país do endereço principal se não tiver no perfil
+                    if ($paisResidencia === '') {
+                        try {
+                            $stmtEnd = $db->prepare('SELECT pais FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1');
+                            $stmtEnd->execute([$uid]);
+                            $pEnd = $stmtEnd->fetchColumn();
+                            if ($pEnd) {
+                                $paisResidencia = strtoupper(trim((string) $pEnd));
+                            }
+                        } catch (\Exception $e) {}
+                    }
+
+                    $loggedUser = [
+                        'id' => (int) $uRow['id'],
+                        'nome' => $nome,
+                        'sobrenome' => $sobrenome,
+                        'email' => $email,
+                        'telefone' => $telefone,
+                        'documento' => $documento,
+                        'data_nascimento' => $dataNascimento,
+                        'pais_residencia' => $paisResidencia !== '' ? $paisResidencia : 'BR',
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            $loggedUser = null;
+        }
+
         $this->view('clube/recarga', [
             'min_usd' => 39.0,
             'usd_brl_rate' => $rate,
@@ -342,6 +402,7 @@ class ClubeRecargaController extends Controller {
             'clube_cap_usd_equiv' => $capUsdEquiv,
             'clube_total_pago_brl' => $totalPagoBrl,
             'clube_cap_reached' => $capReached,
+            'logged_user' => $loggedUser,
         ]);
     }
 

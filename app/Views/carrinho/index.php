@@ -318,14 +318,12 @@
                         <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
                     </div>
                     
+                    <?php if (empty($entrega_fora_br)): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('cart.taxes_brazil', 'Impostos do Brasil') ?></span>
-                        <?php if (!empty($entrega_fora_br)): ?>
-                            <span class="text-muted">Isento</span>
-                        <?php else: ?>
-                            <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
-                        <?php endif; ?>
+                        <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
+                    <?php endif; ?>
 
                     <?php if (($imposto_local ?? 0) > 0): ?>
                     <div class="d-flex justify-content-between mb-2">
