@@ -3735,11 +3735,19 @@ HTML;
 
             input.addEventListener('input', function() {
                 const q = (input.value || '').toLowerCase().trim();
+                let firstVisible = null;
                 Array.from(select.options).forEach((opt) => {
-                    if (opt.value === '') return;
+                    if (opt.value === '') { opt.hidden = q !== ''; return; }
                     const text = (opt.text || '').toLowerCase();
-                    opt.hidden = q !== '' && !text.includes(q);
+                    const visible = q === '' || text.includes(q);
+                    opt.hidden = !visible;
+                    if (visible && !firstVisible) firstVisible = opt;
                 });
+                if (q !== '' && firstVisible) {
+                    select.value = firstVisible.value;
+                } else if (q === '') {
+                    select.value = '';
+                }
             });
         })();
 
@@ -3751,11 +3759,19 @@ HTML;
 
             input.addEventListener('input', function() {
                 const q = (input.value || '').toLowerCase().trim();
+                let firstVisible = null;
                 Array.from(select.options).forEach((opt) => {
-                    if (opt.value === '') return;
+                    if (opt.value === '') { opt.hidden = q !== ''; return; }
                     const text = (opt.text || '').toLowerCase();
-                    opt.hidden = q !== '' && !text.includes(q);
+                    const visible = q === '' || text.includes(q);
+                    opt.hidden = !visible;
+                    if (visible && !firstVisible) firstVisible = opt;
                 });
+                if (q !== '' && firstVisible) {
+                    select.value = firstVisible.value;
+                } else if (q === '') {
+                    select.value = '';
+                }
             });
         })();
     </script>
@@ -4507,11 +4523,19 @@ HTML;
 
             input.addEventListener("input", function() {
                 const q = (input.value || "").toLowerCase().trim();
+                let firstVisible = null;
                 Array.from(select.options).forEach((opt) => {
-                    if (opt.value === "") return;
+                    if (opt.value === "") { opt.hidden = q !== ""; return; }
                     const text = (opt.text || "").toLowerCase();
-                    opt.hidden = q !== "" && !text.includes(q);
+                    const visible = q === "" || text.includes(q);
+                    opt.hidden = !visible;
+                    if (visible && !firstVisible) firstVisible = opt;
                 });
+                if (q !== "" && firstVisible) {
+                    select.value = firstVisible.value;
+                } else if (q === "") {
+                    select.value = "";
+                }
             });
         })();
 
@@ -4523,11 +4547,19 @@ HTML;
 
             input.addEventListener("input", function() {
                 const q = (input.value || "").toLowerCase().trim();
+                let firstVisible = null;
                 Array.from(select.options).forEach((opt) => {
-                    if (opt.value === "") return;
+                    if (opt.value === "") { opt.hidden = q !== ""; return; }
                     const text = (opt.text || "").toLowerCase();
-                    opt.hidden = q !== "" && !text.includes(q);
+                    const visible = q === "" || text.includes(q);
+                    opt.hidden = !visible;
+                    if (visible && !firstVisible) firstVisible = opt;
                 });
+                if (q !== "" && firstVisible) {
+                    select.value = firstVisible.value;
+                } else if (q === "") {
+                    select.value = "";
+                }
             });
         })();
 

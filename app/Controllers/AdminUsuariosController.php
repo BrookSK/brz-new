@@ -17,8 +17,9 @@ class AdminUsuariosController extends Controller {
             $limite = 12;
             $offset = ($pagina - 1) * $limite;
             $busca = $request->getParam('busca', '');
+            $ordem = $request->getParam('ordem', '');
             
-            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset);
+            $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset, $ordem);
             $total = $helper->getTotalUsuarios($busca);
             $totalPaginas = ceil($total / $limite);
             $stats = $helper->getStatsUsuarios();
@@ -81,8 +82,15 @@ class AdminUsuariosController extends Controller {
         echo \App\Controllers\AdminUsuariosViews::renderStatsCards($stats);
                 
         echo '<form method="GET" class="row g-3 mb-4">
-                    <div class="col-md-8">
+                    <div class="col-md-5">
                         <input type="text" class="form-control" name="busca" placeholder="Buscar usuário por nome, email ou CPF..." value="' . htmlspecialchars($busca) . '">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" name="ordem" onchange="this.form.submit()">
+                            <option value="">Mais recentes</option>
+                            <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>Carteira: maior → menor</option>
+                            <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>Carteira: menor → maior</option>
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <button type="submit" class="btn btn-outline-primary me-2">
@@ -115,8 +123,11 @@ class AdminUsuariosController extends Controller {
                     $paginaAtual = (int) $pagina;
                     if ($paginaAtual < 1) $paginaAtual = 1;
                     if ($paginaAtual > (int) $totalPaginas) $paginaAtual = (int) $totalPaginas;
-                    $mkUrl = function(int $p) use ($busca): string {
-                        return "/admin/usuarios?pagina={$p}" . (!empty($busca) ? "&busca=" . urlencode($busca) : "");
+                    $mkUrl = function(int $p) use ($busca, $ordem): string {
+                        $url = "/admin/usuarios?pagina={$p}";
+                        if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
+                        if (!empty($ordem)) $url .= "&ordem=" . urlencode($ordem);
+                        return $url;
                     };
 
                     $start = max(1, $paginaAtual - 1);
@@ -678,7 +689,7 @@ class AdminUsuariosController extends Controller {
                                                 <td>#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td>
                                                 <td><span class="badge bg-' . ($pedido['status'] == 'pago' ? 'success' : 'warning') . '">' . ucfirst($pedido['status']) . '</span></td>
-                                                <td>R$ ' . number_format($pedido['valor_total'], 2, ',', '.') . '</td>
+                                                <td>R$ ' . number_format((float) ($pedido['valor_total'] ?? $pedido['total'] ?? 0), 2, ',', '.') . '</td>
                                                 <td>
                                                     <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                         <i class="fas fa-eye"></i>

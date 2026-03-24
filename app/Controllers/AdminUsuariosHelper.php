@@ -55,7 +55,7 @@ class AdminUsuariosHelper {
         return substr($text, 0, 120);
     }
     
-    public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0) {
+    public function getUsuariosComCarteira($busca = '', $limite = 12, $offset = 0, $ordem = '') {
         $colunasUsuarios = $this->getColunasUsuarios();
         $buscaCols = ['u.nome', 'u.email'];
         if (is_array($colunasUsuarios) && in_array('cpf', $colunasUsuarios, true)) {
@@ -81,8 +81,16 @@ class AdminUsuariosHelper {
             $sql .= " AND (" . implode(' OR ', $conds) . ")";
             $params[':busca'] = "%{$busca}%";
         }
-        
-        $sql .= " ORDER BY u.created_at DESC LIMIT :limite OFFSET :offset";
+
+        if ($ordem === 'carteira_desc') {
+            $sql .= " ORDER BY (COALESCE(w.saldo_usd, 0) + COALESCE(w.saldo_brl, 0)) DESC";
+        } elseif ($ordem === 'carteira_asc') {
+            $sql .= " ORDER BY (COALESCE(w.saldo_usd, 0) + COALESCE(w.saldo_brl, 0)) ASC";
+        } else {
+            $sql .= " ORDER BY u.created_at DESC";
+        }
+
+        $sql .= " LIMIT :limite OFFSET :offset";
         
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $key => $value) $stmt->bindValue($key, $value);
