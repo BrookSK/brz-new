@@ -58,6 +58,7 @@ $router->post('/admin/pedidos/importar/processar', 'AdminPedidosController', 'im
 // Pedidos do WordPress (somente leitura)
 $router->get('/admin/pedidos-wp', 'AdminPedidosWpController', 'index');
 $router->get('/admin/pedidos-wp/detalhes/{id}', 'AdminPedidosWpController', 'detalhes');
+$router->get('/admin/pedidos-wp/estatisticas', 'AdminPedidosWpController', 'estatisticas');
 $router->get('/admin/pedidos-wp/export', 'AdminPedidosWpController', 'exportCsv');
 $router->get('/admin/pedidos-wp/export-xlsx', 'AdminPedidosWpController', 'exportXlsx');
  $router->post('/admin/pedidos-wp/wexpress/gerar/{id}', 'AdminPedidosWpController', 'gerarEtiquetaWexpress');
