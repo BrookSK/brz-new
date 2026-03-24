@@ -805,16 +805,16 @@
                             <?php endif; ?>
 
                             <?php if (!empty($entrega_fora_br) && !empty($mensagem_entrega_fora_br)): ?>
-                                <div class="alert alert-warning small">
+                                <div class="alert alert-warning small" id="entrega-fora-br-alert">
                                     <i class="fas fa-exclamation-triangle"></i>
                                     <?= htmlspecialchars((string) $mensagem_entrega_fora_br, ENT_QUOTES, 'UTF-8') ?>
                                 </div>
+                            <?php else: ?>
+                                <div class="alert alert-warning small d-none" id="entrega-fora-br-alert">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <?= __('checkout.delivery_outside_br_no_taxes', 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.') ?>
+                                </div>
                             <?php endif; ?>
-
-                            <div class="alert alert-warning small d-none" id="entrega-fora-br-alert">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <?= __('checkout.delivery_outside_br_no_taxes', 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.') ?>
-                            </div>
 
                             <!-- Termos Legais -->
                             <div class="mb-3">

@@ -471,27 +471,55 @@ class CarrinhoController extends Controller {
         if ($uid > 0) {
             try {
                 $dbPais = \Config\Database::getConnection();
-                // Verificar endereço de entrega principal e pais_residencia
-                $paisUsuario = '';
-                $stPais = $dbPais->prepare('SELECT pais_residencia, pais FROM usuarios WHERE id = ? LIMIT 1');
-                $stPais->execute([$uid]);
-                $rowPais = $stPais->fetch(\PDO::FETCH_ASSOC) ?: [];
-                $paisUsuario = strtoupper(trim((string) ($rowPais['pais_residencia'] ?? ($rowPais['pais'] ?? ''))));
 
-                // Verificar também endereço de entrega cadastrado
-                if ($paisUsuario === '' || $paisUsuario === 'BR') {
-                    try {
-                        $stEnd = $dbPais->prepare("SELECT pais FROM enderecos WHERE usuario_id = ? AND tipo = 'entrega' ORDER BY id DESC LIMIT 1");
-                        $stEnd->execute([$uid]);
-                        $paisEntrega = strtoupper(trim((string) ($stEnd->fetchColumn() ?: '')));
-                        if ($paisEntrega !== '' && $paisEntrega !== 'BR') {
-                            $entregaForaBR = true;
-                        }
-                    } catch (\Throwable $e) {}
+                // Descobrir colunas disponíveis na tabela usuarios
+                $uCols = [];
+                try {
+                    $stUCols = $dbPais->query('DESCRIBE usuarios');
+                    $uCols = $stUCols ? ($stUCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Throwable $e) { $uCols = []; }
+
+                $paisUsuario = '';
+                $selectCols = [];
+                if (in_array('pais_residencia', $uCols, true)) $selectCols[] = 'pais_residencia';
+                if (in_array('pais', $uCols, true)) $selectCols[] = 'pais';
+                if (!empty($selectCols)) {
+                    $stPais = $dbPais->prepare('SELECT ' . implode(',', $selectCols) . ' FROM usuarios WHERE id = ? LIMIT 1');
+                    $stPais->execute([$uid]);
+                    $rowPais = $stPais->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $paisUsuario = strtoupper(trim((string) ($rowPais['pais_residencia'] ?? ($rowPais['pais'] ?? ''))));
                 }
 
                 if ($paisUsuario !== '' && $paisUsuario !== 'BR') {
                     $entregaForaBR = true;
+                }
+
+                // Se pais_residencia é BR ou vazio, verificar endereços cadastrados
+                if (!$entregaForaBR) {
+                    try {
+                        // Verificar se tabela enderecos existe e tem coluna pais
+                        $endCols = [];
+                        try {
+                            $stEC = $dbPais->query('DESCRIBE enderecos');
+                            $endCols = $stEC ? ($stEC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        } catch (\Throwable $e) { $endCols = []; }
+
+                        if (in_array('pais', $endCols, true)) {
+                            // Buscar qualquer endereço do usuário que não seja BR
+                            $hasTipo = in_array('tipo', $endCols, true);
+                            $sql = 'SELECT pais FROM enderecos WHERE usuario_id = ? AND pais IS NOT NULL AND pais != \'\' ORDER BY id DESC LIMIT 5';
+                            $stEnd = $dbPais->prepare($sql);
+                            $stEnd->execute([$uid]);
+                            $enderecos = $stEnd->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                            foreach ($enderecos as $pe) {
+                                $pe = strtoupper(trim((string) $pe));
+                                if ($pe !== '' && $pe !== 'BR' && $pe !== 'BRASIL' && $pe !== 'BRAZIL') {
+                                    $entregaForaBR = true;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 }
             } catch (\Throwable $e) {}
         }
