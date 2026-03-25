@@ -437,7 +437,7 @@ class AdminPedidosEditController extends Controller {
                         <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
                         </a>
-                        <button type="button" class="btn btn-success" onclick="salvarPedido()" ' . (!$canEditItens ? 'disabled' : '') . '>
+                        <button type="button" class="btn btn-success" onclick="salvarPedido()">
                             <i class="fas fa-save me-1"></i>Salvar
                         </button>
                     </div>
@@ -773,7 +773,6 @@ class AdminPedidosEditController extends Controller {
             };
 
             window.salvarPedido = function(){
-                if (!canEditItens) return;
                 const itens = [];
                 document.querySelectorAll(".item-row").forEach(function(row){
                     const item = {
