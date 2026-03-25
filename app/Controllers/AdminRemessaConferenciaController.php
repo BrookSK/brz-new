@@ -988,14 +988,8 @@ th{background:#f5f5f5}
                 } else {
                     $fotoUrl = $foto;
                 }
-                // Buscar imagem via HTTP e embutir como base64
-                $ctx = stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true], 'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
-                $raw = @file_get_contents($fotoUrl, false, $ctx);
-                if ($raw !== false && strlen($raw) > 100) {
-                    $ext = strtolower(pathinfo($foto, PATHINFO_EXTENSION));
-                    $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', default => 'image/jpeg' };
-                    $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
-                }
+                // DEBUG TEMPORÁRIO
+                $imgTag = '<span style="font-size:9px;color:red">foto_produto=[' . htmlspecialchars($foto) . '] docroot=[' . htmlspecialchars($_SERVER['DOCUMENT_ROOT'] ?? '') . '] file=[' . htmlspecialchars($_SERVER['DOCUMENT_ROOT'] . $foto) . '] exists=[' . (@file_exists($_SERVER['DOCUMENT_ROOT'] . $foto) ? 'SIM' : 'NAO') . ']</span>';
             }
             echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
             $idx++;
