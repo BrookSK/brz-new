@@ -269,9 +269,6 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         $idCorreios = trim((string) ($cfg['prepostagem_id_correios'] ?? ''));
-        if ($idCorreios === '') {
-            throw new \Exception('Pré-Postagem: informe o idCorreios nas configurações');
-        }
 
         $items = [];
         if (isset($pedido['items']) && is_array($pedido['items'])) {
@@ -378,7 +375,6 @@ class AdminRemessaCorreiosController extends Controller {
         $formato = '2';
 
         $payload = [
-            'idCorreios' => $idCorreios,
             'remetente' => $sender,
             'destinatario' => $destinatario,
             'codigoServico' => $codigoServico,
@@ -392,6 +388,11 @@ class AdminRemessaCorreiosController extends Controller {
             'solicitarColeta' => 'N',
             'observacao' => 'Pedido #' . (int) ($pedido['id'] ?? 0),
         ];
+
+        // idCorreios é opcional — só inclui se preenchido
+        if ($idCorreios !== '') {
+            $payload['idCorreios'] = $idCorreios;
+        }
 
         if (isset($payload['canalExternoOrigem'])) {
             unset($payload['canalExternoOrigem']);
