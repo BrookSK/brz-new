@@ -506,10 +506,10 @@ class AdminRemessaConferenciaController extends Controller {
             echo '<span class="badge bg-success fs-6 px-3 py-2"><i class="fas fa-check-circle me-1"></i>Recebimento Confirmado' . ($dtRec !== '' ? ' em ' . $dtRec : '') . '</span>';
         } else {
             echo '<button class="btn btn-success" id="btnConfirmarRecebimento" onclick="confirmarRecebimento()"
-                title="Confirmar que o pacote foi recebido fisicamente no armazém. Isso marca o pedido como recebido no sistema e notifica a equipe.">
-                Confirmar Recebimento
+                title="Confirmar que o pedido chegou no Brasil. Muda o status para Aguardando Liberação Aduaneira.">
+                Confirmar Recebimento no Brasil
             </button>
-            <small class="text-muted d-block" style="font-size:0.7rem;max-width:180px">Confirma recebimento físico no armazém</small>';
+            <small class="text-muted d-block" style="font-size:0.7rem;max-width:200px">Pedido chegou no BR → muda para Aguardando Liberação Aduaneira</small>';
         }
 
         echo '<a class="btn btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>';
@@ -797,7 +797,7 @@ function uploadDoc(tipo) {
     }).catch(() => alert("Erro ao enviar"));
 }
 function confirmarRecebimento() {
-    if (!confirm("Confirmar que o pacote foi recebido fisicamente no armazém?")) return;
+    if (!confirm("Confirmar que o pedido chegou no Brasil? O status será alterado para Aguardando Liberação Aduaneira.")) return;
     const btn = document.getElementById("btnConfirmarRecebimento");
     if (btn) { btn.disabled = true; btn.textContent = "Confirmando..."; }
     fetch("/admin/remessa-conferencia/janela/" + jid + "/pedido/" + pid + "/confirmar-recebimento", {
@@ -817,8 +817,14 @@ function confirmarRecebimento() {
         $jid = (int)$janelaId; $pid = (int)$pedidoId;
         try {
             $this->ensureDocumentosTable();
+            // Marcar recebimento na janela
             $st = $this->connection->prepare("UPDATE remessa_janela_pedidos SET recebido_confirmado = 1, recebido_confirmado_em = NOW() WHERE janela_id = ? AND pedido_id = ?");
             $st->execute([$jid, $pid]);
+            // Mudar status do pedido para aguardando_liberacao_aduaneira
+            try {
+                $stP = $this->connection->prepare("UPDATE pedidos SET status = 'aguardando_liberacao_aduaneira', updated_at = NOW() WHERE id = ?");
+                $stP->execute([$pid]);
+            } catch (\Exception $e) {}
             echo json_encode(['success' => true]);
         } catch (\Exception $e) { echo json_encode(['success' => false, 'error' => $e->getMessage()]); }
         exit;
