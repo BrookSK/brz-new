@@ -980,24 +980,35 @@ th{background:#f5f5f5}
             $foto = trim((string)($it['foto_produto'] ?? ''));
             $imgTag = '-';
             if ($foto !== '') {
-                if (!str_starts_with($foto, 'http')) {
-                    $foto = '/' . ltrim($foto, '/');
-                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                    $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost');
-                    $foto = $scheme . '://' . $host . $foto;
+                // Normalizar para caminho relativo
+                $fotoPath = $foto;
+                if (str_starts_with($fotoPath, 'http')) {
+                    // Extrair só o path da URL
+                    $parsed = parse_url($fotoPath);
+                    $fotoPath = $parsed['path'] ?? $fotoPath;
                 }
-                // Tentar embutir como base64 para funcionar no PDF e no HTML baixado
+                $fotoPath = '/' . ltrim($fotoPath, '/');
+
+                // Tentar encontrar o arquivo em múltiplos caminhos base
                 $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
-                $localPath = $docRoot . parse_url($foto, PHP_URL_PATH);
-                if ($docRoot !== '' && @file_exists($localPath)) {
-                    $raw = @file_get_contents($localPath);
-                    if ($raw !== false && $raw !== '') {
-                        $ext = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
-                        $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', default => 'image/jpeg' };
-                        $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
+                $scriptDir = dirname(dirname(dirname(__FILE__))); // raiz do projeto
+                $candidates = [
+                    $docRoot . $fotoPath,
+                    $scriptDir . '/public' . $fotoPath,
+                    $scriptDir . $fotoPath,
+                ];
+                $raw = false;
+                foreach ($candidates as $candidate) {
+                    $candidate = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $candidate);
+                    if (@file_exists($candidate)) {
+                        $raw = @file_get_contents($candidate);
+                        if ($raw !== false && $raw !== '') break;
                     }
-                } else {
-                    $imgTag = '<img src="' . $h($foto) . '" style="width:40px;height:40px;object-fit:cover">';
+                }
+                if ($raw !== false && $raw !== '') {
+                    $ext = strtolower(pathinfo($fotoPath, PATHINFO_EXTENSION));
+                    $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', default => 'image/jpeg' };
+                    $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
                 }
             }
             echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
