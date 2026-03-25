@@ -533,6 +533,8 @@ $router->post('/admin/remessa-internacional/janela/{id}/fechar', 'AdminRemessaIn
 $router->get('/admin/remessa-conferencia', 'AdminRemessaConferenciaController', 'index');
 $router->get('/admin/remessa-conferencia/janela/{id}', 'AdminRemessaConferenciaController', 'verJanela');
 $router->get('/admin/remessa-conferencia/janela/{janelaId}/pedido/{pedidoId}', 'AdminRemessaConferenciaController', 'detalhesPedido');
+$router->post('/admin/remessa-conferencia/janela/{janelaId}/pedido/{pedidoId}/medicamento', 'AdminRemessaConferenciaController', 'salvarMedicamento');
+$router->post('/admin/remessa-conferencia/janela/{janelaId}/pedido/{pedidoId}/documento/{tipo}', 'AdminRemessaConferenciaController', 'uploadDocumento');
 
 // Rotas de Remessa WP
 $router->get('/admin/remessa-wp', 'AdminRemessaWpController', 'index');
