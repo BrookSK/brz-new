@@ -3204,8 +3204,8 @@ HTML;
                                             }
                                             echo '</td>
                                                 <td>' . $item['quantidade'] . '</td>
-                                                <td>' . $this->formatarMoeda($item['preco_unitario'], $pedido['moeda']) . '</td>
-                                                <td>' . $this->formatarMoeda($item['subtotal'], $pedido['moeda']) . '</td>
+                                                <td>US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ',') . '</td>
+                                                <td>US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ',') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
                                                 <td>' . $acoesHtml . '</td>
                                             </tr>';
@@ -3638,13 +3638,13 @@ HTML;
                                             <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
                                             ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
                                             <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>
-                                            <tr><td><strong>Subtotal</strong></td><td>' . $this->formatarMoeda((float) ($pedido['subtotal'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
-                                            <tr><td><strong>Serviços</strong></td><td>' . $this->formatarMoeda((float) ($pedido['servicos'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
-                                            <tr><td><strong>Impostos</strong></td><td>' . $this->formatarMoeda((float) ($pedido['impostos'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>Imposto local</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $this->formatarMoeda((float) $pedido['imposto_local'], (string) ($pedido['moeda'] ?? 'BRL')) . '</span></td></tr>' : '') . '
-                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</td></tr>
-                                            <tr><td><strong>Desconto</strong></td><td>' . $this->formatarMoeda((float) ($pedido['desconto'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
-                                            <tr><td><strong>Total</strong></td><td><strong>' . $this->formatarMoeda((float) ($pedido['total'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL')) . '</strong></td></tr>
+                                            <tr><td><strong>Subtotal</strong></td><td>' . $this->formatarMoeda((float) ($pedido['subtotal'] ?? 0), 'USD') . '</td></tr>
+                                            <tr><td><strong>Serviços</strong></td><td>' . $this->formatarMoeda((float) ($pedido['servicos'] ?? 0), 'USD') . '</td></tr>
+                                            <tr><td><strong>Impostos</strong></td><td>' . $this->formatarMoeda((float) ($pedido['impostos'] ?? 0), 'USD') . '</td></tr>
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>Imposto local</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $this->formatarMoeda((float) $pedido['imposto_local'], 'USD') . '</span></td></tr>' : '') . '
+                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), 'USD')) . '</td></tr>
+                                            <tr><td><strong>Desconto</strong></td><td>' . $this->formatarMoeda((float) ($pedido['desconto'] ?? 0), 'USD') . '</td></tr>
+                                            <tr><td><strong>Total</strong></td><td><strong>' . $this->formatarMoeda((float) ($pedido['total'] ?? 0), 'USD') . '</strong></td></tr>
                                             <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars((string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
                                             <tr><td><strong>Taxa Conversão</strong></td><td>' . (
                                                 (strtoupper((string) ($pedido['moeda'] ?? '')) === 'BRL' && (float) ($pedido['taxa_conversao'] ?? 1) > 1.01)

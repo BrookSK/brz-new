@@ -14,6 +14,28 @@ class AdminRemessaCorreiosController extends Controller {
         $this->connection = Database::getConnection();
     }
 
+    private function getUsdToBrlRate(): float {
+        try {
+            foreach (['configuracoes_sistema','configuracoes','settings','config'] as $t) {
+                try {
+                    $st = $this->connection->prepare("SHOW TABLES LIKE ?");
+                    $st->execute([$t]);
+                    if (!$st->fetchColumn()) continue;
+                    $stCols = $this->connection->query("DESCRIBE {$t}");
+                    $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                        $vc = in_array('valor', $cols, true) ? 'valor' : 'value';
+                        $st2 = $this->connection->prepare("SELECT {$vc} FROM {$t} WHERE categoria='sistema' AND chave='usd_brl_rate' LIMIT 1");
+                        $st2->execute();
+                        $v = $st2->fetchColumn();
+                        if ($v !== false && is_numeric($v) && (float)$v > 0) return (float)$v;
+                    }
+                } catch (\Exception $e) {}
+            }
+        } catch (\Exception $e) {}
+        return 5.80;
+    }
+
     private function tableExists(string $table): bool {
         try {
             $stmt = $this->connection->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
@@ -712,13 +734,7 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td>' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($remessa['created_at'])) . '</td>
                                                 <td>' . ($remessa['peso_total'] !== null && (float)$remessa['peso_total'] > 0 ? number_format((float)$remessa['peso_total'], 3, ',', '.') . ' kg' : '<span class="text-muted">—</span>') . '</td>
-                                                <td>' . (function() use ($remessa) {
-                                                    $v = $remessa['valor_total'] ?? null;
-                                                    $m = strtoupper(trim((string)($remessa['moeda'] ?? 'USD')));
-                                                    if ($v === null) return '-';
-                                                    return ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.');
-                                                })() . '</td>
-                                                <td>
+                                                <td>' . ($remessa['valor_total'] !== null ? 'R$ ' . number_format((float)$remessa['valor_total'], 2, ',', '.') : '-') . '</td>                                                <td>
                                                     <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-tags"></i> Gerar Etiqueta
                                                     </button>
@@ -1382,7 +1398,22 @@ class AdminRemessaCorreiosController extends Controller {
 
         $totalExpr = (is_array($colsPedidos) && in_array('total', $colsPedidos, true)) ? 'p.total' : (in_array('valor_total', $colsPedidos, true) ? 'p.valor_total' : '0');
         $pesoExpr = (is_array($colsPedidos) && in_array('peso_total', $colsPedidos, true)) ? 'p.peso_total' : 'NULL';
-        $moedaExpr = (is_array($colsPedidos) && in_array('moeda', $colsPedidos, true)) ? 'p.moeda' : (in_array('currency', $colsPedidos, true) ? 'p.currency' : "'BRL'");
+        $moedaExpr = (is_array($colsPedidos) && in_array('moeda', $colsPedidos, true)) ? 'p.moeda' : (in_array('currency', $colsPedidos, true) ? 'p.currency' : "'USD'");
+
+        // Subtotal dos produtos em BRL: soma dos itens × câmbio
+        $usdToBrl = $this->getUsdToBrlRate();
+        $subtotalExpr = 'NULL';
+        if ($this->tableExists('pedido_itens')) {
+            $colsItens = [];
+            try {
+                $stCI = $this->connection->query('DESCRIBE pedido_itens');
+                $colsItens = $stCI ? $stCI->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {}
+            $subCol = in_array('subtotal', $colsItens, true) ? 'subtotal' : (in_array('preco_unitario', $colsItens, true) ? 'preco_unitario * quantidade' : null);
+            if ($subCol !== null) {
+                $subtotalExpr = "(SELECT COALESCE(SUM({$subCol}), 0) * {$usdToBrl} FROM pedido_itens WHERE pedido_id = p.id)";
+            }
+        }
 
         $stmt = $this->connection->prepare(" 
             SELECT
@@ -1391,7 +1422,7 @@ class AdminRemessaCorreiosController extends Controller {
                 u.nome as cliente_nome,
                 p.usuario_id,
                 p.created_at,
-                {$totalExpr} as valor_total,
+                {$subtotalExpr} as valor_total,
                 {$pesoExpr} as peso_total,
                 {$moedaExpr} as moeda
             FROM pedidos p

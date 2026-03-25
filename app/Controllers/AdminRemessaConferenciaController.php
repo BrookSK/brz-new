@@ -610,8 +610,8 @@ class AdminRemessaConferenciaController extends Controller {
                     <td>' . ($foto !== '' ? '<img src="' . $h($foto) . '" style="width:48px;height:48px;object-fit:cover;border-radius:6px">' : '<span class="text-muted">-</span>') . '</td>
                     <td>' . $h($it['produto_nome'] ?? $it['nome_produto'] ?? '') . '</td>
                     <td>' . $qtdIt . '</td>
-                    <td>' . $fmtMoeda($pu, $moeda) . '</td>
-                    <td>' . $fmtMoeda($totIt, $moeda) . '</td>
+                    <td>' . $fmtMoeda($pu, 'USD') . '</td>
+                    <td>' . $fmtMoeda($totIt, 'USD') . '</td>
                 </tr>';
                 $idx++;
             }
@@ -843,6 +843,24 @@ function confirmarRecebimento() {
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
 
+        $taxaUsdBrl = 5.5;
+        try {
+            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                try {
+                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $st->execute([$k]);
+                    $val = $st->fetchColumn();
+                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
+                    if ($v > 0.0001) {
+                        $taxaUsdBrl = $v;
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
         $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
         $gwLabel = $gateway === 'appmax' ? 'AppMax' : ($gateway === 'cambioreal' ? 'Câmbio Real' : strtoupper($gateway));
         $totalGw = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $pagamentos));
@@ -855,9 +873,15 @@ function confirmarRecebimento() {
 <style>
 body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
 h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
-table{width:100%;border-collapse:collapse;margin-top:8px}
-th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}
+table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
+th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}
 th{background:#f5f5f5;width:160px}
+.itens th,.itens td{font-size:11px}
+.itens th:nth-child(1),.itens td:nth-child(1){width:24px}
+.itens th:nth-child(3),.itens td:nth-child(3){width:30px;text-align:center}
+.itens th:nth-child(4),.itens td:nth-child(4){width:90px;text-align:right}
+.itens th:nth-child(5),.itens td:nth-child(5){width:90px;text-align:right}
+.wrap{word-break:break-word;overflow-wrap:anywhere;white-space:normal}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 .logo{font-size:22px;font-weight:bold;color:#1a5276}
 </style></head><body>
@@ -886,7 +910,7 @@ th{background:#f5f5f5;width:160px}
             echo '</table>';
         }
 
-        echo '<h2>Itens</h2><table><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
+        echo '<h2>Itens</h2><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit. (USD)</th><th>Total (USD)</th></tr></thead><tbody>';
         $idx = 1;
         foreach ($itens as $it) {
             $pu = null;
@@ -895,12 +919,16 @@ th{background:#f5f5f5;width:160px}
             }
             $qtdIt = (int)($it['quantidade'] ?? 0);
             $totIt = $pu !== null ? $pu * $qtdIt : null;
-            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
+            echo '<tr><td>' . $idx . '</td><td class="wrap">' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
             $idx++;
         }
         echo '</tbody></table>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
         echo '<h2>Total ' . $h($gwLabel) . '</h2><table>';
-        echo '<tr><th>Total pago</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+        $totalUsdEq = $taxaUsdBrl > 0 ? ($totalGw / $taxaUsdBrl) : 0.0;
+        echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+        echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
         $html = ob_get_clean();
 
@@ -920,6 +948,24 @@ th{background:#f5f5f5;width:160px}
         $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
+
+        $taxaUsdBrl = 5.5;
+        try {
+            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                try {
+                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $st->execute([$k]);
+                    $val = $st->fetchColumn();
+                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
+                    if ($v > 0.0001) {
+                        $taxaUsdBrl = $v;
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+        } catch (\Throwable $e) {
+        }
 
         $itens = $pedido['itens'] ?? [];
         $pagamentos = $pedido['pagamentos'] ?? [];
@@ -1032,24 +1078,33 @@ th{background:#f5f5f5}
                     }
                 }
             }
-            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
+            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
             $idx++;
         }
         echo '</tbody></table>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
 
         echo '<h2>Resumo de Pagamento</h2><table>';
+        $cambioRealPagamentos = array_filter($pagamentos, fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === 'cambioreal');
         $totalBrl = 0.0;
-        $metodoPagamento = (string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''));
+        $metodoPagamento = 'Câmbio Real';
         $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
-        foreach ($pagamentos as $pg) {
+        foreach ($cambioRealPagamentos as $pg) {
             $v = (float)($pg['valor'] ?? 0);
             $m = strtolower((string)($pg['moeda'] ?? 'BRL'));
-            if ($m === 'brl') $totalBrl += $v;
-            if ($metodoPagamento === '' && isset($pg['metodo'])) $metodoPagamento = (string)$pg['metodo'];
+            if ($m === 'brl') {
+                $totalBrl += $v;
+            }
+            if ($dataPagamento === '' && !empty($pg['created_at'])) {
+                $dataPagamento = (string) $pg['created_at'];
+            }
         }
+        $totalUsdEq = $taxaUsdBrl > 0 ? ($totalBrl / $taxaUsdBrl) : 0.0;
         echo '<tr><th>Método</th><td>' . $h($metodoPagamento) . '</td></tr>';
         echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
-        echo '<tr><th>Total pago (BRL)</th><td>R$ ' . number_format($totalBrl, 2, ',', '.') . '</td></tr>';
+        echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
+        echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
 
         $html = ob_get_clean();
