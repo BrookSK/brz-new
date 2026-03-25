@@ -983,7 +983,6 @@ th{background:#f5f5f5}
                 // Normalizar para caminho relativo
                 $fotoPath = $foto;
                 if (str_starts_with($fotoPath, 'http')) {
-                    // Extrair só o path da URL
                     $parsed = parse_url($fotoPath);
                     $fotoPath = $parsed['path'] ?? $fotoPath;
                 }
@@ -1009,6 +1008,9 @@ th{background:#f5f5f5}
                     $ext = strtolower(pathinfo($fotoPath, PATHINFO_EXTENSION));
                     $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', default => 'image/jpeg' };
                     $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
+                } else {
+                    // Debug: mostrar o caminho tentado para diagnóstico
+                    $imgTag = '<span style="font-size:9px;color:#999">' . htmlspecialchars($candidates[0] ?? $fotoPath) . '</span>';
                 }
             }
             echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
