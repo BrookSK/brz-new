@@ -986,8 +986,22 @@ th{background:#f5f5f5}
                 $raw = @file_get_contents($localPath);
                 if ($raw !== false && strlen($raw) > 100) {
                     $ext = strtolower(pathinfo($foto, PATHINFO_EXTENSION));
-                    // AVIF não é suportado — converter para JPEG via GD
-                    if ($ext === 'avif' || $ext === 'webp') {
+                    $converted = false;
+                    // Tentar converter AVIF/WEBP para JPEG via Imagick
+                    if (in_array($ext, ['avif', 'webp'], true) && class_exists('Imagick')) {
+                        try {
+                            $im = new \Imagick();
+                            $im->readImageBlob($raw);
+                            $im->setImageFormat('jpeg');
+                            $im->setImageCompressionQuality(85);
+                            $raw = $im->getImagesBlob();
+                            $im->clear(); $im->destroy();
+                            $ext = 'jpg';
+                            $converted = true;
+                        } catch (\Throwable $e) {}
+                    }
+                    // Tentar converter via GD
+                    if (!$converted && in_array($ext, ['avif', 'webp'], true)) {
                         try {
                             $img = @imagecreatefromstring($raw);
                             if ($img !== false) {
@@ -996,12 +1010,19 @@ th{background:#f5f5f5}
                                 $raw = ob_get_clean();
                                 imagedestroy($img);
                                 $ext = 'jpg';
+                                $converted = true;
                             }
-                        } catch (\Throwable $e) { $raw = false; }
+                        } catch (\Throwable $e) {}
                     }
-                    if ($raw !== false && strlen($raw) > 100) {
+                    if ($converted || !in_array($ext, ['avif', 'webp'], true)) {
                         $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', default => 'image/jpeg' };
                         $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
+                    } else {
+                        // Fallback: URL absoluta (funciona no browser ao abrir o HTML)
+                        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                        $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '');
+                        $absUrl = $host !== '' ? $scheme . '://' . $host . $foto : $foto;
+                        $imgTag = '<img src="' . htmlspecialchars($absUrl, ENT_QUOTES, 'UTF-8') . '" style="width:40px;height:40px;object-fit:cover">';
                     }
                 }
             }
