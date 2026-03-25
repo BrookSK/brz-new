@@ -77,7 +77,23 @@ class AdminRemessaInternacionalController extends Controller {
     }
 
     private function ensureTables(): void {
-        return;
+        // Migrar coluna status de ENUM para VARCHAR nas tabelas de remessa
+        try {
+            foreach (['remessa_janelas', 'pedidos'] as $tbl) {
+                try {
+                    $stDesc = $this->connection->query("DESCRIBE {$tbl}");
+                    $rows = $stDesc ? $stDesc->fetchAll(\PDO::FETCH_ASSOC) : [];
+                    foreach ($rows as $row) {
+                        if (strtolower((string)($row['Field'] ?? '')) === 'status'
+                            && strpos(strtolower((string)($row['Type'] ?? '')), 'enum') !== false) {
+                            $default = ($tbl === 'pedidos') ? 'pendente' : 'aberta';
+                            $this->connection->exec("ALTER TABLE {$tbl} MODIFY COLUMN status VARCHAR(60) NOT NULL DEFAULT '{$default}'");
+                            break;
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+        } catch (\Exception $e) {}
     }
 
     private function now(): \DateTime {
@@ -296,6 +312,7 @@ class AdminRemessaInternacionalController extends Controller {
         $this->requireAdmin();
         $errorMsg = null;
         try {
+            $this->ensureTables();
             $janelaAtual = $this->ensureJanelaAtual();
 
             $janelasAbertas = $this->getJanelasByStatus(['aberta']);
