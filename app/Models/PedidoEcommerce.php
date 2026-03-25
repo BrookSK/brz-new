@@ -1980,6 +1980,18 @@ class PedidoEcommerce {
         if ($pedidoId <= 0) return false;
 
         try {
+            // Garantir que status seja VARCHAR (não ENUM) para aceitar todos os valores
+            try {
+                $stDesc = $this->connection->query("DESCRIBE pedidos");
+                $rows = $stDesc ? $stDesc->fetchAll(\PDO::FETCH_ASSOC) : [];
+                foreach ($rows as $row) {
+                    if (strtolower((string)($row['Field'] ?? '')) === 'status' && strpos(strtolower((string)($row['Type'] ?? '')), 'enum') !== false) {
+                        $this->connection->exec("ALTER TABLE pedidos MODIFY COLUMN status VARCHAR(60) NOT NULL DEFAULT 'pendente'");
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {}
+
             $st = $this->connection->prepare('UPDATE pedidos SET status = ?, updated_at = NOW() WHERE id = ?');
             $st->execute([$novoStatus, $pedidoId]);
 

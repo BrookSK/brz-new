@@ -47,6 +47,12 @@ class AdminPedidosEditController extends Controller {
                             $this->connection->exec("ALTER TABLE pedidos MODIFY COLUMN {$field} DECIMAL(8,2) NULL");
                         } catch (\Exception $e) {}
                     }
+                    // Migrar status de ENUM para VARCHAR para suportar todos os valores
+                    if ($field === 'status' && strpos($type, 'enum') !== false) {
+                        try {
+                            $this->connection->exec("ALTER TABLE pedidos MODIFY COLUMN status VARCHAR(60) NOT NULL DEFAULT 'pendente'");
+                        } catch (\Exception $e) {}
+                    }
                 }
             } catch (\Exception $e) {}
         } catch (\Exception $e) {
