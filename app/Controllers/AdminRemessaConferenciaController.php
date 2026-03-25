@@ -980,16 +980,30 @@ th{background:#f5f5f5}
             $foto = trim((string)($it['foto_produto'] ?? ''));
             $imgTag = '-';
             if ($foto !== '') {
-                if (!str_starts_with($foto, 'http')) {
-                    $foto = '/' . ltrim($foto, '/');
-                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                    $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost');
-                    $fotoUrl = $scheme . '://' . $host . $foto;
-                } else {
-                    $fotoUrl = $foto;
+                if (!str_starts_with($foto, 'http')) $foto = '/' . ltrim($foto, '/');
+                $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                $localPath = $docRoot . $foto;
+                $raw = @file_get_contents($localPath);
+                if ($raw !== false && strlen($raw) > 100) {
+                    $ext = strtolower(pathinfo($foto, PATHINFO_EXTENSION));
+                    // AVIF não é suportado — converter para JPEG via GD
+                    if ($ext === 'avif' || $ext === 'webp') {
+                        try {
+                            $img = @imagecreatefromstring($raw);
+                            if ($img !== false) {
+                                ob_start();
+                                imagejpeg($img, null, 85);
+                                $raw = ob_get_clean();
+                                imagedestroy($img);
+                                $ext = 'jpg';
+                            }
+                        } catch (\Throwable $e) { $raw = false; }
+                    }
+                    if ($raw !== false && strlen($raw) > 100) {
+                        $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', default => 'image/jpeg' };
+                        $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
+                    }
                 }
-                // DEBUG TEMPORÁRIO
-                $imgTag = '<span style="font-size:9px;color:red">foto_produto=[' . htmlspecialchars($foto) . '] docroot=[' . htmlspecialchars($_SERVER['DOCUMENT_ROOT'] ?? '') . '] file=[' . htmlspecialchars($_SERVER['DOCUMENT_ROOT'] . $foto) . '] exists=[' . (@file_exists($_SERVER['DOCUMENT_ROOT'] . $foto) ? 'SIM' : 'NAO') . ']</span>';
             }
             echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
             $idx++;
