@@ -978,16 +978,28 @@ th{background:#f5f5f5}
             $qtdIt = (int)($it['quantidade'] ?? 0);
             $totIt = $pu !== null ? $pu * $qtdIt : null;
             $foto = trim((string)($it['foto_produto'] ?? ''));
+            $imgTag = '-';
             if ($foto !== '') {
-                // Converter para URL absoluta para o Dompdf conseguir carregar
                 if (!str_starts_with($foto, 'http')) {
                     $foto = '/' . ltrim($foto, '/');
                     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                     $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost');
                     $foto = $scheme . '://' . $host . $foto;
                 }
+                // Tentar embutir como base64 para funcionar no PDF e no HTML baixado
+                $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                $localPath = $docRoot . parse_url($foto, PHP_URL_PATH);
+                if ($docRoot !== '' && @file_exists($localPath)) {
+                    $raw = @file_get_contents($localPath);
+                    if ($raw !== false && $raw !== '') {
+                        $ext = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
+                        $mime = match($ext) { 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', default => 'image/jpeg' };
+                        $imgTag = '<img src="data:' . $mime . ';base64,' . base64_encode($raw) . '" style="width:40px;height:40px;object-fit:cover">';
+                    }
+                } else {
+                    $imgTag = '<img src="' . $h($foto) . '" style="width:40px;height:40px;object-fit:cover">';
+                }
             }
-            $imgTag = $foto !== '' ? '<img src="' . $h($foto) . '" style="width:40px;height:40px;object-fit:cover">' : '-';
             echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
             $idx++;
         }
@@ -1006,19 +1018,9 @@ th{background:#f5f5f5}
         echo '<tr><th>Método</th><td>' . $h($metodoPagamento) . '</td></tr>';
         echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><th>Total pago (BRL)</th><td>R$ ' . number_format($totalBrl, 2, ',', '.') . '</td></tr>';
-        echo '</table>';
-
-        echo '<h2>Totais</h2><table class="totals">';
-        $totFields = ['subtotal' => 'Subtotal','frete' => 'Frete','desconto' => 'Desconto','imposto_local' => 'Imposto local','total' => 'Total'];
-        foreach ($totFields as $col => $label) {
-            if (isset($pedido[$col]) && is_numeric($pedido[$col])) {
-                $bold = $col === 'total' ? ' style="font-weight:bold"' : '';
-                echo '<tr' . $bold . '><th>' . $label . '</th><td>' . $fmtMoeda((float)$pedido[$col], $moeda) . '</td></tr>';
-            }
-        }
         echo '</table></body></html>';
-        $html = ob_get_clean();
 
+        $html = ob_get_clean();
         $fname = 'invoice_pedido_' . $pid . '_' . date('Ymd') . '.pdf';
         $this->renderPdf($html, $fname);
         exit;
