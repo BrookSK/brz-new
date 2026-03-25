@@ -529,6 +529,11 @@ $router->post('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/
 $router->get('/admin/remessa-internacional/janela/{janelaId}/pedido/{pedidoId}/etiqueta-download', 'AdminRemessaInternacionalController', 'baixarEtiquetaWexpress');
 $router->post('/admin/remessa-internacional/janela/{id}/fechar', 'AdminRemessaInternacionalController', 'fecharJanela');
 
+// Rotas de Conferência de Remessa (acessível para conferente)
+$router->get('/admin/remessa-conferencia', 'AdminRemessaConferenciaController', 'index');
+$router->get('/admin/remessa-conferencia/janela/{id}', 'AdminRemessaConferenciaController', 'verJanela');
+$router->get('/admin/remessa-conferencia/janela/{janelaId}/pedido/{pedidoId}', 'AdminRemessaConferenciaController', 'detalhesPedido');
+
 // Rotas de Remessa WP
 $router->get('/admin/remessa-wp', 'AdminRemessaWpController', 'index');
 $router->get('/admin/remessa-wp/janela/{id}', 'AdminRemessaWpController', 'verJanela');

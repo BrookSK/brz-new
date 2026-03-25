@@ -228,6 +228,7 @@ function renderAdminSidebar($activePage = '') {
         'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
         'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => __('admin.menu.international_shipment', 'Remessa Internacional'), 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
         'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
+        'remessa-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Conferência de Remessa', 'url' => '/admin/remessa-conferencia', 'roles' => ['admin','vendedor','suporte','conferente']],
         'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => __('admin.menu.post_office_shipment', 'Remessa Correios'), 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
         'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correios Mundial', 'url' => '/admin/correios-mundial', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => __('admin.menu.shipstation_shipment', 'Remessa ShipStation (UPS)'), 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
