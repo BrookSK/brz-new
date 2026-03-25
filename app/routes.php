@@ -551,6 +551,7 @@ $router->post('/admin/remessa-wp/primeira-remessa/popular', 'AdminRemessaWpContr
 // Rotas de Remessa Correios
 $router->get('/admin/remessa-correios', 'AdminRemessaCorreiosController', 'index');
 $router->post('/admin/remessa-correios/gerar-etiqueta/{id}', 'AdminRemessaCorreiosController', 'gerarEtiqueta');
+$router->post('/admin/remessa-correios/regerar-etiqueta/{id}', 'AdminRemessaCorreiosController', 'regerarEtiqueta');
 $router->post('/admin/remessa-correios/gerar-lote-etiquetas', 'AdminRemessaCorreiosController', 'gerarLoteEtiquetas');
 $router->get('/admin/remessa-correios/imprimir-etiqueta/{id}', 'AdminRemessaCorreiosController', 'imprimirEtiqueta');
 $router->get('/admin/remessa-correios/imprimir-todas-etiquetas', 'AdminRemessaCorreiosController', 'imprimirTodasEtiquetas');

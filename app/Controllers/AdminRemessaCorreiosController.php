@@ -772,6 +772,9 @@ class AdminRemessaCorreiosController extends Controller {
                                                     <button class="btn btn-sm btn-success" onclick="imprimirEtiqueta(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-print"></i> Imprimir
                                                     </button>
+                                                    <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="Deletar etiqueta atual e gerar nova com as medidas atuais do pedido">
+                                                        <i class="fas fa-redo"></i> Regerar
+                                                    </button>
                                                     <button class="btn btn-sm btn-outline-info" onclick="rastrearEtiqueta(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-search"></i>
                                                     </button>
@@ -828,6 +831,9 @@ class AdminRemessaCorreiosController extends Controller {
                                                     </button>
                                                     <button class="btn btn-sm btn-primary" onclick="confirmarPostagem(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-check"></i> Confirmar Postagem
+                                                    </button>
+                                                    <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="Deletar etiqueta atual e gerar nova com as medidas atuais do pedido">
+                                                        <i class="fas fa-redo"></i> Regerar
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-info" onclick="rastrearEtiqueta(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-search"></i>
@@ -961,6 +967,25 @@ class AdminRemessaCorreiosController extends Controller {
 
         function verDetalhesRemessa(pedidoId) {
             window.open("/admin/pedidos/detalhes/" + pedidoId, "_blank");
+        }
+
+        function regerarEtiqueta(pedidoId, etiquetaId) {
+            if (!confirm("Isso vai DELETAR a etiqueta atual (#" + etiquetaId + ") e gerar uma nova com as medidas atuais do pedido. Continuar?")) return;
+            fetch("/admin/remessa-correios/regerar-etiqueta/" + pedidoId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ etiqueta_id: etiquetaId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Etiqueta regerada com sucesso! Novo código: " + data.codigo_etiqueta);
+                    location.reload();
+                } else {
+                    alert("Erro ao regerar etiqueta: " + data.message);
+                }
+            })
+            .catch(() => alert("Erro ao regerar etiqueta"));
         }
     </script>
 </body>
@@ -1453,6 +1478,35 @@ class AdminRemessaCorreiosController extends Controller {
             
         } catch (\Exception $e) {
             $this->connection->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function regerarEtiqueta($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        $pedidoId = (int) $request->getParam('id');
+
+        try {
+            $this->connection->beginTransaction();
+
+            // Deletar etiqueta existente
+            $stDel = $this->connection->prepare('DELETE FROM correios_etiquetas WHERE pedido_id = ?');
+            $stDel->execute([$pedidoId]);
+
+            // Gerar nova etiqueta com medidas atuais
+            $r = $this->criarEtiquetaCorreiosParaPedido($pedidoId);
+            $this->connection->commit();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Etiqueta regerada com sucesso!',
+                'etiqueta_id' => (int) ($r['etiqueta_id'] ?? 0),
+                'codigo_etiqueta' => (string) ($r['codigo_etiqueta'] ?? ''),
+            ]);
+        } catch (\Exception $e) {
+            try { $this->connection->rollBack(); } catch (\Exception $e2) {}
             echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
         }
         exit;
