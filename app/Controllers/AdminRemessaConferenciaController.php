@@ -967,7 +967,7 @@ th{background:#f5f5f5}
 
 <h2>Itens</h2>
 <table>
-<thead><tr><th>#</th><th>Imagem</th><th>Produto / Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
+<thead><tr><th>#</th><th>Produto / Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
 <tbody>';
         $idx = 1;
         foreach ($itens as $it) {
@@ -1026,7 +1026,7 @@ th{background:#f5f5f5}
                     }
                 }
             }
-            echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
+            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
             $idx++;
         }
         echo '</tbody></table>';
