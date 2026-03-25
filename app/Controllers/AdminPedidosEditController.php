@@ -948,14 +948,8 @@ class AdminPedidosEditController extends Controller {
                 }
             }
 
-            // Se estiver pago, não permite editar itens aqui (apenas via rota atualizar-status).
-            if (strtolower(trim($oldStatus)) === 'pago') {
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Pedido está com status Pago. Para editar itens, altere para Pendente primeiro. Para alterar apenas o status, use o botão "Atualizar Status".'
-                ]);
-                return;
-            }
+            // Se estiver pago, permite salvar status e medidas, mas não altera itens
+            $isPago = strtolower(trim($oldStatus)) === 'pago';
 
             $newStatus = (string) ($dados['status'] ?? '');
             $cicloFechado = in_array($newStatus, [
@@ -1045,13 +1039,15 @@ class AdminPedidosEditController extends Controller {
             if ($this->tableExists('pedido_items')) $itensTables[] = 'pedido_items';
             if (empty($itensTables)) $itensTables[] = $this->getItensTable();
 
+            $subtotal = 0;
+
+            if (!$isPago) {
             foreach ($itensTables as $t) {
                 $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             }
 
             // Calcular subtotal e inserir novos itens
-            $subtotal = 0;
             foreach (($dados['itens'] ?? []) as $item) {
                 $subtotalItem = ((float) ($item['quantidade'] ?? 0)) * ((float) ($item['preco_unitario'] ?? 0));
                 $subtotal += $subtotalItem;
@@ -1124,6 +1120,18 @@ class AdminPedidosEditController extends Controller {
                         $this->upsertPendenciaCompra($pedidoId, $produtoId, $faltante);
                     }
                 }
+            }
+
+            } // end if (!$isPago) — processamento de itens
+
+            // Se pago, recalcular subtotal a partir dos itens existentes
+            if ($isPago) {
+                try {
+                    $itensTable = $this->tableExists('pedido_itens') ? 'pedido_itens' : $this->getItensTable();
+                    $stSub = $this->connection->prepare("SELECT COALESCE(SUM(subtotal), 0) FROM {$itensTable} WHERE pedido_id = :pid");
+                    $stSub->execute([':pid' => $pedidoId]);
+                    $subtotal = (float) ($stSub->fetchColumn() ?: 0);
+                } catch (\Exception $e) { $subtotal = 0; }
             }
 
             // Calcular valores
