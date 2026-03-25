@@ -711,7 +711,12 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td>' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($remessa['created_at'])) . '</td>
                                                 <td>' . ($remessa['peso_total'] !== null && (float)$remessa['peso_total'] > 0 ? number_format((float)$remessa['peso_total'], 3, ',', '.') . ' kg' : '<span class="text-muted">—</span>') . '</td>
-                                                <td>R$ ' . number_format($remessa['valor_total'] ?? 0, 2, ',', '.') . '</td>
+                                                <td>' . (function() use ($remessa) {
+                                                    $v = $remessa['valor_total'] ?? null;
+                                                    $m = strtoupper(trim((string)($remessa['moeda'] ?? 'USD')));
+                                                    if ($v === null) return '-';
+                                                    return ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.');
+                                                })() . '</td>
                                                 <td>
                                                     <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
                                                         <i class="fas fa-tags"></i> Gerar Etiqueta
@@ -1376,6 +1381,7 @@ class AdminRemessaCorreiosController extends Controller {
 
         $totalExpr = (is_array($colsPedidos) && in_array('total', $colsPedidos, true)) ? 'p.total' : (in_array('valor_total', $colsPedidos, true) ? 'p.valor_total' : '0');
         $pesoExpr = (is_array($colsPedidos) && in_array('peso_total', $colsPedidos, true)) ? 'p.peso_total' : 'NULL';
+        $moedaExpr = (is_array($colsPedidos) && in_array('moeda', $colsPedidos, true)) ? 'p.moeda' : (in_array('currency', $colsPedidos, true) ? 'p.currency' : "'BRL'");
 
         $stmt = $this->connection->prepare(" 
             SELECT
@@ -1385,7 +1391,8 @@ class AdminRemessaCorreiosController extends Controller {
                 p.usuario_id,
                 p.created_at,
                 {$totalExpr} as valor_total,
-                {$pesoExpr} as peso_total
+                {$pesoExpr} as peso_total,
+                {$moedaExpr} as moeda
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             {$joinEndereco}
