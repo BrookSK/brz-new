@@ -158,6 +158,12 @@ class AdminRemessaConferenciaController extends Controller {
         try {
             $this->connection->exec("ALTER TABLE remessa_janela_pedidos ADD COLUMN medicamento TINYINT(1) NOT NULL DEFAULT 0");
         } catch (\Exception $e) {}
+        try {
+            $this->connection->exec("ALTER TABLE remessa_janela_pedidos ADD COLUMN recebido_confirmado TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (\Exception $e) {}
+        try {
+            $this->connection->exec("ALTER TABLE remessa_janela_pedidos ADD COLUMN recebido_confirmado_em DATETIME NULL");
+        } catch (\Exception $e) {}
     }
 
     public function index($request) {
@@ -230,9 +236,7 @@ class AdminRemessaConferenciaController extends Controller {
         try { $st = $this->connection->query('DESCRIBE pedidos'); $colsPedidos = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
         $hasMoeda = in_array('moeda', $colsPedidos, true);
         $hasCurrency = in_array('currency', $colsPedidos, true);
-        $hasCep = in_array('cep', $colsPedidos, true);
 
-        // Detectar coluna CEP do endereço
         $colsEnd = [];
         try { $st = $this->connection->query('DESCRIBE enderecos'); $colsEnd = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
         $cepEndCol = in_array('cep', $colsEnd, true) ? 'cep' : (in_array('zip_code', $colsEnd, true) ? 'zip_code' : null);
@@ -244,14 +248,12 @@ class AdminRemessaConferenciaController extends Controller {
                     " . ($hasCurrency ? 'p.currency,' : "'' AS currency,") . "
                     u.nome AS cliente_nome, u.email AS cliente_email";
 
-        // Tentar pegar CEP do endereço
         if ($cepEndCol) {
             $sql .= ", (SELECT e.{$cepEndCol} FROM enderecos e WHERE e.usuario_id = p.usuario_id ORDER BY e.id DESC LIMIT 1) AS cep_entrega";
         } else {
             $sql .= ", NULL AS cep_entrega";
         }
 
-        // Tentar pegar quantidade total de itens
         if ($this->tableExists('pedido_itens')) {
             $sql .= ", (SELECT SUM(pi.quantidade) FROM pedido_itens pi WHERE pi.pedido_id = p.id) AS qtd_itens";
         } else {
@@ -271,8 +273,6 @@ class AdminRemessaConferenciaController extends Controller {
         $total = count($pedidos);
         $geradas = count(array_filter($pedidos, fn($p) => (int)($p['etiqueta_gerada'] ?? 0) === 1));
         $pendentes = $total - $geradas;
-        $usdToBrl = $this->getUsdToBrlRate();
-        $brlToUsd = $usdToBrl > 0 ? 1.0 / $usdToBrl : 1.0;
         $badge = match($janela['status'] ?? '') { 'aberta' => 'success', 'atraso' => 'danger', 'remessa_gerada' => 'info', default => 'secondary' };
 
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -394,7 +394,6 @@ class AdminRemessaConferenciaController extends Controller {
         if (!$pedido) { header('Location: /admin/remessa-conferencia/janela/' . $jid); exit; }
 
         $usdToBrl = $this->getUsdToBrlRate();
-        $brlToUsd = $usdToBrl > 0 ? 1.0 / $usdToBrl : 1.0;
         $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
         if ($moeda === '') $moeda = 'USD';
 
@@ -405,51 +404,86 @@ class AdminRemessaConferenciaController extends Controller {
         $wxCourier = (string)($rel['courier_tracking_number'] ?? '');
         $labelUrl = $wxShipId !== '' ? 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wxShipId) : '';
         $medicamentoFlag = (bool)($rel['medicamento'] ?? false);
+        $recebidoConfirmado = (int)($rel['recebido_confirmado'] ?? 0);
+        $recebidoEm = (string)($rel['recebido_confirmado_em'] ?? '');
         $docs = $this->getDocumentos($jid, $pid);
 
         $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
-        $fmtUsd = fn($v) => $v !== null ? 'US$ ' . number_format((float)$v, 2, ',', '.') : '-';
+        $fmtMoeda = function($v, $m) {
+            if ($v === null) return '-';
+            return $m === 'BRL'
+                ? 'R$ ' . number_format((float)$v, 2, ',', '.')
+                : 'US$ ' . number_format((float)$v, 2, ',', '.');
+        };
         $fmtBrl = fn($v) => $v !== null ? 'R$ ' . number_format((float)$v, 2, ',', '.') : '-';
 
         // Endereço
         $end = $pedido['endereco'] ?? null;
-        $logr = is_array($end) ? trim((string)($end['endereco'] ?? ($end['logradouro'] ?? ''))) : '';
-        $num = is_array($end) ? trim((string)($end['numero'] ?? '')) : '';
-        $compl = is_array($end) ? trim((string)($end['complemento'] ?? '')) : '';
+        $logr   = is_array($end) ? trim((string)($end['endereco'] ?? ($end['logradouro'] ?? ''))) : '';
+        $num    = is_array($end) ? trim((string)($end['numero'] ?? '')) : '';
+        $compl  = is_array($end) ? trim((string)($end['complemento'] ?? '')) : '';
         $bairro = is_array($end) ? trim((string)($end['bairro'] ?? '')) : '';
         $cidade = is_array($end) ? trim((string)($end['cidade'] ?? '')) : '';
         $estado = is_array($end) ? trim((string)($end['estado'] ?? '')) : '';
-        $cep = is_array($end) ? trim((string)($end['cep'] ?? ($end['zip_code'] ?? ''))) : '';
-        $pais = is_array($end) ? trim((string)($end['pais'] ?? ($end['country'] ?? 'BR'))) : 'BR';
+        $cep    = is_array($end) ? trim((string)($end['cep'] ?? ($end['zip_code'] ?? ''))) : '';
+        $pais   = is_array($end) ? trim((string)($end['pais'] ?? ($end['country'] ?? 'BR'))) : 'BR';
 
         // Pagamentos split
         $pagamentos = $pedido['pagamentos'] ?? [];
-        $totalBrl = 0.0; $totalUsdPago = 0.0;
-        $produtosValor = 0.0; $taxaServico = 0.0; $impostoValor = 0.0;
-        $impostoLocal = 0.0; $appmaxValor = 0.0; $cambioRealValor = 0.0;
+        $totalBrl = 0.0;
+        $produtosValor = 0.0; $taxaServico = 0.0; $impostoValor = 0.0; $impostoLocal = 0.0;
         $metodoPagamento = (string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''));
         $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
+
+        $appmaxPagamentos = [];
+        $cambioRealPagamentos = [];
+
         foreach ($pagamentos as $pg) {
             $v = (float)($pg['valor'] ?? 0);
             $m = strtolower((string)($pg['moeda'] ?? 'BRL'));
             if ($m === 'brl') $totalBrl += $v;
-            else $totalUsdPago += $v;
             $gw = strtolower((string)($pg['gateway'] ?? ''));
             $comp = strtolower((string)($pg['componente'] ?? ''));
-            if ($gw === 'appmax') $appmaxValor += $v;
-            if ($gw === 'cambioreal') $cambioRealValor += $v;
+            if ($gw === 'appmax') $appmaxPagamentos[] = $pg;
+            if ($gw === 'cambioreal') $cambioRealPagamentos[] = $pg;
             if (strpos($comp, 'produto') !== false || strpos($comp, 'product') !== false) $produtosValor += $v;
             if (strpos($comp, 'taxa') !== false || strpos($comp, 'servico') !== false || strpos($comp, 'service') !== false) $taxaServico += $v;
             if (strpos($comp, 'imposto') !== false || strpos($comp, 'tax') !== false) $impostoValor += $v;
             if (strpos($comp, 'local') !== false) $impostoLocal += $v;
             if ($metodoPagamento === '' && isset($pg['metodo'])) $metodoPagamento = (string)$pg['metodo'];
         }
-        $totalPedidoUsd = is_numeric($pedido['total'] ?? null) ? (float)$pedido['total'] : null;
-        if ($totalPedidoUsd !== null && $moeda === 'BRL') $totalPedidoUsd *= $brlToUsd;
-        $subtotal = is_numeric($pedido['subtotal'] ?? null) ? (float)$pedido['subtotal'] : null;
-        if ($subtotal !== null && $moeda === 'BRL') $subtotal *= $brlToUsd;
-        $frete = is_numeric($pedido['frete'] ?? null) ? (float)$pedido['frete'] : null;
-        if ($frete !== null && $moeda === 'BRL') $frete *= $brlToUsd;
+
+        $appmaxValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $appmaxPagamentos));
+        $cambioRealValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $cambioRealPagamentos));
+
+        // Totais direto do banco na moeda do pedido
+        $subtotal    = is_numeric($pedido['subtotal'] ?? null)     ? (float)$pedido['subtotal']     : null;
+        $frete       = is_numeric($pedido['frete'] ?? null)        ? (float)$pedido['frete']        : null;
+        $desconto    = is_numeric($pedido['desconto'] ?? null)     ? (float)$pedido['desconto']     : null;
+        $impLocal    = is_numeric($pedido['imposto_local'] ?? null) ? (float)$pedido['imposto_local'] : null;
+        $totalPedido = is_numeric($pedido['total'] ?? null)        ? (float)$pedido['total']        : null;
+
+        // Status split em português
+        $traduzirStatus = function(string $s): string {
+            $map = [
+                'approved'      => 'Aprovado',
+                'aprovado'      => 'Aprovado',
+                'pending'       => 'Pendente',
+                'pendente'      => 'Pendente',
+                'paid'          => 'Pago',
+                'pago'          => 'Pago',
+                'cancelled'     => 'Cancelado',
+                'cancelado'     => 'Cancelado',
+                'refunded'      => 'Estornado',
+                'failed'        => 'Falhou',
+                'falhou'        => 'Falhou',
+                'LABEL_CREATED' => 'Etiqueta Gerada',
+            ];
+            return $map[$s] ?? $map[strtolower($s)] ?? $s;
+        };
+
+        // Verificar se existe doc medicamento
+        $hasMedDoc = !empty($docs['medicamento']['file_path']);
 
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pedido #' . $pid . ' - Conferência</title>
@@ -459,16 +493,34 @@ class AdminRemessaConferenciaController extends Controller {
         echo '</head><body><div class="container-fluid"><div class="row">';
         renderAdminSidebar('remessa-conferencia');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+<div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom flex-wrap gap-2">
     <div>
         <h1 class="h3 mb-0">Pedido #' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</h1>
         <div class="text-muted small">Janela #' . $jid . ' | Etiqueta: <span class="badge bg-' . ($et === 1 ? 'success' : 'warning') . '">' . ($et === 1 ? 'Gerada' : 'Pendente') . '</span></div>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>
-        ' . ($labelUrl !== '' ? '<a class="btn btn-outline-primary" href="' . $h($labelUrl) . '" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>' : '') . '
-    </div>
-</div>';
+    <div class="d-flex gap-2 flex-wrap align-items-center">';
+
+        // Confirmar Recebimento
+        if ($recebidoConfirmado === 1) {
+            $dtRec = $recebidoEm !== '' ? date('d/m/Y H:i', strtotime($recebidoEm)) : '';
+            echo '<span class="badge bg-success fs-6 px-3 py-2"><i class="fas fa-check-circle me-1"></i>Recebimento Confirmado' . ($dtRec !== '' ? ' em ' . $dtRec : '') . '</span>';
+        } else {
+            echo '<button class="btn btn-success" id="btnConfirmarRecebimento" onclick="confirmarRecebimento()"
+                title="Confirmar que o pacote foi recebido fisicamente no armazém. Isso marca o pedido como recebido no sistema e notifica a equipe.">
+                <i class="fas fa-check me-1"></i>✓ Confirmar Recebimento
+            </button>
+            <small class="text-muted d-block" style="font-size:0.7rem;max-width:180px">Confirma recebimento físico no armazém</small>';
+        }
+
+        echo '<a class="btn btn-outline-secondary" href="/admin/remessa-conferencia/janela/' . $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>';
+        if ($labelUrl !== '') echo '<a class="btn btn-outline-primary" href="' . $h($labelUrl) . '" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/appmax" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante AppMax</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante Câmbio Real</a>';
+        echo '<a class="btn btn-outline-dark" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/invoice" target="_blank"><i class="fas fa-file-alt me-1"></i>Invoice</a>';
+        if ($hasMedDoc) {
+            echo '<a class="btn btn-outline-warning" href="' . $h($docs['medicamento']['file_path']) . '" target="_blank"><i class="fas fa-pills me-1"></i>Doc. Medicamento</a>';
+        }
+        echo '</div></div>';
 
         // Status / Tracking
         echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info-circle me-1"></i>Status e Rastreio</strong></div><div class="card-body">
@@ -535,13 +587,13 @@ class AdminRemessaConferenciaController extends Controller {
     <div class="col-md-2"><div class="text-muted small">País</div><div>' . $h($pais) . '</div></div>
 </div></div></div>';
 
-        // Itens
+        // Itens — sem SKU e NCM
         $itens = $pedido['itens'] ?? [];
         echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-box me-1"></i>Itens do Pedido</strong></div><div class="card-body">
 <div class="table-responsive"><table class="table table-sm align-middle">
-<thead><tr><th>#</th><th>Imagem</th><th>Declaração</th><th>SKU</th><th>NCM</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
+<thead><tr><th>#</th><th>Imagem</th><th>Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
         if (!$itens) {
-            echo '<tr><td colspan="8" class="text-center text-muted">Nenhum item.</td></tr>';
+            echo '<tr><td colspan="6" class="text-center text-muted">Nenhum item.</td></tr>';
         } else {
             $idx = 1;
             foreach ($itens as $it) {
@@ -549,7 +601,6 @@ class AdminRemessaConferenciaController extends Controller {
                 foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
                     if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
                 }
-                if ($pu !== null && $moeda === 'BRL') $pu *= $brlToUsd;
                 $qtdIt = (int)($it['quantidade'] ?? 0);
                 $totIt = $pu !== null ? $pu * $qtdIt : null;
                 $foto = trim((string)($it['foto_produto'] ?? ''));
@@ -558,74 +609,121 @@ class AdminRemessaConferenciaController extends Controller {
                     <td>' . $idx . '</td>
                     <td>' . ($foto !== '' ? '<img src="' . $h($foto) . '" style="width:48px;height:48px;object-fit:cover;border-radius:6px">' : '<span class="text-muted">-</span>') . '</td>
                     <td>' . $h($it['produto_nome'] ?? $it['nome_produto'] ?? '') . '</td>
-                    <td>' . $h($it['sku'] ?? '') . '</td>
-                    <td>' . $h($it['ncm'] ?? '') . '</td>
                     <td>' . $qtdIt . '</td>
-                    <td>' . $fmtUsd($pu) . '</td>
-                    <td>' . $fmtUsd($totIt) . '</td>
+                    <td>' . $fmtMoeda($pu, $moeda) . '</td>
+                    <td>' . $fmtMoeda($totIt, $moeda) . '</td>
                 </tr>';
                 $idx++;
             }
         }
         echo '</tbody></table></div></div></div>';
 
-        // Pagamento
+        // Pagamento — bloco principal + dois cards AppMax / Câmbio Real
         echo '<div class="row"><div class="col-md-6">
 <div class="card mb-3"><div class="card-header"><strong><i class="fas fa-credit-card me-1"></i>Pagamento</strong></div><div class="card-body">
-<table class="table table-sm mb-0">
-<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl > 0 ? $totalBrl : null) . '</td></tr>
-<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtUsd($totalUsdPago > 0 ? $totalUsdPago : $totalPedidoUsd) . '</td></tr>
-<tr><td class="text-muted">Taxa de conversão</td><td>R$ ' . number_format($usdToBrl, 4, ',', '.') . ' / USD</td></tr>
-<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>
-<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>
-<tr><td class="text-muted">Produtos</td><td>' . $fmtBrl($produtosValor > 0 ? $produtosValor : null) . '</td></tr>
-<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtBrl($taxaServico > 0 ? $taxaServico : null) . '</td></tr>
-<tr><td class="text-muted">Imposto</td><td>' . $fmtBrl($impostoValor > 0 ? $impostoValor : null) . '</td></tr>
-<tr><td class="text-muted">Imposto local</td><td>' . $fmtBrl($impostoLocal > 0 ? $impostoLocal : null) . '</td></tr>
-<tr><td class="text-muted">AppMax</td><td>' . $fmtBrl($appmaxValor > 0 ? $appmaxValor : null) . '</td></tr>
-<tr><td class="text-muted">Câmbio Real</td><td>' . $fmtBrl($cambioRealValor > 0 ? $cambioRealValor : null) . '</td></tr>
-</table></div></div></div>
-<div class="col-md-6">
+<table class="table table-sm mb-0">';
+        echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl > 0 ? $totalBrl : null) . '</td></tr>';
+        echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
+        echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
+        echo '<tr><td class="text-muted">Produtos</td><td>' . $fmtBrl($produtosValor > 0 ? $produtosValor : null) . '</td></tr>';
+        echo '<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtBrl($taxaServico > 0 ? $taxaServico : null) . '</td></tr>';
+        echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtBrl($impostoValor > 0 ? $impostoValor : null) . '</td></tr>';
+        echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtBrl($impostoLocal > 0 ? $impostoLocal : null) . '</td></tr>';
+        echo '</table></div></div></div>';
+
+        // Totais direto do banco
+        echo '<div class="col-md-6">
 <div class="card mb-3"><div class="card-header"><strong><i class="fas fa-calculator me-1"></i>Totais</strong></div><div class="card-body">
 <table class="table table-sm mb-0">
-<tr><td class="text-muted">Subtotal</td><td>' . $fmtUsd($subtotal) . '</td></tr>
-<tr><td class="text-muted">Frete</td><td>' . $fmtUsd($frete) . '</td></tr>
-<tr><td class="text-muted">Desconto</td><td>' . $fmtUsd(is_numeric($pedido['desconto'] ?? null) ? (float)$pedido['desconto'] : null) . '</td></tr>
-<tr><td class="text-muted">Imposto local</td><td>' . $fmtUsd(is_numeric($pedido['imposto_local'] ?? null) ? (float)$pedido['imposto_local'] : null) . '</td></tr>
-<tr class="fw-bold"><td>Total</td><td>' . $fmtUsd($totalPedidoUsd) . '</td></tr>
+<tr><td class="text-muted">Subtotal</td><td>' . $fmtMoeda($subtotal, $moeda) . '</td></tr>
+<tr><td class="text-muted">Frete</td><td>' . $fmtMoeda($frete, $moeda) . '</td></tr>
+<tr><td class="text-muted">Desconto</td><td>' . $fmtMoeda($desconto, $moeda) . '</td></tr>
+<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impLocal, $moeda) . '</td></tr>
+<tr class="fw-bold"><td>Total</td><td>' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>
 </table></div></div>
 </div></div>';
 
-        // Split detalhado
+        // Cards AppMax e Câmbio Real lado a lado
+        echo '<div class="row mb-3">';
+
+        // AppMax card
+        echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-primary text-white"><strong><i class="fas fa-credit-card me-1"></i>AppMax</strong></div><div class="card-body">';
+        if (empty($appmaxPagamentos)) {
+            echo '<div class="text-muted">Nenhum pagamento AppMax encontrado.</div>';
+        } else {
+            echo '<div class="mb-2"><strong>Valor AppMax (BRL):</strong> ' . $fmtBrl($appmaxValorTotal > 0 ? $appmaxValorTotal : null) . '</div>';
+            foreach ($appmaxPagamentos as $pg) {
+                echo '<hr class="my-2"><table class="table table-sm mb-0">';
+                $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
+                foreach ($fields as $f) {
+                    if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                    $val = (string)$pg[$f];
+                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '…';
+                    if ($f === 'invoice_url' || $f === 'bank_slip_url') {
+                        $val = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
+                    } else {
+                        $val = $h($val);
+                    }
+                    echo '<tr><td class="text-muted" style="width:140px">' . $h($f) . '</td><td>' . $val . '</td></tr>';
+                }
+                echo '</table>';
+            }
+        }
+        echo '</div></div></div>';
+
+        // Câmbio Real card
+        echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-success text-white"><strong><i class="fas fa-exchange-alt me-1"></i>Câmbio Real</strong></div><div class="card-body">';
+        if (empty($cambioRealPagamentos)) {
+            echo '<div class="text-muted">Nenhum pagamento Câmbio Real encontrado.</div>';
+        } else {
+            echo '<div class="mb-2"><strong>Valor Câmbio Real (BRL):</strong> ' . $fmtBrl($cambioRealValorTotal > 0 ? $cambioRealValorTotal : null) . '</div>';
+            foreach ($cambioRealPagamentos as $pg) {
+                echo '<hr class="my-2"><table class="table table-sm mb-0">';
+                $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
+                foreach ($fields as $f) {
+                    if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                    $val = (string)$pg[$f];
+                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '…';
+                    if ($f === 'invoice_url' || $f === 'bank_slip_url') {
+                        $val = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
+                    } else {
+                        $val = $h($val);
+                    }
+                    echo '<tr><td class="text-muted" style="width:140px">' . $h($f) . '</td><td>' . $val . '</td></tr>';
+                }
+                echo '</table>';
+            }
+        }
+        echo '</div></div></div>';
+        echo '</div>'; // end row cards
+
+        // Split detalhado — sem coluna Link, status em português
         if (!empty($pagamentos)) {
             echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-code-branch me-1"></i>Split de Pagamento</strong></div><div class="card-body">
 <div class="table-responsive"><table class="table table-sm">
-<thead><tr><th>Componente</th><th>Gateway</th><th>Método</th><th>Moeda</th><th>Valor</th><th>Status</th><th>Link</th></tr></thead><tbody>';
+<thead><tr><th>Componente</th><th>Gateway</th><th>Método</th><th>Moeda</th><th>Valor</th><th>Status</th></tr></thead><tbody>';
             foreach ($pagamentos as $pg) {
                 $gw = strtolower((string)($pg['gateway'] ?? ''));
                 $gwLabel = $gw !== '' ? strtoupper($gw) : '-';
                 if ($gw === 'cambioreal') $gwLabel = 'Câmbio Real';
                 if ($gw === 'appmax') $gwLabel = 'AppMax';
-                $url = trim((string)($pg['invoice_url'] ?? ($pg['bank_slip_url'] ?? '')));
-                $pix = trim((string)($pg['pix_payload'] ?? ''));
-                $link = $url !== '' ? '<a href="' . $h($url) . '" target="_blank">Abrir</a>' : ($pix !== '' ? '<span class="text-muted small">PIX</span>' : '-');
+                $statusRaw = (string)($pg['status'] ?? '');
                 echo '<tr>
                     <td>' . $h($pg['componente'] ?? '') . '</td>
                     <td>' . $h($gwLabel) . '</td>
                     <td>' . $h($pg['metodo'] ?? '') . '</td>
                     <td>' . $h(strtoupper((string)($pg['moeda'] ?? ''))) . '</td>
                     <td>' . number_format((float)($pg['valor'] ?? 0), 2, ',', '.') . '</td>
-                    <td>' . $h($pg['status'] ?? '') . '</td>
-                    <td>' . $link . '</td>
+                    <td>' . $h($traduzirStatus($statusRaw)) . '</td>
                 </tr>';
             }
             echo '</tbody></table></div></div></div>';
         }
 
         // Medidas
-        $pesoTotal = (float)($pedido['peso_total'] ?? 0);
-        $altura = (float)($pedido['altura'] ?? 0);
-        $largura = (float)($pedido['largura'] ?? 0);
+        $pesoTotal   = (float)($pedido['peso_total'] ?? 0);
+        $altura      = (float)($pedido['altura'] ?? 0);
+        $largura     = (float)($pedido['largura'] ?? 0);
         $comprimento = (float)($pedido['comprimento'] ?? 0);
         if ($pesoTotal > 0 || $altura > 0) {
             echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-ruler-combined me-1"></i>Medidas e Peso</strong></div><div class="card-body">
@@ -637,25 +735,54 @@ class AdminRemessaConferenciaController extends Controller {
 </div></div></div>';
         }
 
-        // Informações úteis
+        // Informações Úteis — inclui todos os dados de pedido_pagamentos agrupados por gateway
+        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info me-1"></i>Informações Úteis</strong></div><div class="card-body">';
         $useful = [
-            'Código do pedido' => $pedido['codigo_pedido'] ?? $pedido['codigo'] ?? '',
-            'Gateway' => $pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? '',
-            'ID transação' => $pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '',
-            'Status pagamento' => $pedido['pagamento_status'] ?? $pedido['payment_status'] ?? '',
-            'Moeda' => $moeda,
-            'Observação vendedor' => $pedido['observacao_vendedor'] ?? '',
+            'Código do pedido'   => $pedido['codigo_pedido'] ?? $pedido['codigo'] ?? '',
+            'Gateway'            => $pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? '',
+            'ID transação'       => $pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '',
+            'Status pagamento'   => $pedido['pagamento_status'] ?? $pedido['payment_status'] ?? '',
+            'Moeda'              => $moeda,
+            'Observação vendedor'=> $pedido['observacao_vendedor'] ?? '',
             'Observação cliente' => $pedido['observacao_cliente'] ?? ($pedido['customer_note'] ?? ''),
-            'Criado em' => !empty($pedido['created_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['created_at'])) : '',
-            'Atualizado em' => !empty($pedido['updated_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['updated_at'])) : '',
+            'Criado em'          => !empty($pedido['created_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['created_at'])) : '',
+            'Atualizado em'      => !empty($pedido['updated_at']) ? date('d/m/Y H:i:s', strtotime((string)$pedido['updated_at'])) : '',
         ];
-        echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info me-1"></i>Informações Úteis</strong></div><div class="card-body">
-<table class="table table-sm mb-0">';
+        echo '<table class="table table-sm mb-3">';
         foreach ($useful as $k => $v) {
             if ((string)$v === '') continue;
             echo '<tr><td class="text-muted" style="width:200px">' . $h($k) . '</td><td>' . $h($v) . '</td></tr>';
         }
-        echo '</table></div></div>';
+        echo '</table>';
+
+        // Dados completos de pedido_pagamentos agrupados por gateway
+        $gwGroups = [];
+        foreach ($pagamentos as $pg) {
+            $gw = strtolower((string)($pg['gateway'] ?? 'outro'));
+            $gwGroups[$gw][] = $pg;
+        }
+        $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
+        foreach ($gwGroups as $gwKey => $pgList) {
+            $gwLabel = $gwKey === 'appmax' ? 'AppMax' : ($gwKey === 'cambioreal' ? 'Câmbio Real' : strtoupper($gwKey));
+            echo '<h6 class="mt-3 mb-2 text-secondary border-bottom pb-1">' . $h($gwLabel) . '</h6>';
+            foreach ($pgList as $i => $pg) {
+                if (count($pgList) > 1) echo '<div class="text-muted small mb-1">Registro #' . ($i + 1) . '</div>';
+                echo '<table class="table table-sm mb-2">';
+                foreach ($allFields as $f) {
+                    if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                    $val = (string)$pg[$f];
+                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '…';
+                    if ($f === 'invoice_url' || $f === 'bank_slip_url') {
+                        $display = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
+                    } else {
+                        $display = $h($val);
+                    }
+                    echo '<tr><td class="text-muted" style="width:160px">' . $h($f) . '</td><td>' . $display . '</td></tr>';
+                }
+                echo '</table>';
+            }
+        }
+        echo '</div></div>';
 
         echo '</main></div></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -681,8 +808,227 @@ function uploadDoc(tipo) {
         else alert("Erro: " + (d.error || "Falha"));
     }).catch(() => alert("Erro ao enviar"));
 }
+function confirmarRecebimento() {
+    if (!confirm("Confirmar que o pacote foi recebido fisicamente no armazém?")) return;
+    const btn = document.getElementById("btnConfirmarRecebimento");
+    if (btn) { btn.disabled = true; btn.textContent = "Confirmando..."; }
+    fetch("/admin/remessa-conferencia/janela/" + jid + "/pedido/" + pid + "/confirmar-recebimento", {
+        method: "POST", headers: {"Content-Type":"application/x-www-form-urlencoded"}, body: ""
+    }).then(r => r.json()).then(d => {
+        if (d.success) { alert("Recebimento confirmado!"); location.reload(); }
+        else { alert("Erro: " + (d.error || "Falha")); if (btn) { btn.disabled = false; btn.textContent = "✓ Confirmar Recebimento"; } }
+    }).catch(() => { alert("Erro ao confirmar"); if (btn) { btn.disabled = false; } });
+}
 </script>
 </body></html>';
+        exit;
+    }
+
+    public function confirmarRecebimento($request, $janelaId, $pedidoId) {
+        $this->requireAccess();
+        $jid = (int)$janelaId; $pid = (int)$pedidoId;
+        try {
+            $this->ensureDocumentosTable();
+            $st = $this->connection->prepare("UPDATE remessa_janela_pedidos SET recebido_confirmado = 1, recebido_confirmado_em = NOW() WHERE janela_id = ? AND pedido_id = ?");
+            $st->execute([$jid, $pid]);
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) { echo json_encode(['success' => false, 'error' => $e->getMessage()]); }
+        exit;
+    }
+
+    public function gerarComprovante($request, $janelaId, $pedidoId, $gateway) {
+        $this->requireAccess();
+        $jid = (int)$janelaId; $pid = (int)$pedidoId;
+        $gateway = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string)$gateway));
+
+        $pedido = $this->getPedidoCompleto($pid);
+        if (!$pedido) { echo '<p>Pedido não encontrado.</p>'; exit; }
+
+        $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moeda === '') $moeda = 'USD';
+        $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
+
+        $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
+        $gwLabel = $gateway === 'appmax' ? 'AppMax' : ($gateway === 'cambioreal' ? 'Câmbio Real' : strtoupper($gateway));
+        $totalGw = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $pagamentos));
+        $itens = $pedido['itens'] ?? [];
+        $dataHoje = date('d/m/Y H:i');
+
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Comprovante ' . $h($gwLabel) . ' - Pedido #' . $pid . '</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
+h1{font-size:20px;margin-bottom:4px}
+h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}
+th{background:#f5f5f5}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.logo{font-size:22px;font-weight:bold;color:#1a5276}
+.print-btn{position:fixed;top:20px;right:20px}
+@media print{.print-btn{display:none}}
+</style></head><body>
+<div class="print-btn"><button onclick="window.print()">🖨 Imprimir</button></div>
+<div class="header">
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div>
+    <div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div>
+</div>
+<h2>Dados do Pedido</h2>
+<table>
+<tr><th>Pedido</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>Data</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
+<tr><th>Cliente</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+</table>
+<h2>Dados do Pagamento — ' . $h($gwLabel) . '</h2>';
+
+        $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
+        foreach ($pagamentos as $i => $pg) {
+            if (count($pagamentos) > 1) echo '<p><strong>Registro #' . ($i + 1) . '</strong></p>';
+            echo '<table>';
+            foreach ($allFields as $f) {
+                if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                $val = (string)$pg[$f];
+                if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '…';
+                echo '<tr><th style="width:160px">' . $h($f) . '</th><td>' . $h($val) . '</td></tr>';
+            }
+            echo '</table>';
+        }
+
+        echo '<h2>Itens</h2><table><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
+        $idx = 1;
+        foreach ($itens as $it) {
+            $pu = null;
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
+                if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
+            }
+            $qtdIt = (int)($it['quantidade'] ?? 0);
+            $totIt = $pu !== null ? $pu * $qtdIt : null;
+            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
+            $idx++;
+        }
+        echo '</tbody></table>';
+
+        echo '<h2>Totais</h2><table>';
+        $totFields = ['subtotal' => 'Subtotal','frete' => 'Frete','desconto' => 'Desconto','imposto_local' => 'Imposto local','total' => 'Total'];
+        foreach ($totFields as $col => $label) {
+            if (isset($pedido[$col]) && is_numeric($pedido[$col])) {
+                echo '<tr><th>' . $label . '</th><td>' . $fmtMoeda((float)$pedido[$col], $moeda) . '</td></tr>';
+            }
+        }
+        echo '<tr><th>Total ' . $h($gwLabel) . '</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+        echo '</table></body></html>';
+        exit;
+    }
+
+    public function gerarInvoice($request, $janelaId, $pedidoId) {
+        $this->requireAccess();
+        $jid = (int)$janelaId; $pid = (int)$pedidoId;
+
+        $pedido = $this->getPedidoCompleto($pid);
+        if (!$pedido) { echo '<p>Pedido não encontrado.</p>'; exit; }
+
+        $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moeda === '') $moeda = 'USD';
+        $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
+
+        $itens = $pedido['itens'] ?? [];
+        $pagamentos = $pedido['pagamentos'] ?? [];
+        $end = $pedido['endereco'] ?? null;
+        $logr   = is_array($end) ? trim((string)($end['endereco'] ?? ($end['logradouro'] ?? ''))) : '';
+        $num    = is_array($end) ? trim((string)($end['numero'] ?? '')) : '';
+        $compl  = is_array($end) ? trim((string)($end['complemento'] ?? '')) : '';
+        $bairro = is_array($end) ? trim((string)($end['bairro'] ?? '')) : '';
+        $cidade = is_array($end) ? trim((string)($end['cidade'] ?? '')) : '';
+        $estado = is_array($end) ? trim((string)($end['estado'] ?? '')) : '';
+        $cep    = is_array($end) ? trim((string)($end['cep'] ?? ($end['zip_code'] ?? ''))) : '';
+        $pais   = is_array($end) ? trim((string)($end['pais'] ?? ($end['country'] ?? 'BR'))) : 'BR';
+        $dataHoje = date('d/m/Y H:i');
+
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Invoice - Pedido #' . $pid . '</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
+h1{font-size:22px;margin-bottom:4px}
+h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}
+th{background:#f5f5f5}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.logo{font-size:24px;font-weight:bold;color:#1a5276}
+.print-btn{position:fixed;top:20px;right:20px}
+.totals td:last-child{text-align:right}
+@media print{.print-btn{display:none}}
+</style></head><body>
+<div class="print-btn"><button onclick="window.print()">🖨 Imprimir</button></div>
+<div class="header">
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div>
+    <div style="text-align:right">
+        <div><strong>Invoice #:</strong> ' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</div>
+        <div><strong>Data:</strong> ' . $dataHoje . '</div>
+        <div><strong>Moeda:</strong> ' . $h($moeda) . '</div>
+    </div>
+</div>
+
+<h2>Dados do Cliente</h2>
+<table>
+<tr><th>Nome</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>CPF/Doc</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>Telefone</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr>
+<tr><th>Suíte</th><td>' . $h($pedido['cliente_suite'] ?? '') . '</td><th>Status pedido</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+</table>
+
+<h2>Endereço de Entrega</h2>
+<table>
+<tr><th>Logradouro</th><td>' . $h($logr . ($num !== '' ? ', ' . $num : '') . ($compl !== '' ? ' - ' . $compl : '')) . '</td><th>Bairro</th><td>' . $h($bairro) . '</td></tr>
+<tr><th>Cidade</th><td>' . $h($cidade) . '</td><th>Estado</th><td>' . $h($estado) . '</td></tr>
+<tr><th>CEP</th><td>' . $h($cep) . '</td><th>País</th><td>' . $h($pais) . '</td></tr>
+</table>
+
+<h2>Itens</h2>
+<table>
+<thead><tr><th>#</th><th>Imagem</th><th>Produto / Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
+<tbody>';
+        $idx = 1;
+        foreach ($itens as $it) {
+            $pu = null;
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
+                if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
+            }
+            $qtdIt = (int)($it['quantidade'] ?? 0);
+            $totIt = $pu !== null ? $pu * $qtdIt : null;
+            $foto = trim((string)($it['foto_produto'] ?? ''));
+            if ($foto !== '' && !str_starts_with($foto, 'http')) $foto = '/' . ltrim($foto, '/');
+            $imgTag = $foto !== '' ? '<img src="' . $h($foto) . '" style="width:40px;height:40px;object-fit:cover">' : '-';
+            echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
+            $idx++;
+        }
+        echo '</tbody></table>';
+
+        echo '<h2>Resumo de Pagamento</h2><table>';
+        $totalBrl = 0.0;
+        $metodoPagamento = (string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''));
+        $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
+        foreach ($pagamentos as $pg) {
+            $v = (float)($pg['valor'] ?? 0);
+            $m = strtolower((string)($pg['moeda'] ?? 'BRL'));
+            if ($m === 'brl') $totalBrl += $v;
+            if ($metodoPagamento === '' && isset($pg['metodo'])) $metodoPagamento = (string)$pg['metodo'];
+        }
+        echo '<tr><th>Método</th><td>' . $h($metodoPagamento) . '</td></tr>';
+        echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
+        echo '<tr><th>Total pago (BRL)</th><td>R$ ' . number_format($totalBrl, 2, ',', '.') . '</td></tr>';
+        echo '</table>';
+
+        echo '<h2>Totais</h2><table class="totals">';
+        $totFields = ['subtotal' => 'Subtotal','frete' => 'Frete','desconto' => 'Desconto','imposto_local' => 'Imposto local','total' => 'Total'];
+        foreach ($totFields as $col => $label) {
+            if (isset($pedido[$col]) && is_numeric($pedido[$col])) {
+                $bold = $col === 'total' ? ' style="font-weight:bold"' : '';
+                echo '<tr' . $bold . '><th>' . $label . '</th><td>' . $fmtMoeda((float)$pedido[$col], $moeda) . '</td></tr>';
+            }
+        }
+        echo '</table></body></html>';
         exit;
     }
 }
