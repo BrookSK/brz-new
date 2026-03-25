@@ -1,4 +1,7 @@
 <?php
+// Timezone padrão: São Paulo
+date_default_timezone_set('America/Sao_Paulo');
+
 // Iniciar sessão antes de qualquer output
 $sessionLifetime = 60 * 60 * 24 * 7;
 ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
