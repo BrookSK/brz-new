@@ -1378,6 +1378,7 @@ function fecharJanela() {
                     <a class="btn btn-outline-secondary" href="/admin/remessa-internacional/janela/' . (int) $jid . '"><i class="fas fa-arrow-left"></i> Voltar</a>
                     ' . ($wxShipId !== '' ? ('<a class="btn btn-outline-primary" href="/admin/remessa-internacional/janela/' . (int) $jid . '/pedido/' . (int) $pid . '/etiqueta-download" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>') : '') . '
                     <button class="btn btn-success" type="button" onclick="gerarEtiqueta()" ' . ($wxHasLabel ? 'disabled' : '') . '><i class="fas fa-tag"></i> ' . ($wxHasLabel ? 'Etiqueta já gerada' : 'Gerar etiqueta') . '</button>
+                    ' . ($wxHasLabel ? '<button class="btn btn-warning" type="button" onclick="regerarEtiqueta()"><i class="fas fa-redo"></i> Regerar etiqueta</button>' : '') . '
                 </div>
             </div>
 
@@ -1522,6 +1523,24 @@ function gerarEtiqueta() {
         })
         .catch(err => alert("Erro: " + err.message));
 }
+
+function regerarEtiqueta() {
+    if (!confirm("Isso vai cancelar a etiqueta atual e gerar uma nova. Continuar?")) return;
+    fetch("/admin/remessa-internacional/janela/" + janelaId + "/pedido/" + pedidoId + "/resetar-etiqueta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+    })
+        .then(r => r.json().catch(() => ({})))
+        .then(data => {
+            if (data.success) {
+                gerarEtiqueta();
+            } else {
+                alert("Erro ao resetar: " + (data.error || JSON.stringify(data)));
+            }
+        })
+        .catch(err => alert("Erro: " + err.message));
+}
 </script>
 </body>
 </html>';
@@ -1654,6 +1673,37 @@ function gerarEtiqueta() {
             }
 
             echo json_encode(['success' => true, 'wexpress_status' => $wxStatus, 'shipping_id' => $wxShipId]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function resetarEtiqueta($request, $janelaId, $pedidoId) {
+        $this->requireAdmin();
+        $jid = (int) $janelaId;
+        $pid = (int) $pedidoId;
+        if ($jid <= 0 || $pid <= 0) {
+            echo json_encode(['success' => false, 'error' => 'Parâmetros inválidos']);
+            exit;
+        }
+        try {
+            $st = $this->connection->prepare(
+                'UPDATE remessa_janela_pedidos
+                 SET etiqueta_gerada = 0,
+                     etiqueta_gerada_em = NULL,
+                     wexpress_shipping_id = NULL,
+                     wexpress_tracking_number = NULL,
+                     courier_tracking_number = NULL,
+                     wexpress_status = NULL,
+                     wexpress_last_request_json = NULL,
+                     wexpress_last_response_json = NULL,
+                     wexpress_last_http_code = NULL,
+                     wexpress_updated_at = NOW()
+                 WHERE janela_id = ? AND pedido_id = ?'
+            );
+            $st->execute([$jid, $pid]);
+            echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -1843,6 +1893,36 @@ function gerarEtiqueta() {
             'items' => $items,
         ];
     }
+    public function resetarEtiqueta($request, $janelaId, $pedidoId) {
+            $this->requireAdmin();
+            $jid = (int) $janelaId;
+            $pid = (int) $pedidoId;
+            if ($jid <= 0 || $pid <= 0) {
+                echo json_encode(['success' => false, 'error' => 'Parâmetros inválidos']);
+                exit;
+            }
+            try {
+                $st = $this->connection->prepare(
+                    'UPDATE remessa_janela_pedidos
+                     SET etiqueta_gerada = 0,
+                         etiqueta_gerada_em = NULL,
+                         wexpress_shipping_id = NULL,
+                         wexpress_tracking_number = NULL,
+                         courier_tracking_number = NULL,
+                         wexpress_status = NULL,
+                         wexpress_last_request_json = NULL,
+                         wexpress_last_response_json = NULL,
+                         wexpress_last_http_code = NULL,
+                         wexpress_updated_at = NOW()
+                     WHERE janela_id = ? AND pedido_id = ?'
+                );
+                $st->execute([$jid, $pid]);
+                echo json_encode(['success' => true]);
+            } catch (\Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            exit;
+        }
 
     private function getUsdToBrlRate(): float {
         try {
