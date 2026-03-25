@@ -978,7 +978,15 @@ th{background:#f5f5f5}
             $qtdIt = (int)($it['quantidade'] ?? 0);
             $totIt = $pu !== null ? $pu * $qtdIt : null;
             $foto = trim((string)($it['foto_produto'] ?? ''));
-            if ($foto !== '' && !str_starts_with($foto, 'http')) $foto = '/' . ltrim($foto, '/');
+            if ($foto !== '') {
+                // Converter para URL absoluta para o Dompdf conseguir carregar
+                if (!str_starts_with($foto, 'http')) {
+                    $foto = '/' . ltrim($foto, '/');
+                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost');
+                    $foto = $scheme . '://' . $host . $foto;
+                }
+            }
             $imgTag = $foto !== '' ? '<img src="' . $h($foto) . '" style="width:40px;height:40px;object-fit:cover">' : '-';
             echo '<tr><td>' . $idx . '</td><td>' . $imgTag . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
             $idx++;
