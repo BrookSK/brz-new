@@ -201,11 +201,12 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                             </h5>
                         </div>
                         <div class="card-body">
+                            <?php
+                            $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
+                            if ($moedaPedido === '') $moedaPedido = 'BRL';
+                            $simboloMoeda = ($moedaPedido === 'BRL') ? 'R$' : 'US$';
+                            ?>
                             <?php if (!empty($pedido['items'])): ?>
-                                <?php
-                                $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
-                                $simboloMoeda = ($moedaPedido === 'BRL') ? 'R$' : 'US$';
-                                ?>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
                                         <?php
