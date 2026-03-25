@@ -507,7 +507,7 @@ class AdminRemessaConferenciaController extends Controller {
         } else {
             echo '<button class="btn btn-success" id="btnConfirmarRecebimento" onclick="confirmarRecebimento()"
                 title="Confirmar que o pacote foi recebido fisicamente no armazém. Isso marca o pedido como recebido no sistema e notifica a equipe.">
-                <i class="fas fa-check me-1"></i>✓ Confirmar Recebimento
+                Confirmar Recebimento
             </button>
             <small class="text-muted d-block" style="font-size:0.7rem;max-width:180px">Confirma recebimento físico no armazém</small>';
         }
@@ -630,18 +630,6 @@ class AdminRemessaConferenciaController extends Controller {
         echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtBrl($impostoValor > 0 ? $impostoValor : null) . '</td></tr>';
         echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtBrl($impostoLocal > 0 ? $impostoLocal : null) . '</td></tr>';
         echo '</table></div></div></div>';
-
-        // Totais direto do banco
-        echo '<div class="col-md-6">
-<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-calculator me-1"></i>Totais</strong></div><div class="card-body">
-<table class="table table-sm mb-0">
-<tr><td class="text-muted">Subtotal</td><td>' . $fmtMoeda($subtotal, $moeda) . '</td></tr>
-<tr><td class="text-muted">Frete</td><td>' . $fmtMoeda($frete, $moeda) . '</td></tr>
-<tr><td class="text-muted">Desconto</td><td>' . $fmtMoeda($desconto, $moeda) . '</td></tr>
-<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impLocal, $moeda) . '</td></tr>
-<tr class="fw-bold"><td>Total</td><td>' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>
-</table></div></div>
-</div></div>';
 
         // Cards AppMax e Câmbio Real lado a lado
         echo '<div class="row mb-3">';
@@ -855,21 +843,18 @@ function confirmarRecebimento() {
         $itens = $pedido['itens'] ?? [];
         $dataHoje = date('d/m/Y H:i');
 
+        ob_start();
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Comprovante ' . $h($gwLabel) . ' - Pedido #' . $pid . '</title>
 <style>
 body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
-h1{font-size:20px;margin-bottom:4px}
 h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
 table{width:100%;border-collapse:collapse;margin-top:8px}
 th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}
-th{background:#f5f5f5}
+th{background:#f5f5f5;width:160px}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 .logo{font-size:22px;font-weight:bold;color:#1a5276}
-.print-btn{position:fixed;top:20px;right:20px}
-@media print{.print-btn{display:none}}
 </style></head><body>
-<div class="print-btn"><button onclick="window.print()">🖨 Imprimir</button></div>
 <div class="header">
     <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div>
     <div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div>
@@ -890,7 +875,7 @@ th{background:#f5f5f5}
                 if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
                 $val = (string)$pg[$f];
                 if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '…';
-                echo '<tr><th style="width:160px">' . $h($f) . '</th><td>' . $h($val) . '</td></tr>';
+                echo '<tr><th>' . $h($f) . '</th><td>' . $h($val) . '</td></tr>';
             }
             echo '</table>';
         }
@@ -908,16 +893,13 @@ th{background:#f5f5f5}
             $idx++;
         }
         echo '</tbody></table>';
-
-        echo '<h2>Totais</h2><table>';
-        $totFields = ['subtotal' => 'Subtotal','frete' => 'Frete','desconto' => 'Desconto','imposto_local' => 'Imposto local','total' => 'Total'];
-        foreach ($totFields as $col => $label) {
-            if (isset($pedido[$col]) && is_numeric($pedido[$col])) {
-                echo '<tr><th>' . $label . '</th><td>' . $fmtMoeda((float)$pedido[$col], $moeda) . '</td></tr>';
-            }
-        }
-        echo '<tr><th>Total ' . $h($gwLabel) . '</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+        echo '<h2>Total ' . $h($gwLabel) . '</h2><table>';
+        echo '<tr><th>Total pago</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
         echo '</table></body></html>';
+        $html = ob_get_clean();
+
+        $fname = 'comprovante_' . $gateway . '_pedido_' . $pid . '_' . date('Ymd') . '.pdf';
+        $this->renderPdf($html, $fname);
         exit;
     }
 
@@ -946,6 +928,7 @@ th{background:#f5f5f5}
         $pais   = is_array($end) ? trim((string)($end['pais'] ?? ($end['country'] ?? 'BR'))) : 'BR';
         $dataHoje = date('d/m/Y H:i');
 
+        ob_start();
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Invoice - Pedido #' . $pid . '</title>
 <style>
@@ -957,11 +940,8 @@ th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}
 th{background:#f5f5f5}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 .logo{font-size:24px;font-weight:bold;color:#1a5276}
-.print-btn{position:fixed;top:20px;right:20px}
 .totals td:last-child{text-align:right}
-@media print{.print-btn{display:none}}
 </style></head><body>
-<div class="print-btn"><button onclick="window.print()">🖨 Imprimir</button></div>
 <div class="header">
     <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div>
     <div style="text-align:right">
@@ -1029,6 +1009,33 @@ th{background:#f5f5f5}
             }
         }
         echo '</table></body></html>';
+        $html = ob_get_clean();
+
+        $fname = 'invoice_pedido_' . $pid . '_' . date('Ymd') . '.pdf';
+        $this->renderPdf($html, $fname);
         exit;
+    }
+
+    private function renderPdf(string $html, string $filename): void {
+        $dompdfClass = 'Dompdf\\Dompdf';
+        if (class_exists($dompdfClass)) {
+            try {
+                $dompdf = new $dompdfClass(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+                header('Cache-Control: private, max-age=0, must-revalidate');
+                echo $dompdf->output();
+                return;
+            } catch (\Throwable $e) {}
+        }
+        // Fallback: download como HTML
+        $htmlFilename = str_replace('.pdf', '.html', $filename);
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $htmlFilename . '"');
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        echo $html;
     }
 }
