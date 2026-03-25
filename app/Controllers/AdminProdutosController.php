@@ -1633,10 +1633,25 @@ class AdminProdutosController extends Controller {
         if (!$this->ensureCadastroRapidoAccess($request)) {
             return;
         }
+
+        $isAjax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+            || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+            || ($request->getParam('_ajax') === '1');
+
         try {
             $created = $this->salvarCadastroRapido($request);
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['ok' => true, 'id' => $created['id'], 'name' => $created['name'], 'foto_principal' => $created['foto_principal']]);
+                exit;
+            }
             $this->renderCadastroRapidoGrupos($created, null);
         } catch (\Exception $e) {
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+                exit;
+            }
             $this->renderCadastroRapidoGrupos(null, $e->getMessage());
         }
     }
@@ -1988,9 +2003,14 @@ class AdminProdutosController extends Controller {
                     <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
                     <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
                 </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="manterDadosSwitch">
+                    <label class="form-check-label fw-semibold" for="manterDadosSwitch">Manter dados após salvar</label>
+                </div>
+                <div id="produtoMsg" class="mb-2"></div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary flex-fill" id="btnVoltarStep2">← Voltar</button>
-                    <button type="submit" class="btn btn-primary flex-fill btn-lg"><i class="fas fa-bolt me-2"></i>Salvar</button>
+                    <button type="submit" class="btn btn-primary flex-fill btn-lg" id="btnSalvarProduto"><i class="fas fa-bolt me-2"></i>Salvar</button>
                 </div>
             </form>
         </div>
@@ -2368,14 +2388,64 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
     }
 });
 
-renderGrupos();
-</script>
-</body>
-</html>';
-        exit;
+// Submit AJAX do formulário individual (com suporte a "Manter dados")
+document.getElementById("formProduto").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnSalvarProduto");
+    const msg = document.getElementById("produtoMsg");
+    const manterDados = document.getElementById("manterDadosSwitch").checked;
+
+    btn.disabled = true;
+    btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-2"></i>Salvando...\';
+    msg.innerHTML = "";
+
+    const fd = new FormData(this);
+
+    try {
+        const resp = await fetch("/admin/produtos/cadastro-rapido/salvar", { method: "POST", body: fd, headers: {"X-Requested-With": "XMLHttpRequest"} });
+        const json = await resp.json();
+
+        if (json.ok) {
+            if (manterDados) {
+                const fotoPath = json.foto_principal || null;
+                if (fotoPath) {
+                    let reutilizarInput = document.getElementById("reutilizarFotoInput");
+                    if (!reutilizarInput) {
+                        reutilizarInput = document.createElement("input");
+                        reutilizarInput.type = "hidden";
+                        reutilizarInput.id = "reutilizarFotoInput";
+                        reutilizarInput.name = "reutilizar_foto";
+                        this.appendChild(reutilizarInput);
+                    }
+                    reutilizarInput.value = fotoPath;
+                }
+                document.getElementById("capaInput").value = "";
+                msg.innerHTML = \'<div class="alert alert-success py-2 small" style="border-radius:12px;"><i class="fas fa-check-circle me-1"></i>Produto salvo! Dados mantidos para o próximo.</div>\';
+                this.querySelector(\'input[name="name"]\').value = "";
+                this.querySelector(\'input[name="name"]\').focus();
+            } else {
+                const successArea = document.getElementById("successArea");
+                if (successArea && json.html) {
+                    successArea.innerHTML = json.html;
+                } else {
+                    msg.innerHTML = \'<div class="alert alert-success" style="border-radius:14px;"><i class="fas fa-check-circle me-2"></i>Produto cadastrado com sucesso!</div>\'
+                        + \'<div class="d-grid gap-2 mt-2"><a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a></div>\';
+                }
+                this.reset();
+                document.getElementById("capaPreview").innerHTML = "";
+            }
+        } else {
+            msg.innerHTML = \'<div class="alert alert-danger py-2 small" style="border-radius:12px;"><i class="fas fa-times-circle me-1"></i>\' + (json.error || json.msg || "Erro ao salvar.") + \'</div>\';
+        }
+    } catch (err) {
+        msg.innerHTML = \'<div class="alert alert-danger py-2 small" style="border-radius:12px;"><i class="fas fa-times-circle me-1"></i>Erro de conexão. Tente novamente.</div>\';
     }
 
-    private function ensureCadastroRapidoAccess(Request $request): bool {
+    btn.disabled = false;
+    btn.innerHTML = \'<i class="fas fa-bolt me-2"></i>Salvar\';
+});
+
+renderGrupos();(Request $request): bool {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
