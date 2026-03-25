@@ -710,7 +710,7 @@ class AdminRemessaCorreiosController extends Controller {
                                                 <td>#' . str_pad($remessa['pedido_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($remessa['created_at'])) . '</td>
-                                                <td>' . number_format($remessa['peso_total'] ?? 1.0, 3, ',', '.') . ' kg</td>
+                                                <td>' . ($remessa['peso_total'] !== null && (float)$remessa['peso_total'] > 0 ? number_format((float)$remessa['peso_total'], 3, ',', '.') . ' kg' : '<span class="text-muted">—</span>') . '</td>
                                                 <td>R$ ' . number_format($remessa['valor_total'] ?? 0, 2, ',', '.') . '</td>
                                                 <td>
                                                     <button class="btn btn-sm btn-purple" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')">
@@ -1375,6 +1375,7 @@ class AdminRemessaCorreiosController extends Controller {
         }
 
         $totalExpr = (is_array($colsPedidos) && in_array('total', $colsPedidos, true)) ? 'p.total' : (in_array('valor_total', $colsPedidos, true) ? 'p.valor_total' : '0');
+        $pesoExpr = (is_array($colsPedidos) && in_array('peso_total', $colsPedidos, true)) ? 'p.peso_total' : 'NULL';
 
         $stmt = $this->connection->prepare(" 
             SELECT
@@ -1383,7 +1384,8 @@ class AdminRemessaCorreiosController extends Controller {
                 u.nome as cliente_nome,
                 p.usuario_id,
                 p.created_at,
-                {$totalExpr} as valor_total
+                {$totalExpr} as valor_total,
+                {$pesoExpr} as peso_total
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             {$joinEndereco}
