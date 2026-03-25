@@ -1712,104 +1712,212 @@ class AdminRemessaCorreiosController extends Controller {
         $etiquetaId = $request->getParam('id');
         
         try {
-            $stmt = $this->connection->prepare(" 
-                SELECT * FROM correios_etiquetas WHERE id = ?
-            ");
+            $stmt = $this->connection->prepare("SELECT * FROM correios_etiquetas WHERE id = ?");
             $stmt->execute([$etiquetaId]);
             $etiqueta = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$etiqueta) {
-                echo '<div class="alert alert-danger">Etiqueta não encontrada</div>';
-                exit;
+                echo '<p>Etiqueta não encontrada</p>'; exit;
             }
             
             // Marcar como impressa
-            $stmt = $this->connection->prepare(" 
-                UPDATE correios_etiquetas 
-                SET status = 'impressa', data_impressao = NOW() 
-                WHERE id = ?
-            ");
-            $stmt->execute([$etiquetaId]);
+            $this->connection->prepare("UPDATE correios_etiquetas SET status = 'impressa', data_impressao = COALESCE(data_impressao, NOW()) WHERE id = ?")->execute([$etiquetaId]);
             
-            // Gerar HTML da etiqueta para impressão
-            $dadosRemetente = json_decode($etiqueta['dados_remetente'], true);
-            $dadosDestinatario = json_decode($etiqueta['dados_destinatario'], true);
+            $dadosRemetente    = json_decode((string)($etiqueta['dados_remetente'] ?? ''), true) ?: [];
+            $dadosDestinatario = json_decode((string)($etiqueta['dados_destinatario'] ?? ''), true) ?: [];
             
-            $codigo = (string) ($etiqueta['codigo_etiqueta'] ?? '');
+            $codigo    = (string)($etiqueta['codigo_etiqueta'] ?? '');
             $codigoHtml = htmlspecialchars($codigo, ENT_QUOTES, 'UTF-8');
-            $codigoJs = json_encode($codigo);
+            $codigoJs   = json_encode($codigo);
 
-            $remNome = htmlspecialchars((string) ($dadosRemetente['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $remEnd = htmlspecialchars((string) ($dadosRemetente['endereco'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $remCidadeUf = htmlspecialchars((string) (($dadosRemetente['cidade'] ?? '') . '/' . ($dadosRemetente['estado'] ?? '')), ENT_QUOTES, 'UTF-8');
-            $remCep = htmlspecialchars((string) ($dadosRemetente['cep'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 
-            $destNome = htmlspecialchars((string) ($dadosDestinatario['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $destEnd = htmlspecialchars((string) ($dadosDestinatario['endereco'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $destCidadeUf = htmlspecialchars((string) (($dadosDestinatario['cidade'] ?? '') . '/' . ($dadosDestinatario['estado'] ?? '')), ENT_QUOTES, 'UTF-8');
-            $destCep = htmlspecialchars((string) ($dadosDestinatario['cep'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $remNome  = $h($dadosRemetente['nome'] ?? '');
+            $remEnd   = $h($dadosRemetente['endereco'] ?? '');
+            $remNum   = $h($dadosRemetente['numero'] ?? '');
+            $remCompl = $h($dadosRemetente['complemento'] ?? '');
+            $remBairro= $h($dadosRemetente['bairro'] ?? '');
+            $remCidade= $h($dadosRemetente['cidade'] ?? '');
+            $remUf    = $h($dadosRemetente['estado'] ?? '');
+            $remCep   = $h($dadosRemetente['cep'] ?? '');
+            $remCnpj  = $h($dadosRemetente['cpfCnpj'] ?? ($dadosRemetente['cnpj'] ?? ''));
+
+            $destNome  = $h($dadosDestinatario['nome'] ?? '');
+            $destEnd   = $h($dadosDestinatario['endereco'] ?? '');
+            $destNum   = $h($dadosDestinatario['numero'] ?? '');
+            $destCompl = $h($dadosDestinatario['complemento'] ?? '');
+            $destBairro= $h($dadosDestinatario['bairro'] ?? '');
+            $destCidade= $h($dadosDestinatario['cidade'] ?? '');
+            $destUf    = $h($dadosDestinatario['estado'] ?? '');
+            $destCep   = $h($dadosDestinatario['cep'] ?? '');
+            $destCpf   = $h($dadosDestinatario['cpf'] ?? ($dadosDestinatario['documento'] ?? ''));
+
+            $destCpfHtml = $destCpf !== '' ? '<div style="font-size:8pt;margin-top:1mm">CPF/Doc: ' . $destCpf . '</div>' : '';
+            $remCnpjHtml = $remCnpj !== '' ? '<div>CNPJ: ' . $remCnpj . '</div>' : '';
 
             $html = <<<HTML
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-    <title>Etiqueta Correios #{$codigoHtml}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .etiqueta {
-            border: 2px solid #000;
-            padding: 16px;
-            width: 420px;
-            margin: 0 auto;
-        }
-        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
-        .codigo { font-size: 16px; font-weight: bold; text-align: center; margin: 10px 0; letter-spacing: 1px; }
-        .barcode { display: flex; justify-content: center; margin: 6px 0 12px; }
-        .section { margin-bottom: 10px; }
-        .label { font-weight: bold; }
-        .small { font-size: 12px; }
-        @media print { body { margin: 0; } }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<meta charset="UTF-8">
+<title>Etiqueta {$codigoHtml}</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page {
+    size: 4in 6in;
+    margin: 0;
+  }
+  body {
+    width: 4in;
+    height: 6in;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+    background: #fff;
+    color: #000;
+    overflow: hidden;
+  }
+  .label {
+    width: 4in;
+    height: 6in;
+    padding: 6mm 5mm;
+    display: flex;
+    flex-direction: column;
+    gap: 3mm;
+    border: 1px solid #000;
+  }
+  .logo-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1.5px solid #000;
+    padding-bottom: 2mm;
+  }
+  .logo-correios {
+    font-size: 16pt;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    color: #003087;
+  }
+  .logo-correios span { color: #f7a800; }
+  .servico {
+    font-size: 8pt;
+    font-weight: bold;
+    text-align: right;
+    color: #333;
+  }
+  .barcode-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1mm;
+  }
+  .barcode-row svg { width: 100%; max-height: 18mm; }
+  .tracking-code {
+    font-size: 11pt;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-align: center;
+  }
+  .divider {
+    border: none;
+    border-top: 1px solid #000;
+  }
+  .section-title {
+    font-size: 7pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #555;
+    margin-bottom: 1mm;
+  }
+  .dest-nome {
+    font-size: 11pt;
+    font-weight: bold;
+    line-height: 1.2;
+  }
+  .dest-end {
+    font-size: 9pt;
+    line-height: 1.4;
+  }
+  .dest-cep {
+    font-size: 13pt;
+    font-weight: 900;
+    letter-spacing: 1px;
+    margin-top: 1mm;
+  }
+  .rem-block {
+    border-top: 1px dashed #999;
+    padding-top: 2mm;
+    font-size: 7.5pt;
+    color: #333;
+    line-height: 1.4;
+  }
+  .rem-block .section-title { color: #777; }
+  @media print {
+    body { margin: 0; }
+    .no-print { display: none; }
+  }
+  .print-btn {
+    position: fixed; top: 8px; right: 8px;
+    background: #003087; color: #fff;
+    border: none; padding: 8px 18px;
+    border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: bold;
+  }
+</style>
 </head>
 <body>
-    <div class="etiqueta">
-        <div class="header">
-            <h3 style="margin:0">CORREIOS</h3>
-            <div class="small">Etiqueta de postagem</div>
-        </div>
+<button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
+<div class="label">
 
-        <div class="barcode"><svg id="barcode"></svg></div>
-        <div class="codigo">{$codigoHtml}</div>
+  <div class="logo-row">
+    <div class="logo-correios">COR<span>REIOS</span></div>
+    <div class="servico">Encomenda Nacional</div>
+  </div>
 
-        <div class="section">
-            <div class="label">REMETENTE</div>
-            <div>{$remNome}</div>
-            <div class="small">{$remEnd}</div>
-            <div class="small">{$remCidadeUf} - CEP: {$remCep}</div>
-        </div>
+  <div class="barcode-row">
+    <svg id="barcode"></svg>
+    <div class="tracking-code">{$codigoHtml}</div>
+  </div>
 
-        <div class="section">
-            <div class="label">DESTINATÁRIO</div>
-            <div>{$destNome}</div>
-            <div class="small">{$destEnd}</div>
-            <div class="small">{$destCidadeUf} - CEP: {$destCep}</div>
-        </div>
+  <hr class="divider">
+
+  <div>
+    <div class="section-title">Destinatário</div>
+    <div class="dest-nome">{$destNome}</div>
+    <div class="dest-end">
+      {$destEnd} {$destNum} {$destCompl}<br>
+      {$destBairro}<br>
+      {$destCidade} - {$destUf}
     </div>
-    <script>
-        (function(){
-            var code = {$codigoJs};
-            try {
-                JsBarcode('#barcode', code, {
-                    format: 'CODE128',
-                    displayValue: false,
-                    margin: 0,
-                    height: 56
-                });
-            } catch (e) {}
-            window.onload = function(){ window.print(); };
-        })();
-    </script>
+    <div class="dest-cep">CEP: {$destCep}</div>
+    {$destCpfHtml}
+  </div>
+
+  <div class="rem-block">
+    <div class="section-title">Remetente</div>
+    <div><strong>{$remNome}</strong></div>
+    <div>{$remEnd} {$remNum} {$remCompl} - {$remBairro}</div>
+    <div>{$remCidade}/{$remUf} - CEP: {$remCep}</div>
+    {$remCnpjHtml}
+  </div>
+
+</div>
+<script>
+(function(){
+  var code = {$codigoJs};
+  try {
+    JsBarcode('#barcode', code, {
+      format: 'CODE128',
+      displayValue: false,
+      margin: 2,
+      height: 60,
+      width: 2
+    });
+  } catch(e){}
+  setTimeout(function(){ window.print(); }, 600);
+})();
+</script>
 </body>
 </html>
 HTML;
@@ -1817,7 +1925,7 @@ HTML;
             echo $html;
             
         } catch (\Exception $e) {
-            echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
+            echo '<p>Erro: ' . htmlspecialchars($e->getMessage()) . '</p>';
         }
         exit;
     }
