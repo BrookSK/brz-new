@@ -1756,25 +1756,27 @@ function gerarEtiqueta() {
             }
         }
 
+        // Usar peso_total do pedido como prioridade; fallback: somar peso dos itens
         $pesoTotal = 0.0;
-        if (is_array($itens)) {
-            foreach ($itens as $it) {
-                $qtd = (int) ($it['quantidade'] ?? 1);
-                if ($qtd <= 0) $qtd = 1;
-                $peso = null;
-                foreach (['peso', 'weight', 'peso_kg'] as $c) {
-                    if (isset($it[$c]) && is_numeric($it[$c])) {
-                        $peso = (float) $it[$c];
-                        break;
+        if (is_numeric($pedido['peso_total'] ?? null) && (float) $pedido['peso_total'] > 0) {
+            $pesoTotal = (float) $pedido['peso_total'];
+        } else {
+            if (is_array($itens)) {
+                foreach ($itens as $it) {
+                    $qtd = (int) ($it['quantidade'] ?? 1);
+                    if ($qtd <= 0) $qtd = 1;
+                    $peso = null;
+                    foreach (['peso', 'weight', 'peso_kg'] as $c) {
+                        if (isset($it[$c]) && is_numeric($it[$c])) {
+                            $peso = (float) $it[$c];
+                            break;
+                        }
+                    }
+                    if ($peso !== null && $peso > 0) {
+                        $pesoTotal += ($peso * $qtd);
                     }
                 }
-                if ($peso !== null && $peso > 0) {
-                    $pesoTotal += ($peso * $qtd);
-                }
             }
-        }
-        if ($pesoTotal <= 0 && is_numeric($pedido['peso_total'] ?? null)) {
-            $pesoTotal = (float) $pedido['peso_total'];
         }
         if ($pesoTotal <= 0) {
             $pesoTotal = 1.0;
@@ -1785,9 +1787,9 @@ function gerarEtiqueta() {
 
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
-            'width'  => (int) ($pedido['largura'] ?? 0) > 0 ? (int) $pedido['largura'] : 10,
-            'length' => (int) ($pedido['comprimento'] ?? 0) > 0 ? (int) $pedido['comprimento'] : 15,
-            'height' => (int) ($pedido['altura'] ?? 0) > 0 ? (int) $pedido['altura'] : 10,
+            'width'  => (float) ($pedido['largura'] ?? 0) > 0 ? (float) $pedido['largura'] : 10,
+            'length' => (float) ($pedido['comprimento'] ?? 0) > 0 ? (float) $pedido['comprimento'] : 15,
+            'height' => (float) ($pedido['altura'] ?? 0) > 0 ? (float) $pedido['altura'] : 10,
         ]];
 
         $declared = 0.0;

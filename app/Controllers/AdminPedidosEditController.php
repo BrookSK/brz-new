@@ -21,9 +21,9 @@ class AdminPedidosEditController extends Controller {
             $cols = $this->getColsFromTable('pedidos');
             $need = [
                 'peso_total' => "ALTER TABLE pedidos ADD COLUMN peso_total DECIMAL(10,3) NULL",
-                'altura' => "ALTER TABLE pedidos ADD COLUMN altura INT NULL",
-                'largura' => "ALTER TABLE pedidos ADD COLUMN largura INT NULL",
-                'comprimento' => "ALTER TABLE pedidos ADD COLUMN comprimento INT NULL",
+                'altura' => "ALTER TABLE pedidos ADD COLUMN altura DECIMAL(8,2) NULL",
+                'largura' => "ALTER TABLE pedidos ADD COLUMN largura DECIMAL(8,2) NULL",
+                'comprimento' => "ALTER TABLE pedidos ADD COLUMN comprimento DECIMAL(8,2) NULL",
             ];
 
             foreach ($need as $col => $sql) {
@@ -34,6 +34,21 @@ class AdminPedidosEditController extends Controller {
                     }
                 }
             }
+
+            // Migrar colunas INT para DECIMAL se necessário
+            try {
+                $stDesc = $this->connection->query("DESCRIBE pedidos");
+                $rows = $stDesc ? $stDesc->fetchAll(\PDO::FETCH_ASSOC) : [];
+                foreach ($rows as $row) {
+                    $field = strtolower((string) ($row['Field'] ?? ''));
+                    $type  = strtolower((string) ($row['Type'] ?? ''));
+                    if (in_array($field, ['altura', 'largura', 'comprimento'], true) && strpos($type, 'int') !== false) {
+                        try {
+                            $this->connection->exec("ALTER TABLE pedidos MODIFY COLUMN {$field} DECIMAL(8,2) NULL");
+                        } catch (\Exception $e) {}
+                    }
+                }
+            } catch (\Exception $e) {}
         } catch (\Exception $e) {
         }
     }
@@ -504,15 +519,15 @@ class AdminPedidosEditController extends Controller {
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label">Altura (cm)</label>
-                                            <input type="number" class="form-control" id="pedido_altura" step="1" min="0" value="' . htmlspecialchars((string) ($pedido['altura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <input type="number" class="form-control" id="pedido_altura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['altura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label">Largura (cm)</label>
-                                            <input type="number" class="form-control" id="pedido_largura" step="1" min="0" value="' . htmlspecialchars((string) ($pedido['largura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <input type="number" class="form-control" id="pedido_largura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['largura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label">Comprimento (cm)</label>
-                                            <input type="number" class="form-control" id="pedido_comprimento" step="1" min="0" value="' . htmlspecialchars((string) ($pedido['comprimento'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <input type="number" class="form-control" id="pedido_comprimento" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['comprimento'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                     </div>
                                 </div>
@@ -964,9 +979,9 @@ class AdminPedidosEditController extends Controller {
             $this->ensurePedidoMedidasColumns();
 
             $pesoTotal = (float) str_replace(',', '.', (string) ($dados['peso_total'] ?? '0'));
-            $altura = (int) ($dados['altura'] ?? 0);
-            $largura = (int) ($dados['largura'] ?? 0);
-            $comprimento = (int) ($dados['comprimento'] ?? 0);
+            $altura = (float) str_replace(',', '.', (string) ($dados['altura'] ?? '0'));
+            $largura = (float) str_replace(',', '.', (string) ($dados['largura'] ?? '0'));
+            $comprimento = (float) str_replace(',', '.', (string) ($dados['comprimento'] ?? '0'));
 
             if ($cicloFechado) {
                 if ($pesoTotal <= 0 || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
