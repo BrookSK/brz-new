@@ -1785,9 +1785,9 @@ function gerarEtiqueta() {
 
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
-            'width' => 10,
-            'length' => 15,
-            'height' => 10,
+            'width'  => (int) ($pedido['largura'] ?? 0) > 0 ? (int) $pedido['largura'] : 10,
+            'length' => (int) ($pedido['comprimento'] ?? 0) > 0 ? (int) $pedido['comprimento'] : 15,
+            'height' => (int) ($pedido['altura'] ?? 0) > 0 ? (int) $pedido['altura'] : 10,
         ]];
 
         $declared = 0.0;
