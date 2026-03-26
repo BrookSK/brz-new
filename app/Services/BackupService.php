@@ -182,8 +182,73 @@ class BackupService {
     private function runCmd(string $cmd): array {
         $out = [];
         $ret = 0;
+
+        // Verificar se exec está disponível
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        if (in_array('exec', $disabled, true)) {
+            return [1, 'exec() está desabilitado no servidor'];
+        }
+
         @\exec($cmd . ' 2>&1', $out, $ret);
         return [$ret, implode("\n", $out)];
+    }
+
+    /**
+     * Dump do banco via PHP puro (fallback quando mysqldump/exec não estão disponíveis)
+     */
+    private function dumpDatabasePHP(string $host, string $db, string $user, string $pass, string $outputPath): void {
+        $pdo = new \PDO("mysql:host={$host};dbname={$db};charset=utf8mb4", $user, $pass, [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+        ]);
+
+        $fp = fopen($outputPath, 'w');
+        if (!$fp) {
+            throw new \RuntimeException('Não foi possível criar arquivo de dump: ' . $outputPath);
+        }
+
+        fwrite($fp, "-- Backup gerado em " . date('Y-m-d H:i:s') . "\n");
+        fwrite($fp, "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
+
+        $tables = $pdo->query("SHOW TABLES")->fetchAll(\PDO::FETCH_COLUMN);
+
+        foreach ($tables as $table) {
+            // CREATE TABLE
+            $create = $pdo->query("SHOW CREATE TABLE `{$table}`")->fetch(\PDO::FETCH_ASSOC);
+            $createSql = $create['Create Table'] ?? ($create['Create View'] ?? '');
+            if ($createSql !== '') {
+                fwrite($fp, "DROP TABLE IF EXISTS `{$table}`;\n");
+                fwrite($fp, $createSql . ";\n\n");
+            }
+
+            // INSERT rows em lotes
+            $count = (int) $pdo->query("SELECT COUNT(*) FROM `{$table}`")->fetchColumn();
+            if ($count === 0) continue;
+
+            $batchSize = 500;
+            $offset = 0;
+            while ($offset < $count) {
+                $rows = $pdo->query("SELECT * FROM `{$table}` LIMIT {$batchSize} OFFSET {$offset}")->fetchAll(\PDO::FETCH_ASSOC);
+                if (empty($rows)) break;
+
+                foreach ($rows as $row) {
+                    $vals = [];
+                    foreach ($row as $v) {
+                        if ($v === null) {
+                            $vals[] = 'NULL';
+                        } else {
+                            $vals[] = $pdo->quote((string) $v);
+                        }
+                    }
+                    $cols = array_map(fn($c) => "`{$c}`", array_keys($row));
+                    fwrite($fp, "INSERT INTO `{$table}` (" . implode(',', $cols) . ") VALUES (" . implode(',', $vals) . ");\n");
+                }
+                $offset += $batchSize;
+            }
+            fwrite($fp, "\n");
+        }
+
+        fwrite($fp, "SET FOREIGN_KEY_CHECKS = 1;\n");
+        fclose($fp);
     }
 
     private function zipDirectory(string $sourceDir, string $zipPath, array $excludeDirs = ['.git', 'vendor', 'node_modules', 'storage', 'public/uploads']): void {
@@ -258,6 +323,8 @@ class BackupService {
                 throw new \RuntimeException('Credenciais do banco inválidas');
             }
 
+            // Tentar mysqldump primeiro, fallback para PHP puro
+            $usedPhpDump = false;
             $mysqldump = 'mysqldump';
             $cmd = '"' . $mysqldump . '"' .
                 ' --host=' . escapeshellarg($host) .
@@ -269,7 +336,9 @@ class BackupService {
 
             [$ret, $out] = $this->runCmd($cmd);
             if ($ret !== 0) {
-                throw new \RuntimeException('Falha no mysqldump: ' . $out);
+                // Fallback: dump via PHP puro
+                $this->dumpDatabasePHP($host, $db, $user, $pass, $dbSqlPath);
+                $usedPhpDump = true;
             }
 
             if (!file_exists($dbSqlPath)) {
