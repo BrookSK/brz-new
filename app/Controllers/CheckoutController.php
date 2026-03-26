@@ -3469,10 +3469,11 @@ class CheckoutController extends Controller {
                 if ($moedaPedidoClear === '') {
                     $moedaPedidoClear = 'BRL';
                 }
-                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && in_array($formaSelecionada, ['cartao_credito', 'pix'], true));
+                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
                 $shouldClearCartNow = (!$isStripeFlow) && (
                     $formaSelecionada === 'carteira'
                     || $moedaPedidoClear === 'BRL'
+                    || $formaSelecionada === 'pix'
                 );
 
                 if ($shouldClearCartNow) {
