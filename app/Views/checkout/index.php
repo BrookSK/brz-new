@@ -1010,6 +1010,56 @@ function iniciarPagamentoStripeElements(pedidoId, email) {
     });
 }
 
+function syncPaymentOptionsByCurrency() {
+    const paisSel = document.getElementById('pais');
+    const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+    const formaSel = document.getElementById('forma_pagamento');
+    if (!formaSel) return;
+
+    const isBR = (pais === 'BR');
+
+    // Opções disponíveis por contexto:
+    // BR: carteira, cartao_credito, cartao_debito, pix, boleto, transferencia, pagamento_entrega
+    // Fora do BR: cartao_credito (Stripe), pix (Stripe) — moeda USD
+    const options = formaSel.querySelectorAll('option');
+    const allowedOutsideBR = ['', 'cartao_credito', 'pix'];
+
+    options.forEach(function(opt) {
+        if (opt.value === '') return; // "Selecione..." sempre visível
+        if (isBR) {
+            opt.style.display = '';
+            opt.disabled = false;
+        } else {
+            if (allowedOutsideBR.indexOf(opt.value) >= 0) {
+                opt.style.display = '';
+                opt.disabled = false;
+            } else {
+                opt.style.display = 'none';
+                opt.disabled = true;
+                if (formaSel.value === opt.value) {
+                    formaSel.value = '';
+                }
+            }
+        }
+    });
+
+    // Forçar moeda USD fora do BR
+    const moedaHidden = document.getElementById('moeda_hidden');
+    if (moedaHidden) {
+        moedaHidden.value = isBR ? 'BRL' : 'USD';
+    }
+
+    // Atualizar preços se a função existir
+    if (typeof updatePrices === 'function') {
+        try { updatePrices(isBR ? 'BRL' : 'USD'); } catch (e) {}
+    }
+
+    // Atualizar forma de pagamento visível
+    if (typeof atualizarFormaPagamento === 'function') {
+        try { atualizarFormaPagamento(); } catch (e) {}
+    }
+}
+
 function atualizarEnderecoPorPais() {
     const pais = (document.getElementById('pais')?.value || 'BR').toUpperCase();
     const cep = document.getElementById('cep');

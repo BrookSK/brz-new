@@ -2082,6 +2082,84 @@ class PaymentService {
         }
     }
 
+    /**
+     * Cria PaymentIntent Stripe PIX para checkout de pedido (USD — fora do BR).
+     * O Stripe PIX opera em USD, gerando QR Code para pagamento.
+     */
+    public function createStripePixPaymentIntentForCheckout(int $pedidoId, float $valorUsd, string $descricao, array $customer = []): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        $amountCents = (int) round(((float) $valorUsd) * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido.'];
+        }
+
+        $body = [
+            'amount' => (string) $amountCents,
+            'currency' => 'usd',
+            'description' => $descricao,
+            'metadata[pedido_id]' => (string) $pedidoId,
+            'payment_method_types[0]' => 'card',
+            'payment_method_types[1]' => 'pix',
+            'confirm' => 'true',
+            'payment_method_data[type]' => 'pix',
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['receipt_email'] = (string) $customer['email'];
+            $body['payment_method_data[billing_details][email]'] = (string) $customer['email'];
+        }
+        if (!empty($customer['name'])) {
+            $body['payment_method_data[billing_details][name]'] = (string) $customer['name'];
+        }
+        if (!empty($customer['tax_id'])) {
+            $taxId = preg_replace('/\D+/', '', (string) $customer['tax_id']);
+            if ($taxId !== '') {
+                $body['payment_method_data[billing_details][tax_id]'] = $taxId;
+            }
+        }
+
+        try {
+            $pi = $this->stripeRequest('POST', '/v1/payment_intents', $body);
+            $id = (string) ($pi['id'] ?? '');
+            $clientSecret = (string) ($pi['client_secret'] ?? '');
+            if ($id === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida (id ausente).'];
+            }
+
+            $pix = null;
+            $next = $pi['next_action'] ?? null;
+            if (is_array($next)) {
+                $pixObj = $next['pix_display_qr_code'] ?? null;
+                if (is_array($pixObj)) {
+                    $pix = [
+                        'hosted_instructions_url' => (string) ($pixObj['hosted_instructions_url'] ?? ''),
+                        'expires_at' => $pixObj['expires_at'] ?? null,
+                        'copy_paste' => (string) ($pixObj['data'] ?? ($pixObj['pix_code'] ?? '')),
+                        'image_url_png' => (string) ($pixObj['image_url_png'] ?? ''),
+                        'image_url_svg' => (string) ($pixObj['image_url_svg'] ?? ''),
+                    ];
+                }
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $id,
+                'client_secret' => $clientSecret,
+                'status' => (string) ($pi['status'] ?? ''),
+                'pix' => $pix,
+                'raw' => $pi,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Stripe PIX: ' . $e->getMessage()];
+        }
+    }
+
     public function createMercadoPagoCheckoutPreferenceProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], ?string $successUrl = null, ?string $failureUrl = null, ?string $pendingUrl = null): array {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) {

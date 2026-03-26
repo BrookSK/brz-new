@@ -3301,17 +3301,60 @@ class CheckoutController extends Controller {
                     }
                 }
                 
+                // Stripe PIX para pedidos fora do BR (moeda USD, forma pix)
+                $paisEntregaCheckout = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+                if ($paisEntregaCheckout === '') $paisEntregaCheckout = 'BR';
+
+                if ($paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix' && !$reused) {
+                    try {
+                        $totalUsdPix = (float) ($pedidoRowPay['total'] ?? 0);
+                        if ($totalUsdPix <= 0) {
+                            throw new \Exception('Valor inválido para Stripe PIX');
+                        }
+
+                        $codigoPedidoPix = (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId);
+                        $descPix = 'Pedido #' . $codigoPedidoPix;
+
+                        $customerPix = [
+                            'name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
+                            'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+                            'tax_id' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
+                        ];
+
+                        $pixResult = $this->paymentService->createStripePixPaymentIntentForCheckout(
+                            (int) $pedidoId,
+                            (float) $totalUsdPix,
+                            $descPix,
+                            $customerPix
+                        );
+
+                        if (!empty($pixResult['success'])) {
+                            $this->atualizarPagamentoNoPedido((int) $pedidoId, [
+                                'payment_id' => $pixResult['payment_intent_id'],
+                                'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
+                                'billingType' => 'PIX',
+                            ], 'stripe');
+                            $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, [
+                                'payment_id' => $pixResult['payment_intent_id'],
+                                'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
+                                'billingType' => 'PIX',
+                            ], 'stripe');
+                        }
+                    } catch (\Exception $e) {
+                        error_log('[CHECKOUT] Erro Stripe PIX (fora BR): ' . $e->getMessage());
+                    }
+                }
+
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
                 // Para USD (Stripe Elements), o carrinho é limpo após confirmação do pagamento.
                 $moedaPedidoClear = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
                 if ($moedaPedidoClear === '') {
                     $moedaPedidoClear = 'BRL';
                 }
-                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
+                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && in_array($formaSelecionada, ['cartao_credito', 'pix'], true));
                 $shouldClearCartNow = (!$isStripeFlow) && (
                     $formaSelecionada === 'carteira'
                     || $moedaPedidoClear === 'BRL'
-                    || in_array($formaSelecionada, ['pix', 'boleto'], true)
                 );
 
                 if ($shouldClearCartNow) {
@@ -3345,8 +3388,19 @@ class CheckoutController extends Controller {
                     'message' => 'Pedido criado com sucesso',
                     'pedido_id' => $pedidoId,
                     'redirect' => '/checkout/conclusao/' . $pedidoId,
-                    'stripe_required' => ($formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL'),
+                    'stripe_required' => ($formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL' && $formaSelecionada === 'cartao_credito'),
+                    'stripe_pix' => ($paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix'),
                 ];
+
+                // Incluir dados do Stripe PIX na resposta
+                if (!empty($pixResult['success']) && $paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix') {
+                    $response['stripe_pix_data'] = [
+                        'payment_intent_id' => $pixResult['payment_intent_id'] ?? '',
+                        'client_secret' => $pixResult['client_secret'] ?? '',
+                        'pix' => $pixResult['pix'] ?? null,
+                    ];
+                    $response['redirect'] = '/checkout/conclusao/' . $pedidoId;
+                }
 
                 // Se geramos split, devolver detalhes para o frontend (para exibição imediata se necessário)
                 if (isset($dados['__split']) && is_array($dados['__split'])) {
@@ -4409,6 +4463,12 @@ class CheckoutController extends Controller {
             $paisEntrega = 'BR';
         }
         $pais = $paisEntrega;
+
+        // Validar forma de pagamento por país
+        $formaPag = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
+        if ($pais !== 'BR' && !in_array($formaPag, ['', 'cartao_credito', 'pix'], true)) {
+            $erros[] = 'Para endereços fora do Brasil, apenas Cartão de Crédito e PIX (Stripe) estão disponíveis.';
+        }
         
         // Dados pessoais
         if (empty($dados['nome'])) {
