@@ -140,9 +140,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => (string) $pedidoId,
-            // Enviar amount em USD. O Câmbio Real converte para BRL internamente.
+            // Enviar amount em BRL com take_rates=1 para valor exato.
             'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'USD',
+            'currency' => 'BRL',
             'payment_method' => 'boleto',
             'client' => [
                 'name' => $clientName,
@@ -161,7 +161,7 @@ class PaymentService {
                 ],
             ],
             'duplicate' => 0,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'products' => [
                 [
                     'descricao' => $descricao,
@@ -503,7 +503,7 @@ class PaymentService {
                 ],
             ],
             'duplicate' => 0,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'products' => $productsPayload,
         ];
 
@@ -636,9 +636,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // Enviar amount em USD. O Câmbio Real converte para BRL internamente.
-            'amount' => round($amountUsdCalc, 2),
-            'currency' => 'USD',
+            // Enviar amount em BRL com take_rates=1 para valor exato.
+            'amount' => round($valorBrlOriginal, 2),
+            'currency' => 'BRL',
             'payment_method' => $paymentMethod,
             'client' => [
                 'name' => $clientName,
@@ -667,12 +667,12 @@ class PaymentService {
                 'type' => $type,
             ],
             'duplicate' => 0,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'products' => [
                 [
                     'descricao' => $descricao,
-                    'base_value' => round($amountUsdCalc, 2),
-                    'valor' => round($amountUsdCalc, 2),
+                    'base_value' => round($valorBrlOriginal, 2),
+                    'valor' => round($valorBrlOriginal, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
@@ -1308,7 +1308,7 @@ class PaymentService {
             'currency' => 'BRL',
             'client' => $client,
             'duplicate' => 0,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'url_callback' => (string) $successUrl,
             'url_error' => (string) $errorUrl,
             'products' => [
