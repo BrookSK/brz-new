@@ -611,8 +611,6 @@
                                                 <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
                                                 <option value="pix">PIX</option>
                                                 <!-- <option value="boleto">Boleto</option> <!-- OCULTO TEMPORARIAMENTE -->
-                                                <option value="transferencia">Transferência</option>
-                                                <option value="pagamento_entrega"><?= __('checkout.payment.cash_on_delivery', 'Pagamento na Entrega') ?></option>
                                             </select>
 
                                             <div id="cambioreal-fees-warning" class="alert alert-warning mt-2" style="display:none;">
@@ -2414,14 +2412,12 @@ function updatePaymentMethodsForCurrency(currency) {
     select.appendChild(new Option('Selecione...', ''));
 
     if (isBR) {
-        // Brasil: todas as opções
+        // Brasil: opções disponíveis
         select.appendChild(new Option('Crédito da Carteira', 'carteira'));
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
         select.appendChild(new Option('PIX', 'pix'));
         // select.appendChild(new Option('Boleto Bancário', 'boleto')); // OCULTO TEMPORARIAMENTE
-        select.appendChild(new Option('Transferência', 'transferencia'));
-        select.appendChild(new Option('Pagamento na Entrega', 'pagamento_entrega'));
     } else {
         // Fora do BR: apenas Stripe (cartão + PIX)
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
