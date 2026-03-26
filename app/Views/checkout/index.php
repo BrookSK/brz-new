@@ -1052,6 +1052,20 @@ function syncPaymentOptionsByCurrency() {
         moedaHidden.value = isBR ? 'BRL' : 'USD';
     }
 
+    // Ocultar/mostrar impostos do Brasil
+    const impostosRow = document.getElementById('impostos-row');
+    if (impostosRow) {
+        impostosRow.style.display = isBR ? '' : 'none';
+    }
+    const alertaForaBR = document.getElementById('entrega-fora-br-alert');
+    if (alertaForaBR) {
+        if (isBR) {
+            alertaForaBR.classList.add('d-none');
+        } else {
+            alertaForaBR.classList.remove('d-none');
+        }
+    }
+
     // Atualizar preços se a função existir
     if (typeof updatePrices === 'function') {
         try { updatePrices(isBR ? 'BRL' : 'USD'); } catch (e) {}

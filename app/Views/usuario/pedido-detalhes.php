@@ -351,10 +351,12 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <span><?= __('checkout.service_fee', 'Taxa de Serviço') ?>:</span>
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
+                                    <?php if (((float) ($pedido['valor_impostos'] ?? 0)) > 0): ?>
                                     <div class="price-row">
                                         <span><?= __('checkout.brazil_taxes', 'Impostos do Brasil') ?>:</span>
                                         <span><?= $simboloMoeda ?> <?= number_format($pedido['valor_impostos'] ?? 0, 2, ',', '.') ?></span>
                                     </div>
+                                    <?php endif; ?>
                                     <?php if (((float) ($pedido['imposto_local'] ?? 0)) > 0): ?>
                                     <div class="price-row">
                                         <span><?= __('checkout.local_tax', 'Imposto local') ?>:</span>

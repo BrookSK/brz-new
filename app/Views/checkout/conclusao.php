@@ -142,10 +142,12 @@
                         <span><?= __('checkout_done.service_fee', 'Taxa de Serviço') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'], 2, ',', '.') ?></span>
                     </div>
+                    <?php if (((float) ($pedido['impostos'] ?? 0)) > 0): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('checkout_done.taxes_brazil', 'Impostos do Brasil') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
                     </div>
+                    <?php endif; ?>
                     <?php if (((float) ($pedido['imposto_local'] ?? 0)) > 0): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('checkout_done.local_tax', 'Imposto local') ?>:</span>

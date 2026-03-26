@@ -3348,40 +3348,23 @@ class CheckoutController extends Controller {
                                 'invoiceUrl' => $pixHostedUrl,
                             ], 'stripe');
 
-                            // Persistir no split_pagamentos para a tela de conclusão
+                            // Persistir no pedido_pagamentos para a tela de conclusão
                             try {
-                                $dbSplit = \Config\Database::getConnection();
-                                if ($this->tableExists('split_pagamentos')) {
-                                    $colsSplit = [];
-                                    try {
-                                        $stC = $dbSplit->query('DESCRIBE split_pagamentos');
-                                        $colsSplit = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                                    } catch (\Exception $e) { $colsSplit = []; }
-
-                                    $ins = ['pedido_id', 'componente', 'gateway', 'metodo', 'moeda', 'valor', 'payment_id', 'status'];
-                                    $vals = ['?', '?', '?', '?', '?', '?', '?', '?'];
-                                    $params = [
-                                        (int) $pedidoId, 'produto', 'stripe', 'pix', 'BRL',
-                                        round($pixResult['valor_brl'] ?? 0, 2),
-                                        (string) $pixResult['payment_intent_id'],
-                                        'pending',
-                                    ];
-
-                                    if (in_array('invoice_url', $colsSplit, true)) {
-                                        $ins[] = 'invoice_url'; $vals[] = '?'; $params[] = $pixHostedUrl;
-                                    }
-                                    if (in_array('pix_payload', $colsSplit, true)) {
-                                        $ins[] = 'pix_payload'; $vals[] = '?'; $params[] = $pixPayloadStr;
-                                    }
-                                    if (in_array('pix_encoded_image', $colsSplit, true) && $pixImgUrl !== '') {
-                                        $ins[] = 'pix_encoded_image'; $vals[] = '?'; $params[] = $pixImgUrl;
-                                    }
-
-                                    $stIns = $dbSplit->prepare('INSERT INTO split_pagamentos (' . implode(',', $ins) . ') VALUES (' . implode(',', $vals) . ')');
-                                    $stIns->execute($params);
-                                }
+                                $this->paymentService->registrarPedidoPagamentoSplit([
+                                    'pedido_id' => (int) $pedidoId,
+                                    'componente' => 'produto',
+                                    'gateway' => 'stripe',
+                                    'metodo' => 'pix',
+                                    'moeda' => 'BRL',
+                                    'valor' => round($pixResult['valor_brl'] ?? 0, 2),
+                                    'payment_id' => (string) $pixResult['payment_intent_id'],
+                                    'status' => 'pending',
+                                    'invoice_url' => $pixHostedUrl,
+                                    'pix_payload' => $pixPayloadStr,
+                                    'pix_encoded_image' => $pixImgUrl,
+                                ]);
                             } catch (\Exception $e) {
-                                error_log('[CHECKOUT] Erro ao persistir Stripe PIX no split: ' . $e->getMessage());
+                                error_log('[CHECKOUT] Erro ao persistir Stripe PIX: ' . $e->getMessage());
                             }
 
                             // Salvar PIX payload/QR no pedido para exibição na conclusão
