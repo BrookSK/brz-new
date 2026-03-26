@@ -415,22 +415,33 @@ class AdminUsuariosController extends Controller {
                         <input type="hidden" name="endereco_id" value="' . (int) ($endereco['id'] ?? 0) . '">
                         <div class="row g-3">
                             <div class="col-md-3">
-                                <label class="form-label">CEP</label>
-                                <input type="text" class="form-control" name="end_cep" value="' . htmlspecialchars((string) ($endereco['cep'] ?? '')) . '" placeholder="00000-000">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Endereço</label>
-                                <input type="text" class="form-control" name="end_endereco" value="' . htmlspecialchars((string) ($endereco['endereco'] ?? ($endereco['logradouro'] ?? ''))) . '">
+                                <label class="form-label">País</label>
+                                <select class="form-select" name="end_pais" id="end_pais" onchange="atualizarCamposPorPais()">
+                                    <option value="BR" ' . (strtoupper((string) ($endereco['pais'] ?? 'BR')) === 'BR' ? 'selected' : '') . '>Brasil</option>
+                                    <option value="US" ' . (strtoupper((string) ($endereco['pais'] ?? '')) === 'US' ? 'selected' : '') . '>Estados Unidos</option>
+                                    <option value="CA" ' . (strtoupper((string) ($endereco['pais'] ?? '')) === 'CA' ? 'selected' : '') . '>Canadá</option>
+                                    <option value="PT" ' . (strtoupper((string) ($endereco['pais'] ?? '')) === 'PT' ? 'selected' : '') . '>Portugal</option>
+                                    <option value="OTHER" ' . (!in_array(strtoupper((string) ($endereco['pais'] ?? 'BR')), ['BR','US','CA','PT',''], true) ? 'selected' : '') . '>Outro</option>
+                                </select>
+                                <input type="text" class="form-control mt-1" name="end_pais_outro" id="end_pais_outro" value="' . htmlspecialchars(!in_array(strtoupper((string) ($endereco['pais'] ?? 'BR')), ['BR','US','CA','PT',''], true) ? (string) ($endereco['pais'] ?? '') : '') . '" placeholder="Código do país (ex: UK)" maxlength="2" style="display:none;">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Número</label>
+                                <label class="form-label" id="lbl_cep">CEP</label>
+                                <input type="text" class="form-control" name="end_cep" id="end_cep" value="' . htmlspecialchars((string) ($endereco['cep'] ?? '')) . '" placeholder="00000-000">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" id="lbl_endereco">Endereço</label>
+                                <input type="text" class="form-control" name="end_endereco" value="' . htmlspecialchars((string) ($endereco['endereco'] ?? ($endereco['logradouro'] ?? ''))) . '">
+                            </div>
+                            <div class="col-md-3" id="wrap_numero">
+                                <label class="form-label" id="lbl_numero">Número</label>
                                 <input type="text" class="form-control" name="end_numero" value="' . htmlspecialchars((string) ($endereco['numero'] ?? '')) . '">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Complemento</label>
+                                <label class="form-label" id="lbl_complemento">Complemento</label>
                                 <input type="text" class="form-control" name="end_complemento" value="' . htmlspecialchars((string) ($endereco['complemento'] ?? '')) . '">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4" id="wrap_bairro">
                                 <label class="form-label">Bairro</label>
                                 <input type="text" class="form-control" name="end_bairro" value="' . htmlspecialchars((string) ($endereco['bairro'] ?? '')) . '">
                             </div>
@@ -439,12 +450,11 @@ class AdminUsuariosController extends Controller {
                                 <input type="text" class="form-control" name="end_cidade" value="' . htmlspecialchars((string) ($endereco['cidade'] ?? '')) . '">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">Estado</label>
-                                <input type="text" class="form-control" name="end_estado" value="' . htmlspecialchars((string) ($endereco['estado'] ?? '')) . '" maxlength="2" placeholder="SP">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">País</label>
-                                <input type="text" class="form-control" name="end_pais" value="' . htmlspecialchars((string) ($endereco['pais'] ?? 'BR')) . '" maxlength="2" placeholder="BR">
+                                <label class="form-label" id="lbl_estado">Estado</label>
+                                <select class="form-select" name="end_estado" id="end_estado_select">
+                                    <option value="">Selecione...</option>
+                                </select>
+                                <input type="text" class="form-control" name="end_estado_text" id="end_estado_text" value="' . htmlspecialchars((string) ($endereco['estado'] ?? '')) . '" maxlength="2" placeholder="SP" style="display:none;">
                             </div>
                         </div>
 
@@ -460,6 +470,73 @@ class AdminUsuariosController extends Controller {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    var estadoAtual = ' . json_encode((string) ($endereco['estado'] ?? '')) . ';
+    var statesByCountry = {
+        BR: ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"],
+        US: ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"],
+        CA: ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]
+    };
+
+    function atualizarCamposPorPais() {
+        var paisSel = document.getElementById("end_pais");
+        var pais = paisSel ? paisSel.value : "BR";
+        var outroInp = document.getElementById("end_pais_outro");
+        var cep = document.getElementById("end_cep");
+        var lblCep = document.getElementById("lbl_cep");
+        var lblEnd = document.getElementById("lbl_endereco");
+        var lblComp = document.getElementById("lbl_complemento");
+        var lblNum = document.getElementById("lbl_numero");
+        var wrapNum = document.getElementById("wrap_numero");
+        var wrapBairro = document.getElementById("wrap_bairro");
+        var selEstado = document.getElementById("end_estado_select");
+        var txtEstado = document.getElementById("end_estado_text");
+        var lblEstado = document.getElementById("lbl_estado");
+
+        if (outroInp) outroInp.style.display = (pais === "OTHER") ? "" : "none";
+
+        if (cep && lblCep) {
+            if (pais === "BR") { cep.placeholder = "00000-000"; cep.maxLength = 9; lblCep.textContent = "CEP"; }
+            else if (pais === "US") { cep.placeholder = "00000"; cep.maxLength = 10; lblCep.textContent = "ZIP Code"; }
+            else if (pais === "CA") { cep.placeholder = "A1A 1A1"; cep.maxLength = 7; lblCep.textContent = "Postal Code"; }
+            else { cep.placeholder = ""; cep.maxLength = 12; lblCep.textContent = "Postal Code"; }
+        }
+
+        if (lblEnd) lblEnd.textContent = (pais === "BR") ? "Endereço" : "Address";
+        if (lblComp) lblComp.textContent = (pais === "BR") ? "Complemento" : "Address line 2";
+        if (lblNum) lblNum.textContent = (pais === "BR") ? "Número" : "Number";
+        if (wrapNum) wrapNum.style.display = (pais === "BR") ? "" : "none";
+        if (wrapBairro) wrapBairro.style.display = (pais === "BR") ? "" : "none";
+        if (lblEstado) lblEstado.textContent = (pais === "BR") ? "Estado" : "State";
+
+        var list = statesByCountry[pais] || null;
+        if (selEstado && txtEstado) {
+            if (Array.isArray(list) && list.length > 0) {
+                var cur = (selEstado.value || txtEstado.value || estadoAtual || "").toUpperCase();
+                selEstado.innerHTML = "";
+                var optE = document.createElement("option");
+                optE.value = ""; optE.textContent = "Selecione...";
+                selEstado.appendChild(optE);
+                list.forEach(function(uf) {
+                    var opt = document.createElement("option");
+                    opt.value = uf; opt.textContent = uf;
+                    if (cur && uf === cur) opt.selected = true;
+                    selEstado.appendChild(opt);
+                });
+                selEstado.style.display = "";
+                selEstado.name = "end_estado";
+                txtEstado.style.display = "none";
+                txtEstado.name = "end_estado_text";
+            } else {
+                selEstado.style.display = "none";
+                selEstado.name = "end_estado_ui";
+                txtEstado.style.display = "";
+                txtEstado.name = "end_estado";
+            }
+        }
+    }
+    atualizarCamposPorPais();
+    </script>
 </body>
 </html>';
         exit;
@@ -498,8 +575,21 @@ class AdminUsuariosController extends Controller {
                     $endComplemento = trim((string) $request->getParam('end_complemento'));
                     $endBairro = trim((string) $request->getParam('end_bairro'));
                     $endCidade = trim((string) $request->getParam('end_cidade'));
+
+                    // Estado: pode vir do select (end_estado) ou do text (end_estado_text)
                     $endEstado = trim((string) $request->getParam('end_estado'));
+                    if ($endEstado === '') {
+                        $endEstado = trim((string) $request->getParam('end_estado_text'));
+                    }
+
+                    // País: pode ser select (BR/US/CA/PT) ou "OTHER" com campo livre
                     $endPais = trim((string) $request->getParam('end_pais'));
+                    if ($endPais === 'OTHER') {
+                        $endPais = strtoupper(trim((string) $request->getParam('end_pais_outro')));
+                    }
+                    if ($endPais === '') {
+                        $endPais = 'BR';
+                    }
                     $enderecoId = (int) $request->getParam('endereco_id');
 
                     // Só salvar se pelo menos um campo de endereço foi preenchido
