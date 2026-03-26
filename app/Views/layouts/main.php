@@ -1303,6 +1303,56 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <!-- SISTEMA DE CONVERSÃO EXCLUSIVO -->
+    <?php if (!$__mostrarConversao): ?>
+    <script>
+        // Conversão desativada: forçar USD
+        localStorage.setItem('selected_currency', 'USD');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Preços de produtos
+            document.querySelectorAll('.product-price').forEach(function(el) {
+                var orig = parseFloat(el.getAttribute('data-original-price'));
+                if (!isNaN(orig) && orig > 0) {
+                    el.textContent = '$ ' + orig.toFixed(2).replace('.', ',');
+                }
+            });
+            // Símbolo de moeda
+            document.querySelectorAll('.currency').forEach(function(el) {
+                var t = el.textContent.trim();
+                if (t === 'BRL' || t === 'R$') el.textContent = '$';
+            });
+            // Carrinho: subtotais e unitários
+            document.querySelectorAll('.cart-item-subtotal, .cart-item-unit').forEach(function(el) {
+                var orig = parseFloat(el.getAttribute('data-original-price'));
+                if (!isNaN(orig) && orig > 0) {
+                    el.textContent = '$ ' + orig.toFixed(2).replace('.', ',');
+                }
+            });
+            // Carrinho: valores do resumo (subtotal, taxa, frete, total)
+            document.querySelectorAll('.cart-currency').forEach(function(el) {
+                var orig = parseFloat(el.getAttribute('data-original-value'));
+                if (!isNaN(orig)) {
+                    var prefix = el.textContent.trim().charAt(0) === '-' ? '-$ ' : '$ ';
+                    el.textContent = prefix + Math.abs(orig).toFixed(2).replace('.', ',');
+                }
+            });
+            // Total do carrinho
+            var totalEl = document.getElementById('total-valor');
+            if (totalEl) {
+                var orig = parseFloat(totalEl.getAttribute('data-original-value'));
+                if (!isNaN(orig) && orig > 0) {
+                    totalEl.textContent = '$ ' + orig.toFixed(2).replace('.', ',');
+                }
+            }
+            // Grupos de compras: preços
+            document.querySelectorAll('[data-price]').forEach(function(el) {
+                var orig = parseFloat(el.getAttribute('data-price'));
+                if (!isNaN(orig) && orig > 0) {
+                    el.textContent = '$ ' + orig.toFixed(2).replace('.', ',');
+                }
+            });
+        });
+    </script>
+    <?php endif; ?>
     <?php if ($__mostrarConversao): ?>
     <script>
         // Incluir o código diretamente para evitar problemas de caminho
