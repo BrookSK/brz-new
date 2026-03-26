@@ -1420,6 +1420,18 @@ class PedidoManualService {
                 $params[':sub'] = $subtotal;
             }
 
+            // Salvar flag "já comprado" quando existir
+            $jaComprado = (int) ($it['ja_comprado'] ?? 0);
+            if (!in_array('ja_comprado', $colsItens, true)) {
+                try { $this->db->exec("ALTER TABLE {$table} ADD COLUMN ja_comprado TINYINT(1) NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
+                $colsItens[] = 'ja_comprado';
+            }
+            if (in_array('ja_comprado', $colsItens, true)) {
+                $cols[] = 'ja_comprado';
+                $vals[] = ':ja_comprado';
+                $params[':ja_comprado'] = $jaComprado;
+            }
+
             $sql = 'INSERT INTO ' . $table . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);

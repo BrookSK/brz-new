@@ -494,6 +494,8 @@ class AdminPedidosManualController extends Controller {
                                         <th>Produto</th>
                                         <th style="width:140px">Qtd</th>
                                         <th style="width:160px">Valor</th>
+                                        <th style="width:60px"></th>
+                                        <th style="width:100px" class="text-center">Já comprado</th>
                                         <th style="width:90px">Ações</th>
                                     </tr>
                                 </thead>
@@ -935,6 +937,12 @@ function addItemRow(){
             <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)">
                 <i class="fas fa-trash"></i>
             </button>
+        </td>
+        <td class="text-center">
+            <div class="form-check d-flex justify-content-center">
+                <input type="hidden" class="jaCompradoHidden" name="ja_comprado[]" value="0">
+                <input type="checkbox" class="form-check-input jaCompradoInp" value="1" title="Marcar se já foi comprado" onchange="this.previousElementSibling.value = this.checked ? '1' : '0'">
+            </div>
         </td>
     `;
     tbody.appendChild(tr);
@@ -2118,12 +2126,14 @@ JS;
             $vals = $request->getParam('valor_unitario', []);
             $custos = $request->getParam('produto_custo', []);
             $ncms = $request->getParam('produto_ncm', []);
+            $jaComprados = $request->getParam('ja_comprado', []);
 
             if (!is_array($produtoIds)) $produtoIds = [];
             if (!is_array($qtds)) $qtds = [];
             if (!is_array($vals)) $vals = [];
             if (!is_array($custos)) $custos = [];
             if (!is_array($ncms)) $ncms = [];
+            if (!is_array($jaComprados)) $jaComprados = [];
 
             $this->validarEAtualizarCustoENcmProdutos($produtoIds, $custos, $ncms);
 
@@ -2138,6 +2148,7 @@ JS;
                         'produto_id' => $pid,
                         'quantidade' => $q,
                         'valor_unitario' => $v,
+                        'ja_comprado' => ((int) ($jaComprados[$i] ?? 0)) === 1 ? 1 : 0,
                     ];
                 }
             }
@@ -2220,12 +2231,14 @@ JS;
             $vals = $request->getParam('valor_unitario', []);
             $custos = $request->getParam('produto_custo', []);
             $ncms = $request->getParam('produto_ncm', []);
+            $jaComprados = $request->getParam('ja_comprado', []);
 
             if (!is_array($produtoIds)) $produtoIds = [];
             if (!is_array($qtds)) $qtds = [];
             if (!is_array($vals)) $vals = [];
             if (!is_array($custos)) $custos = [];
             if (!is_array($ncms)) $ncms = [];
+            if (!is_array($jaComprados)) $jaComprados = [];
 
             $this->validarEAtualizarCustoENcmProdutos($produtoIds, $custos, $ncms);
 
@@ -2240,6 +2253,7 @@ JS;
                         'produto_id' => $pid,
                         'quantidade' => $q,
                         'valor_unitario' => $v,
+                        'ja_comprado' => ((int) ($jaComprados[$i] ?? 0)) === 1 ? 1 : 0,
                     ];
                 }
             }

@@ -5659,10 +5659,34 @@ HTML;
 
                 // Para cada item, pendenciar somente o faltante (qtd_pedido - qtd_reservada) e dar baixa no estoque pelo reservado
                 if ($temPedidoIdLista && $temProdutoIdLista && is_array($itens)) {
+                    // Verificar se a tabela de itens tem coluna ja_comprado
+                    $temJaComprado = false;
+                    try {
+                        $itensTableCheck = $this->tableExistsPdo($pdo, 'pedido_itens') ? 'pedido_itens' : ($this->tableExistsPdo($pdo, 'pedido_items') ? 'pedido_items' : '');
+                        if ($itensTableCheck !== '') {
+                            $colsItCheck = $this->getTableColumnsPdo($pdo, $itensTableCheck);
+                            $temJaComprado = is_array($colsItCheck) && in_array('ja_comprado', $colsItCheck, true);
+                        }
+                    } catch (\Exception $e) { $temJaComprado = false; }
+
+                    // Buscar itens marcados como já comprados
+                    $itensJaComprados = [];
+                    if ($temJaComprado && $itensTableCheck !== '') {
+                        try {
+                            $stJc = $pdo->prepare('SELECT produto_id FROM ' . $itensTableCheck . ' WHERE pedido_id = ? AND ja_comprado = 1');
+                            $stJc->execute([(int) $id]);
+                            $rowsJc = $stJc->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                            $itensJaComprados = array_map('intval', $rowsJc);
+                        } catch (\Exception $e) { $itensJaComprados = []; }
+                    }
+
                     foreach ($itens as $it) {
                         $produtoId = (int) ($it['produto_id'] ?? 0);
                         $qtdPedido = (int) ($it['quantidade'] ?? 0);
                         if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                        // Pular itens marcados como já comprados
+                        if (in_array($produtoId, $itensJaComprados, true)) continue;
 
                         $qtdReservada = 0;
                         if ($temPedidoIdReserva && $temProdutoIdReserva && $temQtdReserva) {
