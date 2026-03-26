@@ -323,20 +323,32 @@ class BackupService {
                 throw new \RuntimeException('Credenciais do banco inválidas');
             }
 
-            // Tentar mysqldump primeiro, fallback para PHP puro
-            $usedPhpDump = false;
-            $mysqldump = 'mysqldump';
-            $cmd = '"' . $mysqldump . '"' .
-                ' --host=' . escapeshellarg($host) .
-                ' --user=' . escapeshellarg($user) .
-                ' --password=' . escapeshellarg($pass) .
-                ' --single-transaction --routines --triggers --events --default-character-set=utf8mb4 ' .
-                escapeshellarg($db) .
-                ' > ' . escapeshellarg($dbSqlPath);
+            // Verificar se exec/shell estão disponíveis
+            $canExec = true;
+            $disabled = \array_map('trim', \explode(',', (string) \ini_get('disable_functions')));
+            if (\in_array('exec', $disabled, true) || \in_array('escapeshellarg', $disabled, true)) {
+                $canExec = false;
+            }
 
-            [$ret, $out] = $this->runCmd($cmd);
-            if ($ret !== 0) {
-                // Fallback: dump via PHP puro
+            $usedPhpDump = false;
+
+            if ($canExec) {
+                $mysqldump = 'mysqldump';
+                $cmd = '"' . $mysqldump . '"' .
+                    ' --host=' . \escapeshellarg($host) .
+                    ' --user=' . \escapeshellarg($user) .
+                    ' --password=' . \escapeshellarg($pass) .
+                    ' --single-transaction --routines --triggers --events --default-character-set=utf8mb4 ' .
+                    \escapeshellarg($db) .
+                    ' > ' . \escapeshellarg($dbSqlPath);
+
+                [$ret, $out] = $this->runCmd($cmd);
+                if ($ret !== 0) {
+                    $this->dumpDatabasePHP($host, $db, $user, $pass, $dbSqlPath);
+                    $usedPhpDump = true;
+                }
+            } else {
+                // exec/escapeshellarg desabilitados — usar dump PHP puro
                 $this->dumpDatabasePHP($host, $db, $user, $pass, $dbSqlPath);
                 $usedPhpDump = true;
             }
