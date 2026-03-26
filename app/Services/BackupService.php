@@ -182,7 +182,7 @@ class BackupService {
     private function runCmd(string $cmd): array {
         $out = [];
         $ret = 0;
-        @exec($cmd . ' 2>&1', $out, $ret);
+        @\exec($cmd . ' 2>&1', $out, $ret);
         return [$ret, implode("\n", $out)];
     }
 
