@@ -469,16 +469,23 @@ class AdminPedidosEditController extends Controller {
                 <div class="row">
                     <div class="col-12">
                         <div class="card mb-4">
-                            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <div>
-                                    <div class="fw-bold">Cobrança de diferença</div>
-                                    <div class="text-muted small">Gera automaticamente: <strong>(novo total) - (valor já pago)</strong> no Asaas.</div>
-                                </div>
+                            <div class="card-body">
+                                <div class="fw-bold mb-1"><i class="fas fa-link me-2"></i>Cobrar diferença (Payment Link)</div>
+                                <div class="text-muted small mb-3">Salve o pedido primeiro com os novos itens. O valor da diferença é calculado automaticamente.</div>
                                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                                    <input type="number" step="0.01" min="0" class="form-control" id="diferenca_valor" placeholder="Valor (opcional)" style="max-width: 180px;" ' . ($temPagamentoAsaas ? '' : 'disabled') . '>
-                                    <button type="button" class="btn btn-outline-dark" onclick="gerarLinkDiferenca()" ' . ($temPagamentoAsaas ? '' : 'disabled') . '>
-                                        <i class="fas fa-link me-1"></i>Gerar link da diferença
-                                    </button>
+                                    <div>
+                                        <label class="form-label small mb-0">Diferença calculada</label>
+                                        <input type="text" class="form-control" id="diferenca_calculada" readonly style="max-width:180px;" value="R$ 0,00">
+                                    </div>
+                                    <div>
+                                        <label class="form-label small mb-0">Valor manual (opcional)</label>
+                                        <input type="number" step="0.01" min="0" class="form-control" id="diferenca_valor" placeholder="Deixe vazio p/ automático" style="max-width:180px;">
+                                    </div>
+                                    <div class="d-flex align-items-end" style="padding-bottom:1px;">
+                                        <button type="button" class="btn btn-primary" onclick="gerarLinkDiferenca()">
+                                            <i class="fas fa-link me-1"></i>Gerar link de pagamento
+                                        </button>
+                                    </div>
                                 </div>
                                 <div id="box_link_diferenca" class="w-100 mt-2" style="display:none;"></div>
                             </div>
@@ -697,6 +704,7 @@ class AdminPedidosEditController extends Controller {
             const pedidoId = ' . (int) $id . ';
             const canEditItens = ' . ($canEditItens ? 'true' : 'false') . ';
             const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
+            const totalOriginalPedido = ' . json_encode((float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0))) . ';
 
             window.abrirModalAdicionarProduto = function(){
                 if (!canEditItens) return;
@@ -736,6 +744,14 @@ class AdminPedidosEditController extends Controller {
                 setVal("subtotal_produtos", "R$ " + subtotal.toFixed(2).replace(".", ","));
                 setVal("valor_desconto", "R$ " + valorDesconto.toFixed(2).replace(".", ","));
                 setVal("valor_total", "R$ " + total.toFixed(2).replace(".", ","));
+
+                // Atualizar diferença calculada
+                const difCalc = document.getElementById("diferenca_calculada");
+                if (difCalc) {
+                    const dif = Math.max(0, total - totalOriginalPedido);
+                    difCalc.value = "R$ " + dif.toFixed(2).replace(".", ",");
+                    difCalc.style.color = dif > 0 ? "#198754" : "";
+                }
             };
 
             window.atualizarSubtotal = function(input){
@@ -851,32 +867,51 @@ class AdminPedidosEditController extends Controller {
                 if (!box) return;
                 box.style.display = "block";
                 box.className = "alert alert-info";
-                box.textContent = "Gerando link...";
+                box.textContent = "Gerando link de pagamento...";
 
                 var inp = document.getElementById("diferenca_valor");
-                var val = inp ? inp.value : "";
+                var valManual = inp ? inp.value.trim() : "";
 
-                fetch("/admin/estoque/compras/gerar-link-diferenca", {
+                fetch("/admin/pedidos/gerar-link-diferenca", {
                     method: "POST",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: "pedido_id=" + encodeURIComponent(String(pedidoId)) + "&valor=" + encodeURIComponent(String(val))
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pedido_id: pedidoId, valor_manual: valManual })
                 })
                     .then(function(r){ return r.json(); })
                     .then(function(data){
                         if (!data || !data.success) {
                             box.className = "alert alert-danger";
-                            box.textContent = (data && data.message) ? data.message : "Erro ao gerar link";
+                            box.textContent = (data && data.error) ? data.error : "Erro ao gerar link";
                             return;
                         }
-                        const link = data.bankSlipUrl || data.invoiceUrl || "";
+                        const link = data.public_url || "";
+                        const fullLink = window.location.origin + link;
                         box.className = "alert alert-success";
-                        box.innerHTML = "<div class=\"fw-bold\">Cobrança gerada</div>" +
-                            (data.diferenca ? ("<div class=\"small\">Diferença: <strong>R$ " + Number(data.diferenca).toFixed(2).replace(".", ",") + "</strong></div>") : "") +
-                            (link ? ("<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-dark\" href=\"" + link + "\" target=\"_blank\" rel=\"noopener\">Abrir link</a></div>") : "");
+                        var html = "<div class=\\"fw-bold\\">Link de pagamento gerado</div>";
+                        html += "<div class=\\"small mt-1\\">Diferença: <strong>R$ " + Number(data.diferenca).toFixed(2).replace(".", ",") + "</strong></div>";
+                        if (link) {
+                            html += "<div class=\\"mt-2 d-flex gap-2 align-items-center\\">";
+                            html += "<input type=\\"text\\" class=\\"form-control form-control-sm\\" id=\\"link_diferenca_url\\" value=\\"" + fullLink + "\\" readonly onclick=\\"this.select()\\" style=\\"max-width:400px;\\">";
+                            html += "<button class=\\"btn btn-sm btn-outline-dark\\" id=\\"btn_copiar_link\\">Copiar</button>";
+                            html += "<a class=\\"btn btn-sm btn-outline-primary\\" href=\\"" + link + "\\" target=\\"_blank\\" rel=\\"noopener\\">Abrir</a>";
+                            html += "</div>";
+                        }
+                        box.innerHTML = html;
+                        if (link) {
+                            var btnCopiar = document.getElementById("btn_copiar_link");
+                            if (btnCopiar) {
+                                btnCopiar.addEventListener("click", function(){
+                                    navigator.clipboard.writeText(fullLink).then(function(){
+                                        btnCopiar.textContent = "Copiado!";
+                                        setTimeout(function(){ btnCopiar.textContent = "Copiar"; }, 1500);
+                                    });
+                                });
+                            }
+                        }
                     })
                     .catch(function(){
                         box.className = "alert alert-danger";
-                        box.textContent = "Erro ao gerar a cobrança.";
+                        box.textContent = "Erro ao gerar o link de pagamento.";
                     });
             };
 
@@ -897,6 +932,139 @@ class AdminPedidosEditController extends Controller {
 
     }
 
+    }
+
+    public function gerarLinkDiferenca($request) {
+        header('Content-Type: application/json; charset=UTF-8');
+
+        try {
+            $dados = json_decode(file_get_contents('php://input'), true);
+            $pedidoId = (int) ($dados['pedido_id'] ?? 0);
+            $valorManual = trim((string) ($dados['valor_manual'] ?? ''));
+
+            if ($pedidoId <= 0) {
+                echo json_encode(['success' => false, 'error' => 'Pedido inválido']);
+                return;
+            }
+
+            $auth = new AuthService();
+            $admin = $auth->getUsuarioLogado();
+            $adminId = (int) ($admin['id'] ?? 0);
+
+            // Buscar pedido
+            $st = $this->connection->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+            $st->execute([$pedidoId]);
+            $pedido = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$pedido) {
+                echo json_encode(['success' => false, 'error' => 'Pedido não encontrado']);
+                return;
+            }
+
+            $totalAtual = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+            $moeda = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
+            if ($moeda === '') $moeda = 'BRL';
+
+            // Calcular subtotal atual dos itens
+            $itensTable = $this->getItensTableForPedido($pedidoId);
+            $colsItens = $this->getColsFromTable($itensTable);
+            $colSub = in_array('subtotal', $colsItens, true) ? 'subtotal' : null;
+            $subtotalItens = 0.0;
+            if ($colSub) {
+                $stSub = $this->connection->prepare("SELECT COALESCE(SUM({$colSub}), 0) FROM {$itensTable} WHERE pedido_id = ?");
+                $stSub->execute([$pedidoId]);
+                $subtotalItens = (float) ($stSub->fetchColumn() ?: 0);
+            }
+
+            // Calcular diferença
+            $diferenca = 0.0;
+            if ($valorManual !== '' && is_numeric(str_replace(',', '.', $valorManual))) {
+                $diferenca = (float) str_replace(',', '.', $valorManual);
+            } else {
+                // Diferença = total atual dos itens recalculado - total original do pedido
+                $diferenca = round(max(0, $subtotalItens - $totalAtual), 2);
+                if ($diferenca <= 0) {
+                    // Tentar: novo total (subtotal + taxas) - total original
+                    $taxaServico = (float) ($pedido['servicos'] ?? ($pedido['taxa_servico'] ?? 0));
+                    $impostos = (float) ($pedido['impostos'] ?? ($pedido['valor_impostos'] ?? 0));
+                    $frete = (float) ($pedido['frete'] ?? ($pedido['valor_frete'] ?? 0));
+                    $novoTotal = $subtotalItens + $taxaServico + $impostos + $frete;
+                    $diferenca = round(max(0, $novoTotal - $totalAtual), 2);
+                }
+            }
+
+            if ($diferenca <= 0) {
+                echo json_encode(['success' => false, 'error' => 'Sem diferença a cobrar. Adicione itens e salve o pedido primeiro.']);
+                return;
+            }
+
+            // Buscar itens novos (os que foram adicionados após o pedido original)
+            // Para simplificar, usamos a descrição genérica
+            $codigoPedido = (string) ($pedido['codigo_pedido'] ?? ($pedido['numero_pedido'] ?? $pedidoId));
+            $descricao = 'Diferença pedido #' . $codigoPedido;
+
+            // Criar Payment Link via PaymentLinkService
+            $svc = new \App\Services\PaymentLinkService();
+            $result = $svc->createLink([
+                'currency' => $moeda,
+                'products' => [
+                    ['name' => $descricao, 'value' => $diferenca]
+                ],
+                'taxa_servico_valor' => 0,
+                'impostos_valor' => 0,
+                'descricao' => $descricao,
+            ], $adminId);
+
+            if (empty($result['success'])) {
+                echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Falha ao criar link']);
+                return;
+            }
+
+            // Registrar no pedido quem gerou o link (para comissão)
+            try {
+                $colsPed = $this->getColsFromTable('pedidos');
+                $sets = [];
+                $params = [':id' => $pedidoId];
+
+                // Garantir colunas de diferença existam
+                $needCols = [
+                    'diferenca_link_id' => "ALTER TABLE pedidos ADD COLUMN diferenca_link_id INT NULL",
+                    'diferenca_valor' => "ALTER TABLE pedidos ADD COLUMN diferenca_valor DECIMAL(10,2) NULL",
+                    'diferenca_vendedor_id' => "ALTER TABLE pedidos ADD COLUMN diferenca_vendedor_id INT NULL",
+                    'diferenca_created_at' => "ALTER TABLE pedidos ADD COLUMN diferenca_created_at DATETIME NULL",
+                ];
+                foreach ($needCols as $col => $ddl) {
+                    if (!in_array($col, $colsPed, true)) {
+                        try { $this->connection->exec($ddl); } catch (\Exception $e) {}
+                    }
+                }
+
+                $sets[] = 'diferenca_link_id = :lid';
+                $params[':lid'] = (int) $result['id'];
+                $sets[] = 'diferenca_valor = :dval';
+                $params[':dval'] = $diferenca;
+                $sets[] = 'diferenca_vendedor_id = :vid';
+                $params[':vid'] = $adminId;
+                $sets[] = 'diferenca_created_at = NOW()';
+
+                if (!empty($sets)) {
+                    $stUpd = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $sets) . ' WHERE id = :id');
+                    $stUpd->execute($params);
+                }
+            } catch (\Exception $e) {
+                error_log('[DIFERENCA_LINK] Erro ao registrar no pedido: ' . $e->getMessage());
+            }
+
+            echo json_encode([
+                'success' => true,
+                'diferenca' => $diferenca,
+                'link_id' => $result['id'],
+                'public_url' => $result['public_url'],
+                'token' => $result['token'],
+                'moeda' => $moeda,
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     public function salvar($request) {

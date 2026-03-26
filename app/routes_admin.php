@@ -48,6 +48,7 @@ $router->get('/admin/pedidos/export-xlsx', 'AdminPedidosController', 'exportXlsx
 $router->get('/admin/pedidos/detalhes/{id}', 'AdminPedidosController', 'detalhes');
 $router->get('/admin/pedidos/editar/{id}', 'AdminPedidosEditController', 'editar');
 $router->post('/admin/pedidos/salvar', 'AdminPedidosEditController', 'salvar');
+$router->post('/admin/pedidos/gerar-link-diferenca', 'AdminPedidosEditController', 'gerarLinkDiferenca');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 $router->post('/admin/pedidos/sincronizar-pagamentos/{id}', 'AdminPedidosController', 'sincronizarPagamentos');
 $router->post('/admin/pedidos/gerar-novo-pix/{id}', 'AdminPedidosController', 'gerarNovoPixSplit');
