@@ -2918,25 +2918,106 @@ class CheckoutController extends Controller {
                             $cr = null;
                             if ($valorProduto > 0) {
                                 if ($formaSelecionada === 'pix') {
-                                    $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                                    if ($tx <= 1.01) {
-                                        try {
-                                            $dbTx = \Config\Database::getConnection();
-                                            $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                            $stTx->execute();
-                                            $v = (string) ($stTx->fetchColumn() ?: '0');
-                                            $tx2 = (float) str_replace(',', '.', $v);
-                                            if ($tx2 > 1.01) {
-                                                $tx = $tx2;
-                                            }
-                                        } catch (\Exception $e) {
+                                    // Calcular subtotal original em USD diretamente dos itens do pedido
+                                    // Os preços dos produtos são originalmente em USD; o pedido BRL é apenas a conversão.
+                                    $subtotalUsdOriginal = 0.0;
+                                    try {
+                                        $dbUsd = \Config\Database::getConnection();
+                                        $itensTableUsd = '';
+                                        if ($this->tableExists('pedido_itens')) {
+                                            $itensTableUsd = 'pedido_itens';
+                                        } elseif ($this->tableExists('pedido_items')) {
+                                            $itensTableUsd = 'pedido_items';
                                         }
-                                    }
-                                    if ($tx <= 0) {
-                                        $tx = 1.0;
+                                        if ($itensTableUsd !== '') {
+                                            $colsIt = [];
+                                            $stColsIt = $dbUsd->query('DESCRIBE ' . $itensTableUsd);
+                                            $colsIt = $stColsIt ? ($stColsIt->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                                            // Tentar pegar preco_unitario_usd ou price_usd (preço original USD)
+                                            $colPrecoUsd = '';
+                                            foreach (['preco_unitario_usd', 'price_usd', 'valor_usd', 'unit_price_usd'] as $c) {
+                                                if (in_array($c, $colsIt, true)) { $colPrecoUsd = $c; break; }
+                                            }
+
+                                            $colPedId = in_array('pedido_id', $colsIt, true) ? 'pedido_id' : '';
+                                            $colQtdIt = '';
+                                            foreach (['quantidade', 'qty', 'qtd'] as $c) {
+                                                if (in_array($c, $colsIt, true)) { $colQtdIt = $c; break; }
+                                            }
+
+                                            if ($colPrecoUsd !== '' && $colPedId !== '' && $colQtdIt !== '') {
+                                                $stUsd = $dbUsd->prepare('SELECT SUM(COALESCE(' . $colPrecoUsd . ',0) * COALESCE(' . $colQtdIt . ',0)) AS subtotal_usd FROM ' . $itensTableUsd . ' WHERE ' . $colPedId . ' = ?');
+                                                $stUsd->execute([(int) $pedidoId]);
+                                                $subtotalUsdOriginal = (float) ($stUsd->fetchColumn() ?: 0);
+                                            }
+
+                                            // Fallback: buscar preço USD do produto na tabela produtos
+                                            if ($subtotalUsdOriginal <= 0 && $colPedId !== '' && $colQtdIt !== '') {
+                                                $colProdId = '';
+                                                foreach (['produto_id', 'product_id'] as $c) {
+                                                    if (in_array($c, $colsIt, true)) { $colProdId = $c; break; }
+                                                }
+                                                if ($colProdId !== '') {
+                                                    $stItens = $dbUsd->prepare('SELECT ' . $colProdId . ' AS pid, ' . $colQtdIt . ' AS qtd FROM ' . $itensTableUsd . ' WHERE ' . $colPedId . ' = ?');
+                                                    $stItens->execute([(int) $pedidoId]);
+                                                    $itensRows = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                                                    $colsProd = [];
+                                                    try {
+                                                        $stColsProd = $dbUsd->query('DESCRIBE produtos');
+                                                        $colsProd = $stColsProd ? ($stColsProd->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                                    } catch (\Exception $e) { $colsProd = []; }
+
+                                                    $colPrice = '';
+                                                    foreach (['price', 'valor', 'preco'] as $c) {
+                                                        if (in_array($c, $colsProd, true)) { $colPrice = $c; break; }
+                                                    }
+
+                                                    if ($colPrice !== '' && !empty($itensRows)) {
+                                                        foreach ($itensRows as $itRow) {
+                                                            $pid = (int) ($itRow['pid'] ?? 0);
+                                                            $qtd = (int) ($itRow['qtd'] ?? 1);
+                                                            if ($pid <= 0) continue;
+                                                            try {
+                                                                $stP = $dbUsd->prepare('SELECT ' . $colPrice . ' AS preco FROM produtos WHERE id = ? LIMIT 1');
+                                                                $stP->execute([$pid]);
+                                                                $precoUsd = (float) ($stP->fetchColumn() ?: 0);
+                                                                $subtotalUsdOriginal += $precoUsd * $qtd;
+                                                            } catch (\Exception $e) {}
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (\Exception $e) {
+                                        $subtotalUsdOriginal = 0.0;
                                     }
 
-                                    $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                    // Se conseguiu o subtotal original em USD, usar ele; senão, converter BRL → USD pela taxa do sistema
+                                    if ($subtotalUsdOriginal > 0) {
+                                        $amountUsd = round($subtotalUsdOriginal, 2);
+                                    } else {
+                                        $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
+                                        if ($tx <= 1.01) {
+                                            try {
+                                                $dbTx = \Config\Database::getConnection();
+                                                $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                                $stTx->execute();
+                                                $v = (string) ($stTx->fetchColumn() ?: '0');
+                                                $tx2 = (float) str_replace(',', '.', $v);
+                                                if ($tx2 > 1.01) {
+                                                    $tx = $tx2;
+                                                }
+                                            } catch (\Exception $e) {
+                                            }
+                                        }
+                                        if ($tx <= 0) {
+                                            $tx = 1.0;
+                                        }
+                                        $amountUsd = round(((float) $valorProduto) / (float) $tx, 2);
+                                    }
+
                                     if ($amountUsd <= 0) {
                                         throw new \Exception('Valor inválido para Câmbio Real (USD)');
                                     }

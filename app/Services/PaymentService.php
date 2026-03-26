@@ -857,9 +857,9 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // Enviar amount em BRL para que o PIX seja gerado com o valor exato em reais.
-            'amount' => round($valorBrlOriginal, 2),
-            'currency' => 'BRL',
+            // Enviar amount em USD. O Câmbio Real converte para BRL usando a taxa deles.
+            'amount' => round($amountUsd, 2),
+            'currency' => 'USD',
             'payment_method' => 'pix',
             'client' => (array) $customer,
             'duplicate' => 1,
@@ -867,15 +867,15 @@ class PaymentService {
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
-                    'base_value' => round($valorBrlOriginal, 2),
-                    'valor' => round($valorBrlOriginal, 2),
+                    'base_value' => round($amountUsd, 2),
+                    'valor' => round($amountUsd, 2),
                     'qty' => 1,
                     'ref' => (string) $pedidoId,
                 ]
             ],
         ];
 
-        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountBrl=' . round($valorBrlOriginal, 2) . ' amountUsdRef=' . round($amountUsd, 2) . ' currency=BRL orderId=' . $orderId);
+        error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountUsd=' . round($amountUsd, 2) . ' valorBrlOriginal=' . round($valorBrlOriginal, 2) . ' currency=USD orderId=' . $orderId);
 
         $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
             $msg = (string) ($resp['message'] ?? $defaultMsg);
