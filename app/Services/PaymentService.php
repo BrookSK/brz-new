@@ -2083,8 +2083,8 @@ class PaymentService {
     }
 
     /**
-     * Cria PaymentIntent Stripe PIX para checkout de pedido (USD — fora do BR).
-     * O Stripe PIX opera em USD, gerando QR Code para pagamento.
+     * Cria PaymentIntent Stripe PIX para checkout de pedido (fora do BR).
+     * O Stripe PIX só aceita BRL. Convertemos USD → BRL usando a taxa do sistema.
      */
     public function createStripePixPaymentIntentForCheckout(int $pedidoId, float $valorUsd, string $descricao, array $customer = []): array {
         if (!$this->isStripeEnabled()) {
@@ -2094,18 +2094,36 @@ class PaymentService {
             return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
         }
 
-        $amountCents = (int) round(((float) $valorUsd) * 100);
+        // Stripe PIX só aceita BRL — converter USD para BRL
+        $taxaConversao = 1.0;
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+            $st->execute();
+            $tx = (float) ($st->fetchColumn() ?: 0);
+            if ($tx > 1.01) {
+                $taxaConversao = $tx;
+            }
+        } catch (\Exception $e) {}
+
+        $valorBrl = round($valorUsd * $taxaConversao, 2);
+        if ($valorBrl < 0.50) {
+            return ['success' => false, 'error' => 'Valor mínimo para PIX é R$ 0,50.'];
+        }
+
+        $amountCents = (int) round($valorBrl * 100);
         if ($amountCents <= 0) {
             return ['success' => false, 'error' => 'Valor inválido.'];
         }
 
         $body = [
             'amount' => (string) $amountCents,
-            'currency' => 'usd',
+            'currency' => 'brl',
             'description' => $descricao,
             'metadata[pedido_id]' => (string) $pedidoId,
-            'payment_method_types[0]' => 'card',
-            'payment_method_types[1]' => 'pix',
+            'metadata[valor_usd_original]' => (string) round($valorUsd, 2),
+            'metadata[taxa_conversao]' => (string) $taxaConversao,
+            'payment_method_types[0]' => 'pix',
             'confirm' => 'true',
             'payment_method_data[type]' => 'pix',
         ];
@@ -2153,6 +2171,8 @@ class PaymentService {
                 'client_secret' => $clientSecret,
                 'status' => (string) ($pi['status'] ?? ''),
                 'pix' => $pix,
+                'valor_brl' => $valorBrl,
+                'taxa_conversao' => $taxaConversao,
                 'raw' => $pi,
             ];
         } catch (\Exception $e) {

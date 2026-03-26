@@ -3329,16 +3329,85 @@ class CheckoutController extends Controller {
                         );
 
                         if (!empty($pixResult['success'])) {
+                            // Persistir dados do Stripe PIX no pedido
+                            $pixData = $pixResult['pix'] ?? null;
+                            $pixPayloadStr = is_array($pixData) ? (string) ($pixData['copy_paste'] ?? '') : '';
+                            $pixImgUrl = is_array($pixData) ? (string) ($pixData['image_url_png'] ?? '') : '';
+                            $pixHostedUrl = is_array($pixData) ? (string) ($pixData['hosted_instructions_url'] ?? '') : '';
+
                             $this->atualizarPagamentoNoPedido((int) $pedidoId, [
                                 'payment_id' => $pixResult['payment_intent_id'],
                                 'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
                                 'billingType' => 'PIX',
+                                'invoiceUrl' => $pixHostedUrl,
                             ], 'stripe');
                             $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, [
                                 'payment_id' => $pixResult['payment_intent_id'],
                                 'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
                                 'billingType' => 'PIX',
+                                'invoiceUrl' => $pixHostedUrl,
                             ], 'stripe');
+
+                            // Persistir no split_pagamentos para a tela de conclusão
+                            try {
+                                $dbSplit = \Config\Database::getConnection();
+                                if ($this->tableExists('split_pagamentos')) {
+                                    $colsSplit = [];
+                                    try {
+                                        $stC = $dbSplit->query('DESCRIBE split_pagamentos');
+                                        $colsSplit = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                    } catch (\Exception $e) { $colsSplit = []; }
+
+                                    $ins = ['pedido_id', 'componente', 'gateway', 'metodo', 'moeda', 'valor', 'payment_id', 'status'];
+                                    $vals = ['?', '?', '?', '?', '?', '?', '?', '?'];
+                                    $params = [
+                                        (int) $pedidoId, 'produto', 'stripe', 'pix', 'BRL',
+                                        round($pixResult['valor_brl'] ?? 0, 2),
+                                        (string) $pixResult['payment_intent_id'],
+                                        'pending',
+                                    ];
+
+                                    if (in_array('invoice_url', $colsSplit, true)) {
+                                        $ins[] = 'invoice_url'; $vals[] = '?'; $params[] = $pixHostedUrl;
+                                    }
+                                    if (in_array('pix_payload', $colsSplit, true)) {
+                                        $ins[] = 'pix_payload'; $vals[] = '?'; $params[] = $pixPayloadStr;
+                                    }
+                                    if (in_array('pix_encoded_image', $colsSplit, true) && $pixImgUrl !== '') {
+                                        $ins[] = 'pix_encoded_image'; $vals[] = '?'; $params[] = $pixImgUrl;
+                                    }
+
+                                    $stIns = $dbSplit->prepare('INSERT INTO split_pagamentos (' . implode(',', $ins) . ') VALUES (' . implode(',', $vals) . ')');
+                                    $stIns->execute($params);
+                                }
+                            } catch (\Exception $e) {
+                                error_log('[CHECKOUT] Erro ao persistir Stripe PIX no split: ' . $e->getMessage());
+                            }
+
+                            // Salvar PIX payload/QR no pedido para exibição na conclusão
+                            try {
+                                $dbPix = \Config\Database::getConnection();
+                                $colsPed = [];
+                                try {
+                                    $stC = $dbPix->query('DESCRIBE pedidos');
+                                    $colsPed = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                } catch (\Exception $e) { $colsPed = []; }
+
+                                $set = [];
+                                $pUpd = [':id' => (int) $pedidoId];
+                                if (is_array($colsPed) && in_array('payment_pix_payload', $colsPed, true) && $pixPayloadStr !== '') {
+                                    $set[] = 'payment_pix_payload = :pp';
+                                    $pUpd[':pp'] = $pixPayloadStr;
+                                }
+                                if (is_array($colsPed) && in_array('pix_payload', $colsPed, true) && $pixPayloadStr !== '') {
+                                    $set[] = 'pix_payload = :pp2';
+                                    $pUpd[':pp2'] = $pixPayloadStr;
+                                }
+                                if (!empty($set)) {
+                                    $stUpd = $dbPix->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
+                                    $stUpd->execute($pUpd);
+                                }
+                            } catch (\Exception $e) {}
                         }
                     } catch (\Exception $e) {
                         error_log('[CHECKOUT] Erro Stripe PIX (fora BR): ' . $e->getMessage());
