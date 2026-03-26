@@ -1017,31 +1017,34 @@ function syncPaymentOptionsByCurrency() {
     if (!formaSel) return;
 
     const isBR = (pais === 'BR');
-
-    // Opções disponíveis por contexto:
-    // BR: carteira, cartao_credito, cartao_debito, pix, boleto, transferencia, pagamento_entrega
-    // Fora do BR: cartao_credito (Stripe), pix (Stripe) — moeda USD
-    const options = formaSel.querySelectorAll('option');
     const allowedOutsideBR = ['', 'cartao_credito', 'pix'];
 
-    options.forEach(function(opt) {
-        if (opt.value === '') return; // "Selecione..." sempre visível
-        if (isBR) {
-            opt.style.display = '';
-            opt.disabled = false;
-        } else {
-            if (allowedOutsideBR.indexOf(opt.value) >= 0) {
-                opt.style.display = '';
-                opt.disabled = false;
-            } else {
-                opt.style.display = 'none';
-                opt.disabled = true;
-                if (formaSel.value === opt.value) {
-                    formaSel.value = '';
-                }
-            }
+    // Guardar todas as opções originais na primeira execução
+    if (!formaSel._allOptions) {
+        formaSel._allOptions = Array.from(formaSel.querySelectorAll('option')).map(function(opt) {
+            return { value: opt.value, text: opt.textContent, disabled: opt.disabled };
+        });
+    }
+
+    // Reconstruir o select com as opções permitidas
+    var currentVal = formaSel.value;
+    formaSel.innerHTML = '';
+    formaSel._allOptions.forEach(function(o) {
+        if (!isBR && o.value !== '' && allowedOutsideBR.indexOf(o.value) < 0) {
+            return; // Remover opção não permitida fora do BR
         }
+        var opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.text;
+        formaSel.appendChild(opt);
     });
+
+    // Restaurar valor selecionado se ainda válido
+    if (currentVal && Array.from(formaSel.options).some(function(o) { return o.value === currentVal; })) {
+        formaSel.value = currentVal;
+    } else {
+        formaSel.value = '';
+    }
 
     // Forçar moeda USD fora do BR
     const moedaHidden = document.getElementById('moeda_hidden');
