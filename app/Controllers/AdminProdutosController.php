@@ -2461,7 +2461,10 @@ document.getElementById("formProduto").addEventListener("submit", async function
 });
 
 renderGrupos();
-';
+</script>
+</body>
+</html>';
+        exit;
     }
 
     private function ensureCadastroRapidoAccess(Request $request): bool {
