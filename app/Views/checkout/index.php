@@ -1100,15 +1100,22 @@ function updatePixBrlInfo() {
         return;
     }
 
-    // Pegar o total em USD do resumo
-    var totalEl = document.getElementById('total');
-    var totalText = totalEl ? totalEl.textContent.replace(/[^\d.,]/g, '') : '0';
-    totalText = totalText.replace(/\./g, '').replace(',', '.');
-    var totalUsd = parseFloat(totalText) || 0;
+    // Pegar o total original em USD (antes da conversão)
+    var totalUsd = 0;
+    if (window.checkoutOriginalValues && window.checkoutOriginalValues.total) {
+        totalUsd = Number(window.checkoutOriginalValues.total) || 0;
+    } else if (window.checkoutBaseValues && window.checkoutBaseValues.total) {
+        totalUsd = Number(window.checkoutBaseValues.total) || 0;
+    }
 
-    // Usar a taxa de conversão do sistema
+    if (totalUsd <= 0) {
+        box.classList.add('d-none');
+        return;
+    }
+
+    // Usar a taxa BRL do sistema
     var rate = window.exchangeRates ? (window.exchangeRates['BRL'] || 1) : 1;
-    if (rate <= 1.01) rate = 5.85; // fallback
+    if (rate <= 1.01) rate = 5.85;
 
     var totalBrl = totalUsd * rate;
 
