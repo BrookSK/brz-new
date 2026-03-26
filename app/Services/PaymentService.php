@@ -2199,6 +2199,92 @@ class PaymentService {
         }
     }
 
+    /**
+     * Cria PaymentIntent Stripe PIX recebendo o valor já convertido em BRL.
+     */
+    public function createStripePixPaymentIntentForCheckoutBrl(int $pedidoId, float $valorBrl, float $valorUsdRef, float $taxaConversaoRef, string $descricao, array $customer = []): array {
+        if (!$this->isStripeEnabled()) {
+            return ['success' => false, 'error' => 'Stripe está desabilitado.'];
+        }
+        if (empty($this->stripeApiKey)) {
+            return ['success' => false, 'error' => 'Stripe não configurado (Secret Key ausente).'];
+        }
+
+        if ($valorBrl < 0.50) {
+            return ['success' => false, 'error' => 'Valor mínimo para PIX é R$ 0,50.'];
+        }
+
+        $amountCents = (int) round($valorBrl * 100);
+        if ($amountCents <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido.'];
+        }
+
+        error_log('[STRIPE_PIX_BRL] pedido=' . $pedidoId . ' valorBrl=' . $valorBrl . ' valorUsdRef=' . $valorUsdRef . ' taxa=' . $taxaConversaoRef . ' amountCents=' . $amountCents);
+
+        $body = [
+            'amount' => (string) $amountCents,
+            'currency' => 'brl',
+            'description' => $descricao,
+            'metadata[pedido_id]' => (string) $pedidoId,
+            'metadata[valor_usd_original]' => (string) round($valorUsdRef, 2),
+            'metadata[taxa_conversao]' => (string) $taxaConversaoRef,
+            'payment_method_types[0]' => 'pix',
+            'confirm' => 'true',
+            'payment_method_data[type]' => 'pix',
+        ];
+
+        if (!empty($customer['email'])) {
+            $body['receipt_email'] = (string) $customer['email'];
+            $body['payment_method_data[billing_details][email]'] = (string) $customer['email'];
+        }
+        if (!empty($customer['name'])) {
+            $body['payment_method_data[billing_details][name]'] = (string) $customer['name'];
+        }
+        if (!empty($customer['tax_id'])) {
+            $taxId = preg_replace('/\D+/', '', (string) $customer['tax_id']);
+            if ($taxId !== '') {
+                $body['payment_method_data[billing_details][tax_id]'] = $taxId;
+            }
+        }
+
+        try {
+            $pi = $this->stripeRequest('POST', '/v1/payment_intents', $body);
+            $id = (string) ($pi['id'] ?? '');
+            $clientSecret = (string) ($pi['client_secret'] ?? '');
+            if ($id === '') {
+                return ['success' => false, 'error' => 'Stripe: resposta inválida (id ausente).'];
+            }
+
+            $pix = null;
+            $next = $pi['next_action'] ?? null;
+            if (is_array($next)) {
+                $pixObj = $next['pix_display_qr_code'] ?? null;
+                if (is_array($pixObj)) {
+                    $pix = [
+                        'hosted_instructions_url' => (string) ($pixObj['hosted_instructions_url'] ?? ''),
+                        'expires_at' => $pixObj['expires_at'] ?? null,
+                        'copy_paste' => (string) ($pixObj['data'] ?? ($pixObj['pix_code'] ?? '')),
+                        'image_url_png' => (string) ($pixObj['image_url_png'] ?? ''),
+                        'image_url_svg' => (string) ($pixObj['image_url_svg'] ?? ''),
+                    ];
+                }
+            }
+
+            return [
+                'success' => true,
+                'payment_intent_id' => $id,
+                'client_secret' => $clientSecret,
+                'status' => (string) ($pi['status'] ?? ''),
+                'pix' => $pix,
+                'valor_brl' => $valorBrl,
+                'taxa_conversao' => $taxaConversaoRef,
+                'raw' => $pi,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => 'Stripe PIX: ' . $e->getMessage()];
+        }
+    }
+
     public function createMercadoPagoCheckoutPreferenceProduto(int $pedidoId, float $valorBrl, string $descricao, array $payer = [], ?string $successUrl = null, ?string $failureUrl = null, ?string $pendingUrl = null): array {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) {

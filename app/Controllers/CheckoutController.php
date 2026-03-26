@@ -3336,6 +3336,27 @@ class CheckoutController extends Controller {
                             throw new \Exception('Valor inválido para Stripe PIX');
                         }
 
+                        // Converter USD para BRL usando a taxa do sistema
+                        $taxaConvPix = 1.0;
+                        try {
+                            $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL');
+                            if ($txFromCarrinho > 1.01) {
+                                $taxaConvPix = $txFromCarrinho;
+                            }
+                        } catch (\Exception $e) {}
+                        if ($taxaConvPix <= 1.01) {
+                            try {
+                                $dbTxPix = \Config\Database::getConnection();
+                                $stTxPix = $dbTxPix->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                $stTxPix->execute();
+                                $txVal = (float) str_replace(',', '.', (string) ($stTxPix->fetchColumn() ?: '0'));
+                                if ($txVal > 1.01) $taxaConvPix = $txVal;
+                            } catch (\Exception $e) {}
+                        }
+
+                        $totalBrlPix = round($totalUsdPix * $taxaConvPix, 2);
+                        error_log('[STRIPE_PIX] totalBrl=' . $totalBrlPix . ' taxa=' . $taxaConvPix);
+
                         $codigoPedidoPix = (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId);
                         $descPix = 'Pedido #' . $codigoPedidoPix;
 
@@ -3345,9 +3366,11 @@ class CheckoutController extends Controller {
                             'tax_id' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
                         ];
 
-                        $pixResult = $this->paymentService->createStripePixPaymentIntentForCheckout(
+                        $pixResult = $this->paymentService->createStripePixPaymentIntentForCheckoutBrl(
                             (int) $pedidoId,
+                            (float) $totalBrlPix,
                             (float) $totalUsdPix,
+                            (float) $taxaConvPix,
                             $descPix,
                             $customerPix
                         );
@@ -3777,7 +3800,6 @@ class CheckoutController extends Controller {
         // Calcular valor BRL do PIX Stripe para exibição
         $pixBrlValor = null;
         $pixBrlTaxa = null;
-        if ($billingType === 'PIX' && $isStripePagamento = false) {}
         $isStripePix = false;
         foreach ($splitPagamentos as $sp) {
             if (is_array($sp) && strtolower(trim((string) ($sp['gateway'] ?? ''))) === 'stripe' && strtolower(trim((string) ($sp['metodo'] ?? ''))) === 'pix') {
@@ -3786,7 +3808,7 @@ class CheckoutController extends Controller {
                 break;
             }
         }
-        if ($isStripePix && $pixBrlValor <= 0) {
+        if ($isStripePix && ($pixBrlValor === null || $pixBrlValor <= 0)) {
             // Calcular a partir do total USD
             $totalUsd = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
             $txConv = 1.0;
@@ -3797,8 +3819,21 @@ class CheckoutController extends Controller {
                 $tx = (float) ($stTx->fetchColumn() ?: 0);
                 if ($tx > 1.01) $txConv = $tx;
             } catch (\Exception $e) {}
+            if ($txConv <= 1.01) {
+                try {
+                    $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL');
+                    if ($txFromCarrinho > 1.01) $txConv = $txFromCarrinho;
+                } catch (\Exception $e) {}
+            }
             $pixBrlValor = round($totalUsd * $txConv, 2);
             $pixBrlTaxa = $txConv;
+        }
+        if ($isStripePix && $pixBrlValor > 0 && $pixBrlTaxa === null) {
+            // Calcular taxa a partir dos valores
+            $totalUsd = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+            if ($totalUsd > 0) {
+                $pixBrlTaxa = round($pixBrlValor / $totalUsd, 2);
+            }
         }
 
         $this->view('checkout/conclusao', [
