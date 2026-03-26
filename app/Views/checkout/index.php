@@ -2313,21 +2313,30 @@ function updatePaymentMethodsForCurrency(currency) {
     const cur = (currency || '').toString().trim().toUpperCase();
     const isBRL = (cur === 'BRL');
 
+    // Verificar país de entrega
+    const paisSel = document.getElementById('pais');
+    const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+    const isBR = (pais === 'BR');
+
     const currentValue = select.value;
 
-    // Recriar options (evita opções inconsistentes ao trocar moeda)
+    // Recriar options
     select.innerHTML = '';
     select.appendChild(new Option('Selecione...', ''));
 
-    // Carteira deve aparecer sempre (independente da moeda)
-    select.appendChild(new Option('Crédito da Carteira', 'carteira'));
-
-    if (isBRL) {
+    if (isBR) {
+        // Brasil: todas as opções
+        select.appendChild(new Option('Crédito da Carteira', 'carteira'));
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
-        // select.appendChild(new Option('Boleto Bancário', 'boleto')); // OCULTO TEMPORARIAMENTE
+        select.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
         select.appendChild(new Option('PIX', 'pix'));
+        // select.appendChild(new Option('Boleto Bancário', 'boleto')); // OCULTO TEMPORARIAMENTE
+        select.appendChild(new Option('Transferência', 'transferencia'));
+        select.appendChild(new Option('Pagamento na Entrega', 'pagamento_entrega'));
     } else {
+        // Fora do BR: apenas Stripe (cartão + PIX)
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
+        select.appendChild(new Option('PIX', 'pix'));
     }
 
     // Manter seleção se ainda válida
