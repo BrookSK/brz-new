@@ -412,18 +412,51 @@ class AdminUsuariosController extends Controller {
 
                         <hr class="my-4">
                         <h5 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Endereço Principal</h5>
-                        <input type="hidden" name="endereco_id" value="' . (int) ($endereco['id'] ?? 0) . '">
+                        <input type="hidden" name="endereco_id" value="' . (int) ($endereco['id'] ?? 0) . '">';
+
+        $paisAtual = strtoupper(trim((string) ($endereco['pais'] ?? 'BR')));
+        if ($paisAtual === '') $paisAtual = 'BR';
+        $todosPaises = [
+            'AF'=>'Afeganistão','ZA'=>'África do Sul','AL'=>'Albânia','DE'=>'Alemanha','AD'=>'Andorra','AO'=>'Angola','AG'=>'Antígua e Barbuda','SA'=>'Arábia Saudita','DZ'=>'Argélia','AR'=>'Argentina','AM'=>'Armênia','AU'=>'Austrália','AT'=>'Áustria','AZ'=>'Azerbaijão',
+            'BS'=>'Bahamas','BH'=>'Bahrein','BD'=>'Bangladesh','BB'=>'Barbados','BE'=>'Bélgica','BZ'=>'Belize','BJ'=>'Benin','BY'=>'Bielorrússia','BO'=>'Bolívia','BA'=>'Bósnia e Herzegovina','BW'=>'Botsuana','BR'=>'Brasil','BN'=>'Brunei','BG'=>'Bulgária','BF'=>'Burkina Faso','BI'=>'Burundi','BT'=>'Butão',
+            'CV'=>'Cabo Verde','CM'=>'Camarões','KH'=>'Camboja','CA'=>'Canadá','QA'=>'Catar','KZ'=>'Cazaquistão','TD'=>'Chade','CL'=>'Chile','CN'=>'China','CY'=>'Chipre','CO'=>'Colômbia','KM'=>'Comores','CG'=>'Congo','KP'=>'Coreia do Norte','KR'=>'Coreia do Sul','CI'=>'Costa do Marfim','CR'=>'Costa Rica','HR'=>'Croácia','CU'=>'Cuba',
+            'DK'=>'Dinamarca','DJ'=>'Djibuti','DM'=>'Dominica',
+            'EG'=>'Egito','SV'=>'El Salvador','AE'=>'Emirados Árabes','EC'=>'Equador','ER'=>'Eritreia','SK'=>'Eslováquia','SI'=>'Eslovênia','ES'=>'Espanha','US'=>'Estados Unidos','EE'=>'Estônia','SZ'=>'Eswatini','ET'=>'Etiópia',
+            'FJ'=>'Fiji','PH'=>'Filipinas','FI'=>'Finlândia','FR'=>'França',
+            'GA'=>'Gabão','GM'=>'Gâmbia','GH'=>'Gana','GE'=>'Geórgia','GR'=>'Grécia','GD'=>'Granada','GT'=>'Guatemala','GY'=>'Guiana','GN'=>'Guiné','GQ'=>'Guiné Equatorial','GW'=>'Guiné-Bissau',
+            'HT'=>'Haiti','HN'=>'Honduras','HU'=>'Hungria',
+            'YE'=>'Iêmen','IN'=>'Índia','ID'=>'Indonésia','IQ'=>'Iraque','IR'=>'Irã','IE'=>'Irlanda','IS'=>'Islândia','IL'=>'Israel','IT'=>'Itália',
+            'JM'=>'Jamaica','JP'=>'Japão','JO'=>'Jordânia',
+            'KW'=>'Kuwait',
+            'LA'=>'Laos','LS'=>'Lesoto','LV'=>'Letônia','LB'=>'Líbano','LR'=>'Libéria','LY'=>'Líbia','LI'=>'Liechtenstein','LT'=>'Lituânia','LU'=>'Luxemburgo',
+            'MK'=>'Macedônia do Norte','MG'=>'Madagascar','MY'=>'Malásia','MW'=>'Malawi','MV'=>'Maldivas','ML'=>'Mali','MT'=>'Malta','MA'=>'Marrocos','MU'=>'Maurício','MR'=>'Mauritânia','MX'=>'México','MM'=>'Mianmar','FM'=>'Micronésia','MZ'=>'Moçambique','MD'=>'Moldávia','MC'=>'Mônaco','MN'=>'Mongólia','ME'=>'Montenegro',
+            'NA'=>'Namíbia','NR'=>'Nauru','NP'=>'Nepal','NI'=>'Nicarágua','NE'=>'Níger','NG'=>'Nigéria','NO'=>'Noruega','NZ'=>'Nova Zelândia',
+            'OM'=>'Omã',
+            'NL'=>'Países Baixos','PW'=>'Palau','PA'=>'Panamá','PG'=>'Papua Nova Guiné','PK'=>'Paquistão','PY'=>'Paraguai','PE'=>'Peru','PL'=>'Polônia','PT'=>'Portugal',
+            'KE'=>'Quênia','KG'=>'Quirguistão',
+            'GB'=>'Reino Unido','CF'=>'República Centro-Africana','CD'=>'República Dem. do Congo','DO'=>'República Dominicana','CZ'=>'República Tcheca','RO'=>'Romênia','RW'=>'Ruanda','RU'=>'Rússia',
+            'WS'=>'Samoa','SM'=>'San Marino','LC'=>'Santa Lúcia','KN'=>'São Cristóvão e Névis','ST'=>'São Tomé e Príncipe','VC'=>'São Vicente e Granadinas','SC'=>'Seicheles','SN'=>'Senegal','SL'=>'Serra Leoa','RS'=>'Sérvia','SG'=>'Singapura','SY'=>'Síria','SO'=>'Somália','LK'=>'Sri Lanka','SD'=>'Sudão','SS'=>'Sudão do Sul','SE'=>'Suécia','CH'=>'Suíça','SR'=>'Suriname',
+            'TJ'=>'Tajiquistão','TH'=>'Tailândia','TZ'=>'Tanzânia','TL'=>'Timor-Leste','TG'=>'Togo','TO'=>'Tonga','TT'=>'Trinidad e Tobago','TN'=>'Tunísia','TM'=>'Turcomenistão','TR'=>'Turquia','TV'=>'Tuvalu',
+            'UA'=>'Ucrânia','UG'=>'Uganda','UY'=>'Uruguai','UZ'=>'Uzbequistão',
+            'VU'=>'Vanuatu','VA'=>'Vaticano','VE'=>'Venezuela','VN'=>'Vietnã',
+            'ZM'=>'Zâmbia','ZW'=>'Zimbábue',
+        ];
+        $paisOptions = '';
+        foreach ($todosPaises as $code => $nome) {
+            $sel = ($code === $paisAtual) ? ' selected' : '';
+            $paisOptions .= '<option value="' . $code . '"' . $sel . '>' . htmlspecialchars($nome) . '</option>';
+        }
+        if ($paisAtual !== '' && !isset($todosPaises[$paisAtual])) {
+            $paisOptions = '<option value="' . htmlspecialchars($paisAtual) . '" selected>' . htmlspecialchars($paisAtual) . '</option>' . $paisOptions;
+        }
+
+        echo '
                         <div class="row g-3">
                             <div class="col-md-3">
                                 <label class="form-label">País</label>
                                 <select class="form-select" name="end_pais" id="end_pais" onchange="atualizarCamposPorPais()">
-                                    <option value="BR" ' . (strtoupper((string) ($endereco['pais'] ?? 'BR')) === 'BR' ? 'selected' : '') . '>Brasil</option>
-                                    <option value="US" ' . (strtoupper((string) ($endereco['pais'] ?? '')) === 'US' ? 'selected' : '') . '>Estados Unidos</option>
-                                    <option value="CA" ' . (strtoupper((string) ($endereco['pais'] ?? '')) === 'CA' ? 'selected' : '') . '>Canadá</option>
-                                    <option value="PT" ' . (strtoupper((string) ($endereco['pais'] ?? '')) === 'PT' ? 'selected' : '') . '>Portugal</option>
-                                    <option value="OTHER" ' . (!in_array(strtoupper((string) ($endereco['pais'] ?? 'BR')), ['BR','US','CA','PT',''], true) ? 'selected' : '') . '>Outro</option>
+                                    ' . $paisOptions . '
                                 </select>
-                                <input type="text" class="form-control mt-1" name="end_pais_outro" id="end_pais_outro" value="' . htmlspecialchars(!in_array(strtoupper((string) ($endereco['pais'] ?? 'BR')), ['BR','US','CA','PT',''], true) ? (string) ($endereco['pais'] ?? '') : '') . '" placeholder="Código do país (ex: UK)" maxlength="2" style="display:none;">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label" id="lbl_cep">CEP</label>
@@ -481,7 +514,6 @@ class AdminUsuariosController extends Controller {
     function atualizarCamposPorPais() {
         var paisSel = document.getElementById("end_pais");
         var pais = paisSel ? paisSel.value : "BR";
-        var outroInp = document.getElementById("end_pais_outro");
         var cep = document.getElementById("end_cep");
         var lblCep = document.getElementById("lbl_cep");
         var lblEnd = document.getElementById("lbl_endereco");
@@ -492,8 +524,6 @@ class AdminUsuariosController extends Controller {
         var selEstado = document.getElementById("end_estado_select");
         var txtEstado = document.getElementById("end_estado_text");
         var lblEstado = document.getElementById("lbl_estado");
-
-        if (outroInp) outroInp.style.display = (pais === "OTHER") ? "" : "none";
 
         if (cep && lblCep) {
             if (pais === "BR") { cep.placeholder = "00000-000"; cep.maxLength = 9; lblCep.textContent = "CEP"; }
@@ -582,11 +612,8 @@ class AdminUsuariosController extends Controller {
                         $endEstado = trim((string) $request->getParam('end_estado_text'));
                     }
 
-                    // País: pode ser select (BR/US/CA/PT) ou "OTHER" com campo livre
-                    $endPais = trim((string) $request->getParam('end_pais'));
-                    if ($endPais === 'OTHER') {
-                        $endPais = strtoupper(trim((string) $request->getParam('end_pais_outro')));
-                    }
+                    // País: vem direto do select com todos os países
+                    $endPais = strtoupper(trim((string) $request->getParam('end_pais')));
                     if ($endPais === '') {
                         $endPais = 'BR';
                     }
