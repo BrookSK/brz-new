@@ -161,7 +161,7 @@ class PaymentService {
                 ],
             ],
             'duplicate' => 0,
-            'take_rates' => 1,
+            'take_rates' => 0,
             'products' => [
                 [
                     'descricao' => $descricao,
@@ -309,7 +309,7 @@ class PaymentService {
                     'raw' => $resp,
                     'code' => $code,
                     'amount_brl_sent' => round($valorBrlOriginal, 2),
-                    'take_rates_sent' => 1,
+                    'take_rates_sent' => 0,
                 ], JSON_UNESCAPED_UNICODE),
             ]);
 
@@ -503,7 +503,7 @@ class PaymentService {
                 ],
             ],
             'duplicate' => 0,
-            'take_rates' => 1,
+            'take_rates' => 0,
             'products' => $productsPayload,
         ];
 
@@ -667,7 +667,7 @@ class PaymentService {
                 'type' => $type,
             ],
             'duplicate' => 0,
-            'take_rates' => 1,
+            'take_rates' => 0,
             'products' => [
                 [
                     'descricao' => $descricao,
@@ -812,7 +812,7 @@ class PaymentService {
                     'code' => $code,
                     'amount_brl_sent' => round($valorBrlOriginal, 2),
                     'amount_usd_calc' => round($amountUsdCalc, 2),
-                    'take_rates_sent' => 1,
+                    'take_rates_sent' => 0,
                 ], JSON_UNESCAPED_UNICODE),
             ]);
 
@@ -863,7 +863,7 @@ class PaymentService {
             'payment_method' => 'pix',
             'client' => (array) $customer,
             'duplicate' => 1,
-            'take_rates' => 1,
+            'take_rates' => 0,
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
@@ -1025,7 +1025,7 @@ class PaymentService {
                     'email_used' => $emailUsed,
                     'amount_brl_sent' => round($valorBrlOriginal, 2),
                     'transaction_amount_brl_returned' => (float) ($tx['amount'] ?? 0),
-                    'take_rates_sent' => 1,
+                    'take_rates_sent' => 0,
                     'amount_usd_calc' => round($amountUsd, 2),
                 ], JSON_UNESCAPED_UNICODE),
             ]);
@@ -1307,7 +1307,7 @@ class PaymentService {
             'currency' => 'BRL',
             'client' => $client,
             'duplicate' => 0,
-            'take_rates' => 1,
+            'take_rates' => 0,
             'url_callback' => (string) $successUrl,
             'url_error' => (string) $errorUrl,
             'products' => [

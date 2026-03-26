@@ -2268,7 +2268,6 @@ class CheckoutController extends Controller {
             'imposto_local' => $impostoLocal,
             'imposto_local_percent' => $impostoLocalPercent,
             'total' => $total,
-            'pix_desconto_taxa_servico_percent' => (float) $this->getPixDescontoTaxaServicoPercent(),
             'cobra_impostos_br' => $cobraImpostosBR,
             'frete_gratis' => ($frete == 0),
             'exchange_rates' => [
@@ -4872,15 +4871,6 @@ class CheckoutController extends Controller {
             $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
             $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
-
-            // PIX: desconto configurável na taxa de serviço
-            $formaPagamentoSel = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
-            if ($formaPagamentoSel === 'pix') {
-                $pct = (float) $this->getPixDescontoTaxaServicoPercent();
-                if ($pct > 0) {
-                    $taxaServicoUsd = max(0.0, $taxaServicoUsd * (1.0 - ($pct / 100.0)));
-                }
-            }
 
             $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
             if ($paisEntrega === '') {
