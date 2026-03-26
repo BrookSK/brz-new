@@ -17,10 +17,20 @@ class BackupService {
 
     private function normalizeBackupDir(?string $dir): string {
         $dir = is_string($dir) ? trim($dir) : '';
+        $defaultDir = (string) (dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'backups');
+
         if ($dir === '') {
-            $dir = (string) (dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'backups');
+            $dir = $defaultDir;
         }
-        return rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dir), DIRECTORY_SEPARATOR);
+
+        $dir = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dir), DIRECTORY_SEPARATOR);
+
+        // Se o caminho salvo no banco não existe (ex: domínio antigo), usar o padrão
+        if (!is_dir($dir) && $dir !== rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $defaultDir), DIRECTORY_SEPARATOR)) {
+            $dir = $defaultDir;
+        }
+
+        return $dir;
     }
 
     public function getConfig(): array {
