@@ -800,8 +800,23 @@
                             </div>
                             <div class="alert alert-success small py-2 d-none" id="pix-brl-info">
                                 <i class="fas fa-qrcode me-1"></i>
-                                <strong>Valor do PIX:</strong> <span id="pix-brl-value"></span>
-                                <div class="text-muted mt-1" style="font-size:0.8em;">Taxa de conversão: <span id="pix-brl-rate"></span></div>
+                                <strong>Pagamento via PIX (Stripe)</strong>
+                                <div class="mt-2 border rounded p-2" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Equivalente em BRL:</span>
+                                        <span id="pix-brl-equiv">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between text-muted">
+                                        <span>Taxa Stripe (3,5%):</span>
+                                        <span id="pix-brl-fee">-</span>
+                                    </div>
+                                    <hr class="my-1">
+                                    <div class="d-flex justify-content-between fw-bold">
+                                        <span>Valor final aprox. no PIX:</span>
+                                        <span id="pix-brl-value">-</span>
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size:0.75em;" id="pix-brl-rate">-</div>
+                                </div>
                             </div>
 
                             <?php if (!$isPaymentLink): ?>
@@ -1094,13 +1109,11 @@ function updatePixBrlInfo() {
     var formaSel = document.getElementById('forma_pagamento');
     var forma = formaSel ? formaSel.value : '';
 
-    // Só mostrar para PIX fora do BR
     if (pais === 'BR' || forma !== 'pix') {
         box.classList.add('d-none');
         return;
     }
 
-    // Pegar o total original em USD (antes da conversão)
     var totalUsd = 0;
     if (window.checkoutOriginalValues && window.checkoutOriginalValues.total) {
         totalUsd = Number(window.checkoutOriginalValues.total) || 0;
@@ -1113,16 +1126,23 @@ function updatePixBrlInfo() {
         return;
     }
 
-    // Usar a taxa BRL do sistema
-    var rate = window.exchangeRates ? (window.exchangeRates['BRL'] || 1) : 1;
+    var rate = window.exchangeRates ? (window.exchangeRates['BRL'] || 0) : 0;
     if (rate <= 1.01) rate = 5.85;
 
-    var totalBrl = totalUsd * rate;
+    var brl = totalUsd * rate;
+    var feeRate = 0.035;
+    var fee = brl * feeRate;
+    var totalPix = brl + fee;
 
+    var equivEl = document.getElementById('pix-brl-equiv');
+    var feeEl = document.getElementById('pix-brl-fee');
     var valEl = document.getElementById('pix-brl-value');
     var rateEl = document.getElementById('pix-brl-rate');
-    if (valEl) valEl.textContent = 'R$ ' + totalBrl.toFixed(2).replace('.', ',');
-    if (rateEl) rateEl.textContent = '1 USD = R$ ' + rate.toFixed(2).replace('.', ',');
+
+    if (equivEl) equivEl.textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
+    if (feeEl) feeEl.textContent = 'R$ ' + fee.toFixed(2).replace('.', ',');
+    if (valEl) valEl.textContent = 'R$ ' + totalPix.toFixed(2).replace('.', ',');
+    if (rateEl) rateEl.textContent = 'Taxa: 1 USD = R$ ' + rate.toFixed(2).replace('.', ',');
 
     box.classList.remove('d-none');
 }

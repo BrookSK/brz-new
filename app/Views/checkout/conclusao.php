@@ -160,13 +160,31 @@
                         <strong style="color: var(--primary-color);"><?= $simboloMoeda ?> <?= number_format($pedido['total'], 2, ',', '.') ?></strong>
                     </div>
                     <?php if (!empty($pixBrlValor) && $pixBrlValor > 0 && strtoupper((string) ($pedido['moeda'] ?? '')) === 'USD'): ?>
-                    <div class="d-flex justify-content-between mt-2" style="background: rgba(16,185,129,0.08); padding: 8px 12px; border-radius: 8px;">
-                        <span><i class="fas fa-qrcode me-1"></i> Valor do PIX:</span>
-                        <strong>R$ <?= number_format($pixBrlValor, 2, ',', '.') ?></strong>
+                    <?php
+                        $pixBrlEquiv = $pixBrlValor;
+                        $pixFeeRate = 0.035;
+                        $pixFee = round($pixBrlEquiv * $pixFeeRate, 2);
+                        $pixTotalFinal = round($pixBrlEquiv + $pixFee, 2);
+                    ?>
+                    <div class="mt-2 border rounded p-2" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important; font-size: 0.9em;">
+                        <div class="fw-bold mb-1"><i class="fas fa-qrcode me-1"></i> PIX (Stripe)</div>
+                        <div class="d-flex justify-content-between">
+                            <span>Equivalente em BRL:</span>
+                            <span>R$ <?= number_format($pixBrlEquiv, 2, ',', '.') ?></span>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted">
+                            <span>Taxa Stripe (3,5%):</span>
+                            <span>R$ <?= number_format($pixFee, 2, ',', '.') ?></span>
+                        </div>
+                        <hr class="my-1">
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Valor final aprox. no PIX:</span>
+                            <span>R$ <?= number_format($pixTotalFinal, 2, ',', '.') ?></span>
+                        </div>
+                        <?php if (!empty($pixBrlTaxa) && $pixBrlTaxa > 1): ?>
+                        <div class="text-muted" style="font-size: 0.8em;">Taxa: 1 USD = R$ <?= number_format($pixBrlTaxa, 2, ',', '.') ?></div>
+                        <?php endif; ?>
                     </div>
-                    <?php if (!empty($pixBrlTaxa)): ?>
-                    <div class="text-muted text-end" style="font-size: 0.75em;">Taxa: 1 USD = R$ <?= number_format($pixBrlTaxa, 2, ',', '.') ?></div>
-                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>

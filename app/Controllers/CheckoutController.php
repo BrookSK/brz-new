@@ -3336,7 +3336,7 @@ class CheckoutController extends Controller {
                             throw new \Exception('Valor inválido para Stripe PIX');
                         }
 
-                        // Converter USD para BRL usando a taxa do sistema
+                        // Converter USD para BRL usando a taxa do sistema (mesma lógica do criarPedido)
                         $taxaConvPix = 1.0;
                         try {
                             $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL');
@@ -3344,14 +3344,33 @@ class CheckoutController extends Controller {
                                 $taxaConvPix = $txFromCarrinho;
                             }
                         } catch (\Exception $e) {}
+
+                        // Fallback direto no banco
                         if ($taxaConvPix <= 1.01) {
                             try {
                                 $dbTxPix = \Config\Database::getConnection();
-                                $stTxPix = $dbTxPix->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                foreach (['configuracoes_sistema', 'configuracoes', 'settings'] as $tbl) {
+                                    try {
+                                        $stCfg = $dbTxPix->prepare("SELECT valor FROM {$tbl} WHERE chave = 'usd_brl_rate' LIMIT 1");
+                                        $stCfg->execute();
+                                        $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0'));
+                                        if ($v > 1.01) { $taxaConvPix = $v; break; }
+                                    } catch (\Exception $e) {}
+                                }
+                            } catch (\Exception $e) {}
+                        }
+                        if ($taxaConvPix <= 1.01) {
+                            try {
+                                $dbTxPix2 = \Config\Database::getConnection();
+                                $stTxPix = $dbTxPix2->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
                                 $stTxPix->execute();
                                 $txVal = (float) str_replace(',', '.', (string) ($stTxPix->fetchColumn() ?: '0'));
                                 if ($txVal > 1.01) $taxaConvPix = $txVal;
                             } catch (\Exception $e) {}
+                        }
+                        // Último fallback
+                        if ($taxaConvPix <= 1.01) {
+                            $taxaConvPix = 5.85;
                         }
 
                         $totalBrlPix = round($totalUsdPix * $taxaConvPix, 2);
@@ -3813,18 +3832,33 @@ class CheckoutController extends Controller {
             $totalUsd = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
             $txConv = 1.0;
             try {
-                $dbTx = \Config\Database::getConnection();
-                $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                $stTx->execute();
-                $tx = (float) ($stTx->fetchColumn() ?: 0);
-                if ($tx > 1.01) $txConv = $tx;
+                $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL');
+                if ($txFromCarrinho > 1.01) $txConv = $txFromCarrinho;
             } catch (\Exception $e) {}
             if ($txConv <= 1.01) {
                 try {
-                    $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL');
-                    if ($txFromCarrinho > 1.01) $txConv = $txFromCarrinho;
+                    $dbTx = \Config\Database::getConnection();
+                    foreach (['configuracoes_sistema', 'configuracoes', 'settings'] as $tbl) {
+                        try {
+                            $stCfg = $dbTx->prepare("SELECT valor FROM {$tbl} WHERE chave = 'usd_brl_rate' LIMIT 1");
+                            $stCfg->execute();
+                            $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0'));
+                            if ($v > 1.01) { $txConv = $v; break; }
+                        } catch (\Exception $e) {}
+                    }
                 } catch (\Exception $e) {}
             }
+            if ($txConv <= 1.01) {
+                try {
+                    $dbTx2 = \Config\Database::getConnection();
+                    $stTx = $dbTx2->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                    $stTx->execute();
+                    $tx = (float) ($stTx->fetchColumn() ?: 0);
+                    if ($tx > 1.01) $txConv = $tx;
+                } catch (\Exception $e) {}
+            }
+            if ($txConv <= 1.01) $txConv = 5.85;
+
             $pixBrlValor = round($totalUsd * $txConv, 2);
             $pixBrlTaxa = $txConv;
         }
