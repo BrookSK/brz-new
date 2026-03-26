@@ -182,7 +182,12 @@ class UsuarioController extends Controller {
                 $pedidosParams = [(int) $usuario['id'], (int) $clienteId];
             }
 
-            $stmtPedidos = $db->prepare('SELECT p.* FROM pedidos p WHERE ' . $pedidosWhere . ' ORDER BY p.created_at DESC LIMIT 10 OFFSET 0');
+            $deletedAtFilter = '';
+            if (is_array($colsPedidos) && in_array('deleted_at', $colsPedidos, true)) {
+                $deletedAtFilter = ' AND p.deleted_at IS NULL';
+            }
+
+            $stmtPedidos = $db->prepare('SELECT p.* FROM pedidos p WHERE ' . $pedidosWhere . $deletedAtFilter . ' ORDER BY p.created_at DESC LIMIT 10 OFFSET 0');
             $stmtPedidos->execute($pedidosParams);
             $pedidos = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {
@@ -228,16 +233,16 @@ class UsuarioController extends Controller {
                 }
             }
 
-            $stmtTotal = $db->prepare('SELECT COUNT(*) FROM pedidos p WHERE ' . $pedidosWhere);
+            $stmtTotal = $db->prepare('SELECT COUNT(*) FROM pedidos p WHERE ' . $pedidosWhere . $deletedAtFilter);
             $stmtTotal->execute($pedidosParams);
             $stats['total_pedidos'] = (int) $stmtTotal->fetchColumn();
 
-            $stmtAtivos = $db->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$pedidosWhere} AND p.status IN ('pendente','processando','enviado')");
+            $stmtAtivos = $db->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$pedidosWhere}{$deletedAtFilter} AND p.status IN ('pendente','processando','enviado')");
             $stmtAtivos->execute($pedidosParams);
             $stats['pedidos_ativos'] = (int) $stmtAtivos->fetchColumn();
 
             if ($moedaCol !== null) {
-                $stmtSum = $db->prepare("SELECT UPPER(COALESCE(p.{$moedaCol}, 'BRL')) AS moeda, SUM(COALESCE(p.{$totalCol},0)) AS total FROM pedidos p WHERE {$pedidosWhere} GROUP BY UPPER(COALESCE(p.{$moedaCol}, 'BRL'))");
+                $stmtSum = $db->prepare("SELECT UPPER(COALESCE(p.{$moedaCol}, 'BRL')) AS moeda, SUM(COALESCE(p.{$totalCol},0)) AS total FROM pedidos p WHERE {$pedidosWhere}{$deletedAtFilter} GROUP BY UPPER(COALESCE(p.{$moedaCol}, 'BRL'))");
                 $stmtSum->execute($pedidosParams);
                 $rows = $stmtSum->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 foreach ($rows as $r) {
@@ -250,7 +255,7 @@ class UsuarioController extends Controller {
                     }
                 }
             } else {
-                $stmtSum = $db->prepare("SELECT SUM(COALESCE(p.{$totalCol},0)) AS total FROM pedidos p WHERE {$pedidosWhere}");
+                $stmtSum = $db->prepare("SELECT SUM(COALESCE(p.{$totalCol},0)) AS total FROM pedidos p WHERE {$pedidosWhere}{$deletedAtFilter}");
                 $stmtSum->execute($pedidosParams);
                 $stats['total_gasto_brl'] = floatval($stmtSum->fetchColumn() ?: 0);
             }

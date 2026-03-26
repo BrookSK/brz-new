@@ -356,7 +356,14 @@ class PedidoEcommerce {
                 }
             }
 
-            $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.' . $colUsuarioId . ' = :uid ORDER BY ' . $orderCol . ' DESC LIMIT :lim OFFSET :off';
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p WHERE p.' . $colUsuarioId . ' = :uid';
+
+            // Filtrar pedidos deletados (soft delete)
+            if (in_array('deleted_at', $cols, true)) {
+                $sql .= ' AND p.deleted_at IS NULL';
+            }
+
+            $sql .= ' ORDER BY ' . $orderCol . ' DESC LIMIT :lim OFFSET :off';
             $stmt = $this->connection->prepare($sql);
             $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
             $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
@@ -528,7 +535,14 @@ class PedidoEcommerce {
                 return 0;
             }
 
-            $stmt = $this->connection->prepare('SELECT COUNT(*) FROM pedidos WHERE ' . $colUsuarioId . ' = ?');
+            $sql = 'SELECT COUNT(*) FROM pedidos WHERE ' . $colUsuarioId . ' = ?';
+
+            // Filtrar pedidos deletados (soft delete)
+            if (in_array('deleted_at', $cols, true)) {
+                $sql .= ' AND deleted_at IS NULL';
+            }
+
+            $stmt = $this->connection->prepare($sql);
             $stmt->execute([$usuarioId]);
             return (int) ($stmt->fetchColumn() ?: 0);
         } catch (\Exception $e) {
@@ -740,7 +754,13 @@ class PedidoEcommerce {
 
         $pedido = null;
         try {
-            $stmt = $this->connection->prepare('SELECT * FROM pedidos WHERE id = :id LIMIT 1');
+            $cols = $this->getTableColumns('pedidos');
+            $sql = 'SELECT * FROM pedidos WHERE id = :id';
+            if (in_array('deleted_at', $cols, true)) {
+                $sql .= ' AND deleted_at IS NULL';
+            }
+            $sql .= ' LIMIT 1';
+            $stmt = $this->connection->prepare($sql);
             $stmt->execute([':id' => $pedidoId]);
             $pedido = $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
         } catch (\Exception $e) {

@@ -5863,6 +5863,45 @@ HTML;
             $temDeletedBy = is_array($colsPedidos) && in_array('deleted_by', $colsPedidos, true);
 
             if ($temDeletedAt) {
+                // Devolver estoque dos itens do pedido
+                try {
+                    $itensTable = '';
+                    if ($this->tableExistsPdo($pdo, 'pedido_itens')) {
+                        $itensTable = 'pedido_itens';
+                    } elseif ($this->tableExistsPdo($pdo, 'pedido_items')) {
+                        $itensTable = 'pedido_items';
+                    }
+                    if ($itensTable !== '') {
+                        $colsItens = $this->getTableColumnsPdo($pdo, $itensTable);
+                        $colPedidoId = $this->pickColumn($colsItens, ['pedido_id']);
+                        $colProdutoId = $this->pickColumn($colsItens, ['produto_id', 'product_id']);
+                        $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
+
+                        if ($colPedidoId && $colProdutoId && $colQtd) {
+                            $stItens = $pdo->prepare('SELECT ' . $colProdutoId . ' AS produto_id, ' . $colQtd . ' AS quantidade FROM ' . $itensTable . ' WHERE ' . $colPedidoId . ' = ?');
+                            $stItens->execute([(int) $id]);
+                            $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                            $colsProd = $this->getTableColumnsPdo($pdo, 'produtos');
+                            $colEstoque = $this->pickColumn($colsProd, ['stock', 'estoque']);
+
+                            if ($colEstoque && !empty($itens)) {
+                                foreach ($itens as $item) {
+                                    $pid = (int) ($item['produto_id'] ?? 0);
+                                    $qtd = (int) ($item['quantidade'] ?? 0);
+                                    if ($pid > 0 && $qtd > 0) {
+                                        $stUpd = $pdo->prepare('UPDATE produtos SET ' . $colEstoque . ' = ' . $colEstoque . ' + ? WHERE id = ?');
+                                        $stUpd->execute([$qtd, $pid]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Não bloquear a exclusão se falhar a devolução de estoque
+                    error_log('[EXCLUIR_PEDIDO] Erro ao devolver estoque: ' . $e->getMessage());
+                }
+
                 $set = ['deleted_at = NOW()'];
                 $params = [':id' => (int) $id];
                 if ($temDeletedBy) {
