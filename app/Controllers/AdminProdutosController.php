@@ -2445,7 +2445,11 @@ document.getElementById("formProduto").addEventListener("submit", async function
     btn.innerHTML = \'<i class="fas fa-bolt me-2"></i>Salvar\';
 });
 
-renderGrupos();(Request $request): bool {
+renderGrupos();
+';
+    }
+
+    private function ensureCadastroRapidoAccess(Request $request): bool {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
