@@ -317,6 +317,24 @@ class AdminUsuariosController extends Controller {
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
+        // Buscar endereço principal do usuário
+        $endereco = [];
+        try {
+            $dbEnd = \Config\Database::getConnection();
+            $colsEnd = [];
+            $stColsE = $dbEnd->query('DESCRIBE enderecos');
+            $colsEnd = $stColsE ? ($stColsE->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            if (in_array('usuario_id', $colsEnd, true)) {
+                $orderBy = in_array('principal', $colsEnd, true) ? 'principal DESC, id DESC' : 'id DESC';
+                $stEnd = $dbEnd->prepare('SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
+                $stEnd->execute([(int) $usuario['id']]);
+                $endereco = $stEnd->fetch(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {
+            $endereco = [];
+        }
+
         $perfilAtual = strtolower(trim((string) ($usuario['perfil'] ?? ($usuario['role'] ?? 'cliente'))));
         if ($perfilAtual === '') {
             $perfilAtual = 'cliente';
@@ -390,11 +408,50 @@ class AdminUsuariosController extends Controller {
                                     <option value="redirecionador" ' . ($perfilAtual === 'redirecionador' ? 'selected' : '') . '>Redirecionador</option>
                                 </select>
                             </div>
-                            <div class="col-12">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i>Salvar Alterações
-                                </button>
+                        </div>
+
+                        <hr class="my-4">
+                        <h5 class="mb-3"><i class="fas fa-map-marker-alt me-2"></i>Endereço Principal</h5>
+                        <input type="hidden" name="endereco_id" value="' . (int) ($endereco['id'] ?? 0) . '">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">CEP</label>
+                                <input type="text" class="form-control" name="end_cep" value="' . htmlspecialchars((string) ($endereco['cep'] ?? '')) . '" placeholder="00000-000">
                             </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Endereço</label>
+                                <input type="text" class="form-control" name="end_endereco" value="' . htmlspecialchars((string) ($endereco['endereco'] ?? ($endereco['logradouro'] ?? ''))) . '">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Número</label>
+                                <input type="text" class="form-control" name="end_numero" value="' . htmlspecialchars((string) ($endereco['numero'] ?? '')) . '">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Complemento</label>
+                                <input type="text" class="form-control" name="end_complemento" value="' . htmlspecialchars((string) ($endereco['complemento'] ?? '')) . '">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Bairro</label>
+                                <input type="text" class="form-control" name="end_bairro" value="' . htmlspecialchars((string) ($endereco['bairro'] ?? '')) . '">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Cidade</label>
+                                <input type="text" class="form-control" name="end_cidade" value="' . htmlspecialchars((string) ($endereco['cidade'] ?? '')) . '">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Estado</label>
+                                <input type="text" class="form-control" name="end_estado" value="' . htmlspecialchars((string) ($endereco['estado'] ?? '')) . '" maxlength="2" placeholder="SP">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">País</label>
+                                <input type="text" class="form-control" name="end_pais" value="' . htmlspecialchars((string) ($endereco['pais'] ?? 'BR')) . '" maxlength="2" placeholder="BR">
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Salvar Alterações
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -427,6 +484,71 @@ class AdminUsuariosController extends Controller {
 
             if (!empty($id)) {
                 $helper->atualizarUsuario($id, $dados);
+
+                // Salvar endereço principal
+                try {
+                    $dbEnd = \Config\Database::getConnection();
+                    $colsEnd = [];
+                    $stColsE = $dbEnd->query('DESCRIBE enderecos');
+                    $colsEnd = $stColsE ? ($stColsE->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                    $endCep = trim((string) $request->getParam('end_cep'));
+                    $endEndereco = trim((string) $request->getParam('end_endereco'));
+                    $endNumero = trim((string) $request->getParam('end_numero'));
+                    $endComplemento = trim((string) $request->getParam('end_complemento'));
+                    $endBairro = trim((string) $request->getParam('end_bairro'));
+                    $endCidade = trim((string) $request->getParam('end_cidade'));
+                    $endEstado = trim((string) $request->getParam('end_estado'));
+                    $endPais = trim((string) $request->getParam('end_pais'));
+                    $enderecoId = (int) $request->getParam('endereco_id');
+
+                    // Só salvar se pelo menos um campo de endereço foi preenchido
+                    $temDados = ($endCep !== '' || $endEndereco !== '' || $endCidade !== '');
+
+                    if ($temDados && in_array('usuario_id', $colsEnd, true)) {
+                        $endData = [];
+                        if (in_array('cep', $colsEnd, true)) $endData['cep'] = $endCep;
+                        if (in_array('endereco', $colsEnd, true)) $endData['endereco'] = $endEndereco;
+                        elseif (in_array('logradouro', $colsEnd, true)) $endData['logradouro'] = $endEndereco;
+                        if (in_array('numero', $colsEnd, true)) $endData['numero'] = $endNumero;
+                        if (in_array('complemento', $colsEnd, true)) $endData['complemento'] = $endComplemento;
+                        if (in_array('bairro', $colsEnd, true)) $endData['bairro'] = $endBairro;
+                        if (in_array('cidade', $colsEnd, true)) $endData['cidade'] = $endCidade;
+                        if (in_array('estado', $colsEnd, true)) $endData['estado'] = $endEstado;
+                        if (in_array('pais', $colsEnd, true)) $endData['pais'] = $endPais !== '' ? $endPais : 'BR';
+                        if (in_array('principal', $colsEnd, true)) $endData['principal'] = 1;
+
+                        if ($enderecoId > 0) {
+                            // Atualizar endereço existente
+                            $sets = [];
+                            $params = [];
+                            foreach ($endData as $k => $v) {
+                                $sets[] = $k . ' = ?';
+                                $params[] = $v;
+                            }
+                            if (in_array('updated_at', $colsEnd, true)) {
+                                $sets[] = 'updated_at = NOW()';
+                            }
+                            $params[] = $enderecoId;
+                            $params[] = (int) $id;
+                            $stUpd = $dbEnd->prepare('UPDATE enderecos SET ' . implode(', ', $sets) . ' WHERE id = ? AND usuario_id = ?');
+                            $stUpd->execute($params);
+                        } else {
+                            // Criar novo endereço
+                            $endData['usuario_id'] = (int) $id;
+                            if (in_array('created_at', $colsEnd, true)) $endData['created_at'] = date('Y-m-d H:i:s');
+                            if (in_array('updated_at', $colsEnd, true)) $endData['updated_at'] = date('Y-m-d H:i:s');
+
+                            $cols = implode(', ', array_keys($endData));
+                            $placeholders = implode(', ', array_fill(0, count($endData), '?'));
+                            $stIns = $dbEnd->prepare('INSERT INTO enderecos (' . $cols . ') VALUES (' . $placeholders . ')');
+                            $stIns->execute(array_values($endData));
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('[ADMIN_EDITAR_USUARIO] Erro ao salvar endereço: ' . $e->getMessage());
+                }
+
                 header('Location: /admin/usuarios/detalhes/' . (int)$id . '?success=1');
                 exit;
             }
