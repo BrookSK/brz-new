@@ -2246,6 +2246,24 @@ class CheckoutController extends Controller {
         } catch (\Exception $e) {
         }
 
+        // Saldo da carteira do usuário
+        $carteiraSaldoUsd = 0.0;
+        $carteiraSaldoBrl = 0.0;
+        $carteiraSaldoDisponivel = 0.0;
+        try {
+            $uid = (int) ($usuario['id'] ?? 0);
+            if ($uid > 0) {
+                $dbCart = \Config\Database::getConnection();
+                $stCart = $dbCart->prepare('SELECT saldo_usd, saldo_brl, COALESCE(saldo_usd_bloqueado, 0) AS bloq_usd, COALESCE(saldo_brl_bloqueado, 0) AS bloq_brl FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                $stCart->execute([$uid]);
+                $rowCart = $stCart->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $carteiraSaldoUsd = max(0, (float) ($rowCart['saldo_usd'] ?? 0) - (float) ($rowCart['bloq_usd'] ?? 0));
+                $carteiraSaldoBrl = max(0, (float) ($rowCart['saldo_brl'] ?? 0) - (float) ($rowCart['bloq_brl'] ?? 0));
+                // Saldo disponível em USD (BRL convertido para USD)
+                $carteiraSaldoDisponivel = $carteiraSaldoUsd + ($rateBRL > 1 ? ($carteiraSaldoBrl / $rateBRL) : 0);
+            }
+        } catch (\Exception $e) {}
+
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
             'items' => $items,
@@ -2278,6 +2296,9 @@ class CheckoutController extends Controller {
             'stripe_enabled' => $this->paymentService->isStripeEnabled(),
             'entrega_fora_br' => !$cobraImpostosBR,
             'mensagem_entrega_fora_br' => 'A entrega para fora do Brasil não inclui impostos brasileiros. A tributação local é responsabilidade do cliente.',
+            'carteira_saldo_usd' => $carteiraSaldoUsd,
+            'carteira_saldo_brl' => $carteiraSaldoBrl,
+            'carteira_saldo_disponivel' => $carteiraSaldoDisponivel,
         ]);
     }
 

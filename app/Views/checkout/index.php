@@ -11,6 +11,9 @@
         window.IS_PAYMENT_LINK = <?= !empty($is_payment_link) ? 'true' : 'false' ?>;
         window.PAYMENT_LINK_CURRENCY = window.IS_PAYMENT_LINK ? <?= json_encode((string) ($moeda ?? ''), JSON_UNESCAPED_UNICODE) ?> : '';
         window.CAMBIOREAL_RATE_BRL = <?= json_encode((float) ($cambioreal_rate_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
+        window.CARTEIRA_SALDO_USD = <?= json_encode((float) ($carteira_saldo_usd ?? 0), JSON_UNESCAPED_UNICODE) ?>;
+        window.CARTEIRA_SALDO_BRL = <?= json_encode((float) ($carteira_saldo_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
+        window.CARTEIRA_SALDO_DISPONIVEL = <?= json_encode((float) ($carteira_saldo_disponivel ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -606,7 +609,13 @@
                                             <label class="form-label"><?= __('checkout.payment_method', 'Forma de Pagamento') ?></label>
                                             <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
                                                 <option value=""><?= __('common.select', 'Selecione...') ?></option>
-                                                <option value="carteira"><?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?></option>
+                                                <?php
+                                                $saldoDispLabel = number_format(($carteira_saldo_disponivel ?? 0), 2, ',', '.');
+                                                $saldoSuficiente = (($carteira_saldo_disponivel ?? 0) + 0.001 >= ($total ?? 0));
+                                                ?>
+                                                <option value="carteira" <?= !$saldoSuficiente ? 'disabled style="color:#999"' : '' ?>>
+                                                    <?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?> ($ <?= $saldoDispLabel ?>)<?= !$saldoSuficiente ? ' - Saldo insuficiente' : '' ?>
+                                                </option>
                                                 <option value="cartao_credito"><?= __('checkout.payment.credit_card', 'Cartão de Crédito') ?></option>
                                                 <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
                                                 <option value="pix">PIX</option>
@@ -2413,13 +2422,40 @@ function updatePaymentMethodsForCurrency(currency) {
 
     if (isBR) {
         // Brasil: opções disponíveis
-        select.appendChild(new Option('Crédito da Carteira', 'carteira'));
+        var saldoUsd = Number(window.CARTEIRA_SALDO_USD || 0);
+        var saldoBrl = Number(window.CARTEIRA_SALDO_BRL || 0);
+        var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
+        var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
+        var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
+        var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
+        if (!saldoSuficiente) {
+            saldoLabel += ' - Saldo insuficiente';
+        }
+        var optCarteira = new Option(saldoLabel, 'carteira');
+        if (!saldoSuficiente) {
+            optCarteira.disabled = true;
+            optCarteira.style.color = '#999';
+        }
+        select.appendChild(optCarteira);
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
         select.appendChild(new Option('PIX', 'pix'));
-        // select.appendChild(new Option('Boleto Bancário', 'boleto')); // OCULTO TEMPORARIAMENTE
     } else {
-        // Fora do BR: apenas Stripe (cartão + PIX)
+        // Fora do BR: Stripe + carteira
+        var saldoUsd = Number(window.CARTEIRA_SALDO_USD || 0);
+        var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
+        var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
+        var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
+        var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
+        if (!saldoSuficiente) {
+            saldoLabel += ' - Saldo insuficiente';
+        }
+        var optCarteira = new Option(saldoLabel, 'carteira');
+        if (!saldoSuficiente) {
+            optCarteira.disabled = true;
+            optCarteira.style.color = '#999';
+        }
+        select.appendChild(optCarteira);
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('PIX', 'pix'));
     }
