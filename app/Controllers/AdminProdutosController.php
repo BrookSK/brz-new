@@ -1855,9 +1855,24 @@ class AdminProdutosController extends Controller {
                 updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             try { $pdo->exec("ALTER TABLE produtos ADD COLUMN grupo_compras_id INT NULL DEFAULT NULL"); } catch (\Throwable $e) {}
-            $stmt = $pdo->query("SELECT id, nome, slug, cobra_imposto_eua, imposto_local_percent FROM grupos_compras ORDER BY nome ASC");
-            $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        } catch (\Throwable $e) {}
+            try { $pdo->exec("ALTER TABLE grupos_compras ADD COLUMN imposto_local_percent DECIMAL(5,2) NULL DEFAULT 0"); } catch (\Throwable $e) {}
+
+            $colsGrupos = [];
+            try {
+                $stCols = $pdo->query('DESCRIBE grupos_compras');
+                $colsGrupos = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Throwable $e) { $colsGrupos = []; }
+
+            $selectCols = ['id', 'nome'];
+            if (is_array($colsGrupos) && in_array('slug', $colsGrupos, true)) $selectCols[] = 'slug';
+            if (is_array($colsGrupos) && in_array('cobra_imposto_eua', $colsGrupos, true)) $selectCols[] = 'cobra_imposto_eua';
+            if (is_array($colsGrupos) && in_array('imposto_local_percent', $colsGrupos, true)) $selectCols[] = 'imposto_local_percent';
+
+            $stmt = $pdo->query("SELECT " . implode(', ', $selectCols) . " FROM grupos_compras ORDER BY nome ASC");
+            $grupos = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Throwable $e) {
+            error_log('[CADASTRO_RAPIDO] Erro ao carregar grupos: ' . $e->getMessage());
+        }
 
         $gruposJson = json_encode($grupos);
         $successHtmlJs = json_encode($successHtml);
