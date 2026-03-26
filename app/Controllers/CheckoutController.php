@@ -3352,7 +3352,7 @@ class CheckoutController extends Controller {
                             try {
                                 $this->paymentService->registrarPedidoPagamentoSplit([
                                     'pedido_id' => (int) $pedidoId,
-                                    'componente' => 'produto',
+                                    'componente' => 'pagamento',
                                     'gateway' => 'stripe',
                                     'metodo' => 'pix',
                                     'moeda' => 'BRL',
@@ -3719,17 +3719,23 @@ class CheckoutController extends Controller {
             }
         }
 
-        // Fallback universal: em alguns schemas, o QR/payload do PIX fica apenas em pedido_pagamentos
-        // (tanto no split quanto no fluxo legado). Garantir exibição no checkout/conclusao.
+        // Fallback universal: buscar PIX de qualquer componente em pedido_pagamentos
         if ($billingType === 'PIX' && empty($pixQrCode) && !empty($splitPagamentos)) {
             foreach ($splitPagamentos as $row) {
                 if (!is_array($row)) continue;
                 $img = trim((string) ($row['pix_encoded_image'] ?? ''));
                 $pay = trim((string) ($row['pix_payload'] ?? ''));
-                if ($img !== '' || $pay !== '') {
+                $invUrl = trim((string) ($row['invoice_url'] ?? ''));
+
+                // Se a imagem é uma URL (Stripe), usar como URL direta
+                $isImgUrl = ($img !== '' && (strpos($img, 'http') === 0));
+
+                if ($img !== '' || $pay !== '' || $invUrl !== '') {
                     $pixQrCode = [
-                        'encodedImage' => $img !== '' ? $img : null,
+                        'encodedImage' => (!$isImgUrl && $img !== '') ? $img : null,
+                        'imageUrl' => $isImgUrl ? $img : null,
                         'payload' => $pay !== '' ? $pay : null,
+                        'hostedUrl' => $invUrl !== '' ? $invUrl : null,
                     ];
                     break;
                 }

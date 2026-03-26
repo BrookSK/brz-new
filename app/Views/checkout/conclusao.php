@@ -213,7 +213,17 @@
 
                     <?php
                     $splitPagamentos = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
-                    $hasSplit = !empty($splitPagamentos);
+
+                    // Stripe não usa split — é pagamento único. Detectar pelo gateway.
+                    $isStripePagamento = false;
+                    foreach ($splitPagamentos as $sp) {
+                        if (is_array($sp) && strtolower(trim((string) ($sp['gateway'] ?? ''))) === 'stripe') {
+                            $isStripePagamento = true;
+                            break;
+                        }
+                    }
+                    // Se só tem componente 'pagamento' (não 'produto'+'taxa_servico'), não é split
+                    $hasSplit = !empty($splitPagamentos) && !$isStripePagamento && (isset($splitPagamentos['produto']) || isset($splitPagamentos['taxa_servico']) || isset($splitPagamentos['taxa']));
                     $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '') ?: ($pedido['forma_pagamento'] ?? '')));
                     $invoiceUrl = (is_array($paymentDetails) ? ($paymentDetails['invoiceUrl'] ?? null) : null);
                     $bankSlipUrl = (is_array($paymentDetails) ? ($paymentDetails['bankSlipUrl'] ?? null) : null);
@@ -313,7 +323,25 @@
                     <?php elseif (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
                         <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
-                        <?php if (!empty($pixImage)): ?>
+                        <?php $pixImageUrl = $pixQrCode['imageUrl'] ?? null; ?>
+                        <?php $pixHostedUrl = $pixQrCode['hostedUrl'] ?? null; ?>
+
+                        <?php if (!empty($pixHostedUrl)): ?>
+                            <div class="mb-3">
+                                <strong>PIX (Stripe)</strong>
+                                <div class="mt-2">
+                                    <a class="btn btn-primary" href="<?= htmlspecialchars($pixHostedUrl) ?>" target="_blank" rel="noopener">
+                                        <i class="fas fa-qrcode me-1"></i> Abrir página de pagamento PIX
+                                    </a>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($pixImageUrl)): ?>
+                            <div class="text-center my-3">
+                                <img src="<?= htmlspecialchars($pixImageUrl) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
+                            </div>
+                        <?php elseif (!empty($pixImage)): ?>
                             <?php
                             $mime = 'image/png';
                             try {
