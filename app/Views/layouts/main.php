@@ -1,4 +1,20 @@
 <!DOCTYPE html>
+<?php
+// Ler configuração de conversão de moeda
+$__conversaoMoedaAtiva = false;
+try {
+    $__pdo = \Config\Database::getConnection();
+    $__st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1");
+    $__st->execute();
+    $__v = (string) ($__st->fetchColumn() ?: '0');
+    $__conversaoMoedaAtiva = ($__v === '1');
+} catch (\Exception $e) {
+    $__conversaoMoedaAtiva = false;
+}
+// No checkout, a conversão é sempre disponível
+$__isCheckoutPage = (strpos($_SERVER['REQUEST_URI'] ?? '', '/checkout') !== false);
+$__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
+?>
 <html lang="<?= htmlspecialchars((class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocaleHtml() : 'pt-BR'), ENT_QUOTES, 'UTF-8') ?>">
 <head>
     <meta charset="UTF-8">
@@ -986,6 +1002,7 @@
                         </ul>
                     </li>
                     <!-- Seletor de Moeda -->
+                    <?php if ($__mostrarConversao): ?>
                     <li class="nav-item dropdown me-3">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="currencyDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-coins me-1"></i>
@@ -1000,6 +1017,7 @@
                             </a></li>
                         </ul>
                     </li>
+                    <?php endif; ?>
                     
                     <?php
                     $isLoggedIn = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
@@ -1285,6 +1303,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <!-- SISTEMA DE CONVERSÃO EXCLUSIVO -->
+    <?php if ($__mostrarConversao): ?>
     <script>
         // Incluir o código diretamente para evitar problemas de caminho
         console.log('Carregando sistema de conversão inline...');
@@ -1511,6 +1530,7 @@
         
         console.log('Sistema de conversão inline carregado com sucesso!');
     </script>
+    <?php endif; ?>
     
     <script>
     // Verificar se jQuery foi carregado

@@ -316,6 +316,16 @@ class AdminConfiguracoesController extends Controller {
                                                 <label class="form-label">Logo URL</label>
                                                 <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
                                             </div>
+                                            <hr>
+                                            <div class="mb-3">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" role="switch" id="loja_conversao_moeda_ativa" name="loja_conversao_moeda_ativa" value="1" ' . ($this->getConfigValue($config, 'loja', 'conversao_moeda_ativa', '0') === '1' ? 'checked' : '') . '>
+                                                    <label class="form-check-label" for="loja_conversao_moeda_ativa">
+                                                        <strong>Exibir conversão de moeda para o cliente</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">Quando desativado, o seletor de moeda BRL/USD e os valores convertidos não aparecem para o cliente nas telas do site (exceto no checkout, onde a conversão é sempre disponível).</small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
