@@ -857,13 +857,14 @@ class PaymentService {
 
         $payload = [
             'order_id' => $orderId,
-            // Enviar amount em BRL com take_rates=0 para que o PIX seja gerado com o valor exato em reais.
+            // Enviar amount em BRL com take_rates=1 para que a empresa assuma as taxas
+            // e o PIX seja gerado com o valor exato em reais.
             'amount' => round($valorBrlOriginal, 2),
             'currency' => 'BRL',
             'payment_method' => 'pix',
             'client' => (array) $customer,
             'duplicate' => 1,
-            'take_rates' => 0,
+            'take_rates' => 1,
             'products' => [
                 [
                     'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (produtos)'),
