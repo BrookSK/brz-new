@@ -798,6 +798,11 @@
                                 <h6><?= __('cart.total', 'Total') ?>:</h6>
                                 <h6 class="text-primary" id="total" class="cart-currency" data-original-value="<?= $total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0)) ?>"><?= number_format(($total ?? ($subtotal + ($frete ?? 0) + ($taxa_servico ?? 0) + ($impostos ?? 0) + ($imposto_local ?? 0))), 2, '.', ',') ?></h6>
                             </div>
+                            <div class="alert alert-success small py-2 d-none" id="pix-brl-info">
+                                <i class="fas fa-qrcode me-1"></i>
+                                <strong>Valor do PIX:</strong> <span id="pix-brl-value"></span>
+                                <div class="text-muted mt-1" style="font-size:0.8em;">Taxa de conversão: <span id="pix-brl-rate"></span></div>
+                            </div>
 
                             <?php if (!$isPaymentLink): ?>
                                 <div class="alert alert-info small">
@@ -1075,6 +1080,44 @@ function syncPaymentOptionsByCurrency() {
     if (typeof atualizarFormaPagamento === 'function') {
         try { atualizarFormaPagamento(); } catch (e) {}
     }
+
+    // Atualizar info do PIX em BRL
+    updatePixBrlInfo();
+}
+
+function updatePixBrlInfo() {
+    var box = document.getElementById('pix-brl-info');
+    if (!box) return;
+
+    var paisSel = document.getElementById('pais');
+    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+    var formaSel = document.getElementById('forma_pagamento');
+    var forma = formaSel ? formaSel.value : '';
+
+    // Só mostrar para PIX fora do BR
+    if (pais === 'BR' || forma !== 'pix') {
+        box.classList.add('d-none');
+        return;
+    }
+
+    // Pegar o total em USD do resumo
+    var totalEl = document.getElementById('total');
+    var totalText = totalEl ? totalEl.textContent.replace(/[^\d.,]/g, '') : '0';
+    totalText = totalText.replace(/\./g, '').replace(',', '.');
+    var totalUsd = parseFloat(totalText) || 0;
+
+    // Usar a taxa de conversão do sistema
+    var rate = window.exchangeRates ? (window.exchangeRates['BRL'] || 1) : 1;
+    if (rate <= 1.01) rate = 5.85; // fallback
+
+    var totalBrl = totalUsd * rate;
+
+    var valEl = document.getElementById('pix-brl-value');
+    var rateEl = document.getElementById('pix-brl-rate');
+    if (valEl) valEl.textContent = 'R$ ' + totalBrl.toFixed(2).replace('.', ',');
+    if (rateEl) rateEl.textContent = '1 USD = R$ ' + rate.toFixed(2).replace('.', ',');
+
+    box.classList.remove('d-none');
 }
 
 function atualizarEnderecoPorPais() {
@@ -1927,6 +1970,11 @@ function atualizarFormaPagamento() {
     }
     
     console.log('🔍 [FIM] atualizarFormaPagamento() concluída');
+
+    // Atualizar info PIX em BRL
+    if (typeof updatePixBrlInfo === 'function') {
+        try { updatePixBrlInfo(); } catch (e) {}
+    }
 }
 
 // Função para habilitar/desabilitar botão finalizar

@@ -159,6 +159,15 @@
                         <strong>Total:</strong>
                         <strong style="color: var(--primary-color);"><?= $simboloMoeda ?> <?= number_format($pedido['total'], 2, ',', '.') ?></strong>
                     </div>
+                    <?php if (!empty($pixBrlValor) && $pixBrlValor > 0 && strtoupper((string) ($pedido['moeda'] ?? '')) === 'USD'): ?>
+                    <div class="d-flex justify-content-between mt-2" style="background: rgba(16,185,129,0.08); padding: 8px 12px; border-radius: 8px;">
+                        <span><i class="fas fa-qrcode me-1"></i> Valor do PIX:</span>
+                        <strong>R$ <?= number_format($pixBrlValor, 2, ',', '.') ?></strong>
+                    </div>
+                    <?php if (!empty($pixBrlTaxa)): ?>
+                    <div class="text-muted text-end" style="font-size: 0.75em;">Taxa: 1 USD = R$ <?= number_format($pixBrlTaxa, 2, ',', '.') ?></div>
+                    <?php endif; ?>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -325,17 +334,6 @@
                         <?php $pixPayload = $pixQrCode['payload'] ?? null; ?>
                         <?php $pixImageUrl = $pixQrCode['imageUrl'] ?? null; ?>
                         <?php $pixHostedUrl = $pixQrCode['hostedUrl'] ?? null; ?>
-
-                        <?php if (!empty($pixHostedUrl)): ?>
-                            <div class="mb-3">
-                                <strong>PIX (Stripe)</strong>
-                                <div class="mt-2">
-                                    <a class="btn btn-primary" href="<?= htmlspecialchars($pixHostedUrl) ?>" target="_blank" rel="noopener">
-                                        <i class="fas fa-qrcode me-1"></i> Abrir página de pagamento PIX
-                                    </a>
-                                </div>
-                            </div>
-                        <?php endif; ?>
 
                         <?php if (!empty($pixImageUrl)): ?>
                             <div class="text-center my-3">

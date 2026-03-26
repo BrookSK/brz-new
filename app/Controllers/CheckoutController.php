@@ -3307,7 +3307,31 @@ class CheckoutController extends Controller {
 
                 if ($paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix' && !$reused) {
                     try {
-                        $totalUsdPix = (float) ($pedidoRowPay['total'] ?? 0);
+                        // Buscar total real do pedido (pode ser 'total' ou 'valor_total')
+                        $totalUsdPix = 0.0;
+                        try {
+                            $dbPixT = \Config\Database::getConnection();
+                            $colsPedPix = [];
+                            $stC = $dbPixT->query('DESCRIBE pedidos');
+                            $colsPedPix = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                            $totalCol = '';
+                            foreach (['valor_total', 'total', 'amount'] as $c) {
+                                if (in_array($c, $colsPedPix, true)) { $totalCol = $c; break; }
+                            }
+                            if ($totalCol !== '') {
+                                $stT = $dbPixT->prepare('SELECT ' . $totalCol . ' FROM pedidos WHERE id = ? LIMIT 1');
+                                $stT->execute([(int) $pedidoId]);
+                                $totalUsdPix = (float) ($stT->fetchColumn() ?: 0);
+                            }
+                        } catch (\Exception $e) {}
+
+                        if ($totalUsdPix <= 0) {
+                            $totalUsdPix = (float) ($pedidoRowPay['total'] ?? 0);
+                        }
+
+                        error_log('[STRIPE_PIX] pedido=' . $pedidoId . ' totalUsd=' . $totalUsdPix);
+
                         if ($totalUsdPix <= 0) {
                             throw new \Exception('Valor inválido para Stripe PIX');
                         }
@@ -3750,12 +3774,41 @@ class CheckoutController extends Controller {
             ];
         }
         
+        // Calcular valor BRL do PIX Stripe para exibição
+        $pixBrlValor = null;
+        $pixBrlTaxa = null;
+        if ($billingType === 'PIX' && $isStripePagamento = false) {}
+        $isStripePix = false;
+        foreach ($splitPagamentos as $sp) {
+            if (is_array($sp) && strtolower(trim((string) ($sp['gateway'] ?? ''))) === 'stripe' && strtolower(trim((string) ($sp['metodo'] ?? ''))) === 'pix') {
+                $isStripePix = true;
+                $pixBrlValor = (float) ($sp['valor'] ?? 0);
+                break;
+            }
+        }
+        if ($isStripePix && $pixBrlValor <= 0) {
+            // Calcular a partir do total USD
+            $totalUsd = (float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+            $txConv = 1.0;
+            try {
+                $dbTx = \Config\Database::getConnection();
+                $stTx = $dbTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                $stTx->execute();
+                $tx = (float) ($stTx->fetchColumn() ?: 0);
+                if ($tx > 1.01) $txConv = $tx;
+            } catch (\Exception $e) {}
+            $pixBrlValor = round($totalUsd * $txConv, 2);
+            $pixBrlTaxa = $txConv;
+        }
+
         $this->view('checkout/conclusao', [
             'pedido' => $pedido,
             'itens' => (array) ($pedido['items'] ?? []),
             'paymentDetails' => $paymentDetails,
             'pixQrCode' => $pixQrCode,
             'splitPagamentos' => $splitPagamentos,
+            'pixBrlValor' => $pixBrlValor,
+            'pixBrlTaxa' => $pixBrlTaxa,
         ]);
     }
     

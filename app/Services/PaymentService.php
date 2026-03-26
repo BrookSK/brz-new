@@ -2098,13 +2098,32 @@ class PaymentService {
         $taxaConversao = 1.0;
         try {
             $db = \Config\Database::getConnection();
+
+            // 1) Tentar configuracoes_moeda
             $st = $db->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
             $st->execute();
             $tx = (float) ($st->fetchColumn() ?: 0);
             if ($tx > 1.01) {
                 $taxaConversao = $tx;
             }
+
+            // 2) Fallback: configuracoes_sistema
+            if ($taxaConversao <= 1.01) {
+                foreach (['configuracoes_sistema', 'configuracoes', 'settings'] as $tbl) {
+                    try {
+                        $stCfg = $db->prepare("SELECT valor FROM {$tbl} WHERE chave = 'usd_brl_rate' LIMIT 1");
+                        $stCfg->execute();
+                        $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0'));
+                        if ($v > 1.01) {
+                            $taxaConversao = $v;
+                            break;
+                        }
+                    } catch (\Exception $e) {}
+                }
+            }
         } catch (\Exception $e) {}
+
+        error_log('[STRIPE_PIX] valorUsd=' . $valorUsd . ' taxaConversao=' . $taxaConversao . ' valorBrl=' . round($valorUsd * $taxaConversao, 2));
 
         $valorBrl = round($valorUsd * $taxaConversao, 2);
         if ($valorBrl < 0.50) {
