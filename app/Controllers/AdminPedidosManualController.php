@@ -617,7 +617,7 @@ class AdminPedidosManualController extends Controller {
         // NCM options para o select de NCM no pedido manual
         $ncmOptions = (new \App\Controllers\AdminProdutosController())->getPublicNcmOptions();
         $ncmOptionsJson = json_encode(array_map(function($code, $label) {
-            return ['code' => $code, 'label' => $label . ' (' . $code . ')'];
+            return ['code' => $code, 'label' => $code . ' - ' . $label];
         }, array_keys($ncmOptions), array_values($ncmOptions)), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         echo 'const NCM_OPTIONS = ' . $ncmOptionsJson . ';' . "\n";
 
@@ -1451,53 +1451,52 @@ function copiarLinkPagamento(){
     const ok = () => {
         const out = document.getElementById('linkResult');
         if (out) {
-            out.querySelector('.alert')?.classList.remove('alert-info');
-            out.querySelector('.alert')?.classList.remove('alert-success');
-            out.querySelector('.alert')?.classList.add('alert-success');
+            const alertEl = out.querySelector('.alert');
+            if (alertEl) {
+                alertEl.classList.remove('alert-info');
+                alertEl.classList.add('alert-success');
+            }
             const d = out.querySelector('.alert > div');
             if (d) d.innerHTML = '<strong>Copiado!</strong> Link de pagamento copiado para a área de transferência.';
         }
     };
-    const fail = () => {
-        const ta = document.getElementById('linkPagamentoTexto');
-        if (ta) {
-            ta.focus();
-            ta.select();
+
+    // Fallback robusto que funciona em HTTP e HTTPS
+    const copyFallback = () => {
+        try {
+            const ta = document.getElementById('linkPagamentoTexto');
+            if (ta) {
+                ta.focus();
+                ta.select();
+                ta.setSelectionRange(0, ta.value.length);
+                const result = document.execCommand('copy');
+                if (result) { ok(); return; }
+            }
+        } catch(e) {}
+        // Último fallback: criar textarea temporária
+        try {
+            const tmp = document.createElement('textarea');
+            tmp.value = txt;
+            tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+            document.body.appendChild(tmp);
+            tmp.focus();
+            tmp.select();
+            tmp.setSelectionRange(0, tmp.value.length);
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+            ok();
+        } catch(e) {
+            // Se nada funcionar, pelo menos selecionar o texto
+            const ta = document.getElementById('linkPagamentoTexto');
+            if (ta) { ta.focus(); ta.select(); }
         }
     };
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(txt).then(ok).catch(() => {
-            try {
-                const ta = document.getElementById('linkPagamentoTexto');
-                if (ta) {
-                    ta.focus();
-                    ta.select();
-                    document.execCommand('copy');
-                    ok();
-                } else {
-                    fail();
-                }
-            } catch (e) {
-                fail();
-            }
-        });
+        navigator.clipboard.writeText(txt).then(ok).catch(copyFallback);
         return;
     }
-
-    try {
-        const ta = document.getElementById('linkPagamentoTexto');
-        if (ta) {
-            ta.focus();
-            ta.select();
-            document.execCommand('copy');
-            ok();
-        } else {
-            fail();
-        }
-    } catch (e) {
-        fail();
-    }
+    copyFallback();
 }
 
 function gerarLinkPagamento(){
@@ -1644,24 +1643,16 @@ function fallbackCopyTextToClipboard(text){
     try {
         const ta = document.createElement('textarea');
         ta.value = String(text || '');
-        ta.style.position = 'fixed';
-        ta.style.top = '0';
-        ta.style.left = '0';
-        ta.style.width = '2em';
-        ta.style.height = '2em';
-        ta.style.padding = '0';
-        ta.style.border = 'none';
-        ta.style.outline = 'none';
-        ta.style.boxShadow = 'none';
-        ta.style.background = 'transparent';
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
         document.body.appendChild(ta);
         ta.focus();
         ta.select();
+        ta.setSelectionRange(0, ta.value.length);
         document.execCommand('copy');
         document.body.removeChild(ta);
         alert('Copiado!');
     } catch(e) {
-        alert('Falha ao copiar.');
+        alert('Falha ao copiar. Selecione o texto manualmente.');
     }
 }
 
@@ -2308,6 +2299,8 @@ JS;
                 $itens = [];
             }
 
+            error_log('[CALC_RESUMO] moeda=' . $moeda . ' itensRaw=' . substr($itensRaw, 0, 500) . ' itensCount=' . count($itens));
+
             // Subtotal autoritativo: soma dos itens (evita divergências de parsing no front)
             $subtotal = 0.0;
             foreach ($itens as $it) {
@@ -2439,10 +2432,24 @@ JS;
                 $frete = $freteUsd * $taxaConversao;
                 $total = $subtotal + $frete + $taxaServico + $impostos;
             } else {
-                $taxaServico = (float) $carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
-                $frete = (float) $calcularFrete((float) $subtotal, (float) $pesoTotal);
-                $impostos = (float) $carrinhoModel->calcularImpostos((float) $subtotal, (float) $frete);
+                $freteCalc = (float) $calcularFrete((float) $subtotal, (float) $pesoTotal);
+                $taxaServicoCalc = 0.0;
+                $impostosCalc = 0.0;
+                try {
+                    $taxaServicoCalc = (float) $carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+                } catch (\Exception $e) {
+                    error_log('[CALC_RESUMO_USD] ERRO calcularTaxaServico: ' . $e->getMessage());
+                }
+                try {
+                    $impostosCalc = (float) $carrinhoModel->calcularImpostos((float) $subtotal, (float) $freteCalc);
+                } catch (\Exception $e) {
+                    error_log('[CALC_RESUMO_USD] ERRO calcularImpostos: ' . $e->getMessage());
+                }
+                $taxaServico = $taxaServicoCalc;
+                $frete = $freteCalc;
+                $impostos = $impostosCalc;
                 $total = $subtotal + $frete + $taxaServico + $impostos;
+                error_log('[CALC_RESUMO_USD] subtotal=' . $subtotal . ' pesoTotal=' . $pesoTotal . ' taxaServico=' . $taxaServico . ' frete=' . $frete . ' impostos=' . $impostos . ' total=' . $total);
             }
 
             // Imposto local do grupo de compras
