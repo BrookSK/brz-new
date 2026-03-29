@@ -2766,7 +2766,11 @@ class CheckoutController extends Controller {
                 if ($moedaPedidoPay === '') {
                     $moedaPedidoPay = 'BRL';
                 }
-                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $moedaPedidoPay === 'BRL' && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
+                $paisEntregaCheckout = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
+                if ($paisEntregaCheckout === '') $paisEntregaCheckout = 'BR';
+
+                // Split (Câmbio Real + AppMax) para qualquer pedido com entrega no Brasil
+                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $paisEntregaCheckout === 'BR' && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
                 // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
                 if ($shouldTrySplit && $reused) {
                     $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
@@ -2913,6 +2917,26 @@ class CheckoutController extends Controller {
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
                             $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
+                            // Quando moeda é USD, converter valores do AppMax para BRL (AppMax só aceita BRL)
+                            $splitTaxaConversao = 1.0;
+                            if ($moedaPedidoPay === 'USD') {
+                                try {
+                                    $dbTxSplit = \Config\Database::getConnection();
+                                    $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                                    $stTxSplit->execute();
+                                    $txSplit = (float) str_replace(',', '.', (string) ($stTxSplit->fetchColumn() ?: '0'));
+                                    if ($txSplit > 1.01) {
+                                        $splitTaxaConversao = $txSplit;
+                                    }
+                                } catch (\Exception $e) {}
+
+                                // Converter taxa/impostos para BRL para o AppMax
+                                $valorTaxa = round($valorTaxa * $splitTaxaConversao, 2);
+                                $valorImposto = round($valorImposto * $splitTaxaConversao, 2);
+                                $valorImpostoLocal = round($valorImpostoLocal * $splitTaxaConversao, 2);
+                                $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
+                            }
+
                             if ($valorProduto <= 0 && $valorAppmax <= 0) {
                                 throw new \Exception('Valores inválidos para split');
                             }
@@ -3018,6 +3042,9 @@ class CheckoutController extends Controller {
                                     // Se conseguiu o subtotal original em USD, usar ele; senão, converter BRL → USD pela taxa do sistema
                                     if ($subtotalUsdOriginal > 0) {
                                         $amountUsd = round($subtotalUsdOriginal, 2);
+                                    } elseif ($moedaPedidoPay === 'USD') {
+                                        // Pedido já está em USD, usar valorProduto direto
+                                        $amountUsd = round((float) $valorProduto, 2);
                                     } else {
                                         $tx = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
                                         if ($tx <= 1.01) {
@@ -3323,9 +3350,6 @@ class CheckoutController extends Controller {
                 }
                 
                 // Stripe PIX para pedidos fora do BR (moeda USD, forma pix)
-                $paisEntregaCheckout = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
-                if ($paisEntregaCheckout === '') $paisEntregaCheckout = 'BR';
-
                 if ($paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix' && !$reused) {
                     try {
                         // Buscar total real do pedido (pode ser 'total' ou 'valor_total')
