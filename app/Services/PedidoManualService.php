@@ -1194,6 +1194,13 @@ class PedidoManualService {
         }
 
         // Sem comissão (já lançado no vendas.braziliana)
+        // created_at explícito no fuso do PHP (America/Sao_Paulo)
+        if (in_array('created_at', $colsPedidos, true)) {
+            $cols[] = 'created_at';
+            $vals[] = ':created_at';
+            $params[':created_at'] = date('Y-m-d H:i:s');
+        }
+
         try {
             $this->db->exec("ALTER TABLE pedidos ADD COLUMN sem_comissao TINYINT(1) NOT NULL DEFAULT 0");
         } catch (\Throwable $e) {}

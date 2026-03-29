@@ -5321,8 +5321,8 @@ class CheckoutController extends Controller {
                 usuario_id, nome, numero_pedido, cliente_id, status, 
                 subtotal, servicos, impostos, frete, desconto, total, 
                 moeda, taxa_conversao, endereco_entrega_id, endereco_cobranca_id, 
-                observacoes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                observacoes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $db->prepare($sql);
             $this->debugLog('[CRIAR_PEDIDO] SQL preparado');
@@ -5343,7 +5343,8 @@ class CheckoutController extends Controller {
                 $taxaConversao, // Taxa de conversão aplicada
                 null, // endereco_entrega_id
                 null, // endereco_cobranca_id
-                trim((string) (($dados['observacoes'] ?? '') . ' [IDEMPOTENCY:' . $idemHash . ']'))
+                trim((string) (($dados['observacoes'] ?? '') . ' [IDEMPOTENCY:' . $idemHash . ']')),
+                date('Y-m-d H:i:s') // created_at no fuso do PHP (America/Sao_Paulo)
             ];
             
             $this->debugLog('[CRIAR_PEDIDO] Parametros: ' . json_encode($params));
