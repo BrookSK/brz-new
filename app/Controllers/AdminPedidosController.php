@@ -6099,6 +6099,78 @@ HTML;
         }
     }
 
+    public function debugPagamento(Request $request, $id = null) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $id = $id ?? $request->getParam('id');
+        $pedidoId = (int) $id;
+        if ($pedidoId <= 0) {
+            $this->json(['error' => 'ID inválido'], 400);
+            return;
+        }
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $result = ['pedido_id' => $pedidoId];
+
+            // Dados do pedido (campos de pagamento)
+            $stPed = $pdo->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+            $stPed->execute([$pedidoId]);
+            $pedido = $stPed->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $payFields = [];
+            foreach ($pedido as $k => $v) {
+                if (stripos($k, 'pagamento') !== false || stripos($k, 'payment') !== false
+                    || stripos($k, 'gateway') !== false || stripos($k, 'transacao') !== false
+                    || stripos($k, 'transaction') !== false || stripos($k, 'forma_pagamento') !== false
+                    || stripos($k, 'moeda') !== false || stripos($k, 'currency') !== false
+                    || stripos($k, 'total') !== false || stripos($k, 'subtotal') !== false
+                    || stripos($k, 'status') !== false || stripos($k, 'pix') !== false
+                    || stripos($k, 'invoice') !== false || stripos($k, 'split') !== false
+                ) {
+                    $payFields[$k] = $v;
+                }
+            }
+            $result['pedido_payment_fields'] = $payFields;
+
+            // Tabela pedido_pagamentos
+            try {
+                $st = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'pedido_pagamentos'");
+                $st->execute();
+                if ((int) $st->fetchColumn() > 0) {
+                    $stPag = $pdo->prepare('SELECT * FROM pedido_pagamentos WHERE pedido_id = ? ORDER BY id ASC');
+                    $stPag->execute([$pedidoId]);
+                    $result['pedido_pagamentos'] = $stPag->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } else {
+                    $result['pedido_pagamentos'] = 'tabela não existe';
+                }
+            } catch (\Exception $e) {
+                $result['pedido_pagamentos_error'] = $e->getMessage();
+            }
+
+            // Tabela pagamentos (legada)
+            try {
+                $st = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'pagamentos'");
+                $st->execute();
+                if ((int) $st->fetchColumn() > 0) {
+                    $stPag = $pdo->prepare('SELECT * FROM pagamentos WHERE pedido_id = ? ORDER BY id ASC');
+                    $stPag->execute([$pedidoId]);
+                    $result['pagamentos'] = $stPag->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } else {
+                    $result['pagamentos'] = 'tabela não existe';
+                }
+            } catch (\Exception $e) {
+                $result['pagamentos_error'] = $e->getMessage();
+            }
+
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            exit;
+        } catch (\Exception $e) {
+            $this->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function gerarNovoPixSplit(Request $request, $id = null) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
