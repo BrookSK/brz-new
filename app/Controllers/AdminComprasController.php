@@ -1170,6 +1170,7 @@ class AdminComprasController extends Controller {
 
             $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
             $temTipoCompraEmLista = $this->columnExists('lista_compras', 'tipo_compra');
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
             $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
             $temCost = $this->columnExists('produtos', 'cost_price');
             $temFoto = $this->columnExists('produtos', 'foto_principal');
@@ -1231,8 +1232,11 @@ class AdminComprasController extends Controller {
                 . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
                 . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
-                . '   FROM lista_compras lc WHERE '
+                . '   FROM lista_compras lc'
+                . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
+                . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
                 . $whereTipoCompra
                 . ($reabertos && !empty($reabertos['items'])
                     ? ($temLojaIdEmLista
@@ -2601,7 +2605,10 @@ class AdminComprasController extends Controller {
             . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
             . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
             . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
-            . "   FROM lista_compras lc WHERE lc.status = 'pendente'"
+            . "   FROM lista_compras lc"
+            . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
+            . "   WHERE lc.status = 'pendente'"
+            . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
             . '   GROUP BY produto_id, '
             . ($temLojaIdEmLista ? 'COALESCE(loja_id,0)' : '0')
             . ' ) agg'
