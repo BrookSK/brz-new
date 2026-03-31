@@ -1225,12 +1225,12 @@ class AdminComprasController extends Controller {
                 . ', agg.loja_id as loja_id'
                 . ', agg.status as status'
                 . ' FROM ('
-                . '   SELECT produto_id, '
-                . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
-                . '     , status as status'
-                . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
-                . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
-                . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
+                . '   SELECT lc.produto_id, '
+                . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
+                . '     , lc.status as status'
+                . '     , SUM(COALESCE(lc.quantidade_faltante,0)) as quantidade_faltante'
+                . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
+                . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
                 . '   FROM lista_compras lc'
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
@@ -1250,8 +1250,8 @@ class AdminComprasController extends Controller {
                             return (int) ($x['produto_id'] ?? 0);
                         }, (array) $reabertos['items'])))) . ')'))
                     : '')
-                . '   GROUP BY produto_id, '
-                . ($temLojaIdEmLista ? 'COALESCE(loja_id,0), status' : '0, status')
+                . '   GROUP BY lc.produto_id, '
+                . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0), lc.status' : '0, lc.status')
                 . ' ) agg'
                 . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
 
@@ -2598,19 +2598,19 @@ class AdminComprasController extends Controller {
             . ', agg.prioridade as prioridade'
             . ", 'pendente' as status"
             . ' FROM ('
-            . '   SELECT produto_id, '
-            . ($temLojaIdEmLista ? 'COALESCE(loja_id,0) as loja_id' : '0 as loja_id')
-            . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(pedido_id,0),0)) as pedido_id' : '')
-            . '     , SUM(COALESCE(quantidade_faltante,0)) as quantidade_faltante'
-            . '     , SUM(COALESCE(quantidade_necessaria,0)) as quantidade_necessaria'
-            . '     , MIN(COALESCE(data_solicitacao, CURDATE())) as data_solicitacao'
+            . '   SELECT lc.produto_id, '
+            . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
+            . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(lc.pedido_id,0),0)) as pedido_id' : '')
+            . '     , SUM(COALESCE(lc.quantidade_faltante,0)) as quantidade_faltante'
+            . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
+            . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
             . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
             . "   FROM lista_compras lc"
             . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
             . "   WHERE lc.status = 'pendente'"
             . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
-            . '   GROUP BY produto_id, '
-            . ($temLojaIdEmLista ? 'COALESCE(loja_id,0)' : '0')
+            . '   GROUP BY lc.produto_id, '
+            . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0)' : '0')
             . ' ) agg'
             . ' JOIN produtos p ON agg.produto_id = p.id';
 
