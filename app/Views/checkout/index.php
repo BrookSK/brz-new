@@ -1106,10 +1106,22 @@ function syncPaymentOptionsByCurrency() {
         formaSel.value = '';
     }
 
-    // Forçar moeda USD fora do BR
+    // Forçar moeda BRL no Brasil, USD fora do BR (padrão)
     const moedaHidden = document.getElementById('moeda_hidden');
     if (moedaHidden) {
-        moedaHidden.value = isBR ? 'BRL' : 'USD';
+        if (isBR) {
+            moedaHidden.value = 'BRL';
+        }
+        // Fora do BR: manter moeda atual ou default USD
+        if (!isBR && moedaHidden.value === '') {
+            moedaHidden.value = 'USD';
+        }
+    }
+
+    // Esconder/mostrar seletor de moeda no header
+    var currencySelector = document.querySelector('.currency-selector');
+    if (currencySelector) {
+        currencySelector.style.display = isBR ? 'none' : '';
     }
 
     // Ocultar/mostrar impostos do Brasil
@@ -1229,16 +1241,27 @@ function atualizarEnderecoPorPais() {
         }
     }
 
-    // Endereço internacional: forçar moeda USD (gateways BR não aceitam)
+    // Endereço internacional: forçar moeda conforme país
     if (moedaHidden) {
-        const desired = (pais !== 'BR') ? 'USD' : 'BRL';
-        moedaHidden.value = desired;
+        if (pais === 'BR') {
+            moedaHidden.value = 'BRL';
+        }
+        // Fora do BR: manter moeda atual (pode ser BRL ou USD, o usuário escolhe)
+        if (pais !== 'BR' && moedaHidden.value === '') {
+            moedaHidden.value = 'USD';
+        }
         if (typeof updatePrices === 'function') {
             try {
-                updatePrices(desired);
+                updatePrices(moedaHidden.value);
             } catch (e) {
             }
         }
+    }
+
+    // Esconder/mostrar seletor de moeda no header
+    var currencySelector = document.querySelector('.currency-selector');
+    if (currencySelector) {
+        currencySelector.style.display = (pais === 'BR') ? 'none' : '';
     }
 
     // Documento (CPF/CNPJ) só é obrigatório para BR
@@ -2819,6 +2842,12 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // Endereço completo: manter formulário oculto (melhor UX)
                 if (enderecoForm) enderecoForm.style.display = 'none';
+                // Preencher país do endereço selecionado e atualizar regras
+                var paisEl = document.getElementById('pais');
+                if (paisEl && selectedOption.dataset && selectedOption.dataset.pais) {
+                    paisEl.value = selectedOption.dataset.pais || 'BR';
+                }
+                try { atualizarEnderecoPorPais(); } catch (e) {}
             }
         }
 
