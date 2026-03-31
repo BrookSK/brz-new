@@ -1571,7 +1571,14 @@ async function processarPedidoDireto() {
             const formaPagamentoSelect = document.getElementById('forma_pagamento');
             const formaPagamento = formaPagamentoSelect ? String(formaPagamentoSelect.value || '') : '';
 
-            const need = (currentCurrency === 'BRL') && (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
+            const need = (function() {
+                const paisSel = document.getElementById('pais');
+                const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+                const isBR = (pais === 'BR');
+                const isBRL = (currentCurrency === 'BRL');
+                // Câmbio Real card hash: Brasil (qualquer moeda) ou fora do BR + BRL
+                return (isBR || isBRL) && (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
+            })();
             if (!need) return;
 
             const cfg = window.CAMBIOREAL_DIRECT || {};
@@ -1840,20 +1847,27 @@ function atualizarFormaPagamento() {
     if (feesWarning) {
         const moedaHidden = document.getElementById('moeda_hidden');
         const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+        const paisSel = document.getElementById('pais');
+        const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
         const isCard = (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
-        const show = (cur === 'BRL') && isCard;
+        // Mostrar aviso de taxas CR: Brasil (qualquer moeda) ou fora do BR + BRL
+        const useSplit = (pais === 'BR' || cur === 'BRL');
+        const show = useSplit && isCard;
         feesWarning.style.display = show ? 'block' : 'none';
         if (show) {
             try { updateCambioRealFeesPreview(); } catch (e) {}
         }
     }
     
-    // Parcelamento: apenas cartão de crédito em BRL (Câmbio Real)
+    // Parcelamento: cartão de crédito via Câmbio Real (Brasil qualquer moeda ou fora do BR + BRL)
     try {
         const installmentsBox = document.getElementById('installments-box');
         const moedaHidden = document.getElementById('moeda_hidden');
         const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
-        const showInstallments = (cur === 'BRL') && (formaPagamento === 'cartao_credito');
+        const paisSel2 = document.getElementById('pais');
+        const pais2 = paisSel2 ? paisSel2.value.toUpperCase() : 'BR';
+        const useSplit2 = (pais2 === 'BR' || cur === 'BRL');
+        const showInstallments = useSplit2 && (formaPagamento === 'cartao_credito');
         if (installmentsBox) {
             installmentsBox.style.display = showInstallments ? 'block' : 'none';
         }
@@ -1910,7 +1924,13 @@ function atualizarFormaPagamento() {
 
                 const moedaHidden = document.getElementById('moeda_hidden');
                 const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
-                const stripeMode = (cur !== 'BRL');
+                const paisSel = document.getElementById('pais');
+                const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+                const isBR = (pais === 'BR');
+                const isBRL = (cur === 'BRL');
+                // Stripe só quando fora do BR + USD; Brasil ou BRL = Câmbio Real (campos manuais)
+                // /* REGRA ANTIGA (por moeda): const stripeMode = (cur !== 'BRL'); */
+                const stripeMode = (!isBR && !isBRL);
 
                 const blocoStripe = document.getElementById('campos-cartao-stripe');
                 const blocoManual = document.getElementById('campos-cartao-manual');
@@ -2085,7 +2105,12 @@ window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.50
 function updateCambioRealFeesPreview() {
     const moedaHidden = document.getElementById('moeda_hidden');
     const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
-    if (cur !== 'BRL') return;
+    const paisSel = document.getElementById('pais');
+    const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+    const isBR = (pais === 'BR');
+    const isBRL = (cur === 'BRL');
+    // Preview de taxas CR: Brasil (qualquer moeda) ou fora do BR + BRL
+    if (!isBR && !isBRL) return;
 
     const rate = (window.CAMBIOREAL_RATE_BRL && Number(window.CAMBIOREAL_RATE_BRL) > 0)
         ? Number(window.CAMBIOREAL_RATE_BRL)
