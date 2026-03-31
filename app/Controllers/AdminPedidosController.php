@@ -3682,6 +3682,25 @@ HTML;
                                     }
                                     $pgStatusView = (string) ($pedido['pagamento_status'] ?? ($pedido['payment_status'] ?? ($pedido['status_pagamento'] ?? '')));
                                     if (trim($pgStatusView) === '') {
+                                        // Fallback: detectar status a partir dos splits
+                                        try {
+                                            $dbSt = \Config\Database::getConnection();
+                                            $stSt = $dbSt->prepare('SELECT status FROM pedido_pagamentos WHERE pedido_id = ? ORDER BY id ASC');
+                                            $stSt->execute([(int) $pedido['id']]);
+                                            $statuses = $stSt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                                            if (!empty($statuses)) {
+                                                $allPaid = true;
+                                                foreach ($statuses as $s) {
+                                                    if (!in_array(strtolower(trim((string) $s)), ['paid', 'pago', 'approved', 'confirmed', 'succeeded'], true)) {
+                                                        $allPaid = false;
+                                                        break;
+                                                    }
+                                                }
+                                                $pgStatusView = $allPaid ? 'Pago' : 'Pendente';
+                                            }
+                                        } catch (\Exception $e) {}
+                                    }
+                                    if (trim($pgStatusView) === '') {
                                         $pgStatusView = 'Pendente';
                                     }
 
@@ -3693,6 +3712,25 @@ HTML;
                                         }
                                     }
                                     $pgGatewayView = (string) ($pedido['pagamento_gateway'] ?? ($pedido['payment_gateway'] ?? ($pedido['gateway'] ?? '')));
+                                    if (trim($pgGatewayView) === '') {
+                                        // Fallback: detectar gateway a partir dos splits (pedido_pagamentos)
+                                        try {
+                                            $dbGw = \Config\Database::getConnection();
+                                            $stGw = $dbGw->prepare('SELECT DISTINCT gateway FROM pedido_pagamentos WHERE pedido_id = ? ORDER BY id ASC');
+                                            $stGw->execute([(int) $pedido['id']]);
+                                            $gws = $stGw->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                                            if (!empty($gws)) {
+                                                $gwLabels = array_map(function($g) {
+                                                    $g = strtolower(trim((string) $g));
+                                                    if ($g === 'cambioreal') return 'Câmbio Real';
+                                                    if ($g === 'appmax') return 'AppMax';
+                                                    if ($g === 'stripe') return 'Stripe';
+                                                    return strtoupper($g);
+                                                }, $gws);
+                                                $pgGatewayView = implode(' + ', array_unique($gwLabels));
+                                            }
+                                        } catch (\Exception $e) {}
+                                    }
                                     if (trim($pgGatewayView) === '') {
                                         $pgGatewayView = 'N/A';
                                     }
