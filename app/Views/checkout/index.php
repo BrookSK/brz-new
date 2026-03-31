@@ -558,6 +558,21 @@
                         syncImpostosRules();
                         // Atualizar formas de pagamento quando o país muda
                         var moedaHidden = document.getElementById('moeda_hidden');
+                        var pais = this.value ? this.value.toUpperCase() : 'BR';
+                        
+                        // Brasil: travar moeda em BRL e esconder seletor de moeda
+                        if (pais === 'BR') {
+                            if (moedaHidden) moedaHidden.value = 'BRL';
+                            // Esconder seletor de moeda no header
+                            var currencySelector = document.querySelector('.currency-selector');
+                            if (currencySelector) currencySelector.style.display = 'none';
+                            if (typeof updatePrices === 'function') updatePrices('BRL');
+                        } else {
+                            // Fora do BR: mostrar seletor de moeda
+                            var currencySelector = document.querySelector('.currency-selector');
+                            if (currencySelector) currencySelector.style.display = '';
+                        }
+                        
                         var cur = moedaHidden ? moedaHidden.value : 'BRL';
                         if (typeof updatePaymentMethodsForCurrency === 'function') {
                             updatePaymentMethodsForCurrency(cur);
@@ -568,6 +583,18 @@
                 syncDocumentoRules();
                 syncBairroRules();
                 syncImpostosRules();
+
+                // Ao carregar: se país é Brasil, travar moeda em BRL e esconder seletor
+                (function() {
+                    var paisSel = document.getElementById('pais');
+                    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+                    if (pais === 'BR') {
+                        var mh = document.getElementById('moeda_hidden');
+                        if (mh) mh.value = 'BRL';
+                        var cs = document.querySelector('.currency-selector');
+                        if (cs) cs.style.display = 'none';
+                    }
+                })();
             });
         })();
         </script>
@@ -2645,16 +2672,27 @@ function setupCardMasks() {
 
 // Verificar mudanças na moeda do header a cada 200ms (mais rápido)
 setInterval(function() {
+    // Se país é Brasil, travar moeda em BRL (não permitir mudança pelo header)
+    var paisSel = document.getElementById('pais');
+    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+    if (pais === 'BR') {
+        var mh = document.getElementById('moeda_hidden');
+        if (mh && mh.value !== 'BRL') {
+            mh.value = 'BRL';
+            if (typeof updatePrices === 'function') updatePrices('BRL');
+        }
+        return;
+    }
+
     var headerCurrency = document.getElementById('current-currency');
     if (headerCurrency) {
         var newCurrency = headerCurrency.textContent;
         var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
         
         if (newCurrency !== currentHiddenCurrency) {
-            console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency); // Debug
+            console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency);
             document.getElementById('moeda_hidden').value = newCurrency;
             
-            // Usar função global do header se existir
             if (typeof updateAllPrices === 'function') {
                 updateAllPrices();
             } else {
@@ -2666,14 +2704,18 @@ setInterval(function() {
 
 // Também verificar mudanças no localStorage
 setInterval(function() {
+    // Se país é Brasil, travar moeda em BRL
+    var paisSel = document.getElementById('pais');
+    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
+    if (pais === 'BR') return;
+
     var storedCurrency = localStorage.getItem('selected_currency');
     var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
     
     if (storedCurrency && storedCurrency !== currentHiddenCurrency) {
-        console.log('Moeda mudou no localStorage de', currentHiddenCurrency, 'para', storedCurrency); // Debug
+        console.log('Moeda mudou no localStorage de', currentHiddenCurrency, 'para', storedCurrency);
         document.getElementById('moeda_hidden').value = storedCurrency;
         
-        // Usar função global do header se existir
         if (typeof updateAllPrices === 'function') {
             updateAllPrices();
         } else {
