@@ -556,6 +556,12 @@
                         syncDocumentoRules();
                         syncBairroRules();
                         syncImpostosRules();
+                        // Atualizar formas de pagamento quando o país muda
+                        var moedaHidden = document.getElementById('moeda_hidden');
+                        var cur = moedaHidden ? moedaHidden.value : 'BRL';
+                        if (typeof updatePaymentMethodsForCurrency === 'function') {
+                            updatePaymentMethodsForCurrency(cur);
+                        }
                     });
                 }
 
@@ -2409,10 +2415,16 @@ function updatePaymentMethodsForCurrency(currency) {
     const cur = (currency || '').toString().trim().toUpperCase();
     const isBRL = (cur === 'BRL');
 
-    // Verificar país de entrega
+    // Regra baseada no PAÍS de entrega (não na moeda)
     const paisSel = document.getElementById('pais');
     const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
     const isBR = (pais === 'BR');
+
+    // Brasil (qualquer moeda): Split CR + AppMax → PIX, Cartão Crédito, Cartão Débito, Carteira
+    // Fora do Brasil + BRL: Split CR + AppMax → PIX, Cartão Crédito, Cartão Débito, Carteira
+    // Fora do Brasil + USD: Stripe (tudo) → Cartão Crédito, PIX (Stripe), Carteira
+    const useSplit = (isBR || isBRL); // Split quando Brasil OU quando moeda é BRL (mesmo fora do BR)
+    // /* REGRA ANTIGA (por moeda): const useSplit = isBRL; */
 
     const currentValue = select.value;
 
@@ -2420,57 +2432,43 @@ function updatePaymentMethodsForCurrency(currency) {
     select.innerHTML = '';
     select.appendChild(new Option('Selecione...', ''));
 
-    if (isBR) {
-        // Brasil: opções disponíveis
-        var saldoUsd = Number(window.CARTEIRA_SALDO_USD || 0);
-        var saldoBrl = Number(window.CARTEIRA_SALDO_BRL || 0);
-        var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
-        var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
-        var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
-        var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
-        if (!saldoSuficiente) {
-            saldoLabel += ' - Saldo insuficiente';
-        }
-        var optCarteira = new Option(saldoLabel, 'carteira');
-        if (!saldoSuficiente) {
-            optCarteira.disabled = true;
-            optCarteira.style.color = '#999';
-        }
+    // Carteira (comum a todos)
+    var saldoUsd = Number(window.CARTEIRA_SALDO_USD || 0);
+    var saldoBrl = Number(window.CARTEIRA_SALDO_BRL || 0);
+    var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
+    var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
+    var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
+    var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
+    if (!saldoSuficiente) {
+        saldoLabel += ' - Saldo insuficiente';
+    }
+    var optCarteira = new Option(saldoLabel, 'carteira');
+    if (!saldoSuficiente) {
+        optCarteira.disabled = true;
+        optCarteira.style.color = '#999';
+    }
+
+    if (useSplit) {
+        // Split: CR produtos + AppMax taxas
+        // Opções: PIX, Cartão de Crédito, Cartão de Débito, Carteira
         select.appendChild(optCarteira);
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
         select.appendChild(new Option('PIX', 'pix'));
     } else {
-        // Fora do BR: Stripe + carteira
-        var saldoUsd = Number(window.CARTEIRA_SALDO_USD || 0);
-        var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
-        var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
-        var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
-        var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
-        if (!saldoSuficiente) {
-            saldoLabel += ' - Saldo insuficiente';
-        }
-        var optCarteira = new Option(saldoLabel, 'carteira');
-        if (!saldoSuficiente) {
-            optCarteira.disabled = true;
-            optCarteira.style.color = '#999';
-        }
+        // Fora do Brasil + USD: Stripe (tudo)
+        // Opções: Cartão de Crédito, PIX (Stripe), Carteira
         select.appendChild(optCarteira);
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('PIX', 'pix'));
     }
 
     // Manter seleção se ainda válida
-    const stillValid = Array.from(select.options).some(o => o.value === currentValue);
+    const stillValid = Array.from(select.options).some(o => o.value === currentValue && !o.disabled);
     if (stillValid) {
         select.value = currentValue;
     } else {
-        if (!isBRL) {
-            // Em USD, não pode ficar sem seleção quando o usuário já havia escolhido um método inválido (pix/boleto)
-            select.value = (currentValue === 'carteira') ? 'carteira' : 'cartao_credito';
-        } else {
-            select.value = '';
-        }
+        select.value = '';
     }
 
     // Atualizar exibição dos campos conforme a forma selecionada

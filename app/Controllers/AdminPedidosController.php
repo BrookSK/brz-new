@@ -3669,6 +3669,8 @@ HTML;
                                 <p><strong>Status:</strong> ' . htmlspecialchars($this->getStatusLabel((string) ($pedido['status'] ?? ''))) . '</p>
                                 <p><strong>Data:</strong> ' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</p>
                                 <p><strong>Forma Pagamento:</strong> ' . htmlspecialchars($pedido['forma_pagamento'] ?? 'N/A') . '</p>
+                                <p><strong>Moeda:</strong> ' . htmlspecialchars(strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'N/A'))))) . '</p>
+                                <p><strong>País Entrega:</strong> ' . htmlspecialchars(strtoupper(trim((string) ($pedido['pais_entrega'] ?? ($pedido['pais'] ?? ($pedido['country'] ?? 'N/A')))))) . '</p>
                                 <p><strong>Frete:</strong> ' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), (string) ($pedido['moeda'] ?? 'BRL'))) . '</p>
                                 <hr>
                                 <div class="mb-3">

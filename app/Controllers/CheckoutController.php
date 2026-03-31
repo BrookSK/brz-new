@@ -31,7 +31,7 @@ class CheckoutController extends Controller {
 
     private function gerarCobrancaAppmaxTaxaServicoSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao, string $componente = 'taxa_servico'): array {
         $billingType = strtoupper(trim($billingType));
-        if (!in_array($billingType, ['PIX', 'BOLETO'], true)) {
+        if (!in_array($billingType, ['PIX', 'BOLETO', 'CREDIT_CARD'], true)) {
             $billingType = 'BOLETO';
         }
         $valor = (float) $valor;
@@ -56,7 +56,7 @@ class CheckoutController extends Controller {
             ]
         ];
 
-        $result = $this->paymentService->processarPagamento([
+        $payloadAppmax = [
             'billingType' => $billingType,
             'force_gateway' => 'appmax',
             'customer_name' => $nome,
@@ -68,7 +68,19 @@ class CheckoutController extends Controller {
             'products_value_cents' => $productsValueCents,
             'shipping_value_cents' => 0,
             'discount_value_cents' => 0,
-        ], $valor, 'BRL', $descricao);
+        ];
+
+        // Passar dados do cartão quando billingType é CREDIT_CARD
+        if ($billingType === 'CREDIT_CARD') {
+            $cardFields = ['card_holder_name', 'card_number', 'card_expiry_month', 'card_expiry_year', 'card_cvv'];
+            foreach ($cardFields as $cf) {
+                if (!empty($usuario[$cf])) {
+                    $payloadAppmax[$cf] = (string) $usuario[$cf];
+                }
+            }
+        }
+
+        $result = $this->paymentService->processarPagamento($payloadAppmax, $valor, 'BRL', $descricao);
 
         if (empty($result['success'])) {
             return $result;
@@ -2769,8 +2781,10 @@ class CheckoutController extends Controller {
                 $paisEntregaCheckout = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
                 if ($paisEntregaCheckout === '') $paisEntregaCheckout = 'BR';
 
-                // Split (Câmbio Real + AppMax) para qualquer pedido com entrega no Brasil
-                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $paisEntregaCheckout === 'BR' && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
+                // Split (Câmbio Real + AppMax): Brasil (qualquer moeda) OU fora do Brasil com BRL
+                // /* REGRA ANTIGA (só Brasil): $shouldTrySplit = (...$paisEntregaCheckout === 'BR'...); */
+                $useSplit = ($paisEntregaCheckout === 'BR' || $moedaPedidoPay === 'BRL');
+                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $useSplit && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
                 // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
                 if ($shouldTrySplit && $reused) {
                     $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
@@ -3349,8 +3363,9 @@ class CheckoutController extends Controller {
                     }
                 }
                 
-                // Stripe PIX para pedidos fora do BR (moeda USD, forma pix)
-                if ($paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix' && !$reused) {
+                // Stripe PIX para pedidos fora do BR em USD (forma pix)
+                // Fora do BR + BRL vai pelo split (Câmbio Real + AppMax), não pelo Stripe
+                if ($paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix' && !$reused) {
                     try {
                         // Buscar total real do pedido (pode ser 'total' ou 'valor_total')
                         $totalUsdPix = 0.0;
@@ -3514,7 +3529,7 @@ class CheckoutController extends Controller {
                 if ($moedaPedidoClear === '') {
                     $moedaPedidoClear = 'BRL';
                 }
-                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
+                $isStripeFlow = ($paisEntregaCheckout !== 'BR' && $moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
                 $shouldClearCartNow = (!$isStripeFlow) && (
                     $formaSelecionada === 'carteira'
                     || $moedaPedidoClear === 'BRL'
@@ -3552,12 +3567,12 @@ class CheckoutController extends Controller {
                     'message' => 'Pedido criado com sucesso',
                     'pedido_id' => $pedidoId,
                     'redirect' => '/checkout/conclusao/' . $pedidoId,
-                    'stripe_required' => ($formaSelecionada !== 'carteira' && strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL'))) !== 'BRL' && $formaSelecionada === 'cartao_credito'),
-                    'stripe_pix' => ($paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix'),
+                    'stripe_required' => ($paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'cartao_credito' && $formaSelecionada !== 'carteira'),
+                    'stripe_pix' => ($paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix'),
                 ];
 
-                // Incluir dados do Stripe PIX na resposta
-                if (!empty($pixResult['success']) && $paisEntregaCheckout !== 'BR' && $formaSelecionada === 'pix') {
+                // Incluir dados do Stripe PIX na resposta (só fora do BR + USD)
+                if (!empty($pixResult['success']) && $paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix') {
                     $response['stripe_pix_data'] = [
                         'payment_intent_id' => $pixResult['payment_intent_id'] ?? '',
                         'client_secret' => $pixResult['client_secret'] ?? '',
@@ -5409,6 +5424,7 @@ class CheckoutController extends Controller {
                         'cidade' => (string) ($dados['cidade'] ?? ''),
                         'estado' => (string) ($dados['estado'] ?? ''),
                         'cep' => (string) ($dados['cep'] ?? ''),
+                        'pais_entrega' => (string) ($dados['pais'] ?? 'BR'),
                         'endereco_entrega' => (string) ($dados['endereco'] ?? ''),
                         'numero_entrega' => (string) ($dados['numero'] ?? ''),
                         'complemento_entrega' => (string) ($dados['complemento'] ?? ''),
