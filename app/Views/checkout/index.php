@@ -560,19 +560,6 @@
                         var moedaHidden = document.getElementById('moeda_hidden');
                         var pais = this.value ? this.value.toUpperCase() : 'BR';
                         
-                        // Brasil: travar moeda em BRL e esconder seletor de moeda
-                        if (pais === 'BR') {
-                            if (moedaHidden) moedaHidden.value = 'BRL';
-                            // Esconder seletor de moeda no header
-                            var currencySelector = document.querySelector('.currency-selector');
-                            if (currencySelector) currencySelector.style.display = 'none';
-                            if (typeof updatePrices === 'function') updatePrices('BRL');
-                        } else {
-                            // Fora do BR: mostrar seletor de moeda
-                            var currencySelector = document.querySelector('.currency-selector');
-                            if (currencySelector) currencySelector.style.display = '';
-                        }
-                        
                         var cur = moedaHidden ? moedaHidden.value : 'BRL';
                         if (typeof updatePaymentMethodsForCurrency === 'function') {
                             updatePaymentMethodsForCurrency(cur);
@@ -584,17 +571,7 @@
                 syncBairroRules();
                 syncImpostosRules();
 
-                // Ao carregar: se país é Brasil, travar moeda em BRL e esconder seletor
-                (function() {
-                    var paisSel = document.getElementById('pais');
-                    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
-                    if (pais === 'BR') {
-                        var mh = document.getElementById('moeda_hidden');
-                        if (mh) mh.value = 'BRL';
-                        var cs = document.querySelector('.currency-selector');
-                        if (cs) cs.style.display = 'none';
-                    }
-                })();
+
             });
         })();
         </script>
@@ -1106,23 +1083,8 @@ function syncPaymentOptionsByCurrency() {
         formaSel.value = '';
     }
 
-    // Forçar moeda BRL no Brasil, USD fora do BR (padrão)
+    // Moeda: não forçar, o usuário escolhe via seletor do header
     const moedaHidden = document.getElementById('moeda_hidden');
-    if (moedaHidden) {
-        if (isBR) {
-            moedaHidden.value = 'BRL';
-        }
-        // Fora do BR: manter moeda atual ou default USD
-        if (!isBR && moedaHidden.value === '') {
-            moedaHidden.value = 'USD';
-        }
-    }
-
-    // Esconder/mostrar seletor de moeda no header
-    var currencySelector = document.querySelector('.currency-selector');
-    if (currencySelector) {
-        currencySelector.style.display = isBR ? 'none' : '';
-    }
 
     // Ocultar/mostrar impostos do Brasil
     const impostosRow = document.getElementById('impostos-row');
@@ -1241,27 +1203,14 @@ function atualizarEnderecoPorPais() {
         }
     }
 
-    // Endereço internacional: forçar moeda conforme país
+    // Moeda: não forçar pelo país, o usuário escolhe via seletor do header
     if (moedaHidden) {
-        if (pais === 'BR') {
-            moedaHidden.value = 'BRL';
-        }
-        // Fora do BR: manter moeda atual (pode ser BRL ou USD, o usuário escolhe)
-        if (pais !== 'BR' && moedaHidden.value === '') {
-            moedaHidden.value = 'USD';
-        }
         if (typeof updatePrices === 'function') {
             try {
-                updatePrices(moedaHidden.value);
+                updatePrices(moedaHidden.value || 'BRL');
             } catch (e) {
             }
         }
-    }
-
-    // Esconder/mostrar seletor de moeda no header
-    var currencySelector = document.querySelector('.currency-selector');
-    if (currencySelector) {
-        currencySelector.style.display = (pais === 'BR') ? 'none' : '';
     }
 
     // Documento (CPF/CNPJ) só é obrigatório para BR
@@ -1626,8 +1575,8 @@ async function processarPedidoDireto() {
                 const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
                 const isBR = (pais === 'BR');
                 const isBRL = (currentCurrency === 'BRL');
-                // Câmbio Real card hash: Brasil (qualquer moeda) ou fora do BR + BRL
-                return (isBR || isBRL) && (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
+                // Câmbio Real card hash: moeda BRL
+                return isBRL && (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
             })();
             if (!need) return;
 
@@ -1900,8 +1849,8 @@ function atualizarFormaPagamento() {
         const paisSel = document.getElementById('pais');
         const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
         const isCard = (formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito');
-        // Mostrar aviso de taxas CR: Brasil (qualquer moeda) ou fora do BR + BRL
-        const useSplit = (pais === 'BR' || cur === 'BRL');
+        // Mostrar aviso de taxas CR: moeda BRL
+        const useSplit = (cur === 'BRL');
         const show = useSplit && isCard;
         feesWarning.style.display = show ? 'block' : 'none';
         if (show) {
@@ -1909,14 +1858,14 @@ function atualizarFormaPagamento() {
         }
     }
     
-    // Parcelamento: cartão de crédito via Câmbio Real (Brasil qualquer moeda ou fora do BR + BRL)
+    // Parcelamento: cartão de crédito via Câmbio Real (moeda BRL)
     try {
         const installmentsBox = document.getElementById('installments-box');
         const moedaHidden = document.getElementById('moeda_hidden');
         const cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
         const paisSel2 = document.getElementById('pais');
         const pais2 = paisSel2 ? paisSel2.value.toUpperCase() : 'BR';
-        const useSplit2 = (pais2 === 'BR' || cur === 'BRL');
+        const useSplit2 = (cur === 'BRL');
         const showInstallments = useSplit2 && (formaPagamento === 'cartao_credito');
         if (installmentsBox) {
             installmentsBox.style.display = showInstallments ? 'block' : 'none';
@@ -1978,9 +1927,8 @@ function atualizarFormaPagamento() {
                 const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
                 const isBR = (pais === 'BR');
                 const isBRL = (cur === 'BRL');
-                // Stripe só quando fora do BR + USD; Brasil ou BRL = Câmbio Real (campos manuais)
-                // /* REGRA ANTIGA (por moeda): const stripeMode = (cur !== 'BRL'); */
-                const stripeMode = (!isBR && !isBRL);
+                // BRL = Câmbio Real (campos manuais), USD = Stripe
+                const stripeMode = !isBRL;
 
                 const blocoStripe = document.getElementById('campos-cartao-stripe');
                 const blocoManual = document.getElementById('campos-cartao-manual');
@@ -2159,8 +2107,8 @@ function updateCambioRealFeesPreview() {
     const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
     const isBR = (pais === 'BR');
     const isBRL = (cur === 'BRL');
-    // Preview de taxas CR: Brasil (qualquer moeda) ou fora do BR + BRL
-    if (!isBR && !isBRL) return;
+    // Preview de taxas CR: moeda BRL
+    if (!isBRL) return;
 
     const rate = (window.CAMBIOREAL_RATE_BRL && Number(window.CAMBIOREAL_RATE_BRL) > 0)
         ? Number(window.CAMBIOREAL_RATE_BRL)
@@ -2498,7 +2446,7 @@ function updatePaymentMethodsForCurrency(currency) {
     // Brasil (qualquer moeda): Split CR + AppMax → PIX, Cartão Crédito, Cartão Débito, Carteira
     // Fora do Brasil + BRL: Split CR + AppMax → PIX, Cartão Crédito, Cartão Débito, Carteira
     // Fora do Brasil + USD: Stripe (tudo) → Cartão Crédito, PIX (Stripe), Carteira
-    const useSplit = (isBR || isBRL); // Split quando Brasil OU quando moeda é BRL (mesmo fora do BR)
+    const useSplit = isBRL; // BRL = Câmbio Real + AppMax, USD = Stripe (independente do país)
     // /* REGRA ANTIGA (por moeda): const useSplit = isBRL; */
 
     const currentValue = select.value;
@@ -2695,18 +2643,6 @@ function setupCardMasks() {
 
 // Verificar mudanças na moeda do header a cada 200ms (mais rápido)
 setInterval(function() {
-    // Se país é Brasil, travar moeda em BRL (não permitir mudança pelo header)
-    var paisSel = document.getElementById('pais');
-    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
-    if (pais === 'BR') {
-        var mh = document.getElementById('moeda_hidden');
-        if (mh && mh.value !== 'BRL') {
-            mh.value = 'BRL';
-            if (typeof updatePrices === 'function') updatePrices('BRL');
-        }
-        return;
-    }
-
     var headerCurrency = document.getElementById('current-currency');
     if (headerCurrency) {
         var newCurrency = headerCurrency.textContent;
@@ -2727,11 +2663,6 @@ setInterval(function() {
 
 // Também verificar mudanças no localStorage
 setInterval(function() {
-    // Se país é Brasil, travar moeda em BRL
-    var paisSel = document.getElementById('pais');
-    var pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
-    if (pais === 'BR') return;
-
     var storedCurrency = localStorage.getItem('selected_currency');
     var currentHiddenCurrency = document.getElementById('moeda_hidden').value;
     

@@ -2781,9 +2781,8 @@ class CheckoutController extends Controller {
                 $paisEntregaCheckout = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
                 if ($paisEntregaCheckout === '') $paisEntregaCheckout = 'BR';
 
-                // Split (Câmbio Real + AppMax): Brasil (qualquer moeda) OU fora do Brasil com BRL
-                // /* REGRA ANTIGA (só Brasil): $shouldTrySplit = (...$paisEntregaCheckout === 'BR'...); */
-                $useSplit = ($paisEntregaCheckout === 'BR' || $moedaPedidoPay === 'BRL');
+                // Split (Câmbio Real + AppMax) quando moeda é BRL; Stripe quando USD
+                $useSplit = ($moedaPedidoPay === 'BRL');
                 $shouldTrySplit = ($formaSelecionada !== 'carteira' && $useSplit && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
                 // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
                 if ($shouldTrySplit && $reused) {
@@ -3363,9 +3362,8 @@ class CheckoutController extends Controller {
                     }
                 }
                 
-                // Stripe PIX para pedidos fora do BR em USD (forma pix)
-                // Fora do BR + BRL vai pelo split (Câmbio Real + AppMax), não pelo Stripe
-                if ($paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix' && !$reused) {
+                // Stripe PIX quando moeda é USD (qualquer país)
+                if ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix' && !$reused) {
                     try {
                         // Buscar total real do pedido (pode ser 'total' ou 'valor_total')
                         $totalUsdPix = 0.0;
@@ -3529,7 +3527,7 @@ class CheckoutController extends Controller {
                 if ($moedaPedidoClear === '') {
                     $moedaPedidoClear = 'BRL';
                 }
-                $isStripeFlow = ($paisEntregaCheckout !== 'BR' && $moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
+                $isStripeFlow = ($moedaPedidoClear !== 'BRL' && $formaSelecionada === 'cartao_credito');
                 $shouldClearCartNow = (!$isStripeFlow) && (
                     $formaSelecionada === 'carteira'
                     || $moedaPedidoClear === 'BRL'
@@ -3567,12 +3565,12 @@ class CheckoutController extends Controller {
                     'message' => 'Pedido criado com sucesso',
                     'pedido_id' => $pedidoId,
                     'redirect' => '/checkout/conclusao/' . $pedidoId,
-                    'stripe_required' => ($paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'cartao_credito' && $formaSelecionada !== 'carteira'),
-                    'stripe_pix' => ($paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix'),
+                    'stripe_required' => ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'cartao_credito' && $formaSelecionada !== 'carteira'),
+                    'stripe_pix' => ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix'),
                 ];
 
-                // Incluir dados do Stripe PIX na resposta (só fora do BR + USD)
-                if (!empty($pixResult['success']) && $paisEntregaCheckout !== 'BR' && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix') {
+                // Incluir dados do Stripe PIX na resposta (moeda USD)
+                if (!empty($pixResult['success']) && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix') {
                     $response['stripe_pix_data'] = [
                         'payment_intent_id' => $pixResult['payment_intent_id'] ?? '',
                         'client_secret' => $pixResult['client_secret'] ?? '',
