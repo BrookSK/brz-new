@@ -1450,9 +1450,7 @@ function fecharJanela() {
         $totalUsd = null;
         if (is_numeric($pedido['total'] ?? null)) {
             $totalUsd = (float) $pedido['total'];
-            if ($moedaPedido === 'BRL') {
-                $totalUsd = $totalUsd * $brlToUsd;
-            }
+            // total é sempre armazenado em USD neste sistema; não converter
         }
         echo 'US$ ' . ($totalUsd !== null ? number_format((float) $totalUsd, 2, ',', '.') : '-') . '</div>
                             <div><strong>Status:</strong> ' . htmlspecialchars((string) ($pedido['status'] ?? '')) . '</div>
@@ -1497,7 +1495,7 @@ function fecharJanela() {
                 }
 
                 if ($precoUnit !== null && $moedaPedido === 'BRL') {
-                    $precoUnit = $precoUnit * $brlToUsd;
+                    // preco_unitario é sempre em USD; não converter
                 }
                 echo '<tr>
                     <td>' . htmlspecialchars((string) ($it['produto_nome'] ?? '')) . '</td>
@@ -1802,9 +1800,7 @@ function regerarEtiqueta() {
                 if ($unitValue === null) {
                     $unitValue = 1.0;
                 }
-                if ($moeda === 'BRL') {
-                    $unitValue = $unitValue * $brlToUsd;
-                }
+                // preco_unitario é sempre armazenado em USD neste sistema; não converter
 
                 $row = [
                     'description' => (string) ($it['produto_nome'] ?? ($it['nome_produto'] ?? 'item')),
