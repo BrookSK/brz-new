@@ -1713,6 +1713,17 @@ class AdminProdutosController extends Controller {
         if (in_array('price', $cols, true)) $data['price'] = $price;
         if (in_array('valor', $cols, true) && !isset($data['price'])) $data['valor'] = $price;
 
+        // Valor promocional (opcional)
+        $salePriceRaw = trim((string) $request->getParam('sale_price', ''));
+        if ($salePriceRaw !== '') {
+            $salePrice = $this->parseMoneyToDb($salePriceRaw);
+            if ($salePrice > 0 && in_array('sale_price', $cols, true)) {
+                $data['sale_price'] = $salePrice;
+            }
+        } elseif (in_array('sale_price', $cols, true)) {
+            $data['sale_price'] = null;
+        }
+
         if (in_array('weight', $cols, true)) $data['weight'] = $weight;
         if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;
 
@@ -2055,6 +2066,11 @@ class AdminProdutosController extends Controller {
                         <input type="text" class="form-control form-control-lg" name="weight" required inputmode="decimal" placeholder="0,000" id="loteWeightInput">
                     </div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Valor Promocional (USD) <span class="text-muted fw-normal small">Opcional</span></label>
+                    <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção" id="loteSalePriceInput"></div>
+                    <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
+                </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label fw-semibold">Estoque</label>
@@ -2364,6 +2380,8 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         fd.append("stock", document.getElementById("loteStockInput").value);
         fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
         fd.append("name", descricoes[i]);
+        const salePriceLote = document.getElementById("loteSalePriceInput").value.trim();
+        if (salePriceLote) fd.append("sale_price", salePriceLote);
         const ncmLoteVal = document.getElementById("ncmSelectLote").value;
         if (ncmLoteVal) fd.append("ncm", ncmLoteVal);
 
