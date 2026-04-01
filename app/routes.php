@@ -11,6 +11,8 @@ $router->get('/produto/detalhes/{id}', 'ProdutoController', 'detalhes');
 $router->get('/produto/variacoes/{id}', 'ProdutoController', 'variacoes');
 $router->get('/produtos/selecionar', 'ProdutoController', 'selecionar');
 $router->get('/grupo/{slug}', 'AdminGruposComprasController', 'paginaPublica');
+$router->get('/receita-federal/grupo/{slug}', 'AdminGruposComprasController', 'paginaReceitaFederal');
+$router->get('/receita-federal/grupo/{slug}/{snapshot_id}', 'AdminGruposComprasController', 'paginaReceitaFederal');
 $router->get('/grupos-compras', 'AdminGruposComprasController', 'todosGrupos');
 $router->post('/produtos/carrinho', 'ProdutoController', 'adicionarAoCarrinho');
 $router->get('/clube-brasiliana', function($request) {

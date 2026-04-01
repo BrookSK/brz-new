@@ -41,6 +41,7 @@ $router->get('/admin/grupos-compras/api/lista', 'AdminGruposComprasController', 
 $router->get('/admin/grupos-compras/api/produtos', 'AdminGruposComprasController', 'apiProdutos');
 $router->post('/admin/grupos-compras/api/remover-produto', 'AdminGruposComprasController', 'apiRemoverProduto');
 $router->post('/admin/grupos-compras/api/excluir-produto', 'AdminGruposComprasController', 'excluirProduto');
+$router->get('/admin/grupos-compras/snapshots/{id}', 'AdminGruposComprasController', 'listarSnapshots');
 
 // Pedidos
 $router->get('/admin/pedidos', 'AdminPedidosController', 'index');

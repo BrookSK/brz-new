@@ -68,6 +68,9 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                         <a href="/grupo/<?= $slug ?>" target="_blank" class="btn btn-sm btn-outline-info" title="Ver página pública">
                             <i class="fas fa-external-link-alt"></i>
                         </a>
+                        <button class="btn btn-sm btn-outline-secondary btn-historico-rf" data-id="<?= (int)$g['id'] ?>" data-slug="<?= $slug ?>" title="Histórico Receita Federal">
+                            <i class="fas fa-archive"></i>
+                        </button>
                         <button class="btn btn-sm btn-outline-danger btn-excluir-grupo" data-id="<?= (int)$g['id'] ?>" data-nome="<?= htmlspecialchars($g['nome'], ENT_QUOTES, 'UTF-8') ?>" title="Excluir grupo">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -272,6 +275,36 @@ document.querySelectorAll('.btn-excluir-grupo').forEach(btn => {
         const j = await r.json();
         if (j.ok) btn.closest('.grupo-card').remove();
         else alert(j.msg || 'Erro ao excluir grupo.');
+    });
+});
+
+// ── Histórico Receita Federal ──────────────────────────────────────────────
+document.querySelectorAll('.btn-historico-rf').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const slug = btn.dataset.slug;
+        try {
+            const r = await fetch('/admin/grupos-compras/snapshots/' + id);
+            const j = await r.json();
+            if (!j.ok) { alert(j.msg || 'Erro'); return; }
+            if (!j.snapshots || j.snapshots.length === 0) {
+                const goTo = confirm('Nenhum histórico disponível.\n\nO histórico é criado automaticamente quando o grupo é desativado.\n\nDeseja abrir a página de histórico mesmo assim?');
+                if (goTo) window.open('/receita-federal/grupo/' + slug, '_blank');
+                return;
+            }
+            let msg = 'Histórico disponível (' + j.snapshots.length + ' período(s)):\n\n';
+            j.snapshots.forEach((s, i) => {
+                const inicio = s.periodo_inicio || 'N/A';
+                const fim = s.periodo_fim || 'N/A';
+                msg += (i+1) + '. ' + inicio + ' — ' + fim + ' (' + s.qtd_produtos + ' produtos)\n';
+            });
+            msg += '\nAbrir página de histórico?';
+            if (confirm(msg)) {
+                window.open('/receita-federal/grupo/' + slug, '_blank');
+            }
+        } catch (e) {
+            alert('Erro ao buscar histórico.');
+        }
     });
 });
 

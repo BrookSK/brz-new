@@ -112,12 +112,12 @@
                                 <?php if ($isClubeBlocked): ?>
                                     <span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>
                                 <?php else: ?>
-                                <span class="h4 text-primary fw-bold mb-0 product-price" 
+                                <span class="h4 fw-bold mb-0 product-price <?= $temPromo ? 'text-danger' : 'text-primary' ?>" 
                                       data-original-price="<?= $precoExibir ?>">
                                     <?= number_format($precoExibir, 2, ',', '.') ?>
                                 </span>
                                 <?php if ($temPromo): ?>
-                                    <small class="text-decoration-line-through text-muted product-original-price"
+                                    <small class="text-decoration-line-through text-muted ms-1 product-original-price"
                                           data-original-original-price="<?= $precoBase ?>">
                                         <?= number_format($precoBase, 2, ',', '.') ?>
                                     </small>

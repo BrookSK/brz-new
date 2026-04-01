@@ -19,6 +19,16 @@ $busca = $busca ?? '';
 
 <div class="container py-4">
 
+<?php if (!empty($grupoInativo)): ?>
+<div class="alert alert-warning mb-4">
+    <i class="fas fa-archive me-2"></i>
+    <strong>Grupo arquivado.</strong> Este grupo de compras foi encerrado. Os produtos e valores exibidos são históricos.
+    <?php if (!empty($snapshotInfo)): ?>
+    <div class="mt-1 small">Período: <?= htmlspecialchars($snapshotInfo['inicio']) ?> — <?= htmlspecialchars($snapshotInfo['fim']) ?></div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
     <!-- Cabeçalho do grupo -->
     <div class="mb-4">
         <h1 class="h3 fw-bold mb-1">
@@ -149,12 +159,12 @@ $busca = $busca ?? '';
                     <?php endif; ?>
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="price-section">
-                            <span class="h4 text-primary fw-bold mb-0 product-price"
+                            <span class="h4 fw-bold mb-0 product-price <?= $temPromo ? 'text-danger' : 'text-primary' ?>"
                                   data-original-price="<?= $precoComImposto ?>">
                                 <?= number_format($precoComImposto, 2, ',', '.') ?>
                             </span>
                             <?php if ($temPromo): ?>
-                            <small class="text-decoration-line-through text-muted product-original-price"
+                            <small class="text-decoration-line-through text-muted ms-1 product-original-price"
                                    data-original-original-price="<?= $precoBaseComImposto ?>">
                                 <?= number_format($precoBaseComImposto, 2, ',', '.') ?>
                             </small>

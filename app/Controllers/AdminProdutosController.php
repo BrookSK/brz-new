@@ -2003,6 +2003,11 @@ class AdminProdutosController extends Controller {
                     </div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label fw-semibold">Valor Promocional (USD) <span class="text-muted fw-normal small">Opcional</span></label>
+                    <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção"></div>
+                    <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-semibold">Estoque</label>
                     <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
                 </div>
@@ -2754,6 +2759,17 @@ HTML;
 
         if (in_array('price', $cols, true)) $data['price'] = $price;
         if (in_array('valor', $cols, true) && !isset($data['price'])) $data['valor'] = $price;
+
+        // Valor promocional (opcional)
+        $salePriceRaw = trim((string) $request->getParam('sale_price', ''));
+        if ($salePriceRaw !== '') {
+            $salePrice = $this->parseMoneyToDb($salePriceRaw);
+            if ($salePrice > 0 && in_array('sale_price', $cols, true)) {
+                $data['sale_price'] = $salePrice;
+            }
+        } elseif (in_array('sale_price', $cols, true)) {
+            $data['sale_price'] = null;
+        }
 
         if (in_array('weight', $cols, true)) $data['weight'] = $weight;
         if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;

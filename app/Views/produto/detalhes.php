@@ -170,7 +170,7 @@
                                     <span class="original-amount" data-original-price="<?= $precoBase ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($precoBase, 2, ',', '.') ?></span>
                                 </div>
                             <?php endif; ?>
-                            <div class="fs-4 fw-bold">
+                            <div class="fs-4 fw-bold <?= $temPromo ? 'text-danger' : '' ?>">
                                 <span class="amount" data-original-price="<?= $temPromo ? $precoPromo : $precoBase ?>"><?= htmlspecialchars($currencyLabel) ?> <?= number_format($temPromo ? $precoPromo : $precoBase, 2, ',', '.') ?></span>
                             </div>
                         </div>

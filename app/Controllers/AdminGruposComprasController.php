@@ -256,15 +256,87 @@ class AdminGruposComprasController extends Controller {
         $id = (int) $request->getParam('id', 0);
         try {
             $pdo = $this->getPdo();
+
+            // Verificar estado atual antes de alternar
+            $stCheck = $pdo->prepare("SELECT ativo, nome FROM grupos_compras WHERE id=?");
+            $stCheck->execute([$id]);
+            $row = $stCheck->fetch(\PDO::FETCH_ASSOC);
+            $eraAtivo = (int) ($row['ativo'] ?? 0);
+
             $st = $pdo->prepare("UPDATE grupos_compras SET ativo = 1 - ativo WHERE id=?");
             $st->execute([$id]);
             $st2 = $pdo->prepare("SELECT ativo FROM grupos_compras WHERE id=?");
             $st2->execute([$id]);
             $ativo = (int)$st2->fetchColumn();
+
+            // Se estava ativo e agora desativou → criar snapshot para histórico (Receita Federal)
+            if ($eraAtivo === 1 && $ativo === 0) {
+                try {
+                    $this->criarSnapshotGrupo($pdo, $id);
+                } catch (\Throwable $e) {
+                    error_log('[SNAPSHOT] Erro ao criar snapshot do grupo ' . $id . ': ' . $e->getMessage());
+                }
+            }
+
             echo json_encode(['ok' => true, 'ativo' => $ativo]);
         } catch (\Throwable $e) {
             echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
         }
+    }
+
+    private function criarSnapshotGrupo(\PDO $pdo, int $grupoId): void {
+        // Criar tabela de snapshots se não existir
+        $pdo->exec("CREATE TABLE IF NOT EXISTS grupo_compras_snapshots (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            grupo_id INT NOT NULL,
+            grupo_nome VARCHAR(255) NOT NULL,
+            grupo_slug VARCHAR(255) NOT NULL,
+            periodo_inicio DATETIME NULL,
+            periodo_fim DATETIME NOT NULL,
+            produtos_json LONGTEXT NOT NULL,
+            qtd_produtos INT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_grupo_id (grupo_id),
+            INDEX idx_periodo (periodo_fim)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Buscar dados do grupo
+        $stG = $pdo->prepare("SELECT * FROM grupos_compras WHERE id = ? LIMIT 1");
+        $stG->execute([$grupoId]);
+        $grupo = $stG->fetch(\PDO::FETCH_ASSOC);
+        if (!$grupo) return;
+
+        // Buscar todos os produtos do grupo com preços atuais
+        $stP = $pdo->prepare("SELECT id, name, sku, price, sale_price, cost_price, weight, stock, ncm, foto_principal, created_at, updated_at FROM produtos WHERE grupo_compras_id = ? ORDER BY id ASC");
+        $stP->execute([$grupoId]);
+        $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Determinar período de início: último snapshot deste grupo ou created_at do grupo
+        $periodoInicio = null;
+        try {
+            $stLast = $pdo->prepare("SELECT periodo_fim FROM grupo_compras_snapshots WHERE grupo_id = ? ORDER BY id DESC LIMIT 1");
+            $stLast->execute([$grupoId]);
+            $lastFim = $stLast->fetchColumn();
+            if ($lastFim) {
+                $periodoInicio = $lastFim;
+            }
+        } catch (\Throwable $e) {}
+
+        if (!$periodoInicio) {
+            $periodoInicio = $grupo['created_at'] ?? date('Y-m-d H:i:s');
+        }
+
+        $stIns = $pdo->prepare("INSERT INTO grupo_compras_snapshots (grupo_id, grupo_nome, grupo_slug, periodo_inicio, periodo_fim, produtos_json, qtd_produtos, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stIns->execute([
+            $grupoId,
+            (string) ($grupo['nome'] ?? ''),
+            (string) ($grupo['slug'] ?? ''),
+            $periodoInicio,
+            date('Y-m-d H:i:s'),
+            json_encode($produtos, JSON_UNESCAPED_UNICODE),
+            count($produtos),
+            date('Y-m-d H:i:s'),
+        ]);
     }
 
     // ── Admin: excluir ────────────────────────────────────────────────────────
@@ -393,6 +465,8 @@ class AdminGruposComprasController extends Controller {
                 return;
             }
 
+            $grupoInativo = false;
+
             // Detectar coluna de status disponível
             $colsStmt = $pdo->query("DESCRIBE produtos");
             $cols = $colsStmt ? $colsStmt->fetchAll(\PDO::FETCH_COLUMN) : [];
@@ -497,6 +571,155 @@ class AdminGruposComprasController extends Controller {
                 }
             }
         }
+
+        ob_start();
+        include __DIR__ . '/../Views/grupo-compras/pagina.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/main.php';
+    }
+
+    // ── API: listar snapshots de um grupo (para admin) ──────────────────────
+    public function listarSnapshots(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $grupoId = (int) $request->getParam('id', 0);
+        try {
+            $pdo = $this->getPdo();
+
+            // Criar tabela se não existir
+            $pdo->exec("CREATE TABLE IF NOT EXISTS grupo_compras_snapshots (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                grupo_id INT NOT NULL,
+                grupo_nome VARCHAR(255) NOT NULL,
+                grupo_slug VARCHAR(255) NOT NULL,
+                periodo_inicio DATETIME NULL,
+                periodo_fim DATETIME NOT NULL,
+                produtos_json LONGTEXT NOT NULL,
+                qtd_produtos INT NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_grupo_id (grupo_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            $st = $pdo->prepare("SELECT id, grupo_nome, periodo_inicio, periodo_fim, qtd_produtos, created_at FROM grupo_compras_snapshots WHERE grupo_id = ? ORDER BY id DESC");
+            $st->execute([$grupoId]);
+            $snapshots = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Buscar slug do grupo
+            $stSlug = $pdo->prepare("SELECT slug FROM grupos_compras WHERE id = ? LIMIT 1");
+            $stSlug->execute([$grupoId]);
+            $slug = (string) ($stSlug->fetchColumn() ?: '');
+
+            echo json_encode(['ok' => true, 'snapshots' => $snapshots, 'slug' => $slug]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    // ── Página pública: snapshot para Receita Federal ─────────────────────────
+    public function paginaReceitaFederal(Request $request) {
+        $slug = (string) $request->getParam('slug', '');
+        $snapshotId = (int) $request->getParam('snapshot_id', 0);
+
+        try {
+            $pdo = $this->getPdo();
+
+            // Buscar grupo (qualquer status)
+            $stG = $pdo->prepare("SELECT * FROM grupos_compras WHERE slug = ? LIMIT 1");
+            $stG->execute([$slug]);
+            $grupo = $stG->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$grupo) {
+                http_response_code(404);
+                $title = 'Grupo não encontrado';
+                ob_start();
+                echo '<div class="container py-5 text-center"><h2>Grupo não encontrado.</h2></div>';
+                $content = ob_get_clean();
+                include __DIR__ . '/../Views/layouts/main.php';
+                return;
+            }
+
+            $grupoId = (int) $grupo['id'];
+
+            // Se snapshot_id = 0, listar todos os snapshots disponíveis
+            if ($snapshotId <= 0) {
+                $stSnaps = $pdo->prepare("SELECT id, grupo_nome, periodo_inicio, periodo_fim, qtd_produtos, created_at FROM grupo_compras_snapshots WHERE grupo_id = ? ORDER BY id DESC");
+                $stSnaps->execute([$grupoId]);
+                $snapshots = $stSnaps->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — Histórico (Receita Federal)';
+                ob_start();
+                echo '<div class="container py-4">';
+                echo '<h2 class="mb-1"><i class="fas fa-archive me-2"></i>' . htmlspecialchars($grupo['nome'] ?? '') . '</h2>';
+                echo '<p class="text-muted mb-4">Histórico de períodos — Receita Federal</p>';
+
+                if (empty($snapshots)) {
+                    echo '<div class="alert alert-info">Nenhum histórico disponível para este grupo.</div>';
+                } else {
+                    echo '<div class="list-group">';
+                    foreach ($snapshots as $snap) {
+                        $inicio = !empty($snap['periodo_inicio']) ? date('d/m/Y H:i', strtotime($snap['periodo_inicio'])) : 'N/A';
+                        $fim = date('d/m/Y H:i', strtotime($snap['periodo_fim']));
+                        $qtd = (int) $snap['qtd_produtos'];
+                        $link = '/receita-federal/grupo/' . htmlspecialchars($slug) . '/' . (int) $snap['id'];
+                        echo '<a href="' . $link . '" class="list-group-item list-group-item-action">'
+                            . '<div class="d-flex justify-content-between align-items-center">'
+                            . '<div>'
+                            . '<strong>Período: ' . $inicio . ' — ' . $fim . '</strong>'
+                            . '<div class="small text-muted">' . $qtd . ' produto(s)</div>'
+                            . '</div>'
+                            . '<i class="fas fa-chevron-right text-muted"></i>'
+                            . '</div>'
+                            . '</a>';
+                    }
+                    echo '</div>';
+                }
+
+                echo '<div class="mt-4"><a href="/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
+                echo '</div>';
+                $content = ob_get_clean();
+                include __DIR__ . '/../Views/layouts/main.php';
+                return;
+            }
+
+            // Buscar snapshot específico
+            $stSnap = $pdo->prepare("SELECT * FROM grupo_compras_snapshots WHERE id = ? AND grupo_id = ? LIMIT 1");
+            $stSnap->execute([$snapshotId, $grupoId]);
+            $snapshot = $stSnap->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$snapshot) {
+                http_response_code(404);
+                $title = 'Histórico não encontrado';
+                ob_start();
+                echo '<div class="container py-5 text-center"><h2>Histórico não encontrado.</h2></div>';
+                $content = ob_get_clean();
+                include __DIR__ . '/../Views/layouts/main.php';
+                return;
+            }
+
+            $produtos = json_decode($snapshot['produtos_json'] ?? '[]', true) ?: [];
+            $grupoInativo = true;
+            $total = count($produtos);
+            $totalPages = 1;
+            $page = 1;
+            $busca = '';
+
+            $periodoInicio = !empty($snapshot['periodo_inicio']) ? date('d/m/Y H:i', strtotime($snapshot['periodo_inicio'])) : 'N/A';
+            $periodoFim = date('d/m/Y H:i', strtotime($snapshot['periodo_fim']));
+            $snapshotInfo = ['inicio' => $periodoInicio, 'fim' => $periodoFim, 'id' => $snapshotId];
+
+            $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — ' . $periodoInicio . ' a ' . $periodoFim;
+
+        } catch (\Throwable $e) {
+            $title = 'Erro';
+            ob_start();
+            echo '<div class="container py-5 text-center"><h2>Erro ao carregar histórico.</h2></div>';
+            $content = ob_get_clean();
+            include __DIR__ . '/../Views/layouts/main.php';
+            return;
+        }
+
+        $clube_acesso = false;
 
         ob_start();
         include __DIR__ . '/../Views/grupo-compras/pagina.php';
