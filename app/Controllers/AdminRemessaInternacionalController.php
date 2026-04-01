@@ -1859,15 +1859,22 @@ function regerarEtiqueta() {
             'height' => (float) ($pedido['altura'] ?? 0) > 0 ? (float) $pedido['altura'] : 10,
         ]];
 
+        // declared_value = subtotal dos produtos em USD (soma de unit_value * quantity dos itens)
         $declared = 0.0;
-        foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
-            if (isset($pedido[$c]) && is_numeric($pedido[$c])) {
-                $declared = (float) $pedido[$c];
-                break;
-            }
+        foreach ($items as $item) {
+            $declared += (float) ($item['unit_value'] ?? 0) * (int) ($item['quantity'] ?? 1);
         }
-        if ($moeda === 'BRL') {
-            $declared = $declared * $brlToUsd;
+        if ($declared <= 0) {
+            // fallback: pegar valor do pedido caso itens não tenham preço
+            foreach (['valor_total', 'total', 'valor', 'amount'] as $c) {
+                if (isset($pedido[$c]) && is_numeric($pedido[$c])) {
+                    $declared = (float) $pedido[$c];
+                    break;
+                }
+            }
+            if ($moeda === 'BRL') {
+                $declared = $declared * $brlToUsd;
+            }
         }
 
         $externalShippingId = (string) (($pedido['codigo_pedido'] ?? '') !== '' ? $pedido['codigo_pedido'] : ('PEDIDO-' . (int) ($pedido['id'] ?? 0)));
