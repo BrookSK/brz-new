@@ -2316,6 +2316,11 @@ class CheckoutController extends Controller {
             'carteira_saldo_disponivel' => $carteiraSaldoDisponivel,
             'is_admin' => (strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ''))) === 'admin'),
             'impostos_calculado' => $impostosCalculado ?? $impostos,
+            'cambioreal_app_id' => $this->paymentService->getCambioRealAppId(),
+            'cambioreal_app_public' => $this->paymentService->getCambioRealAppPublic(),
+            'cambioreal_base_url' => $this->paymentService->getCambioRealBaseUrlPublic(),
+            'cambioreal_rate_brl' => $rateBRL,
+            'pix_desconto_taxa_servico_percent' => $this->getPixDescontoTaxaServicoPercent(),
         ]);
     }
 

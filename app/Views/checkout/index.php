@@ -1612,7 +1612,7 @@ async function processarPedidoDireto() {
             const sandbox = (baseUrl !== '') ? (baseUrl.indexOf('sandbox.cambioreal.com') !== -1) : true;
 
             if (!appId || !appPublic || typeof CardHash !== 'function') {
-                return;
+                throw new Error('SDK do Câmbio Real não disponível. Recarregue a página e tente novamente.');
             }
 
             const camposCartao = document.getElementById('campos-cartao');
@@ -1630,7 +1630,7 @@ async function processarPedidoDireto() {
             const cvv = cvvEl ? String(cvvEl.value || '').trim() : '';
 
             if (!holder || !number || !mm || !yyyy || !cvv) {
-                return;
+                throw new Error('Preencha todos os campos do cartão de crédito.');
             }
 
             const dfpId = 'PEDIDO_' + String(Date.now());
@@ -1651,7 +1651,7 @@ async function processarPedidoDireto() {
             const bin = String(number.substring(0,6) || '').replace(/\D/g,'');
 
             if (!token || !brand || !bin) {
-                return;
+                throw new Error('Não foi possível tokenizar o cartão. Verifique os dados e tente novamente.');
             }
 
             formData.set('cambioreal_card_token', token);
