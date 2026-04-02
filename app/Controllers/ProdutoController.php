@@ -587,7 +587,11 @@ class ProdutoController extends Controller {
             $this->json(['error' => 'Produto não encontrado'], 404);
         }
         
-        $itemPrice = (float) ($produto['preco'] ?? $produto['valor'] ?? 0);
+        $precoBase = (float) ($produto['preco'] ?? $produto['valor'] ?? 0);
+        if ($precoBase < 0) $precoBase = 0.0;
+        $precoPromo = (float) ($produto['preco_promocao'] ?? 0);
+        if ($precoPromo < 0) $precoPromo = 0.0;
+        $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
         $itemStock = (int) ($produto['estoque'] ?? 0);
         $variacaoDescricao = null;
         $pvId = null;

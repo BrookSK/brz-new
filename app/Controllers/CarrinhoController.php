@@ -328,7 +328,11 @@ class CarrinhoController extends Controller {
                     $storedPesoUnit = (float) $item['peso_unit'];
                 }
 
-                $itemPrice = floatval($produto['preco'] ?? 0);
+                $precoBase = floatval($produto['preco'] ?? ($produto['valor'] ?? 0));
+                if ($precoBase < 0) $precoBase = 0.0;
+                $precoPromo = floatval($produto['preco_promocao'] ?? 0);
+                if ($precoPromo < 0) $precoPromo = 0.0;
+                $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
                 $itemStock = intval($produto['estoque'] ?? 0);
                 if ($pvId > 0) {
                     $infoVar = $this->getVariacaoInfo($pvId);
@@ -1088,10 +1092,14 @@ class CarrinhoController extends Controller {
                 return;
             }
 
-            // Garantir preço numérico (com override da variação, quando existir)
+            // Garantir preço numérico (com desconto quando válido; override da variação tem prioridade)
             $itemPrice = 0.0;
             if ($produto) {
-                $itemPrice = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+                $precoBase = floatval($produto['preco'] ?? $produto['valor'] ?? 0);
+                if ($precoBase < 0) $precoBase = 0.0;
+                $precoPromo = floatval($produto['preco_promocao'] ?? 0);
+                if ($precoPromo < 0) $precoPromo = 0.0;
+                $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
             }
             $pvId = (int) ($_SESSION['carrinho'][$itemKey]['produto_variacao_id'] ?? 0);
             if ($pvId > 0) {
