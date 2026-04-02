@@ -398,10 +398,13 @@
                 if (subtotalLabel) subtotalLabel.textContent = (window.CHECKOUT_I18N && window.CHECKOUT_I18N.subtotal_products) ? window.CHECKOUT_I18N.subtotal_products : 'Subtotal Produtos:';
 
                 if (br) {
-                    window.checkoutOriginalValues.impostos = (window.checkoutBaseValues.impostos || 0);
-                    window.checkoutOriginalValues.total = (window.checkoutBaseValues.total || 0);
+                    window.checkoutOriginalValues.impostos = (window.checkoutBaseValues.impostosCalculado || window.checkoutBaseValues.impostos || 0);
+                    window.checkoutOriginalValues.total = (window.checkoutOriginalValues.subtotal || 0) + (window.checkoutBaseValues.frete || 0) + (window.checkoutBaseValues.taxaServico || 0) + (window.checkoutBaseValues.impostosCalculado || window.checkoutBaseValues.impostos || 0) + (window.checkoutBaseValues.impostoLocal || 0);
                     if (impostosRow) {
                         impostosRow.classList.remove('d-none');
+                    }
+                    if (impostosEl) {
+                        impostosEl.setAttribute('data-original-value', window.checkoutOriginalValues.impostos);
                     }
                     if (alertEl) {
                         alertEl.classList.add('d-none');
@@ -419,6 +422,12 @@
                     if (alertEl) {
                         alertEl.classList.remove('d-none');
                     }
+                }
+
+                // Atualizar data-original-value do total
+                var totalEl = document.getElementById('total');
+                if (totalEl) {
+                    totalEl.setAttribute('data-original-value', window.checkoutOriginalValues.total);
                 }
 
                 try {
@@ -800,8 +809,16 @@
                                 <?php else: ?>
                                     <div class="d-flex justify-content-between d-none" id="impostos-row">
                                         <span><?= __('cart.taxes', 'Impostos') ?>:</span>
-                                        <span id="impostos" class="cart-currency" data-original-value="0">0</span>
+                                        <span id="impostos" class="cart-currency" data-original-value="<?= $impostos_calculado ?? $impostos ?? 0 ?>"><?= number_format(($impostos_calculado ?? $impostos ?? 0), 2, '.', ',') ?></span>
                                     </div>
+                                <?php endif; ?>
+                                <?php if (!empty($is_admin)): ?>
+                                <div class="form-check mt-1 mb-1" id="admin-impostos-teste-wrap" <?= empty($cobra_impostos_br) ? 'style="display:none"' : '' ?>>
+                                    <input class="form-check-input" type="checkbox" id="admin-impostos-teste" name="admin_impostos_teste" value="1">
+                                    <label class="form-check-label small text-warning" for="admin-impostos-teste">
+                                        <i class="fas fa-flask me-1"></i>Modo teste: impostos $1.00
+                                    </label>
+                                </div>
                                 <?php endif; ?>
                                 <?php if (($imposto_local ?? 0) > 0): ?>
                                     <div class="d-flex justify-content-between" id="imposto-local-row">
@@ -2272,6 +2289,7 @@ function updatePrices(currency) {
             frete: <?= ($frete ?? 0) ?>,
             taxaServico: <?= ($taxa_servico ?? 0) ?>,
             impostos: <?= ($impostos ?? 0) ?>,
+            impostosCalculado: <?= ($impostos_calculado ?? $impostos ?? 0) ?>,
             impostoLocal: <?= ($imposto_local ?? 0) ?>,
             total: <?= ($total ?? 0) ?>
         };
@@ -2891,46 +2909,76 @@ main {
 <?php if (!empty($is_admin)): ?>
 <script>
 (function() {
-    var cb = document.getElementById('admin-taxa-teste');
-    if (!cb) return;
-    var taxaOriginal = <?= json_encode((float) ($taxa_servico ?? 0)) ?>;
     var TAXA_TESTE = 1.00;
+    var IMPOSTOS_TESTE = 1.00;
+    var taxaOriginal = <?= json_encode((float) ($taxa_servico ?? 0)) ?>;
+    var impostosOriginal = <?= json_encode((float) ($impostos_calculado ?? $impostos ?? 0)) ?>;
 
-    cb.addEventListener('change', function() {
-        var useTeste = cb.checked;
-        var novaTaxa = useTeste ? TAXA_TESTE : taxaOriginal;
-        var diff = taxaOriginal - novaTaxa;
+    function recalcTotal() {
+        if (!window.checkoutOriginalValues) return;
+        var v = window.checkoutOriginalValues;
+        v.total = (v.subtotal || 0) + (v.frete || 0) + (v.taxaServico || 0) + (v.impostos || 0) + (v.impostoLocal || 0);
+    }
 
-        // Atualizar valores base do JS
-        if (window.checkoutBaseValues) {
-            window.checkoutBaseValues.taxaServico = novaTaxa;
-            window.checkoutBaseValues.total = (window.checkoutBaseValues.total || 0) - (useTeste ? diff : -diff);
-        }
-        if (window.checkoutOriginalValues) {
-            window.checkoutOriginalValues.taxaServico = novaTaxa;
-            window.checkoutOriginalValues.total = (window.checkoutOriginalValues.total || 0) - (useTeste ? diff : -diff);
-        }
-
-        // Atualizar elementos na tela
+    function refreshDisplay() {
         var taxaEl = document.getElementById('taxa-servico');
-        if (taxaEl) {
-            taxaEl.setAttribute('data-original-value', novaTaxa);
-            taxaEl.textContent = novaTaxa.toFixed(2).replace('.', ',');
+        if (taxaEl && window.checkoutOriginalValues) {
+            taxaEl.setAttribute('data-original-value', window.checkoutOriginalValues.taxaServico);
+        }
+        var impostosEl = document.getElementById('impostos');
+        if (impostosEl && window.checkoutOriginalValues) {
+            impostosEl.setAttribute('data-original-value', window.checkoutOriginalValues.impostos);
         }
         var totalEl = document.getElementById('total');
-        if (totalEl) {
-            var novoTotal = parseFloat(totalEl.getAttribute('data-original-value') || '0');
-            novoTotal = useTeste ? (novoTotal - diff) : (novoTotal + diff);
-            totalEl.setAttribute('data-original-value', novoTotal);
-            totalEl.textContent = novoTotal.toFixed(2).replace('.', ',');
+        if (totalEl && window.checkoutOriginalValues) {
+            totalEl.setAttribute('data-original-value', window.checkoutOriginalValues.total);
         }
+        try {
+            var moedaHidden = document.getElementById('moeda_hidden');
+            var curr = moedaHidden ? (moedaHidden.value || 'BRL') : 'BRL';
+            if (typeof updatePrices === 'function') updatePrices(curr);
+        } catch (e) {}
+    }
 
-        // Re-disparar conversão de moeda se ativa
-        if (typeof window.updateCheckoutCurrency === 'function') {
-            var cur = document.querySelector('input[name="moeda"]:checked');
-            if (cur) window.updateCheckoutCurrency(cur.value);
-        }
-    });
+    // Taxa de serviço
+    var cbTaxa = document.getElementById('admin-taxa-teste');
+    if (cbTaxa) {
+        cbTaxa.addEventListener('change', function() {
+            var novaTaxa = cbTaxa.checked ? TAXA_TESTE : taxaOriginal;
+            if (window.checkoutBaseValues) window.checkoutBaseValues.taxaServico = novaTaxa;
+            if (window.checkoutOriginalValues) {
+                window.checkoutOriginalValues.taxaServico = novaTaxa;
+                recalcTotal();
+            }
+            refreshDisplay();
+        });
+    }
+
+    // Impostos
+    var cbImpostos = document.getElementById('admin-impostos-teste');
+    if (cbImpostos) {
+        cbImpostos.addEventListener('change', function() {
+            var novoImposto = cbImpostos.checked ? IMPOSTOS_TESTE : impostosOriginal;
+            if (window.checkoutBaseValues) {
+                window.checkoutBaseValues.impostosCalculado = novoImposto;
+            }
+            if (window.checkoutOriginalValues) {
+                window.checkoutOriginalValues.impostos = novoImposto;
+                recalcTotal();
+            }
+            refreshDisplay();
+        });
+    }
+
+    // Mostrar/esconder checkbox de impostos quando país muda
+    var paisEl = document.getElementById('pais');
+    if (paisEl) {
+        var wrap = document.getElementById('admin-impostos-teste-wrap');
+        paisEl.addEventListener('change', function() {
+            var br = ((paisEl.value || '').toUpperCase() === 'BR');
+            if (wrap) wrap.style.display = br ? '' : 'none';
+        });
+    }
 })();
 </script>
 <?php endif; ?>

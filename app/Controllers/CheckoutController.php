@@ -2216,6 +2216,9 @@ class CheckoutController extends Controller {
         // Impostos (Remessa Conforme/ICMS/II) só devem ser exibidos/cobrados para entrega no Brasil.
         // Para outros países, a tributação local é responsabilidade do cliente.
         $cobraImpostosBR = ($paisEntrega === 'BR');
+        // Sempre calcular o valor real dos impostos para o frontend poder mostrar/esconder
+        // quando o usuário troca o endereço de entrega.
+        $impostosCalculado = $impostos;
         if (!$cobraImpostosBR) {
             $impostos = 0.0;
             $total = (float) $subtotal + (float) $frete + (float) $taxaServico;
@@ -2312,6 +2315,7 @@ class CheckoutController extends Controller {
             'carteira_saldo_brl' => $carteiraSaldoBrl,
             'carteira_saldo_disponivel' => $carteiraSaldoDisponivel,
             'is_admin' => (strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ''))) === 'admin'),
+            'impostos_calculado' => $impostosCalculado ?? $impostos,
         ]);
     }
 
@@ -5268,6 +5272,15 @@ class CheckoutController extends Controller {
             }
             if ($paisEntrega !== 'BR') {
                 $impostosUsd = 0.0;
+            }
+
+            // Admin: modo teste — impostos fixos em $1.00
+            if (!empty($dados['admin_impostos_teste']) && $paisEntrega === 'BR') {
+                $perfilSessao = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+                if ($perfilSessao === 'admin') {
+                    $impostosUsd = 1.00;
+                    $this->debugLog('[CRIAR_PEDIDO] Admin modo teste: impostos forçados para $1.00');
+                }
             }
 
             // Imposto local do grupo de compras (baseado no grupo dos produtos no carrinho)
