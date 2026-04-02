@@ -304,21 +304,26 @@
 
                             $display = $url !== '' ? $url : ($pixPayload !== '' ? $pixPayload : ($bank !== '' ? $bank : $dig));
                             $openUrl = $url !== '' ? $url : ($bank !== '' ? $bank : '');
+                            $hasPaymentAction = ($display !== '' || $pixImg !== '');
 
                             $boxId = 'split_' . md5($titulo . $display);
                             ?>
                             <div class="border rounded p-3 mb-3" style="background: rgba(148, 163, 184, 0.08);">
                                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                     <div><strong><?= htmlspecialchars($titulo) ?></strong></div>
+                                    <?php if ($hasPaymentAction): ?>
                                     <div class="d-flex gap-2">
                                         <?php if ($openUrl !== ''): ?>
                                             <a class="btn btn-sm btn-outline-primary" href="<?= htmlspecialchars($openUrl) ?>" target="_blank" rel="noopener"><?= __('checkout_done.open', 'Abrir') ?></a>
                                         <?php endif; ?>
                                         <button type="button" class="btn btn-sm btn-outline-dark" onclick="copiarPixPayload('<?= $boxId ?>','<?= $boxId ?>_copied', this)"><?= __('checkout_done.copy', 'Copiar') ?></button>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
+                                <?php if ($hasPaymentAction): ?>
                                 <input id="<?= $boxId ?>" type="text" class="form-control mt-2" value="<?= htmlspecialchars($display) ?>" readonly onclick="this.select();" />
                                 <div id="<?= $boxId ?>_copied" class="small text-success mt-1" style="display:none;"><?= __('checkout_done.copied', 'Copiado!') ?></div>
+                                <?php endif; ?>
 
                                 <?php if ($pixImg !== ''): ?>
                                     <?php
