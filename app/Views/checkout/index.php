@@ -1714,7 +1714,7 @@ async function processarPedidoDireto() {
 
             console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);
 
-            const isStripeUsd = (currentCurrency !== 'BRL') && (data.stripe_required === true);
+            const isStripeUsd = (data.stripe_required === true);
             if (!isStripeUsd) {
                 // Manter overlay até redirecionar para página de conclusão
                 const destino = data.redirect || ('/checkout/conclusao/' + data.pedido_id);

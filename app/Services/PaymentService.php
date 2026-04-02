@@ -4620,6 +4620,16 @@ class PaymentService {
                 ],
             ]);
             $result['appmax']['credit_card_response'] = $ccResp;
+
+            // Verificar se o pagamento foi aprovado
+            $ccStatus = strtolower(trim((string) ($ccResp['data']['status'] ?? ($ccResp['status'] ?? ''))));
+            $ccSuccess = (bool) ($ccResp['success'] ?? ($ccResp['data']['success'] ?? true));
+            if ($ccSuccess === false || in_array($ccStatus, ['rejected', 'declined', 'refused', 'failed', 'error', 'cancelled'], true)) {
+                $ccMsg = (string) ($ccResp['data']['message'] ?? ($ccResp['message'] ?? ($ccResp['error'] ?? 'Cartão recusado')));
+                $result['success'] = false;
+                $result['error'] = 'AppMax: ' . $ccMsg;
+            }
+
             return $result;
         }
 
