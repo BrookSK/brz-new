@@ -781,6 +781,14 @@
                                     <span><?= $isPaymentLink ? 'Taxa de Serviço' : __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
                                     <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                 </div>
+                                <?php if (!empty($is_admin)): ?>
+                                <div class="form-check mt-1 mb-1">
+                                    <input class="form-check-input" type="checkbox" id="admin-taxa-teste" name="admin_taxa_teste" value="1">
+                                    <label class="form-check-label small text-warning" for="admin-taxa-teste">
+                                        <i class="fas fa-flask me-1"></i>Modo teste: taxa $1.00
+                                    </label>
+                                </div>
+                                <?php endif; ?>
                                 <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
                                     <div class="alert alert-info small mt-2 mb-2" id="pixTaxaServicoInfo" style="display:none;"></div>
                                 <?php endif; ?>
@@ -2879,6 +2887,54 @@ main {
     }
 }
 </style>
+
+<?php if (!empty($is_admin)): ?>
+<script>
+(function() {
+    var cb = document.getElementById('admin-taxa-teste');
+    if (!cb) return;
+    var taxaOriginal = <?= json_encode((float) ($taxa_servico ?? 0)) ?>;
+    var TAXA_TESTE = 1.00;
+
+    cb.addEventListener('change', function() {
+        var useTeste = cb.checked;
+        var novaTaxa = useTeste ? TAXA_TESTE : taxaOriginal;
+        var diff = taxaOriginal - novaTaxa;
+
+        // Atualizar valores base do JS
+        if (window.checkoutBaseValues) {
+            window.checkoutBaseValues.taxaServico = novaTaxa;
+            window.checkoutBaseValues.total = (window.checkoutBaseValues.total || 0) - (useTeste ? diff : -diff);
+        }
+        if (window.checkoutOriginalValues) {
+            window.checkoutOriginalValues.taxaServico = novaTaxa;
+            window.checkoutOriginalValues.total = (window.checkoutOriginalValues.total || 0) - (useTeste ? diff : -diff);
+        }
+
+        // Atualizar elementos na tela
+        var taxaEl = document.getElementById('taxa-servico');
+        if (taxaEl) {
+            taxaEl.setAttribute('data-original-value', novaTaxa);
+            taxaEl.textContent = novaTaxa.toFixed(2).replace('.', ',');
+        }
+        var totalEl = document.getElementById('total');
+        if (totalEl) {
+            var novoTotal = parseFloat(totalEl.getAttribute('data-original-value') || '0');
+            novoTotal = useTeste ? (novoTotal - diff) : (novoTotal + diff);
+            totalEl.setAttribute('data-original-value', novoTotal);
+            totalEl.textContent = novoTotal.toFixed(2).replace('.', ',');
+        }
+
+        // Re-disparar conversão de moeda se ativa
+        if (typeof window.updateCheckoutCurrency === 'function') {
+            var cur = document.querySelector('input[name="moeda"]:checked');
+            if (cur) window.updateCheckoutCurrency(cur.value);
+        }
+    });
+})();
+</script>
+<?php endif; ?>
+
 <?php $content = ob_get_clean(); ?>
 <?php if ($isPaymentLink): ?>
     <!DOCTYPE html>

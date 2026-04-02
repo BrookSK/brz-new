@@ -2311,6 +2311,7 @@ class CheckoutController extends Controller {
             'carteira_saldo_usd' => $carteiraSaldoUsd,
             'carteira_saldo_brl' => $carteiraSaldoBrl,
             'carteira_saldo_disponivel' => $carteiraSaldoDisponivel,
+            'is_admin' => (strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ''))) === 'admin'),
         ]);
     }
 
@@ -5251,6 +5252,15 @@ class CheckoutController extends Controller {
             $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
             $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
+
+            // Admin: modo teste — taxa de serviço fixa em $1.00
+            if (!empty($dados['admin_taxa_teste'])) {
+                $perfilSessao = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+                if ($perfilSessao === 'admin') {
+                    $taxaServicoUsd = 1.00;
+                    $this->debugLog('[CRIAR_PEDIDO] Admin modo teste: taxa de serviço forçada para $1.00');
+                }
+            }
 
             $paisEntrega = strtoupper(trim((string) ($dados['pais'] ?? 'BR')));
             if ($paisEntrega === '') {
