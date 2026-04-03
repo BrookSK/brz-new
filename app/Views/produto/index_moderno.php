@@ -184,16 +184,9 @@
         };
     ?>
 
-    <?php if (!empty($produtos) && ($totalPages > 1 || !empty($ver_todos))): ?>
+    <?php if (!empty($produtos) && $totalPages > 1): ?>
         <nav aria-label="Paginação" class="mt-4">
             <ul class="pagination justify-content-center flex-wrap gap-1">
-                <?php if (!empty($ver_todos)): ?>
-                    <li class="page-item">
-                        <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(1), ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="fas fa-list me-1"></i>Paginado
-                        </a>
-                    </li>
-                <?php else: ?>
                 <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                     <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(max(1, $page - 1)), ENT_QUOTES, 'UTF-8') ?>" tabindex="-1">Anterior</a>
                 </li>
@@ -222,19 +215,6 @@
                 <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
                     <a class="page-link" href="<?= htmlspecialchars($buildProductsUrl(min($totalPages, $page + 1)), ENT_QUOTES, 'UTF-8') ?>">Próxima</a>
                 </li>
-                <?php
-                    // Botão Ver Todos
-                    $verTodosQs = ['ver_todos' => '1'];
-                    if (!empty($searchVal)) $verTodosQs['search'] = $searchVal;
-                    if (!empty($categoriaVal)) $verTodosQs['categoria'] = $categoriaVal;
-                    $verTodosUrl = '/produtos?' . http_build_query($verTodosQs);
-                ?>
-                <li class="page-item ms-2">
-                    <a class="page-link text-primary fw-semibold" href="<?= htmlspecialchars($verTodosUrl, ENT_QUOTES, 'UTF-8') ?>">
-                        <i class="fas fa-th me-1"></i>Ver Todos (<?= (int) $total ?>)
-                    </a>
-                </li>
-                <?php endif; ?>
             </ul>
         </nav>
     <?php endif; ?>

@@ -3361,7 +3361,50 @@ HTML;
             . '</form>'
             . '</div>';
 
-        // Modal de ações em massa
+        // Modal de ações em massa — buscar categorias e grupos para selects
+        $categoriasSelect = [];
+        $gruposSelect = [];
+        try {
+            $pdoModal = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            // Categorias
+            try {
+                $stCat = $pdoModal->query("SELECT id, nome FROM categorias WHERE 1=1 ORDER BY nome ASC");
+                if ($stCat) {
+                    foreach ($stCat->fetchAll(\PDO::FETCH_ASSOC) as $c) {
+                        $categoriasSelect[] = $c;
+                    }
+                }
+            } catch (\Exception $e) {
+                try {
+                    $stCat2 = $pdoModal->query("SELECT id, name AS nome FROM categorias ORDER BY name ASC");
+                    if ($stCat2) {
+                        foreach ($stCat2->fetchAll(\PDO::FETCH_ASSOC) as $c) {
+                            $categoriasSelect[] = $c;
+                        }
+                    }
+                } catch (\Exception $e2) {}
+            }
+            // Grupos de compras
+            try {
+                $stGrp = $pdoModal->query("SELECT id, nome FROM grupos_compras WHERE ativo=1 ORDER BY nome ASC");
+                if ($stGrp) {
+                    foreach ($stGrp->fetchAll(\PDO::FETCH_ASSOC) as $g) {
+                        $gruposSelect[] = $g;
+                    }
+                }
+            } catch (\Exception $e) {}
+        } catch (\Exception $e) {}
+
+        // Gerar options HTML
+        $optCategorias = '<option value="">— Não alterar —</option>';
+        foreach ($categoriasSelect as $c) {
+            $optCategorias .= '<option value="' . (int)$c['id'] . '">' . htmlspecialchars((string)$c['nome'], ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+        $optGrupos = '<option value="">— Não alterar —</option>';
+        foreach ($gruposSelect as $g) {
+            $optGrupos .= '<option value="' . (int)$g['id'] . '">' . htmlspecialchars((string)$g['nome'], ENT_QUOTES, 'UTF-8') . '</option>';
+        }
+
         echo '
 <div class="modal fade" id="modalMassa" tabindex="-1" aria-labelledby="modalMassaLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -3396,11 +3439,11 @@ HTML;
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Categoria</label>
-              <input type="text" class="form-control" name="massa_categoria" placeholder="Nome da categoria">
+              <select class="form-select" name="massa_categoria_id">' . $optCategorias . '</select>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Grupo de Compras (ID)</label>
-              <input type="number" min="0" class="form-control" name="massa_grupo_id" placeholder="ID do grupo">
+              <label class="form-label fw-semibold">Grupo de Compras</label>
+              <select class="form-select" name="massa_grupo_id">' . $optGrupos . '</select>
             </div>
           </div>
         </form>
@@ -3457,6 +3500,8 @@ HTML;
         const n = document.querySelectorAll(".check-produto:checked").length;
         if (n === 0) return;
         document.getElementById("modalMassaLabel").innerHTML = \'<i class="fas fa-edit me-2"></i>Edição em Massa — \' + n + \' produto(s)\';
+        // Limpar campos do modal
+        document.getElementById("formMassaModal").reset();
         new bootstrap.Modal(document.getElementById("modalMassa")).show();
     };
 
@@ -3467,11 +3512,10 @@ HTML;
         const form = document.getElementById("formMassaModal");
         const data = new FormData(form);
 
-        // Verificar se pelo menos um campo foi preenchido
+        // Verificar se pelo menos um campo foi preenchido (ignora selects em "Não alterar")
         let temAlgo = false;
         for (const [k, v] of data.entries()) {
-            if (v !== "" && v !== "0" && k !== "massa_status") { temAlgo = true; break; }
-            if (k === "massa_status" && v !== "") { temAlgo = true; break; }
+            if (v !== "") { temAlgo = true; break; }
         }
         if (!temAlgo) {
             alert("Preencha pelo menos um campo para alterar.");
@@ -3584,13 +3628,13 @@ HTML;
 
         header('Content-Type: application/json');
 
-        $ids = $request->getParam('ids') ?? [];
+        // Usar $_POST diretamente para garantir arrays corretos
+        $ids = $_POST['ids'] ?? [];
         if (!is_array($ids) || empty($ids)) {
             echo json_encode(['success' => false, 'error' => 'Nenhum produto selecionado.']);
             exit;
         }
-        $ids = array_map('intval', $ids);
-        $ids = array_filter($ids, fn($id) => $id > 0);
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($id) => $id > 0));
         if (empty($ids)) {
             echo json_encode(['success' => false, 'error' => 'IDs inválidos.']);
             exit;
@@ -3599,40 +3643,40 @@ HTML;
         $campos = [];
         $params = [];
 
-        $preco = $request->getParam('massa_preco');
-        if ($preco !== null && $preco !== '') {
+        $preco = $_POST['massa_preco'] ?? '';
+        if ($preco !== '') {
             $campos[] = 'price = ?';
             $params[] = (float) str_replace(',', '.', $preco);
         }
 
-        $peso = $request->getParam('massa_peso');
-        if ($peso !== null && $peso !== '') {
+        $peso = $_POST['massa_peso'] ?? '';
+        if ($peso !== '') {
             $campos[] = 'weight = ?';
             $params[] = (float) str_replace(',', '.', $peso);
         }
 
-        $estoque = $request->getParam('massa_estoque');
-        if ($estoque !== null && $estoque !== '') {
+        $estoque = $_POST['massa_estoque'] ?? '';
+        if ($estoque !== '') {
             $campos[] = 'stock = ?';
             $params[] = (int) $estoque;
         }
 
-        $status = $request->getParam('massa_status');
-        if ($status !== null && $status !== '') {
+        $status = $_POST['massa_status'] ?? '';
+        if ($status !== '') {
             $campos[] = 'active = ?';
             $params[] = (int) $status;
         }
 
-        $categoria = $request->getParam('massa_categoria');
-        if ($categoria !== null && trim($categoria) !== '') {
-            $campos[] = 'categoria = ?';
-            $params[] = trim($categoria);
+        $categoriaId = $_POST['massa_categoria_id'] ?? '';
+        if ($categoriaId !== '') {
+            $campos[] = 'category_id = ?';
+            $params[] = (int) $categoriaId;
         }
 
-        $grupoId = $request->getParam('massa_grupo_id');
-        if ($grupoId !== null && $grupoId !== '') {
+        $grupoId = $_POST['massa_grupo_id'] ?? '';
+        if ($grupoId !== '') {
             $campos[] = 'grupo_compras_id = ?';
-            $params[] = (int) $grupoId;
+            $params[] = (int) $grupoId > 0 ? (int) $grupoId : null;
         }
 
         if (empty($campos)) {
@@ -3642,6 +3686,7 @@ HTML;
 
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $in = implode(',', array_fill(0, count($ids), '?'));
             $sql = 'UPDATE produtos SET ' . implode(', ', $campos) . ' WHERE id IN (' . $in . ')';
             $stmt = $pdo->prepare($sql);

@@ -56,10 +56,10 @@ $busca = $busca ?? '';
 
     <!-- Busca por nome -->
     <div class="mb-4">
-        <form method="GET" action="/grupo/<?= $slug ?>" class="d-flex" style="max-width:400px">
+        <form method="GET" action="/grupo/<?= $slug ?>" id="formBuscaGrupo" class="d-flex" style="max-width:400px">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" name="q" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome..." value="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="text" name="q" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome..." value="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
                 <?php if ($busca !== ''): ?>
                 <a href="/grupo/<?= $slug ?>" class="btn btn-outline-secondary" title="Limpar"><i class="fas fa-times"></i></a>
                 <?php endif; ?>
@@ -212,16 +212,9 @@ $busca = $busca ?? '';
     <?php endif; ?>
 
     <!-- Paginação -->
-    <?php if ($totalPages > 1 || !empty($verTodos)): ?>
+    <?php if ($totalPages > 1): ?>
     <nav aria-label="Paginação" class="mt-4">
         <ul class="pagination justify-content-center flex-wrap gap-1">
-            <?php if (!empty($verTodos)): ?>
-                <li class="page-item">
-                    <a class="page-link" href="<?= htmlspecialchars($buildUrl(1), ENT_QUOTES, 'UTF-8') ?>">
-                        <i class="fas fa-list me-1"></i>Paginado
-                    </a>
-                </li>
-            <?php else: ?>
             <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                 <a class="page-link" href="<?= htmlspecialchars($buildUrl(max(1, $page - 1)), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
             </li>
@@ -244,17 +237,6 @@ $busca = $busca ?? '';
             <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
                 <a class="page-link" href="<?= htmlspecialchars($buildUrl(min($totalPages, $page + 1)), ENT_QUOTES, 'UTF-8') ?>">Próxima</a>
             </li>
-            <?php
-            // Botão Ver Todos
-            $verTodosUrl = '/grupo/' . $slug . '?ver_todos=1';
-            if ($busca !== '') $verTodosUrl .= '&q=' . urlencode($busca);
-            ?>
-            <li class="page-item ms-2">
-                <a class="page-link text-primary fw-semibold" href="<?= htmlspecialchars($verTodosUrl, ENT_QUOTES, 'UTF-8') ?>">
-                    <i class="fas fa-th me-1"></i>Ver Todos (<?= $total ?>)
-                </a>
-            </li>
-            <?php endif; ?>
         </ul>
     </nav>
     <?php endif; ?>
@@ -321,16 +303,15 @@ document.addEventListener('DOMContentLoaded', function () {
         window.updateProductPrices(cur);
     }
 
-    // Filtro client-side adicional (dentro da página atual)
-    const filtro = document.getElementById('filtroProduto');
-    if (filtro) {
-        filtro.addEventListener('input', function () {
-            const q = this.value.toLowerCase().trim();
-            const items = document.querySelectorAll('.produto-item');
-            items.forEach(item => {
-                const nome = item.dataset.nome || '';
-                item.style.display = (q === '' || nome.includes(q)) ? '' : 'none';
-            });
+    // Submeter busca automaticamente ao digitar (debounce 500ms)
+    const filtroProduto = document.getElementById('filtroProduto');
+    if (filtroProduto) {
+        let debounceTimer;
+        filtroProduto.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+                document.getElementById('formBuscaGrupo').submit();
+            }, 500);
         });
     }
 });
