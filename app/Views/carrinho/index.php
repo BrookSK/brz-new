@@ -544,7 +544,12 @@ function limparCarrinho() {
 <script>
 (function() {
     // Verificar oferta gratuita via AJAX
-    fetch('/oferta-gratuita/verificar', { credentials: 'same-origin' })
+    var url = '/oferta-gratuita/verificar';
+    // Propagar modo teste se presente na URL do carrinho
+    if (window.location.search.indexOf('test_oferta=1') !== -1) {
+        url += '?test_oferta=1';
+    }
+    fetch(url, { credentials: 'same-origin' })
         .then(r => r.json())
         .then(data => {
             if (!data || !data.show) return;

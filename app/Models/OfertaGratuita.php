@@ -79,8 +79,9 @@ class OfertaGratuita extends Model {
 
     /**
      * Verifica se a sessão é orgânica (não é admin, não é redirecionamento, não é venda manual)
+     * Se $allowTestMode = true e o admin tiver ?test_oferta=1 na URL, permite para teste
      */
-    public function isSessaoOrganica(): bool {
+    public function isSessaoOrganica(bool $allowTestMode = false): bool {
         if (session_status() === PHP_SESSION_NONE) {
             @session_start();
         }
@@ -98,15 +99,19 @@ class OfertaGratuita extends Model {
         if (!empty($_SESSION['redirecionamento_ativo'])) return false;
         if (!empty($_SESSION['is_redirecionamento'])) return false;
 
-        // Verificar perfil - deve ser cliente
-        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
-        if (in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'representante', 'conferente'], true)) {
-            return false;
-        }
-
         // Deve ter usuário logado
         $uid = (int) ($_SESSION['usuario_id'] ?? 0);
         if ($uid <= 0) return false;
+
+        // Verificar perfil - deve ser cliente
+        $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
+        if (in_array($perfil, ['admin', 'vendedor', 'suporte', 'redirecionador', 'representante', 'conferente'], true)) {
+            // Modo teste: admin pode testar com ?test_oferta=1 na página do carrinho
+            if ($allowTestMode && $perfil === 'admin' && !empty($_SESSION['oferta_gratuita_test_mode'])) {
+                return true;
+            }
+            return false;
+        }
 
         return true;
     }
@@ -146,16 +151,16 @@ class OfertaGratuita extends Model {
     }
 
     /**
-     * Busca um produto gratuito elegível aleatório da categoria
+     * Busca um produto gratuito elegível aleatório da categoria, excluindo produtos já no carrinho
      */
-    public function sortearProdutoGratuito(?int $categoriaId): ?array {
+    public function sortearProdutoGratuito(?int $categoriaId, array $produtoIdsNoCarrinho = []): ?array {
         if ($categoriaId === null || $categoriaId <= 0) return null;
 
         $cols = $this->getTableColumns('produtos');
         if (!in_array('elegivel_oferta_gratis', $cols, true)) return null;
 
         try {
-            $stmt = $this->connection->prepare("
+            $sql = "
                 SELECT id, name, price, weight, stock, category_id, foto_principal
                 FROM produtos 
                 WHERE elegivel_oferta_gratis = 1 
@@ -163,10 +168,20 @@ class OfertaGratuita extends Model {
                   AND active = 1 
                   AND status = 'published'
                   AND stock > 0
-                ORDER BY RAND() 
-                LIMIT 1
-            ");
-            $stmt->execute([$categoriaId]);
+            ";
+            $params = [$categoriaId];
+
+            // Excluir produtos que já estão no carrinho
+            if (!empty($produtoIdsNoCarrinho)) {
+                $placeholders = implode(',', array_fill(0, count($produtoIdsNoCarrinho), '?'));
+                $sql .= " AND id NOT IN ($placeholders)";
+                $params = array_merge($params, array_map('intval', $produtoIdsNoCarrinho));
+            }
+
+            $sql .= " ORDER BY RAND() LIMIT 1";
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute($params);
             return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
         } catch (\Exception $e) {
             return null;
@@ -244,14 +259,20 @@ class OfertaGratuita extends Model {
      */
     public function podeExibirOferta(int $usuarioId, array $carrinho): bool {
         if (!$this->isOfertaGlobalAtiva()) return false;
-        if (!$this->isSessaoOrganica()) return false;
+        if (!$this->isSessaoOrganica(true)) return false;
         if ($this->usuarioJaRecebeuOferta($usuarioId)) return false;
         if (empty($carrinho)) return false;
 
         $categoriaId = $this->getCategoriaPredominante($carrinho);
         if ($categoriaId === null) return false;
 
-        $produto = $this->sortearProdutoGratuito($categoriaId);
+        $produtoIdsNoCarrinho = [];
+        foreach ($carrinho as $item) {
+            $pid = (int) ($item['produto_id'] ?? 0);
+            if ($pid > 0) $produtoIdsNoCarrinho[] = $pid;
+        }
+
+        $produto = $this->sortearProdutoGratuito($categoriaId, $produtoIdsNoCarrinho);
         return ($produto !== null);
     }
 }

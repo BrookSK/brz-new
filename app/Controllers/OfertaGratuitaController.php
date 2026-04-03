@@ -15,16 +15,24 @@ class OfertaGratuitaController extends Controller {
     public function verificar(Request $request) {
         if (session_status() === PHP_SESSION_NONE) session_start();
 
+        // Modo teste: admin pode ativar com ?test_oferta=1 no carrinho
+        if (!empty($_GET['test_oferta']) || !empty($request->getParam('test_oferta'))) {
+            $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
+            if ($perfil === 'admin') {
+                $_SESSION['oferta_gratuita_test_mode'] = true;
+            }
+        }
+
         $model = new OfertaGratuita();
         $uid = (int) ($_SESSION['usuario_id'] ?? 0);
 
-        if ($uid <= 0 || !$model->isSessaoOrganica() || !$model->isOfertaGlobalAtiva()) {
-            $this->json(['show' => false]);
+        if ($uid <= 0 || !$model->isSessaoOrganica(true) || !$model->isOfertaGlobalAtiva()) {
+            $this->json(['show' => false, 'reason' => 'sessao_ou_config']);
             return;
         }
 
         if ($model->usuarioJaRecebeuOferta($uid)) {
-            $this->json(['show' => false]);
+            $this->json(['show' => false, 'reason' => 'ja_recebeu']);
             return;
         }
 
@@ -47,19 +55,26 @@ class OfertaGratuitaController extends Controller {
         }
 
         if (empty($carrinho)) {
-            $this->json(['show' => false]);
+            $this->json(['show' => false, 'reason' => 'carrinho_vazio']);
             return;
+        }
+
+        // Coletar IDs dos produtos já no carrinho para excluir do sorteio
+        $produtoIdsNoCarrinho = [];
+        foreach ($carrinho as $item) {
+            $pid = (int) ($item['produto_id'] ?? 0);
+            if ($pid > 0) $produtoIdsNoCarrinho[] = $pid;
         }
 
         $categoriaId = $model->getCategoriaPredominante($carrinho);
         if ($categoriaId === null) {
-            $this->json(['show' => false]);
+            $this->json(['show' => false, 'reason' => 'sem_categoria']);
             return;
         }
 
-        $produto = $model->sortearProdutoGratuito($categoriaId);
+        $produto = $model->sortearProdutoGratuito($categoriaId, $produtoIdsNoCarrinho);
         if ($produto === null) {
-            $this->json(['show' => false]);
+            $this->json(['show' => false, 'reason' => 'sem_produto_elegivel', 'categoria_id' => $categoriaId, 'excluidos' => $produtoIdsNoCarrinho]);
             return;
         }
 
@@ -107,7 +122,7 @@ class OfertaGratuitaController extends Controller {
         $model = new OfertaGratuita();
         $uid = (int) ($_SESSION['usuario_id'] ?? 0);
 
-        if ($uid <= 0 || !$model->isSessaoOrganica() || !$model->isOfertaGlobalAtiva()) {
+        if ($uid <= 0 || !$model->isSessaoOrganica(true) || !$model->isOfertaGlobalAtiva()) {
             $this->json(['success' => false, 'error' => 'Oferta não disponível']);
             return;
         }
