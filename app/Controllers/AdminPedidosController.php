@@ -3052,6 +3052,32 @@ HTML;
             }
 
             // Conteúdo principal
+            // Verificar se pedido tem item gratuito
+            $temItemGratuito = false;
+            $freeOfferItemInfo = null;
+            if (is_array($itens)) {
+                foreach ($itens as $it) {
+                    if (!empty($it['is_free_offer'])) {
+                        $temItemGratuito = true;
+                        $freeOfferItemInfo = $it;
+                        break;
+                    }
+                }
+            }
+            if ($temItemGratuito) {
+                $freeOrigPrice = (float) ($freeOfferItemInfo['free_offer_original_price'] ?? ($freeOfferItemInfo['preco_unitario'] ?? 0));
+                echo '<div class="alert alert-success mb-3">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-gift fa-2x me-3"></i>
+                        <div>
+                            <strong>Este pedido contém um produto gratuito promocional</strong>
+                            <div class="small">Produto: ' . htmlspecialchars((string) ($freeOfferItemInfo['nome_produto'] ?? '')) . '</div>
+                            <div class="small">Valor original: $ ' . number_format($freeOrigPrice, 2) . ' | Valor cobrado: $ 0,00 | Imposto não cobrado</div>
+                        </div>
+                    </div>
+                </div>';
+            }
+
             echo '<div class="row">
                     <div class="col-md-12">
                         <div class="card mb-4">
@@ -3126,6 +3152,12 @@ HTML;
                                                 $nomeHtml = '<a href="' . htmlspecialchars($urlOriginal) . '" target="_blank" class="text-decoration-none">' . htmlspecialchars($nomeProduto) . '</a>';
                                             } else {
                                                 $nomeHtml = htmlspecialchars($nomeProduto);
+                                            }
+
+                                            // Badge de produto gratuito promocional
+                                            $isFreeOfferItem = !empty($item['is_free_offer']);
+                                            if ($isFreeOfferItem) {
+                                                $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Produto Gratuito</span>';
                                             }
 
                                             $extraHtml = '';

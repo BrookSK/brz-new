@@ -4287,6 +4287,14 @@ HTML;
                                             <option value="1">Sim</option>
                                         </select>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Elegível para Oferta Gratuita</label>
+                                        <select class="form-select" name="elegivel_oferta_gratis">
+                                            <option value="0" selected>Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, este produto poderá ser oferecido gratuitamente no carrinho</small>
+                                    </div>
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
                                 </div>
                             </div>
@@ -4500,6 +4508,7 @@ HTML;
             }
             if (in_array('featured', $cols, true)) $data['featured'] = $request->getParam('featured') ?: 0;
             if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
+            if (in_array('elegivel_oferta_gratis', $cols, true)) $data['elegivel_oferta_gratis'] = $request->getParam('elegivel_oferta_gratis') ?: 0;
 
             if (in_array('created_at', $cols, true) && empty($data['created_at'])) {
                 $data['created_at'] = date('Y-m-d H:i:s');
@@ -5111,6 +5120,14 @@ HTML;
                                             <option value="0" ' . (empty($produto['clube_ativo']) ? 'selected' : '') . '>Não</option>
                                         </select>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Elegível para Oferta Gratuita</label>
+                                        <select class="form-select" name="elegivel_oferta_gratis">
+                                            <option value="1" ' . (!empty($produto['elegivel_oferta_gratis']) ? 'selected' : '') . '>Sim</option>
+                                            <option value="0" ' . (empty($produto['elegivel_oferta_gratis']) ? 'selected' : '') . '>Não</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, este produto poderá ser oferecido gratuitamente no carrinho</small>
+                                    </div>
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar Alterações</button>
                                 </div>
                             </div>
@@ -5466,6 +5483,11 @@ HTMLSCRIPT;
             if (in_array('clube_ativo', $cols, true)) {
                 $stmtClube = $pdo->prepare('UPDATE produtos SET clube_ativo = ? WHERE id = ?');
                 $stmtClube->execute([(int) ($request->getParam('clube_ativo') ?: 0), (int) $id]);
+            }
+
+            if (in_array('elegivel_oferta_gratis', $cols, true)) {
+                $stmtOferta = $pdo->prepare('UPDATE produtos SET elegivel_oferta_gratis = ? WHERE id = ?');
+                $stmtOferta->execute([(int) ($request->getParam('elegivel_oferta_gratis') ?: 0), (int) $id]);
             }
 
             if ($perfil === 'representante') {

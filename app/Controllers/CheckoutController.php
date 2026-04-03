@@ -4252,6 +4252,24 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
+            // Dados do item gratuito promocional
+            $isFreeOffer = !empty($item['is_free_offer']);
+            if ($isFreeOffer && is_array($colsItens) && in_array('is_free_offer', $colsItens, true)) {
+                $cols[] = 'is_free_offer';
+                $vals[] = 1;
+                $placeholders[] = '?';
+            }
+            if ($isFreeOffer && is_array($colsItens) && in_array('free_offer_original_price', $colsItens, true)) {
+                $cols[] = 'free_offer_original_price';
+                $vals[] = (float) ($item['free_offer_original_price'] ?? $precoUnitario);
+                $placeholders[] = '?';
+            }
+            if ($isFreeOffer && is_array($colsItens) && in_array('free_offer_exempt_tax', $colsItens, true)) {
+                $cols[] = 'free_offer_exempt_tax';
+                $vals[] = 1;
+                $placeholders[] = '?';
+            }
+
                 $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
                 $stmt = $db->prepare($sql);
                 $stmt->execute($vals);

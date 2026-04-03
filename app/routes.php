@@ -32,6 +32,12 @@ $router->post('/carrinho/atualizar', 'CarrinhoController', 'atualizar');
 $router->post('/carrinho/toggle-ativo', 'CarrinhoController', 'toggleAtivo');
 $router->post('/carrinho/limpar', 'CarrinhoController', 'limpar');
 $router->get('/carrinho/checkout', 'CarrinhoController', 'checkout');
+
+// Oferta Gratuita (Frontend AJAX)
+$router->get('/oferta-gratuita/verificar', 'OfertaGratuitaController', 'verificar');
+$router->post('/oferta-gratuita/aceitar', 'OfertaGratuitaController', 'aceitar');
+$router->post('/oferta-gratuita/recusar', 'OfertaGratuitaController', 'recusar');
+$router->post('/oferta-gratuita/remover', 'OfertaGratuitaController', 'removerDoCarrinho');
 $router->get('/cobranca', 'CobrancaController', 'index');
 $router->post('/cobranca/calcular', 'CobrancaController', 'calcular');
 $router->get('/rastreamento', 'RastreamentoController', 'index');

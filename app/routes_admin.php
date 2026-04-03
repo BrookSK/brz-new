@@ -127,6 +127,13 @@ $router->post('/admin/pagamentos/comissoes-gerais/pagamento', 'AdminPagamentosCo
 $router->post('/admin/pagamentos/comissoes-gerais/aprovar/{id}', 'AdminPagamentosController', 'aprovarPagamentoComissaoGeral');
 $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamentosController', 'deletarPagamentoComissaoGeral');
 
+// Oferta Gratuita
+$router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
+$router->post('/admin/oferta-gratuita/toggle-global', 'AdminOfertaGratuitaController', 'toggleGlobal');
+$router->post('/admin/oferta-gratuita/adicionar', 'AdminOfertaGratuitaController', 'adicionar');
+$router->post('/admin/oferta-gratuita/remover', 'AdminOfertaGratuitaController', 'remover');
+$router->get('/admin/oferta-gratuita/buscar-produtos', 'AdminOfertaGratuitaController', 'buscarProdutos');
+
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');

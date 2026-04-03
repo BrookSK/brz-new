@@ -237,6 +237,7 @@ function renderAdminSidebar($activePage = '') {
         'payment-links' => ['icon' => 'fas fa-link', 'label' => 'Payment Links', 'url' => '/admin/payment-links', 'roles' => ['admin','vendedor']],
         'clube-recargas' => ['icon' => 'fas fa-wallet', 'label' => 'Recargas Clube', 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'backup' => ['icon' => 'fas fa-database', 'label' => 'Backup', 'url' => '/admin/backup', 'roles' => ['admin']],
+        'oferta-gratuita' => ['icon' => 'fas fa-gift', 'label' => 'Oferta Gratuita', 'url' => '/admin/oferta-gratuita', 'roles' => ['admin']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
 
         // Módulo Redirecionamento (visível no admin/suporte)

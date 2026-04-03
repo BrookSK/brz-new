@@ -117,6 +117,9 @@
                                 <div class="col-8 col-md-5">
                                     <h6 class="mb-1">
                                         <?= htmlspecialchars($item['nome']) ?>
+                                        <?php if (!empty($item['is_free_offer'])): ?>
+                                            <span class="badge bg-success ms-1"><i class="fas fa-gift me-1"></i>Produto Gratuito</span>
+                                        <?php endif; ?>
                                         <?php if (!empty($isClubeAtivo)): ?>
                                             <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                         <?php endif; ?>
@@ -154,6 +157,7 @@
                                         <div class="small text-muted fst-italic"><?= __('cart.select_to_activate', 'Selecione o item para ativar e prossiga.') ?></div>
                                     <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
+                                        <?php if (empty($item['is_free_offer'])): ?>
                                         <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
                                             <i class="fas fa-minus"></i>
                                         </button>
@@ -167,10 +171,19 @@
                                         <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= $item['quantidade'] + 1 ?>)'>
                                             <i class="fas fa-plus"></i>
                                         </button>
+                                        <?php else: ?>
+                                        <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Qtd: 1</span>
+                                        <?php endif; ?>
                                     </div>
                                     <small class="text-muted"><?= __('cart.id', 'ID') ?>: <?= $item['produto_id'] ?></small>
                                 </div>
                                 <div class="col-8 col-md-3 text-start text-md-end mt-2 mt-md-0">
+                                    <?php if (!empty($item['is_free_offer'])): ?>
+                                        <div class="fw-bold text-success">GRÁTIS</div>
+                                        <small class="text-muted text-decoration-line-through">
+                                            <?= number_format((float) ($item['free_offer_original_price'] ?? 0), 2, ',', '.') ?>
+                                        </small>
+                                    <?php else: ?>
                                     <div class="fw-bold">
                                         <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>">
                                             <?= number_format($item['subtotal'], 2, ',', '.') ?>
@@ -181,6 +194,7 @@
                                             <?= number_format($item['price'] ?? $item['preco_unitario'], 2, ',', '.') ?>
                                         </span>
                                     </small>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
                                     <div class="d-flex gap-1 justify-content-end">
@@ -323,6 +337,15 @@
                         <span><?= __('cart.taxes_brazil', 'Impostos do Brasil') ?></span>
                         <span class="cart-currency impostos-value" data-original-value="<?= $impostos ?>"><?= number_format($impostos, 2, ',', '.') ?></span>
                     </div>
+                    <?php if (!empty($free_offer_info)): ?>
+                        <div class="d-flex justify-content-between mb-1 small">
+                            <span class="text-muted">Imposto do brinde (não cobrado)</span>
+                            <span class="text-decoration-line-through text-muted">$ <?= number_format($free_offer_info['imposto_teorico'], 2, ',', '.') ?></span>
+                        </div>
+                        <div class="small text-success mb-2">
+                            <i class="fas fa-gift me-1"></i> Você não paga o imposto do brinde — a Braziliana paga por você!
+                        </div>
+                    <?php endif; ?>
                     <?php endif; ?>
 
                     <?php if (($imposto_local ?? 0) > 0): ?>
@@ -489,5 +512,95 @@ function limparCarrinho() {
     });
 }
 </script>
+
+<!-- Modal Oferta Gratuita -->
+<div class="modal fade" id="modalOfertaGratuita" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title"><i class="fas fa-gift me-2"></i> Presente para você!</h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div id="ofertaGratuitaConteudo">
+                    <img id="ofertaFoto" src="" alt="Produto gratuito" class="img-fluid rounded mb-3" style="max-height:200px; object-fit:contain; display:none;">
+                    <h5 id="ofertaNome" class="mb-2"></h5>
+                    <p class="text-muted mb-1">Valor original: <strong><span id="ofertaPrecoOriginal"></span></strong></p>
+                    <p class="text-success fw-bold fs-5 mb-1">Você paga: R$ 0,00 pelo produto</p>
+                    <p class="text-muted small mb-3">Você paga apenas a taxa de serviço referente ao peso (<span id="ofertaTaxaServico"></span>). Sem imposto adicional — a Braziliana paga por você!</p>
+                    <div class="d-grid gap-2">
+                        <button id="btnAceitarOferta" class="btn btn-success btn-lg" onclick="aceitarOfertaGratuita()">
+                            <i class="fas fa-gift me-2"></i> Quero meu produto gratuito!
+                        </button>
+                        <button id="btnRecusarOferta" class="btn btn-outline-secondary" onclick="recusarOfertaGratuita()">
+                            Agora não, continuar sem adicionar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Verificar oferta gratuita via AJAX
+    fetch('/oferta-gratuita/verificar', { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            if (!data || !data.show) return;
+            const p = data.produto;
+            document.getElementById('ofertaNome').textContent = p.nome || '';
+            document.getElementById('ofertaPrecoOriginal').textContent = '$ ' + parseFloat(p.preco_original || 0).toFixed(2);
+            document.getElementById('ofertaTaxaServico').textContent = '$ ' + parseFloat(p.taxa_servico || 0).toFixed(2);
+            const fotoEl = document.getElementById('ofertaFoto');
+            if (p.foto) {
+                fotoEl.src = p.foto;
+                fotoEl.style.display = 'block';
+            }
+            // Mostrar modal após 1.5s
+            setTimeout(function() {
+                try {
+                    var modal = new bootstrap.Modal(document.getElementById('modalOfertaGratuita'));
+                    modal.show();
+                } catch(e) {}
+            }, 1500);
+        })
+        .catch(function() {});
+})();
+
+function aceitarOfertaGratuita() {
+    var btn = document.getElementById('btnAceitarOferta');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Adicionando...';
+
+    fetch('/oferta-gratuita/aceitar', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Erro ao aceitar oferta');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-gift me-2"></i> Quero meu produto gratuito!';
+            }
+        })
+        .catch(function() {
+            alert('Erro de conexão');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-gift me-2"></i> Quero meu produto gratuito!';
+        });
+}
+
+function recusarOfertaGratuita() {
+    fetch('/oferta-gratuita/recusar', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function() {
+            try { bootstrap.Modal.getInstance(document.getElementById('modalOfertaGratuita')).hide(); } catch(e) {}
+        })
+        .catch(function() {
+            try { bootstrap.Modal.getInstance(document.getElementById('modalOfertaGratuita')).hide(); } catch(e) {}
+        });
+}
+</script>
+
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

@@ -431,10 +431,16 @@ class CarrinhoController extends Controller {
 
                 $totalItensAll += (int) ($item['quantidade'] ?? 0);
 
+                $isFreeOffer = !empty($item['is_free_offer']);
+
                 if ($ativo) {
-                    $subtotal += $itemSubtotal;
+                    if (!$isFreeOffer) {
+                        $subtotal += $itemSubtotal;
+                    }
                     $pesoTotal += $pesoItem;
-                    $totalItensAtivos += (int) ($item['quantidade'] ?? 0);
+                    if (!$isFreeOffer) {
+                        $totalItensAtivos += (int) ($item['quantidade'] ?? 0);
+                    }
                 }
             } else {
                 $this->debugLog('[CARRINHO] Produto nao encontrado: ' . $item['produto_id']);
@@ -652,6 +658,25 @@ class CarrinhoController extends Controller {
             }
         }
         
+        // Calcular dados do item gratuito para exibição no resumo
+        $freeOfferInfo = null;
+        foreach ($carrinho as $item) {
+            if (!empty($item['is_free_offer'])) {
+                $freeOrigPrice = (float) ($item['free_offer_original_price'] ?? ($item['price'] ?? 0));
+                $freePeso = (float) ($item['peso_unit'] ?? ($item['peso_item'] ?? 0.5));
+                if ($freePeso <= 0) $freePeso = 0.5;
+                $freeImpostoTeorico = (float) $this->carrinhoModel->calcularImpostos($freeOrigPrice, 0);
+                $freeTaxaServico = (float) $this->carrinhoModel->calcularTaxaServico($freePeso, 'USD', 1.0);
+                $freeOfferInfo = [
+                    'nome' => (string) ($item['nome'] ?? ''),
+                    'preco_original' => $freeOrigPrice,
+                    'imposto_teorico' => $freeImpostoTeorico,
+                    'taxa_servico' => $freeTaxaServico,
+                ];
+                break;
+            }
+        }
+
         $this->view('carrinho/index', [
             'carrinho' => $carrinho,
             'produtosDetalhados' => $produtosDetalhados,
@@ -672,6 +697,7 @@ class CarrinhoController extends Controller {
             'peso_max_kg' => $pesoMaxKg,
             'excede_peso' => $excedePeso,
             'entrega_fora_br' => $entregaForaBR,
+            'free_offer_info' => $freeOfferInfo,
         ]);
     }
 
