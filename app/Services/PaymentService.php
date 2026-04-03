@@ -3405,7 +3405,11 @@ class PaymentService {
 
             $pctRaw = $this->getConfig('clube', 'rendimento_percent', null);
             $pct = (float) str_replace(',', '.', trim((string) ($pctRaw ?? '0')));
-            if ($pct <= 0) {
+
+            $pctTurboRaw = $this->getConfig('clube', 'rendimento_turbo_percent', null);
+            $pctTurbo = (float) str_replace(',', '.', trim((string) ($pctTurboRaw ?? '2')));
+
+            if ($pct <= 0 && $pctTurbo <= 0) {
                 return $out;
             }
 
@@ -3425,6 +3429,18 @@ class PaymentService {
             }
 
             $this->garantirTabelaTransacoesCarteira($db);
+
+            // Ensure modalidade and recarga_id columns exist
+            try {
+                $stCols = $db->query('DESCRIBE transacoes_carteira');
+                $colsList = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!in_array('modalidade', $colsList, true)) {
+                    $db->exec("ALTER TABLE transacoes_carteira ADD COLUMN modalidade varchar(10) DEFAULT 'normal'");
+                }
+                if (!in_array('recarga_id', $colsList, true)) {
+                    $db->exec("ALTER TABLE transacoes_carteira ADD COLUMN recarga_id int(11) DEFAULT NULL");
+                }
+            } catch (\Exception $e) {}
 
             $hasUpdatedAt = $this->carteiraHasUpdatedAt($db);
 
@@ -3451,74 +3467,46 @@ class PaymentService {
                 }
                 $out['eligible']++;
 
-                $creditoUsd = $equivUsd * ($pct / 100.0);
-                if ($creditoUsd <= 0) {
-                    continue;
-                }
-
-                $creditMoeda = ($saldoUsd >= ($saldoBrl > 0 && $rate > 0 ? ($saldoBrl / $rate) : 0.0)) ? 'USD' : 'BRL';
-                $valorCredito = $creditoUsd;
-                if ($creditMoeda === 'BRL') {
-                    $valorCredito = $creditoUsd * $rate;
-                }
-
-                if ($valorCredito <= 0) {
-                    continue;
-                }
-
-                $saldoCol = ($creditMoeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
-                $valorCol = ($creditMoeda === 'BRL') ? 'valor_brl' : 'valor_usd';
-
-                $startedTx = false;
+                // Calculate normal balance (total - turbo locked)
+                $turboLockedUsd = 0.0;
                 try {
-                    if (!$db->inTransaction()) {
-                        $db->beginTransaction();
-                        $startedTx = true;
+                    $stTurbo = $db->prepare("SELECT COALESCE(SUM(valor), 0) AS total FROM carteira_recargas
+                        WHERE usuario_id = :uid AND tipo_recarga = 'turbo'
+                          AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                          AND (locked_until IS NOT NULL AND locked_until > NOW() AND unlocked_at IS NULL)
+                          AND moeda = 'USD'");
+                    $stTurbo->execute([':uid' => $usuarioId]);
+                    $turboLockedUsd = (float) ($stTurbo->fetchColumn() ?: 0);
+                } catch (\Exception $e) {}
+
+                $turboUnlockedUsd = 0.0;
+                try {
+                    $stTurboU = $db->prepare("SELECT COALESCE(SUM(valor), 0) AS total FROM carteira_recargas
+                        WHERE usuario_id = :uid AND tipo_recarga = 'turbo'
+                          AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                          AND (locked_until IS NULL OR locked_until <= NOW() OR unlocked_at IS NOT NULL)
+                          AND moeda = 'USD'");
+                    $stTurboU->execute([':uid' => $usuarioId]);
+                    $turboUnlockedUsd = (float) ($stTurboU->fetchColumn() ?: 0);
+                } catch (\Exception $e) {}
+
+                // Normal balance = total - turbo locked - turbo unlocked (approximate)
+                $normalEquivUsd = max(0, $equivUsd - $turboLockedUsd - $turboUnlockedUsd);
+                $turboTotalUsd = $turboLockedUsd + $turboUnlockedUsd;
+
+                // Process Normal rendimento
+                if ($pct > 0 && $normalEquivUsd > 0.001) {
+                    $creditoNormalUsd = $normalEquivUsd * ($pct / 100.0);
+                    if ($creditoNormalUsd > 0) {
+                        $this->creditarRendimento($db, $usuarioId, $creditoNormalUsd, $rate, $saldoUsd, $saldoBrl, $periodKey, 'normal', $hasUpdatedAt, $out);
                     }
+                }
 
-                    $desc = 'Rendimento Clube - ' . $periodKey;
-                    $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao = :desc LIMIT 1");
-                    $stmtChk->execute([':uid' => $usuarioId, ':desc' => $desc]);
-                    $exists = (int) ($stmtChk->fetchColumn() ?: 0);
-                    if ($exists > 0) {
-                        if ($startedTx) {
-                            $db->commit();
-                        }
-                        $out['skipped_idempotent']++;
-                        continue;
-                    }
-
-                    $this->garantirCarteiraUsuario($db, $usuarioId);
-
-                    $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl FROM carteiras WHERE usuario_id = ? FOR UPDATE');
-                    $stmtLock->execute([$usuarioId]);
-
-                    $sqlUpd = 'UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor' . ($hasUpdatedAt ? ', updated_at = NOW()' : '') . ' WHERE usuario_id = :uid';
-                    $stmtUpd = $db->prepare($sqlUpd);
-                    $stmtUpd->execute([':valor' => $valorCredito, ':uid' => $usuarioId]);
-
-                    try {
-                        $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'credito\', :valor, :desc, NOW())');
-                        $stmtTx->execute([
-                            ':uid' => $usuarioId,
-                            ':valor' => $valorCredito,
-                            ':desc' => $desc,
-                        ]);
-                    } catch (\Exception $e) {
-                    }
-
-                    if ($startedTx) {
-                        $db->commit();
-                    }
-
-                    $out['credited']++;
-                } catch (\Exception $e) {
-                    if ($startedTx && $db->inTransaction()) {
-                        $db->rollBack();
-                    }
-                    $out['errors']++;
-                    if (is_array($out['error_samples']) && count($out['error_samples']) < 5) {
-                        $out['error_samples'][] = $e->getMessage();
+                // Process Turbo rendimento (locked + unlocked turbo balance)
+                if ($pctTurbo > 0 && $turboTotalUsd > 0.001) {
+                    $creditoTurboUsd = $turboTotalUsd * ($pctTurbo / 100.0);
+                    if ($creditoTurboUsd > 0) {
+                        $this->creditarRendimento($db, $usuarioId, $creditoTurboUsd, $rate, $saldoUsd, $saldoBrl, $periodKey, 'turbo', $hasUpdatedAt, $out);
                     }
                 }
             }
@@ -3528,6 +3516,93 @@ class PaymentService {
             $out['success'] = false;
             $out['errors']++;
             return $out;
+        }
+    }
+
+    private function creditarRendimento(\PDO $db, int $usuarioId, float $creditoUsd, float $rate, float $saldoUsd, float $saldoBrl, string $periodKey, string $modalidade, bool $hasUpdatedAt, array &$out): void {
+        $creditMoeda = ($saldoUsd >= ($saldoBrl > 0 && $rate > 0 ? ($saldoBrl / $rate) : 0.0)) ? 'USD' : 'BRL';
+        $valorCredito = $creditoUsd;
+        if ($creditMoeda === 'BRL') {
+            $valorCredito = $creditoUsd * $rate;
+        }
+        if ($valorCredito <= 0) {
+            return;
+        }
+
+        $saldoCol = ($creditMoeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $valorCol = ($creditMoeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+        $modalidadeLabel = ($modalidade === 'turbo') ? 'Turbo' : 'Normal';
+
+        $startedTx = false;
+        try {
+            if (!$db->inTransaction()) {
+                $db->beginTransaction();
+                $startedTx = true;
+            }
+
+            $desc = 'Rendimento Clube Braziliana — ' . $modalidadeLabel . ' - ' . $periodKey;
+            $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao = :desc LIMIT 1");
+            $stmtChk->execute([':uid' => $usuarioId, ':desc' => $desc]);
+            $exists = (int) ($stmtChk->fetchColumn() ?: 0);
+            if ($exists > 0) {
+                if ($startedTx) {
+                    $db->commit();
+                }
+                $out['skipped_idempotent']++;
+                return;
+            }
+
+            $this->garantirCarteiraUsuario($db, $usuarioId);
+
+            $stmtLock = $db->prepare('SELECT saldo_usd, saldo_brl, saldo_usd_bloqueado, saldo_brl_bloqueado FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+            $stmtLock->execute([$usuarioId]);
+
+            // For turbo rendimento, also add to blocked balance if there are locked turbo recargas
+            $shouldBlock = false;
+            if ($modalidade === 'turbo') {
+                try {
+                    $stHasLocked = $db->prepare("SELECT COUNT(*) FROM carteira_recargas
+                        WHERE usuario_id = :uid AND tipo_recarga = 'turbo'
+                          AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                          AND locked_until IS NOT NULL AND locked_until > NOW() AND unlocked_at IS NULL");
+                    $stHasLocked->execute([':uid' => $usuarioId]);
+                    $shouldBlock = ((int) $stHasLocked->fetchColumn() > 0);
+                } catch (\Exception $e) {}
+            }
+
+            $saldoBloqCol = ($creditMoeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+            $sqlUpd = 'UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor';
+            if ($shouldBlock) {
+                $sqlUpd .= ', ' . $saldoBloqCol . ' = ' . $saldoBloqCol . ' + :valor';
+            }
+            $sqlUpd .= ($hasUpdatedAt ? ', updated_at = NOW()' : '') . ' WHERE usuario_id = :uid';
+            $stmtUpd = $db->prepare($sqlUpd);
+            $stmtUpd->execute([':valor' => $valorCredito, ':uid' => $usuarioId]);
+
+            try {
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, modalidade, created_at) VALUES (:uid, \'credito\', :valor, :desc, :modalidade, NOW())');
+                $stmtTx->execute([
+                    ':uid' => $usuarioId,
+                    ':valor' => $valorCredito,
+                    ':desc' => $desc,
+                    ':modalidade' => $modalidade,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            if ($startedTx) {
+                $db->commit();
+            }
+
+            $out['credited']++;
+        } catch (\Exception $e) {
+            if ($startedTx && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            $out['errors']++;
+            if (is_array($out['error_samples']) && count($out['error_samples']) < 5) {
+                $out['error_samples'][] = $e->getMessage();
+            }
         }
     }
 
@@ -3750,6 +3825,7 @@ class PaymentService {
                 `moeda` varchar(3) NOT NULL DEFAULT 'USD',
                 `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
                 `origem` varchar(40) DEFAULT NULL,
+                `tipo_recarga` varchar(10) NOT NULL DEFAULT 'normal',
                 `public_token` varchar(64) DEFAULT NULL,
                 `pagador_nome` varchar(191) DEFAULT NULL,
                 `pagador_email` varchar(191) DEFAULT NULL,
@@ -3770,7 +3846,8 @@ class PaymentService {
                 KEY `idx_usuario_id` (`usuario_id`),
                 KEY `idx_public_token` (`public_token`),
                 KEY `idx_gateway_payment` (`gateway`, `payment_id`),
-                KEY `idx_status` (`status`)
+                KEY `idx_status` (`status`),
+                KEY `idx_tipo_recarga` (`tipo_recarga`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         } catch (\Exception $e) {
         }
@@ -3795,6 +3872,7 @@ class PaymentService {
                 'valor_brl' => "ALTER TABLE carteira_recargas ADD COLUMN valor_brl decimal(10,2) DEFAULT NULL",
                 'locked_until' => "ALTER TABLE carteira_recargas ADD COLUMN locked_until timestamp NULL DEFAULT NULL",
                 'unlocked_at' => "ALTER TABLE carteira_recargas ADD COLUMN unlocked_at timestamp NULL DEFAULT NULL",
+                'tipo_recarga' => "ALTER TABLE carteira_recargas ADD COLUMN tipo_recarga varchar(10) NOT NULL DEFAULT 'normal'",
             ];
 
             foreach ($toAdd as $c => $sql) {
@@ -3805,6 +3883,17 @@ class PaymentService {
 
             try {
                 $db->exec("CREATE INDEX idx_public_token ON carteira_recargas (public_token)");
+            } catch (\Exception $e) {
+            }
+
+            // Migration: mark all existing paid recargas (from clube_quick_checkout with locked_until) as turbo
+            try {
+                $db->exec("UPDATE carteira_recargas
+                    SET tipo_recarga = 'turbo'
+                    WHERE origem = 'clube_quick_checkout'
+                      AND tipo_recarga = 'normal'
+                      AND locked_until IS NOT NULL
+                      AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
             } catch (\Exception $e) {
             }
         } catch (\Exception $e) {
@@ -3921,32 +4010,57 @@ class PaymentService {
                 $stmtLock->execute([$usuarioId]);
 
                 $origem = strtolower(trim((string) ($recarga['origem'] ?? '')));
+                $tipoRecarga = strtolower(trim((string) ($recarga['tipo_recarga'] ?? 'normal')));
                 $isLockedFlow = ($origem === 'clube_quick_checkout');
+                $isTurbo = ($tipoRecarga === 'turbo');
                 $saldoBloqCol = ($moeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
 
+                // Turbo recargas always get locked; normal recargas from clube_quick_checkout no longer lock
+                $shouldLock = $isTurbo;
+
                 $sqlUpd = 'UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor';
-                if ($isLockedFlow) {
+                if ($shouldLock) {
                     $sqlUpd .= ', ' . $saldoBloqCol . ' = ' . $saldoBloqCol . ' + :valor';
                 }
                 $sqlUpd .= ', updated_at = NOW() WHERE usuario_id = :uid';
                 $stmtUpd = $db->prepare($sqlUpd);
                 $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
 
+                $modalidadeLabel = $isTurbo ? 'Turbo' : 'Normal';
                 try {
-                    $desc = 'Recarga Carteira #' . $recargaId;
-                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'credito\', :valor, :desc, NOW())');
-                    $stmtTx->execute([
-                        ':uid' => $usuarioId,
-                        ':valor' => $valor,
-                        ':desc' => $desc,
-                    ]);
+                    $desc = 'Recarga Clube Braziliana — ' . $modalidadeLabel . ' #' . $recargaId;
+                    // Add modalidade column if available
+                    $txCols = 'usuario_id, tipo, ' . $valorCol . ', descricao, created_at';
+                    $txVals = ':uid, \'credito\', :valor, :desc, NOW()';
+                    $txParams = [':uid' => $usuarioId, ':valor' => $valor, ':desc' => $desc];
+                    try {
+                        $hasModalidade = false;
+                        $stCols = $db->query('DESCRIBE transacoes_carteira');
+                        $colsList = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        $hasModalidade = in_array('modalidade', $colsList, true);
+                        if (!$hasModalidade) {
+                            $db->exec("ALTER TABLE transacoes_carteira ADD COLUMN modalidade varchar(10) DEFAULT 'normal'");
+                            $hasModalidade = true;
+                        }
+                        if (!in_array('recarga_id', $colsList, true)) {
+                            $db->exec("ALTER TABLE transacoes_carteira ADD COLUMN recarga_id int(11) DEFAULT NULL");
+                        }
+                        if ($hasModalidade) {
+                            $txCols .= ', modalidade, recarga_id';
+                            $txVals .= ', :modalidade, :recarga_id';
+                            $txParams[':modalidade'] = $tipoRecarga;
+                            $txParams[':recarga_id'] = $recargaId;
+                        }
+                    } catch (\Exception $e) {}
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (' . $txCols . ') VALUES (' . $txVals . ')');
+                    $stmtTx->execute($txParams);
                 } catch (\Exception $e) {
                 }
 
                 $stUp = $db->prepare("UPDATE carteira_recargas SET status = 'paid', paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE id = :id");
                 $stUp->execute([':id' => $recargaId]);
 
-                if ($isLockedFlow) {
+                if ($shouldLock) {
                     try {
                         $stLockRec = $db->prepare("UPDATE carteira_recargas
                             SET locked_until = COALESCE(locked_until, DATE_ADD(NOW(), INTERVAL 6 MONTH)), updated_at = NOW()

@@ -973,14 +973,51 @@ class CheckoutController extends Controller {
             $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
 
             try {
-                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, created_at) VALUES (:uid, \'debito\', :valor, :desc, NOW())');
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, modalidade, created_at) VALUES (:uid, \'debito\', :valor, :desc, \'normal\', NOW())');
                 $stmtTx->execute([
                     ':uid' => $usuarioId,
                     ':valor' => $valor,
-                    ':desc' => 'Pagamento do Pedido #' . $pedidoId,
+                    ':desc' => 'Uso de saldo da carteira — Pedido #' . $pedidoId,
                 ]);
             } catch (\Exception $e) {
             }
+
+            // Check minimum balance rule for Clube Normal
+            try {
+                $stmtNewBal = $db->prepare('SELECT saldo_usd, saldo_brl, COALESCE(saldo_usd_bloqueado, 0) AS bloq_usd FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                $stmtNewBal->execute([$usuarioId]);
+                $newBal = $stmtNewBal->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $newSaldoDisp = max(0, (float) ($newBal['saldo_usd'] ?? 0) - (float) ($newBal['bloq_usd'] ?? 0));
+                if ($newSaldoDisp + 0.00001 < 39.0) {
+                    // Register warning and start 48h grace period
+                    try {
+                        // Ensure clube_status table exists
+                        $db->exec("CREATE TABLE IF NOT EXISTS `clube_status` (
+                            `id` int(11) NOT NULL AUTO_INCREMENT,
+                            `usuario_id` int(11) NOT NULL,
+                            `status` varchar(30) NOT NULL DEFAULT 'ativo',
+                            `motivo` text,
+                            `grace_until` timestamp NULL DEFAULT NULL,
+                            `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (`id`),
+                            UNIQUE KEY `uk_usuario` (`usuario_id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+                        $db->exec("INSERT IGNORE INTO clube_status (usuario_id, status) VALUES ({$usuarioId}, 'ativo')");
+
+                        $stmtGrace = $db->prepare("UPDATE clube_status SET status = 'grace_period', grace_until = DATE_ADD(NOW(), INTERVAL 48 HOUR), motivo = 'Saldo abaixo de US\$ 39 após uso da carteira', updated_at = NOW() WHERE usuario_id = :uid AND status = 'ativo'");
+                        $stmtGrace->execute([':uid' => $usuarioId]);
+
+                        // Log the warning as a transaction
+                        $stmtWarn = $db->prepare("INSERT INTO transacoes_carteira (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) VALUES (:uid, 'credito', 0, :desc, 'normal', NOW())");
+                        $stmtWarn->execute([
+                            ':uid' => $usuarioId,
+                            ':desc' => 'Aviso: saldo do Clube abaixo de US$ 39. Você tem 48 horas para recarregar e manter os benefícios.',
+                        ]);
+                    } catch (\Exception $e) {}
+                }
+            } catch (\Exception $e) {}
 
             $db->commit();
 
@@ -2265,6 +2302,8 @@ class CheckoutController extends Controller {
         $carteiraSaldoUsd = 0.0;
         $carteiraSaldoBrl = 0.0;
         $carteiraSaldoDisponivel = 0.0;
+        $carteiraTurboBloqueado = 0.0;
+        $carteiraTurboLiberacaoData = null;
         try {
             $uid = (int) ($usuario['id'] ?? 0);
             if ($uid > 0) {
@@ -2272,10 +2311,26 @@ class CheckoutController extends Controller {
                 $stCart = $dbCart->prepare('SELECT saldo_usd, saldo_brl, COALESCE(saldo_usd_bloqueado, 0) AS bloq_usd, COALESCE(saldo_brl_bloqueado, 0) AS bloq_brl FROM carteiras WHERE usuario_id = ? LIMIT 1');
                 $stCart->execute([$uid]);
                 $rowCart = $stCart->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $carteiraTurboBloqueado = (float) ($rowCart['bloq_usd'] ?? 0);
                 $carteiraSaldoUsd = max(0, (float) ($rowCart['saldo_usd'] ?? 0) - (float) ($rowCart['bloq_usd'] ?? 0));
                 $carteiraSaldoBrl = max(0, (float) ($rowCart['saldo_brl'] ?? 0) - (float) ($rowCart['bloq_brl'] ?? 0));
                 // Saldo disponível em USD (BRL convertido para USD)
                 $carteiraSaldoDisponivel = $carteiraSaldoUsd + ($rateBRL > 1 ? ($carteiraSaldoBrl / $rateBRL) : 0);
+
+                // Get next turbo unlock date
+                if ($carteiraTurboBloqueado > 0) {
+                    try {
+                        $stNextUnlock = $dbCart->prepare("SELECT MIN(locked_until) AS next_unlock FROM carteira_recargas
+                            WHERE usuario_id = :uid AND tipo_recarga = 'turbo'
+                              AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                              AND locked_until IS NOT NULL AND locked_until > NOW() AND unlocked_at IS NULL");
+                        $stNextUnlock->execute([':uid' => $uid]);
+                        $nextUnlock = $stNextUnlock->fetchColumn();
+                        if ($nextUnlock) {
+                            $carteiraTurboLiberacaoData = date('d/m/Y', strtotime($nextUnlock));
+                        }
+                    } catch (\Exception $e) {}
+                }
             }
         } catch (\Exception $e) {}
 
@@ -2314,6 +2369,8 @@ class CheckoutController extends Controller {
             'carteira_saldo_usd' => $carteiraSaldoUsd,
             'carteira_saldo_brl' => $carteiraSaldoBrl,
             'carteira_saldo_disponivel' => $carteiraSaldoDisponivel,
+            'carteira_turbo_bloqueado' => $carteiraTurboBloqueado,
+            'carteira_turbo_liberacao_data' => $carteiraTurboLiberacaoData,
             'is_admin' => (strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ''))) === 'admin'),
             'impostos_calculado' => $impostosCalculado ?? $impostos,
             'cambioreal_app_id' => $this->paymentService->getCambioRealAppId(),

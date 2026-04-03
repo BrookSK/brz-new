@@ -39,6 +39,7 @@ class AdminClubeRecargasController extends Controller {
                 if (is_array($cols) && !empty($cols)) {
                     $toAdd = [
                         'origem' => "ALTER TABLE carteira_recargas ADD COLUMN origem varchar(40) DEFAULT NULL",
+                        'tipo_recarga' => "ALTER TABLE carteira_recargas ADD COLUMN tipo_recarga varchar(10) NOT NULL DEFAULT 'normal'",
                         'public_token' => "ALTER TABLE carteira_recargas ADD COLUMN public_token varchar(64) DEFAULT NULL",
                         'pagador_nome' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_nome varchar(191) DEFAULT NULL",
                         'pagador_email' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_email varchar(191) DEFAULT NULL",
@@ -52,6 +53,16 @@ class AdminClubeRecargasController extends Controller {
                             try { $db->exec($sql); } catch (\Exception $e) {}
                         }
                     }
+
+                    // Migration: mark existing paid recargas with locked_until as turbo
+                    try {
+                        $db->exec("UPDATE carteira_recargas
+                            SET tipo_recarga = 'turbo'
+                            WHERE origem = 'clube_quick_checkout'
+                              AND tipo_recarga = 'normal'
+                              AND locked_until IS NOT NULL
+                              AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
+                    } catch (\Exception $e) {}
                 }
             } catch (\Exception $e) {
             }
@@ -60,7 +71,7 @@ class AdminClubeRecargasController extends Controller {
             if ($limit <= 0) $limit = 200;
             if ($limit > 1000) $limit = 1000;
 
-            $stmt = $db->prepare("SELECT id, usuario_id, pagador_nome, pagador_email, pagador_documento, metodo, moeda, valor, usd_brl_rate, valor_brl, gateway, payment_id, status, created_at, paid_at
+            $stmt = $db->prepare("SELECT id, usuario_id, pagador_nome, pagador_email, pagador_documento, metodo, moeda, valor, usd_brl_rate, valor_brl, gateway, payment_id, status, tipo_recarga, created_at, paid_at
                 FROM carteira_recargas
                 WHERE origem = 'clube_quick_checkout'
                 ORDER BY created_at DESC, id DESC

@@ -88,6 +88,7 @@ class ClubeRecargaController extends Controller {
                 `moeda` varchar(3) NOT NULL DEFAULT 'USD',
                 `valor` decimal(10,2) NOT NULL DEFAULT 0.00,
                 `origem` varchar(40) DEFAULT NULL,
+                `tipo_recarga` varchar(10) NOT NULL DEFAULT 'normal',
                 `public_token` varchar(64) DEFAULT NULL,
                 `pagador_nome` varchar(191) DEFAULT NULL,
                 `pagador_email` varchar(191) DEFAULT NULL,
@@ -102,11 +103,14 @@ class ClubeRecargaController extends Controller {
                 `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 `paid_at` timestamp NULL DEFAULT NULL,
+                `locked_until` timestamp NULL DEFAULT NULL,
+                `unlocked_at` timestamp NULL DEFAULT NULL,
                 PRIMARY KEY (`id`),
                 KEY `idx_usuario_id` (`usuario_id`),
                 KEY `idx_public_token` (`public_token`),
                 KEY `idx_gateway_payment` (`gateway`, `payment_id`),
-                KEY `idx_status` (`status`)
+                KEY `idx_status` (`status`),
+                KEY `idx_tipo_recarga` (`tipo_recarga`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         } catch (\Exception $e) {
         }
@@ -122,6 +126,7 @@ class ClubeRecargaController extends Controller {
 
             $toAdd = [
                 'origem' => "ALTER TABLE carteira_recargas ADD COLUMN origem varchar(40) DEFAULT NULL",
+                'tipo_recarga' => "ALTER TABLE carteira_recargas ADD COLUMN tipo_recarga varchar(10) NOT NULL DEFAULT 'normal'",
                 'public_token' => "ALTER TABLE carteira_recargas ADD COLUMN public_token varchar(64) DEFAULT NULL",
                 'pagador_nome' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_nome varchar(191) DEFAULT NULL",
                 'pagador_email' => "ALTER TABLE carteira_recargas ADD COLUMN pagador_email varchar(191) DEFAULT NULL",
@@ -129,6 +134,8 @@ class ClubeRecargaController extends Controller {
                 'metodo' => "ALTER TABLE carteira_recargas ADD COLUMN metodo varchar(20) DEFAULT NULL",
                 'usd_brl_rate' => "ALTER TABLE carteira_recargas ADD COLUMN usd_brl_rate decimal(10,6) DEFAULT NULL",
                 'valor_brl' => "ALTER TABLE carteira_recargas ADD COLUMN valor_brl decimal(10,2) DEFAULT NULL",
+                'locked_until' => "ALTER TABLE carteira_recargas ADD COLUMN locked_until timestamp NULL DEFAULT NULL",
+                'unlocked_at' => "ALTER TABLE carteira_recargas ADD COLUMN unlocked_at timestamp NULL DEFAULT NULL",
             ];
 
             foreach ($toAdd as $c => $sql) {
@@ -139,6 +146,17 @@ class ClubeRecargaController extends Controller {
 
             try {
                 $db->exec("CREATE INDEX idx_public_token ON carteira_recargas (public_token)");
+            } catch (\Exception $e) {
+            }
+
+            // Migration: mark all existing paid recargas (from clube_quick_checkout with locked_until) as turbo
+            try {
+                $db->exec("UPDATE carteira_recargas
+                    SET tipo_recarga = 'turbo'
+                    WHERE origem = 'clube_quick_checkout'
+                      AND tipo_recarga = 'normal'
+                      AND locked_until IS NOT NULL
+                      AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
             } catch (\Exception $e) {
             }
         } catch (\Exception $e) {
@@ -454,6 +472,8 @@ class ClubeRecargaController extends Controller {
             return;
         }
 
+        $tipoRecarga = (!empty($data['turbo'])) ? 'turbo' : 'normal';
+
         $pais = strtoupper(trim((string) ($data['pais'] ?? 'BR')));
         if ($pais === '') {
             $pais = 'BR';
@@ -654,11 +674,12 @@ class ClubeRecargaController extends Controller {
 
             $publicToken = $this->generatePublicToken();
 
-            $stmtIns = $db->prepare("INSERT INTO carteira_recargas (usuario_id, moeda, valor, origem, public_token, pagador_nome, pagador_email, pagador_documento, metodo, usd_brl_rate, valor_brl, status, created_at, updated_at) VALUES (:uid, 'USD', :valor, :origem, :ptok, :pnome, :pemail, :pdoc, :metodo, :rate, :vbrl, 'pending', NOW(), NOW())");
+            $stmtIns = $db->prepare("INSERT INTO carteira_recargas (usuario_id, moeda, valor, origem, tipo_recarga, public_token, pagador_nome, pagador_email, pagador_documento, metodo, usd_brl_rate, valor_brl, status, created_at, updated_at) VALUES (:uid, 'USD', :valor, :origem, :tipo_recarga, :ptok, :pnome, :pemail, :pdoc, :metodo, :rate, :vbrl, 'pending', NOW(), NOW())");
             $stmtIns->execute([
                 ':uid' => $usuarioId,
                 ':valor' => $valorUsd,
                 ':origem' => 'clube_quick_checkout',
+                ':tipo_recarga' => $tipoRecarga,
                 ':ptok' => $publicToken,
                 ':pnome' => $nomeCompleto,
                 ':pemail' => $email,

@@ -318,6 +318,50 @@ class UsuarioController extends Controller {
             $carteiraSaldoBrlEquiv = (float) ($carteiraSaldoBrl + ($carteiraSaldoUsd * $usdBrlRate));
         }
 
+        // Load turbo balance data
+        $carteiraTurboLockedUsd = 0.0;
+        $carteiraTurboUnlockedUsd = 0.0;
+        $carteiraTurboRecargas = [];
+        $carteiraBloqueadoUsd = 0.0;
+        try {
+            $db = \Config\Database::getConnection();
+            $uid = (int) $usuario['id'];
+
+            // Get blocked balance from carteiras table
+            try {
+                $stBloq = $db->prepare('SELECT COALESCE(saldo_usd_bloqueado, 0) AS bloq_usd, COALESCE(saldo_brl_bloqueado, 0) AS bloq_brl FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                $stBloq->execute([$uid]);
+                $bloqRow = $stBloq->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $carteiraBloqueadoUsd = (float) ($bloqRow['bloq_usd'] ?? 0);
+            } catch (\Exception $e) {}
+
+            // Get turbo recargas with lock info
+            try {
+                $stTurbo = $db->prepare("SELECT id, valor, moeda, created_at, locked_until, unlocked_at, status
+                    FROM carteira_recargas
+                    WHERE usuario_id = :uid AND tipo_recarga = 'turbo'
+                      AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                    ORDER BY created_at DESC LIMIT 20");
+                $stTurbo->execute([':uid' => $uid]);
+                $carteiraTurboRecargas = $stTurbo->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+
+            foreach ($carteiraTurboRecargas as $tr) {
+                $v = (float) ($tr['valor'] ?? 0);
+                $lockedUntil = $tr['locked_until'] ?? null;
+                $unlockedAt = $tr['unlocked_at'] ?? null;
+                $isLocked = ($lockedUntil && strtotime($lockedUntil) > time() && !$unlockedAt);
+                if ($isLocked) {
+                    $carteiraTurboLockedUsd += $v;
+                } else {
+                    $carteiraTurboUnlockedUsd += $v;
+                }
+            }
+        } catch (\Exception $e) {}
+
+        $carteiraNormalDisponivel = max(0, $carteiraSaldoUsd - $carteiraBloqueadoUsd);
+        $carteiraTotalDisponivel = $carteiraNormalDisponivel;
+
         $orcamentosAssessoria = [];
         try {
             $orcModel = new AssessoriaOrcamento();
@@ -350,7 +394,19 @@ class UsuarioController extends Controller {
             }
 
             if ($temTabela) {
-                $stmtTx = $db->prepare('SELECT id, tipo, valor_usd, valor_brl, descricao, created_at FROM transacoes_carteira WHERE usuario_id = ? ORDER BY created_at DESC, id DESC LIMIT 50');
+                // Ensure modalidade column exists
+                try {
+                    $stCols = $db->query('DESCRIBE transacoes_carteira');
+                    $colsList = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    if (!in_array('modalidade', $colsList, true)) {
+                        $db->exec("ALTER TABLE transacoes_carteira ADD COLUMN modalidade varchar(10) DEFAULT 'normal'");
+                    }
+                    if (!in_array('recarga_id', $colsList, true)) {
+                        $db->exec("ALTER TABLE transacoes_carteira ADD COLUMN recarga_id int(11) DEFAULT NULL");
+                    }
+                } catch (\Exception $e) {}
+
+                $stmtTx = $db->prepare('SELECT id, tipo, valor_usd, valor_brl, descricao, COALESCE(modalidade, \'\') AS modalidade, created_at FROM transacoes_carteira WHERE usuario_id = ? ORDER BY created_at DESC, id DESC LIMIT 50');
                 $stmtTx->execute([(int) $usuario['id']]);
                 $carteiraTransacoes = $stmtTx->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -391,6 +447,12 @@ class UsuarioController extends Controller {
             'carteira_saldo_brl_equiv' => (float) $carteiraSaldoBrlEquiv,
             'carteira_transacoes' => $carteiraTransacoes,
             'carteira_rendimento_resumo' => $carteiraRendimentoResumo,
+            'carteira_normal_disponivel' => (float) $carteiraNormalDisponivel,
+            'carteira_turbo_locked_usd' => (float) $carteiraTurboLockedUsd,
+            'carteira_turbo_unlocked_usd' => (float) $carteiraTurboUnlockedUsd,
+            'carteira_bloqueado_usd' => (float) $carteiraBloqueadoUsd,
+            'carteira_total_disponivel' => (float) $carteiraTotalDisponivel,
+            'carteira_turbo_recargas' => $carteiraTurboRecargas,
             'stripe_enabled' => (bool) $this->paymentService->isStripeEnabled(),
             'stripe_publishable_key' => (string) $this->paymentService->getStripePublishableKey()
         ]);

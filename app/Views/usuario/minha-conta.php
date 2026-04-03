@@ -128,22 +128,8 @@
                                     <small class="text-muted d-block mb-1">Carteira</small>
                                     <h6 class="mb-0 text-dark" style="line-height: 1.2;">
                                         <?php
-                                        $cb = floatval($carteira_saldo_brl ?? 0);
                                         $cu = floatval($carteira_saldo_usd ?? 0);
-                                        $rate = floatval($carteira_usd_brl_rate ?? 0);
-                                        $equiv = floatval($carteira_saldo_brl_equiv ?? $cb);
-
-                                        if ($equiv > 0) {
-                                            $label = ($cu > 0 && $rate > 0 && $cb <= 0.00001) ? ' (equiv.)' : '';
-                                            echo 'R$ ' . number_format($equiv, 2, ',', '.') . $label;
-                                            if ($cu > 0) {
-                                                echo '<br><span class="text-muted" style="font-size: 0.85rem;">US$ ' . number_format($cu, 2, ',', '.') . '</span>';
-                                            }
-                                        } elseif ($cu > 0) {
-                                            echo 'US$ ' . number_format($cu, 2, ',', '.');
-                                        } else {
-                                            echo 'R$ 0,00';
-                                        }
+                                        echo 'US$ ' . number_format($cu, 2, ',', '.');
                                         ?>
                                     </h6>
                                     <a href="/clube/recarga" class="btn btn-sm btn-outline-primary mt-2">Adicionar saldo</a>
@@ -154,6 +140,80 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Wallet Balance Breakdown -->
+            <?php
+            $normalDisp = floatval($carteira_normal_disponivel ?? 0);
+            $bloqueado = floatval($carteira_bloqueado_usd ?? 0);
+            $turboRecargas = $carteira_turbo_recargas ?? [];
+            ?>
+            <div class="card shadow-sm mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-wallet"></i> Saldos da Carteira</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important;">
+                                <div class="small text-muted">Saldo disponível para uso</div>
+                                <div class="h5 mb-0 fw-bold">US$ <?= number_format($normalDisp, 2, ',', '.') ?></div>
+                                <div class="small text-muted mt-1">Clube Normal + Turbo liberado</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3" style="background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.18) !important;">
+                                <div class="small text-muted">Saldo Turbo bloqueado</div>
+                                <div class="h5 mb-0 fw-bold" style="color:#b45309;">US$ <?= number_format($bloqueado, 2, ',', '.') ?></div>
+                                <div class="small text-muted mt-1">Em permanência mínima</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3" style="background: rgba(99, 102, 241, 0.06); border-color: rgba(99, 102, 241, 0.18) !important;">
+                                <div class="small text-muted">Saldo total da carteira</div>
+                                <div class="h5 mb-0 fw-bold">US$ <?= number_format(floatval($carteira_saldo_usd ?? 0), 2, ',', '.') ?></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <?php if (!empty($turboRecargas)): ?>
+                    <div class="mt-4">
+                        <div class="fw-semibold mb-2"><i class="fas fa-bolt" style="color:#b45309;"></i> Recargas Turbo</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead><tr><th>Valor</th><th>Data da recarga</th><th>Permanência até</th><th>Dias restantes</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    <?php foreach ($turboRecargas as $tr):
+                                        $trValor = (float) ($tr['valor'] ?? 0);
+                                        $trCreated = $tr['created_at'] ?? '';
+                                        $trLockedUntil = $tr['locked_until'] ?? null;
+                                        $trUnlockedAt = $tr['unlocked_at'] ?? null;
+                                        $trIsLocked = ($trLockedUntil && strtotime($trLockedUntil) > time() && !$trUnlockedAt);
+                                        $trDiasRestantes = $trIsLocked ? max(0, (int) ceil((strtotime($trLockedUntil) - time()) / 86400)) : 0;
+                                        $trStatus = $trIsLocked ? 'Turbo ativo em permanência' : 'Turbo liberado para uso';
+                                        $trBadge = $trIsLocked ? 'warning' : 'success';
+                                    ?>
+                                    <tr>
+                                        <td>US$ <?= number_format($trValor, 2, ',', '.') ?></td>
+                                        <td><?= $trCreated ? date('d/m/Y', strtotime($trCreated)) : '-' ?></td>
+                                        <td><?= $trLockedUntil ? date('d/m/Y', strtotime($trLockedUntil)) : '-' ?></td>
+                                        <td><?= $trIsLocked ? $trDiasRestantes . ' dias' : '-' ?></td>
+                                        <td><span class="badge bg-<?= $trBadge ?>"><?= $trStatus ?></span></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($bloqueado > 0): ?>
+                    <div class="alert alert-warning mt-3 mb-0" style="border-radius:10px;">
+                        <i class="fas fa-lock me-1"></i>
+                        Seu saldo Turbo de US$ <?= number_format($bloqueado, 2, ',', '.') ?> está em permanência mínima. O saldo e os rendimentos gerados por ele ficarão disponíveis após o término do prazo.
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -216,7 +276,10 @@
                                         <?php
                                             $desc = (string) ($t['descricao'] ?? '');
                                             $tipo = strtolower(trim((string) ($t['tipo'] ?? '')));
+                                            $modalidade = strtolower(trim((string) ($t['modalidade'] ?? '')));
                                             $isRend = (stripos($desc, 'Rendimento Clube') !== false);
+                                            $isRecarga = (stripos($desc, 'Recarga Clube') !== false || stripos($desc, 'Recarga Carteira') !== false);
+                                            $isTurbo = ($modalidade === 'turbo' || stripos($desc, 'Turbo') !== false);
                                             $vUsd = (float) ($t['valor_usd'] ?? 0);
                                             $vBrl = (float) ($t['valor_brl'] ?? 0);
                                             $valorStr = '-';
@@ -227,13 +290,18 @@
                                             }
                                             $valorClass = ($tipo === 'debito') ? 'text-danger' : 'text-success';
                                         ?>
-                                        <tr class="<?= $isRend ? '' : 'text-muted' ?>">
+                                        <tr class="<?= ($isRend || $isRecarga) ? '' : 'text-muted' ?>">
                                             <td style="white-space: nowrap;">
                                                 <?= !empty($t['created_at']) ? date('d/m/Y H:i', strtotime((string) $t['created_at'])) : '-' ?>
                                             </td>
                                             <td>
-                                                <?php if ($isRend): ?>
+                                                <?php if ($isRend || $isRecarga): ?>
                                                     <span class="badge" style="background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14); color: rgba(11, 31, 58, 1);">Clube</span>
+                                                <?php endif; ?>
+                                                <?php if ($isTurbo): ?>
+                                                    <span class="badge" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.25); color: #b45309;">Turbo</span>
+                                                <?php elseif ($modalidade === 'normal' || $isRend || $isRecarga): ?>
+                                                    <span class="badge" style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.25); color: #065f46;">Normal</span>
                                                 <?php endif; ?>
                                                 <?= htmlspecialchars($desc, ENT_QUOTES, 'UTF-8') ?>
                                             </td>

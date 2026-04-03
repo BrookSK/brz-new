@@ -59,6 +59,10 @@ class AdminCarteiraController extends Controller {
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarioId = $data['usuario_id'] ?? 0;
         $valor = $data['valor'] ?? 0;
+        $descricao = trim((string) ($data['descricao'] ?? ''));
+        if ($descricao === '') {
+            $descricao = 'Crédito adicionado pelo admin';
+        }
         
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
@@ -73,18 +77,27 @@ class AdminCarteiraController extends Controller {
             
             // Garantir carteira existe
             $this->garantirCarteiraUsuario($pdo, $usuarioId);
+
+            // Ensure modalidade column exists
+            try {
+                $stCols = $pdo->query('DESCRIBE transacoes_carteira');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!in_array('modalidade', $cols, true)) {
+                    $pdo->exec("ALTER TABLE transacoes_carteira ADD COLUMN modalidade varchar(10) DEFAULT 'normal'");
+                }
+            } catch (\Exception $e) {}
             
             // Adicionar crédito (sempre em USD)
             $stmt = $pdo->prepare("UPDATE carteiras SET saldo_usd = saldo_usd + ?, updated_at = NOW() WHERE usuario_id = ?");
             $stmt->execute([$valor, $usuarioId]);
             
-            // Registrar transação
+            // Registrar transação como Normal
             $stmt = $pdo->prepare("
                 INSERT INTO transacoes_carteira 
-                (usuario_id, tipo, valor_usd, descricao, created_at) 
-                VALUES (?, 'credito', ?, 'Crédito adicionado pelo admin', NOW())
+                (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) 
+                VALUES (?, 'credito', ?, ?, 'normal', NOW())
             ");
-            $stmt->execute([$usuarioId, $valor]);
+            $stmt->execute([$usuarioId, $valor, $descricao]);
             
             $pdo->commit();
             
@@ -298,8 +311,8 @@ class AdminCarteiraController extends Controller {
                     // Registrar transação
                     $stmt = $pdo->prepare("
                         INSERT INTO transacoes_carteira 
-                        (usuario_id, tipo, valor_usd, descricao, created_at) 
-                        VALUES (?, 'credito', ?, ?, NOW())
+                        (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) 
+                        VALUES (?, 'credito', ?, ?, 'normal', NOW())
                     ");
                     $stmt->execute([$usuarioId, $valor, $descricao]);
                     

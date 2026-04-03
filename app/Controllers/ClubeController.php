@@ -291,9 +291,66 @@ class ClubeController extends Controller {
             }
 
             $result = $this->paymentService->processarRendimentoClube();
+
+            // Process grace period expirations
+            $graceResult = $this->processarGracePeriodExpirados();
+            $result['grace_expired'] = $graceResult;
+
             $this->json($result);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
+    }
+
+    private function processarGracePeriodExpirados(): array {
+        $out = ['processed' => 0, 'deactivated' => 0];
+        try {
+            $db = \Config\Database::getConnection();
+
+            // Check if clube_status table exists
+            try {
+                $st = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+                $st->execute(['clube_status']);
+                if (!$st->fetchColumn()) return $out;
+            } catch (\Exception $e) { return $out; }
+
+            // Find users in grace period whose 48h expired
+            $stmt = $db->prepare("SELECT usuario_id FROM clube_status WHERE status = 'grace_period' AND grace_until IS NOT NULL AND grace_until <= NOW()");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($rows as $r) {
+                $out['processed']++;
+                $uid = (int) ($r['usuario_id'] ?? 0);
+                if ($uid <= 0) continue;
+
+                // Check if user recharged during grace period
+                $stBal = $db->prepare('SELECT COALESCE(saldo_usd, 0) - COALESCE(saldo_usd_bloqueado, 0) AS disp FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                $stBal->execute([$uid]);
+                $disp = (float) ($stBal->fetchColumn() ?: 0);
+
+                if ($disp + 0.00001 >= 39.0) {
+                    // User recharged, reactivate
+                    $stReact = $db->prepare("UPDATE clube_status SET status = 'ativo', grace_until = NULL, motivo = 'Reativado por recarga durante período de carência', updated_at = NOW() WHERE usuario_id = :uid");
+                    $stReact->execute([':uid' => $uid]);
+
+                    try {
+                        $db->prepare("INSERT INTO transacoes_carteira (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) VALUES (:uid, 'credito', 0, :desc, 'normal', NOW())")
+                            ->execute([':uid' => $uid, ':desc' => 'Reativação do Clube Braziliana']);
+                    } catch (\Exception $e) {}
+                } else {
+                    // Deactivate benefits
+                    $stDeact = $db->prepare("UPDATE clube_status SET status = 'inativo', grace_until = NULL, motivo = 'Desativado por saldo abaixo de US\$ 39 após 48h', updated_at = NOW() WHERE usuario_id = :uid");
+                    $stDeact->execute([':uid' => $uid]);
+                    $out['deactivated']++;
+
+                    try {
+                        $db->prepare("INSERT INTO transacoes_carteira (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) VALUES (:uid, 'credito', 0, :desc, 'normal', NOW())")
+                            ->execute([':uid' => $uid, ':desc' => 'Desativação por saldo abaixo do mínimo — Seu saldo do Clube Braziliana ficou abaixo de US$ 39 e os benefícios foram desativados.']);
+                    } catch (\Exception $e) {}
+                }
+            }
+        } catch (\Exception $e) {}
+        return $out;
     }
 }

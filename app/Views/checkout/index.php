@@ -14,6 +14,8 @@
         window.CARTEIRA_SALDO_USD = <?= json_encode((float) ($carteira_saldo_usd ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CARTEIRA_SALDO_BRL = <?= json_encode((float) ($carteira_saldo_brl ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CARTEIRA_SALDO_DISPONIVEL = <?= json_encode((float) ($carteira_saldo_disponivel ?? 0), JSON_UNESCAPED_UNICODE) ?>;
+        window.CARTEIRA_TURBO_BLOQUEADO = <?= json_encode((float) ($carteira_turbo_bloqueado ?? 0), JSON_UNESCAPED_UNICODE) ?>;
+        window.CARTEIRA_TURBO_LIBERACAO_DATA = <?= json_encode((string) ($carteira_turbo_liberacao_data ?? ''), JSON_UNESCAPED_UNICODE) ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -631,9 +633,11 @@
                                                 <?php
                                                 $saldoDispLabel = number_format(($carteira_saldo_disponivel ?? 0), 2, ',', '.');
                                                 $saldoSuficiente = (($carteira_saldo_disponivel ?? 0) + 0.001 >= ($total ?? 0));
+                                                $turboBloqLabel = (float) ($carteira_turbo_bloqueado ?? 0);
+                                                $turboLibLabel = (string) ($carteira_turbo_liberacao_data ?? '');
                                                 ?>
                                                 <option value="carteira" <?= !$saldoSuficiente ? 'disabled style="color:#999"' : '' ?>>
-                                                    <?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?> ($ <?= $saldoDispLabel ?>)<?= !$saldoSuficiente ? ' - Saldo insuficiente' : '' ?>
+                                                    <?= __('checkout.payment.wallet_credit', 'Crédito da Carteira') ?> ($ <?= $saldoDispLabel ?>)<?php if ($turboBloqLabel > 0.01): ?> | Turbo bloqueado: $ <?= number_format($turboBloqLabel, 2, ',', '.') ?><?php if ($turboLibLabel): ?> (lib. <?= $turboLibLabel ?>)<?php endif; ?><?php endif; ?><?= !$saldoSuficiente ? ' - Saldo insuficiente' : '' ?>
                                                 </option>
                                                 <option value="cartao_credito"><?= __('checkout.payment.credit_card', 'Cartão de Crédito') ?></option>
                                                 <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
@@ -2485,9 +2489,15 @@ function updatePaymentMethodsForCurrency(currency) {
     var saldoUsd = Number(window.CARTEIRA_SALDO_USD || 0);
     var saldoBrl = Number(window.CARTEIRA_SALDO_BRL || 0);
     var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
+    var turboBloq = Number(window.CARTEIRA_TURBO_BLOQUEADO || 0);
+    var turboLibData = (window.CARTEIRA_TURBO_LIBERACAO_DATA || '').toString();
     var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
     var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
     var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
+    if (turboBloq > 0.01) {
+        saldoLabel += ' | Turbo bloqueado: $ ' + turboBloq.toFixed(2).replace('.', ',');
+        if (turboLibData) saldoLabel += ' (lib. ' + turboLibData + ')';
+    }
     if (!saldoSuficiente) {
         saldoLabel += ' - Saldo insuficiente';
     }

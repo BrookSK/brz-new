@@ -148,6 +148,19 @@ ob_start();
                             </div>
 
                             <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" value="1" id="qc_turbo">
+                                <label class="form-check-label" for="qc_turbo">
+                                    Ativar Clube Turbo
+                                    <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top" title="Com o Clube Turbo, sua recarga rende mais (rendimento especial configurado pelo admin), mas o saldo fica bloqueado por um período mínimo de 6 meses. Após esse prazo, o saldo e os rendimentos ficam disponíveis para uso.">
+                                        <i class="fas fa-question-circle text-muted" style="cursor:pointer;"></i>
+                                    </span>
+                                </label>
+                                <div class="form-text" id="qc_turbo_hint" style="display:none; color:#b45309;">
+                                    Permanência mínima de 6 meses. O saldo e rendimentos ficam bloqueados até o fim do prazo.
+                                </div>
+                            </div>
+
+                            <div class="form-check mt-3">
                                 <input class="form-check-input" type="checkbox" value="1" id="qc_termos">
                                 <label class="form-check-label" for="qc_termos">
                                     Concordo que li os termos de como funciona o Clube Brasiliana: <a href="/como-funciona-clube" target="_blank" class="text-primary text-decoration-none">Como funciona o Clube Brasiliana</a>.
@@ -449,7 +462,7 @@ ob_start();
         }
         if(metodo==='card'){ if(!ensureStripe()) return; }
 
-        const payload = { email, nome, sobrenome, telefone_ddi, telefone_numero, data_nascimento, pais, documento, senha, aceitou_termos, metodo, valor_usd: valor, usd_brl_rate: USD_BRL_RATE };
+        const payload = { email, nome, sobrenome, telefone_ddi, telefone_numero, data_nascimento, pais, documento, senha, aceitou_termos, metodo, valor_usd: valor, usd_brl_rate: USD_BRL_RATE, turbo: !!document.getElementById('qc_turbo')?.checked };
         const r = await fetch('/clube/recarga/criar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const data = await r.json();
         if(!data || !data.success){ setError(data && (data.error || data.message) ? (data.error || data.message) : 'Falha ao iniciar pagamento'); return; }
@@ -496,6 +509,21 @@ ob_start();
         setMetodo('pix');
         syncDdiOutro();
         syncDocumentoRules();
+
+        // Turbo toggle hint
+        const turboCheck = document.getElementById('qc_turbo');
+        const turboHint = document.getElementById('qc_turbo_hint');
+        if(turboCheck && turboHint){
+            turboCheck.addEventListener('change', function(){
+                turboHint.style.display = this.checked ? '' : 'none';
+            });
+        }
+
+        // Initialize Bootstrap tooltips
+        try {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function(el){ return new bootstrap.Tooltip(el); });
+        } catch(e){}
 
         document.getElementById('qc_valor_usd')?.addEventListener('input', updateEquiv);
         document.getElementById('qc_valor_usd')?.addEventListener('blur', clampValorMinimo);

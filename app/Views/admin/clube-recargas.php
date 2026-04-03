@@ -64,6 +64,7 @@
                             <th>Usuário</th>
                             <th>Pagador</th>
                             <th>Documento</th>
+                            <th>Tipo</th>
                             <th>Método</th>
                             <th>Valor USD</th>
                             <th>Valor BRL</th>
@@ -77,7 +78,7 @@
                         <?php $recargas = isset($recargas) && is_array($recargas) ? $recargas : []; ?>
                         <?php if (empty($recargas)): ?>
                             <tr>
-                                <td colspan="11" class="text-muted">Nenhuma recarga encontrada.</td>
+                                <td colspan="12" class="text-muted">Nenhuma recarga encontrada.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($recargas as $r): ?>
@@ -96,6 +97,14 @@
                                         <div class="text-muted small"><?= htmlspecialchars((string) ($r['pagador_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
                                     </td>
                                     <td class="text-muted small"><?= htmlspecialchars((string) ($r['pagador_documento'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td>
+                                        <?php
+                                        $tipoRec = strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal')));
+                                        $tipoBadge = ($tipoRec === 'turbo') ? 'warning' : 'info';
+                                        $tipoLabel = ($tipoRec === 'turbo') ? 'Turbo' : 'Normal';
+                                        ?>
+                                        <span class="badge bg-<?= $tipoBadge ?>"><?= $tipoLabel ?></span>
+                                    </td>
                                     <td><?= htmlspecialchars((string) ($r['metodo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                     <td>$ <?= number_format((float) ($r['valor'] ?? 0), 2, ',', '.') ?></td>
                                     <td>R$ <?= number_format((float) ($r['valor_brl'] ?? 0), 2, ',', '.') ?></td>
