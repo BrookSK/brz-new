@@ -214,12 +214,6 @@
         <div class="row g-4" id="produtos-destaque">
             <!-- Produtos serão carregados via AJAX -->
         </div>
-        
-        <div class="text-center mt-4">
-            <a href="/produtos" class="btn btn-outline-primary btn-lg" data-aos="fade-up">
-                <i class="fas fa-th me-2"></i> <?= __('home.view_all_products', 'Ver Todos os Produtos') ?>
-            </a>
-        </div>
     </div>
 </section>
 
