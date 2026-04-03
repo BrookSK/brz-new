@@ -159,8 +159,8 @@
 <section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up"><?= __('home.why_title', 'Por que escolher a Braziliana?') ?></h2>
-            <p class="section-subtitle" data-aos="fade-up"><?= __('home.why_subtitle', 'Oferecemos a melhor experiência de importação com tecnologia e confiança') ?></p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.why_title', 'Por que a Braziliana é diferente?') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.why_subtitle', 'Importar dos Estados Unidos nunca foi tão simples, seguro e inteligente.') ?></p>
         </div>
         
         <div class="row g-4">
@@ -170,9 +170,9 @@
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
                             <i class="fas fa-shield-alt fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
-                        <h5><?= __('home.feature.secure_buy', 'Compra Segura') ?></h5>
+                        <h5><?= __('home.feature.secure_buy', 'Segurança em cada etapa') ?></h5>
                     </div>
-                    <p class="text-muted"><?= __('home.feature.secure_buy_desc', 'Pagamento 100% seguro com proteção anti-fraude e criptografia de dados.') ?></p>
+                    <p class="text-muted"><?= __('home.feature.secure_buy_desc', 'Seus dados e seu pagamento protegidos do início ao fim.') ?></p>
                 </div>
             </div>
             
@@ -182,9 +182,9 @@
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
                             <i class="fas fa-plane fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
-                        <h5><?= __('home.feature.full_logistics', 'Logística Completa') ?></h5>
+                        <h5><?= __('home.feature.full_logistics', 'Do início ao fim, sem complicação') ?></h5>
                     </div>
-                    <p class="text-muted"><?= __('home.feature.full_logistics_desc', 'Do despacho nos EUA até a entrega na sua porta, cuidamos de tudo.') ?></p>
+                    <p class="text-muted"><?= __('home.feature.full_logistics_desc', 'A gente cuida de tudo — do pedido à entrega no Brasil e mais de 180 países.') ?></p>
                 </div>
             </div>
             
@@ -194,9 +194,9 @@
                         <div class="feature-icon rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px; background: rgba(11, 31, 58, 0.08); border: 1px solid rgba(11, 31, 58, 0.14);">
                             <i class="fas fa-calculator fa-2x" style="color: rgba(11, 31, 58, 1);"></i>
                         </div>
-                        <h5><?= __('home.feature.transparent_prices', 'Preços Transparentes') ?></h5>
+                        <h5><?= __('home.feature.transparent_prices', 'Transparência total') ?></h5>
                     </div>
-                    <p class="text-muted"><?= __('home.feature.transparent_prices_desc', 'Sem taxas escondidas. Você vê o valor final antes de comprar.') ?></p>
+                    <p class="text-muted"><?= __('home.feature.transparent_prices_desc', 'Você vê o valor final antes de comprar. Sem surpresas.') ?></p>
                 </div>
             </div>
         </div>
@@ -207,8 +207,8 @@
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up"><?= __('home.featured_title', 'Produtos em Destaque') ?></h2>
-            <p class="section-subtitle" data-aos="fade-up"><?= __('home.featured_subtitle', 'Conheça nossos produtos mais populares') ?></p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.featured_title', 'Grupos de Compra Abertos Agora!') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.featured_subtitle', 'Ofertas exclusivas com preços promocionais — disponíveis por tempo limitado ou até acabar o estoque.') ?></p>
         </div>
         
         <div class="row g-4" id="produtos-destaque">
@@ -227,8 +227,8 @@
 <section class="py-5 bg-light">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up"><?= __('home.how_title', 'Como Funciona') ?></h2>
-            <p class="section-subtitle" data-aos="fade-up"><?= __('home.how_subtitle', 'Importar nunca foi tão simples') ?></p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.how_title', 'Como Funciona?') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.how_subtitle', 'Comprar nos Estados Unidos nunca foi tão simples') ?></p>
         </div>
         
         <div class="row">
@@ -240,8 +240,8 @@
                             <span class="fw-bold">1</span>
                         </div>
                         <div class="timeline-content">
-                            <h5><?= __('home.step1_title', 'Escolha seus Produtos') ?></h5>
-                            <p class="text-muted"><?= __('home.step1_desc', 'Navegue pelo nosso catálogo e selecione os produtos desejados.') ?></p>
+                            <h5><?= __('home.step1_title', '1. Escolha o que você quiser') ?></h5>
+                            <p class="text-muted"><?= __('home.step1_desc', 'Explore nossos produtos ou aproveite os grupos de compra com ofertas exclusivas.') ?></p>
                         </div>
                     </div>
                     
@@ -251,8 +251,8 @@
                             <span class="fw-bold">2</span>
                         </div>
                         <div class="timeline-content">
-                            <h5><?= __('home.step2_title', 'Pague de Forma Segura') ?></h5>
-                            <p class="text-muted"><?= __('home.step2_desc', 'Checkout seguro com múltiplas opções de pagamento.') ?></p>
+                            <h5><?= __('home.step2_title', '2. Finalize sua compra com segurança') ?></h5>
+                            <p class="text-muted"><?= __('home.step2_desc', 'Pagamento simples e seguro, com diferentes opções para você.') ?></p>
                         </div>
                     </div>
                     
@@ -262,8 +262,8 @@
                             <span class="fw-bold">3</span>
                         </div>
                         <div class="timeline-content">
-                            <h5><?= __('home.step3_title', 'Acompanhe o Processo') ?></h5>
-                            <p class="text-muted"><?= __('home.step3_desc', 'Acompanhe cada etapa desde o despacho até a entrega.') ?></p>
+                            <h5><?= __('home.step3_title', '3. Acompanhe tudo em tempo real') ?></h5>
+                            <p class="text-muted"><?= __('home.step3_desc', 'Você acompanha cada etapa do processo até o envio.') ?></p>
                         </div>
                     </div>
                     
@@ -273,8 +273,8 @@
                             <span class="fw-bold">4</span>
                         </div>
                         <div class="timeline-content">
-                            <h5><?= __('home.step4_title', 'Receba em Casa') ?></h5>
-                            <p class="text-muted"><?= __('home.step4_desc', 'Receba seus produtos diretamente na sua porta.') ?></p>
+                            <h5><?= __('home.step4_title', '4. Receba suas compras sem complicação') ?></h5>
+                            <p class="text-muted"><?= __('home.step4_desc', 'Seu pedido chega direto na sua casa, com toda a logística cuidada por nós.') ?></p>
                         </div>
                     </div>
                 </div>
@@ -287,8 +287,8 @@
 <section class="py-5">
     <div class="container">
         <div class="text-center mb-5">
-            <h2 class="section-title" data-aos="fade-up"><?= __('home.testimonials_title', 'O que nossos clientes dizem') ?></h2>
-            <p class="section-subtitle" data-aos="fade-up"><?= __('home.testimonials_subtitle', 'Milhares de clientes satisfeitos') ?></p>
+            <h2 class="section-title" data-aos="fade-up"><?= __('home.testimonials_title', 'Quem já compra com a Braziliana') ?></h2>
+            <p class="section-subtitle" data-aos="fade-up"><?= __('home.testimonials_subtitle', 'Clientes que importam com segurança, economia e tranquilidade.') ?></p>
         </div>
         
         <div class="row">
@@ -372,8 +372,8 @@
     <div class="container text-center">
         <div class="row">
             <div class="col-lg-8 mx-auto" data-aos="zoom-in">
-                <h2 class="mb-4"><?= __('home.cta_title', 'Pronto para começar a importar?') ?></h2>
-                <p class="lead mb-4"><?= __('home.cta_subtitle', 'Junte-se a milhares de clientes que economizam comprando diretamente dos EUA') ?></p>
+                <h2 class="mb-4"><?= __('home.cta_title', 'Comece a comprar nos EUA hoje e deixa que o resto a gente cuida.') ?></h2>
+                <p class="lead mb-4"><?= __('home.cta_subtitle', 'Entre agora e aproveite ofertas com valores promocionais antes que acabem.') ?></p>
                 <div class="d-flex gap-3 justify-content-center">
                     <a href="/register" class="btn btn-primary btn-lg">
                         <i class="fas fa-user-plus me-2"></i> <?= __('home.cta_create_account', 'Criar Conta Gratuita') ?>

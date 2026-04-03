@@ -445,8 +445,13 @@ class AdminGruposComprasController extends Controller {
         $slug = (string) $request->getParam('slug', '');
         $page = max(1, (int) $request->getParam('page', 1));
         $busca = trim((string) $request->getParam('q', ''));
+        $verTodos = ($request->getParam('ver_todos') === '1');
         $limit = 20;
         $offset = ($page - 1) * $limit;
+
+        // Quando há busca ativa ou ver_todos, buscar sem paginação
+        $buscaAtiva = ($busca !== '');
+        $semPaginacao = $buscaAtiva || $verTodos;
 
         try {
             $pdo = $this->getPdo();
@@ -493,8 +498,20 @@ class AdminGruposComprasController extends Controller {
             $stCount->execute($buscaParams);
             $total = (int) $stCount->fetchColumn();
 
-            $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC LIMIT " . $limit . " OFFSET " . $offset);
-            $stP->execute($buscaParams);
+            if ($buscaAtiva) {
+                // Busca ativa: retornar todos os resultados sem paginação
+                $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC");
+                $stP->execute($buscaParams);
+                $page = 1;
+            } elseif ($verTodos) {
+                // Ver todos: sem paginação
+                $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC");
+                $stP->execute($buscaParams);
+                $page = 1;
+            } else {
+                $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC LIMIT " . $limit . " OFFSET " . $offset);
+                $stP->execute($buscaParams);
+            }
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);
 
             // Normalizar foto_principal
@@ -542,7 +559,7 @@ class AdminGruposComprasController extends Controller {
             return;
         }
 
-        $totalPages = max(1, (int) ceil($total / $limit));
+        $totalPages = $semPaginacao ? 1 : max(1, (int) ceil($total / $limit));
         $title = htmlspecialchars($grupo['nome'], ENT_QUOTES, 'UTF-8');
 
         // Verificar restrição do Clube Braziliana

@@ -3175,32 +3175,51 @@ HTML;
                 }
             }
 
-            $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
-            $stmt = $pdo->prepare($sql);
-            foreach ($params as $k => $v) {
-                if ($k === ':rep_id') {
-                    $stmt->bindValue($k, (int) $v, \PDO::PARAM_INT);
-                } else {
-                    $stmt->bindValue($k, (string) $v);
+            // Quando há busca ativa, retornar todos os resultados sem paginação
+            $buscaAtiva = (trim($busca) !== '');
+            if ($buscaAtiva) {
+                $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY ' . $orderBy;
+                $stmt = $pdo->prepare($sql);
+                foreach ($params as $k => $v) {
+                    if ($k === ':rep_id') {
+                        $stmt->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                    } else {
+                        $stmt->bindValue($k, (string) $v);
+                    }
                 }
-            }
-            $stmt->bindValue(':limite', (int) $limite, \PDO::PARAM_INT);
-            $stmt->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
-            $stmt->execute();
-            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $stmt->execute();
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $total = count($rows);
+                $totalPaginas = 1;
+                $pagina = 1;
+            } else {
+                $sql = 'SELECT p.* FROM produtos p' . $where . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
+                $stmt = $pdo->prepare($sql);
+                foreach ($params as $k => $v) {
+                    if ($k === ':rep_id') {
+                        $stmt->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                    } else {
+                        $stmt->bindValue($k, (string) $v);
+                    }
+                }
+                $stmt->bindValue(':limite', (int) $limite, \PDO::PARAM_INT);
+                $stmt->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
+                $stmt->execute();
+                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            $sqlTotal = 'SELECT COUNT(*) FROM produtos p' . $where;
-            $stmtT = $pdo->prepare($sqlTotal);
-            foreach ($params as $k => $v) {
-                if ($k === ':rep_id') {
-                    $stmtT->bindValue($k, (int) $v, \PDO::PARAM_INT);
-                } else {
-                    $stmtT->bindValue($k, (string) $v);
+                $sqlTotal = 'SELECT COUNT(*) FROM produtos p' . $where;
+                $stmtT = $pdo->prepare($sqlTotal);
+                foreach ($params as $k => $v) {
+                    if ($k === ':rep_id') {
+                        $stmtT->bindValue($k, (int) $v, \PDO::PARAM_INT);
+                    } else {
+                        $stmtT->bindValue($k, (string) $v);
+                    }
                 }
+                $stmtT->execute();
+                $total = (int) ($stmtT->fetchColumn() ?: 0);
+                $totalPaginas = (int) ceil($total / $limite);
             }
-            $stmtT->execute();
-            $total = (int) ($stmtT->fetchColumn() ?: 0);
-            $totalPaginas = (int) ceil($total / $limite);
 
             $produtos = [];
             foreach ($rows as $r) {
@@ -3213,6 +3232,7 @@ HTML;
                     'id' => $id,
                     'name' => (string) ($r['name'] ?? ($r['nome'] ?? '')),
                     'sku' => (string) ($r['sku'] ?? ''),
+
                     'price' => (float) ($r['price'] ?? ($r['preco'] ?? ($r['valor'] ?? 0))),
                     'weight' => $r['weight'] ?? $r['peso'] ?? 0,
                     'active' => (int) ($r['active'] ?? ($r['ativo'] ?? 1)),
@@ -3288,8 +3308,15 @@ HTML;
             . '</form>';
 
         echo '<div class="table-responsive">'
+            . '<form id="formMassa" method="POST" action="/admin/produtos/acoes-massa">'
+            . '<div id="barraMassa" class="d-none mb-3 p-3 rounded-3 d-flex align-items-center gap-3 flex-wrap" style="background:rgba(11,31,58,0.06);border:1px solid rgba(11,31,58,0.14);">'
+            . '<span class="fw-semibold text-primary"><span id="qtdSelecionados">0</span> produto(s) selecionado(s)</span>'
+            . '<button type="button" class="btn btn-sm btn-primary" onclick="abrirModalMassa()"><i class="fas fa-edit me-1"></i>Editar em massa</button>'
+            . '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="desmarcarTodos()"><i class="fas fa-times me-1"></i>Desmarcar todos</button>'
+            . '</div>'
             . '<table class="table table-hover align-middle">'
             . '<thead><tr>'
+            . '<th style="width:40px"><input type="checkbox" id="checkTodos" class="form-check-input" title="Selecionar todos"></th>'
             . '<th style="width:72px">Imagem</th>'
             . '<th>Nome</th>'
             . '<th style="width:130px">Loja</th>'
@@ -3312,6 +3339,7 @@ HTML;
             $label = ((int) $produto['active'] ? 'Ativo' : 'Inativo');
 
             echo '<tr>'
+                . '<td><input type="checkbox" name="ids[]" value="' . (int) $produto['id'] . '" class="form-check-input check-produto"></td>'
                 . '<td><img src="' . $img . '" alt="' . $nome . '" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:1px solid rgba(0,0,0,0.06);"></td>'
                 . '<td><div class="fw-bold" style="font-size: 1.05rem;">' . $nome . '</div><div class="text-muted small">#' . (int) $produto['id'] . '</div></td>'
                 . '<td><span class="text-muted small">' . ($lojaNome !== '' ? $lojaNome : '<em class="text-secondary">—</em>') . '</span></td>'
@@ -3329,7 +3357,166 @@ HTML;
                 . '</tr>';
         }
 
-        echo '</tbody></table></div>';
+        echo '</tbody></table>'
+            . '</form>'
+            . '</div>';
+
+        // Modal de ações em massa
+        echo '
+<div class="modal fade" id="modalMassa" tabindex="-1" aria-labelledby="modalMassaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalMassaLabel"><i class="fas fa-edit me-2"></i>Edição em Massa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-4">Preencha apenas os campos que deseja alterar. Campos em branco serão ignorados.</p>
+        <form id="formMassaModal">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Preço (USD)</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="massa_preco" placeholder="Ex: 9.99">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Peso (kg)</label>
+              <input type="number" step="0.001" min="0" class="form-control" name="massa_peso" placeholder="Ex: 0.500">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Estoque</label>
+              <input type="number" step="1" min="0" class="form-control" name="massa_estoque" placeholder="Ex: 100">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Status</label>
+              <select class="form-select" name="massa_status">
+                <option value="">— Não alterar —</option>
+                <option value="1">Ativo</option>
+                <option value="0">Inativo</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Categoria</label>
+              <input type="text" class="form-control" name="massa_categoria" placeholder="Nome da categoria">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Grupo de Compras (ID)</label>
+              <input type="number" min="0" class="form-control" name="massa_grupo_id" placeholder="ID do grupo">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="confirmarMassa()">
+          <i class="fas fa-save me-1"></i>Salvar para todos selecionados
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+    const checkTodos = document.getElementById("checkTodos");
+    const barra = document.getElementById("barraMassa");
+    const qtdEl = document.getElementById("qtdSelecionados");
+
+    function atualizarBarra() {
+        const checks = document.querySelectorAll(".check-produto:checked");
+        const n = checks.length;
+        qtdEl.textContent = n;
+        if (n > 0) {
+            barra.classList.remove("d-none");
+            barra.classList.add("d-flex");
+        } else {
+            barra.classList.add("d-none");
+            barra.classList.remove("d-flex");
+        }
+    }
+
+    checkTodos.addEventListener("change", function() {
+        document.querySelectorAll(".check-produto").forEach(c => c.checked = this.checked);
+        atualizarBarra();
+    });
+
+    document.querySelectorAll(".check-produto").forEach(c => {
+        c.addEventListener("change", function() {
+            const all = document.querySelectorAll(".check-produto");
+            checkTodos.checked = [...all].every(x => x.checked);
+            atualizarBarra();
+        });
+    });
+
+    window.desmarcarTodos = function() {
+        document.querySelectorAll(".check-produto").forEach(c => c.checked = false);
+        checkTodos.checked = false;
+        atualizarBarra();
+    };
+
+    window.abrirModalMassa = function() {
+        const n = document.querySelectorAll(".check-produto:checked").length;
+        if (n === 0) return;
+        document.getElementById("modalMassaLabel").innerHTML = \'<i class="fas fa-edit me-2"></i>Edição em Massa — \' + n + \' produto(s)\';
+        new bootstrap.Modal(document.getElementById("modalMassa")).show();
+    };
+
+    window.confirmarMassa = function() {
+        const ids = [...document.querySelectorAll(".check-produto:checked")].map(c => c.value);
+        if (ids.length === 0) return;
+
+        const form = document.getElementById("formMassaModal");
+        const data = new FormData(form);
+
+        // Verificar se pelo menos um campo foi preenchido
+        let temAlgo = false;
+        for (const [k, v] of data.entries()) {
+            if (v !== "" && v !== "0" && k !== "massa_status") { temAlgo = true; break; }
+            if (k === "massa_status" && v !== "") { temAlgo = true; break; }
+        }
+        if (!temAlgo) {
+            alert("Preencha pelo menos um campo para alterar.");
+            return;
+        }
+
+        const payload = new URLSearchParams();
+        ids.forEach(id => payload.append("ids[]", id));
+        for (const [k, v] of data.entries()) {
+            if (v !== "") payload.append(k, v);
+        }
+
+        const btn = document.querySelector("#modalMassa .btn-primary");
+        btn.disabled = true;
+        btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Salvando...\';
+
+        fetch("/admin/produtos/acoes-massa", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest" },
+            body: payload.toString()
+        })
+        .then(r => r.json())
+        .then(res => {
+            bootstrap.Modal.getInstance(document.getElementById("modalMassa")).hide();
+            if (res.success) {
+                const toast = document.createElement("div");
+                toast.style.cssText = "position:fixed;top:20px;right:20px;z-index:99999;max-width:400px;";
+                toast.innerHTML = \'<div class="alert alert-success alert-dismissible fade show shadow"><i class="fas fa-check-circle me-2"></i>\' + res.message + \'<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>\';
+                document.body.appendChild(toast);
+                setTimeout(() => { toast.remove(); location.reload(); }, 2000);
+            } else {
+                alert("Erro: " + (res.error || "Falha ao salvar."));
+                btn.disabled = false;
+                btn.innerHTML = \'<i class="fas fa-save me-1"></i>Salvar para todos selecionados\';
+            }
+        })
+        .catch(() => {
+            alert("Erro de comunicação com o servidor.");
+            btn.disabled = false;
+            btn.innerHTML = \'<i class="fas fa-save me-1"></i>Salvar para todos selecionados\';
+        });
+    };
+})();
+</script>';
+
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
@@ -3388,6 +3575,83 @@ HTML;
         $content = ob_get_clean();
         $title = 'Produtos - Braziliana Admin';
         include __DIR__ . '/../Views/layouts/admin.php';
+        exit;
+    }
+
+    public function acoesMassa(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json');
+
+        $ids = $request->getParam('ids') ?? [];
+        if (!is_array($ids) || empty($ids)) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum produto selecionado.']);
+            exit;
+        }
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn($id) => $id > 0);
+        if (empty($ids)) {
+            echo json_encode(['success' => false, 'error' => 'IDs inválidos.']);
+            exit;
+        }
+
+        $campos = [];
+        $params = [];
+
+        $preco = $request->getParam('massa_preco');
+        if ($preco !== null && $preco !== '') {
+            $campos[] = 'price = ?';
+            $params[] = (float) str_replace(',', '.', $preco);
+        }
+
+        $peso = $request->getParam('massa_peso');
+        if ($peso !== null && $peso !== '') {
+            $campos[] = 'weight = ?';
+            $params[] = (float) str_replace(',', '.', $peso);
+        }
+
+        $estoque = $request->getParam('massa_estoque');
+        if ($estoque !== null && $estoque !== '') {
+            $campos[] = 'stock = ?';
+            $params[] = (int) $estoque;
+        }
+
+        $status = $request->getParam('massa_status');
+        if ($status !== null && $status !== '') {
+            $campos[] = 'active = ?';
+            $params[] = (int) $status;
+        }
+
+        $categoria = $request->getParam('massa_categoria');
+        if ($categoria !== null && trim($categoria) !== '') {
+            $campos[] = 'categoria = ?';
+            $params[] = trim($categoria);
+        }
+
+        $grupoId = $request->getParam('massa_grupo_id');
+        if ($grupoId !== null && $grupoId !== '') {
+            $campos[] = 'grupo_compras_id = ?';
+            $params[] = (int) $grupoId;
+        }
+
+        if (empty($campos)) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum campo para atualizar.']);
+            exit;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $sql = 'UPDATE produtos SET ' . implode(', ', $campos) . ' WHERE id IN (' . $in . ')';
+            $stmt = $pdo->prepare($sql);
+            $allParams = array_merge($params, $ids);
+            $stmt->execute($allParams);
+            $affected = $stmt->rowCount();
+            echo json_encode(['success' => true, 'message' => $affected . ' produto(s) atualizado(s) com sucesso.']);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
         exit;
     }
 

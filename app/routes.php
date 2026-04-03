@@ -340,6 +340,7 @@ $router->post('/admin/produtos/variacoes/{id}/fotos/upload', 'AdminProdutosContr
 $router->post('/admin/produtos/variacoes/fotos/remover/{id}', 'AdminProdutosController', 'removerFotoVariacao');
 $router->post('/admin/produtos/variacoes/{id}/fotos/ordem', 'AdminProdutosController', 'salvarOrdemFotosVariacao');
 $router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
+$router->post('/admin/produtos/acoes-massa', 'AdminProdutosController', 'acoesMassa');
 
 // Lojas
 $router->get('/admin/lojas', 'AdminLojasController', 'index');

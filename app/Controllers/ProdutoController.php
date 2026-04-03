@@ -76,20 +76,35 @@ class ProdutoController extends Controller {
     public function index(Request $request) {
         $search = $request->getParam('search');
         $categoria = $request->getParam('categoria');
+        $verTodos = ($request->getParam('ver_todos') === '1');
 
         $page = (int) $request->getParam('page');
         if ($page <= 0) $page = 1;
         $limit = 20;
         $offset = ($page - 1) * $limit;
 
+        // Sem paginação quando há busca ativa ou ver_todos
+        $buscaAtiva = ($search !== null && trim($search) !== '');
+        $semPaginacao = $buscaAtiva || $verTodos;
+
         $total = 0;
         
-        if ($search && $categoria) {
+        if ($buscaAtiva && $categoria) {
             $total = $this->produtoModel->countSearch($search, $categoria);
-            $produtos = $this->produtoModel->search($search, $limit, $categoria, $offset);
-        } elseif ($search) {
+            $produtos = $this->produtoModel->search($search, $total ?: 9999, $categoria, 0);
+            $page = 1;
+        } elseif ($buscaAtiva) {
             $total = $this->produtoModel->countSearch($search, null);
-            $produtos = $this->produtoModel->search($search, $limit, null, $offset);
+            $produtos = $this->produtoModel->search($search, $total ?: 9999, null, 0);
+            $page = 1;
+        } elseif ($verTodos && $categoria) {
+            $total = $this->produtoModel->countByCategoriaId($categoria);
+            $produtos = $this->produtoModel->getByCategoriaIdPaginado($categoria, $total ?: 9999, 0);
+            $page = 1;
+        } elseif ($verTodos) {
+            $total = $this->produtoModel->countAllWithCategoria();
+            $produtos = $this->produtoModel->getAllWithCategoriaPaginado($total ?: 9999, 0);
+            $page = 1;
         } elseif ($categoria) {
             $total = $this->produtoModel->countByCategoriaId($categoria);
             $produtos = $this->produtoModel->getByCategoriaIdPaginado($categoria, $limit, $offset);
@@ -99,7 +114,7 @@ class ProdutoController extends Controller {
             $produtos = $this->produtoModel->getAllWithCategoriaPaginado($limit, $offset);
         }
 
-        $totalPages = (int) ceil(($total > 0 ? $total : 0) / $limit);
+        $totalPages = $semPaginacao ? 1 : (int) ceil(($total > 0 ? $total : 0) / $limit);
         if ($totalPages <= 0) $totalPages = 1;
         if ($page > $totalPages) {
             $page = $totalPages;
@@ -182,6 +197,7 @@ class ProdutoController extends Controller {
             'total' => $total,
             'totalPages' => $totalPages,
             'clube_acesso' => $clubeAccess['acesso'],
+            'ver_todos' => $verTodos,
         ]);
     }
 
