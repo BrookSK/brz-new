@@ -151,7 +151,7 @@ ob_start();
                                 <input class="form-check-input" type="checkbox" value="1" id="qc_turbo">
                                 <label class="form-check-label" for="qc_turbo">
                                     Ativar Clube Turbo
-                                    <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top" title="Com o Clube Turbo, sua recarga rende mais (rendimento especial configurado pelo admin), mas o saldo fica bloqueado por um período mínimo de 6 meses. Após esse prazo, o saldo e os rendimentos ficam disponíveis para uso.">
+                                    <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top" title="Com o Clube Turbo, sua recarga rende mais (rendimento especial), mas o saldo fica bloqueado por um período mínimo de 6 meses. Após esse prazo, o saldo e os rendimentos ficam disponíveis para uso.">
                                         <i class="fas fa-question-circle text-muted" style="cursor:pointer;"></i>
                                     </span>
                                 </label>

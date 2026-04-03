@@ -21,6 +21,20 @@ class AdminClubeRecargasController extends Controller {
             'total_pago_brl' => 0.0,
             'cap_brl' => (float) self::CLUBE_CAP_BRL,
             'cap_reached' => false,
+            // Turbo
+            'turbo_registros' => 0,
+            'turbo_usd' => 0.0,
+            'turbo_brl' => 0.0,
+            'turbo_pago_registros' => 0,
+            'turbo_pago_usd' => 0.0,
+            'turbo_pago_brl' => 0.0,
+            // Normal
+            'normal_registros' => 0,
+            'normal_usd' => 0.0,
+            'normal_brl' => 0.0,
+            'normal_pago_registros' => 0,
+            'normal_pago_usd' => 0.0,
+            'normal_pago_brl' => 0.0,
         ];
 
         try {
@@ -71,7 +85,7 @@ class AdminClubeRecargasController extends Controller {
             if ($limit <= 0) $limit = 200;
             if ($limit > 1000) $limit = 1000;
 
-            $stmt = $db->prepare("SELECT id, usuario_id, pagador_nome, pagador_email, pagador_documento, metodo, moeda, valor, usd_brl_rate, valor_brl, gateway, payment_id, status, tipo_recarga, created_at, paid_at
+            $stmt = $db->prepare("SELECT id, usuario_id, pagador_nome, pagador_email, pagador_documento, metodo, moeda, valor, usd_brl_rate, valor_brl, gateway, payment_id, status, tipo_recarga, locked_until, created_at, paid_at
                 FROM carteira_recargas
                 WHERE origem = 'clube_quick_checkout'
                 ORDER BY created_at DESC, id DESC
@@ -81,14 +95,26 @@ class AdminClubeRecargasController extends Controller {
 
             $stats['total_registros'] = count($rows);
             foreach ($rows as $r) {
-                $stats['total_usd'] += (float) ($r['valor'] ?? 0);
-                $stats['total_brl'] += (float) ($r['valor_brl'] ?? 0);
+                $vUsd = (float) ($r['valor'] ?? 0);
+                $vBrl = (float) ($r['valor_brl'] ?? 0);
+                $tipo = strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal')));
+                $isTurbo = ($tipo === 'turbo');
+                $prefix = $isTurbo ? 'turbo' : 'normal';
+
+                $stats['total_usd'] += $vUsd;
+                $stats['total_brl'] += $vBrl;
+                $stats[$prefix . '_registros']++;
+                $stats[$prefix . '_usd'] += $vUsd;
+                $stats[$prefix . '_brl'] += $vBrl;
 
                 $st = strtolower(trim((string) ($r['status'] ?? 'pending')));
                 if (in_array($st, ['paid', 'approved', 'credited'], true)) {
                     $stats['total_pago_registros']++;
-                    $stats['total_pago_usd'] += (float) ($r['valor'] ?? 0);
-                    $stats['total_pago_brl'] += (float) ($r['valor_brl'] ?? 0);
+                    $stats['total_pago_usd'] += $vUsd;
+                    $stats['total_pago_brl'] += $vBrl;
+                    $stats[$prefix . '_pago_registros']++;
+                    $stats[$prefix . '_pago_usd'] += $vUsd;
+                    $stats[$prefix . '_pago_brl'] += $vBrl;
                 }
             }
 
