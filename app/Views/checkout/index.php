@@ -778,8 +778,8 @@
                                 </div>
                                 <?php if (!empty($free_offer_info)): ?>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted"><i class="fas fa-gift me-1 text-success"></i>Brinde:</span>
-                                        <span><span class="text-decoration-line-through text-muted">$ <?= number_format($free_offer_info['preco_original'], 2, '.', ',') ?></span> <span class="text-success fw-bold">GRÁTIS</span></span>
+                                        <span class="text-muted text-truncate me-2"><i class="fas fa-gift me-1 text-success"></i>Brinde:</span>
+                                        <span class="text-nowrap"><span class="text-decoration-line-through text-muted">$ <?= number_format($free_offer_info['preco_original'], 2, '.', ',') ?></span> <span class="text-success fw-bold">GRÁTIS</span></span>
                                     </div>
                                 <?php endif; ?>
 
