@@ -336,8 +336,22 @@
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
-                        <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
+                        <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
+                            <span class="cart-currency text-decoration-line-through text-muted" data-original-value="<?= $taxa_servico_original ?>">$ <?= number_format($taxa_servico_original, 2, ',', '.') ?></span>
+                        <?php else: ?>
+                            <span class="cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
+                        <?php endif; ?>
                     </div>
+                    <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
+                        <div class="d-flex justify-content-between mb-1 small">
+                            <span class="text-success"><i class="fas fa-tags me-1"></i><?= __('cart.promo_discount', 'Desconto promocional') ?></span>
+                            <span class="text-success cart-currency" data-original-value="<?= $taxa_servico_desconto_aplicado ?>">-<?= number_format($taxa_servico_desconto_aplicado, 2, ',', '.') ?></span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 small">
+                            <span class="fw-semibold"><?= __('cart.service_fee_final', 'Taxa de serviço final') ?></span>
+                            <span class="fw-semibold cart-currency taxa-servico-value" data-original-value="<?= $taxa_servico ?>"><?= number_format($taxa_servico, 2, ',', '.') ?></span>
+                        </div>
+                    <?php endif; ?>
                     
                     <?php if (empty($entrega_fora_br)): ?>
                     <div class="d-flex justify-content-between mb-2">

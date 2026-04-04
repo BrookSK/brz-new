@@ -2214,7 +2214,12 @@ class CheckoutController extends Controller {
         // Calcular valores no backend sempre em USD (moeda base), para evitar mistura de moedas.
         // A conversão para BRL é feita no JS da view (assim como no carrinho).
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
-        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+        $taxaServicoBruta = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+
+        // Aplicar desconto promocional na taxa de serviço (compra orgânica)
+        $descontoTaxaInfo = $this->carrinhoModel->calcularDescontoTaxaServico($taxaServicoBruta);
+        $taxaServico = $descontoTaxaInfo['final'];
+
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
@@ -2381,6 +2386,10 @@ class CheckoutController extends Controller {
             'moeda' => $_GET['moeda'] ?? 'BRL',
             'frete' => $frete,
             'taxa_servico' => $taxaServico,
+            'taxa_servico_original' => $descontoTaxaInfo['original'] ?? null,
+            'taxa_servico_desconto_tipo' => $descontoTaxaInfo['tipo'] ?? null,
+            'taxa_servico_desconto_valor' => $descontoTaxaInfo['valor_config'] ?? null,
+            'taxa_servico_desconto_aplicado' => $descontoTaxaInfo['desconto_aplicado'] ?? null,
             'impostos' => $impostos,
             'imposto_local' => $impostoLocal,
             'imposto_local_percent' => $impostoLocalPercent,
@@ -5021,6 +5030,8 @@ class CheckoutController extends Controller {
                     'subtotal_produtos' => number_format($carrinho['subtotal_produtos'], 2, ',', '.'),
                     'valor_frete' => number_format($carrinho['frete_manual'], 2, ',', '.'),
                     'taxa_servico' => number_format($carrinho['taxa_servico'], 2, ',', '.'),
+                    'taxa_servico_original' => isset($carrinho['taxa_servico_original']) ? number_format((float) $carrinho['taxa_servico_original'], 2, ',', '.') : null,
+                    'taxa_servico_desconto_aplicado' => isset($carrinho['taxa_servico_desconto_aplicado']) ? number_format((float) $carrinho['taxa_servico_desconto_aplicado'], 2, ',', '.') : null,
                     'valor_impostos' => number_format($carrinho['valor_impostos'], 2, ',', '.'),
                     'valor_total' => number_format($carrinho['valor_total'], 2, ',', '.'),
                     'valor_total_brl' => number_format($carrinho['valor_total'] * $taxaConversao, 2, ',', '.'),
@@ -5368,7 +5379,12 @@ class CheckoutController extends Controller {
 
             // Calcular em USD (mesma regra do carrinho/checkout)
             $freteUsd = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
-            $taxaServicoUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+            $taxaServicoBrutaUsd = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+
+            // Aplicar desconto promocional na taxa de serviço (compra orgânica)
+            $descontoTaxaInfo = $this->carrinhoModel->calcularDescontoTaxaServico($taxaServicoBrutaUsd);
+            $taxaServicoUsd = $descontoTaxaInfo['final'];
+
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
 
             // Admin: modo teste — taxa de serviço fixa em $1.00
@@ -5596,6 +5612,42 @@ class CheckoutController extends Controller {
                 if (is_array($colsPed) && in_array('origem_pedido', $colsPed, true)) {
                     $stmtOrigem = $db->prepare('UPDATE pedidos SET origem_pedido = ? WHERE id = ?');
                     $stmtOrigem->execute(['organico', $pedidoId]);
+                }
+
+                // Persistir desconto promocional na taxa de serviço (histórico fixo)
+                if (isset($descontoTaxaInfo) && !empty($descontoTaxaInfo['desconto_aplicado']) && (float) $descontoTaxaInfo['desconto_aplicado'] > 0) {
+                    $setDesc = [];
+                    $pDesc = [':id' => (int) $pedidoId];
+
+                    if (is_array($colsPed) && in_array('taxa_servico_original', $colsPed, true)) {
+                        $origVal = (float) $descontoTaxaInfo['original'];
+                        if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
+                            $origVal = $origVal * $taxaConversao;
+                        }
+                        $setDesc[] = 'taxa_servico_original = :tso';
+                        $pDesc[':tso'] = round($origVal, 2);
+                    }
+                    if (is_array($colsPed) && in_array('taxa_servico_desconto_tipo', $colsPed, true)) {
+                        $setDesc[] = 'taxa_servico_desconto_tipo = :tsdt';
+                        $pDesc[':tsdt'] = (string) $descontoTaxaInfo['tipo'];
+                    }
+                    if (is_array($colsPed) && in_array('taxa_servico_desconto_valor', $colsPed, true)) {
+                        $setDesc[] = 'taxa_servico_desconto_valor = :tsdv';
+                        $pDesc[':tsdv'] = (float) $descontoTaxaInfo['valor_config'];
+                    }
+                    if (is_array($colsPed) && in_array('taxa_servico_desconto_aplicado', $colsPed, true)) {
+                        $descAplicado = (float) $descontoTaxaInfo['desconto_aplicado'];
+                        if ($moedaSelecionada === 'BRL' && $taxaConversao > 1.01) {
+                            $descAplicado = $descAplicado * $taxaConversao;
+                        }
+                        $setDesc[] = 'taxa_servico_desconto_aplicado = :tsda';
+                        $pDesc[':tsda'] = round($descAplicado, 2);
+                    }
+
+                    if (!empty($setDesc)) {
+                        $stmtDesc = $db->prepare('UPDATE pedidos SET ' . implode(', ', $setDesc) . ' WHERE id = :id');
+                        $stmtDesc->execute($pDesc);
+                    }
                 }
             } catch (\Exception $e) {
             }

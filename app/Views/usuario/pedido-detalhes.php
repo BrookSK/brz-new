@@ -349,8 +349,22 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                     </div>
                                     <div class="price-row">
                                         <span><?= __('checkout.service_fee', 'Taxa de Serviço') ?>:</span>
-                                        <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
+                                        <?php if (((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) > 0): ?>
+                                            <span class="text-decoration-line-through text-muted"><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico_original'] ?? 0, 2, ',', '.') ?></span>
+                                        <?php else: ?>
+                                            <span><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
+                                        <?php endif; ?>
                                     </div>
+                                    <?php if (((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) > 0): ?>
+                                    <div class="price-row small">
+                                        <span class="text-success"><i class="fas fa-tags me-1"></i><?= __('cart.promo_discount', 'Desconto promocional') ?></span>
+                                        <span class="text-success">-<?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico_desconto_aplicado'] ?? 0, 2, ',', '.') ?></span>
+                                    </div>
+                                    <div class="price-row small">
+                                        <span class="fw-semibold"><?= __('cart.service_fee_final', 'Taxa de serviço final') ?></span>
+                                        <span class="fw-semibold"><?= $simboloMoeda ?> <?= number_format($pedido['taxa_servico'] ?? 0, 2, ',', '.') ?></span>
+                                    </div>
+                                    <?php endif; ?>
                                     <?php if (((float) ($pedido['valor_impostos'] ?? 0)) > 0): ?>
                                     <div class="price-row">
                                         <span><?= __('checkout.brazil_taxes', 'Impostos do Brasil') ?>:</span>

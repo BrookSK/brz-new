@@ -810,8 +810,22 @@
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
                                     <span><?= $isPaymentLink ? 'Taxa de Serviço' : __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
-                                    <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
+                                    <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
+                                        <span class="text-decoration-line-through text-muted" data-original-value="<?= $taxa_servico_original ?? 0 ?>">$ <?= number_format(($taxa_servico_original ?? 0), 2, '.', ',') ?></span>
+                                    <?php else: ?>
+                                        <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
+                                    <?php endif; ?>
                                 </div>
+                                <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
+                                    <div class="d-flex justify-content-between small text-success">
+                                        <span><i class="fas fa-tags me-1"></i><?= __('cart.promo_discount', 'Desconto promocional') ?></span>
+                                        <span>-$ <?= number_format(($taxa_servico_desconto_aplicado ?? 0), 2, '.', ',') ?></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small fw-semibold">
+                                        <span><?= __('cart.service_fee_final', 'Taxa de serviço final') ?></span>
+                                        <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
+                                    </div>
+                                <?php endif; ?>
                                 <?php if (!empty($is_admin)): ?>
                                 <div class="form-check mt-1 mb-1">
                                     <input class="form-check-input" type="checkbox" id="admin-taxa-teste" name="admin_taxa_teste" value="1">

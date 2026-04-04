@@ -665,6 +665,8 @@ return [
     'cart.order_summary' => 'Order Summary',
     'cart.subtotal_items' => 'Subtotal ({count} items)',
     'cart.service_fee_kg' => 'Service Fee ({kg} kg)',
+    'cart.promo_discount' => 'Promotional discount',
+    'cart.service_fee_final' => 'Final service fee',
     'cart.taxes' => 'Taxes',
     'cart.taxes_brazil' => 'Brazil taxes',
     'cart.shipping_kg' => 'Shipping ({kg} kg)',

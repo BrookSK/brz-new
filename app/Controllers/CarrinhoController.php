@@ -650,6 +650,24 @@ class CarrinhoController extends Controller {
                         $cashbackClubeEstimado = (float) ($row['cashback_clube_estimado'] ?? 0);
                     }
 
+                    // Desconto promocional na taxa de serviço
+                    $taxaServicoOriginal = null;
+                    $taxaServicoDescontoTipo = null;
+                    $taxaServicoDescontoValor = null;
+                    $taxaServicoDescontoAplicado = null;
+                    if (is_array($cols) && in_array('taxa_servico_original', $cols, true)) {
+                        $taxaServicoOriginal = ($row['taxa_servico_original'] !== null) ? (float) $row['taxa_servico_original'] : null;
+                    }
+                    if (is_array($cols) && in_array('taxa_servico_desconto_tipo', $cols, true)) {
+                        $taxaServicoDescontoTipo = $row['taxa_servico_desconto_tipo'] ?? null;
+                    }
+                    if (is_array($cols) && in_array('taxa_servico_desconto_valor', $cols, true)) {
+                        $taxaServicoDescontoValor = ($row['taxa_servico_desconto_valor'] !== null) ? (float) $row['taxa_servico_desconto_valor'] : null;
+                    }
+                    if (is_array($cols) && in_array('taxa_servico_desconto_aplicado', $cols, true)) {
+                        $taxaServicoDescontoAplicado = ($row['taxa_servico_desconto_aplicado'] !== null) ? (float) $row['taxa_servico_desconto_aplicado'] : null;
+                    }
+
                     // Se o DB tiver valores válidos, usar; senão manter cálculo atual
                     $skipPersistedTotals = (isset($cartMoedaFromDb) && $cartMoedaFromDb === 'BRL');
                     if (!$skipPersistedTotals) {
@@ -710,6 +728,10 @@ class CarrinhoController extends Controller {
             'desconto_clube' => $descontoClube,
             'cashback_clube_estimado' => $cashbackClubeEstimado,
             'taxa_servico' => $taxaServico,
+            'taxa_servico_original' => $taxaServicoOriginal ?? null,
+            'taxa_servico_desconto_tipo' => $taxaServicoDescontoTipo ?? null,
+            'taxa_servico_desconto_valor' => $taxaServicoDescontoValor ?? null,
+            'taxa_servico_desconto_aplicado' => $taxaServicoDescontoAplicado ?? null,
             'impostos' => $impostos,
             'imposto_local' => $impostoLocal,
             'imposto_local_percent' => $impostoLocalPercent,
@@ -1252,7 +1274,11 @@ class CarrinhoController extends Controller {
         }
         
         // Taxas fixas
-        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+        $taxaServicoBruta = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+
+        // Aplicar desconto promocional na taxa de serviço
+        $descontoTaxaInfo = $this->carrinhoModel->calcularDescontoTaxaServico($taxaServicoBruta);
+        $taxaServico = $descontoTaxaInfo['final'];
         
         // Frete baseado no peso arredondado
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
@@ -1267,6 +1293,8 @@ class CarrinhoController extends Controller {
             'peso_total' => $pesoTotal,
             'peso_arredondado' => $pesoArredondado,
             'taxa_servico' => $taxaServico,
+            'taxa_servico_original' => $descontoTaxaInfo['original'],
+            'taxa_servico_desconto_aplicado' => $descontoTaxaInfo['desconto_aplicado'],
             'frete' => $frete,
             'impostos' => $impostos,
             'subtotal' => $subtotal,

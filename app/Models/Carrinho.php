@@ -76,13 +76,38 @@ class Carrinho extends Model {
             if (!$this->tableExists('configuracoes_sistema')) {
                 return $default;
             }
+
+            // Tentar buscar pela chave completa (modo chave_valor)
             $stmt = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
             $stmt->execute([(string) $key]);
             $v = $stmt->fetchColumn();
-            if ($v === false || $v === null) {
-                return $default;
+            if ($v !== false && $v !== null) {
+                return $v;
             }
-            return $v;
+
+            // Tentar buscar por categoria + chave (modo categoria_chave)
+            $pos = strpos($key, '_');
+            if ($pos !== false) {
+                $cols = [];
+                try {
+                    $stCols = $this->connection->query('DESCRIBE configuracoes_sistema');
+                    $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $cols = [];
+                }
+                if (is_array($cols) && in_array('categoria', $cols, true)) {
+                    $categoria = substr($key, 0, $pos);
+                    $chave = substr($key, $pos + 1);
+                    $stmt2 = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1');
+                    $stmt2->execute([$categoria, $chave]);
+                    $v2 = $stmt2->fetchColumn();
+                    if ($v2 !== false && $v2 !== null) {
+                        return $v2;
+                    }
+                }
+            }
+
+            return $default;
         } catch (\Exception $e) {
             return $default;
         }
@@ -388,7 +413,11 @@ class Carrinho extends Model {
         $carrinho = $stmt->fetch(\PDO::FETCH_ASSOC);
         
         // Calcular taxas
-        $taxaServico = $this->calcularTaxaServico($pesoTotal, $carrinho['moeda'], $carrinho['taxa_conversao']);
+        $taxaServicoBruta = $this->calcularTaxaServico($pesoTotal, $carrinho['moeda'], $carrinho['taxa_conversao']);
+
+        // Aplicar desconto promocional na taxa de serviço (somente compra orgânica)
+        $descontoTaxaInfo = $this->calcularDescontoTaxaServico((float) $taxaServicoBruta);
+        $taxaServico = $descontoTaxaInfo['final'];
 
         $pctDesconto = $this->getClubeFaixaPercentual((float) $pesoClubeTotal);
         $descontoClube = 0.0;
@@ -437,6 +466,18 @@ class Carrinho extends Model {
         if (is_array($cartCols) && in_array('cashback_clube_estimado', $cartCols, true)) {
             $setExtra .= ', cashback_clube_estimado = :cashback_clube_estimado';
         }
+        if (is_array($cartCols) && in_array('taxa_servico_original', $cartCols, true)) {
+            $setExtra .= ', taxa_servico_original = :taxa_servico_original';
+        }
+        if (is_array($cartCols) && in_array('taxa_servico_desconto_tipo', $cartCols, true)) {
+            $setExtra .= ', taxa_servico_desconto_tipo = :taxa_servico_desconto_tipo';
+        }
+        if (is_array($cartCols) && in_array('taxa_servico_desconto_valor', $cartCols, true)) {
+            $setExtra .= ', taxa_servico_desconto_valor = :taxa_servico_desconto_valor';
+        }
+        if (is_array($cartCols) && in_array('taxa_servico_desconto_aplicado', $cartCols, true)) {
+            $setExtra .= ', taxa_servico_desconto_aplicado = :taxa_servico_desconto_aplicado';
+        }
 
         $stmt = $this->connection->prepare("
             UPDATE {$this->table} 
@@ -465,6 +506,18 @@ class Carrinho extends Model {
         if (strpos($setExtra, ':cashback_clube_estimado') !== false) {
             $stmt->bindValue(':cashback_clube_estimado', (float) $cashbackEstimado);
         }
+        if (strpos($setExtra, ':taxa_servico_original') !== false) {
+            $stmt->bindValue(':taxa_servico_original', (float) $descontoTaxaInfo['original']);
+        }
+        if (strpos($setExtra, ':taxa_servico_desconto_tipo') !== false) {
+            $stmt->bindValue(':taxa_servico_desconto_tipo', $descontoTaxaInfo['tipo']);
+        }
+        if (strpos($setExtra, ':taxa_servico_desconto_valor') !== false) {
+            $stmt->bindValue(':taxa_servico_desconto_valor', (float) $descontoTaxaInfo['valor_config']);
+        }
+        if (strpos($setExtra, ':taxa_servico_desconto_aplicado') !== false) {
+            $stmt->bindValue(':taxa_servico_desconto_aplicado', (float) $descontoTaxaInfo['desconto_aplicado']);
+        }
         $stmt->bindValue(':id', (int) $carrinhoId);
         $stmt->execute();
     }
@@ -478,6 +531,55 @@ class Carrinho extends Model {
         $pesoArredondado = ceil((float) $pesoKg);
         $taxaUSD = $pesoArredondado * $taxaPorKg;
         return $taxaUSD;
+    }
+
+    /**
+     * Calcula o desconto promocional na taxa de serviço (somente compra orgânica).
+     * Retorna array com: original, tipo, valor_config, desconto_aplicado, final
+     */
+    public function calcularDescontoTaxaServico(float $taxaServicoOriginal): array {
+        $result = [
+            'original' => $taxaServicoOriginal,
+            'tipo' => null,
+            'valor_config' => 0.0,
+            'desconto_aplicado' => 0.0,
+            'final' => $taxaServicoOriginal,
+        ];
+
+        $ativo = $this->getConfigValue('promocao_taxa_servico_ativo', '0');
+        if ((string) $ativo !== '1') {
+            return $result;
+        }
+
+        $tipo = (string) $this->getConfigValue('promocao_taxa_servico_tipo', 'percentual');
+        $valor = (float) $this->getConfigValue('promocao_taxa_servico_valor', '0');
+
+        if ($valor <= 0) {
+            return $result;
+        }
+
+        $result['tipo'] = $tipo;
+        $result['valor_config'] = $valor;
+
+        if ($tipo === 'percentual') {
+            $desconto = $taxaServicoOriginal * ($valor / 100.0);
+        } else {
+            // valor fixo (USD)
+            $desconto = $valor;
+        }
+
+        // Nunca deixar negativo
+        if ($desconto > $taxaServicoOriginal) {
+            $desconto = $taxaServicoOriginal;
+        }
+        if ($desconto < 0) {
+            $desconto = 0.0;
+        }
+
+        $result['desconto_aplicado'] = round($desconto, 2);
+        $result['final'] = round($taxaServicoOriginal - $desconto, 2);
+
+        return $result;
     }
 
     public function calcularImpostos($valorProdutos, $valorFrete) {

@@ -2172,6 +2172,68 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="row">
                                                 <div class="col-12">
+                                                    <div class="card border-success mb-3">
+                                                        <div class="card-header bg-success bg-opacity-10">
+                                                            <h6 class="mb-0"><i class="fas fa-tags me-1"></i> Desconto Promocional na Taxa de Serviço (Compra Orgânica)</h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <div class="alert alert-info small mb-3">
+                                                                <i class="fas fa-info-circle me-1"></i>
+                                                                Este desconto é aplicado <strong>somente sobre a taxa de serviço</strong> em compras orgânicas reais.
+                                                                Não se aplica a redirecionamentos, vendas manuais ou compras feitas pelo admin em nome do cliente.
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox" id="promocao_taxa_servico_ativo" name="promocao_taxa_servico_ativo" value="1" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_ativo', '0') === '1' ? 'checked' : '') . '>
+                                                                    <label class="form-check-label" for="promocao_taxa_servico_ativo">
+                                                                        <strong>Ativar desconto na taxa de serviço</strong>
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Tipo de desconto</label>
+                                                                        <select class="form-select" name="promocao_taxa_servico_tipo" id="promocao_taxa_servico_tipo">
+                                                                            <option value="percentual" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_tipo', 'percentual') === 'percentual' ? 'selected' : '') . '>Porcentagem (%)</option>
+                                                                            <option value="fixo" ' . ($this->getConfigValue($config, 'promocao', 'taxa_servico_tipo', 'percentual') === 'fixo' ? 'selected' : '') . '>Valor fixo (USD)</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label">Valor do desconto</label>
+                                                                        <input type="number" class="form-control" name="promocao_taxa_servico_valor" id="promocao_taxa_servico_valor" value="' . $this->getConfigValue($config, 'promocao', 'taxa_servico_valor', '0') . '" step="0.01" min="0">
+                                                                        <small class="text-muted" id="promocao_taxa_servico_hint">Ex: 10 = 10% de desconto na taxa de serviço</small>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <script>
+                                                            document.addEventListener("DOMContentLoaded", function() {
+                                                                var tipoSel = document.getElementById("promocao_taxa_servico_tipo");
+                                                                var hint = document.getElementById("promocao_taxa_servico_hint");
+                                                                if (tipoSel && hint) {
+                                                                    function updateHint() {
+                                                                        if (tipoSel.value === "fixo") {
+                                                                            hint.textContent = "Ex: 8 = US$ 8.00 de desconto na taxa de serviço";
+                                                                        } else {
+                                                                            hint.textContent = "Ex: 10 = 10% de desconto na taxa de serviço";
+                                                                        }
+                                                                    }
+                                                                    tipoSel.addEventListener("change", updateHint);
+                                                                    updateHint();
+                                                                }
+                                                            });
+                                                            </script>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="row">
+                                                <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header">
                                                             <h6 class="mb-0">👑 Clube Brasiliana</h6>
@@ -4377,10 +4439,11 @@ HTML;
                 'woocommerce_us' => ['store_url', 'consumer_key', 'consumer_secret'],
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
-                'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url']
+                'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url'],
+                'promocao' => ['taxa_servico_ativo', 'taxa_servico_tipo', 'taxa_servico_valor']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
@@ -4422,6 +4485,13 @@ HTML;
                             $valor = is_numeric($valor) ? (float) $valor : 0;
                             if ($valor < 0) $valor = 0;
                             if ($valor > 100) $valor = 100;
+                        }
+                        if ($categoria === 'promocao' && $chave === 'taxa_servico_tipo') {
+                            $valor = in_array($valor, ['percentual', 'fixo'], true) ? $valor : 'percentual';
+                        }
+                        if ($categoria === 'promocao' && $chave === 'taxa_servico_valor') {
+                            $valor = is_numeric($valor) ? (float) $valor : 0;
+                            if ($valor < 0) $valor = 0;
                         }
                         if ($chave === 'comissao_percentual') {
                             $valor = is_numeric($valor) ? floatval($valor) : 0;
