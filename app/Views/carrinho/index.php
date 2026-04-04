@@ -711,7 +711,11 @@ function aceitarOfertaGratuita() {
         .then(data => {
             if (data && data.success) {
                 btn.innerHTML = '\u2705 Brinde adicionado!';
-                setTimeout(function() { location.reload(); }, 800);
+                // Recarregar sem ?test_oferta=1 para não entrar em loop
+                setTimeout(function() {
+                    var cleanUrl = window.location.pathname;
+                    window.location.href = cleanUrl;
+                }, 800);
             } else {
                 alert(data.error || 'Erro ao aceitar oferta');
                 btn.disabled = false;
@@ -729,6 +733,11 @@ function recusarOfertaGratuita() {
     fetch('/oferta-gratuita/recusar', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function() {
             try { bootstrap.Modal.getInstance(document.getElementById('modalOfertaGratuita')).hide(); } catch(e) {}
+            // Recarregar sem ?test_oferta=1
+            var cleanUrl = window.location.pathname;
+            if (window.location.search.indexOf('test_oferta=1') !== -1) {
+                window.location.href = cleanUrl;
+            }
         })
         .catch(function() {
             try { bootstrap.Modal.getInstance(document.getElementById('modalOfertaGratuita')).hide(); } catch(e) {}
