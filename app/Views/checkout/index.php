@@ -811,7 +811,7 @@
                                 <div class="d-flex justify-content-between">
                                     <span><?= $isPaymentLink ? 'Taxa de Serviço' : __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
                                     <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
-                                        <span class="text-decoration-line-through text-muted" data-original-value="<?= $taxa_servico_original ?? 0 ?>">$ <?= number_format(($taxa_servico_original ?? 0), 2, '.', ',') ?></span>
+                                        <span id="taxa-servico-original" class="cart-currency text-decoration-line-through text-muted" data-original-value="<?= $taxa_servico_original ?? 0 ?>"><?= number_format(($taxa_servico_original ?? 0), 2, '.', ',') ?></span>
                                     <?php else: ?>
                                         <span id="taxa-servico" class="cart-currency" data-original-value="<?= $taxa_servico ?? 0 ?>"><?= number_format(($taxa_servico ?? 0), 2, '.', ',') ?></span>
                                     <?php endif; ?>
@@ -819,7 +819,7 @@
                                 <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
                                     <div class="d-flex justify-content-between small text-success">
                                         <span><i class="fas fa-tags me-1"></i><?= __('cart.promo_discount', 'Desconto promocional') ?></span>
-                                        <span>-$ <?= number_format(($taxa_servico_desconto_aplicado ?? 0), 2, '.', ',') ?></span>
+                                        <span class="text-success">-<span id="taxa-servico-desconto" class="cart-currency" data-original-value="<?= $taxa_servico_desconto_aplicado ?? 0 ?>"><?= number_format(($taxa_servico_desconto_aplicado ?? 0), 2, '.', ',') ?></span></span>
                                     </div>
                                     <div class="d-flex justify-content-between small fw-semibold">
                                         <span><?= __('cart.service_fee_final', 'Taxa de serviço final') ?></span>
@@ -2333,6 +2333,8 @@ function updatePrices(currency) {
             subtotal: <?= $subtotal ?>,
             frete: <?= ($frete ?? 0) ?>,
             taxaServico: <?= ($taxa_servico ?? 0) ?>,
+            taxaServicoOriginal: <?= ($taxa_servico_original ?? 0) ?>,
+            taxaServicoDesconto: <?= ($taxa_servico_desconto_aplicado ?? 0) ?>,
             impostos: <?= ($impostos ?? 0) ?>,
             impostosCalculado: <?= ($impostos_calculado ?? $impostos ?? 0) ?>,
             impostoLocal: <?= ($imposto_local ?? 0) ?>,
@@ -2351,6 +2353,8 @@ function updatePrices(currency) {
         subtotal: originalValues.subtotal * rate,
         frete: originalValues.frete * rate,
         taxaServico: originalValues.taxaServico * rate,
+        taxaServicoOriginal: (originalValues.taxaServicoOriginal || 0) * rate,
+        taxaServicoDesconto: (originalValues.taxaServicoDesconto || 0) * rate,
         impostos: originalValues.impostos * rate,
         impostoLocal: (originalValues.impostoLocal || 0) * rate,
         total: originalValues.total * rate
@@ -2364,6 +2368,8 @@ function updatePrices(currency) {
             subtotal: document.getElementById('subtotal'),
             frete: document.getElementById('frete'),
             taxaServico: document.getElementById('taxa-servico'),
+            taxaServicoOriginal: document.getElementById('taxa-servico-original'),
+            taxaServicoDesconto: document.getElementById('taxa-servico-desconto'),
             impostos: document.getElementById('impostos'),
             impostoLocal: document.getElementById('imposto-local'),
             total: document.getElementById('total')
@@ -2379,6 +2385,11 @@ function updatePrices(currency) {
             if (element) {
                 if (key === 'frete' && originalValues.frete === 0) {
                     element.textContent = 'Frete grátis';
+                } else if (key === 'taxaServicoDesconto') {
+                    const value = convertedValues[key];
+                    if (value > 0) {
+                        element.textContent = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
+                    }
                 } else {
                     const value = convertedValues[key];
                     const formattedValue = currencySymbol + ' ' + value.toFixed(2).replace('.', ',');
