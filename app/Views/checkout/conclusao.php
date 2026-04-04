@@ -82,16 +82,32 @@
                             </thead>
                             <tbody>
                                 <?php foreach ($itens as $item): ?>
+                                <?php $isItemFree = !empty($item['is_free_offer']); ?>
                                 <tr>
                                     <td>
                                         <?= htmlspecialchars($item['nome']) ?>
+                                        <?php if ($isItemFree): ?>
+                                            <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Gratuito</span>
+                                        <?php endif; ?>
                                         <?php if (!empty($item['variacao_descricao']) || !empty($item['variacao_label'])): ?>
                                             <div class="small text-muted"><?= htmlspecialchars((string) ($item['variacao_descricao'] ?? $item['variacao_label']), ENT_QUOTES, 'UTF-8') ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center"><?= $item['quantidade'] ?></td>
-                                    <td class="text-end"><?= $simboloMoeda ?> <?= number_format($item['preco_unitario'], 2, ',', '.') ?></td>
-                                    <td class="text-end"><?= $simboloMoeda ?> <?= number_format($item['subtotal'], 2, ',', '.') ?></td>
+                                    <td class="text-end">
+                                        <?php if ($isItemFree): ?>
+                                            <span class="text-decoration-line-through text-muted"><?= $simboloMoeda ?> <?= number_format((float) ($item['free_offer_original_price'] ?? $item['preco_unitario']), 2, ',', '.') ?></span>
+                                        <?php else: ?>
+                                            <?= $simboloMoeda ?> <?= number_format($item['preco_unitario'], 2, ',', '.') ?>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end">
+                                        <?php if ($isItemFree): ?>
+                                            <span class="text-success fw-bold">GRÁTIS</span>
+                                        <?php else: ?>
+                                            <?= $simboloMoeda ?> <?= number_format($item['subtotal'], 2, ',', '.') ?>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -129,10 +145,24 @@
                     <h5 class="mb-0"><i class="fas fa-calculator"></i> <?= __('checkout_done.values', 'Valores') ?></h5>
                 </div>
                 <div class="card-body">
+                    <?php
+                    // Detectar item gratuito para exibir info de desconto
+                    $freeItem = null;
+                    foreach ($itens as $it) {
+                        if (!empty($it['is_free_offer'])) { $freeItem = $it; break; }
+                    }
+                    $freeOrigPrice = $freeItem ? (float) ($freeItem['free_offer_original_price'] ?? $freeItem['preco_unitario'] ?? 0) : 0;
+                    ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('checkout_done.subtotal', 'Subtotal') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['subtotal'], 2, ',', '.') ?></span>
                     </div>
+                    <?php if ($freeItem): ?>
+                        <div class="d-flex justify-content-between mb-2 small">
+                            <span class="text-muted text-truncate me-2"><i class="fas fa-gift me-1 text-success"></i>Brinde:</span>
+                            <span class="text-nowrap"><span class="text-decoration-line-through text-muted"><?= $simboloMoeda ?> <?= number_format($freeOrigPrice, 2, ',', '.') ?></span> <span class="text-success fw-bold">GRÁTIS</span></span>
+                        </div>
+                    <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('checkout_done.shipping', 'Frete') ?>:</span>
                         <?php $freteVal = (float) ($pedido['frete'] ?? 0); ?>
@@ -147,6 +177,25 @@
                         <span><?= __('checkout_done.taxes_brazil', 'Impostos do Brasil') ?>:</span>
                         <span><?= $simboloMoeda ?> <?= number_format($pedido['impostos'], 2, ',', '.') ?></span>
                     </div>
+                    <?php if ($freeItem && $freeOrigPrice > 0): ?>
+                        <?php
+                        $freeImpostoTeorico = (float) ($freeItem['free_offer_tax_teorico'] ?? 0);
+                        if ($freeImpostoTeorico <= 0) {
+                            // Calcular estimativa: mesma alíquota do pedido
+                            $aliquota = ($pedido['subtotal'] > 0) ? ($pedido['impostos'] / $pedido['subtotal']) : 0;
+                            $freeImpostoTeorico = $freeOrigPrice * $aliquota;
+                        }
+                        ?>
+                        <?php if ($freeImpostoTeorico > 0): ?>
+                        <div class="d-flex justify-content-between mb-1 small">
+                            <span class="text-muted">Imposto do brinde (não cobrado):</span>
+                            <span class="text-nowrap text-decoration-line-through text-muted"><?= $simboloMoeda ?> <?= number_format($freeImpostoTeorico, 2, ',', '.') ?></span>
+                        </div>
+                        <div class="small text-success mb-2">
+                            <i class="fas fa-gift me-1"></i> A Braziliana pagou o imposto do brinde por você!
+                        </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <?php if (((float) ($pedido['imposto_local'] ?? 0)) > 0): ?>
                     <div class="d-flex justify-content-between mb-2">
