@@ -179,10 +179,11 @@
                                 </div>
                                 <div class="col-8 col-md-3 text-start text-md-end mt-2 mt-md-0">
                                     <?php if (!empty($item['is_free_offer'])): ?>
-                                        <div class="fw-bold text-success">GRÁTIS</div>
-                                        <small class="text-muted text-decoration-line-through">
-                                            <?= number_format((float) ($item['free_offer_original_price'] ?? 0), 2, ',', '.') ?>
-                                        </small>
+                                        <?php $freeOrigPrice = (float) ($item['free_offer_original_price'] ?? 0); ?>
+                                        <?php if ($freeOrigPrice > 0): ?>
+                                            <div class="text-muted small text-decoration-line-through">$ <?= number_format($freeOrigPrice, 2, ',', '.') ?></div>
+                                        <?php endif; ?>
+                                        <div class="fw-bold text-success" style="font-size:1.1em;">GRÁTIS</div>
                                     <?php else: ?>
                                     <div class="fw-bold">
                                         <span class="cart-item-subtotal" data-original-price="<?= $item['subtotal'] ?>">
@@ -514,25 +515,126 @@ function limparCarrinho() {
 </script>
 
 <!-- Modal Oferta Gratuita -->
+<style>
+@keyframes ofertaPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+@keyframes ofertaShine {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+#modalOfertaGratuita .modal-content {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 3px solid #28a745;
+}
+#modalOfertaGratuita .oferta-header {
+    background: linear-gradient(135deg, #1a7a3a 0%, #28a745 40%, #34d058 100%);
+    padding: 24px 20px 18px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+#modalOfertaGratuita .oferta-header::before {
+    content: '\1F340 \2728 \1F381 \2728 \1F340';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    letter-spacing: 8px;
+    opacity: 0.5;
+}
+#modalOfertaGratuita .oferta-icon {
+    font-size: 48px;
+    animation: ofertaPulse 1.5s ease-in-out infinite;
+    display: inline-block;
+    margin-bottom: 6px;
+}
+#modalOfertaGratuita .oferta-titulo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 0;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+#modalOfertaGratuita .oferta-subtitulo {
+    color: rgba(255,255,255,0.85);
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+#modalOfertaGratuita .oferta-preco-tag {
+    display: inline-block;
+    background: linear-gradient(90deg, #ffd700, #ffec80, #ffd700);
+    background-size: 200% auto;
+    animation: ofertaShine 2s linear infinite;
+    color: #1a5c2a;
+    font-weight: 900;
+    font-size: 1.3rem;
+    padding: 6px 22px;
+    border-radius: 30px;
+    box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+}
+#modalOfertaGratuita .oferta-aviso-unico {
+    background: #fff8e1;
+    border: 1px dashed #f9a825;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    color: #7b6b1a;
+}
+#modalOfertaGratuita .btn-aceitar-oferta {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 12px 24px;
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(40,167,69,0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+#modalOfertaGratuita .btn-aceitar-oferta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(40,167,69,0.45);
+}
+</style>
+
 <div class="modal fade" id="modalOfertaGratuita" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-success text-white border-0">
-                <h5 class="modal-title"><i class="fas fa-gift me-2"></i> Presente para você!</h5>
+        <div class="modal-content border-0 shadow-lg">
+            <div class="oferta-header">
+                <div class="oferta-icon">&#x1F340;</div>
+                <h5 class="oferta-titulo">Dia de sorte! Um presente especial</h5>
+                <div class="oferta-subtitulo">Selecionamos um brinde exclusivo para o seu pedido</div>
             </div>
-            <div class="modal-body text-center py-4">
+            <div class="modal-body text-center py-4 px-4">
                 <div id="ofertaGratuitaConteudo">
-                    <img id="ofertaFoto" src="" alt="Produto gratuito" class="img-fluid rounded mb-3" style="max-height:200px; object-fit:contain; display:none;">
-                    <h5 id="ofertaNome" class="mb-2"></h5>
-                    <p class="text-muted mb-1">Valor original: <strong><span id="ofertaPrecoOriginal"></span></strong></p>
-                    <p class="text-success fw-bold fs-5 mb-1">Você paga: R$ 0,00 pelo produto</p>
-                    <p class="text-muted small mb-3">Você paga apenas a taxa de serviço referente ao peso (<span id="ofertaTaxaServico"></span>). Sem imposto adicional — a Braziliana paga por você!</p>
+                    <img id="ofertaFoto" src="" alt="Produto gratuito" class="img-fluid rounded mb-3" style="max-height:180px; object-fit:contain; display:none; border: 2px solid #e9ecef; border-radius: 12px !important;">
+
+                    <h5 id="ofertaNome" class="mb-2 fw-bold"></h5>
+
+                    <div class="mb-3">
+                        <div class="text-muted small mb-1">Valor original: <span class="text-decoration-line-through" id="ofertaPrecoOriginal"></span></div>
+                        <div class="oferta-preco-tag">GRÁTIS</div>
+                    </div>
+
+                    <div class="text-muted small mb-3" style="line-height: 1.5;">
+                        Você paga apenas a taxa de serviço pelo peso (<strong id="ofertaTaxaServico"></strong>).<br>
+                        <span class="text-success fw-semibold">Sem imposto adicional — a Braziliana paga por você! &#x1F389;</span>
+                    </div>
+
+                    <div class="oferta-aviso-unico mb-3">
+                        <i class="fas fa-exclamation-circle me-1"></i>
+                        <strong>Atenção:</strong> esta oferta é única e exclusiva. Após sua escolha (aceitar ou recusar), ela não aparecerá novamente.
+                    </div>
+
                     <div class="d-grid gap-2">
-                        <button id="btnAceitarOferta" class="btn btn-success btn-lg" onclick="aceitarOfertaGratuita()">
-                            <i class="fas fa-gift me-2"></i> Quero meu produto gratuito!
+                        <button id="btnAceitarOferta" class="btn btn-aceitar-oferta btn-lg text-white" onclick="aceitarOfertaGratuita()">
+                            &#x1F340; Quero meu brinde gratuito!
                         </button>
-                        <button id="btnRecusarOferta" class="btn btn-outline-secondary" onclick="recusarOfertaGratuita()">
-                            Agora não, continuar sem adicionar
+                        <button id="btnRecusarOferta" class="btn btn-outline-secondary btn-sm" onclick="recusarOfertaGratuita()" style="border-radius: 10px;">
+                            Não, obrigado — continuar sem o brinde
                         </button>
                     </div>
                 </div>
@@ -576,23 +678,24 @@ function limparCarrinho() {
 function aceitarOfertaGratuita() {
     var btn = document.getElementById('btnAceitarOferta');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Adicionando...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Adicionando ao carrinho...';
 
     fetch('/oferta-gratuita/aceitar', { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(r => r.json())
         .then(data => {
             if (data && data.success) {
-                location.reload();
+                btn.innerHTML = '\u2705 Brinde adicionado!';
+                setTimeout(function() { location.reload(); }, 800);
             } else {
                 alert(data.error || 'Erro ao aceitar oferta');
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-gift me-2"></i> Quero meu produto gratuito!';
+                btn.innerHTML = '\uD83C\uDF40 Quero meu brinde gratuito!';
             }
         })
         .catch(function() {
             alert('Erro de conexão');
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-gift me-2"></i> Quero meu produto gratuito!';
+            btn.innerHTML = '\uD83C\uDF40 Quero meu brinde gratuito!';
         });
 }
 

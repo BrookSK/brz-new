@@ -682,6 +682,26 @@ class CheckoutController extends Controller {
         return $p;
     }
 
+    private function calcularFreeOfferInfo(array $items): ?array {
+        foreach ($items as $item) {
+            if (!empty($item['is_free_offer'])) {
+                $origPrice = (float) ($item['free_offer_original_price'] ?? ($item['preco'] ?? 0));
+                $peso = (float) ($item['peso'] ?? 0.5);
+                if ($peso <= 0) $peso = 0.5;
+                $impostoTeorico = (float) $this->carrinhoModel->calcularImpostos($origPrice, 0);
+                $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($peso, 'USD', 1.0);
+                return [
+                    'nome' => (string) ($item['nome'] ?? ''),
+                    'preco_original' => $origPrice,
+                    'imposto_teorico' => $impostoTeorico,
+                    'taxa_servico' => $taxaServico,
+                    'peso' => $peso,
+                ];
+            }
+        }
+        return null;
+    }
+
     private function calcularFrete(float $subtotal, float $pesoTotal, string $moeda = 'USD'): float {
         $calcularAutomatico = $this->getConfigValue('entrega_calcular_automatico', '1');
         $calcularAutomatico = ($calcularAutomatico === '1' || strtolower((string) $calcularAutomatico) === 'true');
@@ -1879,6 +1899,8 @@ class CheckoutController extends Controller {
                             'quantidade' => $qtd,
                             'subtotal' => $sub,
                             'peso' => 0.0,
+                            'is_free_offer' => (int) ($it['is_free_offer'] ?? 0),
+                            'free_offer_original_price' => isset($it['free_offer_original_price']) ? (float) $it['free_offer_original_price'] : null,
                         ];
                     }
 
@@ -2112,10 +2134,17 @@ class CheckoutController extends Controller {
                 'produto_variacao_id' => $item['produto_variacao_id'] ?? null,
                 'variacao_descricao' => $item['variacao_descricao'] ?? null,
                 'clube_ativo' => $isClubeAtivo ? 1 : 0,
+                'is_free_offer' => !empty($item['is_free_offer']) ? 1 : 0,
+                'free_offer_original_price' => (float) ($item['free_offer_original_price'] ?? 0),
             ];
             
             $items[] = $produto;
-            $subtotal += $produto['subtotal'];
+            
+            // Item gratuito: não entra no subtotal, mas entra no peso
+            $isFreeOffer = !empty($item['is_free_offer']);
+            if (!$isFreeOffer) {
+                $subtotal += $produto['subtotal'];
+            }
             $pesoTotal += $pesoItem;
 
             $this->debugLog('[CHECKOUT_INDEX] Item: ' . json_encode($item));
@@ -2378,6 +2407,7 @@ class CheckoutController extends Controller {
             'cambioreal_base_url' => $this->paymentService->getCambioRealBaseUrlPublic(),
             'cambioreal_rate_brl' => $rateBRL,
             'pix_desconto_taxa_servico_percent' => $this->getPixDescontoTaxaServicoPercent(),
+            'free_offer_info' => $this->calcularFreeOfferInfo($items),
         ]);
     }
 
@@ -5284,7 +5314,11 @@ class CheckoutController extends Controller {
                 $precoUnitario = $item['preco_unitario'] ?? $item['price'] ?? $item['preco'] ?? 0;
                 $quantidade = $item['quantidade'] ?? 1;
                 
-                $subtotal += $precoUnitario * $quantidade;
+                // Item gratuito: não entra no subtotal, mas entra no peso
+                $isFreeOfferItem = !empty($item['is_free_offer']);
+                if (!$isFreeOfferItem) {
+                    $subtotal += $precoUnitario * $quantidade;
+                }
 
                 // Peso real (kg) quando disponível
                 $pesoUnit = (float) ($item['peso'] ?? ($item['weight'] ?? 0));

@@ -605,6 +605,9 @@
                                         <div>
                                             <small>
                                                 <?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)
+                                                <?php if (!empty($item['is_free_offer'])): ?>
+                                                    <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Gratuito</span>
+                                                <?php endif; ?>
                                                 <?php if (!empty($item['clube_ativo'])): ?>
                                                     <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                                 <?php endif; ?>
@@ -613,7 +616,16 @@
                                                 <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
                                             <?php endif; ?>
                                         </div>
-                                        <small class="item-price" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></small>
+                                        <?php if (!empty($item['is_free_offer'])): ?>
+                                            <small>
+                                                <?php if ($item['free_offer_original_price'] > 0): ?>
+                                                    <span class="text-decoration-line-through text-muted">$ <?= number_format($item['free_offer_original_price'], 2, '.', ',') ?></span>
+                                                <?php endif; ?>
+                                                <span class="text-success fw-bold ms-1">GRÁTIS</span>
+                                            </small>
+                                        <?php else: ?>
+                                            <small class="item-price" data-original-price="<?= $item['subtotal'] ?>"><?= number_format($item['subtotal'], 2, '.', ',') ?></small>
+                                        <?php endif; ?>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -810,6 +822,15 @@
                                         <span><?= __('cart.taxes', 'Impostos') ?>:</span>
                                         <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
                                     </div>
+                                    <?php if (!empty($free_offer_info)): ?>
+                                        <div class="d-flex justify-content-between small" id="impostos-brinde-row">
+                                            <span class="text-muted">Imposto do brinde (não cobrado):</span>
+                                            <span class="text-decoration-line-through text-muted">$ <?= number_format($free_offer_info['imposto_teorico'], 2, '.', ',') ?></span>
+                                        </div>
+                                        <div class="small text-success mb-1">
+                                            <i class="fas fa-gift me-1"></i> A Braziliana paga o imposto do brinde por você!
+                                        </div>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <div class="d-flex justify-content-between d-none" id="impostos-row">
                                         <span><?= __('cart.taxes', 'Impostos') ?>:</span>

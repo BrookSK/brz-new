@@ -243,6 +243,8 @@ class CarrinhoController extends Controller {
                     'stored_peso_unit' => $weightSnap,
                     'quantidade' => $qtd,
                     'subtotal' => $sub,
+                    'is_free_offer' => (int) ($it['is_free_offer'] ?? 0),
+                    'free_offer_original_price' => isset($it['free_offer_original_price']) ? (float) $it['free_offer_original_price'] : null,
                 ];
             }
             return $out;
