@@ -638,6 +638,85 @@
                                 <h6><i class="fas fa-credit-card"></i> <?= __('checkout.payment_info', 'Informações de Pagamento') ?></h6>
                                 <div class="border rounded p-3" style="background: rgba(248, 250, 252, 0.85);">
                                     <div class="row g-2">
+                                        <!-- Seletor de Moeda (radio buttons) -->
+                                        <div class="col-12 mb-2">
+                                            <label class="form-label mb-1"><?= __('checkout.currency', 'Moeda') ?></label>
+                                            <div class="d-flex gap-0" role="group" id="currency-radio-group">
+                                                <label class="btn btn-outline-primary flex-fill text-center rounded-end-0" id="currency-label-brl" for="currency_brl" style="cursor:pointer;">
+                                                    <input type="radio" name="currency_radio" id="currency_brl" value="BRL" class="btn-check" autocomplete="off">
+                                                    R$ Real (BRL)
+                                                </label>
+                                                <label class="btn btn-outline-primary flex-fill text-center rounded-start-0" id="currency-label-usd" for="currency_usd" style="cursor:pointer;">
+                                                    <input type="radio" name="currency_radio" id="currency_usd" value="USD" class="btn-check" autocomplete="off">
+                                                    $ Dólar (USD)
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <script>
+                                        (function() {
+                                            function initCurrencyRadio() {
+                                                var radios = document.querySelectorAll('input[name="currency_radio"]');
+                                                var labelBrl = document.getElementById('currency-label-brl');
+                                                var labelUsd = document.getElementById('currency-label-usd');
+                                                var moedaHidden = document.getElementById('moeda_hidden');
+
+                                                function updateLabels(selected) {
+                                                    if (labelBrl && labelUsd) {
+                                                        labelBrl.classList.toggle('active', selected === 'BRL');
+                                                        labelBrl.classList.toggle('btn-primary', selected === 'BRL');
+                                                        labelBrl.classList.toggle('btn-outline-primary', selected !== 'BRL');
+                                                        labelUsd.classList.toggle('active', selected === 'USD');
+                                                        labelUsd.classList.toggle('btn-primary', selected === 'USD');
+                                                        labelUsd.classList.toggle('btn-outline-primary', selected !== 'USD');
+                                                    }
+                                                }
+
+                                                function setCurrency(currency) {
+                                                    if (moedaHidden) moedaHidden.value = currency;
+                                                    localStorage.setItem('selected_currency', currency);
+
+                                                    // Atualizar display do header (caso exista)
+                                                    var headerSpan = document.getElementById('current-currency');
+                                                    if (headerSpan) headerSpan.textContent = currency;
+
+                                                    // Marcar o radio correto
+                                                    radios.forEach(function(r) { r.checked = (r.value === currency); });
+                                                    updateLabels(currency);
+
+                                                    // Disparar conversão de preços
+                                                    if (typeof updatePrices === 'function') {
+                                                        try { updatePrices(currency); } catch (e) {}
+                                                    } else if (typeof updateAllPrices === 'function') {
+                                                        try { updateAllPrices(); } catch (e) {}
+                                                    }
+
+                                                    // Atualizar formas de pagamento
+                                                    if (typeof updatePaymentMethodsForCurrency === 'function') {
+                                                        try { updatePaymentMethodsForCurrency(currency); } catch (e) {}
+                                                    }
+                                                }
+
+                                                radios.forEach(function(radio) {
+                                                    radio.addEventListener('change', function() {
+                                                        setCurrency(this.value);
+                                                    });
+                                                });
+
+                                                // Inicializar com a moeda atual
+                                                var current = (moedaHidden && moedaHidden.value) ? moedaHidden.value.toUpperCase() : 'BRL';
+                                                var stored = localStorage.getItem('selected_currency');
+                                                if (stored && (stored === 'BRL' || stored === 'USD')) current = stored;
+                                                radios.forEach(function(r) { r.checked = (r.value === current); });
+                                                updateLabels(current);
+                                            }
+
+                                            if (document.readyState === 'loading') {
+                                                document.addEventListener('DOMContentLoaded', initCurrencyRadio);
+                                            } else {
+                                                initCurrencyRadio();
+                                            }
+                                        })();
+                                        </script>
                                         <div class="col-12">
                                             <label class="form-label"><?= __('checkout.payment_method', 'Forma de Pagamento') ?></label>
                                             <select name="forma_pagamento" class="form-select" id="forma_pagamento" required onchange="atualizarFormaPagamento()">
@@ -2740,6 +2819,20 @@ setInterval(function() {
             console.log('Moeda mudou de', currentHiddenCurrency, 'para', newCurrency);
             document.getElementById('moeda_hidden').value = newCurrency;
             
+            // Sincronizar radio buttons
+            var radio = document.getElementById('currency_' + newCurrency.toLowerCase());
+            if (radio) radio.checked = true;
+            var lblBrl = document.getElementById('currency-label-brl');
+            var lblUsd = document.getElementById('currency-label-usd');
+            if (lblBrl && lblUsd) {
+                lblBrl.classList.toggle('active', newCurrency === 'BRL');
+                lblBrl.classList.toggle('btn-primary', newCurrency === 'BRL');
+                lblBrl.classList.toggle('btn-outline-primary', newCurrency !== 'BRL');
+                lblUsd.classList.toggle('active', newCurrency === 'USD');
+                lblUsd.classList.toggle('btn-primary', newCurrency === 'USD');
+                lblUsd.classList.toggle('btn-outline-primary', newCurrency !== 'USD');
+            }
+
             if (typeof updateAllPrices === 'function') {
                 updateAllPrices();
             } else {
@@ -2758,6 +2851,20 @@ setInterval(function() {
         console.log('Moeda mudou no localStorage de', currentHiddenCurrency, 'para', storedCurrency);
         document.getElementById('moeda_hidden').value = storedCurrency;
         
+        // Sincronizar radio buttons
+        var radio = document.getElementById('currency_' + storedCurrency.toLowerCase());
+        if (radio) radio.checked = true;
+        var lblBrl = document.getElementById('currency-label-brl');
+        var lblUsd = document.getElementById('currency-label-usd');
+        if (lblBrl && lblUsd) {
+            lblBrl.classList.toggle('active', storedCurrency === 'BRL');
+            lblBrl.classList.toggle('btn-primary', storedCurrency === 'BRL');
+            lblBrl.classList.toggle('btn-outline-primary', storedCurrency !== 'BRL');
+            lblUsd.classList.toggle('active', storedCurrency === 'USD');
+            lblUsd.classList.toggle('btn-primary', storedCurrency === 'USD');
+            lblUsd.classList.toggle('btn-outline-primary', storedCurrency !== 'USD');
+        }
+
         if (typeof updateAllPrices === 'function') {
             updateAllPrices();
         } else {

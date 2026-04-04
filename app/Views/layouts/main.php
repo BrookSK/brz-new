@@ -1001,8 +1001,8 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                             <li><a class="dropdown-item" href="/lang/en"><span class="me-2">EN</span> <?= __('nav.language_en', 'English') ?></a></li>
                         </ul>
                     </li>
-                    <!-- Seletor de Moeda -->
-                    <?php if ($__mostrarConversao): ?>
+                    <!-- Seletor de Moeda (oculto no checkout, onde aparece inline) -->
+                    <?php if ($__mostrarConversao && !$__isCheckoutPage): ?>
                     <li class="nav-item dropdown me-3">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="currencyDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-coins me-1"></i>
