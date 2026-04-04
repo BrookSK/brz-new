@@ -3109,6 +3109,7 @@ HTML;
                                         
                                         foreach ($itens as $item) {
                                             $pidItem = (int) ($item['produto_id'] ?? 0);
+                                            $isFreeOfferItem = !empty($item['is_free_offer']);
                                             $metaProd = ($pidItem > 0 && isset($produtoMetaById[$pidItem]) && is_array($produtoMetaById[$pidItem]))
                                                 ? $produtoMetaById[$pidItem]
                                                 : null;

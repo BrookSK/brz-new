@@ -1501,6 +1501,13 @@ class PedidoEcommerce {
             if ($colUrlOriginalItem) $selectParts[] = 'pi.' . $colUrlOriginalItem . ' AS url_original';
             if ($pick(['created_at']) !== null) $selectParts[] = 'pi.created_at';
 
+            // Colunas de oferta gratuita
+            if ($pick(['is_free_offer']) !== null) $selectParts[] = 'pi.is_free_offer';
+            if ($pick(['free_offer_original_price']) !== null) $selectParts[] = 'pi.free_offer_original_price';
+            if ($pick(['free_offer_exempt_tax']) !== null) $selectParts[] = 'pi.free_offer_exempt_tax';
+            if ($pick(['free_offer_tax_teorico']) !== null) $selectParts[] = 'pi.free_offer_tax_teorico';
+            if ($pick(['free_offer_taxa_servico']) !== null) $selectParts[] = 'pi.free_offer_taxa_servico';
+
             // Fallback: buscar nome do produto na tabela produtos quando nome_produto do item estiver vazio
             if ($colProdutoId) {
                 try {
