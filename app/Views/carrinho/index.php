@@ -647,8 +647,9 @@ function limparCarrinho() {
 (function() {
     // Verificar oferta gratuita via AJAX
     var url = '/oferta-gratuita/verificar';
-    // Propagar modo teste se presente na URL do carrinho
-    if (window.location.search.indexOf('test_oferta=1') !== -1) {
+    // Propagar modo teste: ativa pela URL e persiste na sessão
+    var isTestMode = (window.location.search.indexOf('test_oferta=1') !== -1);
+    if (isTestMode) {
         url += '?test_oferta=1';
     }
     fetch(url, { credentials: 'same-origin' })

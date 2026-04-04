@@ -351,6 +351,13 @@ class CarrinhoController extends Controller {
 
                 $itemSubtotal = ((int) ($item['quantidade'] ?? 0)) * $itemPrice;
 
+                // Item gratuito: manter preço = 0 e subtotal = 0
+                $isFreeOffer = !empty($item['is_free_offer']);
+                if ($isFreeOffer) {
+                    $itemPrice = 0;
+                    $itemSubtotal = 0;
+                }
+
                 $pesoUnit = (float) ($produto['peso'] ?? 0.5);
                 if ($pesoUnit <= 0) {
                     $pesoUnit = 0.5;
@@ -358,12 +365,12 @@ class CarrinhoController extends Controller {
                 $pesoItem = ((int) ($item['quantidade'] ?? 0)) * $pesoUnit;
 
                 $changedFields = [];
-                if ($storedUnit !== null && $storedUnit > 0) {
+                if (!$isFreeOffer && $storedUnit !== null && $storedUnit > 0) {
                     if (abs(((float) $itemPrice) - ((float) $storedUnit)) > 0.009) {
                         $changedFields[] = 'price';
                     }
                 }
-                if ($storedPesoUnit !== null && $storedPesoUnit > 0) {
+                if (!$isFreeOffer && $storedPesoUnit !== null && $storedPesoUnit > 0) {
                     if (abs(((float) $pesoUnit) - ((float) $storedPesoUnit)) > 0.0005) {
                         $changedFields[] = 'weight';
                     }
@@ -394,6 +401,13 @@ class CarrinhoController extends Controller {
                     $_SESSION['carrinho'][$k]['ativo'] = $ativo ? 1 : 0;
                     $_SESSION['carrinho'][$k]['item_changed'] = $itemChanged ? 1 : 0;
                     $_SESSION['carrinho'][$k]['changed_fields'] = $changedFields;
+                    // Preservar flags de oferta gratuita
+                    if ($isFreeOffer) {
+                        $_SESSION['carrinho'][$k]['is_free_offer'] = 1;
+                        if (!isset($_SESSION['carrinho'][$k]['free_offer_original_price'])) {
+                            $_SESSION['carrinho'][$k]['free_offer_original_price'] = floatval($produto['preco'] ?? ($produto['valor'] ?? 0));
+                        }
+                    }
                 }
 
                 // Normalizar o carrinho local usado pela view
@@ -413,6 +427,13 @@ class CarrinhoController extends Controller {
                     $carrinho[$k]['ativo'] = $ativo ? 1 : 0;
                     $carrinho[$k]['item_changed'] = $itemChanged ? 1 : 0;
                     $carrinho[$k]['changed_fields'] = $changedFields;
+                    // Preservar flags de oferta gratuita
+                    if ($isFreeOffer) {
+                        $carrinho[$k]['is_free_offer'] = 1;
+                        if (!isset($carrinho[$k]['free_offer_original_price'])) {
+                            $carrinho[$k]['free_offer_original_price'] = floatval($produto['preco'] ?? ($produto['valor'] ?? 0));
+                        }
+                    }
                 }
                 
                 $this->debugLog('[CARRINHO] Preco: ' . $itemPrice . ', Quantidade: ' . $item['quantidade'] . ', Subtotal: ' . $itemSubtotal);
