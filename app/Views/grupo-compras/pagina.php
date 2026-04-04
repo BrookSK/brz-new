@@ -119,10 +119,7 @@ $busca = $busca ?? '';
             $precoPromo = (float) ($produto['sale_price'] ?? 0);
             $temPromo   = ($precoPromo > 0 && $precoPromo < $precoBase);
             $precoExibir = $temPromo ? $precoPromo : $precoBase;
-            // Aplicar imposto local do grupo no preço exibido
             $impostoLocalGrupo = (float)($grupo['imposto_local_percent'] ?? 0);
-            $precoComImposto = $impostoLocalGrupo > 0 ? $precoExibir * (1 + $impostoLocalGrupo / 100) : $precoExibir;
-            $precoBaseComImposto = $impostoLocalGrupo > 0 ? $precoBase * (1 + $impostoLocalGrupo / 100) : $precoBase;
         ?>
         <div class="col-lg-3 col-md-6 mb-4 produto-item" data-nome="<?= strtolower(htmlspecialchars($produto['name'] ?? '', ENT_QUOTES, 'UTF-8')) ?>">
             <div class="card h-100 product-card-modern border-0 shadow-sm">
@@ -160,17 +157,17 @@ $busca = $busca ?? '';
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="price-section">
                             <span class="h4 fw-bold mb-0 product-price <?= $temPromo ? 'text-danger' : 'text-primary' ?>"
-                                  data-original-price="<?= $precoComImposto ?>">
-                                <?= number_format($precoComImposto, 2, ',', '.') ?>
+                                  data-original-price="<?= $precoExibir ?>">
+                                <?= number_format($precoExibir, 2, ',', '.') ?>
                             </span>
                             <?php if ($temPromo): ?>
                             <small class="text-decoration-line-through text-muted ms-1 product-original-price"
-                                   data-original-original-price="<?= $precoBaseComImposto ?>">
-                                <?= number_format($precoBaseComImposto, 2, ',', '.') ?>
+                                   data-original-original-price="<?= $precoBase ?>">
+                                <?= number_format($precoBase, 2, ',', '.') ?>
                             </small>
                             <?php endif; ?>
                             <?php if ($impostoLocalGrupo > 0): ?>
-                            <div class="small text-warning mt-1">Incl. imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
+                            <div class="small text-warning mt-1">+ imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
                             <?php endif; ?>
                         </div>
                         <div>
