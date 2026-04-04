@@ -620,7 +620,7 @@ function limparCarrinho() {
                     </div>
 
                     <div class="text-muted small mb-3" style="line-height: 1.5;">
-                        Você paga apenas a taxa de serviço pelo peso (<strong id="ofertaTaxaServico"></strong>).<br>
+                        Você paga apenas a taxa de serviço pelo peso.<br>
                         <span class="text-success fw-semibold">Sem imposto adicional — a Braziliana paga por você! &#x1F389;</span>
                     </div>
 
