@@ -496,7 +496,16 @@ class CarrinhoController extends Controller {
         $frete = $this->calcularFrete($subtotal, $pesoTotal, 'USD');
 
         // Mesma regra do checkout (Model Carrinho): taxa por kg configurada + impostos (Receita Federal)
-        $taxaServico = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+        $taxaServicoBruta = (float) $this->carrinhoModel->calcularTaxaServico($pesoTotal, 'USD', 1.0);
+
+        // Aplicar desconto promocional na taxa de serviço (compra orgânica)
+        $descontoTaxaInfo = $this->carrinhoModel->calcularDescontoTaxaServico($taxaServicoBruta);
+        $taxaServico = $descontoTaxaInfo['final'];
+        $taxaServicoOriginal = $descontoTaxaInfo['original'];
+        $taxaServicoDescontoTipo = $descontoTaxaInfo['tipo'];
+        $taxaServicoDescontoValor = $descontoTaxaInfo['valor_config'];
+        $taxaServicoDescontoAplicado = $descontoTaxaInfo['desconto_aplicado'];
+
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
 
         // Detectar país do usuário para isenção de impostos BR
@@ -650,22 +659,18 @@ class CarrinhoController extends Controller {
                         $cashbackClubeEstimado = (float) ($row['cashback_clube_estimado'] ?? 0);
                     }
 
-                    // Desconto promocional na taxa de serviço
-                    $taxaServicoOriginal = null;
-                    $taxaServicoDescontoTipo = null;
-                    $taxaServicoDescontoValor = null;
-                    $taxaServicoDescontoAplicado = null;
-                    if (is_array($cols) && in_array('taxa_servico_original', $cols, true)) {
-                        $taxaServicoOriginal = ($row['taxa_servico_original'] !== null) ? (float) $row['taxa_servico_original'] : null;
+                    // Desconto promocional na taxa de serviço (sobrescrever com dados do DB se disponíveis)
+                    if (is_array($cols) && in_array('taxa_servico_original', $cols, true) && $row['taxa_servico_original'] !== null) {
+                        $taxaServicoOriginal = (float) $row['taxa_servico_original'];
                     }
-                    if (is_array($cols) && in_array('taxa_servico_desconto_tipo', $cols, true)) {
-                        $taxaServicoDescontoTipo = $row['taxa_servico_desconto_tipo'] ?? null;
+                    if (is_array($cols) && in_array('taxa_servico_desconto_tipo', $cols, true) && $row['taxa_servico_desconto_tipo'] !== null) {
+                        $taxaServicoDescontoTipo = $row['taxa_servico_desconto_tipo'];
                     }
-                    if (is_array($cols) && in_array('taxa_servico_desconto_valor', $cols, true)) {
-                        $taxaServicoDescontoValor = ($row['taxa_servico_desconto_valor'] !== null) ? (float) $row['taxa_servico_desconto_valor'] : null;
+                    if (is_array($cols) && in_array('taxa_servico_desconto_valor', $cols, true) && $row['taxa_servico_desconto_valor'] !== null) {
+                        $taxaServicoDescontoValor = (float) $row['taxa_servico_desconto_valor'];
                     }
-                    if (is_array($cols) && in_array('taxa_servico_desconto_aplicado', $cols, true)) {
-                        $taxaServicoDescontoAplicado = ($row['taxa_servico_desconto_aplicado'] !== null) ? (float) $row['taxa_servico_desconto_aplicado'] : null;
+                    if (is_array($cols) && in_array('taxa_servico_desconto_aplicado', $cols, true) && $row['taxa_servico_desconto_aplicado'] !== null) {
+                        $taxaServicoDescontoAplicado = (float) $row['taxa_servico_desconto_aplicado'];
                     }
 
                     // Se o DB tiver valores válidos, usar; senão manter cálculo atual
