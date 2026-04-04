@@ -64,8 +64,10 @@ class OfertaGratuita extends Model {
 
     /**
      * Verifica se o usuário já recebeu/recusou a oferta
+     * No modo teste admin, sempre retorna false para permitir testes repetidos
      */
-    public function usuarioJaRecebeuOferta(int $usuarioId): bool {
+    public function usuarioJaRecebeuOferta(int $usuarioId, bool $ignorarParaTeste = false): bool {
+        if ($ignorarParaTeste) return false;
         if ($usuarioId <= 0) return true;
         try {
             if (!$this->tableExists($this->table)) return false;

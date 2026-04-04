@@ -15,11 +15,36 @@ class OfertaGratuitaController extends Controller {
     public function verificar(Request $request) {
         if (session_status() === PHP_SESSION_NONE) session_start();
 
+        $isTestMode = false;
+
         // Modo teste: admin pode ativar com ?test_oferta=1 no carrinho
         if (!empty($_GET['test_oferta']) || !empty($request->getParam('test_oferta'))) {
             $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
             if ($perfil === 'admin') {
                 $_SESSION['oferta_gratuita_test_mode'] = true;
+                $isTestMode = true;
+
+                // Modo teste: remover item gratuito existente do carrinho para poder testar de novo
+                $uid = (int) ($_SESSION['usuario_id'] ?? 0);
+                if ($uid > 0) {
+                    try {
+                        $carrinhoModelClean = new Carrinho();
+                        $cartClean = $carrinhoModelClean->getOrCreateCarrinho($uid, null, 'BRL');
+                        $cartIdClean = is_array($cartClean) ? (int) ($cartClean['id'] ?? 0) : (int) $cartClean;
+                        if ($cartIdClean > 0) {
+                            $pdoClean = Database::getConnection();
+                            $pdoClean->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ? AND is_free_offer = 1')->execute([$cartIdClean]);
+                            $carrinhoModelClean->atualizarTotais($cartIdClean);
+                        }
+                    } catch (\Exception $e) {}
+
+                    // Remover da sessão também
+                    if (isset($_SESSION['carrinho']) && is_array($_SESSION['carrinho'])) {
+                        $_SESSION['carrinho'] = array_values(array_filter($_SESSION['carrinho'], function($item) {
+                            return empty($item['is_free_offer']);
+                        }));
+                    }
+                }
             }
         }
 
@@ -31,13 +56,18 @@ class OfertaGratuitaController extends Controller {
             return;
         }
 
-        if ($model->usuarioJaRecebeuOferta($uid)) {
+        if ($model->usuarioJaRecebeuOferta($uid, $isTestMode)) {
             $this->json(['show' => false, 'reason' => 'ja_recebeu']);
             return;
         }
 
-        // Obter carrinho
+        // Obter carrinho (excluir itens gratuitos da análise)
         $carrinho = $_SESSION['carrinho'] ?? [];
+        if (!empty($carrinho) && is_array($carrinho)) {
+            $carrinho = array_filter($carrinho, function($item) {
+                return empty($item['is_free_offer']);
+            });
+        }
         if (empty($carrinho)) {
             try {
                 $carrinhoModel = new Carrinho();
@@ -127,7 +157,7 @@ class OfertaGratuitaController extends Controller {
             return;
         }
 
-        if ($model->usuarioJaRecebeuOferta($uid)) {
+        if ($model->usuarioJaRecebeuOferta($uid, !empty($_SESSION['oferta_gratuita_test_mode']))) {
             $this->json(['success' => false, 'error' => 'Oferta já utilizada']);
             return;
         }
@@ -196,6 +226,9 @@ class OfertaGratuitaController extends Controller {
                 $sql = 'INSERT INTO carrinho_items (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertVals) . ')';
                 $st = $pdo->prepare($sql);
                 $st->execute($insertParams);
+
+                // Recalcular totais do carrinho (peso, taxa de serviço, etc.)
+                $carrinhoModel->atualizarTotais($cartId);
             }
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => 'Erro ao adicionar ao carrinho']);
