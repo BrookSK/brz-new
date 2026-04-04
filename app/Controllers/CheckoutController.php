@@ -3327,6 +3327,16 @@ class CheckoutController extends Controller {
                                     throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
                                 }
 
+                                // Corrigir o valor registrado no split: o pagamento AppMax é do total (taxa+impostos),
+                                // mas o componente taxa_servico deve registrar apenas o valor da taxa.
+                                if (!empty($taxa['payment_id']) && $valorTaxa < $valorAppmax) {
+                                    try {
+                                        $dbFixSplit = \Config\Database::getConnection();
+                                        $stFix = $dbFixSplit->prepare('UPDATE pedido_pagamentos SET valor = ? WHERE pedido_id = ? AND componente = ? AND payment_id = ? ORDER BY id DESC LIMIT 1');
+                                        $stFix->execute([(float) $valorTaxa, (int) $pedidoId, 'taxa_servico', (string) $taxa['payment_id']]);
+                                    } catch (\Exception $e) {}
+                                }
+
                                 $appmaxPaymentId = (string) ($taxa['payment_id'] ?? '');
                                 if ($appmaxPaymentId !== '' && $valorImposto > 0) {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
