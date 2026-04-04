@@ -52,12 +52,27 @@ class OfertaGratuitaController extends Controller {
         $uid = (int) ($_SESSION['usuario_id'] ?? 0);
 
         if ($uid <= 0 || !$model->isSessaoOrganica(true) || !$model->isOfertaGlobalAtiva()) {
-            $this->json(['show' => false, 'reason' => 'sessao_ou_config']);
+            $this->json([
+                'show' => false,
+                'reason' => 'sessao_ou_config',
+                'debug' => [
+                    'uid' => $uid,
+                    'isTestMode' => $isTestMode,
+                    'testModeSession' => !empty($_SESSION['oferta_gratuita_test_mode']),
+                    'perfil' => strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? '')))),
+                    'sessaoOrganica' => $model->isSessaoOrganica(true),
+                    'globalAtiva' => $model->isOfertaGlobalAtiva(),
+                ],
+            ]);
             return;
         }
 
         if ($model->usuarioJaRecebeuOferta($uid, $isTestMode)) {
-            $this->json(['show' => false, 'reason' => 'ja_recebeu']);
+            $this->json([
+                'show' => false,
+                'reason' => 'ja_recebeu',
+                'debug' => ['isTestMode' => $isTestMode],
+            ]);
             return;
         }
 
