@@ -657,23 +657,48 @@ function limparCarrinho() {
         .then(data => {
             if (!data || !data.show) return;
             const p = data.produto;
-            document.getElementById('ofertaNome').textContent = p.nome || '';
-            document.getElementById('ofertaPrecoOriginal').textContent = '$ ' + parseFloat(p.preco_original || 0).toFixed(2);
-            document.getElementById('ofertaTaxaServico').textContent = '$ ' + parseFloat(p.taxa_servico || 0).toFixed(2);
-            const fotoEl = document.getElementById('ofertaFoto');
-            if (p.foto) {
+            var nomeEl = document.getElementById('ofertaNome');
+            var precoEl = document.getElementById('ofertaPrecoOriginal');
+            var taxaEl = document.getElementById('ofertaTaxaServico');
+            var fotoEl = document.getElementById('ofertaFoto');
+            if (nomeEl) nomeEl.textContent = p.nome || '';
+            if (precoEl) precoEl.textContent = '$ ' + parseFloat(p.preco_original || 0).toFixed(2);
+            if (taxaEl) taxaEl.textContent = '$ ' + parseFloat(p.taxa_servico || 0).toFixed(2);
+            if (fotoEl && p.foto) {
                 fotoEl.src = p.foto;
                 fotoEl.style.display = 'block';
             }
-            // Mostrar modal após 1.5s
-            setTimeout(function() {
-                try {
-                    var modal = new bootstrap.Modal(document.getElementById('modalOfertaGratuita'));
-                    modal.show();
-                } catch(e) {}
-            }, 1500);
+            // Mostrar modal — aguardar Bootstrap estar disponível
+            var tentativas = 0;
+            function abrirModalOferta() {
+                tentativas++;
+                var el = document.getElementById('modalOfertaGratuita');
+                if (!el) { console.warn('Modal element not found'); return; }
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    try {
+                        var modal = new bootstrap.Modal(el);
+                        modal.show();
+                        console.log('Oferta gratuita modal aberto');
+                    } catch(e) { console.error('Erro ao abrir modal:', e); }
+                } else if (typeof jQuery !== 'undefined' && jQuery.fn.modal) {
+                    jQuery(el).modal('show');
+                } else if (tentativas < 20) {
+                    // Bootstrap ainda não carregou, tentar novamente
+                    setTimeout(abrirModalOferta, 300);
+                } else {
+                    console.warn('Bootstrap não disponível após 20 tentativas');
+                }
+            }
+            // Aguardar 1.5s + garantir que a página carregou
+            if (document.readyState === 'complete') {
+                setTimeout(abrirModalOferta, 1500);
+            } else {
+                window.addEventListener('load', function() {
+                    setTimeout(abrirModalOferta, 800);
+                });
+            }
         })
-        .catch(function() {});
+        .catch(function(e) { console.error('Oferta gratuita erro:', e); });
 })();
 
 function aceitarOfertaGratuita() {
