@@ -301,6 +301,12 @@
                             <span><?= __('cart.subtotal_items', 'Subtotal ({count} itens)', ['count' => (int) $total_itens]) ?></span>
                             <span class="cart-currency subtotal-value" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, ',', '.') ?></span>
                         </div>
+                        <?php if (!empty($free_offer_info)): ?>
+                            <div class="d-flex justify-content-between mb-2 small">
+                                <span class="text-muted"><i class="fas fa-gift me-1 text-success"></i>Brinde (<?= htmlspecialchars($free_offer_info['nome']) ?>)</span>
+                                <span><span class="text-decoration-line-through text-muted">$ <?= number_format($free_offer_info['preco_original'], 2, ',', '.') ?></span> <span class="text-success fw-bold">GRÁTIS</span></span>
+                            </div>
+                        <?php endif; ?>
 
                         <?php if (!empty($desconto_clube) || !empty($cashback_clube_estimado) || !empty($peso_clube_total) || !empty($subtotal_clube)): ?>
                             <div class="mt-2 mb-2 p-2" style="background: rgba(11,31,58,0.04); border: 1px solid rgba(11,31,58,0.08); border-radius: 12px;">
