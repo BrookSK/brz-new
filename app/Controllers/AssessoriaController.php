@@ -1892,7 +1892,7 @@ class AssessoriaController extends Controller {
                 'timeout' => '120000',
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                'ai_query' => 'Return JSON with: product name, images, base price. List ALL variant/option combinations (size/color/style). For EACH variant include: id, attributes, specific price in USD, weight in lbs, and stock availability (in_stock true/false). Prices often differ per variant.'
+                'ai_query' => 'Extract product data as JSON. For EACH size/variant option, return its SPECIFIC price shown on the page. Variant prices are usually displayed near or inside the option buttons. Return: name, images, variants with option_name, option_value, price, weight, in_stock.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -2149,8 +2149,8 @@ class AssessoriaController extends Controller {
     }
 
     /**
-     * Tenta enriquecer variações com preços individuais usando json_response do ScrapingBee
-     * que intercepta XHR/Ajax requests internos do site
+     * Tenta enriquecer variações com preços individuais usando uma segunda chamada ao ScrapingBee
+     * Estratégia: pegar HTML renderizado + metadata e usar ChatGPT para extrair preços por variação
      */
     private function tentarEnriquecerVariacoes(array $produto, string $url, string $apiKey, callable $doRequest): array {
         $variacoes = $produto['variacoes'] ?? [];
@@ -2158,87 +2158,20 @@ class AssessoriaController extends Controller {
             return $produto;
         }
 
-        // Montar URL com json_response=true para interceptar XHR requests
-        // e js_scenario para clicar nos botões de variação
-        $keys = [];
-        foreach ($variacoes as $v) {
-            if (is_array($v) && isset($v['atributos']) && is_array($v['atributos'])) {
-                foreach (array_keys($v['atributos']) as $k) {
-                    $keys[(string) $k] = true;
-                }
-            }
-        }
+        error_log('[Assessoria] Variações com mesmo preço detectadas, tentando enriquecer para: ' . $url);
 
-        // Construir js_scenario: clicar em cada opção de variação e esperar
-        $instructions = [];
-        $instructions[] = ['wait' => 3000]; // Esperar página carregar
-
-        // Coletar todos os valores de variação para clicar
-        $variantValues = [];
-        foreach ($variacoes as $v) {
-            if (!is_array($v) || !isset($v['atributos']) || !is_array($v['atributos'])) continue;
-            foreach ($v['atributos'] as $attrKey => $attrVal) {
-                $variantValues[$attrVal] = true;
-            }
-        }
-
-        // Para cada valor de variação, tentar clicar no botão correspondente
-        foreach (array_keys($variantValues) as $val) {
-            // Seletores genéricos que funcionam na maioria dos e-commerce
-            // Tenta por texto do botão, aria-label, data-value, etc.
-            $escapedVal = addslashes((string) $val);
-            $jsClick = "
-                (function() {
-                    var btns = document.querySelectorAll('button, [role=\"radio\"], [role=\"option\"], .swatch-option, .variant-option, [data-value]');
-                    for (var i = 0; i < btns.length; i++) {
-                        var txt = (btns[i].textContent || '').trim();
-                        var val = btns[i].getAttribute('data-value') || btns[i].getAttribute('aria-label') || '';
-                        if (txt === '{$escapedVal}' || val === '{$escapedVal}') {
-                            btns[i].click();
-                            return 'clicked: {$escapedVal}';
-                        }
-                    }
-                    return 'not found: {$escapedVal}';
-                })()
-            ";
-            $instructions[] = ['evaluate' => $jsClick];
-            $instructions[] = ['wait' => 1500]; // Esperar preço atualizar
-        }
-
-        // Adicionar evaluate final para capturar preços visíveis na página
-        $instructions[] = ['evaluate' => "
-            (function() {
-                var results = [];
-                // Tentar capturar preços de variações visíveis
-                var priceEls = document.querySelectorAll('[data-price], .price, .product-price, [itemprop=\"price\"], .a-price .a-offscreen, .price-current, .price__sale');
-                priceEls.forEach(function(el) {
-                    var p = el.getAttribute('data-price') || el.getAttribute('content') || el.textContent;
-                    if (p) results.push(p.trim());
-                });
-                // Tentar capturar dados de variação de scripts JSON-LD ou data attributes
-                var scripts = document.querySelectorAll('script[type=\"application/ld+json\"]');
-                scripts.forEach(function(s) {
-                    try { results.push(JSON.parse(s.textContent)); } catch(e) {}
-                });
-                return JSON.stringify(results);
-            })()
-        "];
-
-        $jsScenario = json_encode(['instructions' => $instructions]);
-
+        // Chamada com json_response para capturar metadata JSON-LD, XHR e HTML body
         $enrichUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
             'api_key' => $apiKey,
             'url' => $url,
             'stealth_proxy' => 'true',
             'country_code' => 'us',
             'timeout' => '60000',
-            'wait_browser' => 'networkidle2',
+            'wait_browser' => 'load',
+            'wait' => '3000',
             'block_ads' => 'true',
             'json_response' => 'true',
-            'js_scenario' => $jsScenario
         ]);
-
-        error_log('[Assessoria] Tentando enriquecer variações via json_response + js_scenario');
 
         [$enrichResp, $enrichCode, $enrichErrno, $enrichError] = $doRequest($enrichUrl, 70);
 
@@ -2252,7 +2185,16 @@ class AssessoriaController extends Controller {
             return $produto;
         }
 
-        // Extrair preços dos XHR interceptados
+        // 1) Tentar extrair preços do metadata JSON-LD
+        if (isset($enrichData['metadata']) && is_array($enrichData['metadata'])) {
+            $this->extractPricesFromMetadata($enrichData['metadata'], $variacoes, $produto);
+            if (!$this->variacoesTemMesmoPreco($produto)) {
+                error_log('[Assessoria] Preços enriquecidos via metadata JSON-LD');
+                return $produto;
+            }
+        }
+
+        // 2) Tentar extrair preços dos XHR interceptados
         $xhrPrices = [];
         if (isset($enrichData['xhr']) && is_array($enrichData['xhr'])) {
             foreach ($enrichData['xhr'] as $xhr) {
@@ -2261,63 +2203,128 @@ class AssessoriaController extends Controller {
                 if (is_string($body) && $body !== '') {
                     $xhrJson = json_decode($body, true);
                     if (is_array($xhrJson)) {
-                        // Buscar preços recursivamente nos XHR responses
                         $this->extractPricesFromXhr($xhrJson, $xhrPrices);
+                    }
+                }
+            }
+            if (!empty($xhrPrices)) {
+                $uniquePrices = array_values(array_unique($xhrPrices));
+                if (count($uniquePrices) > 1 && count($uniquePrices) <= count($variacoes) * 2) {
+                    sort($uniquePrices);
+                    $i = 0;
+                    foreach ($produto['variacoes'] as &$vEnrich) {
+                        if ($i < count($uniquePrices)) {
+                            $vEnrich['valor'] = $uniquePrices[$i];
+                        }
+                        $i++;
+                    }
+                    unset($vEnrich);
+                    if (!$this->variacoesTemMesmoPreco($produto)) {
+                        error_log('[Assessoria] Preços enriquecidos via XHR');
+                        return $produto;
                     }
                 }
             }
         }
 
-        // Extrair preços dos evaluate_results (resultados do JS executado)
-        if (isset($enrichData['evaluate_results']) && is_array($enrichData['evaluate_results'])) {
-            foreach ($enrichData['evaluate_results'] as $evalResult) {
-                if (is_string($evalResult)) {
-                    $evalJson = json_decode($evalResult, true);
-                    if (is_array($evalJson)) {
-                        foreach ($evalJson as $item) {
-                            if (is_string($item)) {
-                                $price = $this->findFirstNumeric($item);
-                                if ($price !== null && $price > 1) {
-                                    $xhrPrices[] = $price;
-                                }
-                            } elseif (is_array($item)) {
-                                $this->extractPricesFromXhr($item, $xhrPrices);
+        // 3) Usar o HTML body + ChatGPT para extrair preços por variação
+        $htmlBody = $enrichData['body'] ?? '';
+        if (is_string($htmlBody) && strlen($htmlBody) > 200) {
+            $chatGptApiKey = $this->getChatGPTApiKey();
+            if ($chatGptApiKey) {
+                $relevantHtml = $this->extractRelevantHtmlForPrices($htmlBody);
+
+                if (strlen($relevantHtml) > 50) {
+                    $varLabels = [];
+                    foreach ($variacoes as $v) {
+                        if (is_array($v) && isset($v['atributos']) && is_array($v['atributos'])) {
+                            foreach ($v['atributos'] as $ak => $av) {
+                                $varLabels[] = (string) $av;
                             }
+                        }
+                    }
+
+                    $pricePrompt = "From the HTML snippets below, extract the SPECIFIC PRICE (in USD) for each product variant/option.\nThe variants are: " . implode(', ', $varLabels) . "\n\nReturn ONLY valid JSON array like: [{\"option\": \"variant value\", \"price\": 99.99}]\nNo text, no markdown.\n\nHTML:\n" . $relevantHtml;
+
+                    [$priceResp, $priceCode, $priceErr] = $this->callChatGPT($chatGptApiKey, $pricePrompt, true);
+                    if ($priceCode === 400) {
+                        [$priceResp, $priceCode, $priceErr] = $this->callChatGPT($chatGptApiKey, $pricePrompt, false);
+                    }
+
+                    if (!$priceErr && $priceCode === 200) {
+                        $priceDecoded = json_decode($priceResp, true);
+                        $priceContent = $priceDecoded['choices'][0]['message']['content'] ?? '';
+                        try {
+                            $priceData = $this->decodeJsonResilient((string) $priceContent);
+                            if (is_array($priceData) && !empty($priceData)) {
+                                foreach ($produto['variacoes'] as &$vPrice) {
+                                    if (!is_array($vPrice)) continue;
+                                    $attrs = $vPrice['atributos'] ?? [];
+                                    foreach ($priceData as $pd) {
+                                        if (!is_array($pd)) continue;
+                                        $pdOption = strtolower(trim((string) ($pd['option'] ?? '')));
+                                        $pdPrice = $this->findFirstNumeric($pd['price'] ?? null);
+                                        if ($pdOption === '' || $pdPrice === null || $pdPrice <= 0) continue;
+
+                                        foreach ($attrs as $av) {
+                                            $avLower = strtolower(trim((string) $av));
+                                            if ($avLower !== '' && ($pdOption === $avLower || stripos($pdOption, $avLower) !== false || stripos($avLower, $pdOption) !== false)) {
+                                                $vPrice['valor'] = $pdPrice;
+                                                break 2;
+                                            }
+                                        }
+                                    }
+                                }
+                                unset($vPrice);
+
+                                if (!$this->variacoesTemMesmoPreco($produto)) {
+                                    error_log('[Assessoria] Preços enriquecidos via ChatGPT + HTML');
+                                    return $produto;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            error_log('[Assessoria] Erro ao parsear preços do ChatGPT: ' . $e->getMessage());
                         }
                     }
                 }
             }
         }
 
-        // Extrair metadata (JSON-LD) que pode conter offers com preços
-        if (isset($enrichData['metadata']) && is_array($enrichData['metadata'])) {
-            $this->extractPricesFromMetadata($enrichData['metadata'], $variacoes, $produto);
-            // Se metadata atualizou os preços, retornar
-            if (!$this->variacoesTemMesmoPreco($produto)) {
-                return $produto;
-            }
-        }
-
-        // Se encontramos preços diferentes nos XHR, tentar associar às variações
-        if (!empty($xhrPrices)) {
-            $uniquePrices = array_values(array_unique($xhrPrices));
-            // Se temos preços diferentes e a quantidade bate com as variações
-            if (count($uniquePrices) > 1 && count($uniquePrices) <= count($variacoes)) {
-                sort($uniquePrices);
-                // Associar preços às variações (ordenados)
-                $i = 0;
-                foreach ($produto['variacoes'] as &$vEnrich) {
-                    if ($i < count($uniquePrices)) {
-                        $vEnrich['valor'] = $uniquePrices[$i];
-                    }
-                    $i++;
-                }
-                unset($vEnrich);
-                error_log('[Assessoria] Variações enriquecidas com preços dos XHR: ' . json_encode($uniquePrices));
-            }
-        }
-
+        error_log('[Assessoria] Não foi possível enriquecer preços das variações');
         return $produto;
+    }
+
+    /**
+     * Extrai a parte relevante do HTML que contém botões de variação e preços
+     */
+    private function extractRelevantHtmlForPrices(string $html): string {
+        // Remover scripts, styles, header, footer, nav
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/si', '', $html);
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/si', '', $html);
+        $html = preg_replace('/<!--.*?-->/s', '', $html);
+        $html = preg_replace('/<header\b[^>]*>.*?<\/header>/si', '', $html);
+        $html = preg_replace('/<footer\b[^>]*>.*?<\/footer>/si', '', $html);
+        $html = preg_replace('/<nav\b[^>]*>.*?<\/nav>/si', '', $html);
+
+        // Extrair linhas de texto que contêm preços ($xxx.xx)
+        $text = strip_tags($html);
+        $lines = preg_split('/[\n\r]+/', $text);
+        $priceLines = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line !== '' && preg_match('/\$[\d,]+\.?\d*/', $line)) {
+                $priceLines[] = $line;
+            }
+        }
+
+        $relevant = implode("\n", array_slice($priceLines, 0, 60));
+
+        // Limitar tamanho
+        if (strlen($relevant) > 6000) {
+            $relevant = substr($relevant, 0, 6000);
+        }
+
+        return $relevant;
     }
 
     /**
