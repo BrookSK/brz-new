@@ -858,7 +858,7 @@ class AssessoriaController extends Controller {
             'url',
             // Campos de peso / especificações
             'weight', 'weights_found', 'shipping_weight', 'specifications', 'specs',
-            'product_weight', 'item_weight',
+            'product_weight', 'item_weight', 'weight_lbs',
             // Campos de disponibilidade / estoque
             'availability', 'stock', 'in_stock', 'out_of_stock', 'inventory',
             'available', 'is_available', 'stock_status',
@@ -867,6 +867,8 @@ class AssessoriaController extends Controller {
             // Campos de SKU / itens filhos (Costco, etc.)
             'skus', 'items', 'children', 'child_items', 'sku_list',
             'variant_pricing', 'option_prices', 'price_map',
+            // Campos do ai_extract_rules do ScrapingBee
+            'base_price', 'description', 'sku',
         ] as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
                 $picked[$k] = $dadosBrutos[$k];
@@ -1353,6 +1355,61 @@ class AssessoriaController extends Controller {
             }
         };
 
+        // Suporte ao formato do ai_extract_rules do ScrapingBee
+        // Formato: variants: [{option_name, option_value, price, weight_lbs, in_stock}, ...]
+        foreach (['variants', 'variations'] as $vk) {
+            if (!empty($dadosBrutos[$vk]) && is_array($dadosBrutos[$vk])) {
+                $first = reset($dadosBrutos[$vk]);
+                if (is_array($first) && (isset($first['option_name']) || isset($first['option_value']))) {
+                    // Agrupar por combinação de atributos para criar variações multi-atributo
+                    // Primeiro, agrupar por option_value para criar variações individuais
+                    $aiVariants = [];
+                    foreach ($dadosBrutos[$vk] as $aiV) {
+                        if (!is_array($aiV)) continue;
+                        $optName = trim((string) ($aiV['option_name'] ?? 'Option'));
+                        $optValue = trim((string) ($aiV['option_value'] ?? ''));
+                        if ($optValue === '') continue;
+
+                        $price = null;
+                        if (isset($aiV['price'])) {
+                            $price = $this->findFirstNumeric($aiV['price']);
+                        }
+
+                        $weightLbs = null;
+                        if (isset($aiV['weight_lbs'])) {
+                            $weightLbs = $this->findFirstNumeric($aiV['weight_lbs']);
+                        }
+                        $weightKg = $weightLbs !== null ? round($weightLbs * 0.4536, 2) : null;
+
+                        $inStock = true;
+                        if (isset($aiV['in_stock'])) {
+                            $isVal = $aiV['in_stock'];
+                            if ($isVal === false || $isVal === 'false' || $isVal === 0 || $isVal === '0' || $isVal === 'no') {
+                                $inStock = false;
+                            }
+                        }
+
+                        $label = $optName . ': ' . $optValue;
+                        $aiVariants[] = [
+                            'id' => md5($label),
+                            'label' => $label,
+                            'atributos' => [$optName => $optValue],
+                            'valor' => $price,
+                            'peso' => $weightKg !== null && $weightKg > 0 ? $weightKg : 1.0,
+                            'out_of_stock' => !$inStock
+                        ];
+                    }
+                    if (!empty($aiVariants)) {
+                        $append($aiVariants);
+                        // Se encontramos variações no formato ai_extract_rules, não precisamos buscar mais
+                        if (!empty($all)) {
+                            return $this->mergeNormalizedVariacoes($all);
+                        }
+                    }
+                }
+            }
+        }
+
         foreach (['variations', 'variants', 'variation', 'variant', 'offers'] as $k) {
             if (!empty($dadosBrutos[$k]) && is_array($dadosBrutos[$k])) {
                 $append($this->normalizeVariacoes($dadosBrutos[$k], $optionNames));
@@ -1827,18 +1884,54 @@ class AssessoriaController extends Controller {
         $requestUrl = 'https://app.scrapingbee.com/api/v1';
 
         $buildUrl = function(array $override = []) use ($requestUrl, $scriptbeeApiKey, $url) {
+            // Usar ai_extract_rules para extração estruturada e precisa
+            $extractRules = json_encode([
+                'product_name' => [
+                    'description' => 'the full product name/title',
+                    'type' => 'string'
+                ],
+                'base_price' => [
+                    'description' => 'the main/default product price in USD as a number',
+                    'type' => 'number'
+                ],
+                'images' => [
+                    'description' => 'all product image URLs',
+                    'type' => 'list'
+                ],
+                'description' => [
+                    'description' => 'product description text',
+                    'type' => 'string'
+                ],
+                'variants' => [
+                    'description' => 'all selectable product variants/options (e.g. different sizes, colors). Each variant that the buyer can choose. Do NOT include fixed specs that have only one value.',
+                    'type' => 'list',
+                    'output' => [
+                        'option_name' => 'the option category name (e.g. Size, Bed Size, Color)',
+                        'option_value' => 'the specific option value (e.g. Queen, King, 10x12)',
+                        'price' => 'the specific price in USD for this variant (may differ from base price)',
+                        'weight_lbs' => 'the shipping weight in pounds for this variant',
+                        'in_stock' => 'whether this variant is currently available for purchase (true/false)',
+                    ]
+                ],
+                'weight_lbs' => [
+                    'description' => 'the product shipping weight in pounds',
+                    'type' => 'string'
+                ],
+                'sku' => [
+                    'description' => 'the product SKU or item number',
+                    'type' => 'string'
+                ]
+            ]);
+
             $params = array_merge([
                 'api_key' => $scriptbeeApiKey,
                 'url' => $url,
                 'stealth_proxy' => 'true',
                 'country_code' => 'us',
-                // Timeout do lado do ScrapingBee (em ms)
                 'timeout' => '120000',
-                // Default mais rápido para evitar timeout no proxy
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                // Limite do ScrapingBee: ai_query <= 300 chars
-                'ai_query' => 'Return JSON with: product name, images, base price. List ALL variant/option combinations (size/color/style). For EACH variant include: id, attributes, specific price in USD, weight in lbs, and stock availability (in_stock true/false). Prices often differ per variant.'
+                'ai_extract_rules' => $extractRules
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -1917,18 +2010,19 @@ class AssessoriaController extends Controller {
             }
         }
 
-        // Se ai_query falhar (tamanho/validação), refazer sem ai_query
-        if (!$curlError && (int) $httpCode === 400 && is_string($response) && stripos($response, 'ai_query') !== false) {
+        // Se ai_extract_rules ou ai_query falhar (tamanho/validação), refazer sem eles
+        if (!$curlError && (int) $httpCode === 400 && is_string($response) && (stripos($response, 'ai_query') !== false || stripos($response, 'ai_extract_rules') !== false || stripos($response, 'extract_rules') !== false)) {
             $retryUrl = $buildUrl([
+                'ai_extract_rules' => null,
                 'ai_query' => null
             ]);
-            // Remove parâmetros nulos (http_build_query inclui ai_query=)
-            $retryUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $retryUrl);
+            // Remove parâmetros nulos
+            $retryUrl = preg_replace('/(&|\?)ai_extract_rules=[^&]*(&|$)/', '$1', $retryUrl);
+            $retryUrl = preg_replace('/(&|\?)ai_query=[^&]*(&|$)/', '$1', $retryUrl);
             $retryUrl = rtrim($retryUrl, '&?');
 
             if (headers_sent() === false) {
-                header('X-ScrapingBee-Retry-No-AIQuery: true');
-                header('X-ScrapingBee-Retry-No-AIQuery-URL: ' . $this->headerSafeValue(substr($retryUrl, 0, 200), 200));
+                header('X-ScrapingBee-Retry-No-AIRules: true');
             }
 
             [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 150);
