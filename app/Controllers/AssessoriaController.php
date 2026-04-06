@@ -850,9 +850,33 @@ class AssessoriaController extends Controller {
 
     private function reduceScrapingBeePayload(array $dadosBrutos): array {
         $picked = [];
-        foreach (['title', 'name', 'product', 'product_name', 'price', 'prices', 'images', 'image', 'variants', 'variation', 'variations', 'offers', 'url'] as $k) {
+        foreach ([
+            'title', 'name', 'product', 'product_name',
+            'price', 'prices',
+            'images', 'image',
+            'variants', 'variation', 'variations', 'offers',
+            'url',
+            // Campos de peso / especificações
+            'weight', 'weights_found', 'shipping_weight', 'specifications', 'specs',
+            'product_weight', 'item_weight',
+            // Campos de disponibilidade / estoque
+            'availability', 'stock', 'in_stock', 'out_of_stock', 'inventory',
+            'available', 'is_available', 'stock_status',
+            // Campos de opções (Walmart, Costco, etc.)
+            'options', 'product_options', 'selected_options',
+        ] as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
                 $picked[$k] = $dadosBrutos[$k];
+            }
+        }
+        // Também incluir chaves aninhadas em 'product' se existir
+        if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
+            foreach (['weights_found', 'weight', 'shipping_weight', 'specifications', 'specs',
+                       'availability', 'stock', 'in_stock', 'out_of_stock', 'inventory',
+                       'options', 'product_options'] as $pk) {
+                if (array_key_exists($pk, $dadosBrutos['product'])) {
+                    $picked['product_' . $pk] = $dadosBrutos['product'][$pk];
+                }
             }
         }
         if (empty($picked)) {
@@ -1090,13 +1114,50 @@ class AssessoriaController extends Controller {
                 $label = (string) ($v['name'] ?? $v['title'] ?? $v['sku'] ?? 'Variação');
             }
 
+            // Detectar disponibilidade (out of stock)
+            $outOfStock = false;
+            foreach (['out_of_stock', 'outOfStock', 'is_out_of_stock'] as $osk) {
+                if (isset($v[$osk])) {
+                    $osVal = $v[$osk];
+                    if ($osVal === true || $osVal === 'true' || $osVal === 1 || $osVal === '1') {
+                        $outOfStock = true;
+                    }
+                    break;
+                }
+            }
+            if (!$outOfStock && isset($v['availability'])) {
+                $avail = strtolower(trim((string) $v['availability']));
+                if (in_array($avail, ['out_of_stock', 'outofstock', 'out of stock', 'unavailable', 'sold_out', 'soldout'], true)) {
+                    $outOfStock = true;
+                }
+            }
+            if (!$outOfStock && isset($v['in_stock'])) {
+                $inStock = $v['in_stock'];
+                if ($inStock === false || $inStock === 'false' || $inStock === 0 || $inStock === '0') {
+                    $outOfStock = true;
+                }
+            }
+            if (!$outOfStock && isset($v['available'])) {
+                $avVal = $v['available'];
+                if ($avVal === false || $avVal === 'false' || $avVal === 0 || $avVal === '0') {
+                    $outOfStock = true;
+                }
+            }
+            if (!$outOfStock && isset($v['stock_status'])) {
+                $ss = strtolower(trim((string) $v['stock_status']));
+                if (in_array($ss, ['out_of_stock', 'outofstock', 'out of stock', 'unavailable', 'sold_out'], true)) {
+                    $outOfStock = true;
+                }
+            }
+
             $id = (string) ($v['id'] ?? $v['variation_id'] ?? $v['variant_id'] ?? $v['variantId'] ?? $v['item_id'] ?? $v['itemId'] ?? $v['sku'] ?? md5($label));
             $out[] = [
                 'id' => $id,
                 'label' => $label,
                 'atributos' => is_array($atributos) ? $atributos : [],
                 'valor' => $valor !== null ? floatval($valor) : null,
-                'peso' => floatval($peso)
+                'peso' => floatval($peso),
+                'out_of_stock' => $outOfStock
             ];
         }
 
@@ -1159,12 +1220,31 @@ class AssessoriaController extends Controller {
                 if (!isset($v['peso']) || floatval($v['peso']) <= 0) {
                     $v['peso'] = 1.0;
                 }
+                // Preservar out_of_stock
+                $oos = false;
+                if (isset($v['out_of_stock'])) {
+                    $oosVal = $v['out_of_stock'];
+                    $oos = ($oosVal === true || $oosVal === 'true' || $oosVal === 1 || $oosVal === '1');
+                }
+                if (!$oos && isset($v['availability'])) {
+                    $avail = strtolower(trim((string) $v['availability']));
+                    if (in_array($avail, ['out_of_stock', 'outofstock', 'out of stock', 'unavailable', 'sold_out', 'soldout'], true)) {
+                        $oos = true;
+                    }
+                }
+                if (!$oos && isset($v['in_stock'])) {
+                    $inStock = $v['in_stock'];
+                    if ($inStock === false || $inStock === 'false' || $inStock === 0 || $inStock === '0') {
+                        $oos = true;
+                    }
+                }
                 $out[] = [
                     'id' => (string) ($v['id'] ?? ''),
                     'label' => (string) ($v['label'] ?? ''),
                     'atributos' => $v['atributos'],
                     'valor' => ($v['valor'] === null ? null : floatval($v['valor'])),
-                    'peso' => floatval($v['peso'])
+                    'peso' => floatval($v['peso']),
+                    'out_of_stock' => $oos
                 ];
             }
             return $this->mergeNormalizedVariacoes($out);
@@ -1194,6 +1274,10 @@ class AssessoriaController extends Controller {
             $curHasPrice = isset($cur['valor']) && $cur['valor'] !== null && floatval($cur['valor']) > 0;
             $newHasPrice = isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) > 0;
             if (!$curHasPrice && $newHasPrice) {
+                // Preservar out_of_stock do existente se o novo não tem
+                if (!isset($v['out_of_stock']) && isset($cur['out_of_stock'])) {
+                    $v['out_of_stock'] = $cur['out_of_stock'];
+                }
                 $unique[$k] = $v;
                 continue;
             }
@@ -1202,7 +1286,16 @@ class AssessoriaController extends Controller {
             $curHasAttrs = isset($cur['atributos']) && is_array($cur['atributos']) && !empty($cur['atributos']);
             $newHasAttrs = isset($v['atributos']) && is_array($v['atributos']) && !empty($v['atributos']);
             if (!$curHasAttrs && $newHasAttrs) {
+                if (!isset($v['out_of_stock']) && isset($cur['out_of_stock'])) {
+                    $v['out_of_stock'] = $cur['out_of_stock'];
+                }
                 $unique[$k] = $v;
+                continue;
+            }
+
+            // Propagar out_of_stock se o novo trouxer
+            if (isset($v['out_of_stock']) && $v['out_of_stock'] && !($cur['out_of_stock'] ?? false)) {
+                $unique[$k]['out_of_stock'] = true;
             }
         }
         return array_values($unique);
@@ -1741,7 +1834,7 @@ class AssessoriaController extends Controller {
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
                 // Limite do ScrapingBee: ai_query <= 300 chars
-                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.'
+                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map, price (USD), weight and availability/stock status. Missing values: null.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -3193,6 +3286,10 @@ class AssessoriaController extends Controller {
                 if (!isset($vFill['peso']) || $vFill['peso'] === null || floatval($vFill['peso']) <= 0) {
                     $vFill['peso'] = $produtoData['peso'];
                 }
+                // Garantir que out_of_stock existe
+                if (!isset($vFill['out_of_stock'])) {
+                    $vFill['out_of_stock'] = false;
+                }
             }
             unset($vFill);
         }
@@ -3218,7 +3315,7 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"valor\": 99.99,
     \"peso\": 1.5,
     \"imagens\": [\"url1\", \"url2\"],
-    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0}],
+    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0, \"out_of_stock\": false}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
@@ -3226,16 +3323,18 @@ REGRAS ESPECÍFICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
 
-2. VARIAÇÕES (IMPORTANTE):
+2. VARIAÇÕES (MUITO IMPORTANTE):
    - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
-   - Cada variação deve ter: id (ou string vazia), label, atributos (mapa chave:valor), valor, peso.
-   - PREÇO POR VARIAÇÃO: Se os dados contêm preços diferentes por variação/tamanho, CADA variação DEVE ter seu preço específico. NÃO copie o mesmo preço para todas.
-   - PESO POR VARIAÇÃO: Se os dados contêm pesos diferentes por variação (ex: weights_found), converta de lbs para kg (1 lb = 0.4536 kg) e atribua a cada variação.
+   - Cada variação deve ter: id (ou string vazia), label, atributos (mapa chave:valor), valor, peso, out_of_stock.
+   - PREÇO POR VARIAÇÃO: Se os dados contêm preços diferentes por variação/tamanho, CADA variação DEVE ter seu preço específico. NÃO copie o mesmo preço para todas. Analise cuidadosamente os dados para encontrar o preço de cada variação individualmente.
+   - PESO POR VARIAÇÃO: Se os dados contêm pesos diferentes por variação (ex: weights_found, specifications, shipping weight), converta de lbs para kg (1 lb = 0.4536 kg) e atribua a cada variação. Se houver pesos diferentes por tamanho/opção, CADA variação DEVE ter seu peso específico.
+   - OUT OF STOCK: Para cada variação, verifique se está disponível. Se a variação estiver \"Out of stock\", \"Unavailable\", \"Sold out\" ou indisponível, defina \"out_of_stock\": true. Caso contrário, \"out_of_stock\": false. Procure campos como availability, in_stock, stock_status, availableQuantity nos dados.
    - Se não existirem variações, retorne \"variacoes\": []
 
 3. PESO (kg):
    - Se o peso estiver em LIBRAS (lbs/pounds), CONVERTA: 1 lb = 0.4536 kg.
-   - Procure peso em: specifications, weights_found, shipping weight, product weight.
+   - Procure peso em: specifications, weights_found, shipping weight, product weight, item weight.
+   - Se houver pesos diferentes por variação/tamanho, atribua o peso correto a cada variação.
    - Se não encontrar o peso exato, ESTIME com base no tipo de produto.
    - Adicione 15% de margem de segurança sobre o peso estimado.
 
@@ -3255,6 +3354,8 @@ IMPORTANTE:
 - CONVERTA libras para kg (1 lb = 0.4536 kg)
 - Para descrição, CRIE uma se não encontrar
 - Use kg para peso
+- CADA variação DEVE ter seu próprio preço e peso (não copie o mesmo para todas)
+- Marque variações indisponíveis com out_of_stock: true
 
 RETORNE APENAS O JSON:";
     }

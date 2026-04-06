@@ -332,6 +332,15 @@ ob_start();
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+    .variation-oos {
+        text-decoration: line-through;
+        opacity: 0.7;
+    }
+    .variation-oos:hover {
+        opacity: 0.9;
+    }
+</style>
 <script>
 $(document).ready(function() {
     const produtos = <?= json_encode($orcamento['produtos']) ?>;
@@ -384,12 +393,12 @@ $(document).ready(function() {
     function resolveVariant(index) {
         const p = produtos[index];
         if (!p || !Array.isArray(p.variacoes) || p.variacoes.length === 0) {
-            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true };
+            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true, out_of_stock: false };
         }
 
         const keys = getVariationKeys(index);
         if (keys.length === 0) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true };
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true, out_of_stock: false };
         }
 
         const sel = selections[index] || {};
@@ -407,7 +416,7 @@ $(document).ready(function() {
         });
 
         if (!complete) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false, out_of_stock: false };
         }
 
         if (matches.length >= 1) {
@@ -426,10 +435,11 @@ $(document).ready(function() {
 
             const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : p.valor;
             const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
-            return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
+            const outOfStock = best && best.out_of_stock === true;
+            return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true, out_of_stock: outOfStock };
         }
 
-        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false, out_of_stock: false };
     }
 
     function updateComboUI(index) {
@@ -475,9 +485,35 @@ $(document).ready(function() {
                     }
                     return true;
                 });
+                // Verificar se TODAS as variações com esse valor estão out_of_stock
+                const allOutOfStock = p.variacoes.filter(variant => {
+                    if (!variant || typeof variant !== 'object') return false;
+                    const attrs = variant.atributos || {};
+                    if (!attrs || typeof attrs !== 'object') return false;
+                    if (String((attrs || {})[k] ?? '') !== String(v)) return false;
+                    // Respeitar seleções parciais de outras chaves
+                    for (const kk of keys) {
+                        if (kk === k) continue;
+                        const want = sel[kk];
+                        if (want === undefined || want === null || String(want).trim() === '') continue;
+                        if (String((attrs || {})[kk] ?? '') !== String(want)) return false;
+                    }
+                    return true;
+                }).every(variant => variant.out_of_stock === true);
+
                 const disabled = !hasAny;
-                const classes = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline-secondary');
-                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
+                const isOOS = hasAny && allOutOfStock;
+                let classes = 'btn btn-sm ';
+                if (isOOS) {
+                    classes += isActive ? 'btn-danger' : 'btn-outline-danger';
+                } else {
+                    classes += isActive ? 'btn-primary' : 'btn-outline-secondary';
+                }
+                let label = $('<div>').text(v).html();
+                if (isOOS) {
+                    label = '<i class="fas fa-times me-1"></i>' + label;
+                }
+                html += '<button type="button" class="' + classes + ' variation-btn' + (isOOS ? ' variation-oos' : '') + '" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + ' title="' + (isOOS ? 'Out of Stock' : '') + '">' + label + '</button>';
             });
             html += '</div>';
             html += '</div>';
@@ -498,6 +534,21 @@ $(document).ready(function() {
         const pesoEl = container.querySelector('.peso-text');
         if (valorEl) valorEl.textContent = (data.valor || 0).toFixed(2);
         if (pesoEl) pesoEl.textContent = (data.peso || 0).toFixed(2);
+
+        // Mostrar indicador de out of stock
+        let oosEl = container.querySelector('.oos-indicator');
+        if (data.out_of_stock && data.complete) {
+            if (!oosEl) {
+                oosEl = document.createElement('span');
+                oosEl.className = 'badge bg-danger ms-2 oos-indicator';
+                oosEl.innerHTML = '<i class="fas fa-times me-1"></i>Out of Stock';
+                const valorParent = container.querySelector('.col-auto.text-end');
+                if (valorParent) valorParent.appendChild(oosEl);
+            }
+            oosEl.style.display = '';
+        } else if (oosEl) {
+            oosEl.style.display = 'none';
+        }
     }
 
     // Calcular totais baseado nos produtos selecionados
