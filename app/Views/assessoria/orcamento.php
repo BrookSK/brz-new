@@ -346,14 +346,6 @@ $(document).ready(function() {
     const produtos = <?= json_encode($orcamento['produtos']) ?>;
     const totaisOriginais = <?= json_encode($totais) ?>;
 
-    // Debug: ver dados das variações
-    console.log('[Assessoria Debug] Produtos:', JSON.parse(JSON.stringify(produtos)));
-    produtos.forEach((p, i) => {
-        if (p.variacoes && p.variacoes.length > 0) {
-            console.log('[Assessoria Debug] Produto ' + i + ' (' + p.nome + ') - Variações:', p.variacoes.map(v => ({label: v.label, valor: v.valor, peso: v.peso, out_of_stock: v.out_of_stock, atributos: v.atributos})));
-        }
-    });
-
     const PIX_PCT = <?= json_encode((float) ($totais['pix_desconto_taxa_servico_percent'] ?? 0)) ?>;
 
     const selections = {};
