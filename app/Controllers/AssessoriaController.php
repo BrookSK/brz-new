@@ -3293,6 +3293,55 @@ class AssessoriaController extends Controller {
             }
             unset($vFill);
         }
+
+        // Pós-processamento: remover atributos que têm apenas 1 valor único (especificações fixas, não variações)
+        if (is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
+            // Coletar todos os valores por chave de atributo
+            $attrValueSets = [];
+            foreach ($produtoData['variacoes'] as $vCheck) {
+                if (!is_array($vCheck) || !isset($vCheck['atributos']) || !is_array($vCheck['atributos'])) continue;
+                foreach ($vCheck['atributos'] as $ak => $av) {
+                    $ak = trim((string) $ak);
+                    if ($ak === '') continue;
+                    if (!isset($attrValueSets[$ak])) $attrValueSets[$ak] = [];
+                    $attrValueSets[$ak][trim((string) $av)] = true;
+                }
+            }
+            // Identificar chaves com apenas 1 valor (especificação fixa)
+            $singleValueKeys = [];
+            foreach ($attrValueSets as $ak => $vals) {
+                if (count($vals) <= 1) {
+                    $singleValueKeys[] = $ak;
+                }
+            }
+            // Remover essas chaves dos atributos de todas as variações
+            if (!empty($singleValueKeys)) {
+                foreach ($produtoData['variacoes'] as &$vClean) {
+                    if (!is_array($vClean) || !isset($vClean['atributos']) || !is_array($vClean['atributos'])) continue;
+                    foreach ($singleValueKeys as $sk) {
+                        unset($vClean['atributos'][$sk]);
+                    }
+                    // Atualizar label
+                    $vClean['label'] = $this->stringifyVariationLabel($vClean['atributos']);
+                }
+                unset($vClean);
+
+                // Após remover atributos de valor único, pode haver variações duplicadas - deduplicar
+                $produtoData['variacoes'] = $this->mergeNormalizedVariacoes($produtoData['variacoes']);
+
+                // Se todas as variações ficaram sem atributos, limpar variacoes
+                $hasAnyAttrs = false;
+                foreach ($produtoData['variacoes'] as $vTest) {
+                    if (is_array($vTest) && isset($vTest['atributos']) && is_array($vTest['atributos']) && !empty($vTest['atributos'])) {
+                        $hasAnyAttrs = true;
+                        break;
+                    }
+                }
+                if (!$hasAnyAttrs) {
+                    $produtoData['variacoes'] = [];
+                }
+            }
+        }
         
         return $produtoData;
     }
@@ -3315,47 +3364,53 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"valor\": 99.99,
     \"peso\": 1.5,
     \"imagens\": [\"url1\", \"url2\"],
-    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0, \"out_of_stock\": false}],
+    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 10x12x8.4 ft\", \"atributos\": {\"Size\": \"10x12x8.4 ft\"}, \"valor\": 1299.99, \"peso\": 50.0, \"out_of_stock\": false}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
-REGRAS ESPECÍFICAS:
+REGRAS CRÍTICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
 
-2. VARIAÇÕES (MUITO IMPORTANTE):
-   - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
-   - Cada variação deve ter: id (ou string vazia), label, atributos (mapa chave:valor), valor, peso, out_of_stock.
-   - PREÇO POR VARIAÇÃO: Se os dados contêm preços diferentes por variação/tamanho, CADA variação DEVE ter seu preço específico. NÃO copie o mesmo preço para todas. Analise cuidadosamente os dados para encontrar o preço de cada variação individualmente.
-   - PESO POR VARIAÇÃO: Se os dados contêm pesos diferentes por variação (ex: weights_found, specifications, shipping weight), converta de lbs para kg (1 lb = 0.4536 kg) e atribua a cada variação. Se houver pesos diferentes por tamanho/opção, CADA variação DEVE ter seu peso específico.
-   - OUT OF STOCK: Para cada variação, verifique se está disponível. Se a variação estiver \"Out of stock\", \"Unavailable\", \"Sold out\" ou indisponível, defina \"out_of_stock\": true. Caso contrário, \"out_of_stock\": false. Procure campos como availability, in_stock, stock_status, availableQuantity nos dados.
-   - Se não existirem variações, retorne \"variacoes\": []
+2. VARIAÇÕES - O QUE É E O QUE NÃO É VARIAÇÃO:
+   - VARIAÇÃO = opção que o COMPRADOR ESCOLHE e que MUDA o produto (ex: tamanho/size, cor/color, Bed Size).
+   - NÃO É VARIAÇÃO = especificação fixa do produto que não muda (ex: material, firmness, mattress type, mattress composition, mattress thickness quando há apenas 1 opção). Se existe apenas UM valor possível para um atributo, NÃO é variação.
+   - SOMENTE inclua como variação atributos que têm MÚLTIPLAS opções selecionáveis pelo comprador.
+   - Exemplo Walmart: \"Size\" com opções 10x12x8.4 ft, 10x14x8.4 ft, 10x18x8.4 ft, 14x9.5x9 FT = VARIAÇÃO.
+   - Exemplo Walmart: \"Color: Black\" quando só existe Black = NÃO É VARIAÇÃO, é especificação fixa.
+   - Exemplo Costco: \"Bed Size\" com opções Queen, King, California King = VARIAÇÃO.
+   - Exemplo Costco: \"Mattress Thickness: 12 Inch\", \"Firmness: Medium\", \"Composition: Hybrid\" = NÃO SÃO VARIAÇÕES (valor único).
 
-3. PESO (kg):
+3. PREÇO POR VARIAÇÃO (MUITO IMPORTANTE):
+   - Se os dados contêm preços diferentes por variação, CADA variação DEVE ter seu preço específico.
+   - NÃO copie o mesmo preço para todas as variações.
+   - Procure preços em: offers, variants, variations, price maps, ou qualquer estrutura que associe opção a preço.
+   - Se não encontrar preço específico para uma variação, use o preço base do produto.
+
+4. PESO POR VARIAÇÃO:
+   - Se os dados contêm pesos diferentes por variação (ex: weights_found, specifications, shipping weight), converta de lbs para kg (1 lb = 0.4536 kg) e atribua a cada variação.
+   - Se houver pesos diferentes por tamanho/opção, CADA variação DEVE ter seu peso específico.
+
+5. OUT OF STOCK POR VARIAÇÃO (MUITO IMPORTANTE):
+   - Analise a disponibilidade de CADA variação INDIVIDUALMENTE.
+   - Se UMA variação específica está \"Out of stock\"/\"Unavailable\"/\"Sold out\", SOMENTE essa variação deve ter \"out_of_stock\": true.
+   - As OUTRAS variações que estão disponíveis DEVEM ter \"out_of_stock\": false.
+   - NÃO marque todas como out_of_stock só porque uma está indisponível.
+   - Procure campos como: availability, in_stock, stock_status, availableQuantity, \"Out of stock\" nos dados de cada variação.
+
+6. PESO (kg):
    - Se o peso estiver em LIBRAS (lbs/pounds), CONVERTA: 1 lb = 0.4536 kg.
    - Procure peso em: specifications, weights_found, shipping weight, product weight, item weight.
-   - Se houver pesos diferentes por variação/tamanho, atribua o peso correto a cada variação.
    - Se não encontrar o peso exato, ESTIME com base no tipo de produto.
    - Adicione 15% de margem de segurança sobre o peso estimado.
 
-4. DESCRIÇÃO:
-   - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
+7. DESCRIÇÃO: Se não encontrar descrição detalhada, CRIE uma baseada no nome e características.
 
-5. IMAGEM:
-   - Extraia todas as URLs de imagens disponíveis
-   - Se não encontrar, use array vazio []
+8. IMAGEM: Extraia todas as URLs de imagens disponíveis. Se não encontrar, use array vazio [].
 
-6. VALOR: Use número decimal com 2 casas (ex: 99.99). Preço em USD.
+9. VALOR: Use número decimal com 2 casas (ex: 99.99). Preço em USD.
 
-7. NOME: Use o nome completo do produto
-
-IMPORTANTE:
-- Retorne APENAS o JSON, sem texto adicional
-- CONVERTA libras para kg (1 lb = 0.4536 kg)
-- Para descrição, CRIE uma se não encontrar
-- Use kg para peso
-- CADA variação DEVE ter seu próprio preço e peso (não copie o mesmo para todas)
-- Marque variações indisponíveis com out_of_stock: true
+10. NOME: Use o nome completo do produto.
 
 RETORNE APENAS O JSON:";
     }

@@ -587,6 +587,10 @@ $(document).ready(function() {
                 if (keys.length > 0 && !d.complete) {
                     allComplete = false;
                 }
+                // Bloquear se variação selecionada está out of stock
+                if (d.complete && d.out_of_stock) {
+                    allComplete = false;
+                }
             }
         });
 
@@ -630,7 +634,15 @@ $(document).ready(function() {
         $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados && allComplete));
 
         const showVariacaoWarning = temSelecionados && !allComplete;
-        $('#variacao-warning').toggleClass('d-none', !showVariacaoWarning);
+        const hasOOS = temSelecionados && selecionadosPayload.some(s => {
+            const d = resolveVariant(s.index);
+            return d.complete && d.out_of_stock;
+        });
+        if (hasOOS) {
+            $('#variacao-warning').html('Um ou mais produtos selecionados possuem variação <strong>Out of Stock</strong>. Selecione outra variação ou desmarque o produto.').removeClass('d-none');
+        } else {
+            $('#variacao-warning').html('Para continuar, selecione a variação obrigatória (ex.: tamanho/cor) dos produtos selecionados.').toggleClass('d-none', !showVariacaoWarning);
+        }
 
         // Cache payload no botão
         $('#addToCartBtn').data('selecionados', selecionadosPayload);
