@@ -1869,6 +1869,18 @@ class AssessoriaController extends Controller {
      * Processa um link individual via ScrapingBee
      */
     private function processarLinkIndividual(string $url): array {
+        // Tentar scraper específico por domínio para dados mais precisos de variações
+        $parsedUrl = parse_url($url);
+        $host = strtolower($parsedUrl['host'] ?? '');
+
+        // Costco: usar API pública de preço para cada variação
+        if (strpos($host, 'costco.com') !== false) {
+            $costcoData = $this->tentarScraperCostco($url);
+            if ($costcoData !== null) {
+                return ['success' => true, 'data' => $costcoData];
+            }
+        }
+
         $scriptbeeApiKey = $this->getScriptBeeApiKey();
         
         if (!$scriptbeeApiKey) {
@@ -2444,6 +2456,167 @@ class AssessoriaController extends Controller {
                 unset($vMeta2);
             }
         }
+    }
+
+    /**
+     * Scraper específico para Costco: usa ScrapingBee normal + segunda chamada com js_scenario
+     * para clicar em cada variação e interceptar os XHR de preço da API gdx-api.costco.com
+     */
+    private function tentarScraperCostco(string $url): ?array {
+        $scriptbeeApiKey = $this->getScriptBeeApiKey();
+        $chatGptApiKey = $this->getChatGPTApiKey();
+        if (!$scriptbeeApiKey || !$chatGptApiKey) {
+            return null;
+        }
+
+        error_log('[Assessoria] Usando scraper especifico Costco para: ' . $url);
+
+        // Passo 1: Buscar dados base via ScrapingBee + ai_query (igual ao fluxo normal)
+        $sbUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
+            'api_key' => $scriptbeeApiKey,
+            'url' => $url,
+            'stealth_proxy' => 'true',
+            'country_code' => 'us',
+            'timeout' => '120000',
+            'wait_browser' => 'domcontentloaded',
+            'block_ads' => 'true',
+            'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.',
+        ]);
+
+        $resolvedIp = $this->resolverDnsScrapingBee();
+        $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
+            $ch = curl_init();
+            $opts = [
+                CURLOPT_URL => $targetUrl,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => $timeoutSeconds,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ];
+            if ($resolvedIp) {
+                $opts[CURLOPT_RESOLVE] = ['app.scrapingbee.com:443:' . $resolvedIp];
+            }
+            curl_setopt_array($ch, $opts);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            return [$response, $httpCode, $curlError];
+        };
+
+        [$resp1, $code1, $err1] = $doRequest($sbUrl, 150);
+        if ($err1 || $code1 !== 200 || empty($resp1)) {
+            error_log('[Assessoria] Costco passo 1 falhou: code=' . $code1);
+            return null;
+        }
+
+        $data1 = json_decode($resp1, true);
+        if (!is_array($data1)) {
+            return null;
+        }
+
+        try {
+            $produto = $this->analisarComChatGPT($data1, $url);
+        } catch (\Exception $e) {
+            error_log('[Assessoria] Costco ChatGPT falhou: ' . $e->getMessage());
+            return null;
+        }
+
+        // Passo 2: Se variações têm mesmo preço, clicar em cada uma para interceptar XHR de preço
+        if (!$this->variacoesTemMesmoPreco($produto)) {
+            return $produto;
+        }
+
+        $variacoes = $produto['variacoes'] ?? [];
+        if (count($variacoes) < 2) {
+            return $produto;
+        }
+
+        $variantNames = [];
+        foreach ($variacoes as $v) {
+            if (!is_array($v) || !isset($v['atributos']) || !is_array($v['atributos'])) continue;
+            foreach ($v['atributos'] as $av) {
+                $variantNames[] = trim((string) $av);
+            }
+        }
+        $variantNames = array_values(array_unique($variantNames));
+
+        if (count($variantNames) < 2) {
+            return $produto;
+        }
+
+        $instructions = [['wait' => 3000]];
+        foreach ($variantNames as $name) {
+            $escaped = str_replace(["'", "\\", "\n", "\r"], ["\\'", "\\\\", "", ""], $name);
+            $instructions[] = ['evaluate' => "(function(){var els=document.querySelectorAll('button,a,[role=radio],[role=option],label,span');for(var i=0;i<els.length;i++){var t=(els[i].textContent||'').trim();if(t==='" . $escaped . "'){els[i].click();return 'clicked:" . $escaped . "'}}return 'notfound:" . $escaped . "'})()"];
+            $instructions[] = ['wait' => 2500];
+        }
+
+        $jsScenario = json_encode(['instructions' => $instructions]);
+
+        $sbUrl2 = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
+            'api_key' => $scriptbeeApiKey,
+            'url' => $url,
+            'stealth_proxy' => 'true',
+            'country_code' => 'us',
+            'timeout' => '120000',
+            'wait_browser' => 'load',
+            'block_ads' => 'true',
+            'json_response' => 'true',
+            'js_scenario' => $jsScenario,
+        ]);
+
+        error_log('[Assessoria] Costco passo 2: clicando em variacoes');
+
+        [$resp2, $code2, $err2] = $doRequest($sbUrl2, 150);
+        if ($err2 || $code2 !== 200 || empty($resp2)) {
+            error_log('[Assessoria] Costco passo 2 falhou: code=' . $code2);
+            return $produto;
+        }
+
+        $data2 = json_decode($resp2, true);
+        if (!is_array($data2)) {
+            return $produto;
+        }
+
+        // Extrair preços dos XHR interceptados (API gdx-api.costco.com)
+        $variantPrices = [];
+        if (isset($data2['xhr']) && is_array($data2['xhr'])) {
+            foreach ($data2['xhr'] as $xhr) {
+                if (!is_array($xhr)) continue;
+                $xhrUrl = $xhr['url'] ?? '';
+                $xhrBody = $xhr['body'] ?? '';
+                if (is_string($xhrUrl) && stripos($xhrUrl, 'price') !== false && is_string($xhrBody) && $xhrBody !== '') {
+                    $xhrJson = json_decode($xhrBody, true);
+                    if (is_array($xhrJson) && isset($xhrJson['priceData']['displayPrice'])) {
+                        $dp = $xhrJson['priceData']['displayPrice'];
+                        $price = $dp['deliveredPrice'] ?? $dp['onlinePrice'] ?? null;
+                        if ($price !== null && floatval($price) > 0) {
+                            $variantPrices[] = floatval($price);
+                        }
+                    }
+                }
+            }
+        }
+
+        error_log('[Assessoria] Costco XHR precos: ' . json_encode($variantPrices));
+
+        if (count($variantPrices) >= count($variantNames)) {
+            $basePrice = floatval($produto['valor'] ?? 0);
+            $i = 0;
+            foreach ($produto['variacoes'] as &$vCostco) {
+                if ($i < count($variantPrices)) {
+                    $p = $variantPrices[$i];
+                    if ($basePrice <= 0 || ($p >= $basePrice * 0.3 && $p <= $basePrice * 3)) {
+                        $vCostco['valor'] = $p;
+                    }
+                }
+                $i++;
+            }
+            unset($vCostco);
+        }
+
+        return $produto;
     }
 
     /**
