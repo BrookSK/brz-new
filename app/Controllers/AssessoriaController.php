@@ -3829,6 +3829,8 @@ REGRAS CRÍTICAS:
 3. PREÇO POR VARIAÇÃO (MUITO IMPORTANTE):
    - Se os dados contêm preços diferentes por variação, CADA variação DEVE ter seu preço específico.
    - NÃO copie o mesmo preço para todas as variações.
+   - Use SEMPRE o preço FINAL/SALE/CURRENT (o preço que o cliente realmente paga). NÃO use o preço \"was\"/\"original\"/\"list\"/\"compare_at\" (preço antigo riscado).
+   - Se houver desconto/promoção, use o preço COM desconto (deliveredPrice, salePrice, finalPrice), NÃO o preço sem desconto.
    - Procure preços em: offers, variants, variations, price maps, ou qualquer estrutura que associe opção a preço.
    - Se não encontrar preço específico para uma variação, use o preço base do produto.
 
@@ -3853,7 +3855,7 @@ REGRAS CRÍTICAS:
 
 8. IMAGEM: Extraia todas as URLs de imagens disponíveis. Se não encontrar, use array vazio [].
 
-9. VALOR: Use número decimal com 2 casas (ex: 99.99). Preço em USD.
+9. VALOR: Use número decimal com 2 casas (ex: 99.99). Preço em USD. Use SEMPRE o preço FINAL que o cliente paga (com desconto/promoção aplicado). NÃO use o preço \"was\"/\"original\" riscado.
 
 10. NOME: Use o nome completo do produto.
 
