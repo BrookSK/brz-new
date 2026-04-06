@@ -3738,6 +3738,7 @@ class AssessoriaController extends Controller {
 
         // Pós-processamento: remover atributos que têm apenas 1 valor único (especificações fixas, não variações)
         if (is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
+            error_log('[Assessoria] Variacoes antes do pos-processamento: ' . count($produtoData['variacoes']));
             // Coletar todos os valores por chave de atributo
             $attrValueSets = [];
             foreach ($produtoData['variacoes'] as $vCheck) {
@@ -3758,6 +3759,7 @@ class AssessoriaController extends Controller {
             }
             // Remover essas chaves dos atributos de todas as variações
             if (!empty($singleValueKeys)) {
+                error_log('[Assessoria] Removendo atributos de valor unico: ' . implode(', ', $singleValueKeys));
                 foreach ($produtoData['variacoes'] as &$vClean) {
                     if (!is_array($vClean) || !isset($vClean['atributos']) || !is_array($vClean['atributos'])) continue;
                     foreach ($singleValueKeys as $sk) {
@@ -3780,6 +3782,7 @@ class AssessoriaController extends Controller {
                     }
                 }
                 if (!$hasAnyAttrs) {
+                    error_log('[Assessoria] TODAS as variacoes ficaram sem atributos - limpando variacoes');
                     $produtoData['variacoes'] = [];
                 }
             }
