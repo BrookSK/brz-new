@@ -2101,6 +2101,11 @@ class AssessoriaController extends Controller {
         try {
             // Usar ChatGPT para analisar os dados brutos
             $produto = $this->analisarComChatGPT($decodedResponse, $url);
+
+            // Pós-processamento: se variações têm todas o mesmo preço, tentar enriquecer via json_response
+            if ($this->variacoesTemMesmoPreco($produto) && $scriptbeeApiKey) {
+                $produto = $this->tentarEnriquecerVariacoes($produto, $url, $scriptbeeApiKey, $doRequest);
+            }
             
             return [
                 'success' => true,
@@ -2117,6 +2122,296 @@ class AssessoriaController extends Controller {
         }
     }
     
+    /**
+     * Verifica se todas as variações têm o mesmo preço (indicando que preços por variação não foram capturados)
+     */
+    private function variacoesTemMesmoPreco(array $produto): bool {
+        $variacoes = $produto['variacoes'] ?? [];
+        if (count($variacoes) < 2) {
+            return false;
+        }
+
+        $precos = [];
+        foreach ($variacoes as $v) {
+            if (!is_array($v)) continue;
+            $p = $v['valor'] ?? null;
+            if ($p !== null && floatval($p) > 0) {
+                $precos[] = round(floatval($p), 2);
+            }
+        }
+
+        if (count($precos) < 2) {
+            return false;
+        }
+
+        // Se todos os preços são iguais, retorna true
+        return count(array_unique($precos)) === 1;
+    }
+
+    /**
+     * Tenta enriquecer variações com preços individuais usando json_response do ScrapingBee
+     * que intercepta XHR/Ajax requests internos do site
+     */
+    private function tentarEnriquecerVariacoes(array $produto, string $url, string $apiKey, callable $doRequest): array {
+        $variacoes = $produto['variacoes'] ?? [];
+        if (empty($variacoes)) {
+            return $produto;
+        }
+
+        // Montar URL com json_response=true para interceptar XHR requests
+        // e js_scenario para clicar nos botões de variação
+        $keys = [];
+        foreach ($variacoes as $v) {
+            if (is_array($v) && isset($v['atributos']) && is_array($v['atributos'])) {
+                foreach (array_keys($v['atributos']) as $k) {
+                    $keys[(string) $k] = true;
+                }
+            }
+        }
+
+        // Construir js_scenario: clicar em cada opção de variação e esperar
+        $instructions = [];
+        $instructions[] = ['wait' => 3000]; // Esperar página carregar
+
+        // Coletar todos os valores de variação para clicar
+        $variantValues = [];
+        foreach ($variacoes as $v) {
+            if (!is_array($v) || !isset($v['atributos']) || !is_array($v['atributos'])) continue;
+            foreach ($v['atributos'] as $attrKey => $attrVal) {
+                $variantValues[$attrVal] = true;
+            }
+        }
+
+        // Para cada valor de variação, tentar clicar no botão correspondente
+        foreach (array_keys($variantValues) as $val) {
+            // Seletores genéricos que funcionam na maioria dos e-commerce
+            // Tenta por texto do botão, aria-label, data-value, etc.
+            $escapedVal = addslashes((string) $val);
+            $jsClick = "
+                (function() {
+                    var btns = document.querySelectorAll('button, [role=\"radio\"], [role=\"option\"], .swatch-option, .variant-option, [data-value]');
+                    for (var i = 0; i < btns.length; i++) {
+                        var txt = (btns[i].textContent || '').trim();
+                        var val = btns[i].getAttribute('data-value') || btns[i].getAttribute('aria-label') || '';
+                        if (txt === '{$escapedVal}' || val === '{$escapedVal}') {
+                            btns[i].click();
+                            return 'clicked: {$escapedVal}';
+                        }
+                    }
+                    return 'not found: {$escapedVal}';
+                })()
+            ";
+            $instructions[] = ['evaluate' => $jsClick];
+            $instructions[] = ['wait' => 1500]; // Esperar preço atualizar
+        }
+
+        // Adicionar evaluate final para capturar preços visíveis na página
+        $instructions[] = ['evaluate' => "
+            (function() {
+                var results = [];
+                // Tentar capturar preços de variações visíveis
+                var priceEls = document.querySelectorAll('[data-price], .price, .product-price, [itemprop=\"price\"], .a-price .a-offscreen, .price-current, .price__sale');
+                priceEls.forEach(function(el) {
+                    var p = el.getAttribute('data-price') || el.getAttribute('content') || el.textContent;
+                    if (p) results.push(p.trim());
+                });
+                // Tentar capturar dados de variação de scripts JSON-LD ou data attributes
+                var scripts = document.querySelectorAll('script[type=\"application/ld+json\"]');
+                scripts.forEach(function(s) {
+                    try { results.push(JSON.parse(s.textContent)); } catch(e) {}
+                });
+                return JSON.stringify(results);
+            })()
+        "];
+
+        $jsScenario = json_encode(['instructions' => $instructions]);
+
+        $enrichUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
+            'api_key' => $apiKey,
+            'url' => $url,
+            'stealth_proxy' => 'true',
+            'country_code' => 'us',
+            'timeout' => '60000',
+            'wait_browser' => 'networkidle2',
+            'block_ads' => 'true',
+            'json_response' => 'true',
+            'js_scenario' => $jsScenario
+        ]);
+
+        error_log('[Assessoria] Tentando enriquecer variações via json_response + js_scenario');
+
+        [$enrichResp, $enrichCode, $enrichErrno, $enrichError] = $doRequest($enrichUrl, 70);
+
+        if ($enrichError || $enrichCode !== 200 || empty($enrichResp)) {
+            error_log('[Assessoria] Enriquecimento falhou: code=' . $enrichCode . ' error=' . ($enrichError ?: 'none'));
+            return $produto;
+        }
+
+        $enrichData = json_decode($enrichResp, true);
+        if (!is_array($enrichData)) {
+            return $produto;
+        }
+
+        // Extrair preços dos XHR interceptados
+        $xhrPrices = [];
+        if (isset($enrichData['xhr']) && is_array($enrichData['xhr'])) {
+            foreach ($enrichData['xhr'] as $xhr) {
+                if (!is_array($xhr)) continue;
+                $body = $xhr['body'] ?? '';
+                if (is_string($body) && $body !== '') {
+                    $xhrJson = json_decode($body, true);
+                    if (is_array($xhrJson)) {
+                        // Buscar preços recursivamente nos XHR responses
+                        $this->extractPricesFromXhr($xhrJson, $xhrPrices);
+                    }
+                }
+            }
+        }
+
+        // Extrair preços dos evaluate_results (resultados do JS executado)
+        if (isset($enrichData['evaluate_results']) && is_array($enrichData['evaluate_results'])) {
+            foreach ($enrichData['evaluate_results'] as $evalResult) {
+                if (is_string($evalResult)) {
+                    $evalJson = json_decode($evalResult, true);
+                    if (is_array($evalJson)) {
+                        foreach ($evalJson as $item) {
+                            if (is_string($item)) {
+                                $price = $this->findFirstNumeric($item);
+                                if ($price !== null && $price > 1) {
+                                    $xhrPrices[] = $price;
+                                }
+                            } elseif (is_array($item)) {
+                                $this->extractPricesFromXhr($item, $xhrPrices);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Extrair metadata (JSON-LD) que pode conter offers com preços
+        if (isset($enrichData['metadata']) && is_array($enrichData['metadata'])) {
+            $this->extractPricesFromMetadata($enrichData['metadata'], $variacoes, $produto);
+            // Se metadata atualizou os preços, retornar
+            if (!$this->variacoesTemMesmoPreco($produto)) {
+                return $produto;
+            }
+        }
+
+        // Se encontramos preços diferentes nos XHR, tentar associar às variações
+        if (!empty($xhrPrices)) {
+            $uniquePrices = array_values(array_unique($xhrPrices));
+            // Se temos preços diferentes e a quantidade bate com as variações
+            if (count($uniquePrices) > 1 && count($uniquePrices) <= count($variacoes)) {
+                sort($uniquePrices);
+                // Associar preços às variações (ordenados)
+                $i = 0;
+                foreach ($produto['variacoes'] as &$vEnrich) {
+                    if ($i < count($uniquePrices)) {
+                        $vEnrich['valor'] = $uniquePrices[$i];
+                    }
+                    $i++;
+                }
+                unset($vEnrich);
+                error_log('[Assessoria] Variações enriquecidas com preços dos XHR: ' . json_encode($uniquePrices));
+            }
+        }
+
+        return $produto;
+    }
+
+    /**
+     * Extrai preços recursivamente de dados XHR
+     */
+    private function extractPricesFromXhr(array $data, array &$prices, int $depth = 0): void {
+        if ($depth > 5) return;
+
+        foreach ($data as $k => $v) {
+            $ks = strtolower((string) $k);
+            if (in_array($ks, ['price', 'salePrice', 'sale_price', 'current_price', 'finalPrice', 'final_price', 'amount'], true)) {
+                $n = $this->findFirstNumeric($v);
+                if ($n !== null && $n > 1) {
+                    $prices[] = $n;
+                }
+            }
+            if (is_array($v)) {
+                $this->extractPricesFromXhr($v, $prices, $depth + 1);
+            }
+        }
+    }
+
+    /**
+     * Extrai preços de metadata JSON-LD e tenta associar às variações
+     */
+    private function extractPricesFromMetadata(array $metadata, array $variacoes, array &$produto): void {
+        // JSON-LD geralmente tem offers com preços
+        $jsonLd = $metadata['json-ld'] ?? [];
+        if (!is_array($jsonLd)) return;
+
+        $offers = [];
+        $queue = [$jsonLd];
+        $seen = 0;
+        while (!empty($queue) && $seen < 100) {
+            $node = array_shift($queue);
+            $seen++;
+            if (!is_array($node)) continue;
+
+            // Procurar offers
+            if (isset($node['offers']) && is_array($node['offers'])) {
+                foreach ($node['offers'] as $offer) {
+                    if (is_array($offer) && isset($offer['price'])) {
+                        $price = $this->findFirstNumeric($offer['price']);
+                        $name = $offer['name'] ?? $offer['sku'] ?? '';
+                        if ($price !== null && $price > 1) {
+                            $offers[] = ['price' => $price, 'name' => (string) $name];
+                        }
+                    }
+                }
+            }
+
+            foreach ($node as $v) {
+                if (is_array($v)) {
+                    $queue[] = $v;
+                }
+            }
+        }
+
+        if (count($offers) >= 2 && count($offers) <= count($variacoes) * 2) {
+            // Tentar associar offers às variações por nome
+            $matched = false;
+            foreach ($produto['variacoes'] as &$vMeta) {
+                if (!is_array($vMeta)) continue;
+                $label = strtolower((string) ($vMeta['label'] ?? ''));
+                $attrs = $vMeta['atributos'] ?? [];
+                foreach ($offers as $offer) {
+                    $offerName = strtolower((string) $offer['name']);
+                    if ($offerName === '') continue;
+                    // Verificar se algum atributo da variação está no nome da offer
+                    foreach ($attrs as $av) {
+                        if (stripos($offerName, (string) $av) !== false) {
+                            $vMeta['valor'] = $offer['price'];
+                            $matched = true;
+                            break 2;
+                        }
+                    }
+                }
+            }
+            unset($vMeta);
+
+            // Se não conseguiu associar por nome, associar por ordem
+            if (!$matched && count($offers) === count($produto['variacoes'])) {
+                $i = 0;
+                foreach ($produto['variacoes'] as &$vMeta2) {
+                    if (isset($offers[$i])) {
+                        $vMeta2['valor'] = $offers[$i]['price'];
+                    }
+                    $i++;
+                }
+                unset($vMeta2);
+            }
+        }
+    }
+
     /**
      * Normaliza os dados do produto vindos do ScrapingBee
      */
