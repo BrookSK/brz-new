@@ -1892,7 +1892,7 @@ class AssessoriaController extends Controller {
                 'timeout' => '120000',
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                'ai_query' => 'Extract product data as JSON. For EACH size/variant option, return its SPECIFIC price shown on the page. Variant prices are usually displayed near or inside the option buttons. Return: name, images, variants with option_name, option_value, price, weight, in_stock.'
+                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
