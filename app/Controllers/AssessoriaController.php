@@ -852,7 +852,7 @@ class AssessoriaController extends Controller {
         $picked = [];
         foreach ([
             'title', 'name', 'product', 'product_name',
-            'price', 'prices',
+            'price', 'prices', 'pricing',
             'images', 'image',
             'variants', 'variation', 'variations', 'offers',
             'url',
@@ -864,6 +864,9 @@ class AssessoriaController extends Controller {
             'available', 'is_available', 'stock_status',
             // Campos de opções (Walmart, Costco, etc.)
             'options', 'product_options', 'selected_options',
+            // Campos de SKU / itens filhos (Costco, etc.)
+            'skus', 'items', 'children', 'child_items', 'sku_list',
+            'variant_pricing', 'option_prices', 'price_map',
         ] as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
                 $picked[$k] = $dadosBrutos[$k];
@@ -873,7 +876,8 @@ class AssessoriaController extends Controller {
         if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
             foreach (['weights_found', 'weight', 'shipping_weight', 'specifications', 'specs',
                        'availability', 'stock', 'in_stock', 'out_of_stock', 'inventory',
-                       'options', 'product_options'] as $pk) {
+                       'options', 'product_options', 'variants', 'variations', 'offers',
+                       'skus', 'items', 'children', 'pricing', 'prices'] as $pk) {
                 if (array_key_exists($pk, $dadosBrutos['product'])) {
                     $picked['product_' . $pk] = $dadosBrutos['product'][$pk];
                 }
@@ -1834,7 +1838,7 @@ class AssessoriaController extends Controller {
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
                 // Limite do ScrapingBee: ai_query <= 300 chars
-                'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map, price (USD), weight and availability/stock status. Missing values: null.'
+                'ai_query' => 'Return JSON with: product name, images, base price. List ALL variant/option combinations (size/color/style). For EACH variant include: id, attributes, specific price in USD, weight in lbs, and stock availability (in_stock true/false). Prices often differ per variant.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -3292,6 +3296,57 @@ class AssessoriaController extends Controller {
                 }
             }
             unset($vFill);
+        }
+
+        // Pós-processamento: detectar se pesos estão em libras e converter para kg
+        // Heurística: se os dados brutos contêm indicação de "lbs"/"pounds"/"lb" nos campos de peso,
+        // ou se o peso é suspeitamente alto (ex: mattress 149 "kg" quando deveria ser ~67 kg),
+        // converter de lbs para kg.
+        $lbsDetected = false;
+        // Verificar nos dados brutos se há indicação de libras
+        $rawJson = json_encode($dadosBrutos);
+        // Procurar padrões como "149 lbs", "weight: 149 lb", "pounds" perto de números de peso
+        if (preg_match('/\b(lbs?|pounds?|libras?)\b/i', $rawJson)) {
+            // Verificar se o peso base ou das variações parece estar em libras (não convertido)
+            // Se o ChatGPT retornou peso > 2.2x do que seria razoável em kg, provavelmente está em lbs
+            $pesosVariacoes = [];
+            if (is_array($produtoData['variacoes'])) {
+                foreach ($produtoData['variacoes'] as $vw) {
+                    if (is_array($vw) && isset($vw['peso']) && floatval($vw['peso']) > 0) {
+                        $pesosVariacoes[] = floatval($vw['peso']);
+                    }
+                }
+            }
+            if (floatval($produtoData['peso']) > 0) {
+                $pesosVariacoes[] = floatval($produtoData['peso']);
+            }
+
+            if (!empty($pesosVariacoes)) {
+                $maxPeso = max($pesosVariacoes);
+                // Se o peso máximo é > 50 e os dados brutos mencionam lbs, provavelmente não foi convertido
+                // (um colchão de 149 lbs = 67.6 kg; se veio 149 "kg" é claramente lbs não convertido)
+                // Regra: se peso > 45 e dados mencionam lbs, converter
+                if ($maxPeso > 45) {
+                    $lbsDetected = true;
+                }
+            }
+        }
+
+        if ($lbsDetected) {
+            $lbsToKg = 0.4536;
+            if (floatval($produtoData['peso']) > 45) {
+                $produtoData['peso'] = round(floatval($produtoData['peso']) * $lbsToKg, 2);
+                error_log('[Assessoria] Peso base convertido de lbs para kg: ' . $produtoData['peso'] . 'kg');
+            }
+            if (is_array($produtoData['variacoes'])) {
+                foreach ($produtoData['variacoes'] as &$vLbs) {
+                    if (!is_array($vLbs)) continue;
+                    if (isset($vLbs['peso']) && floatval($vLbs['peso']) > 45) {
+                        $vLbs['peso'] = round(floatval($vLbs['peso']) * $lbsToKg, 2);
+                    }
+                }
+                unset($vLbs);
+            }
         }
 
         // Pós-processamento: remover atributos que têm apenas 1 valor único (especificações fixas, não variações)
