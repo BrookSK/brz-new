@@ -1884,45 +1884,6 @@ class AssessoriaController extends Controller {
         $requestUrl = 'https://app.scrapingbee.com/api/v1';
 
         $buildUrl = function(array $override = []) use ($requestUrl, $scriptbeeApiKey, $url) {
-            // Usar ai_extract_rules para extração estruturada e precisa
-            $extractRules = json_encode([
-                'product_name' => [
-                    'description' => 'the full product name/title',
-                    'type' => 'string'
-                ],
-                'base_price' => [
-                    'description' => 'the main/default product price in USD as a number',
-                    'type' => 'number'
-                ],
-                'images' => [
-                    'description' => 'all product image URLs',
-                    'type' => 'list'
-                ],
-                'description' => [
-                    'description' => 'product description text',
-                    'type' => 'string'
-                ],
-                'variants' => [
-                    'description' => 'all selectable product variants/options (e.g. different sizes, colors). Each variant that the buyer can choose. Do NOT include fixed specs that have only one value.',
-                    'type' => 'list',
-                    'output' => [
-                        'option_name' => 'the option category name (e.g. Size, Bed Size, Color)',
-                        'option_value' => 'the specific option value (e.g. Queen, King, 10x12)',
-                        'price' => 'the specific price in USD for this variant (may differ from base price)',
-                        'weight_lbs' => 'the shipping weight in pounds for this variant',
-                        'in_stock' => 'whether this variant is currently available for purchase (true/false)',
-                    ]
-                ],
-                'weight_lbs' => [
-                    'description' => 'the product shipping weight in pounds',
-                    'type' => 'string'
-                ],
-                'sku' => [
-                    'description' => 'the product SKU or item number',
-                    'type' => 'string'
-                ]
-            ]);
-
             $params = array_merge([
                 'api_key' => $scriptbeeApiKey,
                 'url' => $url,
@@ -1931,7 +1892,7 @@ class AssessoriaController extends Controller {
                 'timeout' => '120000',
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
-                'ai_extract_rules' => $extractRules
+                'ai_query' => 'Return JSON with: product name, images, base price. List ALL variant/option combinations (size/color/style). For EACH variant include: id, attributes, specific price in USD, weight in lbs, and stock availability (in_stock true/false). Prices often differ per variant.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
         };
@@ -2010,19 +1971,17 @@ class AssessoriaController extends Controller {
             }
         }
 
-        // Se ai_extract_rules ou ai_query falhar (tamanho/validação), refazer sem eles
+        // Se ai_query falhar (tamanho/validação), refazer sem ai_query
         if (!$curlError && (int) $httpCode === 400 && is_string($response) && (stripos($response, 'ai_query') !== false || stripos($response, 'ai_extract_rules') !== false || stripos($response, 'extract_rules') !== false)) {
             $retryUrl = $buildUrl([
-                'ai_extract_rules' => null,
                 'ai_query' => null
             ]);
             // Remove parâmetros nulos
-            $retryUrl = preg_replace('/(&|\?)ai_extract_rules=[^&]*(&|$)/', '$1', $retryUrl);
             $retryUrl = preg_replace('/(&|\?)ai_query=[^&]*(&|$)/', '$1', $retryUrl);
             $retryUrl = rtrim($retryUrl, '&?');
 
             if (headers_sent() === false) {
-                header('X-ScrapingBee-Retry-No-AIRules: true');
+                header('X-ScrapingBee-Retry-No-AIQuery: true');
             }
 
             [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 150);
@@ -3336,6 +3295,11 @@ class AssessoriaController extends Controller {
             'variacoes' => is_array($produtoData['variacoes'] ?? null) ? $produtoData['variacoes'] : [],
             'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
         ];
+
+        // Truncar descrição se muito longa (evitar lixo de cookies/policies)
+        if (mb_strlen($produtoData['descricao']) > 500) {
+            $produtoData['descricao'] = mb_substr($produtoData['descricao'], 0, 497) . '...';
+        }
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Success: true');
@@ -3553,7 +3517,7 @@ REGRAS CRÍTICAS:
    - Se não encontrar o peso exato, ESTIME com base no tipo de produto.
    - Adicione 15% de margem de segurança sobre o peso estimado.
 
-7. DESCRIÇÃO: Se não encontrar descrição detalhada, CRIE uma baseada no nome e características.
+7. DESCRIÇÃO: Se não encontrar descrição detalhada, CRIE uma baseada no nome e características. Máximo 300 caracteres. NÃO inclua textos de cookies, políticas de privacidade, termos de uso ou qualquer conteúdo que não seja sobre o produto.
 
 8. IMAGEM: Extraia todas as URLs de imagens disponíveis. Se não encontrar, use array vazio [].
 
