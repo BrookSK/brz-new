@@ -3854,8 +3854,43 @@ class AssessoriaController extends Controller {
                 if (!isset($vFill['out_of_stock'])) {
                     $vFill['out_of_stock'] = false;
                 }
+                // Detecção adicional de out_of_stock baseada no label/texto da variação
+                if (!$vFill['out_of_stock']) {
+                    $label = strtolower((string) ($vFill['label'] ?? ''));
+                    if (preg_match('/out.?of.?stock|unavailable|sold.?out|indispon/i', $label)) {
+                        $vFill['out_of_stock'] = true;
+                    }
+                }
             }
             unset($vFill);
+        }
+
+        // Pós-processamento: detectar out_of_stock nos dados brutos do ScrapingBee
+        // Procurar por texto "Out of stock" associado a variações específicas
+        if (is_array($produtoData['variacoes']) && !empty($produtoData['variacoes'])) {
+            $rawJsonLower = strtolower(json_encode($dadosBrutos));
+            foreach ($produtoData['variacoes'] as &$vOos) {
+                if (!is_array($vOos) || ($vOos['out_of_stock'] ?? false)) continue;
+                $attrs = $vOos['atributos'] ?? [];
+                foreach ($attrs as $av) {
+                    $avLower = strtolower(trim((string) $av));
+                    if ($avLower === '') continue;
+                    // Procurar padrões como: "14x9.5x9 FT" seguido de "out of stock" nos dados brutos
+                    $pattern = preg_quote($avLower, '/');
+                    if (preg_match('/' . $pattern . '[^}]{0,200}(out.?of.?stock|unavailable|sold.?out)/i', $rawJsonLower)) {
+                        $vOos['out_of_stock'] = true;
+                        error_log('[Assessoria] Out of stock detectado nos dados brutos para: ' . $avLower);
+                        break;
+                    }
+                    // Também verificar o inverso: "out of stock" seguido do nome da variação
+                    if (preg_match('/(out.?of.?stock|unavailable|sold.?out)[^}]{0,200}' . $pattern . '/i', $rawJsonLower)) {
+                        $vOos['out_of_stock'] = true;
+                        error_log('[Assessoria] Out of stock detectado nos dados brutos para: ' . $avLower);
+                        break;
+                    }
+                }
+            }
+            unset($vOos);
         }
 
         // Pós-processamento: detectar se pesos estão em libras e converter para kg
