@@ -2209,7 +2209,18 @@ class AssessoriaController extends Controller {
             }
             if (!empty($xhrPrices)) {
                 $uniquePrices = array_values(array_unique($xhrPrices));
-                if (count($uniquePrices) > 1 && count($uniquePrices) <= count($variacoes) * 2) {
+                $basePrice = floatval($produto['valor'] ?? 0);
+                // Validar que preços são razoáveis
+                $reasonable = true;
+                if ($basePrice > 0) {
+                    foreach ($uniquePrices as $xp) {
+                        if ($xp < $basePrice * 0.1 || $xp > $basePrice * 5) {
+                            $reasonable = false;
+                            break;
+                        }
+                    }
+                }
+                if ($reasonable && count($uniquePrices) > 1 && count($uniquePrices) <= count($variacoes) * 2) {
                     sort($uniquePrices);
                     $i = 0;
                     foreach ($produto['variacoes'] as &$vEnrich) {
@@ -2244,7 +2255,8 @@ class AssessoriaController extends Controller {
                         }
                     }
 
-                    $pricePrompt = "From the HTML snippets below, extract the SPECIFIC PRICE (in USD) for each product variant/option.\nThe variants are: " . implode(', ', $varLabels) . "\n\nReturn ONLY valid JSON array like: [{\"option\": \"variant value\", \"price\": 99.99}]\nNo text, no markdown.\n\nHTML:\n" . $relevantHtml;
+                    $basePrice = floatval($produto['valor'] ?? 0);
+                    $pricePrompt = "From the HTML snippets below, extract the SPECIFIC PRICE (in USD) for each product variant/option.\nThe variants are: " . implode(', ', $varLabels) . "\nThe base product price is approximately $" . number_format($basePrice, 2) . " USD.\nPrices should be in a similar range to the base price.\n\nReturn ONLY valid JSON array like: [{\"option\": \"variant value\", \"price\": 99.99}]\nNo text, no markdown.\n\nHTML:\n" . $relevantHtml;
 
                     [$priceResp, $priceCode, $priceErr] = $this->callChatGPT($chatGptApiKey, $pricePrompt, true);
                     if ($priceCode === 400) {
@@ -2257,29 +2269,45 @@ class AssessoriaController extends Controller {
                         try {
                             $priceData = $this->decodeJsonResilient((string) $priceContent);
                             if (is_array($priceData) && !empty($priceData)) {
-                                foreach ($produto['variacoes'] as &$vPrice) {
-                                    if (!is_array($vPrice)) continue;
-                                    $attrs = $vPrice['atributos'] ?? [];
-                                    foreach ($priceData as $pd) {
-                                        if (!is_array($pd)) continue;
-                                        $pdOption = strtolower(trim((string) ($pd['option'] ?? '')));
-                                        $pdPrice = $this->findFirstNumeric($pd['price'] ?? null);
-                                        if ($pdOption === '' || $pdPrice === null || $pdPrice <= 0) continue;
-
-                                        foreach ($attrs as $av) {
-                                            $avLower = strtolower(trim((string) $av));
-                                            if ($avLower !== '' && ($pdOption === $avLower || stripos($pdOption, $avLower) !== false || stripos($avLower, $pdOption) !== false)) {
-                                                $vPrice['valor'] = $pdPrice;
-                                                break 2;
-                                            }
+                                // Validar que os preços extraídos são razoáveis (dentro de 5x do preço base)
+                                $allReasonable = true;
+                                foreach ($priceData as $pd) {
+                                    if (!is_array($pd)) continue;
+                                    $pdPrice = $this->findFirstNumeric($pd['price'] ?? null);
+                                    if ($pdPrice !== null && $pdPrice > 0 && $basePrice > 0) {
+                                        if ($pdPrice < $basePrice * 0.1 || $pdPrice > $basePrice * 5) {
+                                            $allReasonable = false;
+                                            error_log('[Assessoria] Preço enriquecido descartado (fora do range): $' . $pdPrice . ' vs base $' . $basePrice);
+                                            break;
                                         }
                                     }
                                 }
-                                unset($vPrice);
 
-                                if (!$this->variacoesTemMesmoPreco($produto)) {
-                                    error_log('[Assessoria] Preços enriquecidos via ChatGPT + HTML');
-                                    return $produto;
+                                if ($allReasonable) {
+                                    foreach ($produto['variacoes'] as &$vPrice) {
+                                        if (!is_array($vPrice)) continue;
+                                        $attrs = $vPrice['atributos'] ?? [];
+                                        foreach ($priceData as $pd) {
+                                            if (!is_array($pd)) continue;
+                                            $pdOption = strtolower(trim((string) ($pd['option'] ?? '')));
+                                            $pdPrice = $this->findFirstNumeric($pd['price'] ?? null);
+                                            if ($pdOption === '' || $pdPrice === null || $pdPrice <= 0) continue;
+
+                                            foreach ($attrs as $av) {
+                                                $avLower = strtolower(trim((string) $av));
+                                                if ($avLower !== '' && ($pdOption === $avLower || stripos($pdOption, $avLower) !== false || stripos($avLower, $pdOption) !== false)) {
+                                                    $vPrice['valor'] = $pdPrice;
+                                                    break 2;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    unset($vPrice);
+
+                                    if (!$this->variacoesTemMesmoPreco($produto)) {
+                                        error_log('[Assessoria] Preços enriquecidos via ChatGPT + HTML');
+                                        return $produto;
+                                    }
                                 }
                             }
                         } catch (\Exception $e) {
@@ -2292,92 +2320,131 @@ class AssessoriaController extends Controller {
 
         error_log('[Assessoria] Não foi possível enriquecer preços das variações via metadata/XHR/HTML');
 
-        // 4) Estratégia final: usar js_scenario para clicar em cada botão de variação e capturar o preço
-        $chatGptApiKey = $this->getChatGPTApiKey();
-        if ($chatGptApiKey) {
-            $variantValues = [];
-            foreach ($variacoes as $v) {
-                if (!is_array($v) || !isset($v['atributos']) || !is_array($v['atributos'])) continue;
-                foreach ($v['atributos'] as $av) {
-                    $variantValues[] = trim((string) $av);
-                }
+        // 4) Estratégia: usar js_scenario para clicar em cada variação e interceptar XHR de preço
+        $variantValues = [];
+        foreach ($variacoes as $v) {
+            if (!is_array($v) || !isset($v['atributos']) || !is_array($v['atributos'])) continue;
+            foreach ($v['atributos'] as $av) {
+                $variantValues[] = trim((string) $av);
             }
-            $variantValues = array_values(array_unique($variantValues));
+        }
+        $variantValues = array_values(array_unique($variantValues));
 
-            if (count($variantValues) >= 2) {
-                // Construir js_scenario: para cada variação, clicar e capturar o preço
-                $instructions = [];
-                $instructions[] = ['wait' => 2000];
+        if (count($variantValues) >= 2) {
+            $instructions = [];
+            $instructions[] = ['wait' => 3000];
 
-                foreach ($variantValues as $val) {
-                    $escapedVal = str_replace(["'", "\\"], ["\\'", "\\\\"], (string) $val);
-                    // Clicar no botão da variação
-                    $instructions[] = ['evaluate' => "(function(){var els=document.querySelectorAll('button,a,[role=radio],[role=option],[data-value],label,span');for(var i=0;i<els.length;i++){var t=(els[i].textContent||'').trim();if(t==='" . $escapedVal . "'){els[i].click();return 'clicked'}}return 'notfound'})()"];
-                    $instructions[] = ['wait' => 2000];
-                    // Capturar o preço visível após o clique
-                    $instructions[] = ['evaluate' => "(function(){var r={option:'" . $escapedVal . "'};var ps=document.querySelectorAll('[data-testid*=price],[class*=price],[itemprop=price],.price,.product-price,h2,span');for(var i=0;i<ps.length;i++){var t=ps[i].textContent||'';var m=t.match(/\\$([\\d,]+\\.?\\d*)/);if(m){r.price=m[1].replace(/,/g,'');return JSON.stringify(r)}}return JSON.stringify(r)})()"];
-                }
+            foreach ($variantValues as $val) {
+                $escapedVal = str_replace(["'", "\\", "\n", "\r"], ["\\'", "\\\\", "", ""], (string) $val);
+                $instructions[] = ['evaluate' => "(function(){var els=document.querySelectorAll('button,a,[role=radio],[role=option],[data-value],label,span,div');for(var i=0;i<els.length;i++){var t=(els[i].textContent||'').trim();if(t==='" . $escapedVal . "'||t.indexOf('" . $escapedVal . "')===0){els[i].click();return 'clicked:" . $escapedVal . "'}}return 'notfound:" . $escapedVal . "'})()"];
+                $instructions[] = ['wait' => 2500];
+                $instructions[] = ['evaluate' => "(function(){var opt='" . $escapedVal . "';var r={option:opt,price:null};try{var els=document.querySelectorAll('[automation-id*=price],[data-testid*=price],[class*=rice],span[class*=oney]');for(var i=0;i<els.length;i++){var t=els[i].textContent||'';var m=t.match(/\\$([\\d,]+\\.\\d{2})/);if(m&&parseFloat(m[1].replace(/,/g,''))>10){r.price=parseFloat(m[1].replace(/,/g,''));break}}if(!r.price){var all=document.querySelectorAll('span,div,p');for(var i=0;i<all.length;i++){var t=all[i].textContent||'';if(t.length<20){var m=t.match(/^\\$([\\d,]+\\.\\d{2})$/);if(m&&parseFloat(m[1].replace(/,/g,''))>10){r.price=parseFloat(m[1].replace(/,/g,''));break}}}}}catch(e){}return JSON.stringify(r)})()"];
+            }
 
-                $jsScenario = json_encode(['instructions' => $instructions]);
+            $jsScenario = json_encode(['instructions' => $instructions]);
 
-                $clickUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
-                    'api_key' => $apiKey,
-                    'url' => $url,
-                    'stealth_proxy' => 'true',
-                    'country_code' => 'us',
-                    'timeout' => '90000',
-                    'wait_browser' => 'load',
-                    'block_ads' => 'true',
-                    'json_response' => 'true',
-                    'js_scenario' => $jsScenario
-                ]);
+            $clickUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
+                'api_key' => $apiKey,
+                'url' => $url,
+                'stealth_proxy' => 'true',
+                'country_code' => 'us',
+                'timeout' => '90000',
+                'wait_browser' => 'load',
+                'block_ads' => 'true',
+                'json_response' => 'true',
+                'js_scenario' => $jsScenario
+            ]);
 
-                error_log('[Assessoria] Tentando enriquecer via js_scenario (clique em variações)');
+            error_log('[Assessoria] Tentando enriquecer via js_scenario (clique + XHR intercept)');
 
-                [$clickResp, $clickCode, $clickErrno, $clickError] = $doRequest($clickUrl, 100);
+            [$clickResp, $clickCode, $clickErrno, $clickError] = $doRequest($clickUrl, 100);
 
-                if (!$clickError && $clickCode === 200 && !empty($clickResp)) {
-                    $clickData = json_decode($clickResp, true);
-                    if (is_array($clickData) && isset($clickData['evaluate_results']) && is_array($clickData['evaluate_results'])) {
-                        $capturedPrices = [];
-                        foreach ($clickData['evaluate_results'] as $evalResult) {
-                            if (!is_string($evalResult)) continue;
-                            $parsed = json_decode($evalResult, true);
-                            if (is_array($parsed) && isset($parsed['option']) && isset($parsed['price'])) {
-                                $price = $this->findFirstNumeric($parsed['price']);
-                                if ($price !== null && $price > 1) {
-                                    $capturedPrices[strtolower(trim((string) $parsed['option']))] = $price;
-                                }
-                            }
-                        }
+            if (!$clickError && $clickCode === 200 && !empty($clickResp)) {
+                $clickData = json_decode($clickResp, true);
+                if (is_array($clickData)) {
+                    $capturedPrices = [];
+                    $basePrice = floatval($produto['valor'] ?? 0);
 
-                        if (!empty($capturedPrices)) {
-                            foreach ($produto['variacoes'] as &$vClick) {
-                                if (!is_array($vClick)) continue;
-                                $attrs = $vClick['atributos'] ?? [];
-                                foreach ($attrs as $av) {
-                                    $avLower = strtolower(trim((string) $av));
-                                    if (isset($capturedPrices[$avLower])) {
-                                        $vClick['valor'] = $capturedPrices[$avLower];
-                                        break;
+                    // Primeiro: extrair preços dos XHR interceptados (Costco API de preço)
+                    if (isset($clickData['xhr']) && is_array($clickData['xhr'])) {
+                        $xhrVariantPrices = [];
+                        foreach ($clickData['xhr'] as $xhr) {
+                            if (!is_array($xhr)) continue;
+                            $xhrUrl = $xhr['url'] ?? '';
+                            $xhrBody = $xhr['body'] ?? '';
+                            if (is_string($xhrUrl) && is_string($xhrBody) && $xhrBody !== '' &&
+                                (stripos($xhrUrl, 'price') !== false || stripos($xhrUrl, 'pricing') !== false)) {
+                                $xhrJson = json_decode($xhrBody, true);
+                                if (is_array($xhrJson)) {
+                                    $dp = $xhrJson['priceData']['displayPrice']['deliveredPrice']
+                                        ?? $xhrJson['priceData']['displayPrice']['onlinePrice']
+                                        ?? $xhrJson['priceData']['sourcePrice']['offerPrice']
+                                        ?? null;
+                                    if ($dp !== null && floatval($dp) > 0) {
+                                        $xhrVariantPrices[] = floatval($dp);
                                     }
                                 }
                             }
-                            unset($vClick);
-
+                        }
+                        if (count($xhrVariantPrices) >= count($variantValues)) {
+                            $i = 0;
+                            foreach ($produto['variacoes'] as &$vXhr) {
+                                if ($i < count($xhrVariantPrices)) {
+                                    $p = $xhrVariantPrices[$i];
+                                    if ($basePrice <= 0 || ($p >= $basePrice * 0.1 && $p <= $basePrice * 5)) {
+                                        $vXhr['valor'] = $p;
+                                    }
+                                }
+                                $i++;
+                            }
+                            unset($vXhr);
                             if (!$this->variacoesTemMesmoPreco($produto)) {
-                                error_log('[Assessoria] Preços enriquecidos via js_scenario (clique): ' . json_encode($capturedPrices));
+                                error_log('[Assessoria] Precos enriquecidos via XHR intercept (Costco API)');
                                 return $produto;
                             }
                         }
                     }
-                } else {
-                    error_log('[Assessoria] js_scenario falhou: code=' . $clickCode . ' error=' . ($clickError ?: 'none'));
+
+                    // Segundo: extrair dos evaluate_results (preço visível na página)
+                    if (isset($clickData['evaluate_results']) && is_array($clickData['evaluate_results'])) {
+                        foreach ($clickData['evaluate_results'] as $evalResult) {
+                            if (!is_string($evalResult)) continue;
+                            $parsed = json_decode($evalResult, true);
+                            if (is_array($parsed) && isset($parsed['option']) && isset($parsed['price']) && $parsed['price'] !== null) {
+                                $price = floatval($parsed['price']);
+                                if ($price > 10 && ($basePrice <= 0 || ($price >= $basePrice * 0.1 && $price <= $basePrice * 5))) {
+                                    $optKey = strtolower(trim((string) $parsed['option']));
+                                    $capturedPrices[$optKey] = $price;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!empty($capturedPrices)) {
+                        foreach ($produto['variacoes'] as &$vEval) {
+                            if (!is_array($vEval)) continue;
+                            $attrs = $vEval['atributos'] ?? [];
+                            foreach ($attrs as $av) {
+                                $avLower = strtolower(trim((string) $av));
+                                if (isset($capturedPrices[$avLower])) {
+                                    $vEval['valor'] = $capturedPrices[$avLower];
+                                    break;
+                                }
+                            }
+                        }
+                        unset($vEval);
+                        if (!$this->variacoesTemMesmoPreco($produto)) {
+                            error_log('[Assessoria] Precos enriquecidos via evaluate_results');
+                            return $produto;
+                        }
+                    }
                 }
+            } else {
+                error_log('[Assessoria] js_scenario falhou: code=' . ($clickCode ?? 0));
             }
         }
 
-        error_log('[Assessoria] Todas as estratégias de enriquecimento falharam');
+        error_log('[Assessoria] Todas as estrategias de enriquecimento falharam');
         return $produto;
     }
 
@@ -2393,7 +2460,7 @@ class AssessoriaController extends Controller {
         $html = preg_replace('/<footer\b[^>]*>.*?<\/footer>/si', '', $html);
         $html = preg_replace('/<nav\b[^>]*>.*?<\/nav>/si', '', $html);
 
-        // Extrair linhas de texto que contêm preços ($xxx.xx)
+        // Extrair linhas de texto que contêm preços
         $text = strip_tags($html);
         $lines = preg_split('/[\n\r]+/', $text);
         $priceLines = [];
@@ -2405,12 +2472,9 @@ class AssessoriaController extends Controller {
         }
 
         $relevant = implode("\n", array_slice($priceLines, 0, 60));
-
-        // Limitar tamanho
         if (strlen($relevant) > 6000) {
             $relevant = substr($relevant, 0, 6000);
         }
-
         return $relevant;
     }
 
@@ -2422,7 +2486,7 @@ class AssessoriaController extends Controller {
 
         foreach ($data as $k => $v) {
             $ks = strtolower((string) $k);
-            if (in_array($ks, ['price', 'salePrice', 'sale_price', 'current_price', 'finalPrice', 'final_price', 'amount'], true)) {
+            if (in_array($ks, ['price', 'saleprice', 'sale_price', 'current_price', 'finalprice', 'final_price', 'amount', 'deliveredprice', 'onlineprice', 'offerprice'], true)) {
                 $n = $this->findFirstNumeric($v);
                 if ($n !== null && $n > 1) {
                     $prices[] = $n;
