@@ -1,0 +1,541 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Request;
+use App\Services\AuthService;
+
+class AdminComissoesGlobalController
+{
+    private $connection;
+
+    public function __construct()
+    {
+        $this->connection = \Config\Database::getConnection();
+    }
+
+    private function pick(array $cols, array $candidates): string
+    {
+        foreach ($candidates as $c) {
+            if (in_array($c, $cols, true)) return $c;
+        }
+        return '';
+    }
+
+    private function getCols(string $table): array
+    {
+        try {
+            $st = $this->connection->query('DESCRIBE ' . $table);
+            return $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    private function fmt(float $v, string $moeda): string
+    {
+        $moeda = strtoupper(trim($moeda));
+        if ($moeda === 'USD') return '$ ' . number_format($v, 2, '.', ',');
+        return 'R$ ' . number_format($v, 2, ',', '.');
+    }
+
+    // ─── Tela 1: Comissões de todos os vendedores ───
+    public function comissoesTodas(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $dataInicio = (string) $request->getParam('data_inicio', '');
+        $dataFim = (string) $request->getParam('data_fim', '');
+
+        $cols = $this->getCols('pedidos');
+        $colTotal = $this->pick($cols, ['valor_total', 'total', 'amount']);
+        $colImpostos = $this->pick($cols, ['valor_impostos', 'impostos']);
+        $colMoeda = $this->pick($cols, ['moeda', 'currency']);
+        $colCreatedAt = $this->pick($cols, ['created_at', 'data_criacao', 'data_pedido']);
+        $colOrigem = $this->pick($cols, ['origem_pedido', 'origem', 'tipo']);
+        $colStatus = $this->pick($cols, ['status', 'status_pedido']);
+        $colPayStatus = $this->pick($cols, ['payment_status', 'status_pagamento']);
+        $colCriadoPor = $this->pick($cols, ['criado_por', 'vendedor_id', 'created_by']);
+        $colSemComissao = $this->pick($cols, ['sem_comissao']);
+
+        // Buscar pedidos manuais pagos
+        $where = [];
+        $params = [];
+
+        if ($colOrigem) {
+            $where[] = "LOWER(COALESCE(p.{$colOrigem}, '')) = 'manual'";
+        }
+
+        $paidParts = [];
+        if ($colStatus) $paidParts[] = "LOWER(COALESCE(p.{$colStatus}, '')) IN ('pago','paid','approved','aprovado')";
+        if ($colPayStatus) $paidParts[] = "LOWER(COALESCE(p.{$colPayStatus}, '')) IN ('approved','paid','pago','aprovado','confirmed','received','succeeded','success')";
+        if (!empty($paidParts)) $where[] = '(' . implode(' OR ', $paidParts) . ')';
+
+        if ($colSemComissao) $where[] = "(p.{$colSemComissao} IS NULL OR p.{$colSemComissao} = 0)";
+
+        if ($dataInicio !== '' && $colCreatedAt) {
+            $where[] = "DATE(p.{$colCreatedAt}) >= :di";
+            $params[':di'] = $dataInicio;
+        }
+        if ($dataFim !== '' && $colCreatedAt) {
+            $where[] = "DATE(p.{$colCreatedAt}) <= :df";
+            $params[':df'] = $dataFim;
+        }
+
+        $sql = 'SELECT p.id'
+            . ($colTotal ? ", p.{$colTotal} AS valor_total" : '')
+            . ($colImpostos ? ", p.{$colImpostos} AS impostos" : '')
+            . ($colMoeda ? ", p.{$colMoeda} AS moeda" : '')
+            . ($colCreatedAt ? ", p.{$colCreatedAt} AS created_at" : '')
+            . ($colCriadoPor ? ", p.{$colCriadoPor} AS criado_por" : '')
+            . ' FROM pedidos p';
+        if (!empty($where)) $sql .= ' WHERE ' . implode(' AND ', $where);
+        $sql .= ' ORDER BY ' . ($colCreatedAt ? "p.{$colCreatedAt} DESC" : 'p.id DESC') . ' LIMIT 2000';
+
+        $rows = [];
+        try {
+            $st = $this->connection->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            $rows = [];
+        }
+
+        // Custo dos produtos por pedido
+        $custoByPedido = [];
+        $itensTable = $this->detectItensTable();
+        if ($itensTable && !empty($rows)) {
+            $custoByPedido = $this->calcCustoProdutosByPedido($itensTable, array_column($rows, 'id'));
+        }
+
+        // Comissões de processamento
+        $comProc = [];
+        try {
+            $stT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'comissoes_processamento'");
+            $stT->execute();
+            if ((int) ($stT->fetchColumn() ?: 0) > 0) {
+                $sqlP = 'SELECT usuario_id, moeda, SUM(valor_comissao) AS total_comissao, SUM(base_liquida) AS total_base FROM comissoes_processamento';
+                $wpP = [];
+                $ppP = [];
+                if ($dataInicio !== '') { $wpP[] = 'DATE(created_at) >= ?'; $ppP[] = $dataInicio; }
+                if ($dataFim !== '') { $wpP[] = 'DATE(created_at) <= ?'; $ppP[] = $dataFim; }
+                if (!empty($wpP)) $sqlP .= ' WHERE ' . implode(' AND ', $wpP);
+                $sqlP .= ' GROUP BY usuario_id, moeda';
+                $stP = $this->connection->prepare($sqlP);
+                $stP->execute($ppP);
+                foreach ($stP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    $uid = (int) ($r['usuario_id'] ?? 0);
+                    $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+                    $comProc[$uid][$m] = [
+                        'total_comissao' => (float) ($r['total_comissao'] ?? 0),
+                        'total_base' => (float) ($r['total_base'] ?? 0),
+                    ];
+                }
+            }
+        } catch (\Exception $e) {}
+
+        // Faixas de comissão manual
+        $faixas = $this->getComissaoManualFaixas();
+
+        // Agrupar por vendedor
+        $porVendedor = [];
+        foreach ($rows as $r) {
+            $uid = (int) ($r['criado_por'] ?? 0);
+            $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+            if ($m === '') $m = 'BRL';
+            $pid = (int) ($r['id'] ?? 0);
+            $fat = (float) ($r['valor_total'] ?? 0);
+            $imp = (float) ($r['impostos'] ?? 0);
+            $custo = (float) ($custoByPedido[$pid] ?? 0);
+            $liq = $fat - $custo - $imp;
+
+            if (!isset($porVendedor[$uid])) $porVendedor[$uid] = [];
+            if (!isset($porVendedor[$uid][$m])) $porVendedor[$uid][$m] = ['faturado' => 0, 'impostos' => 0, 'custo' => 0, 'liquido' => 0, 'qtd' => 0];
+            $porVendedor[$uid][$m]['faturado'] += $fat;
+            $porVendedor[$uid][$m]['impostos'] += $imp;
+            $porVendedor[$uid][$m]['custo'] += $custo;
+            $porVendedor[$uid][$m]['liquido'] += $liq;
+            $porVendedor[$uid][$m]['qtd']++;
+        }
+
+        // Nomes dos vendedores
+        $nomes = [];
+        $uids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
+        if (!empty($uids)) {
+            $in = implode(',', array_fill(0, count($uids), '?'));
+            try {
+                $st = $this->connection->prepare("SELECT id, nome, email FROM usuarios WHERE id IN ({$in})");
+                $st->execute(array_values($uids));
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $u) {
+                    $nomes[(int) $u['id']] = trim(($u['nome'] ?? '') . ' (' . ($u['email'] ?? '') . ')');
+                }
+            } catch (\Exception $e) {}
+        }
+
+        // Vendas orgânicas (sem criado_por ou criado_por = 0)
+        $organico = $porVendedor[0] ?? [];
+        unset($porVendedor[0]);
+
+        // Render
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+
+        echo '<div class="pt-3">';
+        echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
+        echo '<h1 class="h2"><i class="fas fa-users-cog me-2"></i>Comissões - Visão Global</h1>';
+        echo '</div>';
+
+        // Filtros
+        echo '<div class="card mb-4"><div class="card-body">';
+        echo '<form method="GET" class="row g-2 align-items-end">';
+        echo '<div class="col-md-3"><label class="form-label">Data início</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>';
+        echo '<div class="col-md-3"><label class="form-label">Data fim</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>';
+        echo '<div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>';
+        echo '</form></div></div>';
+
+        // Vendas orgânicas
+        if (!empty($organico)) {
+            echo '<div class="card mb-4"><div class="card-header bg-success bg-opacity-10"><strong><i class="fas fa-leaf me-1"></i>Vendas Orgânicas (sem vendedor atribuído)</strong></div><div class="card-body">';
+            foreach ($organico as $m => $t) {
+                echo '<div class="mb-2"><span class="badge bg-secondary">' . htmlspecialchars($m) . '</span> ';
+                echo $t['qtd'] . ' pedidos | Faturado: <strong>' . $this->fmt($t['faturado'], $m) . '</strong>';
+                echo ' | Impostos: ' . $this->fmt($t['impostos'], $m);
+                echo ' | Custo: ' . $this->fmt($t['custo'], $m);
+                echo ' | Líquido: <strong>' . $this->fmt($t['liquido'], $m) . '</strong></div>';
+            }
+            echo '</div></div>';
+        }
+
+        // Tabela por vendedor
+        echo '<div class="card mb-4"><div class="card-header"><strong>Comissões por Vendedor (Pedidos Manuais + Processamento)</strong></div><div class="card-body">';
+        echo '<div class="table-responsive"><table class="table table-hover table-sm">';
+        echo '<thead><tr><th>Vendedor</th><th>Moeda</th><th class="text-end">Pedidos</th><th class="text-end">Faturado</th><th class="text-end">Impostos</th><th class="text-end">Custo</th><th class="text-end">Líquido</th><th class="text-end">% Comissão</th><th class="text-end">Comissão Manual</th><th class="text-end">Comissão Proc.</th><th class="text-end">Total Comissão</th></tr></thead><tbody>';
+
+        $allUids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
+        sort($allUids);
+
+        $grandTotal = ['USD' => 0, 'BRL' => 0];
+
+        foreach ($allUids as $uid) {
+            if ($uid <= 0) continue;
+            $nome = $nomes[$uid] ?? ('Vendedor #' . $uid);
+            $moedas = array_unique(array_merge(array_keys($porVendedor[$uid] ?? []), array_keys($comProc[$uid] ?? [])));
+            foreach ($moedas as $m) {
+                $t = $porVendedor[$uid][$m] ?? ['faturado' => 0, 'impostos' => 0, 'custo' => 0, 'liquido' => 0, 'qtd' => 0];
+                $pct = $this->resolvePercentualPorFaixas($t['faturado'], $faixas);
+                $comManual = max(0, $t['liquido']) * ($pct / 100);
+                $cp = $comProc[$uid][$m] ?? ['total_comissao' => 0, 'total_base' => 0];
+                $comProcVal = (float) ($cp['total_comissao'] ?? 0);
+                $totalCom = $comManual + $comProcVal;
+                $grandTotal[$m] = ($grandTotal[$m] ?? 0) + $totalCom;
+
+                echo '<tr>';
+                echo '<td>' . htmlspecialchars($nome) . '</td>';
+                echo '<td>' . htmlspecialchars($m) . '</td>';
+                echo '<td class="text-end">' . $t['qtd'] . '</td>';
+                echo '<td class="text-end">' . $this->fmt($t['faturado'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($t['impostos'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($t['custo'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($t['liquido'], $m) . '</td>';
+                echo '<td class="text-end">' . number_format($pct, 2, ',', '.') . '%</td>';
+                echo '<td class="text-end">' . $this->fmt($comManual, $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($comProcVal, $m) . '</td>';
+                echo '<td class="text-end fw-bold">' . $this->fmt($totalCom, $m) . '</td>';
+                echo '</tr>';
+            }
+        }
+
+        echo '</tbody><tfoot><tr class="table-dark">';
+        echo '<td colspan="10" class="text-end fw-bold">Total Geral</td>';
+        echo '<td class="text-end fw-bold">';
+        foreach ($grandTotal as $m => $v) {
+            if ($v > 0) echo $this->fmt($v, $m) . '<br>';
+        }
+        echo '</td></tr></tfoot></table></div></div></div>';
+
+        echo '</div>';
+        $content = ob_get_clean();
+        $sidebarActive = 'comissoes-global';
+        $title = 'Comissões Global - Admin';
+        include __DIR__ . '/../Views/layouts/admin.php';
+        exit;
+    }
+
+    // ─── Tela 2: Resumo Financeiro Global ───
+    public function resumoFinanceiro(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $dataInicio = (string) $request->getParam('data_inicio', '');
+        $dataFim = (string) $request->getParam('data_fim', '');
+        $status = (string) $request->getParam('status', '');
+        $moedaFiltro = strtoupper(trim((string) $request->getParam('moeda', '')));
+        if ($moedaFiltro !== '' && !in_array($moedaFiltro, ['USD', 'BRL'], true)) $moedaFiltro = '';
+
+        $cols = $this->getCols('pedidos');
+        $colTotal = $this->pick($cols, ['valor_total', 'total', 'amount']);
+        $colImpostos = $this->pick($cols, ['valor_impostos', 'impostos']);
+        $colTaxa = $this->pick($cols, ['taxa_servico']);
+        $colSubtotal = $this->pick($cols, ['subtotal_produtos', 'subtotal']);
+        $colMoeda = $this->pick($cols, ['moeda', 'currency']);
+        $colCreatedAt = $this->pick($cols, ['created_at', 'data_criacao', 'data_pedido']);
+        $colStatus = $this->pick($cols, ['status', 'status_pedido']);
+        $colFrete = $this->pick($cols, ['frete', 'frete_manual', 'shipping']);
+        $colTaxaConv = $this->pick($cols, ['taxa_conversao']);
+        $colCodigo = $this->pick($cols, ['numero_pedido', 'codigo_pedido', 'codigo']);
+
+        $where = [];
+        $params = [];
+        if ($dataInicio !== '' && $colCreatedAt) { $where[] = "DATE(p.{$colCreatedAt}) >= :di"; $params[':di'] = $dataInicio; }
+        if ($dataFim !== '' && $colCreatedAt) { $where[] = "DATE(p.{$colCreatedAt}) <= :df"; $params[':df'] = $dataFim; }
+        if ($status !== '' && $colStatus) { $where[] = "LOWER(p.{$colStatus}) = :st"; $params[':st'] = strtolower($status); }
+        if ($moedaFiltro !== '' && $colMoeda) { $where[] = "UPPER(COALESCE(p.{$colMoeda}, 'BRL')) = :m"; $params[':m'] = $moedaFiltro; }
+
+        $sel = ['p.id'];
+        if ($colTotal) $sel[] = "p.{$colTotal} AS valor_total";
+        if ($colImpostos) $sel[] = "p.{$colImpostos} AS impostos";
+        if ($colTaxa) $sel[] = "p.{$colTaxa} AS taxa_servico";
+        if ($colSubtotal) $sel[] = "p.{$colSubtotal} AS subtotal_produtos";
+        if ($colMoeda) $sel[] = "p.{$colMoeda} AS moeda";
+        if ($colCreatedAt) $sel[] = "p.{$colCreatedAt} AS created_at";
+        if ($colStatus) $sel[] = "p.{$colStatus} AS status";
+        if ($colFrete) $sel[] = "p.{$colFrete} AS frete";
+        if ($colTaxaConv) $sel[] = "p.{$colTaxaConv} AS taxa_conversao";
+        if ($colCodigo) $sel[] = "p.{$colCodigo} AS codigo";
+
+        $sql = 'SELECT ' . implode(', ', $sel) . ' FROM pedidos p';
+        if (!empty($where)) $sql .= ' WHERE ' . implode(' AND ', $where);
+        $sql .= ' ORDER BY ' . ($colCreatedAt ? "p.{$colCreatedAt} DESC" : 'p.id DESC') . ' LIMIT 2000';
+
+        $rows = [];
+        try {
+            $st = $this->connection->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) { $rows = []; }
+
+        // Custo dos produtos
+        $custoByPedido = [];
+        $itensTable = $this->detectItensTable();
+        if ($itensTable && !empty($rows)) {
+            $custoByPedido = $this->calcCustoProdutosByPedido($itensTable, array_column($rows, 'id'));
+        }
+
+        // Totais por moeda
+        $totais = [];
+        $pedidosOut = [];
+        foreach ($rows as $r) {
+            $pid = (int) ($r['id'] ?? 0);
+            $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+            if ($m === '') $m = 'BRL';
+
+            $total = (float) ($r['valor_total'] ?? 0);
+            $imp = (float) ($r['impostos'] ?? 0);
+            $taxa = (float) ($r['taxa_servico'] ?? 0);
+            $sub = (float) ($r['subtotal_produtos'] ?? 0);
+            $frete = (float) ($r['frete'] ?? 0);
+            $custo = (float) ($custoByPedido[$pid] ?? 0);
+
+            if (!isset($totais[$m])) $totais[$m] = ['qtd' => 0, 'total' => 0, 'impostos' => 0, 'taxa_servico' => 0, 'subtotal_produtos' => 0, 'frete' => 0, 'custo_produtos' => 0];
+            $totais[$m]['qtd']++;
+            $totais[$m]['total'] += $total;
+            $totais[$m]['impostos'] += $imp;
+            $totais[$m]['taxa_servico'] += $taxa;
+            $totais[$m]['subtotal_produtos'] += $sub;
+            $totais[$m]['frete'] += $frete;
+            $totais[$m]['custo_produtos'] += $custo;
+
+            $pedidosOut[] = [
+                'id' => $pid,
+                'codigo' => (string) ($r['codigo'] ?? $pid),
+                'status' => (string) ($r['status'] ?? ''),
+                'created_at' => (string) ($r['created_at'] ?? ''),
+                'moeda' => $m,
+                'total' => $total,
+                'impostos' => $imp,
+                'taxa_servico' => $taxa,
+                'subtotal_produtos' => $sub,
+                'frete' => $frete,
+                'custo_produtos' => $custo,
+            ];
+        }
+
+        // Render
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+
+        echo '<div class="pt-3">';
+        echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
+        echo '<h1 class="h2"><i class="fas fa-chart-bar me-2"></i>Resumo Financeiro Global</h1>';
+        echo '</div>';
+
+        // Filtros
+        echo '<div class="card mb-4"><div class="card-body">';
+        echo '<form method="GET" class="row g-2 align-items-end">';
+        echo '<div class="col-md-2"><label class="form-label">Data início</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>';
+        echo '<div class="col-md-2"><label class="form-label">Data fim</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>';
+        echo '<div class="col-md-2"><label class="form-label">Status</label><input type="text" class="form-control" name="status" value="' . htmlspecialchars($status) . '" placeholder="ex: pago"></div>';
+        echo '<div class="col-md-2"><label class="form-label">Moeda</label><select class="form-select" name="moeda">';
+        echo '<option value="">Todas</option>';
+        echo '<option value="USD"' . ($moedaFiltro === 'USD' ? ' selected' : '') . '>USD</option>';
+        echo '<option value="BRL"' . ($moedaFiltro === 'BRL' ? ' selected' : '') . '>BRL</option>';
+        echo '</select></div>';
+        echo '<div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>';
+        echo '</form></div></div>';
+
+        // Cards de resumo por moeda
+        foreach ($totais as $m => $t) {
+            $lucro = $t['total'] - $t['impostos'] - $t['taxa_servico'] - $t['custo_produtos'] - $t['frete'];
+            echo '<div class="card mb-3"><div class="card-header"><strong>' . htmlspecialchars($m) . ' - ' . $t['qtd'] . ' pedidos</strong></div>';
+            echo '<div class="card-body"><div class="row g-3">';
+            $cards = [
+                ['Total Arrecadado', $t['total'], 'fas fa-dollar-sign', 'primary'],
+                ['Subtotal Produtos', $t['subtotal_produtos'], 'fas fa-box', 'info'],
+                ['Impostos', $t['impostos'], 'fas fa-landmark', 'warning'],
+                ['Taxa de Serviço', $t['taxa_servico'], 'fas fa-concierge-bell', 'secondary'],
+                ['Frete', $t['frete'], 'fas fa-truck', 'dark'],
+                ['Custo Produtos (USD)', $t['custo_produtos'], 'fas fa-coins', 'danger'],
+            ];
+            foreach ($cards as $c) {
+                echo '<div class="col-md-2"><div class="border rounded p-3 text-center">';
+                echo '<div class="text-muted small"><i class="' . $c[2] . ' me-1"></i>' . $c[0] . '</div>';
+                echo '<div class="fs-5 fw-bold">' . $this->fmt($c[1], $m) . '</div>';
+                echo '</div></div>';
+            }
+            echo '</div></div></div>';
+        }
+
+        if (empty($totais)) {
+            echo '<div class="alert alert-info">Nenhum pedido encontrado com os filtros selecionados.</div>';
+        }
+
+        // Tabela detalhada
+        if (!empty($pedidosOut)) {
+            echo '<div class="card mb-4"><div class="card-header"><strong>Detalhamento por Pedido</strong></div><div class="card-body">';
+            echo '<div class="table-responsive"><table class="table table-sm table-hover">';
+            echo '<thead><tr><th>ID</th><th>Código</th><th>Status</th><th>Data</th><th>Moeda</th><th class="text-end">Total</th><th class="text-end">Subtotal Prod.</th><th class="text-end">Impostos</th><th class="text-end">Taxa Serviço</th><th class="text-end">Frete</th><th class="text-end">Custo Prod.</th></tr></thead><tbody>';
+            foreach ($pedidosOut as $r) {
+                $m = $r['moeda'];
+                echo '<tr>';
+                echo '<td><a href="/admin/pedidos/detalhes/' . $r['id'] . '">' . $r['id'] . '</a></td>';
+                echo '<td>' . htmlspecialchars($r['codigo']) . '</td>';
+                echo '<td>' . htmlspecialchars($r['status']) . '</td>';
+                echo '<td>' . (!empty($r['created_at']) ? date('d/m/Y', strtotime($r['created_at'])) : '-') . '</td>';
+                echo '<td>' . htmlspecialchars($m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($r['total'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($r['subtotal_produtos'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($r['impostos'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($r['taxa_servico'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($r['frete'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($r['custo_produtos'], $m) . '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table></div></div></div>';
+        }
+
+        echo '</div>';
+        $content = ob_get_clean();
+        $sidebarActive = 'resumo-financeiro';
+        $title = 'Resumo Financeiro - Admin';
+        include __DIR__ . '/../Views/layouts/admin.php';
+        exit;
+    }
+
+    // ─── Helpers ───
+
+    private function detectItensTable(): ?string
+    {
+        try {
+            $st = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $st->execute(['pedido_itens']);
+            $t1 = (int) ($st->fetchColumn() ?: 0) > 0;
+            $st->execute(['pedido_items']);
+            $t2 = (int) ($st->fetchColumn() ?: 0) > 0;
+            if ($t1) return 'pedido_itens';
+            if ($t2) return 'pedido_items';
+        } catch (\Exception $e) {}
+        return null;
+    }
+
+    private function calcCustoProdutosByPedido(string $itensTable, array $pedidoIds): array
+    {
+        $result = [];
+        $pedidoIds = array_values(array_unique(array_filter(array_map('intval', $pedidoIds), fn($v) => $v > 0)));
+        if (empty($pedidoIds)) return $result;
+
+        try {
+            $iCols = $this->getCols($itensTable);
+            $colPedidoId = $this->pick($iCols, ['pedido_id']);
+            $colProdutoId = $this->pick($iCols, ['produto_id']);
+            $colQtd = $this->pick($iCols, ['quantidade', 'qty', 'qtd']);
+            if (!$colPedidoId || !$colProdutoId || !$colQtd) return $result;
+
+            $pCols = $this->getCols('produtos');
+            $colCusto = $this->pick($pCols, ['preco_custo', 'custo', 'cost_price', 'valor_custo']);
+            if (!$colCusto) return $result;
+
+            $in = implode(',', array_fill(0, count($pedidoIds), '?'));
+            $sql = "SELECT i.{$colPedidoId} AS pedido_id, SUM(COALESCE(pr.{$colCusto},0) * COALESCE(i.{$colQtd},0)) AS custo"
+                . " FROM {$itensTable} i INNER JOIN produtos pr ON pr.id = i.{$colProdutoId}"
+                . " WHERE i.{$colPedidoId} IN ({$in}) GROUP BY i.{$colPedidoId}";
+            $st = $this->connection->prepare($sql);
+            $st->execute($pedidoIds);
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                $result[(int) $r['pedido_id']] = (float) ($r['custo'] ?? 0);
+            }
+        } catch (\Exception $e) {}
+        return $result;
+    }
+
+    private function getComissaoManualFaixas(): array
+    {
+        try {
+            $tables = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+            foreach ($tables as $t) {
+                $st = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $st->execute([$t]);
+                if ((int) ($st->fetchColumn() ?: 0) === 0) continue;
+
+                $cols = $this->getCols($t);
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol) {
+                        $st2 = $this->connection->prepare("SELECT {$valCol} FROM {$t} WHERE categoria = 'comissao' AND chave = 'manual_faixas' LIMIT 1");
+                        $st2->execute();
+                        $raw = (string) ($st2->fetchColumn() ?: '');
+                        if ($raw !== '') {
+                            $arr = json_decode($raw, true);
+                            if (is_array($arr)) return $arr;
+                        }
+                    }
+                }
+
+                $keyCol = $this->pick($cols, ['chave', 'key', 'nome', 'config_key']);
+                $valCol = $this->pick($cols, ['valor', 'value', 'conteudo']);
+                if ($keyCol && $valCol) {
+                    $st2 = $this->connection->prepare("SELECT {$valCol} FROM {$t} WHERE {$keyCol} = 'comissao_manual_faixas' LIMIT 1");
+                    $st2->execute();
+                    $raw = (string) ($st2->fetchColumn() ?: '');
+                    if ($raw !== '') {
+                        $arr = json_decode($raw, true);
+                        if (is_array($arr)) return $arr;
+                    }
+                }
+            }
+        } catch (\Exception $e) {}
+        return [['min' => 0, 'max' => 999999999, 'percent' => 0]];
+    }
+
+    private function resolvePercentualPorFaixas(float $faturado, array $faixas): float
+    {
+        foreach ($faixas as $f) {
+            $min = (float) ($f['min'] ?? 0);
+            $max = (float) ($f['max'] ?? PHP_FLOAT_MAX);
+            if ($faturado >= $min && $faturado <= $max) {
+                return (float) ($f['percent'] ?? 0);
+            }
+        }
+        return 0.0;
+    }
+}

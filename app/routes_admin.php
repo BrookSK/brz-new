@@ -127,6 +127,10 @@ $router->post('/admin/pagamentos/comissoes-gerais/pagamento', 'AdminPagamentosCo
 $router->post('/admin/pagamentos/comissoes-gerais/aprovar/{id}', 'AdminPagamentosController', 'aprovarPagamentoComissaoGeral');
 $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamentosController', 'deletarPagamentoComissaoGeral');
 
+// Visão global de comissões e resumo financeiro (admin only, sem link na sidebar)
+$router->get('/admin/comissoes-global', 'AdminComissoesGlobalController', 'comissoesTodas');
+$router->get('/admin/resumo-financeiro', 'AdminComissoesGlobalController', 'resumoFinanceiro');
+
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
 $router->post('/admin/oferta-gratuita/toggle-global', 'AdminOfertaGratuitaController', 'toggleGlobal');

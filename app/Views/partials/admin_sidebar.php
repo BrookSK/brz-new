@@ -239,6 +239,8 @@ function renderAdminSidebar($activePage = '') {
         'backup' => ['icon' => 'fas fa-database', 'label' => 'Backup', 'url' => '/admin/backup', 'roles' => ['admin']],
         'oferta-gratuita' => ['icon' => 'fas fa-gift', 'label' => 'Oferta Gratuita', 'url' => '/admin/oferta-gratuita', 'roles' => ['admin']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
+        'comissoes-global' => ['icon' => 'fas fa-users-cog', 'label' => 'Comissões Global', 'url' => '/admin/comissoes-global', 'roles' => ['admin']],
+        'resumo-financeiro' => ['icon' => 'fas fa-chart-bar', 'label' => 'Resumo Financeiro', 'url' => '/admin/resumo-financeiro', 'roles' => ['admin']],
 
         // Módulo Redirecionamento (visível no admin/suporte)
         'redirecionamento-envios' => ['icon' => 'fas fa-truck-fast', 'label' => '(RED) Envios', 'url' => '/admin/redirecionamento/envios', 'roles' => ['admin', 'suporte']],
