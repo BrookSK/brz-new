@@ -719,7 +719,8 @@ class AdminRelatoriosController extends Controller {
         }
 
         $custoEnvioPorItemUsd = $this->getConfigNumber('entrega', 'custo_envio_por_item_usd', 0.0);
-        $comissaoPercentual = 0.0;
+        $comissaoPercentual = $this->getConfigNumber('entrega', 'comissao_percentual', 0.0);
+        $comissaoManualFaixas = $this->getComissaoManualFaixasConfig();
 
         $itensTable = $this->getPedidoItensTable();
         $temItens = ($itensTable !== null);
@@ -755,6 +756,14 @@ class AdminRelatoriosController extends Controller {
             }
         }
         $colTaxa = in_array('taxa_conversao', $colsPedidos, true) ? 'taxa_conversao' : null;
+        $colTaxaServico = null;
+        foreach (['taxa_servico'] as $c) {
+            if (in_array($c, $colsPedidos, true)) { $colTaxaServico = $c; break; }
+        }
+        $colSubtotalProdutos = null;
+        foreach (['subtotal_produtos', 'subtotal'] as $c) {
+            if (in_array($c, $colsPedidos, true)) { $colSubtotalProdutos = $c; break; }
+        }
 
         $where = [];
         $params = [];
@@ -775,6 +784,24 @@ class AdminRelatoriosController extends Controller {
             $params[':m'] = $moeda;
         }
 
+        // Filtrar por data de pagamento (se informado)
+        if ($dataInicioPagamento !== '' || $dataFimPagamento !== '') {
+            $colPaidAt = null;
+            foreach (['paid_at', 'data_pagamento', 'pago_em'] as $c) {
+                if (in_array($c, $colsPedidos, true)) { $colPaidAt = $c; break; }
+            }
+            if ($colPaidAt) {
+                if ($dataInicioPagamento !== '') {
+                    $where[] = 'DATE(p.' . $colPaidAt . ') >= :dip';
+                    $params[':dip'] = $dataInicioPagamento;
+                }
+                if ($dataFimPagamento !== '') {
+                    $where[] = 'DATE(p.' . $colPaidAt . ') <= :dfp';
+                    $params[':dfp'] = $dataFimPagamento;
+                }
+            }
+        }
+
         $sql = 'SELECT p.* FROM pedidos p';
         if (!empty($where)) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -790,17 +817,7 @@ class AdminRelatoriosController extends Controller {
             $rows = [];
         }
 
-        // Filtrar por data de pagamento em PHP (tolerante)
-        if ($dataInicioPagamento !== '' || $dataFimPagamento !== '') {
-            $rows = array_values(array_filter($rows, function ($p) use ($dataInicioPagamento, $dataFimPagamento) {
-                $paidAt = $this->detectPaidAt((array) $p);
-                if (!$paidAt) return false;
-                $d = date('Y-m-d', strtotime((string) $paidAt));
-                if ($dataInicioPagamento !== '' && $d < $dataInicioPagamento) return false;
-                if ($dataFimPagamento !== '' && $d > $dataFimPagamento) return false;
-                return true;
-            }));
-        }
+        // (filtro de data de pagamento já aplicado na query SQL acima)
 
         // Mapas de itens: qtd total por pedido + custo produto (USD)
         $qtdByPedido = [];
@@ -879,13 +896,17 @@ class AdminRelatoriosController extends Controller {
         $out = [];
         $totais = [
             'total_usd' => 0.0,
+            'subtotal_produtos_usd' => 0.0,
             'impostos_usd' => 0.0,
+            'taxa_servico_usd' => 0.0,
             'envio_fixo_usd' => 0.0,
             'custo_produtos_usd' => 0.0,
             'comissao_usd' => 0.0,
             'lucro_usd' => 0.0,
             'total_brl' => 0.0,
+            'subtotal_produtos_brl' => 0.0,
             'impostos_brl' => 0.0,
+            'taxa_servico_brl' => 0.0,
             'envio_fixo_brl' => 0.0,
             'custo_produtos_brl' => 0.0,
             'comissao_brl' => 0.0,
@@ -911,6 +932,8 @@ class AdminRelatoriosController extends Controller {
 
             $totalOrig = (float) ($colTotal ? ($p[$colTotal] ?? 0) : 0);
             $impostosOrig = (float) ($colImpostos ? ($p[$colImpostos] ?? 0) : 0);
+            $taxaServicoOrig = (float) ($colTaxaServico ? ($p[$colTaxaServico] ?? 0) : 0);
+            $subtotalProdutosOrig = (float) ($colSubtotalProdutos ? ($p[$colSubtotalProdutos] ?? 0) : 0);
 
             $qtdPedidos++;
             if ($m === 'USD') {
@@ -925,8 +948,12 @@ class AdminRelatoriosController extends Controller {
 
             $totalUsd = ($m === 'USD') ? $totalOrig : ($totalOrig / $taxa);
             $impostosUsd = ($m === 'USD') ? $impostosOrig : ($impostosOrig / $taxa);
+            $taxaServicoUsd = ($m === 'USD') ? $taxaServicoOrig : ($taxaServicoOrig / $taxa);
+            $subtotalProdutosUsd = ($m === 'USD') ? $subtotalProdutosOrig : ($subtotalProdutosOrig / $taxa);
             $totalBrl = ($m === 'BRL') ? $totalOrig : ($totalOrig * $taxa);
             $impostosBrl = ($m === 'BRL') ? $impostosOrig : ($impostosOrig * $taxa);
+            $taxaServicoBrl = ($m === 'BRL') ? $taxaServicoOrig : ($taxaServicoOrig * $taxa);
+            $subtotalProdutosBrl = ($m === 'BRL') ? $subtotalProdutosOrig : ($subtotalProdutosOrig * $taxa);
 
             $qtdItens = (int) ($qtdByPedido[$pedidoId] ?? 0);
             if ($qtdItens <= 0) $qtdItens = 1;
@@ -937,12 +964,17 @@ class AdminRelatoriosController extends Controller {
             $custoProdutosUsd = (float) ($custoProdutosUsdByPedido[$pedidoId] ?? 0);
             $custoProdutosBrl = $custoProdutosUsd * $taxa;
 
+            // Comissão: usar faixas se disponíveis, senão percentual fixo
+            $pctComissao = $comissaoPercentual;
+            if (!empty($comissaoManualFaixas)) {
+                $pctComissao = $this->resolvePercentualPorFaixas($totalOrig, $comissaoManualFaixas);
+            }
             $baseComissaoUsd = max(0.0, $totalUsd - $impostosUsd);
-            $valorComissaoUsd = $baseComissaoUsd * ($comissaoPercentual / 100.0);
+            $valorComissaoUsd = $baseComissaoUsd * ($pctComissao / 100.0);
             $valorComissaoBrl = $valorComissaoUsd * $taxa;
 
-            $lucroUsd = $totalUsd - $impostosUsd - $custoEnvioFixoUsd - $custoProdutosUsd - $valorComissaoUsd;
-            $lucroBrl = $totalBrl - $impostosBrl - $custoEnvioFixoBrl - $custoProdutosBrl - $valorComissaoBrl;
+            $lucroUsd = $totalUsd - $impostosUsd - $taxaServicoUsd - $custoEnvioFixoUsd - $custoProdutosUsd - $valorComissaoUsd;
+            $lucroBrl = $totalBrl - $impostosBrl - $taxaServicoBrl - $custoEnvioFixoBrl - $custoProdutosBrl - $valorComissaoBrl;
 
             $createdAt = !empty($p['created_at']) ? (string) $p['created_at'] : '';
             $paidAt = $this->detectPaidAt($p) ?? '';
@@ -958,13 +990,17 @@ class AdminRelatoriosController extends Controller {
                 'taxa_conversao' => $taxa,
                 'qtd_itens' => $qtdItens,
                 'total_usd' => $totalUsd,
+                'subtotal_produtos_usd' => $subtotalProdutosUsd,
                 'impostos_usd' => $impostosUsd,
+                'taxa_servico_usd' => $taxaServicoUsd,
                 'envio_fixo_usd' => $custoEnvioFixoUsd,
                 'custo_produtos_usd' => $custoProdutosUsd,
                 'comissao_usd' => $valorComissaoUsd,
                 'lucro_usd' => $lucroUsd,
                 'total_brl' => $totalBrl,
+                'subtotal_produtos_brl' => $subtotalProdutosBrl,
                 'impostos_brl' => $impostosBrl,
+                'taxa_servico_brl' => $taxaServicoBrl,
                 'envio_fixo_brl' => $custoEnvioFixoBrl,
                 'custo_produtos_brl' => $custoProdutosBrl,
                 'comissao_brl' => $valorComissaoBrl,
@@ -972,14 +1008,18 @@ class AdminRelatoriosController extends Controller {
             ];
 
             $totais['total_usd'] += $totalUsd;
+            $totais['subtotal_produtos_usd'] += $subtotalProdutosUsd;
             $totais['impostos_usd'] += $impostosUsd;
+            $totais['taxa_servico_usd'] += $taxaServicoUsd;
             $totais['envio_fixo_usd'] += $custoEnvioFixoUsd;
             $totais['custo_produtos_usd'] += $custoProdutosUsd;
             $totais['comissao_usd'] += $valorComissaoUsd;
             $totais['lucro_usd'] += $lucroUsd;
 
             $totais['total_brl'] += $totalBrl;
+            $totais['subtotal_produtos_brl'] += $subtotalProdutosBrl;
             $totais['impostos_brl'] += $impostosBrl;
+            $totais['taxa_servico_brl'] += $taxaServicoBrl;
             $totais['envio_fixo_brl'] += $custoEnvioFixoBrl;
             $totais['custo_produtos_brl'] += $custoProdutosBrl;
             $totais['comissao_brl'] += $valorComissaoBrl;
@@ -1054,18 +1094,24 @@ class AdminRelatoriosController extends Controller {
             . '<div class="col-md-6"><div class="card"><div class="card-body">'
             . '<div class="fw-bold mb-2">Consolidado (USD)</div>'
             . '<div>Total arrecadado: <strong>$ ' . number_format($totais['total_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>Subtotal produtos: <strong>$ ' . number_format($totais['subtotal_produtos_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Impostos (pass-through): <strong>$ ' . number_format($totais['impostos_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div>Taxa de serviço: <strong>$ ' . number_format($totais['taxa_servico_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Custo envio fixo: <strong>$ ' . number_format($totais['envio_fixo_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Custo produtos: <strong>$ ' . number_format($totais['custo_produtos_usd'], 2, '.', ',') . '</strong></div>'
             . '<div>Comissão: <strong>$ ' . number_format($totais['comissao_usd'], 2, '.', ',') . '</strong></div>'
+            . '<div class="mt-2 pt-2 border-top">Lucro: <strong class="text-success">$ ' . number_format($totais['lucro_usd'], 2, '.', ',') . '</strong></div>'
             . '</div></div></div>'
             . '<div class="col-md-6"><div class="card"><div class="card-body">'
             . '<div class="fw-bold mb-2">Consolidado (BRL)</div>'
             . '<div>Total arrecadado: <strong>R$ ' . number_format($totais['total_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>Subtotal produtos: <strong>R$ ' . number_format($totais['subtotal_produtos_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Impostos (pass-through): <strong>R$ ' . number_format($totais['impostos_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div>Taxa de serviço: <strong>R$ ' . number_format($totais['taxa_servico_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Custo envio fixo: <strong>R$ ' . number_format($totais['envio_fixo_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Custo produtos: <strong>R$ ' . number_format($totais['custo_produtos_brl'], 2, ',', '.') . '</strong></div>'
             . '<div>Comissão: <strong>R$ ' . number_format($totais['comissao_brl'], 2, ',', '.') . '</strong></div>'
+            . '<div class="mt-2 pt-2 border-top">Lucro: <strong class="text-success">R$ ' . number_format($totais['lucro_brl'], 2, ',', '.') . '</strong></div>'
             . '</div></div></div>'
             . '</div>';
 
@@ -1073,13 +1119,13 @@ class AdminRelatoriosController extends Controller {
             . '<div class="table-responsive"><table class="table table-sm table-hover">'
             . '<thead><tr>'
             . '<th>ID</th><th>Número</th><th>Status</th><th>Criado</th><th>Pago</th><th>Moeda</th><th>Tx</th><th>Itens</th>'
-            . '<th>Total USD</th><th>Impostos USD</th><th>Envio USD</th><th>Custo Prod USD</th><th>Comissão USD</th><th>Lucro USD</th>'
-            . '<th>Total BRL</th><th>Impostos BRL</th><th>Envio BRL</th><th>Custo Prod BRL</th><th>Comissão BRL</th><th>Lucro BRL</th>'
+            . '<th>Total USD</th><th>Subtotal Prod USD</th><th>Impostos USD</th><th>Taxa Serv USD</th><th>Envio USD</th><th>Custo Prod USD</th><th>Comissão USD</th><th>Lucro USD</th>'
+            . '<th>Total BRL</th><th>Subtotal Prod BRL</th><th>Impostos BRL</th><th>Taxa Serv BRL</th><th>Envio BRL</th><th>Custo Prod BRL</th><th>Comissão BRL</th><th>Lucro BRL</th>'
             . '</tr></thead><tbody>';
 
         foreach ($out as $r) {
             echo '<tr>'
-                . '<td>' . (int) $r['id'] . '</td>'
+                . '<td><a href="/admin/pedidos/detalhes/' . (int) $r['id'] . '">' . (int) $r['id'] . '</a></td>'
                 . '<td>' . htmlspecialchars((string) $r['numero']) . '</td>'
                 . '<td>' . htmlspecialchars((string) $r['status']) . '</td>'
                 . '<td>' . (!empty($r['created_at']) ? date('d/m/Y', strtotime((string) $r['created_at'])) : '-') . '</td>'
@@ -1088,17 +1134,21 @@ class AdminRelatoriosController extends Controller {
                 . '<td>' . number_format((float) $r['taxa_conversao'], 4, '.', ',') . '</td>'
                 . '<td>' . (int) $r['qtd_itens'] . '</td>'
                 . '<td>$ ' . number_format((float) $r['total_usd'], 2, '.', ',') . '</td>'
+                . '<td>$ ' . number_format((float) $r['subtotal_produtos_usd'], 2, '.', ',') . '</td>'
                 . '<td>$ ' . number_format((float) $r['impostos_usd'], 2, '.', ',') . '</td>'
+                . '<td>$ ' . number_format((float) $r['taxa_servico_usd'], 2, '.', ',') . '</td>'
                 . '<td>$ ' . number_format((float) $r['envio_fixo_usd'], 2, '.', ',') . '</td>'
                 . '<td>$ ' . number_format((float) $r['custo_produtos_usd'], 2, '.', ',') . '</td>'
                 . '<td>$ ' . number_format((float) $r['comissao_usd'], 2, '.', ',') . '</td>'
-                . '<td>$ ' . number_format((float) $r['lucro_usd'], 2, '.', ',') . '</td>'
+                . '<td class="' . ((float) $r['lucro_usd'] >= 0 ? 'text-success' : 'text-danger') . ' fw-semibold">$ ' . number_format((float) $r['lucro_usd'], 2, '.', ',') . '</td>'
                 . '<td>R$ ' . number_format((float) $r['total_brl'], 2, ',', '.') . '</td>'
+                . '<td>R$ ' . number_format((float) $r['subtotal_produtos_brl'], 2, ',', '.') . '</td>'
                 . '<td>R$ ' . number_format((float) $r['impostos_brl'], 2, ',', '.') . '</td>'
+                . '<td>R$ ' . number_format((float) $r['taxa_servico_brl'], 2, ',', '.') . '</td>'
                 . '<td>R$ ' . number_format((float) $r['envio_fixo_brl'], 2, ',', '.') . '</td>'
                 . '<td>R$ ' . number_format((float) $r['custo_produtos_brl'], 2, ',', '.') . '</td>'
                 . '<td>R$ ' . number_format((float) $r['comissao_brl'], 2, ',', '.') . '</td>'
-                . '<td>R$ ' . number_format((float) $r['lucro_brl'], 2, ',', '.') . '</td>'
+                . '<td class="' . ((float) $r['lucro_brl'] >= 0 ? 'text-success' : 'text-danger') . ' fw-semibold">R$ ' . number_format((float) $r['lucro_brl'], 2, ',', '.') . '</td>'
                 . '</tr>';
         }
 
@@ -1201,6 +1251,14 @@ class AdminRelatoriosController extends Controller {
             }
         }
         $colTaxa = in_array('taxa_conversao', $colsPedidos, true) ? 'taxa_conversao' : null;
+        $colTaxaServico = null;
+        foreach (['taxa_servico'] as $c) {
+            if (in_array($c, $colsPedidos, true)) { $colTaxaServico = $c; break; }
+        }
+        $colSubtotalProdutos = null;
+        foreach (['subtotal_produtos', 'subtotal'] as $c) {
+            if (in_array($c, $colsPedidos, true)) { $colSubtotalProdutos = $c; break; }
+        }
 
         $where = [];
         $params = [];
@@ -1306,9 +1364,11 @@ class AdminRelatoriosController extends Controller {
         $fp = fopen('php://output', 'w');
         fputcsv($fp, [
             'pedido_id', 'numero', 'status', 'created_at', 'paid_at', 'moeda', 'taxa_conversao', 'qtd_itens',
-            'total_usd', 'impostos_usd', 'envio_fixo_usd', 'custo_produtos_usd', 'comissao_usd', 'lucro_usd',
-            'total_brl', 'impostos_brl', 'envio_fixo_brl', 'custo_produtos_brl', 'comissao_brl', 'lucro_brl',
+            'total_usd', 'subtotal_prod_usd', 'impostos_usd', 'taxa_servico_usd', 'envio_fixo_usd', 'custo_produtos_usd', 'comissao_usd', 'lucro_usd',
+            'total_brl', 'subtotal_prod_brl', 'impostos_brl', 'taxa_servico_brl', 'envio_fixo_brl', 'custo_produtos_brl', 'comissao_brl', 'lucro_brl',
         ]);
+
+        $comissaoManualFaixas = $this->getComissaoManualFaixasConfig();
 
         foreach ($rows as $p) {
             $pedidoId = (int) ($p['id'] ?? 0);
@@ -1319,29 +1379,39 @@ class AdminRelatoriosController extends Controller {
             if ($taxa <= 0) $taxa = 1.0;
             $totalOrig = (float) ($colTotal ? ($p[$colTotal] ?? 0) : 0);
             $impostosOrig = (float) ($colImpostos ? ($p[$colImpostos] ?? 0) : 0);
+            $taxaServicoOrig = (float) ($colTaxaServico ? ($p[$colTaxaServico] ?? 0) : 0);
+            $subtotalProdutosOrig = (float) ($colSubtotalProdutos ? ($p[$colSubtotalProdutos] ?? 0) : 0);
             $totalUsd = ($m === 'USD') ? $totalOrig : ($totalOrig / $taxa);
             $impostosUsd = ($m === 'USD') ? $impostosOrig : ($impostosOrig / $taxa);
+            $taxaServicoUsd = ($m === 'USD') ? $taxaServicoOrig : ($taxaServicoOrig / $taxa);
+            $subtotalProdutosUsd = ($m === 'USD') ? $subtotalProdutosOrig : ($subtotalProdutosOrig / $taxa);
             $totalBrl = ($m === 'BRL') ? $totalOrig : ($totalOrig * $taxa);
             $impostosBrl = ($m === 'BRL') ? $impostosOrig : ($impostosOrig * $taxa);
+            $taxaServicoBrl = ($m === 'BRL') ? $taxaServicoOrig : ($taxaServicoOrig * $taxa);
+            $subtotalProdutosBrl = ($m === 'BRL') ? $subtotalProdutosOrig : ($subtotalProdutosOrig * $taxa);
             $qtdItens = (int) ($qtdByPedido[$pedidoId] ?? 0);
             if ($qtdItens <= 0) $qtdItens = 1;
             $envioUsd = $custoEnvioPorItemUsd * $qtdItens;
             $envioBrl = $envioUsd * $taxa;
             $custoProdUsd = (float) ($custoProdutosUsdByPedido[$pedidoId] ?? 0);
             $custoProdBrl = $custoProdUsd * $taxa;
+            $pctComissao = $comissaoPercentual;
+            if (!empty($comissaoManualFaixas)) {
+                $pctComissao = $this->resolvePercentualPorFaixas($totalOrig, $comissaoManualFaixas);
+            }
             $baseComUsd = max(0.0, $totalUsd - $impostosUsd);
-            $comUsd = $baseComUsd * ($comissaoPercentual / 100.0);
+            $comUsd = $baseComUsd * ($pctComissao / 100.0);
             $comBrl = $comUsd * $taxa;
-            $lucroUsd = $totalUsd - $impostosUsd - $envioUsd - $custoProdUsd - $comUsd;
-            $lucroBrl = $totalBrl - $impostosBrl - $envioBrl - $custoProdBrl - $comBrl;
+            $lucroUsd = $totalUsd - $impostosUsd - $taxaServicoUsd - $envioUsd - $custoProdUsd - $comUsd;
+            $lucroBrl = $totalBrl - $impostosBrl - $taxaServicoBrl - $envioBrl - $custoProdBrl - $comBrl;
             $numero = (string) ($p['numero_pedido'] ?? ($p['codigo_pedido'] ?? $pedidoId));
             $createdAt = !empty($p['created_at']) ? (string) $p['created_at'] : '';
             $paidAt = $this->detectPaidAt($p) ?? '';
 
             fputcsv($fp, [
                 $pedidoId, $numero, (string) ($p['status'] ?? ''), $createdAt, $paidAt, $m, $taxa, $qtdItens,
-                $totalUsd, $impostosUsd, $envioUsd, $custoProdUsd, $comUsd, $lucroUsd,
-                $totalBrl, $impostosBrl, $envioBrl, $custoProdBrl, $comBrl, $lucroBrl,
+                $totalUsd, $subtotalProdutosUsd, $impostosUsd, $taxaServicoUsd, $envioUsd, $custoProdUsd, $comUsd, $lucroUsd,
+                $totalBrl, $subtotalProdutosBrl, $impostosBrl, $taxaServicoBrl, $envioBrl, $custoProdBrl, $comBrl, $lucroBrl,
             ]);
         }
         fclose($fp);
@@ -2085,5 +2155,51 @@ class AdminRelatoriosController extends Controller {
         header('Content-Disposition: inline; filename="relatorio_' . $tipo . '_' . date('Y-m-d') . '.html"');
         echo $html;
         exit;
+    }
+
+    private function getComissaoManualFaixasConfig(): array
+    {
+        $tables = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tables as $t) {
+            try {
+                $st = $this->connection->prepare("SHOW TABLES LIKE ?");
+                $st->execute([$t]);
+                if (!$st->fetchColumn()) continue;
+                $cols = [];
+                try { $stC = $this->connection->query('DESCRIBE ' . $t); $cols = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) { $cols = []; }
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol) {
+                        $st2 = $this->connection->prepare("SELECT {$valCol} FROM {$t} WHERE categoria = 'comissao' AND chave = 'manual_faixas' LIMIT 1");
+                        $st2->execute();
+                        $raw = (string) ($st2->fetchColumn() ?: '');
+                        if ($raw !== '') { $arr = json_decode($raw, true); if (is_array($arr)) return $arr; }
+                    }
+                }
+                $keyCol = '';
+                foreach (['chave', 'key', 'nome', 'config_key'] as $c) { if (in_array($c, $cols, true)) { $keyCol = $c; break; } }
+                $valCol = '';
+                foreach (['valor', 'value', 'conteudo'] as $c) { if (in_array($c, $cols, true)) { $valCol = $c; break; } }
+                if ($keyCol && $valCol) {
+                    $st2 = $this->connection->prepare("SELECT {$valCol} FROM {$t} WHERE {$keyCol} = 'comissao_manual_faixas' LIMIT 1");
+                    $st2->execute();
+                    $raw = (string) ($st2->fetchColumn() ?: '');
+                    if ($raw !== '') { $arr = json_decode($raw, true); if (is_array($arr)) return $arr; }
+                }
+            } catch (\Exception $e) {}
+        }
+        return [];
+    }
+
+    private function resolvePercentualPorFaixas(float $faturado, array $faixas): float
+    {
+        foreach ($faixas as $f) {
+            $min = (float) ($f['min'] ?? 0);
+            $max = (float) ($f['max'] ?? PHP_FLOAT_MAX);
+            if ($faturado >= $min && $faturado <= $max) {
+                return (float) ($f['percent'] ?? 0);
+            }
+        }
+        return 0.0;
     }
 }
