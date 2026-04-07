@@ -2977,8 +2977,6 @@ async function enriquecerIA(prefix, nome, transcricao, preco, peso) {
             document.getElementById("iaMarca" + prefix).value = d.marca || "";
             document.getElementById("iaEspecificacoes" + prefix).value = d.especificacoes || "";
             document.getElementById("iaTags" + prefix).value = d.tags || "";
-            const nameInput = prefix === "Single" ? document.querySelector(\'#formProduto input[name="name"]\') : null;
-            if (nameInput && d.nome && (nameInput.value.trim() === "" || nameInput.value.trim().length < d.nome.length)) nameInput.value = d.nome;
             if (status) status.innerHTML = \'<span class="text-success"><i class="fas fa-magic me-1"></i>Campos preenchidos pela IA!</span>\';
         } else { if (status) status.innerHTML = \'<span class="text-warning">\' + (j.error || "IA sem dados") + \'</span>\'; }
     } catch(e) { if (status) status.innerHTML = \'<span class="text-danger">Erro ao enriquecer.</span>\'; }
