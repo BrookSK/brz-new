@@ -1618,6 +1618,184 @@ class AdminProdutosController extends Controller {
         ];
     }
 
+    public function listarCategorias(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=UTF-8');
+        try {
+            $pdo = \Config\Database::getConnection();
+            $cols = $this->getTableColumns($pdo, 'categorias');
+            $statusCol = in_array('status', $cols, true) ? 'status' : null;
+            $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : 'nome');
+            $sql = "SELECT id, {$nomeCol} AS nome FROM categorias";
+            if ($statusCol) $sql .= " WHERE {$statusCol} = 'ativo'";
+            $sql .= " ORDER BY {$nomeCol} ASC";
+            $st = $pdo->query($sql);
+            echo json_encode(['ok' => true, 'categorias' => $st->fetchAll(\PDO::FETCH_ASSOC) ?: []]);
+        } catch (\Exception $e) {
+            echo json_encode(['ok' => false, 'categorias' => []]);
+        }
+        exit;
+    }
+
+    public function transcreverAudio(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=UTF-8');
+
+        $apiKey = $this->getChatGPTApiKey();
+        if (!$apiKey) {
+            echo json_encode(['ok' => false, 'error' => 'API Key do ChatGPT não configurada. Vá em Configurações.']);
+            exit;
+        }
+
+        if (empty($_FILES['audio']) || $_FILES['audio']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['ok' => false, 'error' => 'Nenhum áudio recebido.']);
+            exit;
+        }
+
+        $tmpFile = $_FILES['audio']['tmp_name'];
+        $mime = $_FILES['audio']['type'] ?? 'audio/webm';
+        $ext = 'webm';
+        if (strpos($mime, 'mp4') !== false || strpos($mime, 'm4a') !== false) $ext = 'm4a';
+        elseif (strpos($mime, 'wav') !== false) $ext = 'wav';
+        elseif (strpos($mime, 'mp3') !== false || strpos($mime, 'mpeg') !== false) $ext = 'mp3';
+
+        $cFile = new \CURLFile($tmpFile, $mime, 'audio.' . $ext);
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => 'https://api.openai.com/v1/audio/transcriptions',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey],
+            CURLOPT_POSTFIELDS => ['file' => $cFile, 'model' => 'whisper-1', 'language' => 'pt'],
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_CONNECTTIMEOUT => 15,
+        ]);
+        $resp = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            $err = json_decode($resp, true);
+            echo json_encode(['ok' => false, 'error' => 'Erro na transcrição: ' . ($err['error']['message'] ?? 'HTTP ' . $httpCode)]);
+            exit;
+        }
+
+        $data = json_decode($resp, true);
+        echo json_encode(['ok' => true, 'text' => trim($data['text'] ?? '')]);
+        exit;
+    }
+
+    public function enriquecerComIA(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=UTF-8');
+
+        $apiKey = $this->getChatGPTApiKey();
+        if (!$apiKey) {
+            echo json_encode(['ok' => false, 'error' => 'API Key do ChatGPT não configurada.']);
+            exit;
+        }
+
+        $nome = trim((string) ($request->getParam('nome') ?? ''));
+        $transcricao = trim((string) ($request->getParam('transcricao') ?? ''));
+        $preco = trim((string) ($request->getParam('preco') ?? ''));
+        $peso = trim((string) ($request->getParam('peso') ?? ''));
+        $grupo = trim((string) ($request->getParam('grupo') ?? ''));
+
+        if ($nome === '' && $transcricao === '') {
+            echo json_encode(['ok' => false, 'error' => 'Informe o nome ou a transcrição do produto.']);
+            exit;
+        }
+
+        $prompt = "Você é um especialista em e-commerce. Com base nas informações abaixo, gere os dados completos do produto para uma loja online.\n\n";
+        $prompt .= "Informações disponíveis:\n";
+        if ($nome !== '') $prompt .= "- Nome do produto: {$nome}\n";
+        if ($transcricao !== '') $prompt .= "- Descrição falada pela operadora: {$transcricao}\n";
+        if ($preco !== '') $prompt .= "- Preço: USD {$preco}\n";
+        if ($peso !== '') $prompt .= "- Peso: {$peso} kg\n";
+        if ($grupo !== '') $prompt .= "- Loja/Grupo de compras: {$grupo}\n";
+
+        $prompt .= "\nRetorne APENAS um JSON válido com os seguintes campos:\n";
+        $prompt .= '{"nome": "nome completo e comercial do produto", "marca": "marca do produto", "descricao": "descrição detalhada para o cliente (2-3 parágrafos, em português do Brasil, com informações úteis para quem vai comprar)", "especificacoes": "especificações técnicas em formato HTML com <ul><li> (cor, tamanho, material, voltagem, etc.)", "tags": "palavras-chave separadas por vírgula"}';
+        $prompt .= "\n\nIMPORTANTE: A descrição deve ser profissional, atrativa e em português do Brasil. As especificações devem ser detalhadas e precisas. Se não souber algum dado, pesquise com base no nome do produto.";
+
+        $model = $this->getChatGPTModel();
+
+        $payload = [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => 'Retorne apenas JSON válido, sem comentários e sem marcações markdown.'],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+            'temperature' => 0.3,
+            'max_tokens' => 1500,
+        ];
+        if (strpos($model, 'gpt-4') !== false || strpos($model, 'gpt-3.5') !== false) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => 'https://api.openai.com/v1/chat/completions',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $apiKey],
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_CONNECTTIMEOUT => 15,
+        ]);
+        $resp = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            $err = json_decode($resp, true);
+            echo json_encode(['ok' => false, 'error' => 'Erro ChatGPT: ' . ($err['error']['message'] ?? 'HTTP ' . $httpCode)]);
+            exit;
+        }
+
+        $data = json_decode($resp, true);
+        $content = trim($data['choices'][0]['message']['content'] ?? '');
+        $parsed = json_decode($content, true);
+        if (!is_array($parsed)) {
+            // Tentar extrair JSON de dentro de markdown
+            if (preg_match('/\{[\s\S]*\}/', $content, $m)) {
+                $parsed = json_decode($m[0], true);
+            }
+        }
+
+        if (!is_array($parsed)) {
+            echo json_encode(['ok' => false, 'error' => 'Resposta inválida da IA.', 'raw' => $content]);
+            exit;
+        }
+
+        echo json_encode(['ok' => true, 'dados' => $parsed]);
+        exit;
+    }
+
+    private function getChatGPTApiKey(): ?string {
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+            $st->execute(['chatgpt_api_key']);
+            $v = (string) ($st->fetchColumn() ?: '');
+            return $v !== '' ? $v : null;
+        } catch (\Exception $e) { return null; }
+    }
+
+    private function getChatGPTModel(): string {
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+            $st->execute(['chatgpt_model']);
+            $v = trim((string) ($st->fetchColumn() ?: ''));
+            return $v !== '' ? $v : 'gpt-4o-mini';
+        } catch (\Exception $e) { return 'gpt-4o-mini'; }
+    }
+
     public function cadastroRapido(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
@@ -1770,6 +1948,19 @@ class AdminProdutosController extends Controller {
                 if (in_array($c, $cols, true)) { $ncmCol = $c; break; }
             }
             if ($ncmCol) $data[$ncmCol] = $ncm;
+        }
+
+        // Categoria (lote)
+        $categoriaIdLote = (int) $request->getParam('categoria_id', 0);
+        if ($categoriaIdLote > 0) {
+            foreach (['categoria_id', 'category_id'] as $c) {
+                if (in_array($c, $cols, true)) { $data[$c] = $categoriaIdLote; break; }
+            }
+        }
+        // Campos IA (lote)
+        foreach (['ia_descricao' => ['description','descricao','desc'], 'ia_marca' => ['brand','marca'], 'ia_especificacoes' => ['specifications','especificacoes','specs'], 'ia_tags' => ['tags','keywords']] as $param => $cands) {
+            $val = trim((string) ($request->getParam($param) ?? ''));
+            if ($val !== '') { foreach ($cands as $c) { if (in_array($c, $cols, true)) { $data[$c] = $val; break; } } }
         }
 
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
@@ -2030,6 +2221,27 @@ class AdminProdutosController extends Controller {
                     </select>
                     <small class="text-muted">Opcional</small>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Categoria</label>
+                    <input type="text" class="form-control" id="catSearchSingle" placeholder="Pesquisar categoria..." autocomplete="off">
+                    <select class="form-select mt-2" name="categoria_id" id="catSelectSingle">
+                        <option value="">Selecione...</option>
+                    </select>
+                    <small class="text-muted">Opcional</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="fas fa-microphone me-1"></i>Descrição por voz (IA)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="transcricaoSingle" placeholder="Clique no microfone e descreva o produto..." readonly>
+                        <button type="button" class="btn btn-outline-danger" id="btnMicSingle" title="Gravar áudio"><i class="fas fa-microphone"></i></button>
+                    </div>
+                    <div id="micStatusSingle" class="small text-muted mt-1"></div>
+                    <small class="text-muted">Grave um áudio descrevendo o produto. A IA vai transcrever e usar para preencher os campos automaticamente.</small>
+                    <input type="hidden" name="ia_descricao" id="iaDescricaoSingle">
+                    <input type="hidden" name="ia_marca" id="iaMarcaSingle">
+                    <input type="hidden" name="ia_especificacoes" id="iaEspecificacoesSingle">
+                    <input type="hidden" name="ia_tags" id="iaTagsSingle">
+                </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
                     <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
@@ -2090,6 +2302,27 @@ class AdminProdutosController extends Controller {
                         <option value="">Selecione...</option>
                     </select>
                     <small class="text-muted">Opcional — aplicado a todos os itens do lote</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Categoria</label>
+                    <input type="text" class="form-control" id="catSearchLote" placeholder="Pesquisar categoria..." autocomplete="off">
+                    <select class="form-select mt-2" name="categoria_id" id="catSelectLote">
+                        <option value="">Selecione...</option>
+                    </select>
+                    <small class="text-muted">Opcional — aplicada a todos os itens do lote</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold"><i class="fas fa-microphone me-1"></i>Descrição por voz (IA)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="transcricaoLote" placeholder="Clique no microfone e descreva o produto..." readonly>
+                        <button type="button" class="btn btn-outline-danger" id="btnMicLote" title="Gravar áudio"><i class="fas fa-microphone"></i></button>
+                    </div>
+                    <div id="micStatusLote" class="small text-muted mt-1"></div>
+                    <small class="text-muted">Grave um áudio descrevendo o produto. A IA vai preencher os campos automaticamente.</small>
+                    <input type="hidden" name="ia_descricao" id="iaDescricaoLote">
+                    <input type="hidden" name="ia_marca" id="iaMarcaLote">
+                    <input type="hidden" name="ia_especificacoes" id="iaEspecificacoesLote">
+                    <input type="hidden" name="ia_tags" id="iaTagsLote">
                 </div>
                 <hr>
                 <div class="fw-semibold mb-2"><i class="fas fa-list me-1"></i>Descrições (variantes)</div>
@@ -2384,6 +2617,17 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         if (salePriceLote) fd.append("sale_price", salePriceLote);
         const ncmLoteVal = document.getElementById("ncmSelectLote").value;
         if (ncmLoteVal) fd.append("ncm", ncmLoteVal);
+        const catLoteVal = document.getElementById("catSelectLote").value;
+        if (catLoteVal) fd.append("categoria_id", catLoteVal);
+        // IA fields
+        const iaDescLote = document.getElementById("iaDescricaoLote").value;
+        if (iaDescLote) fd.append("ia_descricao", iaDescLote);
+        const iaMarcaLote = document.getElementById("iaMarcaLote").value;
+        if (iaMarcaLote) fd.append("ia_marca", iaMarcaLote);
+        const iaSpecLote = document.getElementById("iaEspecificacoesLote").value;
+        if (iaSpecLote) fd.append("ia_especificacoes", iaSpecLote);
+        const iaTagsLote = document.getElementById("iaTagsLote").value;
+        if (iaTagsLote) fd.append("ia_tags", iaTagsLote);
 
         // Enviar foto apenas no primeiro produto, depois reutilizar o path
         const capaFile = document.getElementById("capaInputLote").files[0];
@@ -2484,6 +2728,115 @@ document.getElementById("formProduto").addEventListener("submit", async function
 });
 
 renderGrupos();
+
+// ─── Categorias ───
+let CATEGORIAS = [];
+async function loadCategorias() {
+    try {
+        const r = await fetch("/admin/produtos/cadastro-rapido/categorias");
+        const j = await r.json();
+        if (j.ok) CATEGORIAS = j.categorias || [];
+    } catch(e) {}
+    populateCatSelect("catSelectSingle");
+    populateCatSelect("catSelectLote");
+}
+function populateCatSelect(id) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = \'<option value="">Selecione...</option>\';
+    CATEGORIAS.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.nome;
+        sel.appendChild(opt);
+    });
+}
+function setupCatFilter(inputId, selectId) {
+    const input = document.getElementById(inputId);
+    const select = document.getElementById(selectId);
+    if (!input || !select) return;
+    input.addEventListener("input", function() {
+        const q = (input.value || "").toLowerCase().trim();
+        Array.from(select.options).forEach(opt => {
+            if (opt.value === "") { opt.hidden = q !== ""; return; }
+            opt.hidden = q !== "" && !(opt.text || "").toLowerCase().includes(q);
+        });
+        const visible = Array.from(select.options).find(o => !o.hidden && o.value !== "");
+        if (q !== "" && visible) select.value = visible.value;
+        else if (q === "") select.value = "";
+    });
+}
+loadCategorias();
+setupCatFilter("catSearchSingle", "catSelectSingle");
+setupCatFilter("catSearchLote", "catSelectLote");
+
+// ─── Gravação de áudio + Transcrição + IA ───
+function setupMic(btnId, statusId, transcricaoId, iaPrefix, getNome, getPreco, getPeso) {
+    const btn = document.getElementById(btnId);
+    const status = document.getElementById(statusId);
+    const transcricaoInput = document.getElementById(transcricaoId);
+    if (!btn) return;
+    let mediaRecorder = null, chunks = [], recording = false;
+    btn.addEventListener("click", async () => {
+        if (recording) { mediaRecorder.stop(); return; }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            chunks = [];
+            mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "" });
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            mediaRecorder.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                recording = false;
+                btn.innerHTML = \'<i class="fas fa-microphone"></i>\';
+                btn.classList.remove("btn-danger"); btn.classList.add("btn-outline-danger");
+                status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Transcrevendo...\';
+                const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+                const fd = new FormData(); fd.append("audio", blob, "audio.webm");
+                try {
+                    const r = await fetch("/admin/produtos/cadastro-rapido/transcrever-audio", { method: "POST", body: fd });
+                    const j = await r.json();
+                    if (j.ok && j.text) {
+                        transcricaoInput.value = j.text; transcricaoInput.removeAttribute("readonly");
+                        status.innerHTML = \'<i class="fas fa-check-circle text-success me-1"></i>Transcrito! Enviando para IA...\';
+                        await enriquecerIA(iaPrefix, getNome(), j.text, getPreco(), getPeso());
+                    } else { status.innerHTML = \'<span class="text-danger">\' + (j.error || "Erro") + \'</span>\'; }
+                } catch(e) { status.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\'; }
+            };
+            mediaRecorder.start(); recording = true;
+            btn.innerHTML = \'<i class="fas fa-stop"></i>\';
+            btn.classList.remove("btn-outline-danger"); btn.classList.add("btn-danger");
+            status.innerHTML = \'<i class="fas fa-circle text-danger me-1"></i>Gravando... clique para parar\';
+        } catch(e) { status.innerHTML = \'<span class="text-danger">Permissão de microfone negada.</span>\'; }
+    });
+}
+async function enriquecerIA(prefix, nome, transcricao, preco, peso) {
+    const status = document.getElementById("micStatus" + prefix);
+    const fd = new FormData();
+    fd.append("nome", nome); fd.append("transcricao", transcricao);
+    fd.append("preco", preco); fd.append("peso", peso);
+    fd.append("grupo", grupoSelecionado ? grupoSelecionado.nome : "");
+    try {
+        const r = await fetch("/admin/produtos/cadastro-rapido/enriquecer-ia", { method: "POST", body: fd });
+        const j = await r.json();
+        if (j.ok && j.dados) {
+            const d = j.dados;
+            document.getElementById("iaDescricao" + prefix).value = d.descricao || "";
+            document.getElementById("iaMarca" + prefix).value = d.marca || "";
+            document.getElementById("iaEspecificacoes" + prefix).value = d.especificacoes || "";
+            document.getElementById("iaTags" + prefix).value = d.tags || "";
+            const nameInput = prefix === "Single" ? document.querySelector(\'#formProduto input[name="name"]\') : null;
+            if (nameInput && d.nome && (nameInput.value.trim() === "" || nameInput.value.trim().length < d.nome.length)) nameInput.value = d.nome;
+            if (status) status.innerHTML = \'<span class="text-success"><i class="fas fa-magic me-1"></i>Campos preenchidos pela IA!</span>\';
+        } else { if (status) status.innerHTML = \'<span class="text-warning">\' + (j.error || "IA sem dados") + \'</span>\'; }
+    } catch(e) { if (status) status.innerHTML = \'<span class="text-danger">Erro ao enriquecer.</span>\'; }
+}
+setupMic("btnMicSingle", "micStatusSingle", "transcricaoSingle", "Single",
+    () => document.querySelector(\'#formProduto input[name="name"]\').value,
+    () => document.querySelector(\'#formProduto input[name="price"]\').value,
+    () => document.querySelector(\'#formProduto input[name="weight"]\').value);
+setupMic("btnMicLote", "micStatusLote", "transcricaoLote", "Lote",
+    () => "", () => document.getElementById("lotePriceInput").value,
+    () => document.getElementById("loteWeightInput").value);
 </script>
 </body>
 </html>';
@@ -2835,6 +3188,19 @@ HTML;
                 if (in_array($c, $cols, true)) { $ncmCol = $c; break; }
             }
             if ($ncmCol) $data[$ncmCol] = $ncm;
+        }
+
+        // Categoria
+        $categoriaIdSingle = (int) $request->getParam('categoria_id', 0);
+        if ($categoriaIdSingle > 0) {
+            foreach (['categoria_id', 'category_id'] as $c) {
+                if (in_array($c, $cols, true)) { $data[$c] = $categoriaIdSingle; break; }
+            }
+        }
+        // Campos enriquecidos pela IA
+        foreach (['ia_descricao' => ['description','descricao','desc'], 'ia_marca' => ['brand','marca'], 'ia_especificacoes' => ['specifications','especificacoes','specs'], 'ia_tags' => ['tags','keywords']] as $param => $cands) {
+            $val = trim((string) ($request->getParam($param) ?? ''));
+            if ($val !== '') { foreach ($cands as $c) { if (in_array($c, $cols, true)) { $data[$c] = $val; break; } } }
         }
 
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
