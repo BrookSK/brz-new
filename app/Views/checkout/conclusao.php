@@ -304,16 +304,24 @@
                     <?php
                     $splitPagamentos = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
 
-                    // Stripe não usa split — é pagamento único. Detectar pelo gateway.
+                    // Detectar se é split real (tem componentes produto + taxa_servico)
                     $isStripePagamento = false;
+                    $isStripeSplit = false;
                     foreach ($splitPagamentos as $sp) {
                         if (is_array($sp) && strtolower(trim((string) ($sp['gateway'] ?? ''))) === 'stripe') {
                             $isStripePagamento = true;
-                            break;
+                            $comp = strtolower(trim((string) ($sp['componente'] ?? '')));
+                            if (in_array($comp, ['produto', 'taxa_servico'], true)) {
+                                $isStripeSplit = true;
+                            }
                         }
                     }
-                    // Se só tem componente 'pagamento' (não 'produto'+'taxa_servico'), não é split
-                    $hasSplit = !empty($splitPagamentos) && !$isStripePagamento && (isset($splitPagamentos['produto']) || isset($splitPagamentos['taxa_servico']) || isset($splitPagamentos['taxa']));
+                    // Split real: tem componentes produto + taxa_servico (qualquer gateway)
+                    $hasSplit = !empty($splitPagamentos) && (isset($splitPagamentos['produto']) || isset($splitPagamentos['taxa_servico']) || isset($splitPagamentos['taxa']));
+                    // Stripe pagamento único (componente 'pagamento') não é split
+                    if ($isStripePagamento && !$isStripeSplit) {
+                        $hasSplit = false;
+                    }
                     $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '') ?: ($pedido['forma_pagamento'] ?? '')));
                     $invoiceUrl = (is_array($paymentDetails) ? ($paymentDetails['invoiceUrl'] ?? null) : null);
                     $bankSlipUrl = (is_array($paymentDetails) ? ($paymentDetails['bankSlipUrl'] ?? null) : null);
@@ -389,6 +397,11 @@
                                 <?php endif; ?>
 
                                 <?php if ($pixImg !== ''): ?>
+                                    <?php if (str_starts_with($pixImg, 'http')): ?>
+                                    <div class="text-center my-3">
+                                        <img src="<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
+                                    </div>
+                                    <?php else: ?>
                                     <?php
                                     $mime = 'image/png';
                                     try {
@@ -406,14 +419,21 @@
                                     <div class="text-center my-3">
                                         <img src="data:<?= htmlspecialchars($mime) ?>;base64,<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
                                     </div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                             <?php
                         };
                         ?>
 
-                        <?php $renderSplitBox('Pagamento 1: Produtos (Câmbio Real)', is_array($pProduto) ? $pProduto : null); ?>
-                        <?php $renderSplitBox('Pagamento 2: Taxas e impostos (AppMax)', is_array($pTaxa) ? $pTaxa : null); ?>
+                        <?php
+                        $gwProduto = is_array($pProduto) ? strtolower(trim((string) ($pProduto['gateway'] ?? ''))) : '';
+                        $gwTaxa = is_array($pTaxa) ? strtolower(trim((string) ($pTaxa['gateway'] ?? ''))) : '';
+                        $gwLabelProduto = $gwProduto === 'stripe' ? 'Stripe' : ($gwProduto === 'cambioreal' ? 'Câmbio Real' : strtoupper($gwProduto));
+                        $gwLabelTaxa = $gwTaxa === 'stripe' ? 'Stripe' : ($gwTaxa === 'appmax' ? 'AppMax' : strtoupper($gwTaxa));
+                        ?>
+                        <?php $renderSplitBox('Pagamento 1: Produtos (' . $gwLabelProduto . ')', is_array($pProduto) ? $pProduto : null); ?>
+                        <?php $renderSplitBox('Pagamento 2: Taxas e impostos (' . $gwLabelTaxa . ')', is_array($pTaxa) ? $pTaxa : null); ?>
 
                     <?php elseif (!$isPago && $billingType === 'PIX' && !empty($pixQrCode)): ?>
                         <?php $pixImage = $pixQrCode['encodedImage'] ?? null; ?>
