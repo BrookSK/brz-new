@@ -155,6 +155,11 @@ class Produto extends Model {
             $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
 
+        // Excluir produtos que pertencem a grupos de compras (devem ser acessados via grupo)
+        if (in_array('grupo_compras_id', $cols, true)) {
+            $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
+        }
+
         if (empty($where)) {
             $where[] = '1=1';
         }
@@ -288,6 +293,9 @@ class Produto extends Model {
         $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
         if (in_array('attributes', $cols, true)) {
             $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+        if (in_array('grupo_compras_id', $cols, true)) {
+            $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
         }
 
         $orderBy = $hasFeatured ? 'ORDER BY p.featured DESC, p.created_at DESC' : 'ORDER BY p.created_at DESC';
