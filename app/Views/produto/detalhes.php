@@ -320,23 +320,36 @@
     <?php if (!empty($produtosRelacionados)): ?>
     <div class="related-products mt-5">
         <h3 class="mb-4"><?= __('product_details.related', 'Produtos Relacionados') ?></h3>
-        <div class="row">
-            <?php foreach ($produtosRelacionados as $relacionado): ?>
+        <div class="row g-3">
+            <?php foreach ($produtosRelacionados as $relacionado):
+                $relNome = (string) ($relacionado['nome'] ?? $relacionado['name'] ?? '');
+                $relPreco = (float) ($relacionado['preco'] ?? $relacionado['price'] ?? 0);
+                $relFoto = (string) ($relacionado['foto_principal'] ?? $relacionado['image'] ?? $relacionado['imagem'] ?? '');
+                if ($relFoto === '') $relFoto = '/uploads/produtos/placeholder.jpg';
+                $relId = (int) ($relacionado['id'] ?? 0);
+                $relCurrencyCode = strtoupper((string) ($relacionado['moeda'] ?? 'USD'));
+                $relCurrencyLabel = $currencySymbols[$relCurrencyCode] ?? $relCurrencyCode;
+                $relSalePrice = (float) ($relacionado['sale_price'] ?? $relacionado['preco_promocional'] ?? 0);
+            ?>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="/produto/detalhes/<?= $relId ?>" class="text-decoration-none">
+                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 14px; overflow: hidden; transition: transform .2s, box-shadow .2s;">
+                        <div style="aspect-ratio: 1; overflow: hidden; background: #f8f9fa;">
+                            <img src="<?= htmlspecialchars($relFoto, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($relNome, ENT_QUOTES, 'UTF-8') ?>" style="width: 100%; height: 100%; object-fit: contain;" loading="lazy">
                         </div>
-                        <div class="card-body">
-                            <h6 class="card-title text-dark"><?= htmlspecialchars((string) ($relacionado['nome'] ?? $relacionado['name'] ?? '')) ?></h6>
-                            <p class="card-text">
-                                <span class="fw-bold" style="color: var(--primary-color);">
-                                    <?php
-                                    $relCurrencyCode = strtoupper((string) ($relacionado['moeda'] ?? ''));
-                                    $relCurrencyLabel = $currencySymbols[$relCurrencyCode] ?? $relCurrencyCode;
-                                    ?>
-                                    <?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format((float) ($relacionado['preco'] ?? $relacionado['price'] ?? 0), 2, ',', '.') ?>
-                                </span>
-                            </p>
+                        <div class="card-body px-3 py-2">
+                            <h6 class="card-title text-dark mb-1" style="font-size: 0.85rem; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"><?= htmlspecialchars($relNome, ENT_QUOTES, 'UTF-8') ?></h6>
+                            <div>
+                                <?php if ($relSalePrice > 0 && $relSalePrice < $relPreco): ?>
+                                    <div class="text-muted small text-decoration-line-through"><?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format($relPreco, 2, ',', '.') ?></div>
+                                    <div class="fw-bold" style="color: var(--primary-color);"><?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format($relSalePrice, 2, ',', '.') ?></div>
+                                <?php else: ?>
+                                    <div class="fw-bold" style="color: var(--primary-color);"><?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format($relPreco, 2, ',', '.') ?></div>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                    </a>
-                </div>
+                    </div>
+                </a>
             </div>
             <?php endforeach; ?>
         </div>
