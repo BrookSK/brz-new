@@ -3500,7 +3500,17 @@ class CheckoutController extends Controller {
                 }
                 
                 // Stripe PIX quando moeda é USD (qualquer país)
-                if ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix' && !$reused) {
+                if ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix') {
+                    // Verificar se já existe PIX gerado para este pedido
+                    $pixJaGerado = false;
+                    try {
+                        $dbChk = \Config\Database::getConnection();
+                        $stChk = $dbChk->prepare("SELECT COUNT(*) FROM pedido_pagamentos WHERE pedido_id = ? AND gateway = 'stripe' AND metodo = 'pix' AND status != 'rejected'");
+                        $stChk->execute([(int) $pedidoId]);
+                        $pixJaGerado = ((int) ($stChk->fetchColumn() ?: 0)) > 0;
+                    } catch (\Throwable $e) {}
+
+                    if (!$pixJaGerado) {
                     try {
                         $dbPixT = \Config\Database::getConnection();
                         $colsPedPix = [];
@@ -3640,6 +3650,7 @@ class CheckoutController extends Controller {
                     } catch (\Exception $e) {
                         error_log('[CHECKOUT] Erro Stripe PIX: ' . $e->getMessage());
                     }
+                    } // fim if (!$pixJaGerado)
                 }
 
                 // Limpar carrinho apenas quando BRL (Asaas) for processado aqui.
