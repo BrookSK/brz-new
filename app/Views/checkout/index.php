@@ -1169,7 +1169,33 @@ function iniciarPagamentoStripeElements(pedidoId, email) {
     })
     .then(r => r.json())
     .then(async (piResp) => {
-        if (!piResp.success || !piResp.client_secret) {
+        if (!piResp.success) {
+            throw new Error(piResp.error || 'Falha ao iniciar pagamento Stripe');
+        }
+
+        // Split: confirmar dois Payment Intents sequencialmente
+        if (piResp.split && piResp.intents && piResp.intents.length > 1) {
+            for (let i = 0; i < piResp.intents.length; i++) {
+                const intent = piResp.intents[i];
+                const label = intent.label || ('Cobrança ' + (i + 1));
+                const result = await stripeClient.confirmCardPayment(intent.client_secret, {
+                    payment_method: { card: stripeCard }
+                });
+                if (result.error) {
+                    throw new Error(label + ': ' + (result.error.message || 'Pagamento não autorizado'));
+                }
+            }
+            // Finalizar com o primeiro PI
+            const firstPiId = piResp.intents[0].payment_intent_id || '';
+            return fetch('/checkout/stripe/finalizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ pedido_id: String(pedidoId), payment_intent_id: String(firstPiId) }).toString()
+            });
+        }
+
+        // Pagamento único
+        if (!piResp.client_secret) {
             throw new Error(piResp.error || 'Falha ao iniciar pagamento Stripe');
         }
 

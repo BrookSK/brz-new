@@ -3502,159 +3502,143 @@ class CheckoutController extends Controller {
                 // Stripe PIX quando moeda é USD (qualquer país)
                 if ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix' && !$reused) {
                     try {
-                        // Buscar total real do pedido (pode ser 'total' ou 'valor_total')
-                        $totalUsdPix = 0.0;
-                        try {
-                            $dbPixT = \Config\Database::getConnection();
-                            $colsPedPix = [];
-                            $stC = $dbPixT->query('DESCRIBE pedidos');
-                            $colsPedPix = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        $dbPixT = \Config\Database::getConnection();
+                        $colsPedPix = [];
+                        try { $stC = $dbPixT->query('DESCRIBE pedidos'); $colsPedPix = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
 
-                            $totalCol = '';
-                            foreach (['valor_total', 'total', 'amount'] as $c) {
-                                if (in_array($c, $colsPedPix, true)) { $totalCol = $c; break; }
-                            }
-                            if ($totalCol !== '') {
-                                $stT = $dbPixT->prepare('SELECT ' . $totalCol . ' FROM pedidos WHERE id = ? LIMIT 1');
-                                $stT->execute([(int) $pedidoId]);
-                                $totalUsdPix = (float) ($stT->fetchColumn() ?: 0);
-                            }
-                        } catch (\Exception $e) {}
-
-                        if ($totalUsdPix <= 0) {
-                            $totalUsdPix = (float) ($pedidoRowPay['total'] ?? 0);
+                        $totalCol = '';
+                        foreach (['valor_total', 'total', 'amount'] as $c) {
+                            if (in_array($c, $colsPedPix, true)) { $totalCol = $c; break; }
+                        }
+                        $subtotalCol = '';
+                        foreach (['subtotal_produtos', 'subtotal'] as $c) {
+                            if (in_array($c, $colsPedPix, true)) { $subtotalCol = $c; break; }
                         }
 
-                        error_log('[STRIPE_PIX] pedido=' . $pedidoId . ' totalUsd=' . $totalUsdPix);
+                        $selPix = ['id'];
+                        if ($totalCol) $selPix[] = $totalCol . ' AS total_val';
+                        if ($subtotalCol) $selPix[] = $subtotalCol . ' AS subtotal_val';
+                        $stT = $dbPixT->prepare('SELECT ' . implode(', ', $selPix) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                        $stT->execute([(int) $pedidoId]);
+                        $rowPix = $stT->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                        $totalUsdPix = (float) ($rowPix['total_val'] ?? ($pedidoRowPay['total'] ?? 0));
+                        $subtotalUsdPix = (float) ($rowPix['subtotal_val'] ?? 0);
+                        $restanteUsdPix = round($totalUsdPix - $subtotalUsdPix, 2);
+                        if ($restanteUsdPix < 0) $restanteUsdPix = 0;
 
                         if ($totalUsdPix <= 0) {
                             throw new \Exception('Valor inválido para Stripe PIX');
                         }
 
-                        // Converter USD para BRL usando a taxa do sistema (mesma lógica do criarPedido)
+                        // Taxa de conversão USD -> BRL
                         $taxaConvPix = 1.0;
-                        try {
-                            $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL');
-                            if ($txFromCarrinho > 1.01) {
-                                $taxaConvPix = $txFromCarrinho;
-                            }
-                        } catch (\Exception $e) {}
-
-                        // Fallback direto no banco
+                        try { $txFromCarrinho = (float) $this->carrinhoModel->getTaxaConversao('BRL'); if ($txFromCarrinho > 1.01) $taxaConvPix = $txFromCarrinho; } catch (\Exception $e) {}
                         if ($taxaConvPix <= 1.01) {
                             try {
                                 $dbTxPix = \Config\Database::getConnection();
                                 foreach (['configuracoes_sistema', 'configuracoes', 'settings'] as $tbl) {
-                                    try {
-                                        $stCfg = $dbTxPix->prepare("SELECT valor FROM {$tbl} WHERE chave = 'usd_brl_rate' LIMIT 1");
-                                        $stCfg->execute();
-                                        $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0'));
-                                        if ($v > 1.01) { $taxaConvPix = $v; break; }
-                                    } catch (\Exception $e) {}
+                                    try { $stCfg = $dbTxPix->prepare("SELECT valor FROM {$tbl} WHERE chave = 'usd_brl_rate' LIMIT 1"); $stCfg->execute(); $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0')); if ($v > 1.01) { $taxaConvPix = $v; break; } } catch (\Exception $e) {}
                                 }
                             } catch (\Exception $e) {}
                         }
-                        if ($taxaConvPix <= 1.01) {
-                            try {
-                                $dbTxPix2 = \Config\Database::getConnection();
-                                $stTxPix = $dbTxPix2->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                $stTxPix->execute();
-                                $txVal = (float) str_replace(',', '.', (string) ($stTxPix->fetchColumn() ?: '0'));
-                                if ($txVal > 1.01) $taxaConvPix = $txVal;
-                            } catch (\Exception $e) {}
-                        }
-                        // Último fallback
-                        if ($taxaConvPix <= 1.01) {
-                            $taxaConvPix = 5.85;
-                        }
-
-                        $totalBrlPix = round($totalUsdPix * $taxaConvPix, 2);
-                        error_log('[STRIPE_PIX] totalBrl=' . $totalBrlPix . ' taxa=' . $taxaConvPix);
+                        if ($taxaConvPix <= 1.01) $taxaConvPix = 5.85;
 
                         $codigoPedidoPix = (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId);
-                        $descPix = 'Pedido #' . $codigoPedidoPix;
-
                         $customerPix = [
                             'name' => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
                             'email' => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
                             'tax_id' => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
                         ];
 
-                        $pixResult = $this->paymentService->createStripePixPaymentIntentForCheckoutBrl(
-                            (int) $pedidoId,
-                            (float) $totalBrlPix,
-                            (float) $totalUsdPix,
-                            (float) $taxaConvPix,
-                            $descPix,
-                            $customerPix
-                        );
+                        // Verificar se deve fazer split (entrega Brasil + subtotal > 0 + restante > 0)
+                        $pixShouldSplit = ($subtotalUsdPix > 0 && $restanteUsdPix > 0);
 
-                        if (!empty($pixResult['success'])) {
-                            // Persistir dados do Stripe PIX no pedido
-                            $pixData = $pixResult['pix'] ?? null;
-                            $pixPayloadStr = is_array($pixData) ? (string) ($pixData['copy_paste'] ?? '') : '';
-                            $pixImgUrl = is_array($pixData) ? (string) ($pixData['image_url_png'] ?? '') : '';
-                            $pixHostedUrl = is_array($pixData) ? (string) ($pixData['hosted_instructions_url'] ?? '') : '';
+                        if ($pixShouldSplit) {
+                            // Split: 2 PIX
+                            $brlProdutos = round($subtotalUsdPix * $taxaConvPix, 2);
+                            $brlRestante = round($restanteUsdPix * $taxaConvPix, 2);
 
-                            $this->atualizarPagamentoNoPedido((int) $pedidoId, [
-                                'payment_id' => $pixResult['payment_intent_id'],
-                                'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
-                                'billingType' => 'PIX',
-                                'invoiceUrl' => $pixHostedUrl,
-                            ], 'stripe');
-                            $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, [
-                                'payment_id' => $pixResult['payment_intent_id'],
-                                'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
-                                'billingType' => 'PIX',
-                                'invoiceUrl' => $pixHostedUrl,
-                            ], 'stripe');
+                            $pix1 = $this->paymentService->createStripePixPaymentIntentForCheckoutBrl(
+                                (int) $pedidoId, $brlProdutos, $subtotalUsdPix, $taxaConvPix,
+                                'Pedido #' . $codigoPedidoPix . ' - Produtos', $customerPix
+                            );
+                            $pix2 = $this->paymentService->createStripePixPaymentIntentForCheckoutBrl(
+                                (int) $pedidoId, $brlRestante, $restanteUsdPix, $taxaConvPix,
+                                'Pedido #' . $codigoPedidoPix . ' - Taxa + Impostos', $customerPix
+                            );
 
-                            // Persistir no pedido_pagamentos para a tela de conclusão
-                            try {
-                                $this->paymentService->registrarPedidoPagamentoSplit([
-                                    'pedido_id' => (int) $pedidoId,
-                                    'componente' => 'pagamento',
-                                    'gateway' => 'stripe',
-                                    'metodo' => 'pix',
-                                    'moeda' => 'BRL',
-                                    'valor' => round($pixResult['valor_brl'] ?? 0, 2),
-                                    'payment_id' => (string) $pixResult['payment_intent_id'],
-                                    'status' => 'pending',
-                                    'invoice_url' => $pixHostedUrl,
-                                    'pix_payload' => $pixPayloadStr,
-                                    'pix_encoded_image' => $pixImgUrl,
-                                ]);
-                            } catch (\Exception $e) {
-                                error_log('[CHECKOUT] Erro ao persistir Stripe PIX: ' . $e->getMessage());
+                            // Registrar splits
+                            foreach ([
+                                ['result' => $pix1, 'componente' => 'produto', 'valor_usd' => $subtotalUsdPix, 'valor_brl' => $brlProdutos],
+                                ['result' => $pix2, 'componente' => 'taxa_servico', 'valor_usd' => $restanteUsdPix, 'valor_brl' => $brlRestante],
+                            ] as $sp) {
+                                if (!empty($sp['result']['success'])) {
+                                    $spPix = $sp['result']['pix'] ?? null;
+                                    $this->paymentService->registrarPedidoPagamentoSplit([
+                                        'pedido_id' => (int) $pedidoId,
+                                        'componente' => $sp['componente'],
+                                        'gateway' => 'stripe',
+                                        'metodo' => 'pix',
+                                        'moeda' => 'BRL',
+                                        'valor' => $sp['valor_brl'],
+                                        'payment_id' => (string) ($sp['result']['payment_intent_id'] ?? ''),
+                                        'status' => 'pending',
+                                        'pix_payload' => is_array($spPix) ? (string) ($spPix['copy_paste'] ?? '') : '',
+                                        'pix_encoded_image' => is_array($spPix) ? (string) ($spPix['image_url_png'] ?? '') : '',
+                                    ]);
+                                }
                             }
 
-                            // Salvar PIX payload/QR no pedido para exibição na conclusão
-                            try {
-                                $dbPix = \Config\Database::getConnection();
-                                $colsPed = [];
-                                try {
-                                    $stC = $dbPix->query('DESCRIBE pedidos');
-                                    $colsPed = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                                } catch (\Exception $e) { $colsPed = []; }
+                            // Salvar primeiro PI no pedido
+                            if (!empty($pix1['success'])) {
+                                $this->atualizarPagamentoNoPedido((int) $pedidoId, [
+                                    'payment_id' => $pix1['payment_intent_id'], 'status' => 'PENDING', 'billingType' => 'PIX',
+                                ], 'stripe');
+                            }
 
-                                $set = [];
-                                $pUpd = [':id' => (int) $pedidoId];
-                                if (is_array($colsPed) && in_array('payment_pix_payload', $colsPed, true) && $pixPayloadStr !== '') {
-                                    $set[] = 'payment_pix_payload = :pp';
-                                    $pUpd[':pp'] = $pixPayloadStr;
-                                }
-                                if (is_array($colsPed) && in_array('pix_payload', $colsPed, true) && $pixPayloadStr !== '') {
-                                    $set[] = 'pix_payload = :pp2';
-                                    $pUpd[':pp2'] = $pixPayloadStr;
-                                }
-                                if (!empty($set)) {
-                                    $stUpd = $dbPix->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
-                                    $stUpd->execute($pUpd);
-                                }
-                            } catch (\Exception $e) {}
+                            $pixResult = $pix1; // Para o response
+                            // Adicionar dados do segundo PIX ao response
+                            if (!empty($pix2['success'])) {
+                                $pixResult['split'] = true;
+                                $pixResult['pix2'] = $pix2['pix'] ?? null;
+                                $pixResult['payment_intent_id_2'] = $pix2['payment_intent_id'] ?? '';
+                                $pixResult['client_secret_2'] = $pix2['client_secret'] ?? '';
+                            }
+                        } else {
+                            // Pagamento único
+                            $totalBrlPix = round($totalUsdPix * $taxaConvPix, 2);
+                            $pixResult = $this->paymentService->createStripePixPaymentIntentForCheckoutBrl(
+                                (int) $pedidoId, $totalBrlPix, $totalUsdPix, $taxaConvPix,
+                                'Pedido #' . $codigoPedidoPix, $customerPix
+                            );
+
+                            if (!empty($pixResult['success'])) {
+                                $pixData = $pixResult['pix'] ?? null;
+                                $pixHostedUrl = is_array($pixData) ? (string) ($pixData['hosted_instructions_url'] ?? '') : '';
+
+                                $this->atualizarPagamentoNoPedido((int) $pedidoId, [
+                                    'payment_id' => $pixResult['payment_intent_id'],
+                                    'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
+                                    'billingType' => 'PIX', 'invoiceUrl' => $pixHostedUrl,
+                                ], 'stripe');
+                                $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, [
+                                    'payment_id' => $pixResult['payment_intent_id'],
+                                    'status' => $pixResult['status'] === 'requires_action' ? 'PENDING' : strtoupper($pixResult['status']),
+                                    'billingType' => 'PIX', 'invoiceUrl' => $pixHostedUrl,
+                                ], 'stripe');
+
+                                $this->paymentService->registrarPedidoPagamentoSplit([
+                                    'pedido_id' => (int) $pedidoId, 'componente' => 'pagamento', 'gateway' => 'stripe',
+                                    'metodo' => 'pix', 'moeda' => 'BRL', 'valor' => round($pixResult['valor_brl'] ?? 0, 2),
+                                    'payment_id' => (string) $pixResult['payment_intent_id'], 'status' => 'pending',
+                                    'pix_payload' => is_array($pixData) ? (string) ($pixData['copy_paste'] ?? '') : '',
+                                    'pix_encoded_image' => is_array($pixData) ? (string) ($pixData['image_url_png'] ?? '') : '',
+                                ]);
+                            }
                         }
                     } catch (\Exception $e) {
-                        error_log('[CHECKOUT] Erro Stripe PIX (fora BR): ' . $e->getMessage());
+                        error_log('[CHECKOUT] Erro Stripe PIX: ' . $e->getMessage());
                     }
                 }
 
@@ -3763,7 +3747,14 @@ class CheckoutController extends Controller {
 
         try {
             $db = \Config\Database::getConnection();
-            $stmt = $db->prepare('SELECT id, total, moeda, numero_pedido, payment_gateway, payment_id FROM pedidos WHERE id = ? LIMIT 1');
+            $colsP = [];
+            try { $stC = $db->query('DESCRIBE pedidos'); $colsP = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
+
+            $sel = ['id', 'total', 'moeda', 'numero_pedido', 'payment_gateway', 'payment_id'];
+            foreach (['subtotal_produtos', 'subtotal', 'taxa_servico', 'valor_impostos', 'impostos', 'frete', 'frete_manual'] as $c) {
+                if (in_array($c, $colsP, true)) $sel[] = $c;
+            }
+            $stmt = $db->prepare('SELECT ' . implode(', ', $sel) . ' FROM pedidos WHERE id = ? LIMIT 1');
             $stmt->execute([$pedidoId]);
             $pedido = $stmt->fetch(\PDO::FETCH_ASSOC);
             if (!is_array($pedido)) {
@@ -3777,30 +3768,96 @@ class CheckoutController extends Controller {
                 return;
             }
 
-            $valor = (float) ($pedido['total'] ?? 0);
-            $descricao = 'Pedido #' . (string) ($pedido['numero_pedido'] ?? $pedidoId);
-            $customer = [
-                'email' => (string) ($request->getParam('email') ?? ''),
-            ];
+            $total = (float) ($pedido['total'] ?? 0);
+            $subtotalProdutos = (float) ($pedido['subtotal_produtos'] ?? $pedido['subtotal'] ?? 0);
+            $taxaServico = (float) ($pedido['taxa_servico'] ?? 0);
+            $impostos = (float) ($pedido['valor_impostos'] ?? $pedido['impostos'] ?? 0);
+            $frete = (float) ($pedido['frete'] ?? $pedido['frete_manual'] ?? 0);
+            $restante = round($total - $subtotalProdutos, 2);
+            if ($restante < 0) $restante = 0;
 
-            $pi = $this->paymentService->createStripePaymentIntent($pedidoId, $valor, $descricao, $customer);
-            if (empty($pi['success'])) {
-                $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao criar PaymentIntent')], 500);
-                return;
+            $codigoPedido = (string) ($pedido['numero_pedido'] ?? $pedidoId);
+            $customer = ['email' => (string) ($request->getParam('email') ?? '')];
+
+            // Verificar se é entrega no Brasil (split em 2 cobranças)
+            $entregaBrasil = false;
+            try {
+                foreach (['pais_entrega', 'pais', 'country'] as $c) {
+                    if (in_array($c, $colsP, true)) {
+                        $stPais = $db->prepare("SELECT {$c} FROM pedidos WHERE id = ? LIMIT 1");
+                        $stPais->execute([$pedidoId]);
+                        $pais = strtoupper(trim((string) ($stPais->fetchColumn() ?: '')));
+                        if (in_array($pais, ['BR', 'BRA', 'BRASIL', 'BRAZIL', ''], true)) {
+                            $entregaBrasil = true;
+                        }
+                        break;
+                    }
+                }
+                if (!$entregaBrasil) $entregaBrasil = true; // default: Brasil
+            } catch (\Throwable $e) { $entregaBrasil = true; }
+
+            $shouldSplit = $entregaBrasil && $subtotalProdutos > 0 && $restante > 0;
+
+            if ($shouldSplit) {
+                // Split: 2 Payment Intents
+                $pi1 = $this->paymentService->createStripePaymentIntent($pedidoId, $subtotalProdutos, 'Pedido #' . $codigoPedido . ' - Produtos', $customer);
+                $pi2 = $this->paymentService->createStripePaymentIntent($pedidoId, $restante, 'Pedido #' . $codigoPedido . ' - Taxa + Impostos', $customer);
+
+                if (empty($pi1['success']) || empty($pi2['success'])) {
+                    $err = (string) ($pi1['error'] ?? $pi2['error'] ?? 'Falha ao criar PaymentIntents');
+                    $this->json(['success' => false, 'error' => $err], 500);
+                    return;
+                }
+
+                $piId1 = (string) ($pi1['payment_intent_id'] ?? '');
+                $piId2 = (string) ($pi2['payment_intent_id'] ?? '');
+
+                // Registrar splits na tabela pedido_pagamentos
+                $this->paymentService->registrarPedidoPagamentoSplit([
+                    'pedido_id' => $pedidoId, 'componente' => 'produto', 'gateway' => 'stripe',
+                    'metodo' => 'cartao_credito', 'moeda' => 'USD', 'valor' => $subtotalProdutos,
+                    'status' => 'pending', 'payment_id' => $piId1,
+                ]);
+                $this->paymentService->registrarPedidoPagamentoSplit([
+                    'pedido_id' => $pedidoId, 'componente' => 'taxa_servico', 'gateway' => 'stripe',
+                    'metodo' => 'cartao_credito', 'moeda' => 'USD', 'valor' => $restante,
+                    'status' => 'pending', 'payment_id' => $piId2,
+                ]);
+
+                // Salvar o primeiro PI no pedido principal
+                $this->atualizarPagamentoNoPedido($pedidoId, ['payment_id' => $piId1, 'status' => 'pending'], 'stripe');
+
+                $this->json([
+                    'success' => true,
+                    'pedido_id' => $pedidoId,
+                    'split' => true,
+                    'intents' => [
+                        ['payment_intent_id' => $piId1, 'client_secret' => (string) ($pi1['client_secret'] ?? ''), 'label' => 'Produtos', 'amount' => $subtotalProdutos],
+                        ['payment_intent_id' => $piId2, 'client_secret' => (string) ($pi2['client_secret'] ?? ''), 'label' => 'Taxa + Impostos', 'amount' => $restante],
+                    ],
+                ]);
+            } else {
+                // Pagamento único (fora do Brasil ou sem split)
+                $pi = $this->paymentService->createStripePaymentIntent($pedidoId, $total, 'Pedido #' . $codigoPedido, $customer);
+                if (empty($pi['success'])) {
+                    $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao criar PaymentIntent')], 500);
+                    return;
+                }
+
+                $paymentIntentId = (string) ($pi['payment_intent_id'] ?? '');
+                if ($paymentIntentId !== '') {
+                    $this->atualizarPagamentoNoPedido($pedidoId, ['payment_id' => $paymentIntentId, 'status' => 'pending'], 'stripe');
+                    $this->atualizarPagamentoNaTabelaPagamentos($pedidoId, ['payment_id' => $paymentIntentId, 'status' => 'pending'], 'stripe');
+                }
+
+                $this->json([
+                    'success' => true,
+                    'pedido_id' => $pedidoId,
+                    'split' => false,
+                    'payment_intent_id' => $paymentIntentId,
+                    'client_secret' => (string) ($pi['client_secret'] ?? ''),
+                ]);
             }
-
-            $paymentIntentId = (string) ($pi['payment_intent_id'] ?? '');
-            if ($paymentIntentId !== '') {
-                $this->atualizarPagamentoNoPedido($pedidoId, ['payment_id' => $paymentIntentId, 'status' => 'pending'], 'stripe');
-                $this->atualizarPagamentoNaTabelaPagamentos($pedidoId, ['payment_id' => $paymentIntentId, 'status' => 'pending'], 'stripe');
-            }
-
-            $this->json([
-                'success' => true,
-                'pedido_id' => $pedidoId,
-                'payment_intent_id' => $paymentIntentId,
-                'client_secret' => (string) ($pi['client_secret'] ?? ''),
-            ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }

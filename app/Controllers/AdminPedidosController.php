@@ -3815,6 +3815,9 @@ HTML;
 
                                             foreach ($rowsSplit as $r) {
                                                 $comp = strtoupper((string) ($r['componente'] ?? ''));
+                                                $compLabel = $comp;
+                                                $compMap = ['PRODUTO' => 'Produtos', 'TAXA_SERVICO' => 'Taxa de Serviço', 'IMPOSTO' => 'Impostos', 'PAGAMENTO' => 'Pagamento Total', 'TAXA' => 'Taxa de Serviço'];
+                                                if (isset($compMap[$comp])) $compLabel = $compMap[$comp];
                                                 $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
                                                 $gwLabel = $gw !== '' ? strtoupper($gw) : 'N/A';
                                                 if ($gw === 'cambioreal') $gwLabel = 'Câmbio Real';
@@ -3844,6 +3847,11 @@ HTML;
                                                     $link = '<span class="small text-muted">Linha digitável</span>';
                                                 }
 
+                                                // Link para Stripe Dashboard quando aplicável
+                                                if ($gw === 'stripe' && $paymentIdRow !== '' && str_starts_with($paymentIdRow, 'pi_')) {
+                                                    $link .= ($link !== '' ? ' | ' : '') . '<a href="https://dashboard.stripe.com/payments/' . htmlspecialchars($paymentIdRow) . '" target="_blank" class="small"><i class="fas fa-external-link-alt me-1"></i>Stripe</a>';
+                                                }
+
                                                 $stNorm = strtolower(trim($st !== '' ? $st : 'pending'));
                                                 $metNorm = strtolower(trim((string) $met));
                                                 $gwStatusNorm = strtoupper(trim((string) $gwStatus));
@@ -3861,7 +3869,7 @@ HTML;
                                                     : '';
 
                                                 echo '<tr>'
-                                                    . '<td>' . htmlspecialchars($comp) . '</td>'
+                                                    . '<td>' . htmlspecialchars($compLabel) . '</td>'
                                                     . '<td>' . htmlspecialchars($gwLabel) . '</td>'
                                                     . '<td>' . htmlspecialchars($met !== '' ? $met : 'N/A') . '</td>'
                                                     . '<td class="text-end">' . htmlspecialchars($this->formatarMoeda($val, $moeda)) . '</td>'
