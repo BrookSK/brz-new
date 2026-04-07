@@ -1017,17 +1017,34 @@
                                 </div>
                             </div>
 
-                            <!-- Aviso valor mínimo -->
-                            <?php if ($subtotal < 5.00): ?>
-                            <div class="alert alert-warning mb-3" id="min-order-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <strong><?= __('checkout.attention', 'Atenção') ?>:</strong>
-                                <?= __('checkout.min_order_warning', 'O valor mínimo de produtos para processamento é de $5.00 (USD). Adicione mais itens ao carrinho para continuar.') ?>
+                            <!-- Aviso valor mínimo (baseado no subtotal de produtos em USD) -->
+                            <?php
+                            // Calcular subtotal USD direto dos itens para validação precisa
+                            $subtotalUsdCheck = 0;
+                            if (!empty($items)) {
+                                foreach ($items as $it) {
+                                    if (!empty($it['is_free_offer'])) continue;
+                                    $subtotalUsdCheck += (float) ($it['subtotal'] ?? 0);
+                                }
+                            }
+                            if ($subtotalUsdCheck <= 0) $subtotalUsdCheck = (float) ($subtotal ?? 0);
+                            $abaixoMinimo = $subtotalUsdCheck < 5.00;
+                            ?>
+                            <?php if ($abaixoMinimo): ?>
+                            <div class="alert alert-danger mb-3" id="min-order-warning" style="border-radius: 14px;">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-exclamation-circle fa-lg"></i>
+                                    <div>
+                                        <strong><?= __('checkout.attention', 'Atenção') ?>:</strong>
+                                        <?= __('checkout.min_order_warning', 'O valor mínimo de produtos para processamento é de $5.00 (USD). Adicione mais itens ao carrinho para continuar.') ?>
+                                        <div class="small mt-1">Subtotal atual: <strong>$ <?= number_format($subtotalUsdCheck, 2, '.', ',') ?></strong> (mínimo: $5.00)</div>
+                                    </div>
+                                </div>
                             </div>
                             <?php endif; ?>
 
                             <!-- Botão Finalizar -->
-                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= ($subtotal < 5.00) ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
+                            <button type="button" class="btn btn-primary btn-lg w-100" id="btn-finalizar" <?= $abaixoMinimo ? 'disabled' : '' ?> <?= (!empty($usuario) && (!($perfil_ok ?? true) || !($termos_ok ?? true))) ? 'disabled' : '' ?>
                                     onclick="console.log('🔍 [INLINE] Botão clicado!'); processarPedidoDireto();">
                                 <i class="fas fa-lock"></i> <?= __('checkout.finalize_secure', 'Finalizar Pedido com Pagamento Seguro') ?>
                             </button>

@@ -2173,7 +2173,8 @@ class CheckoutController extends Controller {
 
                     if (!empty($row)) {
                         $cartMoedaFromDb = strtoupper(trim((string) ($row['moeda'] ?? '')));
-                        if (array_key_exists('subtotal_produtos', $row)) {
+                        // Só usar subtotal_produtos do DB se estiver em USD (moeda base)
+                        if (array_key_exists('subtotal_produtos', $row) && (!isset($cartMoedaFromDb) || $cartMoedaFromDb !== 'BRL')) {
                             $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
                             if ($subtotalFromDb > 0) {
                                 $subtotal = $subtotalFromDb;
@@ -2736,16 +2737,36 @@ class CheckoutController extends Controller {
             return;
         }
 
-        // Validar valor mínimo de produtos (USD 5.00)
-        $subtotalCheck = 0;
+        // Validar valor mínimo de produtos (USD 5.00) — sempre em USD
+        $subtotalCheckUsd = 0;
+        $db = \Config\Database::getConnection();
         foreach ($carrinho as $cItem) {
-            $p = $cItem['preco_unitario'] ?? $cItem['price'] ?? $cItem['preco'] ?? 0;
-            $q = $cItem['quantidade'] ?? 1;
-            $subtotalCheck += (float) $p * (int) $q;
+            $pid = (int) ($cItem['produto_id'] ?? 0);
+            $q = (int) ($cItem['quantidade'] ?? 1);
+            if ($q < 1) $q = 1;
+            // Buscar preço original em USD direto do produto
+            $precoUsd = 0;
+            if ($pid > 0) {
+                try {
+                    $colsP = [];
+                    try { $stC = $db->query('DESCRIBE produtos'); $colsP = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) { $colsP = []; }
+                    $priceCol = 'price';
+                    foreach (['price', 'valor', 'preco'] as $c) { if (in_array($c, $colsP, true)) { $priceCol = $c; break; } }
+                    $stP = $db->prepare("SELECT {$priceCol} FROM produtos WHERE id = ? LIMIT 1");
+                    $stP->execute([$pid]);
+                    $precoUsd = (float) ($stP->fetchColumn() ?: 0);
+                } catch (\Throwable $e) {
+                    $precoUsd = (float) ($cItem['preco_unitario'] ?? $cItem['price'] ?? $cItem['preco'] ?? 0);
+                }
+            }
+            if ($precoUsd <= 0) {
+                $precoUsd = (float) ($cItem['preco_unitario'] ?? $cItem['price'] ?? $cItem['preco'] ?? 0);
+            }
+            $subtotalCheckUsd += $precoUsd * $q;
         }
-        if ($subtotalCheck < 5.00) {
+        if ($subtotalCheckUsd < 5.00) {
             $this->json([
-                'error' => 'O valor mínimo de produtos para processamento é de $5.00 (USD). Seu subtotal atual é $' . number_format($subtotalCheck, 2, '.', ',') . '.'
+                'error' => 'O valor mínimo de produtos para processamento é de $5.00 (USD). Seu subtotal atual é $' . number_format($subtotalCheckUsd, 2, '.', ',') . '.'
             ], 400);
             return;
         }
