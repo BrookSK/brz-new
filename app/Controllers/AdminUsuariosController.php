@@ -1055,8 +1055,18 @@ class AdminUsuariosController extends Controller {
             exit;
         }
 
-        $targetPerfil = strtolower(trim((string) ($target['perfil'] ?? ($target['role'] ?? 'cliente'))));
-        if ($targetPerfil !== 'cliente') {
+        // Normalizar perfil: checar 'perfil' e 'role', tratar vazio como 'cliente'
+        $targetPerfil = '';
+        if (!empty($target['perfil']) && trim((string) $target['perfil']) !== '') {
+            $targetPerfil = strtolower(trim((string) $target['perfil']));
+        } elseif (!empty($target['role']) && trim((string) $target['role']) !== '') {
+            $targetPerfil = strtolower(trim((string) $target['role']));
+        } else {
+            $targetPerfil = 'cliente';
+        }
+        // Aceitar variações comuns de perfil de cliente (ex: 'customer' do WooCommerce)
+        $perfisCliente = ['cliente', 'customer', 'subscriber', ''];
+        if (!in_array($targetPerfil, $perfisCliente, true) && !str_contains($targetPerfil, 'customer')) {
             $_SESSION['message'] = 'Você só pode logar como clientes.';
             $_SESSION['message_type'] = 'warning';
             header('Location: /admin/usuarios');

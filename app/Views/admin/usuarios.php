@@ -131,7 +131,13 @@ function getUserStatusLabel($status) {
                                     <td><?= date('d/m/Y H:i', strtotime($usuario['created_at'] ?? $usuario['data_criacao'] ?? 'now')) ?></td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <?php if (($usuario['perfil'] ?? '') === 'cliente'): ?>
+                                            <?php
+                                                $perfilCheck = strtolower(trim((string) ($usuario['perfil'] ?? '')));
+                                                if ($perfilCheck === '') $perfilCheck = strtolower(trim((string) ($usuario['role'] ?? '')));
+                                                if ($perfilCheck === '') $perfilCheck = 'cliente';
+                                                $ehCliente = in_array($perfilCheck, ['cliente', 'customer', 'subscriber'], true) || str_contains($perfilCheck, 'customer');
+                                            ?>
+                                            <?php if ($ehCliente): ?>
                                                 <form method="POST" action="/admin/usuarios/impersonar/<?= (int) $usuario['id'] ?>" style="display: inline;">
                                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((new \App\Services\AuthService())->getCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-secondary" title="Logar como">

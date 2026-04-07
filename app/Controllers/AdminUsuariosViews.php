@@ -46,7 +46,8 @@ class AdminUsuariosViews {
         }
 
         $btnImpersonar = '';
-        if ($perfil === 'cliente') {
+        $ehCliente = in_array($perfil, ['cliente', 'customer', 'subscriber'], true) || str_contains($perfil, 'customer');
+        if ($ehCliente) {
             $btnImpersonar = '<form method="POST" action="/admin/usuarios/impersonar/' . (int) $usuario['id'] . '" style="display: inline;">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) $csrf) . '">' 
                 . '<button type="submit" class="btn btn-sm btn-outline-secondary" title="Logar como">'
