@@ -250,10 +250,15 @@
                         <div id="collapseDesc" class="accordion-collapse collapse show" aria-labelledby="headingDesc" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
                                 <?php
+                                $marcaProduto = trim((string) ($produto['marca'] ?? $produto['brand'] ?? ''));
                                 $descCurta = trim((string) ($produto['descricao_curta'] ?? ''));
-                                $descCompleta = trim((string) ($produto['descricao'] ?? ''));
+                                $descCompleta = trim((string) ($produto['descricao'] ?? $produto['description'] ?? ''));
                                 $descExtra = trim((string) ($produto['descricao_completa'] ?? ''));
                                 ?>
+
+                                <?php if ($marcaProduto !== ''): ?>
+                                    <div class="mb-2"><span class="badge bg-dark" style="font-size: 0.8rem;"><i class="fas fa-tag me-1"></i><?= htmlspecialchars($marcaProduto) ?></span></div>
+                                <?php endif; ?>
 
                                 <?php if ($descCurta !== ''): ?>
                                     <div class="text-muted"><?= nl2br(htmlspecialchars($descCurta)) ?></div>
@@ -275,17 +280,29 @@
                         </h2>
                         <div id="collapseSpecs" class="accordion-collapse collapse" aria-labelledby="headingSpecs" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
+                                <?php
+                                $especificacoesIA = trim((string) ($produto['especificacoes'] ?? $produto['specifications'] ?? $produto['specs'] ?? ''));
+                                ?>
+                                <?php if ($especificacoesIA !== ''): ?>
+                                    <div class="mb-3"><?= $especificacoesIA ?></div>
+                                <?php endif; ?>
                                 <div class="table-responsive">
                                     <table class="table table-sm mb-0">
+                                        <?php if ($marcaProduto !== ''): ?>
+                                        <tr>
+                                            <td><strong><?= __('product_details.brand', 'Marca') ?>:</strong></td>
+                                            <td><?= htmlspecialchars($marcaProduto) ?></td>
+                                        </tr>
+                                        <?php endif; ?>
                                         <tr>
                                             <td><strong>SKU:</strong></td>
-                                            <td><?= htmlspecialchars($produto['sku']) ?></td>
+                                            <td><?= htmlspecialchars((string) ($produto['sku'] ?? '')) ?></td>
                                         </tr>
                                         <tr>
                                             <td><strong><?= __('product_details.weight', 'Peso') ?>:</strong></td>
-                                            <td><?= number_format($produto['peso'], 3, ',', '.') ?> kg</td>
+                                            <td><?= number_format((float) ($produto['peso'] ?? $produto['weight'] ?? 0), 3, ',', '.') ?> kg</td>
                                         </tr>
-                                        <?php if ($produto['comprimento'] && $produto['largura'] && $produto['altura']): ?>
+                                        <?php if (!empty($produto['comprimento']) && !empty($produto['largura']) && !empty($produto['altura'])): ?>
                                         <tr>
                                             <td><strong><?= __('product_details.dimensions', 'Dimensões') ?>:</strong></td>
                                             <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
