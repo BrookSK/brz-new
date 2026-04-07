@@ -1754,7 +1754,8 @@ class AdminProdutosController extends Controller {
             exit;
         }
 
-        $prompt = "Você é um especialista em e-commerce de produtos importados dos EUA para o Brasil. Com base nas informações abaixo, gere os dados completos do produto para uma loja online brasileira.\n\n";
+        $prompt = "Você é um especialista em produtos e e-commerce. Você tem conhecimento enciclopédico sobre todos os produtos vendidos nos EUA.\n\n";
+        $prompt .= "Com base nas informações abaixo, PESQUISE o produto real e gere dados COMPLETOS e PRECISOS para uma loja online brasileira que importa dos EUA.\n\n";
         $prompt .= "Informações disponíveis:\n";
         if ($nome !== '') $prompt .= "- Nome do produto: {$nome}\n";
         if ($transcricao !== '') $prompt .= "- Descrição falada pela operadora: {$transcricao}\n";
@@ -1762,16 +1763,24 @@ class AdminProdutosController extends Controller {
         if ($peso !== '') $prompt .= "- Peso: {$peso} kg\n";
         if ($grupo !== '') $prompt .= "- Loja/Grupo de compras: {$grupo}\n";
 
-        $prompt .= "\nRetorne APENAS um JSON válido com os seguintes campos:\n";
-        $prompt .= '{"marca": "marca do produto (ex: Apple, Samsung, Dyson, etc.)", "descricao": "descrição detalhada para o cliente em português do Brasil (2-3 parágrafos, profissional e atrativa, explicando benefícios e para quem é indicado)", "especificacoes": "especificações técnicas em formato HTML usando <table class=\'table table-sm\'><tr><td><strong>Campo</strong></td><td>Valor</td></tr></table>. OBRIGATÓRIO incluir: Marca, Modelo, Voltagem (110V/220V/Bivolt ou N/A), Tipo de tomada (americana/brasileira/N/A), Precisa de adaptador de tomada? (Sim/Não/N/A), Material principal, Cor, Dimensões aproximadas, Peso. Incluir também outras specs relevantes do produto.", "tags": "palavras-chave separadas por vírgula"}';
-        $prompt .= "\n\nIMPORTANTE:\n- A descrição deve ser em português do Brasil, profissional e atrativa.\n- As especificações DEVEM incluir voltagem, tipo de tomada e se precisa de adaptador (quando aplicável ao produto).\n- Se o produto não usa eletricidade, coloque N/A nos campos de voltagem/tomada.\n- Pesquise com base no nome do produto para obter dados precisos.\n- NÃO inclua o campo 'nome' no JSON.";
+        $prompt .= "\nRetorne APENAS um JSON válido com estes campos:\n";
+        $prompt .= '{"marca": "marca real do produto", "descricao": "descrição detalhada em português do Brasil (2-3 parágrafos, profissional, explicando benefícios, para quem é indicado e diferenciais)", "especificacoes": "HTML com <table class=\'table table-sm\'><tr><td><strong>Campo</strong></td><td>Valor</td></tr></table>", "tags": "palavras-chave separadas por vírgula"}';
+
+        $prompt .= "\n\nREGRAS OBRIGATÓRIAS PARA AS ESPECIFICAÇÕES:";
+        $prompt .= "\n1. Você DEVE identificar o produto real pelo nome/descrição e preencher com dados REAIS. NUNCA coloque 'N/A', 'Não especificado' ou 'Não informado' se o dado puder ser descoberto pelo nome do produto.";
+        $prompt .= "\n2. Para produtos elétricos/eletrônicos: Voltagem REAL (ex: '110V' ou '110V-240V Bivolt'), Tipo de tomada ('Americana (tipo A/B)'), Precisa de adaptador no Brasil? ('Sim, necessita adaptador de tomada americana para brasileira').";
+        $prompt .= "\n3. Para produtos que NÃO usam eletricidade: simplesmente não inclua as linhas de voltagem/tomada/adaptador.";
+        $prompt .= "\n4. SEMPRE inclua: Marca, Modelo completo, Material principal, Cor(es) disponível(is), Dimensões aproximadas (pesquise!), Peso.";
+        $prompt .= "\n5. Inclua também especificações relevantes ao tipo de produto (ex: capacidade em litros para aspirador, potência em watts, tipo de bateria, autonomia, etc).";
+        $prompt .= "\n6. NÃO inclua o campo 'nome' no JSON.";
+        $prompt .= "\n7. A descrição deve ser em português do Brasil, atrativa e informativa.";
 
         $model = $this->getChatGPTModel();
 
         $payload = [
             'model' => $model,
             'messages' => [
-                ['role' => 'system', 'content' => 'Retorne apenas JSON válido, sem comentários e sem marcações markdown.'],
+                ['role' => 'system', 'content' => 'Você é um banco de dados de produtos. Conhece especificações técnicas detalhadas de qualquer produto vendido nos EUA. Retorne apenas JSON válido, sem comentários e sem marcações markdown.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
             'temperature' => 0.3,
