@@ -3732,9 +3732,7 @@ class CheckoutController extends Controller {
     }
 
     public function stripePaymentIntent(Request $request) {
-        if (!$this->requireFromCartOrRedirect(true)) {
-            return;
-        }
+        // Não verificar requireFromCartOrRedirect aqui pois o pedido já foi criado
         if (!$this->validatePesoMaximoCarrinhoAtivoOrFail(true)) {
             return;
         }

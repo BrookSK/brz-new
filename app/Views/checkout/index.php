@@ -1156,6 +1156,16 @@ function ensureStripeInit() {
 }
 
 function iniciarPagamentoStripeElements(pedidoId, email) {
+    iniciarPagamentoStripeElementsAsync(pedidoId, email).catch(e => {
+        console.error('[STRIPE] Erro:', e);
+        hideCheckoutLoading();
+        alert('Erro no pagamento: ' + (e.message || e));
+        const botao = document.getElementById('btn-finalizar');
+        if (botao) botao.disabled = false;
+    });
+}
+
+async function iniciarPagamentoStripeElementsAsync(pedidoId, email) {
     if (!ensureStripeInit()) {
         hideCheckoutLoading();
         alert((window.CHECKOUT_I18N && window.CHECKOUT_I18N.stripe_not_configured) ? window.CHECKOUT_I18N.stripe_not_configured : 'Stripe não configurado. Verifique as configurações de pagamento.');
@@ -1856,7 +1866,7 @@ async function processarPedidoDireto() {
         const html = await response.text();
         return { __is_html: true, __html: html };
     })
-    .then(data => {
+    .then(async data => {
         console.log('🔍 [DIRETO] Dados recebidos:', data);
 
         if (data && data.__is_html) {
@@ -1893,7 +1903,16 @@ async function processarPedidoDireto() {
             }
 
             // Stripe Elements (USD)
-            iniciarPagamentoStripeElements(data.pedido_id, formData.get('email') || '');
+            console.log('🔍 [DIRETO] Stripe required, iniciando Stripe Elements para pedido:', data.pedido_id);
+            try {
+                await iniciarPagamentoStripeElementsAsync(data.pedido_id, formData.get('email') || '');
+            } catch (stripeErr) {
+                console.error('❌ [DIRETO] Erro Stripe:', stripeErr);
+                hideCheckoutLoading();
+                alert('Erro no pagamento Stripe: ' + (stripeErr.message || stripeErr));
+                botao.disabled = false;
+                botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+            }
         } else {
             console.error('❌ [DIRETO] Erro ao processar pedido:', data.error);
             alert('Erro: ' + data.error);
