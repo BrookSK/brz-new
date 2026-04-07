@@ -659,18 +659,26 @@ class CarrinhoController extends Controller {
                         $cashbackClubeEstimado = (float) ($row['cashback_clube_estimado'] ?? 0);
                     }
 
-                    // Desconto promocional na taxa de serviço (sobrescrever com dados do DB se disponíveis)
-                    if (is_array($cols) && in_array('taxa_servico_original', $cols, true) && $row['taxa_servico_original'] !== null) {
-                        $taxaServicoOriginal = (float) $row['taxa_servico_original'];
-                    }
-                    if (is_array($cols) && in_array('taxa_servico_desconto_tipo', $cols, true) && $row['taxa_servico_desconto_tipo'] !== null) {
-                        $taxaServicoDescontoTipo = $row['taxa_servico_desconto_tipo'];
-                    }
-                    if (is_array($cols) && in_array('taxa_servico_desconto_valor', $cols, true) && $row['taxa_servico_desconto_valor'] !== null) {
-                        $taxaServicoDescontoValor = (float) $row['taxa_servico_desconto_valor'];
-                    }
-                    if (is_array($cols) && in_array('taxa_servico_desconto_aplicado', $cols, true) && $row['taxa_servico_desconto_aplicado'] !== null) {
-                        $taxaServicoDescontoAplicado = (float) $row['taxa_servico_desconto_aplicado'];
+                    // Desconto promocional na taxa de serviço (usar dados do DB apenas se a promoção ainda estiver ativa)
+                    $promoAinda = ((string) ($this->carrinhoModel->calcularDescontoTaxaServico(1.0)['tipo'] ?? '') !== '');
+                    if ($promoAinda) {
+                        if (is_array($cols) && in_array('taxa_servico_original', $cols, true) && $row['taxa_servico_original'] !== null) {
+                            $taxaServicoOriginal = (float) $row['taxa_servico_original'];
+                        }
+                        if (is_array($cols) && in_array('taxa_servico_desconto_tipo', $cols, true) && $row['taxa_servico_desconto_tipo'] !== null) {
+                            $taxaServicoDescontoTipo = $row['taxa_servico_desconto_tipo'];
+                        }
+                        if (is_array($cols) && in_array('taxa_servico_desconto_valor', $cols, true) && $row['taxa_servico_desconto_valor'] !== null) {
+                            $taxaServicoDescontoValor = (float) $row['taxa_servico_desconto_valor'];
+                        }
+                        if (is_array($cols) && in_array('taxa_servico_desconto_aplicado', $cols, true) && $row['taxa_servico_desconto_aplicado'] !== null) {
+                            $taxaServicoDescontoAplicado = (float) $row['taxa_servico_desconto_aplicado'];
+                        }
+                    } else {
+                        // Promoção desativada: zerar desconto independente do que está no DB
+                        $taxaServicoDescontoAplicado = 0.0;
+                        $taxaServicoDescontoTipo = null;
+                        $taxaServicoDescontoValor = 0.0;
                     }
 
                     // Se o DB tiver valores válidos, usar; senão manter cálculo atual
