@@ -15,6 +15,7 @@ $router->post('/admin/produtos/cadastro-rapido/salvar-lote', 'AdminProdutosContr
 $router->post('/admin/produtos/cadastro-rapido/transcrever-audio', 'AdminProdutosController', 'transcreverAudio');
 $router->post('/admin/produtos/cadastro-rapido/enriquecer-ia', 'AdminProdutosController', 'enriquecerComIA');
 $router->get('/admin/produtos/cadastro-rapido/categorias', 'AdminProdutosController', 'listarCategorias');
+$router->post('/admin/produtos/cadastro-rapido/categorias/criar', 'AdminProdutosController', 'criarCategoria');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');

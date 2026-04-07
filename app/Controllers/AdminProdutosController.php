@@ -1638,6 +1638,50 @@ class AdminProdutosController extends Controller {
         exit;
     }
 
+    public function criarCategoria(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+        header('Content-Type: application/json; charset=UTF-8');
+
+        $nome = trim((string) ($request->getParam('nome') ?? ''));
+        if ($nome === '') {
+            echo json_encode(['ok' => false, 'error' => 'Nome é obrigatório.']);
+            exit;
+        }
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $cols = $this->getTableColumns($pdo, 'categorias');
+            $nomeCol = in_array('nome', $cols, true) ? 'nome' : (in_array('name', $cols, true) ? 'name' : 'nome');
+
+            // Verificar duplicata
+            $st = $pdo->prepare("SELECT id FROM categorias WHERE LOWER({$nomeCol}) = LOWER(?) LIMIT 1");
+            $st->execute([$nome]);
+            if ($st->fetchColumn()) {
+                echo json_encode(['ok' => false, 'error' => 'Categoria já existe.']);
+                exit;
+            }
+
+            $data = [$nomeCol => $nome];
+            if (in_array('status', $cols, true)) $data['status'] = 'ativo';
+            if (in_array('descricao', $cols, true)) $data['descricao'] = '';
+            if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
+            if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
+
+            $colsSql = implode(', ', array_keys($data));
+            $placeholders = ':' . implode(', :', array_keys($data));
+            $st = $pdo->prepare("INSERT INTO categorias ({$colsSql}) VALUES ({$placeholders})");
+            foreach ($data as $k => $v) $st->bindValue(':' . $k, $v);
+            $st->execute();
+
+            $id = (int) $pdo->lastInsertId();
+            echo json_encode(['ok' => true, 'categoria' => ['id' => $id, 'nome' => $nome]]);
+        } catch (\Exception $e) {
+            echo json_encode(['ok' => false, 'error' => 'Erro ao criar: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function transcreverAudio(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
@@ -1960,7 +2004,18 @@ class AdminProdutosController extends Controller {
         // Campos IA (lote)
         foreach (['ia_descricao' => ['description','descricao','desc'], 'ia_marca' => ['brand','marca'], 'ia_especificacoes' => ['specifications','especificacoes','specs'], 'ia_tags' => ['tags','keywords']] as $param => $cands) {
             $val = trim((string) ($request->getParam($param) ?? ''));
-            if ($val !== '') { foreach ($cands as $c) { if (in_array($c, $cols, true)) { $data[$c] = $val; break; } } }
+            if ($val !== '') {
+                // Tags: converter para JSON array se necessário
+                if ($param === 'ia_tags') {
+                    $decoded = json_decode($val, true);
+                    if (!is_array($decoded)) {
+                        $parts = array_map('trim', explode(',', $val));
+                        $parts = array_values(array_filter($parts, fn($p) => $p !== ''));
+                        $val = json_encode($parts, JSON_UNESCAPED_UNICODE);
+                    }
+                }
+                foreach ($cands as $c) { if (in_array($c, $cols, true)) { $data[$c] = $val; break; } }
+            }
         }
 
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
@@ -2223,10 +2278,23 @@ class AdminProdutosController extends Controller {
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Categoria</label>
-                    <input type="text" class="form-control" id="catSearchSingle" placeholder="Pesquisar categoria..." autocomplete="off">
-                    <select class="form-select mt-2" name="categoria_id" id="catSelectSingle">
-                        <option value="">Selecione...</option>
-                    </select>
+                    <div class="d-flex gap-2 align-items-start">
+                        <div class="flex-fill">
+                            <input type="text" class="form-control" id="catSearchSingle" placeholder="Pesquisar categoria..." autocomplete="off">
+                            <select class="form-select mt-2" name="categoria_id" id="catSelectSingle">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaCatSingle" title="Nova categoria" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="novaCatFormSingle" style="display:none" class="mt-2 p-2 border rounded" style="border-radius:12px;">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="novaCatNomeSingle" placeholder="Nome da nova categoria">
+                            <button type="button" class="btn btn-primary btn-sm" id="btnSalvarCatSingle"><i class="fas fa-check"></i></button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelarCatSingle"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div id="novaCatMsgSingle" class="small mt-1"></div>
+                    </div>
                     <small class="text-muted">Opcional</small>
                 </div>
                 <div class="mb-3">
@@ -2305,10 +2373,23 @@ class AdminProdutosController extends Controller {
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Categoria</label>
-                    <input type="text" class="form-control" id="catSearchLote" placeholder="Pesquisar categoria..." autocomplete="off">
-                    <select class="form-select mt-2" name="categoria_id" id="catSelectLote">
-                        <option value="">Selecione...</option>
-                    </select>
+                    <div class="d-flex gap-2 align-items-start">
+                        <div class="flex-fill">
+                            <input type="text" class="form-control" id="catSearchLote" placeholder="Pesquisar categoria..." autocomplete="off">
+                            <select class="form-select mt-2" name="categoria_id" id="catSelectLote">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaCatLote" title="Nova categoria" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="novaCatFormLote" style="display:none" class="mt-2 p-2 border rounded" style="border-radius:12px;">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="novaCatNomeLote" placeholder="Nome da nova categoria">
+                            <button type="button" class="btn btn-primary btn-sm" id="btnSalvarCatLote"><i class="fas fa-check"></i></button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelarCatLote"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div id="novaCatMsgLote" class="small mt-1"></div>
+                    </div>
                     <small class="text-muted">Opcional — aplicada a todos os itens do lote</small>
                 </div>
                 <div class="mb-3">
@@ -2770,6 +2851,71 @@ loadCategorias();
 setupCatFilter("catSearchSingle", "catSelectSingle");
 setupCatFilter("catSearchLote", "catSelectLote");
 
+// Nova categoria inline
+function setupNovaCat(btnId, formId, inputId, btnSalvarId, btnCancelarId, msgId, selectId) {
+    const btn = document.getElementById(btnId);
+    const form = document.getElementById(formId);
+    const input = document.getElementById(inputId);
+    const btnSalvar = document.getElementById(btnSalvarId);
+    const btnCancelar = document.getElementById(btnCancelarId);
+    const msg = document.getElementById(msgId);
+    if (!btn || !form) return;
+
+    btn.addEventListener("click", () => { form.style.display = ""; input.value = ""; msg.innerHTML = ""; input.focus(); });
+    btnCancelar.addEventListener("click", () => { form.style.display = "none"; });
+    btnSalvar.addEventListener("click", async () => {
+        const nome = input.value.trim();
+        if (!nome) { msg.innerHTML = \'<span class="text-danger">Nome obrigatório.</span>\'; return; }
+        btnSalvar.disabled = true;
+        msg.innerHTML = \'<i class="fas fa-spinner fa-spin"></i>\';
+        try {
+            const fd = new FormData(); fd.append("nome", nome);
+            const r = await fetch("/admin/produtos/cadastro-rapido/categorias/criar", { method: "POST", body: fd });
+            const j = await r.json();
+            if (j.ok && j.categoria) {
+                CATEGORIAS.push(j.categoria);
+                populateCatSelect("catSelectSingle");
+                populateCatSelect("catSelectLote");
+                document.getElementById(selectId).value = j.categoria.id;
+                form.style.display = "none";
+                msg.innerHTML = "";
+            } else { msg.innerHTML = \'<span class="text-danger">\' + (j.error || "Erro") + \'</span>\'; }
+        } catch(e) { msg.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\'; }
+        btnSalvar.disabled = false;
+    });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); btnSalvar.click(); } });
+}
+setupNovaCat("btnNovaCatSingle", "novaCatFormSingle", "novaCatNomeSingle", "btnSalvarCatSingle", "btnCancelarCatSingle", "novaCatMsgSingle", "catSelectSingle");
+setupNovaCat("btnNovaCatLote", "novaCatFormLote", "novaCatNomeLote", "btnSalvarCatLote", "btnCancelarCatLote", "novaCatMsgLote", "catSelectLote");
+
+// ─── Bloqueio do formulário durante processamento IA ───
+let iaProcessando = false;
+function bloquearForm(prefix) {
+    iaProcessando = true;
+    const overlay = document.getElementById("iaOverlay" + prefix);
+    if (!overlay) {
+        const container = prefix === "Single" ? document.getElementById("formProduto") : document.getElementById("formLote");
+        if (container) {
+            container.style.position = "relative";
+            const ov = document.createElement("div");
+            ov.id = "iaOverlay" + prefix;
+            ov.style.cssText = "position:absolute;inset:0;background:rgba(255,255,255,0.85);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:18px;";
+            ov.innerHTML = \'<div class="text-center"><div class="mb-3"><i class="fas fa-robot fa-3x text-primary fa-bounce"></i></div><div class="fw-bold fs-5 mb-1">IA preenchendo os campos...</div><div class="text-muted">Aguarde, isso leva alguns segundos.</div></div>\';
+            container.appendChild(ov);
+        }
+    } else { overlay.style.display = "flex"; }
+    // Desabilitar botões
+    var btns = [document.getElementById("btnSalvarProduto"), document.getElementById("btnVoltarStep2"), document.getElementById("btnSalvarLote"), document.getElementById("btnVoltarStep2Lote")];
+    btns.forEach(b => { if (b) { b.disabled = true; b.dataset.iaBlocked = "1"; } });
+}
+function desbloquearForm(prefix) {
+    iaProcessando = false;
+    const overlay = document.getElementById("iaOverlay" + prefix);
+    if (overlay) overlay.style.display = "none";
+    var btns = [document.getElementById("btnSalvarProduto"), document.getElementById("btnVoltarStep2"), document.getElementById("btnSalvarLote"), document.getElementById("btnVoltarStep2Lote")];
+    btns.forEach(b => { if (b && b.dataset.iaBlocked === "1") { b.disabled = false; delete b.dataset.iaBlocked; } });
+}
+
 // ─── Gravação de áudio + Transcrição + IA ───
 function setupMic(btnId, statusId, transcricaoId, iaPrefix, getNome, getPreco, getPeso) {
     const btn = document.getElementById(btnId);
@@ -2789,6 +2935,7 @@ function setupMic(btnId, statusId, transcricaoId, iaPrefix, getNome, getPreco, g
                 recording = false;
                 btn.innerHTML = \'<i class="fas fa-microphone"></i>\';
                 btn.classList.remove("btn-danger"); btn.classList.add("btn-outline-danger");
+                bloquearForm(iaPrefix);
                 status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Transcrevendo...\';
                 const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
                 const fd = new FormData(); fd.append("audio", blob, "audio.webm");
@@ -2797,10 +2944,16 @@ function setupMic(btnId, statusId, transcricaoId, iaPrefix, getNome, getPreco, g
                     const j = await r.json();
                     if (j.ok && j.text) {
                         transcricaoInput.value = j.text; transcricaoInput.removeAttribute("readonly");
-                        status.innerHTML = \'<i class="fas fa-check-circle text-success me-1"></i>Transcrito! Enviando para IA...\';
+                        status.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Transcrito! Enviando para IA...\';
                         await enriquecerIA(iaPrefix, getNome(), j.text, getPreco(), getPeso());
-                    } else { status.innerHTML = \'<span class="text-danger">\' + (j.error || "Erro") + \'</span>\'; }
-                } catch(e) { status.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\'; }
+                    } else {
+                        status.innerHTML = \'<span class="text-danger">\' + (j.error || "Erro") + \'</span>\';
+                        desbloquearForm(iaPrefix);
+                    }
+                } catch(e) {
+                    status.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\';
+                    desbloquearForm(iaPrefix);
+                }
             };
             mediaRecorder.start(); recording = true;
             btn.innerHTML = \'<i class="fas fa-stop"></i>\';
@@ -2829,6 +2982,7 @@ async function enriquecerIA(prefix, nome, transcricao, preco, peso) {
             if (status) status.innerHTML = \'<span class="text-success"><i class="fas fa-magic me-1"></i>Campos preenchidos pela IA!</span>\';
         } else { if (status) status.innerHTML = \'<span class="text-warning">\' + (j.error || "IA sem dados") + \'</span>\'; }
     } catch(e) { if (status) status.innerHTML = \'<span class="text-danger">Erro ao enriquecer.</span>\'; }
+    desbloquearForm(prefix);
 }
 setupMic("btnMicSingle", "micStatusSingle", "transcricaoSingle", "Single",
     () => document.querySelector(\'#formProduto input[name="name"]\').value,
@@ -3200,7 +3354,17 @@ HTML;
         // Campos enriquecidos pela IA
         foreach (['ia_descricao' => ['description','descricao','desc'], 'ia_marca' => ['brand','marca'], 'ia_especificacoes' => ['specifications','especificacoes','specs'], 'ia_tags' => ['tags','keywords']] as $param => $cands) {
             $val = trim((string) ($request->getParam($param) ?? ''));
-            if ($val !== '') { foreach ($cands as $c) { if (in_array($c, $cols, true)) { $data[$c] = $val; break; } } }
+            if ($val !== '') {
+                if ($param === 'ia_tags') {
+                    $decoded = json_decode($val, true);
+                    if (!is_array($decoded)) {
+                        $parts = array_map('trim', explode(',', $val));
+                        $parts = array_values(array_filter($parts, fn($p) => $p !== ''));
+                        $val = json_encode($parts, JSON_UNESCAPED_UNICODE);
+                    }
+                }
+                foreach ($cands as $c) { if (in_array($c, $cols, true)) { $data[$c] = $val; break; } }
+            }
         }
 
         if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
