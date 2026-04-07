@@ -228,13 +228,39 @@
                         $pixFeeRate = 0.035;
                         $pixFee = round($pixBrlEquiv * $pixFeeRate, 2);
                         $pixTotalFinal = round($pixBrlEquiv + $pixFee, 2);
+
+                        // Calcular valores por split se disponível
+                        $pixSplitProduto = null;
+                        $pixSplitTaxa = null;
+                        if (!empty($splitPagamentos['produto']) && !empty($splitPagamentos['taxa_servico'])) {
+                            $sp1 = $splitPagamentos['produto'];
+                            $sp2 = $splitPagamentos['taxa_servico'];
+                            if (strtolower(trim((string) ($sp1['gateway'] ?? ''))) === 'stripe' && strtolower(trim((string) ($sp1['metodo'] ?? ''))) === 'pix') {
+                                $v1 = (float) ($sp1['valor'] ?? 0);
+                                $v2 = (float) ($sp2['valor'] ?? 0);
+                                $pixSplitProduto = ['brl' => $v1, 'fee' => round($v1 * $pixFeeRate, 2), 'total' => round($v1 + ($v1 * $pixFeeRate), 2)];
+                                $pixSplitTaxa = ['brl' => $v2, 'fee' => round($v2 * $pixFeeRate, 2), 'total' => round($v2 + ($v2 * $pixFeeRate), 2)];
+                            }
+                        }
                     ?>
                     <div class="mt-2 border rounded p-2" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.18) !important; font-size: 0.9em;">
                         <div class="fw-bold mb-1"><i class="fas fa-qrcode me-1"></i> PIX (Stripe)</div>
+                        <?php if ($pixSplitProduto && $pixSplitTaxa): ?>
+                        <div class="d-flex justify-content-between">
+                            <span>PIX 1 — Produtos:</span>
+                            <span>R$ <?= number_format($pixSplitProduto['total'], 2, ',', '.') ?></span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>PIX 2 — Taxa + Impostos:</span>
+                            <span>R$ <?= number_format($pixSplitTaxa['total'], 2, ',', '.') ?></span>
+                        </div>
+                        <hr class="my-1">
+                        <?php else: ?>
                         <div class="d-flex justify-content-between">
                             <span>Equivalente em BRL:</span>
                             <span>R$ <?= number_format($pixBrlEquiv, 2, ',', '.') ?></span>
                         </div>
+                        <?php endif; ?>
                         <div class="d-flex justify-content-between text-muted">
                             <span>Taxa Stripe (3,5%):</span>
                             <span>R$ <?= number_format($pixFee, 2, ',', '.') ?></span>
