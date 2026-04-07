@@ -5312,6 +5312,10 @@ class PaymentService {
 
         if ($eventType === 'payment_intent.succeeded') {
             $this->tentarCreditarCarteiraPorRecarga('stripe', $paymentId, 'approved', $gatewayStatus !== '' ? $gatewayStatus : 'SUCCEEDED');
+
+            // Tentar vincular o payment_intent ao pedido se ainda não estiver vinculado
+            $this->tentarVincularStripePaymentIntent($obj);
+
             $this->atualizarPagamentoPedidoPorGateway($paymentId, 'stripe', 'approved', $gatewayStatus !== '' ? $gatewayStatus : 'SUCCEEDED');
             return ['status' => 'processed'];
         }
@@ -5322,6 +5326,77 @@ class PaymentService {
         }
 
         return ['status' => 'ignored'];
+    }
+
+    /**
+     * Tenta vincular um payment_intent do Stripe a um pedido que ainda não tem payment_id salvo.
+     * Busca por valor + moeda USD + status pendente + forma_pagamento cartao_credito.
+     */
+    private function tentarVincularStripePaymentIntent(array $piObj): void {
+        try {
+            $piId = trim((string) ($piObj['id'] ?? ''));
+            if ($piId === '') return;
+
+            $db = \Config\Database::getConnection();
+
+            // Verificar se já existe pedido com este payment_id
+            $stCheck = $db->prepare("SELECT id FROM pedidos WHERE payment_id = ? AND payment_gateway = 'stripe' LIMIT 1");
+            $stCheck->execute([$piId]);
+            if ($stCheck->fetchColumn()) return; // já vinculado
+
+            // Verificar também na tabela de split
+            try {
+                $stSplit = $db->prepare("SELECT id FROM pedido_pagamentos WHERE payment_id = ? AND gateway = 'stripe' LIMIT 1");
+                $stSplit->execute([$piId]);
+                if ($stSplit->fetchColumn()) return;
+            } catch (\Exception $e) {}
+
+            // Buscar pedido candidato: moeda USD, status pagamento pendente, sem payment_id, valor compatível
+            $amountCents = (int) ($piObj['amount'] ?? 0);
+            $amountUsd = $amountCents / 100.0;
+            if ($amountUsd <= 0) return;
+
+            $colsP = [];
+            try { $st = $db->query('DESCRIBE pedidos'); $colsP = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+
+            $hasPaymentId = in_array('payment_id', $colsP, true);
+            $hasGateway = in_array('payment_gateway', $colsP, true);
+            $hasTotal = in_array('total', $colsP, true) || in_array('valor_total', $colsP, true);
+            $hasMoeda = in_array('moeda', $colsP, true);
+            $hasStatus = in_array('status', $colsP, true);
+            $hasPayStatus = in_array('payment_status', $colsP, true);
+
+            if (!$hasPaymentId || !$hasGateway || !$hasTotal) return;
+
+            $totalCol = in_array('total', $colsP, true) ? 'total' : 'valor_total';
+
+            // Buscar pedidos USD pendentes sem payment_id, com valor próximo (tolerância de $0.50)
+            $sql = "SELECT id, {$totalCol} AS total_val FROM pedidos WHERE "
+                . "({$totalCol} BETWEEN :min AND :max) "
+                . ($hasMoeda ? "AND UPPER(COALESCE(moeda, 'USD')) = 'USD' " : '')
+                . ($hasPaymentId ? "AND (payment_id IS NULL OR payment_id = '') " : '')
+                . ($hasStatus ? "AND LOWER(COALESCE(status, '')) IN ('pagamento', 'pendente', 'pending', 'selecao', 'aguardando_pagamento') " : '')
+                . "ORDER BY id DESC LIMIT 5";
+
+            $st = $db->prepare($sql);
+            $st->execute([':min' => $amountUsd - 0.50, ':max' => $amountUsd + 0.50]);
+            $candidates = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            if (empty($candidates)) return;
+
+            // Pegar o mais recente
+            $pedidoId = (int) ($candidates[0]['id'] ?? 0);
+            if ($pedidoId <= 0) return;
+
+            // Vincular
+            $set = ["payment_id = :pid", "payment_gateway = 'stripe'"];
+            if ($hasPayStatus) $set[] = "payment_status = 'pending'";
+            $db->prepare("UPDATE pedidos SET " . implode(', ', $set) . " WHERE id = :id")
+                ->execute([':pid' => $piId, ':id' => $pedidoId]);
+
+        } catch (\Exception $e) {
+            // Não falhar o webhook
+        }
     }
 
     public function processarWebhookAppmax($payload) {
@@ -5397,7 +5472,7 @@ class PaymentService {
         return ['status' => 'ignored'];
     }
 
-    private function atualizarPagamentoPedidoPorPedidoId(int $pedidoId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
+    public function atualizarPagamentoPedidoPorPedidoId(int $pedidoId, string $gateway, string $paymentStatusInterno, string $gatewayStatus = ''): void {
         try {
             $db = \Config\Database::getConnection();
             $colsP = [];

@@ -2717,7 +2717,7 @@ HTML;
                             <i class="fas fa-headset me-1"></i>Criar ticket
                         </button>
                     </form>
-                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" class="me-2" onsubmit="return confirm(' . "'" . 'Sincronizar status de pagamento (Câmbio Real + AppMax) agora?' . "'" . ');">
+                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" class="me-2" onsubmit="return confirm(' . "'" . 'Sincronizar status de pagamento (Câmbio Real + AppMax + Stripe) agora?' . "'" . ');">
                         <button type="submit" class="btn btn-outline-success">
                             <i class="fas fa-rotate me-1"></i>Sincronizar pagamentos
                         </button>
@@ -3788,9 +3788,16 @@ HTML;
 
                                     echo '<p class="mb-1"><strong>Método:</strong> ' . htmlspecialchars($pgMetodoView) . '</p>'
                                         . '<p class="mb-1"><strong>Status:</strong> ' . htmlspecialchars($pgStatusView) . '</p>'
-                                        . '<p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pgGatewayView) . '</p>'
-                                        . '<p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pgTransView) . '</p>'
-                                        . '<p class="mb-0"><strong>Data:</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
+                                        . '<p class="mb-1"><strong>Gateway:</strong> ' . htmlspecialchars($pgGatewayView) . '</p>';
+
+                                    // Transação com link para o Stripe Dashboard
+                                    if (strtolower($pgGatewayView) === 'stripe' && str_starts_with($pgTransView, 'pi_')) {
+                                        echo '<p class="mb-1"><strong>Transação:</strong> <a href="https://dashboard.stripe.com/payments/' . htmlspecialchars($pgTransView) . '" target="_blank" class="text-primary">' . htmlspecialchars($pgTransView) . ' <i class="fas fa-external-link-alt small"></i></a></p>';
+                                    } else {
+                                        echo '<p class="mb-1"><strong>Transação:</strong> ' . htmlspecialchars($pgTransView) . '</p>';
+                                    }
+
+                                    echo '<p class="mb-0"><strong>Data:</strong> ' . (!empty($pgDataView) ? date('d/m/Y H:i', strtotime($pgDataView)) : 'N/A') . '</p>';
 
                                     // Split: exibir quanto foi para cada conta/gateway (pedido_pagamentos)
                                     try {
@@ -6169,6 +6176,31 @@ HTML;
 
             $r1 = $paymentService->atualizarStatusPagamentoCambioRealSplitPorPedido($pedidoId);
             $r2 = $paymentService->atualizarStatusPagamentoAppmaxSplitPorPedido($pedidoId);
+
+            // Sincronizar Stripe: se o pedido tem payment_id com pi_, consultar status no Stripe
+            $r3 = ['success' => true];
+            try {
+                $pdo = \Config\Database::getConnection();
+                $st = $pdo->prepare('SELECT payment_id, payment_gateway FROM pedidos WHERE id = ? LIMIT 1');
+                $st->execute([$pedidoId]);
+                $pedRow = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $piId = trim((string) ($pedRow['payment_id'] ?? ''));
+                $gw = strtolower(trim((string) ($pedRow['payment_gateway'] ?? '')));
+
+                if ($piId !== '' && ($gw === 'stripe' || str_starts_with($piId, 'pi_'))) {
+                    $pi = $paymentService->retrieveStripePaymentIntent($piId);
+                    if (is_array($pi) && !empty($pi['status'])) {
+                        $stripeStatus = strtolower(trim((string) $pi['status']));
+                        if ($stripeStatus === 'succeeded') {
+                            $paymentService->atualizarPagamentoPedidoPorPedidoId($pedidoId, 'stripe', 'approved', 'SUCCEEDED');
+                        } elseif (in_array($stripeStatus, ['canceled', 'requires_payment_method'], true)) {
+                            $paymentService->atualizarPagamentoPedidoPorPedidoId($pedidoId, 'stripe', 'rejected', strtoupper($stripeStatus));
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $r3 = ['success' => true]; // não falhar por causa do Stripe
+            }
 
             $ok = (!empty($r1['success']) && !empty($r2['success']));
             if ($ok) {
