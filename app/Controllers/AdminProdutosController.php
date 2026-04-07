@@ -2788,11 +2788,26 @@ document.getElementById("formProduto").addEventListener("submit", async function
                 this.querySelector(\'input[name="name"]\').focus();
             } else {
                 const successArea = document.getElementById("successArea");
-                if (successArea && json.html) {
-                    successArea.innerHTML = json.html;
+                const pid = json.id || 0;
+                const pnome = json.name || "";
+                const pfoto = json.foto_principal || "/uploads/produtos/placeholder.jpg";
+                const plink = "/produto/detalhes/" + pid;
+                const cardHtml = \'<div class="alert alert-success d-flex align-items-start gap-2" role="alert" style="border-radius:14px;">\'
+                    + \'<i class="fas fa-check-circle mt-1"></i>\'
+                    + \'<div><div class="fw-bold">Produto salvo com sucesso.</div></div>\'
+                    + \'</div>\'
+                    + \'<div class="card border-0 shadow-sm mb-3" style="border-radius:18px;overflow:hidden;">\'
+                    + \'<div class="row g-0"><div class="col-4"><img src="\' + pfoto + \'" alt="\' + pnome + \'" style="width:100%;height:100%;object-fit:cover;min-height:92px;"></div>\'
+                    + \'<div class="col-8"><div class="card-body py-3"><div class="fw-bold">\' + pnome + \'</div>\'
+                    + \'<div class="d-grid gap-2 mt-2">\'
+                    + \'<a class="btn btn-outline-primary btn-sm" href="\' + plink + \'" target="_blank"><i class="fas fa-external-link-alt me-1"></i>Abrir produto</a>\'
+                    + \'<a class="btn btn-primary btn-sm" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a>\'
+                    + \'</div></div></div></div></div>\';
+                if (successArea) {
+                    successArea.innerHTML = cardHtml;
+                    successArea.scrollIntoView({ behavior: "smooth", block: "start" });
                 } else {
-                    msg.innerHTML = \'<div class="alert alert-success" style="border-radius:14px;"><i class="fas fa-check-circle me-2"></i>Produto cadastrado com sucesso!</div>\'
-                        + \'<div class="d-grid gap-2 mt-2"><a class="btn btn-primary" href="/admin/produtos/cadastro-rapido"><i class="fas fa-plus me-1"></i>Novo produto</a></div>\';
+                    msg.innerHTML = cardHtml;
                 }
                 this.reset();
                 document.getElementById("capaPreview").innerHTML = "";

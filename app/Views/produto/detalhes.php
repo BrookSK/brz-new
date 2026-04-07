@@ -324,14 +324,14 @@
             <?php foreach ($produtosRelacionados as $relacionado): ?>
                         </div>
                         <div class="card-body">
-                            <h6 class="card-title text-dark"><?= htmlspecialchars($relacionado['nome']) ?></h6>
+                            <h6 class="card-title text-dark"><?= htmlspecialchars((string) ($relacionado['nome'] ?? $relacionado['name'] ?? '')) ?></h6>
                             <p class="card-text">
                                 <span class="fw-bold" style="color: var(--primary-color);">
                                     <?php
                                     $relCurrencyCode = strtoupper((string) ($relacionado['moeda'] ?? ''));
                                     $relCurrencyLabel = $currencySymbols[$relCurrencyCode] ?? $relCurrencyCode;
                                     ?>
-                                    <?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format($relacionado['preco'], 2, ',', '.') ?>
+                                    <?= htmlspecialchars($relCurrencyLabel) ?> <?= number_format((float) ($relacionado['preco'] ?? $relacionado['price'] ?? 0), 2, ',', '.') ?>
                                 </span>
                             </p>
                         </div>
