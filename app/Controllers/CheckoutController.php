@@ -3534,6 +3534,32 @@ class CheckoutController extends Controller {
 
                         $totalUsdPix = (float) ($rowPix['total_val'] ?? ($pedidoRowPay['total'] ?? 0));
                         $subtotalUsdPix = (float) ($rowPix['subtotal_val'] ?? 0);
+
+                        // Se subtotal_produtos não está no pedido, calcular a partir dos itens
+                        if ($subtotalUsdPix <= 0) {
+                            try {
+                                $itensTable = null;
+                                foreach (['pedido_itens', 'pedido_items'] as $t) {
+                                    $stT2 = $dbPixT->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                                    $stT2->execute([$t]);
+                                    if ((int) ($stT2->fetchColumn() ?: 0) > 0) { $itensTable = $t; break; }
+                                }
+                                if ($itensTable) {
+                                    $colsIt = [];
+                                    try { $stCI = $dbPixT->query("DESCRIBE {$itensTable}"); $colsIt = $stCI ? ($stCI->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
+                                    $subCol = '';
+                                    foreach (['subtotal', 'valor_total'] as $c) { if (in_array($c, $colsIt, true)) { $subCol = $c; break; } }
+                                    $pidCol = in_array('pedido_id', $colsIt, true) ? 'pedido_id' : '';
+                                    if ($subCol && $pidCol) {
+                                        $stSub = $dbPixT->prepare("SELECT SUM({$subCol}) FROM {$itensTable} WHERE {$pidCol} = ?");
+                                        $stSub->execute([(int) $pedidoId]);
+                                        $calcSub = (float) ($stSub->fetchColumn() ?: 0);
+                                        if ($calcSub > 0) $subtotalUsdPix = $calcSub;
+                                    }
+                                }
+                            } catch (\Throwable $e) {}
+                        }
+
                         $restanteUsdPix = round($totalUsdPix - $subtotalUsdPix, 2);
                         if ($restanteUsdPix < 0) $restanteUsdPix = 0;
 
@@ -3779,6 +3805,32 @@ class CheckoutController extends Controller {
 
             $total = (float) ($pedido['total'] ?? 0);
             $subtotalProdutos = (float) ($pedido['subtotal_produtos'] ?? $pedido['subtotal'] ?? 0);
+
+            // Se subtotal_produtos não está no pedido, calcular a partir dos itens
+            if ($subtotalProdutos <= 0) {
+                try {
+                    $itensTable = null;
+                    foreach (['pedido_itens', 'pedido_items'] as $t) {
+                        $stT = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                        $stT->execute([$t]);
+                        if ((int) ($stT->fetchColumn() ?: 0) > 0) { $itensTable = $t; break; }
+                    }
+                    if ($itensTable) {
+                        $colsIt = [];
+                        try { $stCI = $db->query("DESCRIBE {$itensTable}"); $colsIt = $stCI ? ($stCI->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Throwable $e) {}
+                        $subCol = '';
+                        foreach (['subtotal', 'valor_total'] as $c) { if (in_array($c, $colsIt, true)) { $subCol = $c; break; } }
+                        $pidCol = in_array('pedido_id', $colsIt, true) ? 'pedido_id' : '';
+                        if ($subCol && $pidCol) {
+                            $stSub = $db->prepare("SELECT SUM({$subCol}) FROM {$itensTable} WHERE {$pidCol} = ?");
+                            $stSub->execute([$pedidoId]);
+                            $calcSub = (float) ($stSub->fetchColumn() ?: 0);
+                            if ($calcSub > 0) $subtotalProdutos = $calcSub;
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+
             $taxaServico = (float) ($pedido['taxa_servico'] ?? 0);
             $impostos = (float) ($pedido['valor_impostos'] ?? $pedido['impostos'] ?? 0);
             $frete = (float) ($pedido['frete'] ?? $pedido['frete_manual'] ?? 0);
