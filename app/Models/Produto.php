@@ -42,10 +42,13 @@ class Produto extends Model {
                 'sku' => $produto['sku'] ?? '',
                 'descricao' => $produto['description'] ?? '',
                 'descricao_curta' => $produto['short_description'] ?? '',
+                'descricao_completa' => $produto['full_description'] ?? $produto['descricao_completa'] ?? '',
                 'foto_principal' => $produto['foto_principal'] ?? null,
                 'categoria_id' => $produto['category_id'] ?? 0,
+                'marca' => $produto['brand'] ?? $produto['marca'] ?? '',
+                'especificacoes' => $produto['specifications'] ?? $produto['especificacoes'] ?? $produto['specs'] ?? '',
                 'valor' => floatval($produto['price'] ?? 0),
-                'preco' => floatval($produto['price'] ?? 0), // Adicionar campo 'preco' para compatibilidade
+                'preco' => floatval($produto['price'] ?? 0),
                 'preco_custo' => floatval($produto['cost_price'] ?? 0),
                 'preco_promocao' => floatval($produto['sale_price'] ?? 0),
                 'estoque' => intval($produto['stock'] ?? 0),
@@ -61,7 +64,7 @@ class Produto extends Model {
                 'imagens' => $produto['images'] ? json_decode($produto['images'], true) : [],
                 'variacoes' => $produto['variations'] ? json_decode($produto['variations'], true) : [],
                 'atributos' => $produto['attributes'] ? json_decode($produto['attributes'], true) : [],
-                'moeda' => $produto['currency'] ?? 'USD', // Adicionar campo moeda
+                'moeda' => $produto['currency'] ?? 'USD',
                 'ativo' => $produto['active'] ?? true,
                 'destaque' => $produto['featured'] ?? false,
                 'digital' => $produto['digital'] ?? false,
@@ -70,7 +73,8 @@ class Produto extends Model {
                 'visualizacoes' => intval($produto['views'] ?? 0),
                 'created_at' => $produto['created_at'] ?? null,
                 'updated_at' => $produto['updated_at'] ?? null,
-                'published_at' => $produto['published_at'] ?? null
+                'published_at' => $produto['published_at'] ?? null,
+                'grupo_compras_id' => $produto['grupo_compras_id'] ?? null,
             ];
             
             $this->debugLog('[PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));

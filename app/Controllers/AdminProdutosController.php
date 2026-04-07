@@ -1754,7 +1754,7 @@ class AdminProdutosController extends Controller {
             exit;
         }
 
-        $prompt = "Você é um especialista em e-commerce. Com base nas informações abaixo, gere os dados completos do produto para uma loja online.\n\n";
+        $prompt = "Você é um especialista em e-commerce de produtos importados dos EUA para o Brasil. Com base nas informações abaixo, gere os dados completos do produto para uma loja online brasileira.\n\n";
         $prompt .= "Informações disponíveis:\n";
         if ($nome !== '') $prompt .= "- Nome do produto: {$nome}\n";
         if ($transcricao !== '') $prompt .= "- Descrição falada pela operadora: {$transcricao}\n";
@@ -1763,8 +1763,8 @@ class AdminProdutosController extends Controller {
         if ($grupo !== '') $prompt .= "- Loja/Grupo de compras: {$grupo}\n";
 
         $prompt .= "\nRetorne APENAS um JSON válido com os seguintes campos:\n";
-        $prompt .= '{"nome": "nome completo e comercial do produto", "marca": "marca do produto", "descricao": "descrição detalhada para o cliente (2-3 parágrafos, em português do Brasil, com informações úteis para quem vai comprar)", "especificacoes": "especificações técnicas em formato HTML com <ul><li> (cor, tamanho, material, voltagem, etc.)", "tags": "palavras-chave separadas por vírgula"}';
-        $prompt .= "\n\nIMPORTANTE: A descrição deve ser profissional, atrativa e em português do Brasil. As especificações devem ser detalhadas e precisas. Se não souber algum dado, pesquise com base no nome do produto.";
+        $prompt .= '{"marca": "marca do produto (ex: Apple, Samsung, Dyson, etc.)", "descricao": "descrição detalhada para o cliente em português do Brasil (2-3 parágrafos, profissional e atrativa, explicando benefícios e para quem é indicado)", "especificacoes": "especificações técnicas em formato HTML usando <table class=\'table table-sm\'><tr><td><strong>Campo</strong></td><td>Valor</td></tr></table>. OBRIGATÓRIO incluir: Marca, Modelo, Voltagem (110V/220V/Bivolt ou N/A), Tipo de tomada (americana/brasileira/N/A), Precisa de adaptador de tomada? (Sim/Não/N/A), Material principal, Cor, Dimensões aproximadas, Peso. Incluir também outras specs relevantes do produto.", "tags": "palavras-chave separadas por vírgula"}';
+        $prompt .= "\n\nIMPORTANTE:\n- A descrição deve ser em português do Brasil, profissional e atrativa.\n- As especificações DEVEM incluir voltagem, tipo de tomada e se precisa de adaptador (quando aplicável ao produto).\n- Se o produto não usa eletricidade, coloque N/A nos campos de voltagem/tomada.\n- Pesquise com base no nome do produto para obter dados precisos.\n- NÃO inclua o campo 'nome' no JSON.";
 
         $model = $this->getChatGPTModel();
 

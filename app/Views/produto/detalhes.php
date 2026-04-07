@@ -242,6 +242,20 @@
                     </div>
                 </div>
 
+                <?php
+                $marcaProduto = trim((string) ($produto['marca'] ?? $produto['brand'] ?? ''));
+                $descCurta = trim((string) ($produto['descricao_curta'] ?? ''));
+                $descCompleta = trim((string) ($produto['descricao'] ?? $produto['description'] ?? ''));
+                $descExtra = trim((string) ($produto['descricao_completa'] ?? ''));
+                $especificacoesIA = trim((string) ($produto['especificacoes'] ?? $produto['specifications'] ?? $produto['specs'] ?? ''));
+                ?>
+
+                <?php if ($marcaProduto !== ''): ?>
+                <div class="mb-3 d-flex align-items-center gap-2">
+                    <span class="badge bg-dark px-3 py-2" style="font-size: 0.85rem;"><i class="fas fa-tag me-1"></i><?= htmlspecialchars($marcaProduto) ?></span>
+                </div>
+                <?php endif; ?>
+
                 <div class="accordion" id="produtoAccordion">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingDesc">
@@ -249,70 +263,55 @@
                         </h2>
                         <div id="collapseDesc" class="accordion-collapse collapse show" aria-labelledby="headingDesc" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
-                                <?php
-                                $marcaProduto = trim((string) ($produto['marca'] ?? $produto['brand'] ?? ''));
-                                $descCurta = trim((string) ($produto['descricao_curta'] ?? ''));
-                                $descCompleta = trim((string) ($produto['descricao'] ?? $produto['description'] ?? ''));
-                                $descExtra = trim((string) ($produto['descricao_completa'] ?? ''));
-                                ?>
-
-                                <?php if ($marcaProduto !== ''): ?>
-                                    <div class="mb-2"><span class="badge bg-dark" style="font-size: 0.8rem;"><i class="fas fa-tag me-1"></i><?= htmlspecialchars($marcaProduto) ?></span></div>
-                                <?php endif; ?>
-
                                 <?php if ($descCurta !== ''): ?>
                                     <div class="text-muted"><?= nl2br(htmlspecialchars($descCurta)) ?></div>
                                 <?php endif; ?>
 
                                 <?php if ($descCompleta !== '' && $descCompleta !== $descCurta): ?>
-                                    <div class="mt-3 text-muted"><?= nl2br(htmlspecialchars($descCompleta)) ?></div>
+                                    <div class="<?= $descCurta !== '' ? 'mt-3' : '' ?> text-muted"><?= nl2br(htmlspecialchars($descCompleta)) ?></div>
                                 <?php endif; ?>
 
                                 <?php if ($descExtra !== '' && $descExtra !== $descCurta && $descExtra !== $descCompleta): ?>
                                     <div class="mt-3 text-muted"><?= nl2br(htmlspecialchars($descExtra)) ?></div>
                                 <?php endif; ?>
+
+                                <?php if ($descCurta === '' && $descCompleta === '' && $descExtra === ''): ?>
+                                    <div class="text-muted"><?= __('product_details.no_description', 'Sem descrição disponível.') ?></div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
+
+                    <?php if ($especificacoesIA !== '' || $marcaProduto !== '' || !empty($produto['sku']) || (float)($produto['peso'] ?? 0) > 0): ?>
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingSpecs">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpecs" aria-expanded="false" aria-controls="collapseSpecs"><?= __('product_details.specs', 'Especificações') ?></button>
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpecs" aria-expanded="false" aria-controls="collapseSpecs"><?= __('product_details.specs', 'Especificações Técnicas') ?></button>
                         </h2>
                         <div id="collapseSpecs" class="accordion-collapse collapse" aria-labelledby="headingSpecs" data-bs-parent="#produtoAccordion">
                             <div class="accordion-body">
-                                <?php
-                                $especificacoesIA = trim((string) ($produto['especificacoes'] ?? $produto['specifications'] ?? $produto['specs'] ?? ''));
-                                ?>
                                 <?php if ($especificacoesIA !== ''): ?>
                                     <div class="mb-3"><?= $especificacoesIA ?></div>
+                                <?php else: ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <?php if ($marcaProduto !== ''): ?>
+                                            <tr><td style="width:40%"><strong><?= __('product_details.brand', 'Marca') ?></strong></td><td><?= htmlspecialchars($marcaProduto) ?></td></tr>
+                                            <?php endif; ?>
+                                            <?php if (!empty($produto['sku'])): ?>
+                                            <tr><td><strong>SKU</strong></td><td><?= htmlspecialchars((string) ($produto['sku'] ?? '')) ?></td></tr>
+                                            <?php endif; ?>
+                                            <tr><td><strong><?= __('product_details.weight', 'Peso') ?></strong></td><td><?= number_format((float) ($produto['peso'] ?? $produto['weight'] ?? 0), 3, ',', '.') ?> kg</td></tr>
+                                            <?php if (!empty($produto['comprimento']) && !empty($produto['largura']) && !empty($produto['altura'])): ?>
+                                            <tr><td><strong><?= __('product_details.dimensions', 'Dimensões') ?></strong></td><td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td></tr>
+                                            <?php endif; ?>
+                                        </table>
+                                    </div>
                                 <?php endif; ?>
-                                <div class="table-responsive">
-                                    <table class="table table-sm mb-0">
-                                        <?php if ($marcaProduto !== ''): ?>
-                                        <tr>
-                                            <td><strong><?= __('product_details.brand', 'Marca') ?>:</strong></td>
-                                            <td><?= htmlspecialchars($marcaProduto) ?></td>
-                                        </tr>
-                                        <?php endif; ?>
-                                        <tr>
-                                            <td><strong>SKU:</strong></td>
-                                            <td><?= htmlspecialchars((string) ($produto['sku'] ?? '')) ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td><strong><?= __('product_details.weight', 'Peso') ?>:</strong></td>
-                                            <td><?= number_format((float) ($produto['peso'] ?? $produto['weight'] ?? 0), 3, ',', '.') ?> kg</td>
-                                        </tr>
-                                        <?php if (!empty($produto['comprimento']) && !empty($produto['largura']) && !empty($produto['altura'])): ?>
-                                        <tr>
-                                            <td><strong><?= __('product_details.dimensions', 'Dimensões') ?>:</strong></td>
-                                            <td><?= $produto['comprimento'] ?> × <?= $produto['largura'] ?> × <?= $produto['altura'] ?> cm</td>
-                                        </tr>
-                                        <?php endif; ?>
-                                    </table>
-                                </div>
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
+
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="headingImport">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="false" aria-controls="collapseImport"><?= __('product_details.import_info', 'Informações de Importação') ?></button>
