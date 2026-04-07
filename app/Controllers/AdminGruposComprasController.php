@@ -445,6 +445,7 @@ class AdminGruposComprasController extends Controller {
         $slug = (string) $request->getParam('slug', '');
         $page = max(1, (int) $request->getParam('page', 1));
         $busca = trim((string) $request->getParam('q', ''));
+        $categoriaFiltro = (int) $request->getParam('categoria', 0);
         $verTodos = ($request->getParam('ver_todos') === '1');
         $limit = 20;
         $offset = ($page - 1) * $limit;
@@ -452,6 +453,8 @@ class AdminGruposComprasController extends Controller {
         // Quando há busca ativa ou ver_todos, buscar sem paginação
         $buscaAtiva = ($busca !== '');
         $semPaginacao = $buscaAtiva || $verTodos;
+
+        $categoriasDoGrupo = [];
 
         try {
             $pdo = $this->getPdo();
@@ -472,19 +475,19 @@ class AdminGruposComprasController extends Controller {
 
             $grupoInativo = false;
 
-            // Detectar coluna de status disponível
             $colsStmt = $pdo->query("DESCRIBE produtos");
             $cols = $colsStmt ? $colsStmt->fetchAll(\PDO::FETCH_COLUMN) : [];
             $hasStatus = in_array('status', $cols, true);
             $hasAtivo  = in_array('ativo', $cols, true);
             $hasActive = in_array('active', $cols, true);
+            $hasCategoryId = in_array('category_id', $cols, true) || in_array('categoria_id', $cols, true);
+            $catCol = in_array('category_id', $cols, true) ? 'category_id' : (in_array('categoria_id', $cols, true) ? 'categoria_id' : '');
 
             $whereAtivo = '';
             if ($hasStatus)      $whereAtivo = " AND (status = 'published' OR status = 'active' OR status = '1')";
             elseif ($hasAtivo)   $whereAtivo = " AND ativo = 1";
             elseif ($hasActive)  $whereAtivo = " AND active = 1";
 
-            // Detectar coluna de nome
             $nameCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
 
             $whereBusca = '';
@@ -494,22 +497,36 @@ class AdminGruposComprasController extends Controller {
                 $buscaParams[] = '%' . $busca . '%';
             }
 
-            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca);
+            $whereCategoria = '';
+            if ($categoriaFiltro > 0 && $catCol !== '') {
+                $whereCategoria = " AND " . $catCol . " = ?";
+                $buscaParams[] = $categoriaFiltro;
+            }
+
+            // Carregar categorias disponíveis neste grupo
+            if ($catCol !== '') {
+                try {
+                    $stCats = $pdo->prepare("SELECT DISTINCT p." . $catCol . " AS cat_id, COALESCE(c.nome, c.name, 'Sem categoria') AS cat_nome FROM produtos p LEFT JOIN categorias c ON c.id = p." . $catCol . " WHERE p.grupo_compras_id = ?" . $whereAtivo . " AND p." . $catCol . " IS NOT NULL AND p." . $catCol . " > 0 ORDER BY cat_nome ASC");
+                    $stCats->execute([$grupo['id']]);
+                    $categoriasDoGrupo = $stCats->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    $categoriasDoGrupo = [];
+                }
+            }
+
+            $stCount = $pdo->prepare("SELECT COUNT(*) FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . $whereCategoria);
             $stCount->execute($buscaParams);
             $total = (int) $stCount->fetchColumn();
 
-            if ($buscaAtiva) {
-                // Busca ativa: retornar todos os resultados sem paginação
-                $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC");
-                $stP->execute($buscaParams);
-                $page = 1;
-            } elseif ($verTodos) {
-                // Ver todos: sem paginação
-                $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC");
+            $orderBy = " ORDER BY id DESC";
+            $baseWhere = "SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . $whereCategoria . $orderBy;
+
+            if ($buscaAtiva || $verTodos) {
+                $stP = $pdo->prepare($baseWhere);
                 $stP->execute($buscaParams);
                 $page = 1;
             } else {
-                $stP = $pdo->prepare("SELECT * FROM produtos WHERE grupo_compras_id=?" . $whereAtivo . $whereBusca . " ORDER BY id DESC LIMIT " . $limit . " OFFSET " . $offset);
+                $stP = $pdo->prepare($baseWhere . " LIMIT " . $limit . " OFFSET " . $offset);
                 $stP->execute($buscaParams);
             }
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC);

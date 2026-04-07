@@ -6,12 +6,15 @@ $page      = (int) ($page ?? 1);
 $totalPages = (int) ($totalPages ?? 1);
 $total     = (int) ($total ?? 0);
 $slug      = htmlspecialchars($grupo['slug'] ?? '', ENT_QUOTES, 'UTF-8');
+$categoriasDoGrupo = $categoriasDoGrupo ?? [];
+$categoriaFiltro = (int) ($categoriaFiltro ?? 0);
 
-$buildUrl = static function (int $p) use ($slug, $busca): string {
+$buildUrl = static function (int $p) use ($slug, $busca, $categoriaFiltro): string {
     $url = '/grupo/' . $slug;
     $qs = [];
     if ($p > 1) $qs[] = 'page=' . $p;
     if (($busca ?? '') !== '') $qs[] = 'q=' . urlencode($busca);
+    if ($categoriaFiltro > 0) $qs[] = 'categoria=' . $categoriaFiltro;
     return $url . (!empty($qs) ? '?' . implode('&', $qs) : '');
 };
 $busca = $busca ?? '';
@@ -54,16 +57,24 @@ $busca = $busca ?? '';
         </div>
     </div>
 
-    <!-- Busca por nome -->
+    <!-- Busca por nome e filtro de categoria -->
     <div class="mb-4">
-        <form method="GET" action="/grupo/<?= $slug ?>" id="formBuscaGrupo" class="d-flex" style="max-width:400px">
-            <div class="input-group">
+        <form method="GET" action="/grupo/<?= $slug ?>" id="formBuscaGrupo" class="d-flex gap-2 flex-wrap" style="max-width:700px">
+            <div class="input-group" style="flex:1;min-width:200px;">
                 <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
                 <input type="text" name="q" id="filtroProduto" class="form-control border-start-0 ps-0" placeholder="Buscar produto pelo nome..." value="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
-                <?php if ($busca !== ''): ?>
-                <a href="/grupo/<?= $slug ?>" class="btn btn-outline-secondary" title="Limpar"><i class="fas fa-times"></i></a>
-                <?php endif; ?>
             </div>
+            <?php if (!empty($categoriasDoGrupo)): ?>
+            <select name="categoria" class="form-select" style="max-width:220px;" onchange="this.form.submit()">
+                <option value="">Todas as categorias</option>
+                <?php foreach ($categoriasDoGrupo as $cat): ?>
+                <option value="<?= (int) $cat['cat_id'] ?>" <?= $categoriaFiltro === (int) $cat['cat_id'] ? 'selected' : '' ?>><?= htmlspecialchars($cat['cat_nome'] ?? 'Sem nome', ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <?php if ($busca !== '' || $categoriaFiltro > 0): ?>
+            <a href="/grupo/<?= $slug ?>" class="btn btn-outline-secondary" title="Limpar filtros"><i class="fas fa-times"></i></a>
+            <?php endif; ?>
         </form>
         <?php if ($busca !== '' && empty($produtos)): ?>
         <div class="text-muted small mt-2">Nenhum produto encontrado para "<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>".</div>

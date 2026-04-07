@@ -1741,9 +1741,9 @@ $popupLogo = !empty($siteLogo) ? $siteLogo : '';
     var overlay = document.getElementById('welcomePopupOverlay');
     if (!overlay) return;
     overlay.style.display = 'flex';
+    localStorage.setItem(KEY, '1');
     window.fecharWelcomePopup = function(){
         overlay.style.display = 'none';
-        localStorage.setItem(KEY, '1');
     };
     overlay.addEventListener('click', function(e){
         if (e.target === overlay) fecharWelcomePopup();
