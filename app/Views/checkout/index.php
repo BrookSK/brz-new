@@ -1880,39 +1880,45 @@ async function processarPedidoDireto() {
         }
         
         if (data.success) {
-            if (data.redirect) {
-                const destinoPaylink = data.redirect;
-                console.log('🔍 [DIRETO] Redirecionando para:', destinoPaylink);
-                setTimeout(function() {
-                    window.location.href = destinoPaylink;
-                }, 100);
-                return;
-            }
-
             console.log('✅ [DIRETO] Pedido criado com sucesso:', data.pedido_id);
 
             const isStripeUsd = (data.stripe_required === true);
-            if (!isStripeUsd) {
-                // Manter overlay até redirecionar para página de conclusão
-                const destino = data.redirect || ('/checkout/conclusao/' + data.pedido_id);
-                console.log('🔍 [DIRETO] Redirecionando para:', destino);
-                setTimeout(function() {
-                    window.location.href = destino;
-                }, 300);
+            const isStripePix = (data.stripe_pix === true);
+
+            // Se é Stripe (cartão ou PIX USD), NÃO redirecionar — processar pagamento primeiro
+            if (isStripeUsd) {
+                console.log('🔍 [DIRETO] Stripe required, iniciando Stripe Elements para pedido:', data.pedido_id);
+                try {
+                    await iniciarPagamentoStripeElementsAsync(data.pedido_id, formData.get('email') || '');
+                } catch (stripeErr) {
+                    console.error('❌ [DIRETO] Erro Stripe:', stripeErr);
+                    hideCheckoutLoading();
+                    alert('Erro no pagamento Stripe: ' + (stripeErr.message || stripeErr));
+                    botao.disabled = false;
+                    botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+                }
                 return;
             }
 
-            // Stripe Elements (USD)
-            console.log('🔍 [DIRETO] Stripe required, iniciando Stripe Elements para pedido:', data.pedido_id);
-            try {
-                await iniciarPagamentoStripeElementsAsync(data.pedido_id, formData.get('email') || '');
-            } catch (stripeErr) {
-                console.error('❌ [DIRETO] Erro Stripe:', stripeErr);
-                hideCheckoutLoading();
-                alert('Erro no pagamento Stripe: ' + (stripeErr.message || stripeErr));
-                botao.disabled = false;
-                botao.innerHTML = '<i class="fas fa-lock"></i> Finalizar Pedido com Pagamento Seguro';
+            // Stripe PIX USD — redirecionar para conclusão (PIX é exibido lá)
+            if (isStripePix) {
+                const destino = data.redirect || ('/checkout/conclusao/' + data.pedido_id);
+                console.log('🔍 [DIRETO] Stripe PIX, redirecionando para:', destino);
+                setTimeout(function() { window.location.href = destino; }, 300);
+                return;
             }
+
+            // Pagamento normal (BRL/carteira/etc) — redirecionar
+            if (data.redirect) {
+                const destinoPaylink = data.redirect;
+                console.log('🔍 [DIRETO] Redirecionando para:', destinoPaylink);
+                setTimeout(function() { window.location.href = destinoPaylink; }, 100);
+                return;
+            }
+
+            // Fallback
+            const destino = '/checkout/conclusao/' + data.pedido_id;
+            setTimeout(function() { window.location.href = destino; }, 300);
         } else {
             console.error('❌ [DIRETO] Erro ao processar pedido:', data.error);
             alert('Erro: ' + data.error);
