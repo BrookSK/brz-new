@@ -146,6 +146,12 @@ $router->get('/admin/oferta-gratuita/buscar-produtos', 'AdminOfertaGratuitaContr
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 
+// FAQ / Termos
+$router->get('/admin/faq', 'AdminFaqController', 'index');
+$router->post('/admin/faq/salvar', 'AdminFaqController', 'salvar');
+$router->post('/admin/faq/toggle/{id}', 'AdminFaqController', 'toggle');
+$router->post('/admin/faq/excluir/{id}', 'AdminFaqController', 'excluir');
+
 // Importação de usuários (CSV)
 $router->get('/admin/configuracoes/importar-usuarios/modelo', 'AdminConfiguracoesController', 'importarUsuariosModelo');
 $router->post('/admin/configuracoes/importar-usuarios/iniciar', 'AdminConfiguracoesController', 'importarUsuariosIniciar');

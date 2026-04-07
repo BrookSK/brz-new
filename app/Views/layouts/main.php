@@ -969,9 +969,12 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                     <li class="nav-item">
                         <a class="nav-link" href="/grupos-compras"><i class="fas fa-store"></i> Grupos de Compras</a>
                     </li>
+                    <!-- Como Funciona: oculto -->
+                    <!--
                     <li class="nav-item">
                         <a class="nav-link" href="/como-funciona"><i class="fas fa-question-circle"></i> <?= __('nav.how_it_works', 'Como Funciona') ?></a>
                     </li>
+                    -->
                     <!-- OCULTO TEMPORARIAMENTE
                     <li class="nav-item">
                         <a class="nav-link" href="/status-pedido"><i class="fas fa-stream"></i> Status do Pedido</a>
@@ -1252,7 +1255,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                     <ul class="list-unstyled">
                         <li class="mb-2"><a href="/" class="footer-link"><?= __('nav.home', 'Início') ?></a></li>
                         <li class="mb-2"><a href="/produtos" class="footer-link"><?= __('nav.products', 'Produtos') ?></a></li>
-                        <li class="mb-2"><a href="/como-funciona" class="footer-link"><?= __('nav.how_it_works', 'Como Funciona') ?></a></li>
+                        <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                         <!-- OCULTO TEMPORARIAMENTE
                         <li class="mb-2"><a href="/status-pedido" class="footer-link">Status do Pedido</a></li>
                         -->
