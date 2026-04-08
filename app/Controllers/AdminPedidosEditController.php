@@ -1291,6 +1291,13 @@ class AdminPedidosEditController extends Controller {
             if ($this->tableExists('pedido_items')) $itensTables[] = 'pedido_items';
             if (empty($itensTables)) $itensTables[] = $this->getItensTable();
 
+            // Garantir coluna nome_produto nas tabelas de itens
+            foreach ($itensTables as $t) {
+                if (!$this->columnExists($t, 'nome_produto')) {
+                    try { $this->connection->exec("ALTER TABLE {$t} ADD COLUMN nome_produto VARCHAR(255) DEFAULT NULL"); } catch (\Exception $e) {}
+                }
+            }
+
             $subtotal = 0;
 
             if (!$isPago) {
