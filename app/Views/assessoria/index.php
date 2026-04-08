@@ -130,7 +130,7 @@ $(document).ready(function() {
     const prefillLinks = <?= json_encode(array_values(array_filter(($assessoria_prefill_links ?? []), function($v) { return is_string($v) && trim($v) !== ''; }))) ?>;
 
     const isLoggedIn = <?= json_encode((bool) ($assessoria_logged_in ?? false)) ?>;
-    let disclaimerAccepted = <?= json_encode((bool) ($assessoria_disclaimer_accepted ?? false)) ?>;
+    const disclaimerAccepted = <?= json_encode((bool) ($assessoria_disclaimer_accepted ?? false)) ?>;
 
     async function ensureLoggedIn() {
         if (isLoggedIn) return true;
@@ -191,7 +191,6 @@ $(document).ready(function() {
                 });
             } catch (e) {
             }
-            disclaimerAccepted = true;
             return true;
         }
 

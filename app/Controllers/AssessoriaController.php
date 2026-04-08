@@ -850,39 +850,9 @@ class AssessoriaController extends Controller {
 
     private function reduceScrapingBeePayload(array $dadosBrutos): array {
         $picked = [];
-        foreach ([
-            'title', 'name', 'product', 'product_name',
-            'price', 'prices', 'pricing',
-            'images', 'image',
-            'variants', 'variation', 'variations', 'offers',
-            'url',
-            // Campos de peso / especificações
-            'weight', 'weights_found', 'shipping_weight', 'specifications', 'specs',
-            'product_weight', 'item_weight', 'weight_lbs',
-            // Campos de disponibilidade / estoque
-            'availability', 'stock', 'in_stock', 'out_of_stock', 'inventory',
-            'available', 'is_available', 'stock_status',
-            // Campos de opções (Walmart, Costco, etc.)
-            'options', 'product_options', 'selected_options',
-            // Campos de SKU / itens filhos (Costco, etc.)
-            'skus', 'items', 'children', 'child_items', 'sku_list',
-            'variant_pricing', 'option_prices', 'price_map',
-            // Campos do ai_extract_rules do ScrapingBee
-            'base_price', 'description', 'sku',
-        ] as $k) {
+        foreach (['title', 'name', 'product', 'product_name', 'price', 'prices', 'images', 'image', 'variants', 'variation', 'variations', 'offers', 'url'] as $k) {
             if (array_key_exists($k, $dadosBrutos)) {
                 $picked[$k] = $dadosBrutos[$k];
-            }
-        }
-        // Também incluir chaves aninhadas em 'product' se existir
-        if (isset($dadosBrutos['product']) && is_array($dadosBrutos['product'])) {
-            foreach (['weights_found', 'weight', 'shipping_weight', 'specifications', 'specs',
-                       'availability', 'stock', 'in_stock', 'out_of_stock', 'inventory',
-                       'options', 'product_options', 'variants', 'variations', 'offers',
-                       'skus', 'items', 'children', 'pricing', 'prices'] as $pk) {
-                if (array_key_exists($pk, $dadosBrutos['product'])) {
-                    $picked['product_' . $pk] = $dadosBrutos['product'][$pk];
-                }
             }
         }
         if (empty($picked)) {
@@ -1120,50 +1090,13 @@ class AssessoriaController extends Controller {
                 $label = (string) ($v['name'] ?? $v['title'] ?? $v['sku'] ?? 'Variação');
             }
 
-            // Detectar disponibilidade (out of stock)
-            $outOfStock = false;
-            foreach (['out_of_stock', 'outOfStock', 'is_out_of_stock'] as $osk) {
-                if (isset($v[$osk])) {
-                    $osVal = $v[$osk];
-                    if ($osVal === true || $osVal === 'true' || $osVal === 1 || $osVal === '1') {
-                        $outOfStock = true;
-                    }
-                    break;
-                }
-            }
-            if (!$outOfStock && isset($v['availability'])) {
-                $avail = strtolower(trim((string) $v['availability']));
-                if (in_array($avail, ['out_of_stock', 'outofstock', 'out of stock', 'unavailable', 'sold_out', 'soldout'], true)) {
-                    $outOfStock = true;
-                }
-            }
-            if (!$outOfStock && isset($v['in_stock'])) {
-                $inStock = $v['in_stock'];
-                if ($inStock === false || $inStock === 'false' || $inStock === 0 || $inStock === '0') {
-                    $outOfStock = true;
-                }
-            }
-            if (!$outOfStock && isset($v['available'])) {
-                $avVal = $v['available'];
-                if ($avVal === false || $avVal === 'false' || $avVal === 0 || $avVal === '0') {
-                    $outOfStock = true;
-                }
-            }
-            if (!$outOfStock && isset($v['stock_status'])) {
-                $ss = strtolower(trim((string) $v['stock_status']));
-                if (in_array($ss, ['out_of_stock', 'outofstock', 'out of stock', 'unavailable', 'sold_out'], true)) {
-                    $outOfStock = true;
-                }
-            }
-
             $id = (string) ($v['id'] ?? $v['variation_id'] ?? $v['variant_id'] ?? $v['variantId'] ?? $v['item_id'] ?? $v['itemId'] ?? $v['sku'] ?? md5($label));
             $out[] = [
                 'id' => $id,
                 'label' => $label,
                 'atributos' => is_array($atributos) ? $atributos : [],
                 'valor' => $valor !== null ? floatval($valor) : null,
-                'peso' => floatval($peso),
-                'out_of_stock' => $outOfStock
+                'peso' => floatval($peso)
             ];
         }
 
@@ -1226,31 +1159,12 @@ class AssessoriaController extends Controller {
                 if (!isset($v['peso']) || floatval($v['peso']) <= 0) {
                     $v['peso'] = 1.0;
                 }
-                // Preservar out_of_stock
-                $oos = false;
-                if (isset($v['out_of_stock'])) {
-                    $oosVal = $v['out_of_stock'];
-                    $oos = ($oosVal === true || $oosVal === 'true' || $oosVal === 1 || $oosVal === '1');
-                }
-                if (!$oos && isset($v['availability'])) {
-                    $avail = strtolower(trim((string) $v['availability']));
-                    if (in_array($avail, ['out_of_stock', 'outofstock', 'out of stock', 'unavailable', 'sold_out', 'soldout'], true)) {
-                        $oos = true;
-                    }
-                }
-                if (!$oos && isset($v['in_stock'])) {
-                    $inStock = $v['in_stock'];
-                    if ($inStock === false || $inStock === 'false' || $inStock === 0 || $inStock === '0') {
-                        $oos = true;
-                    }
-                }
                 $out[] = [
                     'id' => (string) ($v['id'] ?? ''),
                     'label' => (string) ($v['label'] ?? ''),
                     'atributos' => $v['atributos'],
                     'valor' => ($v['valor'] === null ? null : floatval($v['valor'])),
-                    'peso' => floatval($v['peso']),
-                    'out_of_stock' => $oos
+                    'peso' => floatval($v['peso'])
                 ];
             }
             return $this->mergeNormalizedVariacoes($out);
@@ -1280,10 +1194,6 @@ class AssessoriaController extends Controller {
             $curHasPrice = isset($cur['valor']) && $cur['valor'] !== null && floatval($cur['valor']) > 0;
             $newHasPrice = isset($v['valor']) && $v['valor'] !== null && floatval($v['valor']) > 0;
             if (!$curHasPrice && $newHasPrice) {
-                // Preservar out_of_stock do existente se o novo não tem
-                if (!isset($v['out_of_stock']) && isset($cur['out_of_stock'])) {
-                    $v['out_of_stock'] = $cur['out_of_stock'];
-                }
                 $unique[$k] = $v;
                 continue;
             }
@@ -1292,16 +1202,7 @@ class AssessoriaController extends Controller {
             $curHasAttrs = isset($cur['atributos']) && is_array($cur['atributos']) && !empty($cur['atributos']);
             $newHasAttrs = isset($v['atributos']) && is_array($v['atributos']) && !empty($v['atributos']);
             if (!$curHasAttrs && $newHasAttrs) {
-                if (!isset($v['out_of_stock']) && isset($cur['out_of_stock'])) {
-                    $v['out_of_stock'] = $cur['out_of_stock'];
-                }
                 $unique[$k] = $v;
-                continue;
-            }
-
-            // Propagar out_of_stock se o novo trouxer
-            if (isset($v['out_of_stock']) && $v['out_of_stock'] && !($cur['out_of_stock'] ?? false)) {
-                $unique[$k]['out_of_stock'] = true;
             }
         }
         return array_values($unique);
@@ -1354,61 +1255,6 @@ class AssessoriaController extends Controller {
                 }
             }
         };
-
-        // Suporte ao formato do ai_extract_rules do ScrapingBee
-        // Formato: variants: [{option_name, option_value, price, weight_lbs, in_stock}, ...]
-        foreach (['variants', 'variations'] as $vk) {
-            if (!empty($dadosBrutos[$vk]) && is_array($dadosBrutos[$vk])) {
-                $first = reset($dadosBrutos[$vk]);
-                if (is_array($first) && (isset($first['option_name']) || isset($first['option_value']))) {
-                    // Agrupar por combinação de atributos para criar variações multi-atributo
-                    // Primeiro, agrupar por option_value para criar variações individuais
-                    $aiVariants = [];
-                    foreach ($dadosBrutos[$vk] as $aiV) {
-                        if (!is_array($aiV)) continue;
-                        $optName = trim((string) ($aiV['option_name'] ?? 'Option'));
-                        $optValue = trim((string) ($aiV['option_value'] ?? ''));
-                        if ($optValue === '') continue;
-
-                        $price = null;
-                        if (isset($aiV['price'])) {
-                            $price = $this->findFirstNumeric($aiV['price']);
-                        }
-
-                        $weightLbs = null;
-                        if (isset($aiV['weight_lbs'])) {
-                            $weightLbs = $this->findFirstNumeric($aiV['weight_lbs']);
-                        }
-                        $weightKg = $weightLbs !== null ? round($weightLbs * 0.4536, 2) : null;
-
-                        $inStock = true;
-                        if (isset($aiV['in_stock'])) {
-                            $isVal = $aiV['in_stock'];
-                            if ($isVal === false || $isVal === 'false' || $isVal === 0 || $isVal === '0' || $isVal === 'no') {
-                                $inStock = false;
-                            }
-                        }
-
-                        $label = $optName . ': ' . $optValue;
-                        $aiVariants[] = [
-                            'id' => md5($label),
-                            'label' => $label,
-                            'atributos' => [$optName => $optValue],
-                            'valor' => $price,
-                            'peso' => $weightKg !== null && $weightKg > 0 ? $weightKg : 1.0,
-                            'out_of_stock' => !$inStock
-                        ];
-                    }
-                    if (!empty($aiVariants)) {
-                        $append($aiVariants);
-                        // Se encontramos variações no formato ai_extract_rules, não precisamos buscar mais
-                        if (!empty($all)) {
-                            return $this->mergeNormalizedVariacoes($all);
-                        }
-                    }
-                }
-            }
-        }
 
         foreach (['variations', 'variants', 'variation', 'variant', 'offers'] as $k) {
             if (!empty($dadosBrutos[$k]) && is_array($dadosBrutos[$k])) {
@@ -1869,18 +1715,6 @@ class AssessoriaController extends Controller {
      * Processa um link individual via ScrapingBee
      */
     private function processarLinkIndividual(string $url): array {
-        // Tentar scraper específico por domínio para dados mais precisos de variações
-        $parsedUrl = parse_url($url);
-        $host = strtolower($parsedUrl['host'] ?? '');
-
-        // Costco: usar API pública de preço para cada variação
-        if (strpos($host, 'costco.com') !== false) {
-            $costcoData = $this->tentarScraperCostco($url);
-            if ($costcoData !== null) {
-                return ['success' => true, 'data' => $costcoData];
-            }
-        }
-
         $scriptbeeApiKey = $this->getScriptBeeApiKey();
         
         if (!$scriptbeeApiKey) {
@@ -1901,9 +1735,12 @@ class AssessoriaController extends Controller {
                 'url' => $url,
                 'stealth_proxy' => 'true',
                 'country_code' => 'us',
+                // Timeout do lado do ScrapingBee (em ms)
                 'timeout' => '120000',
+                // Default mais rápido para evitar timeout no proxy
                 'wait_browser' => 'domcontentloaded',
                 'block_ads' => 'true',
+                // Limite do ScrapingBee: ai_query <= 300 chars
                 'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.'
             ], $override);
             return $requestUrl . '?' . http_build_query($params);
@@ -1916,29 +1753,17 @@ class AssessoriaController extends Controller {
             header('X-ScrapingBee-Request-URL: ' . $this->headerSafeValue(substr($fullUrl, 0, 200), 200));
         }
         
-        // Resolver DNS de app.scrapingbee.com antecipadamente (evita "Could not resolve host")
-        $resolvedIp = $this->resolverDnsScrapingBee();
-        error_log('[ScrapingBee] DNS resolved IP: ' . ($resolvedIp ?: 'FAILED'));
-
-        $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
+        $doRequest = function(string $targetUrl, int $timeoutSeconds) {
             $ch = curl_init();
-            $opts = [
+            curl_setopt_array($ch, [
                 CURLOPT_URL => $targetUrl,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CUSTOMREQUEST => 'GET',
                 CURLOPT_TIMEOUT => $timeoutSeconds,
-                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            ];
-            // Se conseguimos resolver o IP, forçar via CURLOPT_RESOLVE
-            if ($resolvedIp) {
-                $opts[CURLOPT_RESOLVE] = ['app.scrapingbee.com:443:' . $resolvedIp];
-                error_log('[ScrapingBee] Using CURLOPT_RESOLVE: app.scrapingbee.com:443:' . $resolvedIp);
-            }
-            // Tentar CURLOPT_DNS_SERVERS (só funciona se cURL compilado com c-ares)
-            @curl_setopt($ch, CURLOPT_DNS_SERVERS, '8.8.8.8,1.1.1.1');
-            curl_setopt_array($ch, $opts);
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1952,48 +1777,18 @@ class AssessoriaController extends Controller {
         // 1 tentativa (até 150s) por produto (cURL deve ser > timeout do ScrapingBee)
         [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 150);
 
-        // Se DNS falhou mesmo com CURLOPT_DNS_SERVERS, tentar resolver manualmente e refazer
-        if ($curlErrno === 6 && !$resolvedIp) {
-            // errno 6 = CURLE_COULDNT_RESOLVE_HOST
-            $resolvedIp = $this->resolverDnsScrapingBee(true);
-            if ($resolvedIp) {
-                if (headers_sent() === false) {
-                    header('X-ScrapingBee-DNS-Retry: ' . $resolvedIp);
-                }
-                $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
-                    $ch = curl_init();
-                    curl_setopt_array($ch, [
-                        CURLOPT_URL => $targetUrl,
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_CUSTOMREQUEST => 'GET',
-                        CURLOPT_TIMEOUT => $timeoutSeconds,
-                        CURLOPT_CONNECTTIMEOUT => 15,
-                        CURLOPT_SSL_VERIFYPEER => true,
-                        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        CURLOPT_RESOLVE => ['app.scrapingbee.com:443:' . $resolvedIp],
-                    ]);
-                    $response = curl_exec($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $curlErrno = curl_errno($ch);
-                    $curlError = curl_error($ch);
-                    curl_close($ch);
-                    return [$response, $httpCode, $curlErrno, $curlError];
-                };
-                [$response, $httpCode, $curlErrno, $curlError] = $doRequest($fullUrl, 150);
-            }
-        }
-
         // Se ai_query falhar (tamanho/validação), refazer sem ai_query
-        if (!$curlError && (int) $httpCode === 400 && is_string($response) && (stripos($response, 'ai_query') !== false || stripos($response, 'ai_extract_rules') !== false || stripos($response, 'extract_rules') !== false)) {
+        if (!$curlError && (int) $httpCode === 400 && is_string($response) && stripos($response, 'ai_query') !== false) {
             $retryUrl = $buildUrl([
                 'ai_query' => null
             ]);
-            // Remove parâmetros nulos
-            $retryUrl = preg_replace('/(&|\?)ai_query=[^&]*(&|$)/', '$1', $retryUrl);
+            // Remove parâmetros nulos (http_build_query inclui ai_query=)
+            $retryUrl = preg_replace('/(&|\?)ai_query=(&|$)/', '$1', $retryUrl);
             $retryUrl = rtrim($retryUrl, '&?');
 
             if (headers_sent() === false) {
                 header('X-ScrapingBee-Retry-No-AIQuery: true');
+                header('X-ScrapingBee-Retry-No-AIQuery-URL: ' . $this->headerSafeValue(substr($retryUrl, 0, 200), 200));
             }
 
             [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 150);
@@ -2046,13 +1841,16 @@ class AssessoriaController extends Controller {
         }
         
         if ($curlError) {
-            error_log('[ScrapingBee] cURL error: errno=' . $curlErrno . ' error=' . $curlError . ' resolvedIp=' . ($resolvedIp ?: 'null'));
             if (headers_sent() === false) {
                 header('X-ScrapingBee-CURL-Error: ' . $curlError);
             }
             
+            // Mensagem amigável para timeout
             $errorMessage = 'Erro na requisição cURL: ' . $curlError;
             if ($curlErrno === 28 || strpos($curlError, 'timeout') !== false) {
+                if (headers_sent() === false) {
+                    header('X-ScrapingBee-Timeout: true');
+                }
                 $errorMessage = 'Timeout ao processar este site. Tente novamente (1 link por vez) ou use outro link.';
             }
             
@@ -2113,11 +1911,6 @@ class AssessoriaController extends Controller {
         try {
             // Usar ChatGPT para analisar os dados brutos
             $produto = $this->analisarComChatGPT($decodedResponse, $url);
-
-            // Pós-processamento: se variações têm todas o mesmo preço, tentar enriquecer via json_response
-            if ($this->variacoesTemMesmoPreco($produto) && $scriptbeeApiKey) {
-                $produto = $this->tentarEnriquecerVariacoes($produto, $url, $scriptbeeApiKey, $doRequest);
-            }
             
             return [
                 'success' => true,
@@ -2134,491 +1927,6 @@ class AssessoriaController extends Controller {
         }
     }
     
-    /**
-     * Verifica se todas as variações têm o mesmo preço (indicando que preços por variação não foram capturados)
-     */
-    private function variacoesTemMesmoPreco(array $produto): bool {
-        $variacoes = $produto['variacoes'] ?? [];
-        if (count($variacoes) < 2) {
-            return false;
-        }
-
-        $precos = [];
-        foreach ($variacoes as $v) {
-            if (!is_array($v)) continue;
-            $p = $v['valor'] ?? null;
-            if ($p !== null && floatval($p) > 0) {
-                $precos[] = round(floatval($p), 2);
-            }
-        }
-
-        if (count($precos) < 2) {
-            return false;
-        }
-
-        // Se todos os preços são iguais, retorna true
-        return count(array_unique($precos)) === 1;
-    }
-
-    /**
-     * Tenta enriquecer variações com preços individuais usando uma segunda chamada ao ScrapingBee
-     * Estratégia: pegar HTML renderizado + metadata e usar ChatGPT para extrair preços por variação
-     */
-    private function tentarEnriquecerVariacoes(array $produto, string $url, string $apiKey, callable $doRequest): array {
-        $variacoes = $produto['variacoes'] ?? [];
-        if (empty($variacoes)) {
-            return $produto;
-        }
-
-        error_log('[Assessoria] Variações com mesmo preço detectadas, tentando enriquecer para: ' . $url);
-
-        // Chamada com json_response para capturar metadata JSON-LD, XHR e HTML body
-        $enrichUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
-            'api_key' => $apiKey,
-            'url' => $url,
-            'stealth_proxy' => 'true',
-            'country_code' => 'us',
-            'timeout' => '60000',
-            'wait_browser' => 'load',
-            'wait' => '3000',
-            'block_ads' => 'true',
-            'json_response' => 'true',
-        ]);
-
-        [$enrichResp, $enrichCode, $enrichErrno, $enrichError] = $doRequest($enrichUrl, 70);
-
-        if ($enrichError || $enrichCode !== 200 || empty($enrichResp)) {
-            error_log('[Assessoria] Enriquecimento falhou: code=' . $enrichCode . ' error=' . ($enrichError ?: 'none'));
-            return $produto;
-        }
-
-        $enrichData = json_decode($enrichResp, true);
-        if (!is_array($enrichData)) {
-            return $produto;
-        }
-
-        // 1) Tentar extrair preços do metadata JSON-LD
-        if (isset($enrichData['metadata']) && is_array($enrichData['metadata'])) {
-            $this->extractPricesFromMetadata($enrichData['metadata'], $variacoes, $produto);
-            if (!$this->variacoesTemMesmoPreco($produto)) {
-                error_log('[Assessoria] Preços enriquecidos via metadata JSON-LD');
-                return $produto;
-            }
-        }
-
-        // 2) Tentar extrair preços dos XHR interceptados
-        $xhrPrices = [];
-        if (isset($enrichData['xhr']) && is_array($enrichData['xhr'])) {
-            foreach ($enrichData['xhr'] as $xhr) {
-                if (!is_array($xhr)) continue;
-                $body = $xhr['body'] ?? '';
-                if (is_string($body) && $body !== '') {
-                    $xhrJson = json_decode($body, true);
-                    if (is_array($xhrJson)) {
-                        $this->extractPricesFromXhr($xhrJson, $xhrPrices);
-                    }
-                }
-            }
-            if (!empty($xhrPrices)) {
-                $uniquePrices = array_values(array_unique($xhrPrices));
-                $basePrice = floatval($produto['valor'] ?? 0);
-                // Validar que preços são razoáveis
-                $reasonable = true;
-                if ($basePrice > 0) {
-                    foreach ($uniquePrices as $xp) {
-                        if ($xp < $basePrice * 0.1 || $xp > $basePrice * 5) {
-                            $reasonable = false;
-                            break;
-                        }
-                    }
-                }
-                if ($reasonable && count($uniquePrices) > 1 && count($uniquePrices) <= count($variacoes) * 2) {
-                    sort($uniquePrices);
-                    $i = 0;
-                    foreach ($produto['variacoes'] as &$vEnrich) {
-                        if ($i < count($uniquePrices)) {
-                            $vEnrich['valor'] = $uniquePrices[$i];
-                        }
-                        $i++;
-                    }
-                    unset($vEnrich);
-                    if (!$this->variacoesTemMesmoPreco($produto)) {
-                        error_log('[Assessoria] Preços enriquecidos via XHR');
-                        return $produto;
-                    }
-                }
-            }
-        }
-
-        // 3) Usar o HTML body + ChatGPT para extrair preços por variação
-        $htmlBody = $enrichData['body'] ?? '';
-        if (is_string($htmlBody) && strlen($htmlBody) > 200) {
-            $chatGptApiKey = $this->getChatGPTApiKey();
-            if ($chatGptApiKey) {
-                $relevantHtml = $this->extractRelevantHtmlForPrices($htmlBody);
-
-                if (strlen($relevantHtml) > 50) {
-                    $varLabels = [];
-                    foreach ($variacoes as $v) {
-                        if (is_array($v) && isset($v['atributos']) && is_array($v['atributos'])) {
-                            foreach ($v['atributos'] as $ak => $av) {
-                                $varLabels[] = (string) $av;
-                            }
-                        }
-                    }
-
-                    $basePrice = floatval($produto['valor'] ?? 0);
-                    $pricePrompt = "From the HTML snippets below, extract the SPECIFIC PRICE (in USD) for each product variant/option.\nThe variants are: " . implode(', ', $varLabels) . "\nThe base product price is approximately $" . number_format($basePrice, 2) . " USD.\nPrices should be in a similar range to the base price.\n\nReturn ONLY valid JSON array like: [{\"option\": \"variant value\", \"price\": 99.99}]\nNo text, no markdown.\n\nHTML:\n" . $relevantHtml;
-
-                    [$priceResp, $priceCode, $priceErr] = $this->callChatGPT($chatGptApiKey, $pricePrompt, true);
-                    if ($priceCode === 400) {
-                        [$priceResp, $priceCode, $priceErr] = $this->callChatGPT($chatGptApiKey, $pricePrompt, false);
-                    }
-
-                    if (!$priceErr && $priceCode === 200) {
-                        $priceDecoded = json_decode($priceResp, true);
-                        $priceContent = $priceDecoded['choices'][0]['message']['content'] ?? '';
-                        try {
-                            $priceData = $this->decodeJsonResilient((string) $priceContent);
-                            if (is_array($priceData) && !empty($priceData)) {
-                                // Validar que os preços extraídos são razoáveis (dentro de 5x do preço base)
-                                $allReasonable = true;
-                                foreach ($priceData as $pd) {
-                                    if (!is_array($pd)) continue;
-                                    $pdPrice = $this->findFirstNumeric($pd['price'] ?? null);
-                                    if ($pdPrice !== null && $pdPrice > 0 && $basePrice > 0) {
-                                        if ($pdPrice < $basePrice * 0.1 || $pdPrice > $basePrice * 5) {
-                                            $allReasonable = false;
-                                            error_log('[Assessoria] Preço enriquecido descartado (fora do range): $' . $pdPrice . ' vs base $' . $basePrice);
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if ($allReasonable) {
-                                    foreach ($produto['variacoes'] as &$vPrice) {
-                                        if (!is_array($vPrice)) continue;
-                                        $attrs = $vPrice['atributos'] ?? [];
-                                        foreach ($priceData as $pd) {
-                                            if (!is_array($pd)) continue;
-                                            $pdOption = strtolower(trim((string) ($pd['option'] ?? '')));
-                                            $pdPrice = $this->findFirstNumeric($pd['price'] ?? null);
-                                            if ($pdOption === '' || $pdPrice === null || $pdPrice <= 0) continue;
-
-                                            foreach ($attrs as $av) {
-                                                $avLower = strtolower(trim((string) $av));
-                                                if ($avLower !== '' && ($pdOption === $avLower || stripos($pdOption, $avLower) !== false || stripos($avLower, $pdOption) !== false)) {
-                                                    $vPrice['valor'] = $pdPrice;
-                                                    break 2;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    unset($vPrice);
-
-                                    if (!$this->variacoesTemMesmoPreco($produto)) {
-                                        error_log('[Assessoria] Preços enriquecidos via ChatGPT + HTML');
-                                        return $produto;
-                                    }
-                                }
-                            }
-                        } catch (\Exception $e) {
-                            error_log('[Assessoria] Erro ao parsear preços do ChatGPT: ' . $e->getMessage());
-                        }
-                    }
-                }
-            }
-        }
-
-        error_log('[Assessoria] Não foi possível enriquecer preços das variações via metadata/XHR/HTML');
-
-        // 4) Estratégias adicionais desabilitadas - preços por variação dependem do ChatGPT
-        return $produto;
-    }
-
-    /**
-     * Extrai a parte relevante do HTML que contém botões de variação e preços
-     */
-    private function extractRelevantHtmlForPrices(string $html): string {
-        // Remover scripts, styles, header, footer, nav
-        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/si', '', $html);
-        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/si', '', $html);
-        $html = preg_replace('/<!--.*?-->/s', '', $html);
-        $html = preg_replace('/<header\b[^>]*>.*?<\/header>/si', '', $html);
-        $html = preg_replace('/<footer\b[^>]*>.*?<\/footer>/si', '', $html);
-        $html = preg_replace('/<nav\b[^>]*>.*?<\/nav>/si', '', $html);
-
-        // Extrair linhas de texto que contêm preços
-        $text = strip_tags($html);
-        $lines = preg_split('/[\n\r]+/', $text);
-        $priceLines = [];
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line !== '' && preg_match('/\$[\d,]+\.?\d*/', $line)) {
-                $priceLines[] = $line;
-            }
-        }
-
-        $relevant = implode("\n", array_slice($priceLines, 0, 60));
-        if (strlen($relevant) > 6000) {
-            $relevant = substr($relevant, 0, 6000);
-        }
-        return $relevant;
-    }
-
-    /**
-     * Extrai preços recursivamente de dados XHR
-     */
-    private function extractPricesFromXhr(array $data, array &$prices, int $depth = 0): void {
-        if ($depth > 5) return;
-
-        foreach ($data as $k => $v) {
-            $ks = strtolower((string) $k);
-            if (in_array($ks, ['price', 'saleprice', 'sale_price', 'current_price', 'finalprice', 'final_price', 'amount', 'deliveredprice', 'onlineprice', 'offerprice'], true)) {
-                $n = $this->findFirstNumeric($v);
-                if ($n !== null && $n > 1) {
-                    $prices[] = $n;
-                }
-            }
-            if (is_array($v)) {
-                $this->extractPricesFromXhr($v, $prices, $depth + 1);
-            }
-        }
-    }
-
-    /**
-     * Extrai preços de metadata JSON-LD e tenta associar às variações
-     */
-    private function extractPricesFromMetadata(array $metadata, array $variacoes, array &$produto): void {
-        // JSON-LD geralmente tem offers com preços
-        $jsonLd = $metadata['json-ld'] ?? [];
-        if (!is_array($jsonLd)) return;
-
-        $offers = [];
-        $queue = [$jsonLd];
-        $seen = 0;
-        while (!empty($queue) && $seen < 100) {
-            $node = array_shift($queue);
-            $seen++;
-            if (!is_array($node)) continue;
-
-            // Procurar offers
-            if (isset($node['offers']) && is_array($node['offers'])) {
-                foreach ($node['offers'] as $offer) {
-                    if (is_array($offer) && isset($offer['price'])) {
-                        $price = $this->findFirstNumeric($offer['price']);
-                        $name = $offer['name'] ?? $offer['sku'] ?? '';
-                        if ($price !== null && $price > 1) {
-                            $offers[] = ['price' => $price, 'name' => (string) $name];
-                        }
-                    }
-                }
-            }
-
-            foreach ($node as $v) {
-                if (is_array($v)) {
-                    $queue[] = $v;
-                }
-            }
-        }
-
-        if (count($offers) >= 2 && count($offers) <= count($variacoes) * 2) {
-            // Tentar associar offers às variações por nome
-            $matched = false;
-            foreach ($produto['variacoes'] as &$vMeta) {
-                if (!is_array($vMeta)) continue;
-                $label = strtolower((string) ($vMeta['label'] ?? ''));
-                $attrs = $vMeta['atributos'] ?? [];
-                foreach ($offers as $offer) {
-                    $offerName = strtolower((string) $offer['name']);
-                    if ($offerName === '') continue;
-                    // Verificar se algum atributo da variação está no nome da offer
-                    foreach ($attrs as $av) {
-                        if (stripos($offerName, (string) $av) !== false) {
-                            $vMeta['valor'] = $offer['price'];
-                            $matched = true;
-                            break 2;
-                        }
-                    }
-                }
-            }
-            unset($vMeta);
-
-            // Se não conseguiu associar por nome, associar por ordem
-            if (!$matched && count($offers) === count($produto['variacoes'])) {
-                $i = 0;
-                foreach ($produto['variacoes'] as &$vMeta2) {
-                    if (isset($offers[$i])) {
-                        $vMeta2['valor'] = $offers[$i]['price'];
-                    }
-                    $i++;
-                }
-                unset($vMeta2);
-            }
-        }
-    }
-
-    /**
-     * Scraper específico para Costco: usa ScrapingBee normal + segunda chamada com js_scenario
-     * para clicar em cada variação e interceptar os XHR de preço da API gdx-api.costco.com
-     */
-    private function tentarScraperCostco(string $url): ?array {
-        $scriptbeeApiKey = $this->getScriptBeeApiKey();
-        $chatGptApiKey = $this->getChatGPTApiKey();
-        if (!$scriptbeeApiKey || !$chatGptApiKey) {
-            return null;
-        }
-
-        error_log('[Assessoria] Usando scraper especifico Costco para: ' . $url);
-
-        // Passo 1: Buscar dados base via ScrapingBee + ai_query (igual ao fluxo normal)
-        $sbUrl = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
-            'api_key' => $scriptbeeApiKey,
-            'url' => $url,
-            'stealth_proxy' => 'true',
-            'country_code' => 'us',
-            'timeout' => '120000',
-            'wait_browser' => 'domcontentloaded',
-            'block_ads' => 'true',
-            'ai_query' => 'Return product name, images, base price and ALL variant combinations (size/color/style/fit). For each variant return id/sku, attributes map and price (USD). Missing values: null.',
-        ]);
-
-        $resolvedIp = $this->resolverDnsScrapingBee();
-        $doRequest = function(string $targetUrl, int $timeoutSeconds) use ($resolvedIp) {
-            $ch = curl_init();
-            $opts = [
-                CURLOPT_URL => $targetUrl,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => $timeoutSeconds,
-                CURLOPT_CONNECTTIMEOUT => 15,
-                CURLOPT_SSL_VERIFYPEER => true,
-            ];
-            if ($resolvedIp) {
-                $opts[CURLOPT_RESOLVE] = ['app.scrapingbee.com:443:' . $resolvedIp];
-            }
-            curl_setopt_array($ch, $opts);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-            return [$response, $httpCode, $curlError];
-        };
-
-        [$resp1, $code1, $err1] = $doRequest($sbUrl, 150);
-        if ($err1 || $code1 !== 200 || empty($resp1)) {
-            error_log('[Assessoria] Costco passo 1 falhou: code=' . $code1);
-            return null;
-        }
-
-        $data1 = json_decode($resp1, true);
-        if (!is_array($data1)) {
-            return null;
-        }
-
-        try {
-            $produto = $this->analisarComChatGPT($data1, $url);
-        } catch (\Exception $e) {
-            error_log('[Assessoria] Costco ChatGPT falhou: ' . $e->getMessage());
-            return null;
-        }
-
-        // Passo 2: Se variações têm mesmo preço, clicar em cada uma para interceptar XHR de preço
-        if (!$this->variacoesTemMesmoPreco($produto)) {
-            return $produto;
-        }
-
-        $variacoes = $produto['variacoes'] ?? [];
-        if (count($variacoes) < 2) {
-            return $produto;
-        }
-
-        $variantNames = [];
-        foreach ($variacoes as $v) {
-            if (!is_array($v) || !isset($v['atributos']) || !is_array($v['atributos'])) continue;
-            foreach ($v['atributos'] as $av) {
-                $variantNames[] = trim((string) $av);
-            }
-        }
-        $variantNames = array_values(array_unique($variantNames));
-
-        if (count($variantNames) < 2) {
-            return $produto;
-        }
-
-        $instructions = [['wait' => 3000]];
-        foreach ($variantNames as $name) {
-            $escaped = str_replace(["'", "\\", "\n", "\r"], ["\\'", "\\\\", "", ""], $name);
-            $instructions[] = ['evaluate' => "(function(){var els=document.querySelectorAll('button,a,[role=radio],[role=option],label,span');for(var i=0;i<els.length;i++){var t=(els[i].textContent||'').trim();if(t==='" . $escaped . "'){els[i].click();return 'clicked:" . $escaped . "'}}return 'notfound:" . $escaped . "'})()"];
-            $instructions[] = ['wait' => 2500];
-        }
-
-        $jsScenario = json_encode(['instructions' => $instructions]);
-
-        $sbUrl2 = 'https://app.scrapingbee.com/api/v1?' . http_build_query([
-            'api_key' => $scriptbeeApiKey,
-            'url' => $url,
-            'stealth_proxy' => 'true',
-            'country_code' => 'us',
-            'timeout' => '120000',
-            'wait_browser' => 'load',
-            'block_ads' => 'true',
-            'json_response' => 'true',
-            'js_scenario' => $jsScenario,
-        ]);
-
-        error_log('[Assessoria] Costco passo 2: clicando em variacoes');
-
-        [$resp2, $code2, $err2] = $doRequest($sbUrl2, 150);
-        if ($err2 || $code2 !== 200 || empty($resp2)) {
-            error_log('[Assessoria] Costco passo 2 falhou: code=' . $code2);
-            return $produto;
-        }
-
-        $data2 = json_decode($resp2, true);
-        if (!is_array($data2)) {
-            return $produto;
-        }
-
-        // Extrair preços dos XHR interceptados (API gdx-api.costco.com)
-        $variantPrices = [];
-        if (isset($data2['xhr']) && is_array($data2['xhr'])) {
-            foreach ($data2['xhr'] as $xhr) {
-                if (!is_array($xhr)) continue;
-                $xhrUrl = $xhr['url'] ?? '';
-                $xhrBody = $xhr['body'] ?? '';
-                if (is_string($xhrUrl) && stripos($xhrUrl, 'price') !== false && is_string($xhrBody) && $xhrBody !== '') {
-                    $xhrJson = json_decode($xhrBody, true);
-                    if (is_array($xhrJson) && isset($xhrJson['priceData']['displayPrice'])) {
-                        $dp = $xhrJson['priceData']['displayPrice'];
-                        $price = $dp['deliveredPrice'] ?? $dp['onlinePrice'] ?? null;
-                        if ($price !== null && floatval($price) > 0) {
-                            $variantPrices[] = floatval($price);
-                        }
-                    }
-                }
-            }
-        }
-
-        error_log('[Assessoria] Costco XHR precos: ' . json_encode($variantPrices));
-
-        if (count($variantPrices) >= count($variantNames)) {
-            $basePrice = floatval($produto['valor'] ?? 0);
-            $i = 0;
-            foreach ($produto['variacoes'] as &$vCostco) {
-                if ($i < count($variantPrices)) {
-                    $p = $variantPrices[$i];
-                    if ($basePrice <= 0 || ($p >= $basePrice * 0.3 && $p <= $basePrice * 3)) {
-                        $vCostco['valor'] = $p;
-                    }
-                }
-                $i++;
-            }
-            unset($vCostco);
-        }
-
-        return $produto;
-    }
-
     /**
      * Normaliza os dados do produto vindos do ScrapingBee
      */
@@ -2757,260 +2065,6 @@ class AssessoriaController extends Controller {
     }
     
     /**
-     * Fallback: scraping direto via cURL quando ScrapingBee está inacessível.
-     * Extrai HTML, JSON-LD e meta tags, depois envia ao ChatGPT para análise.
-     */
-    private function processarLinkDireto(string $url): array {
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS      => 5,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            CURLOPT_HTTPHEADER     => [
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language: en-US,en;q=0.9,pt-BR;q=0.8',
-            ],
-            CURLOPT_ENCODING       => '', // aceita gzip
-        ]);
-
-        $html = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlErr || !$html || $httpCode >= 400) {
-            return [
-                'success' => false,
-                'error'   => 'Não foi possível acessar o site diretamente' . ($curlErr ? ': ' . $curlErr : " (HTTP {$httpCode})"),
-            ];
-        }
-
-        // Extrair dados estruturados do HTML
-        $extracted = $this->extrairDadosDoHtml($html, $url);
-
-        if (empty($extracted)) {
-            return [
-                'success' => false,
-                'error'   => 'Não foi possível extrair dados do produto neste site.',
-            ];
-        }
-
-        // Enviar ao ChatGPT para análise (mesmo fluxo do ScrapingBee)
-        try {
-            $produto = $this->analisarComChatGPT($extracted, $url);
-            return ['success' => true, 'data' => $produto];
-        } catch (\Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    /**
-     * Extrai dados estruturados de um HTML: JSON-LD, Open Graph, meta tags e texto visível.
-     */
-    private function extrairDadosDoHtml(string $html, string $url): array {
-        $data = ['url' => $url];
-
-        // 1) JSON-LD (schema.org Product)
-        if (preg_match_all('/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/si', $html, $m)) {
-            foreach ($m[1] as $blob) {
-                $json = json_decode(trim($blob), true);
-                if (!is_array($json)) continue;
-                // Pode ser array de schemas
-                $items = isset($json['@type']) ? [$json] : (isset($json['@graph']) ? $json['@graph'] : (array_values($json) === $json ? $json : [$json]));
-                foreach ($items as $item) {
-                    if (!is_array($item)) continue;
-                    $type = strtolower((string)($item['@type'] ?? ''));
-                    if (in_array($type, ['product', 'indivproduct', 'productgroup'], true)) {
-                        $data['jsonld_product'] = $item;
-                        break 2;
-                    }
-                }
-            }
-        }
-
-        // 2) Open Graph tags
-        if (preg_match_all('/<meta\s+(?:property|name)=["\']og:([^"\']+)["\']\s+content=["\']([^"\']*)["\'][^>]*>/i', $html, $og, PREG_SET_ORDER)) {
-            foreach ($og as $tag) {
-                $data['og_' . $tag[1]] = html_entity_decode($tag[2], ENT_QUOTES, 'UTF-8');
-            }
-        }
-
-        // 3) Title
-        if (preg_match('/<title[^>]*>(.*?)<\/title>/si', $html, $tm)) {
-            $data['title'] = html_entity_decode(trim($tm[1]), ENT_QUOTES, 'UTF-8');
-        }
-
-        // 4) Meta description
-        if (preg_match('/<meta\s+name=["\']description["\']\s+content=["\']([^"\']*)["\'][^>]*>/i', $html, $dm)) {
-            $data['description'] = html_entity_decode($dm[1], ENT_QUOTES, 'UTF-8');
-        }
-
-        // 5) Preço visível no HTML (padrões comuns)
-        if (preg_match_all('/\$\s?(\d{1,6}[.,]\d{2})/', $html, $prices)) {
-            $data['prices_found'] = array_unique(array_slice($prices[1], 0, 10));
-        }
-
-        // 6) Imagens de produto (og:image ou primeiras imagens grandes)
-        $images = [];
-        if (!empty($data['og_image'])) {
-            $images[] = $data['og_image'];
-        }
-        if (preg_match_all('/<img[^>]+src=["\']([^"\']+)["\'][^>]*/i', $html, $imgs)) {
-            foreach ($imgs[1] as $src) {
-                if (count($images) >= 8) break;
-                // Filtrar imagens pequenas/icons
-                if (preg_match('/\.(svg|gif|ico)(\?|$)/i', $src)) continue;
-                if (stripos($src, 'icon') !== false || stripos($src, 'logo') !== false) continue;
-                if (stripos($src, 'pixel') !== false || stripos($src, '1x1') !== false) continue;
-                $images[] = $src;
-            }
-        }
-        if (!empty($images)) {
-            $data['images'] = array_values(array_unique($images));
-        }
-
-        // 7) Pesos encontrados no HTML (lbs, kg, oz)
-        $weights = [];
-        if (preg_match_all('/(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?)\b/i', $html, $wm)) {
-            foreach ($wm[0] as $i => $full) {
-                $weights[] = ['raw' => trim($full), 'value_lbs' => floatval($wm[1][$i]), 'value_kg' => round(floatval($wm[1][$i]) * 0.4536, 2)];
-            }
-        }
-        if (preg_match_all('/(\d+(?:\.\d+)?)\s*kg\b/i', $html, $wkg)) {
-            foreach ($wkg[0] as $i => $full) {
-                $weights[] = ['raw' => trim($full), 'value_kg' => floatval($wkg[1][$i])];
-            }
-        }
-        if (!empty($weights)) {
-            $data['weights_found'] = array_values(array_unique($weights, SORT_REGULAR));
-        }
-
-        // 8) Especificações / tabelas de specs (peso, dimensões, etc.)
-        $specs = [];
-        if (preg_match_all('/<t[hd][^>]*>(.*?)<\/t[hd]>\s*<td[^>]*>(.*?)<\/td>/si', $html, $specMatches, PREG_SET_ORDER)) {
-            foreach ($specMatches as $sm) {
-                $label = trim(strip_tags($sm[1]));
-                $value = trim(strip_tags($sm[2]));
-                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
-                    $specs[$label] = $value;
-                }
-            }
-        }
-        if (preg_match_all('/<dt[^>]*>(.*?)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/si', $html, $dtMatches, PREG_SET_ORDER)) {
-            foreach ($dtMatches as $dm2) {
-                $label = trim(strip_tags($dm2[1]));
-                $value = trim(strip_tags($dm2[2]));
-                if ($label !== '' && $value !== '' && strlen($label) < 100 && strlen($value) < 200) {
-                    $specs[$label] = $value;
-                }
-            }
-        }
-        if (!empty($specs)) {
-            $data['specifications'] = $specs;
-        }
-
-        // 9) Preços associados a tamanhos/variações no HTML
-        $variantPrices = [];
-        if (preg_match_all('/(?:Split California King|Split Cal King|California King|Cal King|Twin XL|Split King|Twin|Full|Queen|King|Double|Single)[^$\n]{0,30}\$\s?(\d{1,6}[.,]\d{2})/i', $html, $vpMatches, PREG_SET_ORDER)) {
-            foreach ($vpMatches as $vpm) {
-                $variantPrices[] = ['context' => trim(substr($vpm[0], 0, 80)), 'price' => $vpm[1]];
-            }
-        }
-        if (!empty($variantPrices)) {
-            $data['variant_prices_found'] = $variantPrices;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Resolve o IP de app.scrapingbee.com usando DNS público (Google/Cloudflare).
-     * Evita falhas quando o resolver DNS local do servidor está com problema.
-     */
-    private function resolverDnsScrapingBee(bool $forceExternal = false): ?string {
-        $host = 'app.scrapingbee.com';
-
-        // 1) Cache em arquivo (válido por 1h) — evita resolver DNS toda vez
-        $cacheFile = sys_get_temp_dir() . '/scrapingbee_ip_cache.json';
-        if (!$forceExternal && file_exists($cacheFile)) {
-            $cache = @json_decode((string)@file_get_contents($cacheFile), true);
-            if (is_array($cache) && !empty($cache['ip']) && ($cache['ts'] ?? 0) > (time() - 3600)) {
-                return $cache['ip'];
-            }
-        }
-
-        // 2) Tentar resolver via sistema operacional (rápido)
-        if (!$forceExternal) {
-            $ip = @gethostbyname($host);
-            if ($ip !== $host && filter_var($ip, FILTER_VALIDATE_IP)) {
-                @file_put_contents($cacheFile, json_encode(['ip' => $ip, 'ts' => time()]));
-                return $ip;
-            }
-        }
-
-        // 3) DNS-over-HTTPS usando IPs hardcoded (bypassa DNS local completamente)
-        //    Google DNS: 8.8.8.8, Cloudflare DNS: 1.1.1.1
-        $dohEndpoints = [
-            ['ip' => '8.8.8.8', 'host' => 'dns.google', 'path' => '/resolve?name=' . urlencode($host) . '&type=A'],
-            ['ip' => '1.1.1.1', 'host' => 'cloudflare-dns.com', 'path' => '/dns-query?name=' . urlencode($host) . '&type=A'],
-        ];
-
-        foreach ($dohEndpoints as $ep) {
-            $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL            => 'https://' . $ep['host'] . $ep['path'],
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 5,
-                CURLOPT_CONNECTTIMEOUT => 3,
-                CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_HTTPHEADER     => ['Accept: application/dns-json'],
-                // Forçar IP hardcoded para o servidor DoH (bypassa DNS local)
-                CURLOPT_RESOLVE        => [$ep['host'] . ':443:' . $ep['ip']],
-            ]);
-            $resp = curl_exec($ch);
-            $err  = curl_errno($ch);
-            curl_close($ch);
-
-            if ($err || !$resp) continue;
-
-            $json = json_decode($resp, true);
-            if (!is_array($json)) continue;
-
-            $answers = $json['Answer'] ?? [];
-            foreach ($answers as $ans) {
-                $type = (int)($ans['type'] ?? 0);
-                $data = (string)($ans['data'] ?? '');
-                if ($type === 1 && filter_var($data, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                    @file_put_contents($cacheFile, json_encode(['ip' => $data, 'ts' => time()]));
-                    return $data;
-                }
-            }
-        }
-
-        // 4) dns_get_record nativo do PHP
-        try {
-            $records = @dns_get_record($host, DNS_A);
-            if (is_array($records)) {
-                foreach ($records as $rec) {
-                    if (!empty($rec['ip']) && filter_var($rec['ip'], FILTER_VALIDATE_IP)) {
-                        @file_put_contents($cacheFile, json_encode(['ip' => $rec['ip'], 'ts' => time()]));
-                        return $rec['ip'];
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-        }
-
-        return null;
-    }
-
-
-    /**
      * Obtém a API Key do ScrapingBee
      */
     private function getScriptBeeApiKey(): ?string {
@@ -3133,45 +2187,18 @@ class AssessoriaController extends Controller {
         }
         
         // Reutiliza funções de cálculo existentes
-        $pesoArredondado = ceil((float) $pesoTotal);
-        $taxaServico = $this->getTaxaServicoPorKg() * $pesoArredondado;
+        $taxaServico = $this->getTaxaServicoPorKg() * $pesoTotal;
         $frete = $this->calcularFrete($subtotal, $pesoTotal);
         $impostos = $this->calcularImpostos($subtotal);
-
-        $pixPct = $this->getPixDescontoTaxaServicoPercent();
-        $taxaServicoPix = ($pixPct > 0) ? max(0.0, $taxaServico * (1.0 - ($pixPct / 100.0))) : $taxaServico;
-        $total = $subtotal + $taxaServico + $frete + $impostos;
-        $totalPix = $subtotal + $taxaServicoPix + $frete + $impostos;
         
         return [
             'subtotal' => $subtotal,
             'peso_total' => $pesoTotal,
             'taxa_servico' => $taxaServico,
-            'pix_desconto_taxa_servico_percent' => $pixPct,
-            'taxa_servico_pix' => $taxaServicoPix,
             'frete' => $frete,
             'impostos' => $impostos,
-            'total' => $total,
-            'total_pix' => $totalPix,
+            'total' => $subtotal + $taxaServico + $frete + $impostos
         ];
-    }
-
-    private function getPixDescontoTaxaServicoPercent(): float {
-        try {
-            $db = \Config\Database::getConnection();
-            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-            $stmt->execute(['pagamentos_pix_desconto_taxa_servico_percent']);
-            $v = $stmt->fetchColumn();
-            if ($v === false || $v === null || (string) $v === '') {
-                return 0.0;
-            }
-            $p = (float) str_replace(',', '.', (string) $v);
-            if ($p < 0) $p = 0.0;
-            if ($p > 100) $p = 100.0;
-            return $p;
-        } catch (\Exception $e) {
-            return 0.0;
-        }
     }
     
     /**
@@ -3335,21 +2362,6 @@ class AssessoriaController extends Controller {
             
             $orcamento = $_SESSION['assessoria_orcamento'];
             $produtosAdicionados = 0;
-
-            // Detectar se o usuário está logado para persistir no DB
-            $auth = new AuthService();
-            $uid = $auth->estaLogado() ? (int) ($auth->getUsuarioLogado()['id'] ?? 0) : 0;
-            $cartId = 0;
-            $carrinhoModel = null;
-            if ($uid > 0) {
-                try {
-                    $carrinhoModel = new \App\Models\Carrinho();
-                    $cart = $carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-                } catch (\Throwable $e) {
-                    $cartId = 0;
-                }
-            }
             
             foreach ($produtosSelecionados as $produtoIndex) {
                 $index = null;
@@ -3400,19 +2412,6 @@ class AssessoriaController extends Controller {
                     $itemKey = (string) $produtoId;
                     if (!empty($produto['variacao_selecionada']['id'])) {
                         $itemKey = $itemKey . ':' . (string) $produto['variacao_selecionada']['id'];
-                    }
-
-                    // Persistir no DB para usuários logados
-                    if ($cartId > 0 && $carrinhoModel !== null) {
-                        try {
-                            $varDesc = null;
-                            if (!empty($produto['variacao_selecionada']['label'])) {
-                                $varDesc = (string) $produto['variacao_selecionada']['label'];
-                            }
-                            $carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, null, $varDesc);
-                        } catch (\Throwable $e) {
-                            error_log('[Assessoria] Erro ao persistir item no carrinho DB: ' . $e->getMessage());
-                        }
                     }
 
                     if (isset($_SESSION['carrinho'][$itemKey])) {
@@ -3797,11 +2796,6 @@ class AssessoriaController extends Controller {
             'variacoes' => is_array($produtoData['variacoes'] ?? null) ? $produtoData['variacoes'] : [],
             'url_original' => (string) ($produtoData['url_original'] ?? $urlOriginal)
         ];
-
-        // Truncar descrição se muito longa (evitar lixo de cookies/policies)
-        if (mb_strlen($produtoData['descricao']) > 500) {
-            $produtoData['descricao'] = mb_substr($produtoData['descricao'], 0, 497) . '...';
-        }
         
         if (headers_sent() === false) {
             header('X-ChatGPT-Success: true');
@@ -3812,188 +2806,6 @@ class AssessoriaController extends Controller {
                 'descricao' => $produtoData['descricao'],
                 'imagens_count' => is_array($produtoData['imagens']) ? count($produtoData['imagens']) : 0
             ]));
-        }
-
-        // Pós-processamento: se peso é suspeitamente baixo, estimar pelo tipo de produto
-        if (floatval($produtoData['peso']) <= 1.5) {
-            $nomeLower = strtolower((string) $produtoData['nome']);
-            $pesoEstimado = null;
-            if (preg_match('/mattress|colch[aã]o/', $nomeLower)) {
-                $pesoEstimado = 38.0;
-            } elseif (preg_match('/sofa|couch|sof[aá]/', $nomeLower)) {
-                $pesoEstimado = 40.0;
-            } elseif (preg_match('/blanket|comforter|cobertor|manta|duvet/', $nomeLower)) {
-                $pesoEstimado = 3.5;
-            } elseif (preg_match('/tv|monitor|television/', $nomeLower)) {
-                $pesoEstimado = 15.0;
-            } elseif (preg_match('/laptop|notebook/', $nomeLower)) {
-                $pesoEstimado = 2.5;
-            } elseif (preg_match('/chair|cadeira/', $nomeLower)) {
-                $pesoEstimado = 15.0;
-            } elseif (preg_match('/table|mesa|desk/', $nomeLower)) {
-                $pesoEstimado = 20.0;
-            } elseif (preg_match('/refrigerator|geladeira|fridge/', $nomeLower)) {
-                $pesoEstimado = 70.0;
-            } elseif (preg_match('/washer|dryer|lavadora|secadora/', $nomeLower)) {
-                $pesoEstimado = 60.0;
-            }
-            if ($pesoEstimado !== null) {
-                $produtoData['peso'] = round($pesoEstimado * 1.15, 2); // +15% margem
-                error_log('[Assessoria] Peso corrigido de <=1.5kg para ' . $produtoData['peso'] . 'kg baseado no nome: ' . $produtoData['nome']);
-            }
-        }
-
-        // Pós-processamento: preencher peso null das variações com peso base
-        if (is_array($produtoData['variacoes'])) {
-            foreach ($produtoData['variacoes'] as &$vFill) {
-                if (!is_array($vFill)) continue;
-                if (!isset($vFill['peso']) || $vFill['peso'] === null || floatval($vFill['peso']) <= 0) {
-                    $vFill['peso'] = $produtoData['peso'];
-                }
-                // Garantir que out_of_stock existe
-                if (!isset($vFill['out_of_stock'])) {
-                    $vFill['out_of_stock'] = false;
-                }
-                // Detecção adicional de out_of_stock baseada no label/texto da variação
-                if (!$vFill['out_of_stock']) {
-                    $label = strtolower((string) ($vFill['label'] ?? ''));
-                    if (preg_match('/out.?of.?stock|unavailable|sold.?out|indispon/i', $label)) {
-                        $vFill['out_of_stock'] = true;
-                    }
-                }
-            }
-            unset($vFill);
-        }
-
-        // Pós-processamento: detectar out_of_stock nos dados brutos do ScrapingBee
-        // Procurar por texto "Out of stock" associado a variações específicas
-        if (is_array($produtoData['variacoes']) && !empty($produtoData['variacoes'])) {
-            $rawJsonLower = strtolower(json_encode($dadosBrutos));
-            foreach ($produtoData['variacoes'] as &$vOos) {
-                if (!is_array($vOos) || ($vOos['out_of_stock'] ?? false)) continue;
-                $attrs = $vOos['atributos'] ?? [];
-                foreach ($attrs as $av) {
-                    $avLower = strtolower(trim((string) $av));
-                    if ($avLower === '') continue;
-                    // Procurar padrões como: "14x9.5x9 FT" seguido de "out of stock" nos dados brutos
-                    $pattern = preg_quote($avLower, '/');
-                    if (preg_match('/' . $pattern . '[^}]{0,200}(out.?of.?stock|unavailable|sold.?out)/i', $rawJsonLower)) {
-                        $vOos['out_of_stock'] = true;
-                        error_log('[Assessoria] Out of stock detectado nos dados brutos para: ' . $avLower);
-                        break;
-                    }
-                    // Também verificar o inverso: "out of stock" seguido do nome da variação
-                    if (preg_match('/(out.?of.?stock|unavailable|sold.?out)[^}]{0,200}' . $pattern . '/i', $rawJsonLower)) {
-                        $vOos['out_of_stock'] = true;
-                        error_log('[Assessoria] Out of stock detectado nos dados brutos para: ' . $avLower);
-                        break;
-                    }
-                }
-            }
-            unset($vOos);
-        }
-
-        // Pós-processamento: detectar se pesos estão em libras e converter para kg
-        // Heurística: se os dados brutos contêm indicação de "lbs"/"pounds"/"lb" nos campos de peso,
-        // ou se o peso é suspeitamente alto (ex: mattress 149 "kg" quando deveria ser ~67 kg),
-        // converter de lbs para kg.
-        $lbsDetected = false;
-        // Verificar nos dados brutos se há indicação de libras
-        $rawJson = json_encode($dadosBrutos);
-        // Procurar padrões como "149 lbs", "weight: 149 lb", "pounds" perto de números de peso
-        if (preg_match('/\b(lbs?|pounds?|libras?)\b/i', $rawJson)) {
-            // Verificar se o peso base ou das variações parece estar em libras (não convertido)
-            // Se o ChatGPT retornou peso > 2.2x do que seria razoável em kg, provavelmente está em lbs
-            $pesosVariacoes = [];
-            if (is_array($produtoData['variacoes'])) {
-                foreach ($produtoData['variacoes'] as $vw) {
-                    if (is_array($vw) && isset($vw['peso']) && floatval($vw['peso']) > 0) {
-                        $pesosVariacoes[] = floatval($vw['peso']);
-                    }
-                }
-            }
-            if (floatval($produtoData['peso']) > 0) {
-                $pesosVariacoes[] = floatval($produtoData['peso']);
-            }
-
-            if (!empty($pesosVariacoes)) {
-                $maxPeso = max($pesosVariacoes);
-                // Se o peso máximo é > 50 e os dados brutos mencionam lbs, provavelmente não foi convertido
-                // (um colchão de 149 lbs = 67.6 kg; se veio 149 "kg" é claramente lbs não convertido)
-                // Regra: se peso > 45 e dados mencionam lbs, converter
-                if ($maxPeso > 45) {
-                    $lbsDetected = true;
-                }
-            }
-        }
-
-        if ($lbsDetected) {
-            $lbsToKg = 0.4536;
-            if (floatval($produtoData['peso']) > 45) {
-                $produtoData['peso'] = round(floatval($produtoData['peso']) * $lbsToKg, 2);
-                error_log('[Assessoria] Peso base convertido de lbs para kg: ' . $produtoData['peso'] . 'kg');
-            }
-            if (is_array($produtoData['variacoes'])) {
-                foreach ($produtoData['variacoes'] as &$vLbs) {
-                    if (!is_array($vLbs)) continue;
-                    if (isset($vLbs['peso']) && floatval($vLbs['peso']) > 45) {
-                        $vLbs['peso'] = round(floatval($vLbs['peso']) * $lbsToKg, 2);
-                    }
-                }
-                unset($vLbs);
-            }
-        }
-
-        // Pós-processamento: remover atributos que têm apenas 1 valor único (especificações fixas, não variações)
-        if (is_array($produtoData['variacoes']) && count($produtoData['variacoes']) > 0) {
-            error_log('[Assessoria] Variacoes antes do pos-processamento: ' . count($produtoData['variacoes']));
-            // Coletar todos os valores por chave de atributo
-            $attrValueSets = [];
-            foreach ($produtoData['variacoes'] as $vCheck) {
-                if (!is_array($vCheck) || !isset($vCheck['atributos']) || !is_array($vCheck['atributos'])) continue;
-                foreach ($vCheck['atributos'] as $ak => $av) {
-                    $ak = trim((string) $ak);
-                    if ($ak === '') continue;
-                    if (!isset($attrValueSets[$ak])) $attrValueSets[$ak] = [];
-                    $attrValueSets[$ak][trim((string) $av)] = true;
-                }
-            }
-            // Identificar chaves com apenas 1 valor (especificação fixa)
-            $singleValueKeys = [];
-            foreach ($attrValueSets as $ak => $vals) {
-                if (count($vals) <= 1) {
-                    $singleValueKeys[] = $ak;
-                }
-            }
-            // Remover essas chaves dos atributos de todas as variações
-            if (!empty($singleValueKeys)) {
-                error_log('[Assessoria] Removendo atributos de valor unico: ' . implode(', ', $singleValueKeys));
-                foreach ($produtoData['variacoes'] as &$vClean) {
-                    if (!is_array($vClean) || !isset($vClean['atributos']) || !is_array($vClean['atributos'])) continue;
-                    foreach ($singleValueKeys as $sk) {
-                        unset($vClean['atributos'][$sk]);
-                    }
-                    // Atualizar label
-                    $vClean['label'] = $this->stringifyVariationLabel($vClean['atributos']);
-                }
-                unset($vClean);
-
-                // Após remover atributos de valor único, pode haver variações duplicadas - deduplicar
-                $produtoData['variacoes'] = $this->mergeNormalizedVariacoes($produtoData['variacoes']);
-
-                // Se todas as variações ficaram sem atributos, limpar variacoes
-                $hasAnyAttrs = false;
-                foreach ($produtoData['variacoes'] as $vTest) {
-                    if (is_array($vTest) && isset($vTest['atributos']) && is_array($vTest['atributos']) && !empty($vTest['atributos'])) {
-                        $hasAnyAttrs = true;
-                        break;
-                    }
-                }
-                if (!$hasAnyAttrs) {
-                    error_log('[Assessoria] TODAS as variacoes ficaram sem atributos - limpando variacoes');
-                    $produtoData['variacoes'] = [];
-                }
-            }
         }
         
         return $produtoData;
@@ -4017,55 +2829,42 @@ EU PRECISO QUE VOCÊ EXTRAIA AS INFORMAÇÕES DO PRODUTO E RETORNE APENAS JSON V
     \"valor\": 99.99,
     \"peso\": 1.5,
     \"imagens\": [\"url1\", \"url2\"],
-    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 10x12x8.4 ft\", \"atributos\": {\"Size\": \"10x12x8.4 ft\"}, \"valor\": 1299.99, \"peso\": 50.0, \"out_of_stock\": false}],
+    \"variacoes\": [{\"id\": \"opcional\", \"label\": \"Ex: Size: 3T | Color: Blue\", \"atributos\": {\"Size\": \"3T\", \"Color\": \"Blue\"}, \"valor\": 99.99, \"peso\": 1.0}],
     \"url_original\": \"{$urlOriginal}\"
 }
 
-REGRAS CRÍTICAS:
+REGRAS ESPECÍFICAS:
 
 1. CAMPOS OBRIGATÓRIOS: nome, imagem, valor, peso, descricao
+1.1 VARIAÇÕES:
+   - Se existirem opções (ex: tamanho/cor/modelo), preencha \"variacoes\" com uma lista.
+   - Cada variação deve ter pelo menos: id (ou string vazia), atributos (mapa), e valor quando houver.
+   - Se não existirem variações, retorne \"variacoes\": []
+2. PESO (kg): 
+   - Se não encontrar o peso exato, ESTIME com base no tipo de produto
+   - Adicione 15% de margem de segurança sobre o peso estimado
+   - Ex: se estimar 1kg, use 1.15kg
+   - Use sempre casas decimais (ex: 1.15)
 
-2. VARIAÇÕES - O QUE É E O QUE NÃO É VARIAÇÃO:
-   - VARIAÇÃO = opção que o COMPRADOR ESCOLHE e que MUDA o produto (ex: tamanho/size, cor/color, Bed Size).
-   - NÃO É VARIAÇÃO = especificação fixa do produto que não muda (ex: material, firmness, mattress type, mattress composition, mattress thickness quando há apenas 1 opção). Se existe apenas UM valor possível para um atributo, NÃO é variação.
-   - SOMENTE inclua como variação atributos que têm MÚLTIPLAS opções selecionáveis pelo comprador.
-   - Exemplo Walmart: \"Size\" com opções 10x12x8.4 ft, 10x14x8.4 ft, 10x18x8.4 ft, 14x9.5x9 FT = VARIAÇÃO.
-   - Exemplo Walmart: \"Color: Black\" quando só existe Black = NÃO É VARIAÇÃO, é especificação fixa.
-   - Exemplo Costco: \"Bed Size\" com opções Queen, King, California King = VARIAÇÃO.
-   - Exemplo Costco: \"Mattress Thickness: 12 Inch\", \"Firmness: Medium\", \"Composition: Hybrid\" = NÃO SÃO VARIAÇÕES (valor único).
+3. DESCRIÇÃO:
+   - Se não encontrar descrição detalhada, CRIE uma baseada no nome e características
+   - Inclua informações relevantes sobre o produto
+   - Seja específico e útil para o cliente
 
-3. PREÇO POR VARIAÇÃO (MUITO IMPORTANTE):
-   - Se os dados contêm preços diferentes por variação, CADA variação DEVE ter seu preço específico.
-   - NÃO copie o mesmo preço para todas as variações.
-   - Use SEMPRE o preço FINAL/SALE/CURRENT (o preço que o cliente realmente paga). NÃO use o preço \"was\"/\"original\"/\"list\"/\"compare_at\" (preço antigo riscado).
-   - Se houver desconto/promoção, use o preço COM desconto (deliveredPrice, salePrice, finalPrice), NÃO o preço sem desconto.
-   - Procure preços em: offers, variants, variations, price maps, ou qualquer estrutura que associe opção a preço.
-   - Se não encontrar preço específico para uma variação, use o preço base do produto.
+4. IMAGEM:
+   - Extraia todas as URLs de imagens disponíveis
+   - Se não encontrar, use array vazio []
 
-4. PESO POR VARIAÇÃO:
-   - Se os dados contêm pesos diferentes por variação (ex: weights_found, specifications, shipping weight), converta de lbs para kg (1 lb = 0.4536 kg) e atribua a cada variação.
-   - Se houver pesos diferentes por tamanho/opção, CADA variação DEVE ter seu peso específico.
+5. VALOR: Use número decimal com 2 casas (ex: 99.99)
 
-5. OUT OF STOCK POR VARIAÇÃO (MUITO IMPORTANTE):
-   - Analise a disponibilidade de CADA variação INDIVIDUALMENTE.
-   - Se UMA variação específica está \"Out of stock\"/\"Unavailable\"/\"Sold out\", SOMENTE essa variação deve ter \"out_of_stock\": true.
-   - As OUTRAS variações que estão disponíveis DEVEM ter \"out_of_stock\": false.
-   - NÃO marque todas como out_of_stock só porque uma está indisponível.
-   - Procure campos como: availability, in_stock, stock_status, availableQuantity, \"Out of stock\" nos dados de cada variação.
+6. NOME: Use o nome completo do produto
 
-6. PESO (kg):
-   - Se o peso estiver em LIBRAS (lbs/pounds), CONVERTA: 1 lb = 0.4536 kg.
-   - Procure peso em: specifications, weights_found, shipping weight, product weight, item weight.
-   - Se não encontrar o peso exato, ESTIME com base no tipo de produto.
-   - Adicione 15% de margem de segurança sobre o peso estimado.
-
-7. DESCRIÇÃO: Se não encontrar descrição detalhada, CRIE uma baseada no nome e características. Máximo 300 caracteres. NÃO inclua textos de cookies, políticas de privacidade, termos de uso ou qualquer conteúdo que não seja sobre o produto.
-
-8. IMAGEM: Extraia todas as URLs de imagens disponíveis. Se não encontrar, use array vazio [].
-
-9. VALOR: Use número decimal com 2 casas (ex: 99.99). Preço em USD. Use SEMPRE o preço FINAL que o cliente paga (com desconto/promoção aplicado). NÃO use o preço \"was\"/\"original\" riscado.
-
-10. NOME: Use o nome completo do produto.
+IMPORTANTE:
+- Retorne APENAS o JSON, sem texto adicional
+- Para peso, SEMPRE inclua a margem de 15% se precisar estimar
+- Para descrição, CRIE uma se não encontrar
+- SKU pode ser gerado baseado no nome se não existir
+- Use kg para peso, cm para dimensões
 
 RETORNE APENAS O JSON:";
     }

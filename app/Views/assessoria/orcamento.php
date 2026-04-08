@@ -275,12 +275,6 @@ ob_start();
                                 <span>Taxa de Serviço:</span>
                                 <span id="taxaServico">$<?= number_format($totais['taxa_servico'], 2) ?></span>
                             </div>
-                            <?php if (!empty($totais['pix_desconto_taxa_servico_percent']) && (float) $totais['pix_desconto_taxa_servico_percent'] > 0): ?>
-                            <div class="alert alert-info small py-2 px-2 mb-2">
-                                Pagando com <strong>PIX</strong> você ganha <strong><?= number_format((float) $totais['pix_desconto_taxa_servico_percent'], 2) ?>%</strong> de desconto na taxa de serviço.
-                                Taxa com desconto: <strong>$<span id="taxaServicoPix"><?= number_format((float) ($totais['taxa_servico_pix'] ?? 0), 2) ?></span></strong>.
-                            </div>
-                            <?php endif; ?>
                             <div class="d-flex justify-content-between mb-2">
                                 <span>Frete:</span>
                                 <span id="frete">$<?= number_format($totais['frete'], 2) ?></span>
@@ -294,21 +288,12 @@ ob_start();
                                 <span>Total:</span>
                                 <span class="text-primary" id="total">$<?= number_format($totais['total'], 2) ?></span>
                             </div>
-                            <?php if (!empty($totais['pix_desconto_taxa_servico_percent']) && (float) $totais['pix_desconto_taxa_servico_percent'] > 0): ?>
-                            <div class="d-flex justify-content-between mt-1">
-                                <span class="text-muted small">Total com PIX:</span>
-                                <span class="small"><strong>$<span id="totalPix"><?= number_format((float) ($totais['total_pix'] ?? 0), 2) ?></span></strong></span>
-                            </div>
-                            <?php endif; ?>
                         </div>
 
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary btn-lg" id="addToCartBtn" disabled>
                                 <i class="fas fa-shopping-cart me-2"></i>Adicionar ao Carrinho
                             </button>
-                            <div class="alert alert-warning small mt-2 d-none" id="variacao-warning" role="alert">
-                                Para continuar, selecione a variação obrigatória (ex.: tamanho/cor) dos produtos selecionados.
-                            </div>
                             <a href="/carrinho" class="btn btn-outline-secondary">
                                 <i class="fas fa-eye me-2"></i>Ver Carrinho
                             </a>
@@ -332,21 +317,10 @@ ob_start();
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<style>
-    .variation-oos {
-        text-decoration: line-through;
-        opacity: 0.7;
-    }
-    .variation-oos:hover {
-        opacity: 0.9;
-    }
-</style>
 <script>
 $(document).ready(function() {
     const produtos = <?= json_encode($orcamento['produtos']) ?>;
     const totaisOriginais = <?= json_encode($totais) ?>;
-
-    const PIX_PCT = <?= json_encode((float) ($totais['pix_desconto_taxa_servico_percent'] ?? 0)) ?>;
 
     const selections = {};
 
@@ -393,12 +367,12 @@ $(document).ready(function() {
     function resolveVariant(index) {
         const p = produtos[index];
         if (!p || !Array.isArray(p.variacoes) || p.variacoes.length === 0) {
-            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true, out_of_stock: false };
+            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true };
         }
 
         const keys = getVariationKeys(index);
         if (keys.length === 0) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true, out_of_stock: false };
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true };
         }
 
         const sel = selections[index] || {};
@@ -416,7 +390,7 @@ $(document).ready(function() {
         });
 
         if (!complete) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false, out_of_stock: false };
+            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
         }
 
         if (matches.length >= 1) {
@@ -435,11 +409,10 @@ $(document).ready(function() {
 
             const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : p.valor;
             const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
-            const outOfStock = best && best.out_of_stock === true;
-            return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true, out_of_stock: outOfStock };
+            return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
         }
 
-        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false, out_of_stock: false };
+        return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
     }
 
     function updateComboUI(index) {
@@ -485,35 +458,9 @@ $(document).ready(function() {
                     }
                     return true;
                 });
-                // Verificar se TODAS as variações com esse valor estão out_of_stock
-                const allOutOfStock = p.variacoes.filter(variant => {
-                    if (!variant || typeof variant !== 'object') return false;
-                    const attrs = variant.atributos || {};
-                    if (!attrs || typeof attrs !== 'object') return false;
-                    if (String((attrs || {})[k] ?? '') !== String(v)) return false;
-                    // Respeitar seleções parciais de outras chaves
-                    for (const kk of keys) {
-                        if (kk === k) continue;
-                        const want = sel[kk];
-                        if (want === undefined || want === null || String(want).trim() === '') continue;
-                        if (String((attrs || {})[kk] ?? '') !== String(want)) return false;
-                    }
-                    return true;
-                }).every(variant => variant.out_of_stock === true);
-
                 const disabled = !hasAny;
-                const isOOS = hasAny && allOutOfStock;
-                let classes = 'btn btn-sm ';
-                if (isOOS) {
-                    classes += isActive ? 'btn-danger' : 'btn-outline-danger';
-                } else {
-                    classes += isActive ? 'btn-primary' : 'btn-outline-secondary';
-                }
-                let label = $('<div>').text(v).html();
-                if (isOOS) {
-                    label = '<i class="fas fa-times me-1"></i>' + label;
-                }
-                html += '<button type="button" class="' + classes + ' variation-btn' + (isOOS ? ' variation-oos' : '') + '" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + ' title="' + (isOOS ? 'Out of Stock' : '') + '">' + label + '</button>';
+                const classes = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline-secondary');
+                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
             });
             html += '</div>';
             html += '</div>';
@@ -534,21 +481,6 @@ $(document).ready(function() {
         const pesoEl = container.querySelector('.peso-text');
         if (valorEl) valorEl.textContent = (data.valor || 0).toFixed(2);
         if (pesoEl) pesoEl.textContent = (data.peso || 0).toFixed(2);
-
-        // Mostrar indicador de out of stock
-        let oosEl = container.querySelector('.oos-indicator');
-        if (data.out_of_stock && data.complete) {
-            if (!oosEl) {
-                oosEl = document.createElement('span');
-                oosEl.className = 'badge bg-danger ms-2 oos-indicator';
-                oosEl.innerHTML = '<i class="fas fa-times me-1"></i>Out of Stock';
-                const valorParent = container.querySelector('.col-auto.text-end');
-                if (valorParent) valorParent.appendChild(oosEl);
-            }
-            oosEl.style.display = '';
-        } else if (oosEl) {
-            oosEl.style.display = 'none';
-        }
     }
 
     // Calcular totais baseado nos produtos selecionados
@@ -587,10 +519,6 @@ $(document).ready(function() {
                 if (keys.length > 0 && !d.complete) {
                     allComplete = false;
                 }
-                // Bloquear se variação selecionada está out of stock
-                if (d.complete && d.out_of_stock) {
-                    allComplete = false;
-                }
             }
         });
 
@@ -609,21 +537,10 @@ $(document).ready(function() {
         const impostos = impostosOriginais * proporcao;
         const total = subtotal + taxaServico + frete + impostos;
 
-        let taxaPix = taxaServico;
-        let totalPix = total;
-        if (PIX_PCT > 0) {
-            taxaPix = Math.max(0, taxaServico * (1 - (PIX_PCT / 100)));
-            totalPix = subtotal + taxaPix + frete + impostos;
-        }
-
         // Atualizar interface
         $('#produtosCount').text(selecionados.length);
         $('#subtotal').text('$' + subtotal.toFixed(2));
         $('#taxaServico').text('$' + taxaServico.toFixed(2));
-        if (PIX_PCT > 0) {
-            $('#taxaServicoPix').text(taxaPix.toFixed(2));
-            $('#totalPix').text(totalPix.toFixed(2));
-        }
         $('#frete').text('$' + frete.toFixed(2));
         $('#impostos').text('$' + impostos.toFixed(2));
         $('#total').text('$' + total.toFixed(2));
@@ -632,17 +549,6 @@ $(document).ready(function() {
         const termosAceitos = $('#termosAceitos').is(':checked');
         const temSelecionados = selecionados.length > 0;
         $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados && allComplete));
-
-        const showVariacaoWarning = temSelecionados && !allComplete;
-        const hasOOS = temSelecionados && selecionadosPayload.some(s => {
-            const d = resolveVariant(s.index);
-            return d.complete && d.out_of_stock;
-        });
-        if (hasOOS) {
-            $('#variacao-warning').html('Um ou mais produtos selecionados possuem variação <strong>Out of Stock</strong>. Selecione outra variação ou desmarque o produto.').removeClass('d-none');
-        } else {
-            $('#variacao-warning').html('Para continuar, selecione a variação obrigatória (ex.: tamanho/cor) dos produtos selecionados.').toggleClass('d-none', !showVariacaoWarning);
-        }
 
         // Cache payload no botão
         $('#addToCartBtn').data('selecionados', selecionadosPayload);
