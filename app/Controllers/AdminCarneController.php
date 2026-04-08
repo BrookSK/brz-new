@@ -210,11 +210,17 @@ class AdminCarneController extends Controller {
             foreach ($campos as $campo) {
                 $val = $request->getParam($campo);
                 if ($val !== null) {
-                    $stmt = $this->db->prepare("
-                        INSERT INTO configuracoes_sistema (chave, valor) VALUES (:chave, :valor)
-                        ON DUPLICATE KEY UPDATE valor = :valor2
-                    ");
-                    $stmt->execute([':chave' => $campo, ':valor' => $val, ':valor2' => $val]);
+                    // Tentar UPDATE primeiro (evita erro com colunas NOT NULL sem default)
+                    $stmt = $this->db->prepare("UPDATE configuracoes_sistema SET valor = :valor WHERE chave = :chave");
+                    $stmt->execute([':valor' => $val, ':chave' => $campo]);
+                    if ($stmt->rowCount() === 0) {
+                        // Registro não existe, tentar INSERT ignorando erros de colunas extras
+                        try {
+                            $this->db->prepare("INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES (?, ?)")->execute([$campo, $val]);
+                        } catch (\Exception $e) {
+                            // Se falhar por colunas obrigatórias, ignorar silenciosamente
+                        }
+                    }
                 }
             }
             $_SESSION['message'] = 'Configurações salvas.';

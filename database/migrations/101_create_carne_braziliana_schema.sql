@@ -127,7 +127,10 @@ CREATE TABLE IF NOT EXISTS carne_compras_internas (
     CONSTRAINT fk_compras_carne FOREIGN KEY (carne_id) REFERENCES carnes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Configurações do carnê no sistema (key-value na tabela configuracoes_sistema)
+-- Corrigir coluna nome_empresa para permitir NULL (evita erro em INSERTs)
+ALTER TABLE configuracoes_sistema MODIFY COLUMN nome_empresa VARCHAR(255) NULL DEFAULT '';
+
+-- Configurações do carnê no sistema
 INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES
 ('carne_ativo', '1'),
 ('carne_max_parcelas', '12'),
@@ -138,6 +141,6 @@ INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES
 ('carne_eventos_webhook', 'carne_criado,parcela_paga,carne_quitado,parcela_vencida'),
 ('carne_eventos_email', 'carne_criado,parcela_gerada,parcela_proxima_vencimento,parcela_vencida,parcela_paga,carne_quitado,envio_liberado');
 
--- Token de segurança para o cron (gere um token aleatório e coloque aqui)
+-- Token de segurança para o cron
 INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES
 ('cron_secret', '');
