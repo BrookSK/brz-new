@@ -2183,14 +2183,13 @@ class AssessoriaController extends Controller {
         
         foreach ($produtos as $produto) {
             $subtotal += $produto['valor'];
-            // Arredondar peso de cada produto para cima (ex: 1.1 -> 2)
-            $pesoTotal += ceil((float) $produto['peso']);
+            $pesoTotal += (float) $produto['peso'];
         }
         
-        // pesoTotal já está arredondado por produto
-        $taxaServico = $this->getTaxaServicoPorKg() * $pesoTotal;
+        // Arredondar peso total para cima (mesmo cálculo do carrinho)
+        $taxaServico = $this->getTaxaServicoPorKg() * ceil($pesoTotal);
         $frete = $this->calcularFrete($subtotal, $pesoTotal);
-        $impostos = $this->calcularImpostos($subtotal);
+        $impostos = $this->calcularImpostos($subtotal, $frete);
 
         $pixPct = $this->getPixDescontoTaxaServicoPercent();
         $taxaServicoPix = ($pixPct > 0) ? max(0.0, $taxaServico * (1.0 - ($pixPct / 100.0))) : $taxaServico;
@@ -2202,7 +2201,7 @@ class AssessoriaController extends Controller {
             'peso_total' => $pesoTotal,
             'taxa_servico' => $taxaServico,
             'taxa_servico_por_kg' => $this->getTaxaServicoPorKg(),
-            'imposto_percentual' => ($subtotal > 0) ? round(($impostos / $subtotal) * 100, 2) : 80,
+            'imposto_params' => $this->getImpostoParams(),
             'pix_desconto_taxa_servico_percent' => $pixPct,
             'taxa_servico_pix' => $taxaServicoPix,
             'frete' => $frete,
@@ -2293,27 +2292,95 @@ class AssessoriaController extends Controller {
     /**
      * Calcula impostos (reutiliza configurações existentes)
      */
-    private function calcularImpostos(float $subtotal): float {
+    private function getImpostoParams(): array {
+        $aliqIcms = 17.0;
+        $certificado = false;
+        $seguro = 0.0;
         try {
             $db = \Config\Database::getConnection();
-            
-            // ICMS
-            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-            $stmt->execute(['icms_aliquota']);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            $icms = floatval($row ? $row['valor'] : 60);
-            
-            // IPI
-            $stmt = $db->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-            $stmt->execute(['ipi_aliquota']);
-            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            $ipi = floatval($row ? $row['valor'] : 20);
-            
-            return ($subtotal * $icms / 100) + ($subtotal * $ipi / 100);
-            
+            $stmt = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'remessa_conforme_certificado', 'remessa_conforme_prc', 'seguro_valor')");
+            $stmt->execute();
+            $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($configs as $cfg) {
+                $k = (string) ($cfg['chave'] ?? '');
+                $vRaw = str_replace(',', '.', trim((string) ($cfg['valor'] ?? '')));
+                if ($k === 'icms_aliquota' && $vRaw !== '') {
+                    $a = (float) $vRaw;
+                    if ($a > 0 && $a <= 1.0) $a = $a * 100.0;
+                    if ($a > 0 && $a < 100) $aliqIcms = $a;
+                }
+                if (($k === 'remessa_conforme_certificado' || $k === 'remessa_conforme_prc') && $vRaw !== '') {
+                    $vv = strtolower($vRaw);
+                    $certificado = ($vv === '1' || $vv === 'true' || $vv === 'yes' || $vv === 'on');
+                }
+                if ($k === 'seguro_valor' && $vRaw !== '') {
+                    $s = (float) $vRaw;
+                    if ($s > 0) $seguro = $s;
+                }
+            }
         } catch (\Exception $e) {
-            return 0.0;
         }
+        return ['icms_aliquota' => $aliqIcms, 'certificado' => $certificado, 'seguro' => $seguro];
+    }
+
+    private function calcularImpostos(float $subtotal, float $frete = 0): float {
+        // Mesma regra do carrinho (Receita Federal):
+        // II + ICMS "por dentro"
+        $aliqIcms = 17.0;
+        $certificado = false;
+        $seguro = 0.0;
+
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('icms_aliquota', 'remessa_conforme_certificado', 'remessa_conforme_prc', 'seguro_valor')");
+            $stmt->execute();
+            $configs = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($configs as $cfg) {
+                $k = (string) ($cfg['chave'] ?? '');
+                $vRaw = str_replace(',', '.', trim((string) ($cfg['valor'] ?? '')));
+                if ($k === 'icms_aliquota' && $vRaw !== '') {
+                    $a = (float) $vRaw;
+                    if ($a > 0 && $a <= 1.0) $a = $a * 100.0;
+                    if ($a > 0 && $a < 100) $aliqIcms = $a;
+                }
+                if (($k === 'remessa_conforme_certificado' || $k === 'remessa_conforme_prc') && $vRaw !== '') {
+                    $vv = strtolower($vRaw);
+                    $certificado = ($vv === '1' || $vv === 'true' || $vv === 'yes' || $vv === 'on');
+                }
+                if ($k === 'seguro_valor' && $vRaw !== '') {
+                    $s = (float) $vRaw;
+                    if ($s > 0) $seguro = $s;
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        $valorAduaneiro = $subtotal + $frete + $seguro;
+        if ($valorAduaneiro < 0) $valorAduaneiro = 0.0;
+
+        // II (Imposto de Importação)
+        $ii = 0.0;
+        if ($certificado) {
+            if ($valorAduaneiro <= 50.0) {
+                $ii = 0.20 * $valorAduaneiro;
+            } else {
+                $ii = (0.60 * $valorAduaneiro) - 20.0;
+                if ($ii < 0) $ii = 0.0;
+            }
+        } else {
+            $ii = 0.60 * $valorAduaneiro;
+        }
+
+        // ICMS "por dentro"
+        $baseIcms = $valorAduaneiro + $ii;
+        $p = $aliqIcms / 100.0;
+        $icms = 0.0;
+        if ($p > 0 && $p < 1) {
+            $bc = $baseIcms / (1.0 - $p);
+            $icms = $bc * $p;
+        }
+
+        return $ii + $icms;
     }
     
     /**

@@ -571,16 +571,37 @@ $(document).ready(function() {
         });
 
         const subtotal = selecionados.reduce((sum, p) => sum + (p.valor * (p.quantidade || 1)), 0);
-        // Arredondar peso de cada produto para cima antes de somar
-        const pesoTotal = selecionados.reduce((sum, p) => sum + (Math.ceil(p.peso) * (p.quantidade || 1)), 0);
+        // Peso total: soma simples (arredondamento para cima do total, igual ao carrinho)
+        const pesoTotalRaw = selecionados.reduce((sum, p) => sum + (p.peso * (p.quantidade || 1)), 0);
+        const pesoTotal = Math.ceil(pesoTotalRaw);
         
-        // Calcular taxa de serviço diretamente: peso arredondado por produto * taxa por kg
-        const TAXA_POR_KG = <?= json_encode((float) $totais['taxa_servico_por_kg'] ?? 39) ?>;
-        const IMPOSTO_PCT = <?= json_encode((float) ($totais['imposto_percentual'] ?? 0)) ?>;
+        // Parâmetros de cálculo vindos do backend (mesma lógica do carrinho)
+        const TAXA_POR_KG = <?= json_encode((float) ($totais['taxa_servico_por_kg'] ?? 39)) ?>;
+        const IMP_PARAMS = <?= json_encode($totais['imposto_params'] ?? ['icms_aliquota' => 17, 'certificado' => false, 'seguro' => 0]) ?>;
         
         const taxaServico = TAXA_POR_KG * pesoTotal;
-        const frete = 0; // frete calculado no backend
-        const impostos = IMPOSTO_PCT > 0 ? subtotal * (IMPOSTO_PCT / 100) : (totaisOriginais.subtotal > 0 ? totaisOriginais.impostos * (subtotal / totaisOriginais.subtotal) : 0);
+        const frete = 0;
+        
+        // Cálculo de impostos (II + ICMS por dentro) - mesma regra do carrinho
+        const valorAduaneiro = Math.max(0, subtotal + frete + (IMP_PARAMS.seguro || 0));
+        let ii = 0;
+        if (IMP_PARAMS.certificado) {
+            if (valorAduaneiro <= 50) {
+                ii = 0.20 * valorAduaneiro;
+            } else {
+                ii = Math.max(0, (0.60 * valorAduaneiro) - 20);
+            }
+        } else {
+            ii = 0.60 * valorAduaneiro;
+        }
+        const pIcms = (IMP_PARAMS.icms_aliquota || 17) / 100;
+        let icms = 0;
+        if (pIcms > 0 && pIcms < 1) {
+            const bc = (valorAduaneiro + ii) / (1 - pIcms);
+            icms = bc * pIcms;
+        }
+        const impostos = ii + icms;
+        
         const total = subtotal + taxaServico + frete + impostos;
 
         let taxaPix = taxaServico;
