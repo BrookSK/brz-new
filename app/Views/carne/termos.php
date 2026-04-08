@@ -1,7 +1,5 @@
-<?php
-$pageTitle = 'Termos do Carnê Braziliana';
-require __DIR__ . '/../partials/header.php';
-?>
+<?php $title = 'Termos do Carnê Braziliana'; ?>
+<?php ob_start(); ?>
 
 <div class="container py-5">
     <div class="row justify-content-center">
@@ -16,8 +14,8 @@ require __DIR__ . '/../partials/header.php';
                     <h5>2. Estrutura das Parcelas</h5>
                     <p>Cada parcela mensal gera dois boletos:</p>
                     <ul>
-                        <li><strong>Boleto 1 (Câmbio Real):</strong> referente ao valor dos produtos</li>
-                        <li><strong>Boleto 2 (Appmax):</strong> referente às taxas de serviço, impostos e demais valores</li>
+                        <li>Boleto 1 (Câmbio Real): referente ao valor dos produtos</li>
+                        <li>Boleto 2 (Appmax): referente às taxas de serviço, impostos e demais valores</li>
                     </ul>
                     <p>A parcela só será considerada quitada quando ambos os boletos forem pagos.</p>
 
@@ -25,7 +23,7 @@ require __DIR__ . '/../partials/header.php';
                     <p>Cada parcela possui prazo de 7 dias para pagamento a partir da data de geração. Parcelas não pagas dentro do prazo serão marcadas como vencidas e posteriormente em atraso.</p>
 
                     <h5>4. Política de Envio</h5>
-                    <p><strong>O envio do pedido será realizado somente após a quitação total de todas as parcelas.</strong> Enquanto houver parcelas pendentes, o pedido permanecerá aguardando.</p>
+                    <p>O envio do pedido será realizado somente após a quitação total de todas as parcelas. Enquanto houver parcelas pendentes, o pedido permanecerá aguardando.</p>
 
                     <h5>5. Inadimplência</h5>
                     <p>Parcelas em atraso podem resultar em bloqueio do carnê. O sistema manterá o registro de todas as parcelas e seus respectivos status.</p>
@@ -59,4 +57,5 @@ require __DIR__ . '/../partials/header.php';
     </div>
 </div>
 
-<?php require __DIR__ . '/../partials/footer.php'; ?>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>

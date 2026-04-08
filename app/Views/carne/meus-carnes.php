@@ -1,7 +1,5 @@
-<?php
-$pageTitle = 'Meus Carnês - Carnê Braziliana';
-require __DIR__ . '/../partials/header.php';
-?>
+<?php $title = 'Meus Carnês - Carnê Braziliana'; ?>
+<?php ob_start(); ?>
 
 <div class="container py-4">
     <h2 class="mb-4"><i class="fas fa-file-invoice-dollar"></i> Meus Carnês</h2>
@@ -52,4 +50,5 @@ require __DIR__ . '/../partials/header.php';
     <?php endif; ?>
 </div>
 
-<?php require __DIR__ . '/../partials/footer.php'; ?>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>

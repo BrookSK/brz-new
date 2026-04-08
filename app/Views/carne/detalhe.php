@@ -1,7 +1,5 @@
-<?php
-$pageTitle = 'Detalhe do Carnê - Carnê Braziliana';
-require __DIR__ . '/../partials/header.php';
-?>
+<?php $title = 'Detalhe do Carnê - Carnê Braziliana'; ?>
+<?php ob_start(); ?>
 
 <div class="container py-4">
     <a href="/meus-carnes" class="btn btn-sm btn-outline-secondary mb-3"><i class="fas fa-arrow-left"></i> Voltar</a>
@@ -39,13 +37,9 @@ require __DIR__ . '/../partials/header.php';
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>#</th>
-                            <th>Vencimento</th>
-                            <th>Valor Total</th>
-                            <th>Boleto Produtos (Câmbio Real)</th>
-                            <th>Boleto Taxas (Appmax)</th>
-                            <th>Status</th>
-                            <th>Ações</th>
+                            <th>#</th><th>Vencimento</th><th>Valor Total</th>
+                            <th>Boleto Produtos (Câmbio Real)</th><th>Boleto Taxas (Appmax)</th>
+                            <th>Status</th><th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -60,9 +54,7 @@ require __DIR__ . '/../partials/header.php';
                                     <?= $p['boleto_produtos_pago'] ? '✓ Pago' : '⏳ Pendente' ?>
                                 </span>
                                 <?php if (!empty($p['boleto_produtos_url'])): ?>
-                                    <a href="<?= htmlspecialchars($p['boleto_produtos_url']) ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                        <i class="fas fa-barcode"></i> Ver Boleto
-                                    </a>
+                                    <a href="<?= htmlspecialchars($p['boleto_produtos_url']) ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-1"><i class="fas fa-barcode"></i> Ver Boleto</a>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -71,34 +63,19 @@ require __DIR__ . '/../partials/header.php';
                                     <?= $p['boleto_taxas_pago'] ? '✓ Pago' : '⏳ Pendente' ?>
                                 </span>
                                 <?php if (!empty($p['boleto_taxas_url'])): ?>
-                                    <a href="<?= htmlspecialchars($p['boleto_taxas_url']) ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                        <i class="fas fa-barcode"></i> Ver Boleto
-                                    </a>
+                                    <a href="<?= htmlspecialchars($p['boleto_taxas_url']) ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-1"><i class="fas fa-barcode"></i> Ver Boleto</a>
                                 <?php endif; ?>
                             </td>
                             <td>
                                 <?php
-                                $statusColors = [
-                                    'paga' => 'success', 'parcialmente_paga' => 'warning',
-                                    'aguardando_pagamento' => 'info', 'pendente' => 'secondary',
-                                    'vencida' => 'danger', 'em_atraso' => 'danger', 'reemitida' => 'primary'
-                                ];
-                                $cor = $statusColors[$p['status']] ?? 'secondary';
+                                $statusColors = ['paga'=>'success','parcialmente_paga'=>'warning','aguardando_pagamento'=>'info','pendente'=>'secondary','vencida'=>'danger','em_atraso'=>'danger','reemitida'=>'primary'];
                                 ?>
-                                <span class="badge bg-<?= $cor ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span>
-                                <?php if ($p['boleto_produtos_pago_em']): ?>
-                                    <br><small class="text-muted">Prod: <?= date('d/m/Y', strtotime($p['boleto_produtos_pago_em'])) ?></small>
-                                <?php endif; ?>
-                                <?php if ($p['boleto_taxas_pago_em']): ?>
-                                    <br><small class="text-muted">Taxa: <?= date('d/m/Y', strtotime($p['boleto_taxas_pago_em'])) ?></small>
-                                <?php endif; ?>
+                                <span class="badge bg-<?= $statusColors[$p['status']] ?? 'secondary' ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span>
                             </td>
                             <td>
-                                <?php if (in_array($p['status'], ['aguardando_pagamento', 'vencida', 'em_atraso', 'reemitida', 'pendente'])): ?>
+                                <?php if (in_array($p['status'], ['aguardando_pagamento','vencida','em_atraso','reemitida','pendente'])): ?>
                                     <form method="POST" action="/carne/segunda-via/<?= $p['id'] ?>" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Segunda Via">
-                                            <i class="fas fa-redo"></i> 2ª Via
-                                        </button>
+                                        <button type="submit" class="btn btn-sm btn-outline-warning"><i class="fas fa-redo"></i> 2ª Via</button>
                                     </form>
                                 <?php endif; ?>
                             </td>
@@ -111,4 +88,5 @@ require __DIR__ . '/../partials/header.php';
     </div>
 </div>
 
-<?php require __DIR__ . '/../partials/footer.php'; ?>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../layouts/main.php'; ?>
