@@ -2917,9 +2917,78 @@ class CheckoutController extends Controller {
                         if ($qtdParcelas < 1 || $qtdParcelas > 12) $qtdParcelas = 1;
 
                         // Separar valores: produtos vs taxas/impostos/serviços
-                        $subtotalProdutos = (float) ($pedidoRowPay['subtotal'] ?? ($pedidoRowPay['subtotal_produtos'] ?? 0));
+                        // Buscar colunas detalhadas do pedido para separação correta
+                        $subtotalProdutos = 0;
+                        $totalTaxas = 0;
                         $totalPedido = (float) ($pedidoRowPay['total'] ?? 0);
-                        $totalTaxas = round($totalPedido - $subtotalProdutos, 2);
+
+                        try {
+                            $dbCarneSep = \Config\Database::getConnection();
+                            $colsPedSep = [];
+                            try { $stColsSep = $dbCarneSep->query('DESCRIBE pedidos'); $colsPedSep = $stColsSep ? ($stColsSep->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+
+                            $selCols = ['id'];
+                            $colMap = [
+                                'subtotal' => ['subtotal', 'subtotal_produtos'],
+                                'servicos' => ['servicos', 'taxa_servico'],
+                                'impostos' => ['impostos', 'valor_impostos'],
+                                'frete' => ['frete', 'valor_frete'],
+                                'total' => ['total', 'valor_total'],
+                            ];
+                            foreach ($colMap as $alias => $candidates) {
+                                foreach ($candidates as $c) {
+                                    if (in_array($c, $colsPedSep, true)) {
+                                        $selCols[] = $c . ' AS ' . $alias;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            $stPedSep = $dbCarneSep->prepare('SELECT ' . implode(', ', $selCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                            $stPedSep->execute([(int) $pedidoId]);
+                            $pedSep = $stPedSep->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                            $subtotalProdutos = (float) ($pedSep['subtotal'] ?? 0);
+                            $servicos = (float) ($pedSep['servicos'] ?? 0);
+                            $impostos = (float) ($pedSep['impostos'] ?? 0);
+                            $frete = (float) ($pedSep['frete'] ?? 0);
+                            $totalDb = (float) ($pedSep['total'] ?? $totalPedido);
+
+                            // Se os valores estão em USD, converter para BRL
+                            $moedaPed = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
+                            $taxaConv = (float) ($pedidoRowPay['taxa_conversao'] ?? 1.0);
+                            if ($taxaConv <= 1.01) {
+                                try {
+                                    $stTx = $dbCarneSep->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+                                    $stTx->execute();
+                                    $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+                                    if ($txVal > 1.01) $taxaConv = $txVal;
+                                } catch (\Exception $e) {}
+                            }
+                            if ($taxaConv <= 1.01) $taxaConv = 5.5;
+
+                            // Se subtotal parece estar em USD (valor baixo), converter
+                            if ($subtotalProdutos > 0 && $subtotalProdutos < 500 && $taxaConv > 1.01) {
+                                $subtotalProdutos = round($subtotalProdutos * $taxaConv, 2);
+                                $servicos = round($servicos * $taxaConv, 2);
+                                $impostos = round($impostos * $taxaConv, 2);
+                                $frete = round($frete * $taxaConv, 2);
+                                $totalDb = round($totalDb * $taxaConv, 2);
+                            }
+
+                            $totalTaxas = round($servicos + $impostos + $frete, 2);
+                            $totalPedido = $totalDb;
+
+                            // Se não conseguiu separar, usar total - subtotal
+                            if ($totalTaxas <= 0 && $subtotalProdutos > 0 && $totalPedido > $subtotalProdutos) {
+                                $totalTaxas = round($totalPedido - $subtotalProdutos, 2);
+                            }
+                        } catch (\Exception $e) {
+                            // Fallback simples
+                            $subtotalProdutos = (float) ($pedidoRowPay['subtotal'] ?? ($pedidoRowPay['subtotal_produtos'] ?? $totalPedido));
+                            $totalTaxas = round($totalPedido - $subtotalProdutos, 2);
+                        }
+
                         if ($totalTaxas < 0) $totalTaxas = 0;
                         if ($subtotalProdutos <= 0) {
                             $subtotalProdutos = $totalPedido;
@@ -2936,7 +3005,20 @@ class CheckoutController extends Controller {
                             $clienteId,
                             $subtotalProdutos,
                             $totalTaxas,
-                            $qtdParcelas
+                            $qtdParcelas,
+                            [
+                                'nome' => $dados['nome'] ?? ($usuario['nome'] ?? ''),
+                                'email' => $dados['email'] ?? ($usuario['email'] ?? ''),
+                                'documento' => $dados['documento'] ?? ($usuario['documento'] ?? ''),
+                                'data_nascimento' => $dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? ''),
+                                'telefone' => $dados['telefone'] ?? ($usuario['telefone'] ?? ''),
+                                'cep' => $dados['cep'] ?? '',
+                                'endereco' => $dados['endereco'] ?? '',
+                                'numero' => $dados['numero'] ?? '',
+                                'bairro' => $dados['bairro'] ?? '',
+                                'cidade' => $dados['cidade'] ?? '',
+                                'estado' => $dados['estado'] ?? '',
+                            ]
                         );
 
                         // Atualizar status do pedido para indicar carnê

@@ -2,6 +2,7 @@
 namespace App\Services;
 
 use App\Models\Carne;
+use App\Services\PaymentService;
 use Config\Database;
 
 class CarneService {
@@ -39,7 +40,7 @@ class CarneService {
     /**
      * Cria carnê a partir do checkout
      */
-    public function criarCarne($pedidoId, $clienteId, $totalProdutos, $totalTaxas, $qtdParcelas) {
+    public function criarCarne($pedidoId, $clienteId, $totalProdutos, $totalTaxas, $qtdParcelas, $dadosCliente = []) {
         $dados = [
             'pedido_id' => $pedidoId,
             'cliente_id' => $clienteId,
@@ -53,8 +54,155 @@ class CarneService {
         ];
 
         $carneId = $this->carneModel->criarComParcelas($dados, $qtdParcelas);
+
+        // Gerar boletos da primeira parcela automaticamente
+        try {
+            $parcelas = $this->carneModel->getParcelas($carneId);
+            if (!empty($parcelas[0])) {
+                $this->gerarBoletosParcela($parcelas[0], $pedidoId, $dadosCliente);
+            }
+        } catch (\Exception $e) {
+            // Log do erro mas não falha a criação do carnê
+            error_log('[CARNE] Erro ao gerar boletos da 1ª parcela: ' . $e->getMessage());
+        }
+
         $this->dispararNotificacao($carneId, null, 'carne_criado');
         return $carneId;
+    }
+
+    /**
+     * Gera os dois boletos de uma parcela (Câmbio Real + Appmax)
+     */
+    public function gerarBoletosParcela($parcela, $pedidoId, $dadosCliente = []) {
+        $paymentService = new PaymentService();
+        $parcelaId = $parcela['id'];
+
+        // Dados do cliente para os gateways
+        $clientData = [
+            'name' => $dadosCliente['nome'] ?? '',
+            'email' => $dadosCliente['email'] ?? '',
+            'document' => $dadosCliente['documento'] ?? '',
+            'birth_date' => $dadosCliente['data_nascimento'] ?? '',
+            'phone' => $dadosCliente['telefone'] ?? '',
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+            'address' => [
+                'state' => $dadosCliente['estado'] ?? '',
+                'city' => $dadosCliente['cidade'] ?? '',
+                'zip_code' => $dadosCliente['cep'] ?? '',
+                'district' => $dadosCliente['bairro'] ?? '',
+                'street' => $dadosCliente['endereco'] ?? '',
+                'number' => $dadosCliente['numero'] ?? '',
+            ],
+        ];
+
+        // Se não temos dados do cliente, buscar do banco
+        if (empty($clientData['name'])) {
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT u.nome, u.email, u.documento, u.data_nascimento, u.telefone, u.celular,
+                           e.estado, e.cidade, e.cep, e.bairro, e.endereco, e.numero
+                    FROM carnes c
+                    JOIN usuarios u ON c.cliente_id = u.id
+                    LEFT JOIN enderecos e ON e.usuario_id = u.id AND e.principal = 1
+                    WHERE c.id = :cid LIMIT 1
+                ");
+                $stmt->execute([':cid' => $parcela['carne_id']]);
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($row) {
+                    $clientData['name'] = $row['nome'] ?? '';
+                    $clientData['email'] = $row['email'] ?? '';
+                    $clientData['document'] = $row['documento'] ?? '';
+                    $clientData['birth_date'] = $row['data_nascimento'] ?? '';
+                    $clientData['phone'] = $row['telefone'] ?? ($row['celular'] ?? '');
+                    $clientData['address'] = [
+                        'state' => $row['estado'] ?? '',
+                        'city' => $row['cidade'] ?? '',
+                        'zip_code' => $row['cep'] ?? '',
+                        'district' => $row['bairro'] ?? '',
+                        'street' => $row['endereco'] ?? '',
+                        'number' => $row['numero'] ?? '',
+                    ];
+                }
+            } catch (\Exception $e) {}
+        }
+
+        $descBase = "Carnê Braziliana - Pedido #{$pedidoId} - Parcela {$parcela['numero_parcela']}";
+
+        // 1. Boleto Produtos via Câmbio Real
+        if ($parcela['valor_produtos'] > 0) {
+            try {
+                $crResult = $paymentService->createCambioRealDirectPaymentProdutoBoleto(
+                    (int) $pedidoId,
+                    (float) $parcela['valor_produtos'],
+                    $descBase . ' - Produtos',
+                    $clientData
+                );
+
+                if (!empty($crResult['success'])) {
+                    $this->carneModel->atualizarParcela($parcelaId, [
+                        'boleto_produtos_url' => $crResult['bank_slip_url'] ?? ($crResult['invoice_url'] ?? ''),
+                        'boleto_produtos_codigo' => $crResult['digitable_line'] ?? '',
+                        'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
+                    ]);
+                } else {
+                    error_log('[CARNE] Erro Câmbio Real boleto: ' . ($crResult['error'] ?? 'desconhecido'));
+                }
+            } catch (\Exception $e) {
+                error_log('[CARNE] Exception Câmbio Real: ' . $e->getMessage());
+            }
+        }
+
+        // 2. Boleto Taxas via Appmax
+        if ($parcela['valor_taxas'] > 0) {
+            try {
+                $appmaxDados = [
+                    'billingType' => 'BOLETO',
+                    'customer_name' => $clientData['name'],
+                    'customer_email' => $clientData['email'],
+                    'customer_document' => $clientData['document'],
+                    'customer_phone' => $clientData['phone'],
+                    'customer_zipcode' => $clientData['address']['zip_code'] ?? '',
+                    'customer_address' => $clientData['address']['street'] ?? '',
+                    'customer_address_number' => $clientData['address']['number'] ?? '',
+                    'customer_province' => $clientData['address']['district'] ?? '',
+                    'customer_city' => $clientData['address']['city'] ?? '',
+                    'customer_state' => $clientData['address']['state'] ?? '',
+                    'products' => [[
+                        'sku' => 'CARNE_TAXA_' . $pedidoId . '_' . $parcela['numero_parcela'],
+                        'name' => $descBase . ' - Taxas',
+                        'quantity' => 1,
+                        'unit_value' => (int) round($parcela['valor_taxas'] * 100),
+                        'type' => 'service',
+                    ]],
+                    'products_value_cents' => (int) round($parcela['valor_taxas'] * 100),
+                    'shipping_value_cents' => 0,
+                    'discount_value_cents' => 0,
+                ];
+
+                $appmaxResult = $paymentService->processarPagamento(
+                    $appmaxDados,
+                    (float) $parcela['valor_taxas'],
+                    'BRL',
+                    $descBase . ' - Taxas'
+                );
+
+                if (!empty($appmaxResult['success'])) {
+                    $boletoUrl = $appmaxResult['bankSlipUrl'] ?? ($appmaxResult['invoiceUrl'] ?? '');
+                    $digitableLine = $appmaxResult['digitableLine'] ?? '';
+                    $paymentId = $appmaxResult['payment_id'] ?? '';
+
+                    $this->carneModel->atualizarParcela($parcelaId, [
+                        'boleto_taxas_url' => $boletoUrl,
+                        'boleto_taxas_codigo' => $digitableLine,
+                        'boleto_taxas_id_externo' => $paymentId,
+                    ]);
+                } else {
+                    error_log('[CARNE] Erro Appmax boleto: ' . ($appmaxResult['error'] ?? 'desconhecido'));
+                }
+            } catch (\Exception $e) {
+                error_log('[CARNE] Exception Appmax: ' . $e->getMessage());
+            }
+        }
     }
 
     /**

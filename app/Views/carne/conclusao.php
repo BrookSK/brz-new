@@ -39,8 +39,17 @@
                                 <p class="fs-4 fw-bold text-primary">R$ <?= number_format($primeiraParcela['valor_produtos'], 2, ',', '.') ?></p>
                                 <p class="text-muted small">Vencimento: <?= date('d/m/Y', strtotime($primeiraParcela['vencimento'])) ?></p>
                                 <?php if (!empty($primeiraParcela['boleto_produtos_url'])): ?>
-                                    <a href="<?= htmlspecialchars($primeiraParcela['boleto_produtos_url']) ?>" target="_blank" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Boleto</a>
-                                <?php else: ?>
+                                    <a href="<?= htmlspecialchars($primeiraParcela['boleto_produtos_url']) ?>" target="_blank" class="btn btn-primary mb-2"><i class="fas fa-external-link-alt"></i> Abrir Boleto</a>
+                                <?php endif; ?>
+                                <?php if (!empty($primeiraParcela['boleto_produtos_codigo'])): ?>
+                                    <div class="mt-2">
+                                        <small class="text-muted d-block mb-1">Linha digitável:</small>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control bg-light" readonly value="<?= htmlspecialchars($primeiraParcela['boleto_produtos_codigo']) ?>" id="linha-prod">
+                                            <button class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('linha-prod').value);this.innerHTML='<i class=\'fas fa-check\'></i> Copiado'"><i class="fas fa-copy"></i> Copiar</button>
+                                        </div>
+                                    </div>
+                                <?php elseif (empty($primeiraParcela['boleto_produtos_url'])): ?>
                                     <span class="badge bg-info">Boleto será gerado em breve</span>
                                 <?php endif; ?>
                             </div>
@@ -51,9 +60,22 @@
                                 <p class="fs-4 fw-bold text-primary">R$ <?= number_format($primeiraParcela['valor_taxas'], 2, ',', '.') ?></p>
                                 <p class="text-muted small">Vencimento: <?= date('d/m/Y', strtotime($primeiraParcela['vencimento'])) ?></p>
                                 <?php if (!empty($primeiraParcela['boleto_taxas_url'])): ?>
-                                    <a href="<?= htmlspecialchars($primeiraParcela['boleto_taxas_url']) ?>" target="_blank" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> Abrir Boleto</a>
-                                <?php else: ?>
-                                    <span class="badge bg-info">Boleto será gerado em breve</span>
+                                    <a href="<?= htmlspecialchars($primeiraParcela['boleto_taxas_url']) ?>" target="_blank" class="btn btn-primary mb-2"><i class="fas fa-external-link-alt"></i> Abrir Boleto</a>
+                                <?php endif; ?>
+                                <?php if (!empty($primeiraParcela['boleto_taxas_codigo'])): ?>
+                                    <div class="mt-2">
+                                        <small class="text-muted d-block mb-1">Linha digitável:</small>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control bg-light" readonly value="<?= htmlspecialchars($primeiraParcela['boleto_taxas_codigo']) ?>" id="linha-taxa">
+                                            <button class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('linha-taxa').value);this.innerHTML='<i class=\'fas fa-check\'></i> Copiado'"><i class="fas fa-copy"></i> Copiar</button>
+                                        </div>
+                                    </div>
+                                <?php elseif (empty($primeiraParcela['boleto_taxas_url'])): ?>
+                                    <?php if ($primeiraParcela['valor_taxas'] > 0): ?>
+                                        <span class="badge bg-info">Boleto será gerado em breve</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary">Sem taxas nesta parcela</span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
