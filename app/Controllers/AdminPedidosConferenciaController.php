@@ -218,6 +218,9 @@ HTML;
         $temCreated = in_array('created_at', $colsPedidos, true) ? 'created_at' : '';
         $temTipoCompra = in_array('tipo_compra', $colsPedidos, true);
 
+        // Buscar nome do cliente
+        $temUsuarioId = in_array('usuario_id', $colsPedidos, true);
+
         $select = ['p.id'];
         if ($temCodigo !== '') $select[] = 'p.' . $temCodigo . ' AS codigo_pedido';
         if ($temOrigem) $select[] = 'p.origem_pedido';
@@ -227,13 +230,33 @@ HTML;
         if ($temTipoCompra) $select[] = 'p.tipo_compra';
         $select[] = 'p.status';
         $select[] = 'p.status_conferencia';
+        if ($temUsuarioId) $select[] = 'p.usuario_id';
+
+        // Buscar nome do cliente via JOIN
+        $join = '';
+        if ($temUsuarioId && $this->tableExists('usuarios')) {
+            $colsUsu = [];
+            try {
+                $stU = $this->connection->query('DESCRIBE usuarios');
+                $colsUsu = $stU ? ($stU->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {}
+            $colNome = $this->pickColumn($colsUsu, ['nome', 'name', 'full_name']);
+            $colEmail = $this->pickColumn($colsUsu, ['email']);
+            if ($colNome !== '') {
+                $select[] = 'u.' . $colNome . ' AS cliente_nome';
+                $join = ' LEFT JOIN usuarios u ON u.id = p.usuario_id';
+            }
+            if ($colEmail !== '') {
+                $select[] = 'u.' . $colEmail . ' AS cliente_email';
+            }
+        }
 
         $where = ["p.status_conferencia = 'pendente'"];
         if ($temOrigem) {
             $where[] = "p.origem_pedido IN ('assessoria','redirecionamento')";
         }
 
-        $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p';
+        $sql = 'SELECT ' . implode(', ', $select) . ' FROM pedidos p' . $join;
         $sql .= ' WHERE ' . implode(' AND ', $where);
         $sql .= ' ORDER BY p.id DESC LIMIT 500';
 
@@ -244,6 +267,7 @@ HTML;
             $pedidos = [];
         }
 
+        // Buscar itens com detalhes completos
         $itensPorPedido = [];
         try {
             $ids = array_values(array_filter(array_map(function ($r) {
@@ -260,30 +284,37 @@ HTML;
                         $colsItens = [];
                     }
 
-                    $colProduto = in_array('produto_id', $colsItens, true) ? 'produto_id' : '';
-                    $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : '');
-                    $colPedido = in_array('pedido_id', $colsItens, true) ? 'pedido_id' : '';
+                    $selItens = ['i.pedido_id', 'i.produto_id'];
+                    $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
+                    if ($colQtd !== '') $selItens[] = 'i.' . $colQtd . ' AS quantidade';
+                    $colPreco = $this->pickColumn($colsItens, ['preco_unitario', 'valor_unitario', 'price']);
+                    if ($colPreco !== '') $selItens[] = 'i.' . $colPreco . ' AS preco_unitario';
+                    $colSubtotal = $this->pickColumn($colsItens, ['subtotal']);
+                    if ($colSubtotal !== '') $selItens[] = 'i.' . $colSubtotal . ' AS subtotal';
+                    $colNomeProd = $this->pickColumn($colsItens, ['nome_produto', 'nome']);
+                    if ($colNomeProd !== '') $selItens[] = 'i.' . $colNomeProd . ' AS nome_produto';
+                    $colUrl = $this->pickColumn($colsItens, ['url_original']);
+                    if ($colUrl !== '') $selItens[] = 'i.' . $colUrl . ' AS url_original';
+                    $colValorInf = $this->pickColumn($colsItens, ['valor_informado_cliente']);
+                    if ($colValorInf !== '') $selItens[] = 'i.' . $colValorInf . ' AS valor_informado_cliente';
+                    $colObs = $this->pickColumn($colsItens, ['observacao_cliente']);
+                    if ($colObs !== '') $selItens[] = 'i.' . $colObs . ' AS observacao_cliente';
+                    $colVarLabel = $this->pickColumn($colsItens, ['variacao_label']);
+                    if ($colVarLabel !== '') $selItens[] = 'i.' . $colVarLabel . ' AS variacao_label';
 
-                    if ($colProduto !== '' && $colQtd !== '' && $colPedido !== '') {
-                        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-                        $sqlItens = 'SELECT i.' . $colPedido . ' AS pedido_id, i.' . $colProduto . ' AS produto_id, i.' . $colQtd . ' AS quantidade'
-                            . ', COALESCE(p.nome, p.name, \'\') AS produto_nome'
-                            . ' FROM ' . $itensTable . ' i'
-                            . ' LEFT JOIN produtos p ON p.id = i.' . $colProduto
-                            . ' WHERE i.' . $colPedido . ' IN (' . $placeholders . ')';
-                        $stItensAll = $this->connection->prepare($sqlItens);
-                        $stItensAll->execute($ids);
-                        $rows = $stItensAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                        foreach ($rows as $r) {
-                            $pid = (int) ($r['pedido_id'] ?? 0);
-                            if ($pid <= 0) {
-                                continue;
-                            }
-                            if (!isset($itensPorPedido[$pid])) {
-                                $itensPorPedido[$pid] = [];
-                            }
-                            $itensPorPedido[$pid][] = $r;
-                        }
+                    // Fallback nome do produto
+                    $selItens[] = "(SELECT COALESCE(pr.nome, pr.name, '') FROM produtos pr WHERE pr.id = i.produto_id LIMIT 1) AS produto_nome_fallback";
+
+                    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                    $sqlItens = 'SELECT ' . implode(', ', $selItens) . ' FROM ' . $itensTable . ' i WHERE i.pedido_id IN (' . $placeholders . ')';
+                    $stItensAll = $this->connection->prepare($sqlItens);
+                    $stItensAll->execute($ids);
+                    $rows = $stItensAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($rows as $r) {
+                        $pid = (int) ($r['pedido_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        if (!isset($itensPorPedido[$pid])) $itensPorPedido[$pid] = [];
+                        $itensPorPedido[$pid][] = $r;
                     }
                 }
             }
@@ -297,71 +328,124 @@ HTML;
             <div class="card-body">';
 
         if (empty($pedidos)) {
-            echo '<div class="text-muted">Nenhum pedido pendente de conferência.</div>';
+            echo '<div class="text-center py-5"><i class="fas fa-check-circle fa-3x text-success mb-3"></i><h5>Nenhum pedido pendente de conferência</h5></div>';
         } else {
-            echo '<div class="table-responsive">'
-                . '<table class="table table-sm align-middle">'
-                . '<thead><tr>'
-                . '<th>ID</th>'
-                . '<th>Origem</th>'
-                . '<th>Moeda</th>'
-                . '<th>Total</th>'
-                . '<th>Criado em</th>'
-                . '<th>Tipo compra</th>'
-                . '<th style="width: 320px;">Ações</th>'
-                . '</tr></thead><tbody>';
+            echo '<div class="small text-muted mb-3">' . count($pedidos) . ' pedido(s) pendente(s)</div>';
 
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['id'] ?? 0);
                 $origem = (string) ($p['origem_pedido'] ?? '');
-                $moeda = (string) ($p['moeda'] ?? '');
+                $moeda = (string) ($p['moeda'] ?? 'USD');
                 $total = isset($p['total']) ? (float) $p['total'] : 0.0;
                 $createdAt = (string) ($p['created_at'] ?? '');
                 $tipoCompraAtual = strtolower(trim((string) ($p['tipo_compra'] ?? '')));
+                $clienteNome = (string) ($p['cliente_nome'] ?? '');
+                $clienteEmail = (string) ($p['cliente_email'] ?? '');
+                $itens = $itensPorPedido[$pid] ?? [];
+                $temValorCliente = false;
+                foreach ($itens as $it) {
+                    if (!empty($it['valor_informado_cliente'])) { $temValorCliente = true; break; }
+                }
 
-                $detId = 'det-pedido-' . $pid;
+                $simbolo = strtoupper($moeda) === 'BRL' ? 'R$' : '$';
 
-                echo '<tr data-pedido-row="1">'
-                    . '<td><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank">#' . $pid . '</a></td>'
-                    . '<td>' . htmlspecialchars($origem !== '' ? $origem : '-') . '</td>'
-                    . '<td>' . htmlspecialchars($moeda !== '' ? $moeda : '-') . '</td>'
-                    . '<td>' . htmlspecialchars(number_format($total, 2, ',', '.')) . '</td>'
-                    . '<td>' . htmlspecialchars($createdAt !== '' ? date('d/m/Y H:i', strtotime($createdAt)) : '-') . '</td>'
-                    . '<td>'
-                    . '  <form class="d-flex gap-2" method="POST" action="/admin/pedidos/conferencia/confirmar/' . $pid . '" enctype="multipart/form-data">'
-                    . '    <select class="form-select form-select-sm" name="tipo_compra" required>'
-                    . '      <option value=""' . ($tipoCompraAtual === '' ? ' selected' : '') . '>Selecione...</option>'
-                    . '      <option value="online"' . ($tipoCompraAtual === 'online' ? ' selected' : '') . '>Online</option>'
-                    . '      <option value="offline"' . ($tipoCompraAtual === 'offline' ? ' selected' : '') . '>Offline</option>'
-                    . '    </select>'
-                    . '    <div data-comprovante-box="1" style="display:none; min-width: 200px;">'
-                    . '      <input class="form-control form-control-sm" type="file" name="comprovante_compra" accept="image/*,application/pdf">'
-                    . '      <div class="form-text">Obrigatório para compra online.</div>'
-                    . '    </div>'
-                    . '</td>'
-                    . '<td>'
-                    . '    <button class="btn btn-outline-info btn-sm me-1" type="button" data-bs-toggle="collapse" data-bs-target="#' . $detId . '" aria-expanded="false" aria-controls="' . $detId . '"><i class="fas fa-eye me-1"></i>Detalhes</button>'
-                    . '    <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Confirmar</button>'
-                    . '  </form>'
-                    . '  <form class="d-inline" method="POST" action="/admin/pedidos/conferencia/cancelar/' . $pid . '" onsubmit="return confirm(\'Cancelar este pedido?\');">'
-                    . '    <button type="submit" class="btn btn-outline-danger btn-sm mt-1"><i class="fas fa-times me-1"></i>Cancelar pedido</button>'
-                    . '  </form>'
-                    . '</td>'
-                    . '</tr>';
+                echo '<div class="card mb-4 border' . ($temValorCliente ? ' border-danger' : '') . '">';
 
-                echo '<tr class="collapse" id="' . $detId . '">'
-                    . '<td colspan="7" class="bg-light">'
-                    . '<div class="small">'
-                    . '<div class="fw-semibold mb-2">Detalhes do pedido</div>'
-                    . '<div style="border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 12px; overflow: hidden; background: #fff;">'
-                    . '<iframe src="/admin/pedidos/detalhes/' . $pid . '?embed=1" style="width: 100%; height: 680px; border: 0;" loading="lazy"></iframe>'
-                    . '</div>'
-                    . '</div>'
-                    . '</td>'
-                    . '</tr>';
+                // Header do pedido
+                echo '<div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">';
+                echo '<div class="d-flex align-items-center gap-3">';
+                echo '<strong><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="text-decoration-none">#' . $pid . '</a></strong>';
+                if ($origem !== '') echo '<span class="badge bg-secondary">' . htmlspecialchars($origem) . '</span>';
+                if ($temValorCliente) echo '<span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
+                echo '<span class="text-muted small">' . htmlspecialchars($createdAt !== '' ? date('d/m/Y H:i', strtotime($createdAt)) : '') . '</span>';
+                if ($clienteNome !== '') echo '<span class="small"><i class="fas fa-user me-1"></i>' . htmlspecialchars($clienteNome) . '</span>';
+                echo '</div>';
+                echo '<div class="fw-bold">' . htmlspecialchars($simbolo . ' ' . number_format($total, 2, ',', '.')) . '</div>';
+                echo '</div>';
+
+                // Itens do pedido
+                echo '<div class="card-body p-0">';
+                if (!empty($itens)) {
+                    echo '<table class="table table-sm table-hover mb-0">';
+                    echo '<thead class="table-light"><tr>';
+                    echo '<th>Produto</th><th>Variação</th><th>Qtd</th><th>Preço Unit.</th><th>Subtotal</th><th>Link</th><th>Status</th>';
+                    echo '</tr></thead><tbody>';
+
+                    foreach ($itens as $it) {
+                        $nomeProd = trim((string) ($it['nome_produto'] ?? ''));
+                        if ($nomeProd === '') $nomeProd = trim((string) ($it['produto_nome_fallback'] ?? ''));
+                        if ($nomeProd === '') $nomeProd = 'Produto #' . ($it['produto_id'] ?? '?');
+                        $qtd = (int) ($it['quantidade'] ?? 1);
+                        $preco = (float) ($it['preco_unitario'] ?? 0);
+                        $sub = (float) ($it['subtotal'] ?? ($preco * $qtd));
+                        $url = trim((string) ($it['url_original'] ?? ''));
+                        $valorInf = !empty($it['valor_informado_cliente']);
+                        $obs = trim((string) ($it['observacao_cliente'] ?? ''));
+                        $varLabel = trim((string) ($it['variacao_label'] ?? ''));
+
+                        echo '<tr' . ($valorInf ? ' class="table-warning"' : '') . '>';
+                        echo '<td>';
+                        echo '<div>' . htmlspecialchars(mb_substr($nomeProd, 0, 60)) . (mb_strlen($nomeProd) > 60 ? '...' : '') . '</div>';
+                        if ($obs !== '') {
+                            echo '<div class="text-danger small"><i class="fas fa-comment me-1"></i>' . htmlspecialchars($obs) . '</div>';
+                        }
+                        echo '</td>';
+                        echo '<td class="small">' . htmlspecialchars($varLabel !== '' ? $varLabel : '-') . '</td>';
+                        echo '<td>' . $qtd . '</td>';
+                        echo '<td>' . ($valorInf ? '<span class="text-danger fw-bold" title="Valor informado pelo cliente">' : '') . htmlspecialchars($simbolo . ' ' . number_format($preco, 2)) . ($valorInf ? ' <i class="fas fa-exclamation-triangle"></i></span>' : '') . '</td>';
+                        echo '<td>' . htmlspecialchars($simbolo . ' ' . number_format($sub, 2)) . '</td>';
+                        echo '<td>';
+                        if ($url !== '') {
+                            echo '<a href="' . htmlspecialchars($url) . '" target="_blank" class="btn btn-outline-primary btn-sm" title="Abrir link original"><i class="fas fa-external-link-alt"></i></a>';
+                        } else {
+                            echo '<span class="text-muted">-</span>';
+                        }
+                        echo '</td>';
+                        echo '<td>';
+                        if ($valorInf) {
+                            echo '<span class="badge bg-warning text-dark">Conferir preço</span>';
+                        } else {
+                            echo '<span class="badge bg-light text-dark">OK</span>';
+                        }
+                        echo '</td>';
+                        echo '</tr>';
+                    }
+                    echo '</tbody></table>';
+                } else {
+                    echo '<div class="p-3 text-muted small">Nenhum item encontrado.</div>';
+                }
+                echo '</div>';
+
+                // Footer com ações
+                echo '<div class="card-footer bg-light">';
+                echo '<form class="d-flex align-items-center gap-3 flex-wrap" method="POST" action="/admin/pedidos/conferencia/confirmar/' . $pid . '" enctype="multipart/form-data">';
+
+                echo '<div>';
+                echo '<label class="form-label small mb-0">Tipo de compra</label>';
+                echo '<select class="form-select form-select-sm" name="tipo_compra" required style="min-width: 130px;">';
+                echo '<option value=""' . ($tipoCompraAtual === '' ? ' selected' : '') . '>Selecione...</option>';
+                echo '<option value="online"' . ($tipoCompraAtual === 'online' ? ' selected' : '') . '>Online</option>';
+                echo '<option value="offline"' . ($tipoCompraAtual === 'offline' ? ' selected' : '') . '>Offline</option>';
+                echo '</select>';
+                echo '</div>';
+
+                echo '<div data-comprovante-box="1" style="display:none;">';
+                echo '<label class="form-label small mb-0">Comprovante (online)</label>';
+                echo '<input class="form-control form-control-sm" type="file" name="comprovante_compra" accept="image/*,application/pdf">';
+                echo '</div>';
+
+                echo '<div class="d-flex gap-2 ms-auto">';
+                echo '<a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-eye me-1"></i>Ver pedido completo</a>';
+                echo '<button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Confirmar</button>';
+                echo '</form>';
+                echo '<form class="d-inline" method="POST" action="/admin/pedidos/conferencia/cancelar/' . $pid . '" onsubmit="return confirm(\'Cancelar este pedido? O cliente será notificado.\');">';
+                echo '<button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i>Cancelar</button>';
+                echo '</form>';
+                echo '</div>';
+
+                echo '</div>'; // card-footer
+                echo '</div>'; // card
             }
-
-            echo '</tbody></table></div>';
         }
 
         echo '</div></div>';
