@@ -221,3 +221,5 @@ $router->post('/admin/configuracoes/desconto/autorizar', 'AdminDescontoAutorizac
 $router->get('/admin/configuracoes/desconto/email-autorizar', 'AdminDescontoAutorizacaoController', 'autorizarEmail');
 $router->get('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
 $router->post('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
+$router->get('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoController', 'painel');
+$router->post('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoController', 'painel');

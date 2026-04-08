@@ -431,4 +431,154 @@ class AdminDescontoAutorizacaoController
 
         echo '</div></div></div></body></html>';
     }
+
+    /** Painel de solicitações — protegido por senha */
+    public function painel(Request $request)
+    {
+        $pdo = Database::getConnection();
+        $this->garantirTabela($pdo);
+
+        if (session_status() === PHP_SESSION_NONE) @session_start();
+
+        $mensagem = '';
+        $tipo = '';
+        $autenticado = !empty($_SESSION['desconto_painel_auth']);
+
+        // Login
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$autenticado) {
+            $senha = trim((string) $request->getParam('senha', ''));
+            if ($senha === self::SENHA_AUTORIZACAO) {
+                $_SESSION['desconto_painel_auth'] = true;
+                $autenticado = true;
+            } else {
+                $mensagem = 'Senha incorreta.';
+                $tipo = 'danger';
+            }
+        }
+
+        // Ação de aprovar/negar
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $autenticado) {
+            $acao = trim((string) $request->getParam('acao', ''));
+            $token = trim((string) $request->getParam('token', ''));
+            $motivo = trim((string) $request->getParam('motivo', ''));
+            if ($token !== '' && in_array($acao, ['aprovar', 'negar'], true)) {
+                if ($acao === 'aprovar') {
+                    $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'aprovado', aprovado_por = 'painel', updated_at = NOW() WHERE token = ? AND status = 'pendente'");
+                    $st->execute([$token]);
+                    $mensagem = 'Desconto aprovado.';
+                    $tipo = 'success';
+                } else {
+                    $st = $pdo->prepare("UPDATE desconto_autorizacoes SET status = 'negado', aprovado_por = 'painel', motivo = ?, updated_at = NOW() WHERE token = ? AND status = 'pendente'");
+                    $st->execute([$motivo, $token]);
+                    $mensagem = 'Desconto negado.';
+                    $tipo = 'warning';
+                }
+            }
+        }
+
+        $h = fn($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Autorizações de Desconto</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head><body><div class="container-fluid"><div class="row">';
+        renderAdminSidebar('descontos');
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-tag me-2"></i>Autorizações de Desconto</h1>
+            </div>';
+
+        if ($mensagem) echo '<div class="alert alert-' . $tipo . '">' . $h($mensagem) . '</div>';
+
+        if (!$autenticado) {
+            echo '<div class="row justify-content-center"><div class="col-md-4">
+                <div class="card"><div class="card-body">
+                    <h5 class="card-title text-center mb-3"><i class="fas fa-lock me-2"></i>Acesso restrito</h5>
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Senha de autorização</label>
+                            <input type="password" class="form-control" name="senha" required autofocus placeholder="Digite a senha...">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-sign-in-alt me-1"></i> Entrar</button>
+                    </form>
+                </div></div>
+            </div></div>';
+        } else {
+            // Listar solicitações
+            $pendentes = $pdo->query("SELECT * FROM desconto_autorizacoes WHERE status = 'pendente' ORDER BY created_at DESC")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $recentes = $pdo->query("SELECT * FROM desconto_autorizacoes WHERE status != 'pendente' ORDER BY updated_at DESC LIMIT 20")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            echo '<div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge bg-warning text-dark fs-6">' . count($pendentes) . ' pendente(s)</span>
+                <a href="/admin/configuracoes/desconto/configuracao" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog"></i> Configurar emails</a>
+            </div>';
+
+            if (empty($pendentes)) {
+                echo '<div class="alert alert-info">Nenhuma solicitação pendente.</div>';
+            } else {
+                echo '<div class="table-responsive"><table class="table table-hover">
+                    <thead><tr><th>Data</th><th>Vendedor</th><th>Produto</th><th>Desconto</th><th>Original</th><th>Final</th><th>Ações</th></tr></thead><tbody>';
+                foreach ($pendentes as $s) {
+                    $sym = ($s['moeda'] ?? 'USD') === 'BRL' ? 'R$' : '$';
+                    $descLabel = $s['desconto_tipo'] === 'percentual'
+                        ? number_format((float) $s['desconto_valor'], 2, ',', '.') . '%'
+                        : $sym . ' ' . number_format((float) $s['desconto_valor'], 2, ',', '.');
+                    echo '<tr>
+                        <td class="small">' . $h($s['created_at']) . '</td>
+                        <td>' . $h($s['vendedor_nome']) . '</td>
+                        <td>' . $h($s['produto_nome']) . '</td>
+                        <td><span class="badge bg-info">' . $descLabel . '</span></td>
+                        <td>' . $sym . ' ' . number_format((float) $s['preco_original'], 2, ',', '.') . '</td>
+                        <td class="text-success fw-bold">' . $sym . ' ' . number_format((float) $s['preco_final'], 2, ',', '.') . '</td>
+                        <td>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="token" value="' . $h($s['token']) . '">
+                                <button type="submit" name="acao" value="aprovar" class="btn btn-success btn-sm"><i class="fas fa-check"></i></button>
+                                <button type="submit" name="acao" value="negar" class="btn btn-danger btn-sm"><i class="fas fa-times"></i></button>
+                            </form>
+                        </td>
+                    </tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+
+            if (!empty($recentes)) {
+                echo '<h5 class="mt-4 mb-3">Histórico recente</h5>
+                <div class="table-responsive"><table class="table table-sm table-striped">
+                    <thead><tr><th>Data</th><th>Vendedor</th><th>Produto</th><th>Desconto</th><th>Status</th><th>Por</th></tr></thead><tbody>';
+                foreach ($recentes as $s) {
+                    $sym = ($s['moeda'] ?? 'USD') === 'BRL' ? 'R$' : '$';
+                    $descLabel = $s['desconto_tipo'] === 'percentual'
+                        ? number_format((float) $s['desconto_valor'], 2, ',', '.') . '%'
+                        : $sym . ' ' . number_format((float) $s['desconto_valor'], 2, ',', '.');
+                    $badge = match ($s['status']) {
+                        'aprovado' => '<span class="badge bg-success">Aprovado</span>',
+                        'negado' => '<span class="badge bg-danger">Negado</span>',
+                        default => '<span class="badge bg-secondary">' . $h($s['status']) . '</span>',
+                    };
+                    echo '<tr>
+                        <td class="small">' . $h($s['updated_at']) . '</td>
+                        <td>' . $h($s['vendedor_nome']) . '</td>
+                        <td>' . $h($s['produto_nome']) . '</td>
+                        <td>' . $descLabel . '</td>
+                        <td>' . $badge . '</td>
+                        <td class="small">' . $h($s['aprovado_por']) . '</td>
+                    </tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+        }
+
+        echo '</main></div></div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+        // Auto-refresh pendentes a cada 10s
+        if ($autenticado) {
+            echo '<script>setTimeout(()=>location.reload(), 10000);</script>';
+        }
+        echo '</body></html>';
+        exit;
+    }
 }

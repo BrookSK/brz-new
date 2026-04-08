@@ -1991,145 +1991,141 @@ document.addEventListener('DOMContentLoaded', function(){
             closeAllProductResults();
         }
     });
+});
 
-    // === SISTEMA DE DESCONTO COM AUTORIZAÇÃO ===
-    window.__DESCONTO_POLLS__ = {};
+// === SISTEMA DE DESCONTO COM AUTORIZAÇÃO ===
+window.__DESCONTO_POLLS__ = {};
 
-    function habilitarDescontoRow(tr) {
-        if (!tr) return;
-        const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
-        const btn = tr.querySelector('.btnSolicitarDesconto');
-        const valInp = tr.querySelector('.descontoValorInp');
-        const tipoInp = tr.querySelector('.descontoTipoInp');
-        if (pid > 0) {
-            if (btn) btn.disabled = false;
-            if (valInp) valInp.disabled = false;
-            if (tipoInp) tipoInp.disabled = false;
-        }
+function habilitarDescontoRow(tr) {
+    if (!tr) return;
+    const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
+    const btn = tr.querySelector('.btnSolicitarDesconto');
+    const valInp = tr.querySelector('.descontoValorInp');
+    const tipoInp = tr.querySelector('.descontoTipoInp');
+    if (pid > 0) {
+        if (btn) btn.disabled = false;
+        if (valInp) valInp.disabled = false;
+        if (tipoInp) tipoInp.disabled = false;
+    }
+}
+
+function solicitarDesconto(btn) {
+    const tr = btn.closest('tr');
+    if (!tr) return;
+
+    const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
+    const prodSearch = tr.querySelector('.produtoSearch');
+    const prodNome = prodSearch ? prodSearch.value.split(' - ')[0].trim() : ('Produto #' + pid);
+    const valorInp = tr.querySelector('.descontoValorInp');
+    const tipoInp = tr.querySelector('.descontoTipoInp');
+    const precoInp = tr.querySelector('.valorInp');
+    const statusEl = tr.querySelector('.descontoStatus');
+
+    const descontoValor = parseFloat(valorInp?.value || '0');
+    const descontoTipo = tipoInp?.value || 'percentual';
+    const precoOriginal = parseMoneyInput(precoInp?.value || '0');
+
+    if (descontoValor <= 0) {
+        alert('Informe o valor do desconto antes de solicitar.');
+        if (valorInp) valorInp.focus();
+        return;
+    }
+    if (precoOriginal <= 0) {
+        alert('O produto precisa ter um preço definido.');
+        return;
     }
 
-    function solicitarDesconto(btn) {
-        const tr = btn.closest('tr');
-        if (!tr) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando...';
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Enviando solicitação...</span>';
 
-        const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
-        const prodSearch = tr.querySelector('.produtoSearch');
-        const prodNome = prodSearch ? prodSearch.value.split(' - ')[0].trim() : ('Produto #' + pid);
-        const valorInp = tr.querySelector('.descontoValorInp');
-        const tipoInp = tr.querySelector('.descontoTipoInp');
-        const precoInp = tr.querySelector('.valorInp');
-        const statusEl = tr.querySelector('.descontoStatus');
+    const fd = new FormData();
+    fd.append('produto_id', pid);
+    fd.append('produto_nome', prodNome);
+    fd.append('desconto_tipo', descontoTipo);
+    fd.append('desconto_valor', descontoValor);
+    fd.append('preco_original', precoOriginal);
+    fd.append('moeda', getSelectedMoeda());
 
-        const descontoValor = parseFloat(valorInp?.value || '0');
-        const descontoTipo = tipoInp?.value || 'percentual';
-        const precoOriginal = parseMoneyInput(precoInp?.value || '0');
+    fetch('/admin/configuracoes/desconto/solicitar', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) throw new Error(data.error || 'Erro ao solicitar');
 
-        if (descontoValor <= 0) {
-            alert('Informe o valor do desconto antes de solicitar.');
-            if (valorInp) valorInp.focus();
-            return;
-        }
-        if (precoOriginal <= 0) {
-            alert('O produto precisa ter um preço definido.');
-            return;
-        }
+            const token = data.token;
+            const tokenInp = tr.querySelector('.descontoTokenInp');
+            if (tokenInp) tokenInp.value = token;
 
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando...';
-        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Enviando solicitação...</span>';
+            btn.innerHTML = '<i class="fas fa-clock"></i> Aguardando...';
+            btn.classList.remove('btn-outline-warning');
+            btn.classList.add('btn-outline-info');
+            if (statusEl) statusEl.innerHTML = '<span class="text-warning"><i class="fas fa-hourglass-half"></i> Aguardando autorização...</span>';
 
-        const fd = new FormData();
-        fd.append('produto_id', pid);
-        fd.append('produto_nome', prodNome);
-        fd.append('desconto_tipo', descontoTipo);
-        fd.append('desconto_valor', descontoValor);
-        fd.append('preco_original', precoOriginal);
-        fd.append('moeda', getSelectedMoeda());
+            if (valorInp) valorInp.disabled = true;
+            if (tipoInp) tipoInp.disabled = true;
 
-        fetch('/admin/configuracoes/desconto/solicitar', { method: 'POST', body: fd })
+            iniciarPollingDesconto(tr, token);
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar desconto';
+            if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + escapeHtml(err.message) + '</span>';
+        });
+}
+
+function iniciarPollingDesconto(tr, token) {
+    if (window.__DESCONTO_POLLS__[token]) {
+        clearInterval(window.__DESCONTO_POLLS__[token]);
+    }
+
+    window.__DESCONTO_POLLS__[token] = setInterval(() => {
+        fetch('/admin/configuracoes/desconto/verificar?token=' + encodeURIComponent(token))
             .then(r => r.json())
             .then(data => {
-                if (!data.ok) throw new Error(data.error || 'Erro ao solicitar');
+                if (!data.ok) return;
 
-                const token = data.token;
-                const tokenInp = tr.querySelector('.descontoTokenInp');
-                if (tokenInp) tokenInp.value = token;
+                const statusEl = tr.querySelector('.descontoStatus');
+                const btn = tr.querySelector('.btnSolicitarDesconto');
+                const valorInp = tr.querySelector('.descontoValorInp');
+                const tipoInp = tr.querySelector('.descontoTipoInp');
+                const precoInp = tr.querySelector('.valorInp');
 
-                btn.innerHTML = '<i class="fas fa-clock"></i> Aguardando...';
-                btn.classList.remove('btn-outline-warning');
-                btn.classList.add('btn-outline-info');
-                if (statusEl) statusEl.innerHTML = '<span class="text-warning"><i class="fas fa-hourglass-half"></i> Aguardando autorização...</span>';
+                if (data.status === 'aprovado') {
+                    clearInterval(window.__DESCONTO_POLLS__[token]);
+                    delete window.__DESCONTO_POLLS__[token];
 
-                // Desabilitar edição do desconto enquanto aguarda
-                if (valorInp) valorInp.disabled = true;
-                if (tipoInp) tipoInp.disabled = true;
-
-                // Iniciar polling
-                iniciarPollingDesconto(tr, token);
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar desconto';
-                if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + escapeHtml(err.message) + '</span>';
-            });
-    }
-
-    function iniciarPollingDesconto(tr, token) {
-        // Limpar polling anterior se existir
-        if (window.__DESCONTO_POLLS__[token]) {
-            clearInterval(window.__DESCONTO_POLLS__[token]);
-        }
-
-        window.__DESCONTO_POLLS__[token] = setInterval(() => {
-            fetch('/admin/configuracoes/desconto/verificar?token=' + encodeURIComponent(token))
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.ok) return;
-
-                    const statusEl = tr.querySelector('.descontoStatus');
-                    const btn = tr.querySelector('.btnSolicitarDesconto');
-                    const valorInp = tr.querySelector('.descontoValorInp');
-                    const tipoInp = tr.querySelector('.descontoTipoInp');
-                    const precoInp = tr.querySelector('.valorInp');
-
-                    if (data.status === 'aprovado') {
-                        clearInterval(window.__DESCONTO_POLLS__[token]);
-                        delete window.__DESCONTO_POLLS__[token];
-
-                        if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Aprovado!</span>';
-                        if (btn) {
-                            btn.innerHTML = '<i class="fas fa-check"></i> Aprovado';
-                            btn.classList.remove('btn-outline-info', 'btn-outline-warning');
-                            btn.classList.add('btn-success');
-                            btn.disabled = true;
-                        }
-
-                        // Aplicar o preço com desconto
-                        if (precoInp && data.preco_final > 0) {
-                            precoInp.value = formatMoney(data.preco_final);
-                            calcTotal();
-                        }
-
-                    } else if (data.status === 'negado') {
-                        clearInterval(window.__DESCONTO_POLLS__[token]);
-                        delete window.__DESCONTO_POLLS__[token];
-
-                        const motivo = data.motivo ? ' - ' + data.motivo : '';
-                        if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Negado' + escapeHtml(motivo) + '</span>';
-                        if (btn) {
-                            btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar desconto';
-                            btn.classList.remove('btn-outline-info', 'btn-success');
-                            btn.classList.add('btn-outline-warning');
-                            btn.disabled = false;
-                        }
-                        if (valorInp) valorInp.disabled = false;
-                        if (tipoInp) tipoInp.disabled = false;
+                    if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Aprovado!</span>';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-check"></i> Aprovado';
+                        btn.classList.remove('btn-outline-info', 'btn-outline-warning');
+                        btn.classList.add('btn-success');
+                        btn.disabled = true;
                     }
-                })
-                .catch(() => {});
-        }, 3000); // Polling a cada 3 segundos
-    }
-});
+
+                    if (precoInp && data.preco_final > 0) {
+                        precoInp.value = formatMoney(data.preco_final);
+                        calcTotal();
+                    }
+
+                } else if (data.status === 'negado') {
+                    clearInterval(window.__DESCONTO_POLLS__[token]);
+                    delete window.__DESCONTO_POLLS__[token];
+
+                    const motivo = data.motivo ? ' - ' + data.motivo : '';
+                    if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Negado' + escapeHtml(motivo) + '</span>';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar desconto';
+                        btn.classList.remove('btn-outline-info', 'btn-success');
+                        btn.classList.add('btn-outline-warning');
+                        btn.disabled = false;
+                    }
+                    if (valorInp) valorInp.disabled = false;
+                    if (tipoInp) tipoInp.disabled = false;
+                }
+            })
+            .catch(() => {});
+    }, 3000);
+}
 
 JS;
 
