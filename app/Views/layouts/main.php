@@ -1259,7 +1259,6 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         <!-- OCULTO TEMPORARIAMENTE
                         <li class="mb-2"><a href="/status-pedido" class="footer-link">Status do Pedido</a></li>
                         -->
-                        <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                         <li class="mb-2"><a href="/como-funciona-clube" class="footer-link"><?= __('nav.club', 'Clube Braziliana') ?></a></li>
                     </ul>
                 </div>

@@ -80,6 +80,9 @@ if (empty($avatarUrl)) {
                 <a class="nav-link <?= $activePage === 'pedidos' ? 'active' : '' ?>" href="/meus-pedidos">
                     <i class="fas fa-shopping-bag me-2"></i> <?= __('user.my_orders', 'Meus Pedidos') ?>
                 </a>
+                <a class="nav-link <?= $activePage === 'carnes' ? 'active' : '' ?>" href="/meus-carnes">
+                    <i class="fas fa-file-invoice-dollar me-2"></i> Meus Carnês
+                </a>
                 <?php
                     $unreadTickets = 0;
                     try {
