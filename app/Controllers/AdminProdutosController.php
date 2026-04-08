@@ -1966,6 +1966,10 @@ class AdminProdutosController extends Controller {
         if (in_array('ativo', $cols, true) && !isset($data['active'])) $data['ativo'] = 1;
         if (in_array('featured', $cols, true)) $data['featured'] = $featured;
 
+        // Ocultar em todo o site (só pedido manual)
+        $ocultoLote = $request->getParam('oculto') ? 1 : 0;
+        if (in_array('oculto', $cols, true)) $data['oculto'] = $ocultoLote;
+
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
             $data['grupo_compras_id'] = $grupoId;
@@ -2324,6 +2328,11 @@ class AdminProdutosController extends Controller {
                     <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
                 </div>
                 <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitch" name="oculto" value="1">
+                    <label class="form-check-label fw-semibold" for="ocultoSwitch">Ocultar em todo o site</label>
+                    <div class="small text-muted">Se marcado, o produto só aparece para admin/vendedor no pedido manual.</div>
+                </div>
+                <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="manterDadosSwitch">
                     <label class="form-check-label fw-semibold" for="manterDadosSwitch">Manter dados após salvar</label>
                 </div>
@@ -2371,6 +2380,11 @@ class AdminProdutosController extends Controller {
                             <label class="form-check-label fw-semibold" for="loteFeaturedSwitch">Destaque</label>
                         </div>
                     </div>
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitchLote" name="oculto" value="1">
+                    <label class="form-check-label fw-semibold" for="ocultoSwitchLote">Ocultar em todo o site</label>
+                    <div class="small text-muted">Se marcado, os produtos só aparecem para admin/vendedor no pedido manual.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">NCM</label>
@@ -2702,6 +2716,7 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         fd.append("weight", weight);
         fd.append("stock", document.getElementById("loteStockInput").value);
         fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
+        fd.append("oculto", document.getElementById("ocultoSwitchLote") && document.getElementById("ocultoSwitchLote").checked ? "1" : "0");
         fd.append("name", descricoes[i]);
         const salePriceLote = document.getElementById("loteSalePriceInput").value.trim();
         if (salePriceLote) fd.append("sale_price", salePriceLote);
@@ -3329,6 +3344,10 @@ HTML;
         if (in_array('ativo', $cols, true) && !isset($data['active'])) $data['ativo'] = 1;
         if (in_array('featured', $cols, true)) $data['featured'] = $featured;
 
+        // Ocultar em todo o site (só pedido manual)
+        $oculto = $request->getParam('oculto') ? 1 : 0;
+        if (in_array('oculto', $cols, true)) $data['oculto'] = $oculto;
+
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
             $data['grupo_compras_id'] = $grupoId;
@@ -3575,6 +3594,12 @@ HTML;
                 <div class="form-check form-switch mt-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="featuredSwitch" name="featured" value="1" checked>
                     <label class="form-check-label fw-semibold" for="featuredSwitch">Destaque (aparece na Home)</label>
+                </div>
+
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitch" name="oculto" value="1">
+                    <label class="form-check-label fw-semibold" for="ocultoSwitch">Ocultar em todo o site</label>
+                    <div class="small subtle">Se marcado, o produto só aparece para admin/vendedor no pedido manual.</div>
                 </div>
 
                 <div class="d-grid mt-4">
@@ -4847,6 +4872,14 @@ HTML;
                                         </select>
                                         <small class="text-muted">Se ativo, este produto poderá ser oferecido gratuitamente no carrinho</small>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Ocultar em todo o site</label>
+                                        <select class="form-select" name="oculto">
+                                            <option value="0" selected>Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
+                                    </div>
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
                                 </div>
                             </div>
@@ -5061,6 +5094,7 @@ HTML;
             if (in_array('featured', $cols, true)) $data['featured'] = $request->getParam('featured') ?: 0;
             if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
             if (in_array('elegivel_oferta_gratis', $cols, true)) $data['elegivel_oferta_gratis'] = $request->getParam('elegivel_oferta_gratis') ?: 0;
+            if (in_array('oculto', $cols, true)) $data['oculto'] = (int) ($request->getParam('oculto') ?: 0);
 
             if (in_array('created_at', $cols, true) && empty($data['created_at'])) {
                 $data['created_at'] = date('Y-m-d H:i:s');
@@ -5680,6 +5714,14 @@ HTML;
                                         </select>
                                         <small class="text-muted">Se ativo, este produto poderá ser oferecido gratuitamente no carrinho</small>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Ocultar em todo o site</label>
+                                        <select class="form-select" name="oculto">
+                                            <option value="0" ' . (empty($produto['oculto']) ? 'selected' : '') . '>Não</option>
+                                            <option value="1" ' . (!empty($produto['oculto']) ? 'selected' : '') . '>Sim</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
+                                    </div>
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar Alterações</button>
                                 </div>
                             </div>
@@ -6042,6 +6084,11 @@ HTMLSCRIPT;
                 $stmtOferta->execute([(int) ($request->getParam('elegivel_oferta_gratis') ?: 0), (int) $id]);
             }
 
+            if (in_array('oculto', $cols, true)) {
+                $stmtOculto = $pdo->prepare('UPDATE produtos SET oculto = ? WHERE id = ?');
+                $stmtOculto->execute([(int) ($request->getParam('oculto') ?: 0), (int) $id]);
+            }
+
             if ($perfil === 'representante') {
                 if (in_array('moeda', $cols, true)) {
                     $pdo->prepare('UPDATE produtos SET moeda = ? WHERE id = ?')->execute(['USD', (int) $id]);
@@ -6124,7 +6171,7 @@ HTMLSCRIPT;
                     $newRow = [];
                 }
 
-                $keys = ['name','sku','loja','ncm','description','short_description','category_id','price','cost_price','sale_price','stock','min_stock','weight','status','active','featured','foto_principal','loja_id','clube_ativo','moeda','currency','representante_id','representante_email'];
+                $keys = ['name','sku','loja','ncm','description','short_description','category_id','price','cost_price','sale_price','stock','min_stock','weight','status','active','featured','foto_principal','loja_id','clube_ativo','moeda','currency','representante_id','representante_email','oculto'];
                 $oldPick = [];
                 $newPick = [];
                 foreach ($keys as $k) {

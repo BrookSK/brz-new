@@ -488,6 +488,12 @@ class AdminGruposComprasController extends Controller {
             elseif ($hasAtivo)   $whereAtivo = " AND ativo = 1";
             elseif ($hasActive)  $whereAtivo = " AND active = 1";
 
+            // Ocultar produtos marcados como ocultos (só pedido manual)
+            $hasOculto = in_array('oculto', $cols, true);
+            if ($hasOculto) {
+                $whereAtivo .= " AND (oculto IS NULL OR oculto = 0)";
+            }
+
             $nameCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
 
             $whereBusca = '';

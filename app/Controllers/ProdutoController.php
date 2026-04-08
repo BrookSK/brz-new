@@ -371,6 +371,12 @@ class ProdutoController extends Controller {
             return;
         }
 
+        // Bloquear acesso direto a produtos ocultos (só visíveis no pedido manual)
+        if (!empty($produto['oculto'])) {
+            $this->view('errors/404');
+            return;
+        }
+
         // Verificar se produto pertence a grupo exclusivo do Clube Braziliana
         $clubeOnly = false;
         try {

@@ -501,6 +501,15 @@ class AdminProdutosNovoController extends Controller {
                                     </select>
                                 </div>
 
+                                <div class="mb-3">
+                                    <label class="form-label">Ocultar em todo o site</label>
+                                    <select class="form-select" name="oculto">
+                                        <option value="0" selected>Não</option>
+                                        <option value="1">Sim</option>
+                                    </select>
+                                    <small class="text-muted">Se ativo, o produto não aparece para clientes. Só fica visível no pedido manual.</small>
+                                </div>
+
                                 <button type="submit" class="btn btn-primary w-100" ' . (!$schemaOk ? 'disabled' : '') . '><i class="fas fa-save"></i> Salvar Produto Variável</button>
                             </div>
                         </div>
@@ -803,6 +812,7 @@ HTML;
             if (in_array('active', $cols, true)) $data['active'] = (int) $request->getParam('active', 1);
             if (in_array('featured', $cols, true)) $data['featured'] = (int) $request->getParam('featured', 0);
             if (in_array('ativo', $cols, true)) $data['ativo'] = (int) $request->getParam('active', 1);
+            if (in_array('oculto', $cols, true)) $data['oculto'] = (int) $request->getParam('oculto', 0);
             if (in_array('created_at', $cols, true)) $data['created_at'] = date('Y-m-d H:i:s');
             if (in_array('updated_at', $cols, true)) $data['updated_at'] = date('Y-m-d H:i:s');
 

@@ -74,6 +74,7 @@ class Produto extends Model {
                 'updated_at' => $produto['updated_at'] ?? null,
                 'published_at' => $produto['published_at'] ?? null,
                 'grupo_compras_id' => $produto['grupo_compras_id'] ?? null,
+                'oculto' => (int) ($produto['oculto'] ?? 0),
             ];
             
             $this->debugLog('[PRODUTO-MODEL] Produto mapeado para frontend: ' . print_r($produtoMapeado, true));
@@ -158,6 +159,11 @@ class Produto extends Model {
         // Excluir produtos que pertencem a grupos de compras (devem ser acessados via grupo)
         if (in_array('grupo_compras_id', $cols, true)) {
             $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
+        }
+
+        // Excluir produtos ocultos (só aparecem no pedido manual)
+        if (in_array('oculto', $cols, true)) {
+            $where[] = "(p.oculto IS NULL OR p.oculto = 0)";
         }
 
         if (empty($where)) {
@@ -298,6 +304,11 @@ class Produto extends Model {
             $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
         }
 
+        // Excluir produtos ocultos (só aparecem no pedido manual)
+        if (in_array('oculto', $cols, true)) {
+            $where[] = "(p.oculto IS NULL OR p.oculto = 0)";
+        }
+
         $orderBy = $hasFeatured ? 'ORDER BY p.featured DESC, p.created_at DESC' : 'ORDER BY p.created_at DESC';
 
         $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                {$orderBy}\n                LIMIT :limit";
@@ -386,6 +397,11 @@ class Produto extends Model {
         $where[] = "(sku IS NULL OR sku NOT LIKE 'ASS-%')";
         if (in_array('attributes', $cols, true)) {
             $where[] = "(attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+        }
+
+        // Excluir produtos ocultos (só aparecem no pedido manual)
+        if (in_array('oculto', $cols, true)) {
+            $where[] = "(oculto IS NULL OR oculto = 0)";
         }
 
         $sql = "SELECT * FROM {$this->table}\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY featured DESC, name ASC";
