@@ -2936,7 +2936,7 @@ class CheckoutController extends Controller {
                                     if ($txVal > 1.01) $taxaConv = $txVal;
                                 } catch (\Exception $e) {}
                             }
-                            if ($taxaConv <= 1.01) $taxaConv = 5.5;
+                            if ($taxaConv <= 1.01) $taxaConv = 5.85;
 
                             // Buscar valores do carrinho (fonte mais confiável, em USD)
                             $subUsd = 0; $svcUsd = 0; $impUsd = 0; $freUsd = 0;

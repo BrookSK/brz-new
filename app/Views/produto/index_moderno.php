@@ -445,7 +445,7 @@ function atualizarBadge(totalItens) {
 // Inicializar taxas de conversão se não existirem
 if (typeof window.exchangeRates === 'undefined') {
     window.exchangeRates = {
-        'BRL': 5.50,
+        'BRL': 5.85,
         'USD': 1.00
     };
 }

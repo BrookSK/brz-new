@@ -116,7 +116,7 @@ class AdminCarteiraController extends Controller {
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarioId = $data['usuario_id'] ?? 0;
         $valorUSD = $data['valor_usd'] ?? 0;
-        $taxaConversao = $data['taxa_conversao'] ?? 5.50; // Taxa padrão
+        $taxaConversao = $data['taxa_conversao'] ?? 5.85; // Taxa padrão
         
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');

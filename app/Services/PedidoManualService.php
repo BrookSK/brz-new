@@ -761,7 +761,7 @@ class PedidoManualService {
     }
 
     public function getTaxaConversaoUSDBRL(): float {
-        $taxa = 5.5;
+        $taxa = 5.85;
 
         $cfg = $this->getConfigKeyValue('sistema_usd_brl_rate', null);
         if ($cfg !== null && $cfg !== '') {

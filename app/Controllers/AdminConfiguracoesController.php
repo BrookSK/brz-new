@@ -2576,7 +2576,7 @@ class AdminConfiguracoesController extends Controller {
 
                                             <div class="mb-3">
                                                 <label class="form-label">Taxa de conversão USD → BRL</label>
-                                                <input type="number" step="0.0001" min="0" class="form-control" name="sistema_usd_brl_rate" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'usd_brl_rate', '5.5'), ENT_QUOTES, 'UTF-8') . '">
+                                                <input type="number" step="0.0001" min="0" class="form-control" name="sistema_usd_brl_rate" value="' . htmlspecialchars($this->getConfigValue($config, 'sistema', 'usd_brl_rate', '5.85'), ENT_QUOTES, 'UTF-8') . '">
                                                 <small class="text-muted">Taxa usada no conversor global e para cálculos auxiliares em BRL quando necessário.</small>
                                             </div>
                                             <div class="form-check">

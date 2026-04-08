@@ -283,7 +283,7 @@
                                                             $svcTx = new \App\Services\PedidoManualService();
                                                             $tx = (float) $svcTx->getTaxaConversaoUSDBRL();
                                                         } catch (\Exception $e) {
-                                                            $tx = 5.5;
+                                                            $tx = 5.85;
                                                         }
                                                     }
                                                     $totalUsd = (float) $totalPedido;

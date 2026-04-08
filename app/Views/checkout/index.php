@@ -2391,7 +2391,7 @@ function toggleButton() {
 
 <script>
 // Usar taxas de conversão globais se existirem, senão definir locais
-window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.50, 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
+window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.85, 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
 
 function updateCambioRealFeesPreview() {
     const moedaHidden = document.getElementById('moeda_hidden');

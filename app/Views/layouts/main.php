@@ -1394,7 +1394,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             $svc = new \App\Services\PedidoManualService();
             echo json_encode((float) $svc->getTaxaConversaoUSDBRL());
         } catch (\Exception $e) {
-            echo '5.5';
+            echo '5.85';
         }
         ?>;
         
@@ -1402,7 +1402,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
         window.CurrencyConverter = {
             currentCurrency: 'USD',
             exchangeRates: {
-                BRL: __USD_BRL_RATE__ || 5.50,
+                BRL: __USD_BRL_RATE__ || 5.85,
                 USD: 1.00
             },
             

@@ -428,7 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Definir taxas de conversão se não existirem
         if (typeof window.exchangeRates === 'undefined') {
             window.exchangeRates = {
-                'BRL': 5.50,
+                'BRL': 5.85,
                 'USD': 1.00
             };
             console.log('🔍 [PRODUTOS PÚBLICOS] Taxas de conversão definidas:', window.exchangeRates);
