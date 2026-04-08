@@ -2635,8 +2635,8 @@ class AssessoriaController extends Controller {
             
             // Mensagem amigável para timeout
             $errorMessage = 'Erro na requisição ChatGPT: ' . $curlError;
-            if (strpos($curlError, 'timeout') !== false) {
-                $errorMessage = 'O serviço de análise demorou muito para responder. Tente novamente.';
+            if (strpos($curlError, 'timeout') !== false || strpos($curlError, 'timed out') !== false || strpos($curlError, 'Resolving timed out') !== false) {
+                $errorMessage = 'O site demorou muito para responder. Isso pode acontecer com sites mais pesados. Tente novamente em alguns instantes ou, se o problema persistir, entre em contato com nosso suporte pelo WhatsApp para ajudarmos com a sua compra.';
             }
             
             throw new \Exception($errorMessage);
@@ -2743,15 +2743,23 @@ class AssessoriaController extends Controller {
                         } catch (\Exception $e4) {
                         }
                     }
+
+                    // Marcar produto como valor_pendente para permitir edição manual
+                    $produtoData['valor'] = 0;
+                    $produtoData['valor_pendente'] = true;
+                    continue;
                 }
 
-                // Fallback para imagens: tentar extrair 1 url
+                // Fallback para imagens: tentar extrair 1 url, senão usar placeholder
                 if ($campo === 'imagens') {
                     $img = $this->extractFirstImageUrl($dadosBrutos);
                     if ($img) {
                         $produtoData['imagens'] = [$img];
                         continue;
                     }
+                    // Usar imagem padrão como fallback
+                    $produtoData['imagens'] = ['/assets/img/produto-sem-imagem.svg'];
+                    continue;
                 }
 
                 // Regra: se não encontrar peso, usar sempre 1kg
@@ -2773,7 +2781,7 @@ class AssessoriaController extends Controller {
                     }
                 }
 
-                throw new \Exception("Campo obrigatório '{$campo}' não encontrado ou vazio");
+                throw new \Exception("Não conseguimos extrair todas as informações deste produto. Entre em contato com nosso suporte pelo WhatsApp para ajudarmos com a sua compra.");
             }
         }
 

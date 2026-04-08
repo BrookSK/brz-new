@@ -100,6 +100,22 @@ ob_start();
                     </div>
                 </div>
             </div>
+
+            <!-- Aviso sobre URLs de variação -->
+            <div class="alert alert-info mt-4 border-0 shadow-sm" role="alert">
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-lightbulb text-info me-3 mt-1 fs-5"></i>
+                    <div>
+                        <strong>Dica importante sobre variações de produto</strong>
+                        <p class="mb-0 mt-1">
+                            Vários sites como <strong>Target</strong>, <strong>Gap</strong>, <strong>Amazon</strong>, entre outros, 
+                            alteram a URL quando você seleciona uma variação (cor, tamanho, modelo, etc). 
+                            Para garantir que capturemos as informações corretas, <strong>selecione a variação desejada no site original</strong> 
+                            e depois copie a URL atualizada para colar aqui.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

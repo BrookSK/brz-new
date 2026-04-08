@@ -30,9 +30,14 @@ ob_start();
                 <?php foreach ($orcamento['erros'] as $erro): ?>
                     <div class="mb-2">
                         <strong>Link:</strong> <?= htmlspecialchars(substr($erro['link'], 0, 80)) ?>...<br>
-                        <strong>Erro:</strong> <?= htmlspecialchars($erro['error']) ?>
+                        <span class="text-muted"><?= htmlspecialchars($erro['error']) ?></span>
                     </div>
                 <?php endforeach; ?>
+                <hr>
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fab fa-whatsapp text-success fs-5"></i>
+                    <span>Precisa de ajuda? Fale com nosso suporte pelo <a href="https://wa.me/5517991098286" target="_blank" class="fw-semibold text-success text-decoration-none">WhatsApp</a> e te ajudamos com a sua compra.</span>
+                </div>
             </div>
         </div>
     </div>
@@ -212,10 +217,27 @@ ob_start();
                                     </div>
                                 </div>
                                 <div class="col-auto text-end">
-                                    <div class="fw-bold text-primary h5">
-                                        $<span class="valor-text" data-base-valor="<?= htmlspecialchars((string) $produto['valor']) ?>"><?= number_format($produto['valor'], 2) ?></span>
-                                    </div>
-                                    <small class="text-muted">USD</small>
+                                    <?php if (!empty($produto['valor_pendente'])): ?>
+                                        <div class="mb-1">
+                                            <span class="badge bg-warning text-dark small">Preço não encontrado</span>
+                                        </div>
+                                        <div class="input-group input-group-sm" style="max-width: 140px;">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" 
+                                                   class="form-control valor-manual-input fw-bold text-primary" 
+                                                   data-index="<?= $index ?>"
+                                                   step="0.01" min="0.01" 
+                                                   placeholder="0.00"
+                                                   value="">
+                                        </div>
+                                        <small class="text-muted d-block mt-1">Informe o valor (USD)</small>
+                                        <small class="text-warning d-block">Será conferido pela equipe</small>
+                                    <?php else: ?>
+                                        <div class="fw-bold text-primary h5">
+                                            $<span class="valor-text" data-base-valor="<?= htmlspecialchars((string) $produto['valor']) ?>"><?= number_format($produto['valor'], 2) ?></span>
+                                        </div>
+                                        <small class="text-muted">USD</small>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -384,7 +406,7 @@ $(document).ready(function() {
     function resolveVariant(index) {
         const p = produtos[index];
         if (!p || !Array.isArray(p.variacoes) || p.variacoes.length === 0) {
-            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true };
+            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true, valor_pendente: !!(p && p.valor_pendente && (!p.valor || p.valor <= 0)) };
         }
 
         const keys = getVariationKeys(index);
@@ -576,7 +598,18 @@ $(document).ready(function() {
         // Habilitar/desabilitar botão
         const termosAceitos = $('#termosAceitos').is(':checked');
         const temSelecionados = selecionados.length > 0;
-        $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados && allComplete));
+        
+        // Verificar se algum produto selecionado tem valor pendente (0 ou não preenchido)
+        let hasValorPendente = false;
+        $('.product-checkbox:checked').each(function() {
+            const idx = parseInt($(this).val());
+            const p = produtos[idx];
+            if (p && p.valor_pendente && (!p.valor || p.valor <= 0)) {
+                hasValorPendente = true;
+            }
+        });
+        
+        $('#addToCartBtn').prop('disabled', !(termosAceitos && temSelecionados && allComplete && !hasValorPendente));
 
         const showVariacaoWarning = temSelecionados && !allComplete;
         $('#variacao-warning').toggleClass('d-none', !showVariacaoWarning);
@@ -589,6 +622,17 @@ $(document).ready(function() {
     $('.product-checkbox').change(calcularTotaisSelecionados);
     $('#termosAceitos').change(calcularTotaisSelecionados);
     $(document).on('input change', '.quantidade-input', calcularTotaisSelecionados);
+
+    // Handler para valor manual (produtos com valor_pendente)
+    $(document).on('input change', '.valor-manual-input', function() {
+        const index = parseInt($(this).data('index'));
+        const val = parseFloat($(this).val());
+        if (!isNaN(index) && produtos[index]) {
+            produtos[index].valor = (!isNaN(val) && val > 0) ? val : 0;
+            produtos[index].valor_pendente = (!isNaN(val) && val > 0) ? false : true;
+        }
+        calcularTotaisSelecionados();
+    });
 
     $(document).on('click', '.variation-btn', function() {
         const index = parseInt($(this).data('index'));
