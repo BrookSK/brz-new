@@ -702,7 +702,6 @@ class AdminComprasController extends Controller {
                 "SELECT DISTINCT lc.pedido_id
                  FROM lista_compras lc
                  WHERE lc.produto_id = :produto_id
-                   AND lc.status = 'pendente'
                    AND lc.pedido_id IS NOT NULL
                    AND lc.pedido_id <> 0" . $whereLoja .
                 " ORDER BY lc.pedido_id DESC"
@@ -1228,7 +1227,7 @@ class AdminComprasController extends Controller {
                 . '   SELECT lc.produto_id, '
                 . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
                 . '     , lc.status as status'
-                . '     , SUM(COALESCE(lc.quantidade_faltante,0)) as quantidade_faltante'
+                . '     , SUM(CASE WHEN COALESCE(lc.quantidade_faltante,0) > 0 THEN lc.quantidade_faltante ELSE COALESCE(lc.quantidade_necessaria,0) END) as quantidade_faltante'
                 . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
                 . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
@@ -1549,7 +1548,10 @@ class AdminComprasController extends Controller {
                                     $prioridade_class = $item['prioridade'] == 'urgente' ? 'danger' : 
                                                        ($item['prioridade'] == 'alta' ? 'warning' : 'info');
 
-                                    $qf = (int) ($item['quantidade_faltante'] ?? $item['quantidade_necessaria'] ?? 0);
+                                    $qf = (int) ($item['quantidade_faltante'] ?? 0);
+                                    if ($qf <= 0) {
+                                        $qf = (int) ($item['quantidade_necessaria'] ?? 0);
+                                    }
 
                                     $imgUrl = $this->resolveProdutoImagem($item);
                                     $imgTag = $imgUrl
