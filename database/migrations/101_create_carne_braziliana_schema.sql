@@ -133,6 +133,7 @@ ALTER TABLE configuracoes_sistema MODIFY COLUMN nome_empresa VARCHAR(255) NULL D
 -- Configurações do carnê no sistema
 INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES
 ('carne_ativo', '1'),
+('carne_somente_admin', '1'),
 ('carne_max_parcelas', '12'),
 ('carne_dias_vencimento', '7'),
 ('carne_webhook_url', ''),

@@ -30,6 +30,14 @@
                             <small class="text-muted">Desativar não afeta carnês já existentes.</small>
                         </div>
                         <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input type="hidden" name="carne_somente_admin" value="0">
+                                <input type="checkbox" name="carne_somente_admin" value="1" class="form-check-input" <?= ($config['carne_somente_admin'] ?? '0') === '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label">Modo Teste (somente admin)</label>
+                            </div>
+                            <small class="text-muted">Quando ativado, o Carnê só aparece no checkout para administradores. Clientes não veem.</small>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">Máximo de Parcelas</label>
                             <input type="number" name="carne_max_parcelas" class="form-control" value="<?= htmlspecialchars($config['carne_max_parcelas'] ?? '12') ?>" min="1" max="24">
                         </div>

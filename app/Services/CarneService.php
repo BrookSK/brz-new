@@ -501,9 +501,23 @@ class CarneService {
             $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_ativo' LIMIT 1");
             $stmt->execute();
             $ativo = $stmt->fetchColumn();
-            // Se não encontrou o registro, considerar desativado
             if ($ativo === false || $ativo === null) return false;
-            return ((string) $ativo === '1') && $moeda === 'BRL' && $paisEnvio === 'BR';
+            if ((string) $ativo !== '1') return false;
+            if ($moeda !== 'BRL' || $paisEnvio !== 'BR') return false;
+
+            // Modo teste: só admin pode ver
+            $stmt2 = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_somente_admin' LIMIT 1");
+            $stmt2->execute();
+            $somenteAdmin = $stmt2->fetchColumn();
+            if ((string) ($somenteAdmin ?: '0') === '1') {
+                $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+                if ($perfil === 'administrator' || $perfil === 'administrador') $perfil = 'admin';
+                if ($perfil !== 'admin') {
+                    return false;
+                }
+            }
+
+            return true;
         } catch (\Exception $e) {
             return false;
         }
