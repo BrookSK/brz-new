@@ -317,6 +317,11 @@ HTML;
                     if ($colNomeProd2 !== '') {
                         $selItens[] = "(SELECT pr." . $colNomeProd2 . " FROM produtos pr WHERE pr.id = i." . $colProdutoId . " LIMIT 1) AS produto_nome_fallback";
                     }
+                    // Imagem do produto
+                    $colFoto = $this->pickColumn($colsProd, ['foto_principal', 'image', 'imagem', 'thumbnail']);
+                    if ($colFoto !== '') {
+                        $selItens[] = "(SELECT pr2." . $colFoto . " FROM produtos pr2 WHERE pr2.id = i." . $colProdutoId . " LIMIT 1) AS produto_imagem";
+                    }
 
                     $placeholders = implode(',', array_fill(0, count($ids), '?'));
                     $sqlItens = 'SELECT ' . implode(', ', $selItens) . ' FROM ' . $itensTable . ' i WHERE i.' . $colPedidoId . ' IN (' . $placeholders . ')';
@@ -380,11 +385,12 @@ HTML;
                 // Itens do pedido
                 echo '<div class="card-body p-0">';
                 if (!empty($itens)) {
-                    echo '<table class="table table-sm table-hover mb-0">';
+                    echo '<table class="table table-sm table-hover mb-0 align-middle">';
                     echo '<thead class="table-light"><tr>';
-                    echo '<th>Produto</th><th>Variação</th><th>Qtd</th><th>Preço Unit.</th><th>Subtotal</th><th>Link</th><th>Status</th>';
+                    echo '<th style="width:60px"></th><th>Produto</th><th>Qtd</th><th>Preço Puxado</th><th>Valor Real</th><th>Link</th><th>Status</th>';
                     echo '</tr></thead><tbody>';
 
+                    $itemIdx = 0;
                     foreach ($itens as $it) {
                         $nomeProd = trim((string) ($it['nome_produto'] ?? ''));
                         if ($nomeProd === '') $nomeProd = trim((string) ($it['produto_nome_fallback'] ?? ''));
@@ -396,33 +402,59 @@ HTML;
                         $valorInf = !empty($it['valor_informado_cliente']);
                         $obs = trim((string) ($it['observacao_cliente'] ?? ''));
                         $varLabel = trim((string) ($it['variacao_label'] ?? ''));
+                        $imagem = trim((string) ($it['produto_imagem'] ?? ''));
+                        $produtoId = (int) ($it['produto_id'] ?? 0);
+
+                        // Resolver URL da imagem
+                        $imgUrl = '';
+                        if ($imagem !== '') {
+                            if (preg_match('#^https?://#i', $imagem) || strpos($imagem, '//') === 0) {
+                                $imgUrl = $imagem;
+                            } else {
+                                $imgUrl = '/uploads/produtos/' . ltrim($imagem, '/');
+                            }
+                        }
 
                         echo '<tr' . ($valorInf ? ' class="table-warning"' : '') . '>';
-                        echo '<td>';
-                        echo '<div>' . htmlspecialchars(mb_substr($nomeProd, 0, 60)) . (mb_strlen($nomeProd) > 60 ? '...' : '') . '</div>';
-                        if ($obs !== '') {
-                            echo '<div class="text-danger small"><i class="fas fa-comment me-1"></i>' . htmlspecialchars($obs) . '</div>';
+                        // Imagem
+                        echo '<td class="text-center">';
+                        if ($imgUrl !== '') {
+                            echo '<img src="' . htmlspecialchars($imgUrl) . '" style="width:50px;height:50px;object-fit:cover;border-radius:4px;" alt="">';
+                        } else {
+                            echo '<div class="bg-light d-flex align-items-center justify-content-center" style="width:50px;height:50px;border-radius:4px;"><i class="fas fa-image text-muted"></i></div>';
                         }
                         echo '</td>';
-                        echo '<td class="small">' . htmlspecialchars($varLabel !== '' ? $varLabel : '-') . '</td>';
+                        // Produto
+                        echo '<td>';
+                        echo '<div class="fw-semibold">' . htmlspecialchars(mb_substr($nomeProd, 0, 80)) . (mb_strlen($nomeProd) > 80 ? '...' : '') . '</div>';
+                        if ($varLabel !== '') echo '<div class="text-muted small">' . htmlspecialchars($varLabel) . '</div>';
+                        if ($obs !== '') echo '<div class="text-danger small mt-1"><i class="fas fa-comment me-1"></i>' . htmlspecialchars($obs) . '</div>';
+                        if ($valorInf) echo '<span class="badge bg-danger small">Preço informado pelo cliente</span>';
+                        echo '</td>';
+                        // Qtd
                         echo '<td>' . $qtd . '</td>';
-                        echo '<td>' . ($valorInf ? '<span class="text-danger fw-bold" title="Valor informado pelo cliente">' : '') . htmlspecialchars($simbolo . ' ' . number_format($preco, 2)) . ($valorInf ? ' <i class="fas fa-exclamation-triangle"></i></span>' : '') . '</td>';
-                        echo '<td>' . htmlspecialchars($simbolo . ' ' . number_format($sub, 2)) . '</td>';
+                        // Preço puxado
+                        echo '<td>' . ($valorInf ? '<span class="text-danger">' : '') . htmlspecialchars($simbolo . ' ' . number_format($preco, 2)) . ($valorInf ? ' <i class="fas fa-exclamation-triangle"></i></span>' : '') . '</td>';
+                        // Valor real (editável)
+                        echo '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm" style="width:100px;" name="valor_real[' . $produtoId . ']" placeholder="' . number_format($preco, 2, '.', '') . '" value=""></td>';
+                        // Link
                         echo '<td>';
                         if ($url !== '') {
-                            echo '<a href="' . htmlspecialchars($url) . '" target="_blank" class="btn btn-outline-primary btn-sm" title="Abrir link original"><i class="fas fa-external-link-alt"></i></a>';
+                            echo '<a href="' . htmlspecialchars($url) . '" target="_blank" class="btn btn-outline-primary btn-sm" title="Abrir no site"><i class="fas fa-external-link-alt"></i></a>';
                         } else {
                             echo '<span class="text-muted">-</span>';
                         }
                         echo '</td>';
+                        // Status
                         echo '<td>';
                         if ($valorInf) {
-                            echo '<span class="badge bg-warning text-dark">Conferir preço</span>';
+                            echo '<span class="badge bg-warning text-dark">Conferir</span>';
                         } else {
-                            echo '<span class="badge bg-light text-dark">OK</span>';
+                            echo '<span class="badge bg-success">OK</span>';
                         }
                         echo '</td>';
                         echo '</tr>';
+                        $itemIdx++;
                     }
                     echo '</tbody></table>';
                 } else {
@@ -433,24 +465,16 @@ HTML;
                 // Footer com ações
                 echo '<div class="card-footer bg-light">';
                 echo '<form class="d-flex align-items-center gap-3 flex-wrap" method="POST" action="/admin/pedidos/conferencia/confirmar/' . $pid . '" enctype="multipart/form-data">';
+                echo '<input type="hidden" name="tipo_compra" value="online">';
 
                 echo '<div>';
-                echo '<label class="form-label small mb-0">Tipo de compra</label>';
-                echo '<select class="form-select form-select-sm" name="tipo_compra" required style="min-width: 130px;">';
-                echo '<option value=""' . ($tipoCompraAtual === '' ? ' selected' : '') . '>Selecione...</option>';
-                echo '<option value="online"' . ($tipoCompraAtual === 'online' ? ' selected' : '') . '>Online</option>';
-                echo '<option value="offline"' . ($tipoCompraAtual === 'offline' ? ' selected' : '') . '>Offline</option>';
-                echo '</select>';
-                echo '</div>';
-
-                echo '<div data-comprovante-box="1" style="display:none;">';
-                echo '<label class="form-label small mb-0">Comprovante (online)</label>';
+                echo '<label class="form-label small mb-0">Comprovante de compra (opcional)</label>';
                 echo '<input class="form-control form-control-sm" type="file" name="comprovante_compra" accept="image/*,application/pdf">';
                 echo '</div>';
 
                 echo '<div class="d-flex gap-2 ms-auto">';
-                echo '<a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-eye me-1"></i>Ver pedido completo</a>';
-                echo '<button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Confirmar</button>';
+                echo '<a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="fas fa-eye me-1"></i>Pedido completo</a>';
+                echo '<button type="submit" class="btn btn-success btn-sm"><i class="fas fa-check me-1"></i>Confirmar pedido</button>';
                 echo '</form>';
                 echo '<form class="d-inline" method="POST" action="/admin/pedidos/conferencia/cancelar/' . $pid . '" onsubmit="return confirm(\'Cancelar este pedido? O cliente será notificado.\');">';
                 echo '<button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times me-1"></i>Cancelar</button>';
@@ -484,10 +508,7 @@ HTML;
         }
 
         if (!in_array($tipoCompra, ['online', 'offline'], true)) {
-            $_SESSION['message'] = 'Selecione o tipo de compra (online/offline).';
-            $_SESSION['message_type'] = 'danger';
-            header('Location: /admin/pedidos/conferencia');
-            exit;
+            $tipoCompra = 'online';
         }
 
         $usuarioId = 0;
@@ -530,9 +551,10 @@ HTML;
 
             // Compra online: exige comprovante, conclui o pedido e gera comissão do processador
             if ($tipoCompra === 'online') {
-                if (!isset($_FILES['comprovante_compra']) || !is_array($_FILES['comprovante_compra'])) {
-                    throw new \Exception('Comprovante obrigatório para compra online');
-                }
+                // Comprovante é opcional
+                $temComprovante = (isset($_FILES['comprovante_compra']) && is_array($_FILES['comprovante_compra']) && ((int) ($_FILES['comprovante_compra']['error'] ?? UPLOAD_ERR_NO_FILE)) === UPLOAD_ERR_OK);
+                
+                if ($temComprovante) {
                 $f = $_FILES['comprovante_compra'];
                 $err = (int) ($f['error'] ?? UPLOAD_ERR_NO_FILE);
                 if ($err !== UPLOAD_ERR_OK) {
@@ -595,6 +617,7 @@ HTML;
                     $st = $this->connection->prepare($sqlInsDoc);
                     $st->execute($p);
                 }
+                } // end if temComprovante
 
                 // concluir pedido e registrar finalizador (quando colunas existirem)
                 $colsPedidos2 = $colsPedidos;
