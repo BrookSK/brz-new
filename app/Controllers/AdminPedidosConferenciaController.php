@@ -284,7 +284,12 @@ HTML;
                         $colsItens = [];
                     }
 
-                    $selItens = ['i.pedido_id', 'i.produto_id'];
+                    $selItens = [];
+                    $colPedidoId = $this->pickColumn($colsItens, ['pedido_id']);
+                    $colProdutoId = $this->pickColumn($colsItens, ['produto_id']);
+                    
+                    if ($colPedidoId !== '' && $colProdutoId !== '') {
+                    $selItens = ['i.' . $colPedidoId . ' AS pedido_id', 'i.' . $colProdutoId . ' AS produto_id'];
                     $colQtd = $this->pickColumn($colsItens, ['quantidade', 'qty']);
                     if ($colQtd !== '') $selItens[] = 'i.' . $colQtd . ' AS quantidade';
                     $colPreco = $this->pickColumn($colsItens, ['preco_unitario', 'valor_unitario', 'price']);
@@ -302,11 +307,19 @@ HTML;
                     $colVarLabel = $this->pickColumn($colsItens, ['variacao_label']);
                     if ($colVarLabel !== '') $selItens[] = 'i.' . $colVarLabel . ' AS variacao_label';
 
-                    // Fallback nome do produto
-                    $selItens[] = "(SELECT COALESCE(pr.nome, pr.name, '') FROM produtos pr WHERE pr.id = i.produto_id LIMIT 1) AS produto_nome_fallback";
+                    // Fallback nome do produto (adaptativo)
+                    $colsProd = [];
+                    try {
+                        $stProd = $this->connection->query('DESCRIBE produtos');
+                        $colsProd = $stProd ? ($stProd->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) { $colsProd = []; }
+                    $colNomeProd2 = $this->pickColumn($colsProd, ['nome', 'name', 'titulo', 'title']);
+                    if ($colNomeProd2 !== '') {
+                        $selItens[] = "(SELECT pr." . $colNomeProd2 . " FROM produtos pr WHERE pr.id = i." . $colProdutoId . " LIMIT 1) AS produto_nome_fallback";
+                    }
 
                     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-                    $sqlItens = 'SELECT ' . implode(', ', $selItens) . ' FROM ' . $itensTable . ' i WHERE i.pedido_id IN (' . $placeholders . ')';
+                    $sqlItens = 'SELECT ' . implode(', ', $selItens) . ' FROM ' . $itensTable . ' i WHERE i.' . $colPedidoId . ' IN (' . $placeholders . ')';
                     $stItensAll = $this->connection->prepare($sqlItens);
                     $stItensAll->execute($ids);
                     $rows = $stItensAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -316,6 +329,7 @@ HTML;
                         if (!isset($itensPorPedido[$pid])) $itensPorPedido[$pid] = [];
                         $itensPorPedido[$pid][] = $r;
                     }
+                    } // end if colPedidoId && colProdutoId
                 }
             }
         } catch (\Exception $e) {
