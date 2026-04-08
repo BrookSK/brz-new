@@ -367,6 +367,7 @@ HTML;
                 }
 
                 $simbolo = strtoupper($moeda) === 'BRL' ? 'R$' : '$';
+                $simboloItem = '$'; // itens sempre em USD (preço original do produto)
 
                 echo '<div class="card mb-4 border' . ($temValorCliente ? ' border-danger' : '') . '">';
 
@@ -434,7 +435,7 @@ HTML;
                         // Qtd
                         echo '<td>' . $qtd . '</td>';
                         // Preço puxado
-                        echo '<td>' . ($valorInf ? '<span class="text-danger">' : '') . htmlspecialchars($simbolo . ' ' . number_format($preco, 2)) . ($valorInf ? ' <i class="fas fa-exclamation-triangle"></i></span>' : '') . '</td>';
+                        echo '<td>' . ($valorInf ? '<span class="text-danger">' : '') . htmlspecialchars($simboloItem . ' ' . number_format($preco, 2)) . ($valorInf ? ' <i class="fas fa-exclamation-triangle"></i></span>' : '') . '</td>';
                         // Valor real (editável)
                         echo '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm" style="width:100px;" name="valor_real[' . $produtoId . ']" placeholder="' . number_format($preco, 2, '.', '') . '" value=""></td>';
                         // Link
