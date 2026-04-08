@@ -17,6 +17,20 @@ ob_start();
             <div class="card shadow-sm border-0">
                 <div class="card-body p-4">
                     <form id="assessoriaForm">
+                        <!-- Aviso destacado sobre URLs de variação -->
+                        <div class="alert alert-warning border-start border-warning border-4 mb-4" role="alert">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-exclamation-triangle text-warning me-3 mt-1 fs-4"></i>
+                                <div>
+                                    <strong class="d-block mb-1">Atenção: copie a URL correta da variação</strong>
+                                    <span>Sites como <strong>Target</strong>, <strong>Gap</strong>, <strong>Amazon</strong>, <strong>Costco</strong>, entre outros, 
+                                    alteram a URL quando você seleciona uma variação (cor, tamanho, modelo, etc).</span>
+                                    <br>
+                                    <span>Para pegarmos as informações corretas, <strong>clique na variação desejada no site</strong> e depois copie a URL atualizada do navegador para colar aqui.</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mb-4">
                             <label for="links" class="form-label fw-semibold">
                                 <i class="fas fa-link me-2"></i>Links dos Produtos
@@ -97,22 +111,6 @@ ob_start();
                                 </li>
                             </ul>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Aviso sobre URLs de variação -->
-            <div class="alert alert-info mt-4 border-0 shadow-sm" role="alert">
-                <div class="d-flex align-items-start">
-                    <i class="fas fa-lightbulb text-info me-3 mt-1 fs-5"></i>
-                    <div>
-                        <strong>Dica importante sobre variações de produto</strong>
-                        <p class="mb-0 mt-1">
-                            Vários sites como <strong>Target</strong>, <strong>Gap</strong>, <strong>Amazon</strong>, entre outros, 
-                            alteram a URL quando você seleciona uma variação (cor, tamanho, modelo, etc). 
-                            Para garantir que capturemos as informações corretas, <strong>selecione a variação desejada no site original</strong> 
-                            e depois copie a URL atualizada para colar aqui.
-                        </p>
                     </div>
                 </div>
             </div>
