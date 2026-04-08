@@ -494,6 +494,7 @@ class AdminPedidosManualController extends Controller {
                                         <th>Produto</th>
                                         <th style="width:140px">Qtd</th>
                                         <th style="width:160px">Valor</th>
+                                        <th style="width:200px">Desconto</th>
                                         <th style="width:60px"></th>
                                         <th style="width:100px" class="text-center">Já comprado</th>
                                         <th style="width:90px">Ações</th>
@@ -934,6 +935,22 @@ function addItemRow(){
             <input type="text" class="form-control form-control-sm valorInp" name="valor_unitario[]" value="0.00" onchange="calcTotal()" required>
         </td>
         <td>
+            <div class="descontoWrap">
+                <div class="input-group input-group-sm">
+                    <input type="number" class="form-control form-control-sm descontoValorInp" value="" min="0" step="0.01" placeholder="0" disabled>
+                    <select class="form-select form-select-sm descontoTipoInp" style="max-width:70px" disabled>
+                        <option value="percentual">%</option>
+                        <option value="fixo">$</option>
+                    </select>
+                </div>
+                <input type="hidden" class="descontoTokenInp" value="">
+                <div class="descontoStatus mt-1" style="font-size:11px;"></div>
+                <button type="button" class="btn btn-outline-warning btn-sm mt-1 btnSolicitarDesconto" onclick="solicitarDesconto(this)" style="font-size:11px;" disabled>
+                    <i class="fas fa-tag"></i> Solicitar desconto
+                </button>
+            </div>
+        </td>
+        <td>
             <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)">
                 <i class="fas fa-trash"></i>
             </button>
@@ -1007,6 +1024,8 @@ function prefillRowFromExisting(tr, item){
     if (qtdEl) qtdEl.value = String(qtd > 0 ? qtd : 1);
 
     updateExtraCamposProduto(tr, prod || null);
+
+    habilitarDescontoRow(tr);
 
     const resultsEl = tr.querySelector('.prodResults');
     if (resultsEl) {
@@ -1133,6 +1152,8 @@ function selectProdutoFromSearch(btn, produtoId){
     }
 
     updateExtraCamposProduto(tr, prod);
+
+    habilitarDescontoRow(tr);
 
     calcTotal();
 }
@@ -1970,6 +1991,144 @@ document.addEventListener('DOMContentLoaded', function(){
             closeAllProductResults();
         }
     });
+
+    // === SISTEMA DE DESCONTO COM AUTORIZAÇÃO ===
+    window.__DESCONTO_POLLS__ = {};
+
+    function habilitarDescontoRow(tr) {
+        if (!tr) return;
+        const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
+        const btn = tr.querySelector('.btnSolicitarDesconto');
+        const valInp = tr.querySelector('.descontoValorInp');
+        const tipoInp = tr.querySelector('.descontoTipoInp');
+        if (pid > 0) {
+            if (btn) btn.disabled = false;
+            if (valInp) valInp.disabled = false;
+            if (tipoInp) tipoInp.disabled = false;
+        }
+    }
+
+    function solicitarDesconto(btn) {
+        const tr = btn.closest('tr');
+        if (!tr) return;
+
+        const pid = Number(tr.querySelector('.produtoIdInp')?.value || 0);
+        const prodSearch = tr.querySelector('.produtoSearch');
+        const prodNome = prodSearch ? prodSearch.value.split(' - ')[0].trim() : ('Produto #' + pid);
+        const valorInp = tr.querySelector('.descontoValorInp');
+        const tipoInp = tr.querySelector('.descontoTipoInp');
+        const precoInp = tr.querySelector('.valorInp');
+        const statusEl = tr.querySelector('.descontoStatus');
+
+        const descontoValor = parseFloat(valorInp?.value || '0');
+        const descontoTipo = tipoInp?.value || 'percentual';
+        const precoOriginal = parseMoneyInput(precoInp?.value || '0');
+
+        if (descontoValor <= 0) {
+            alert('Informe o valor do desconto antes de solicitar.');
+            if (valorInp) valorInp.focus();
+            return;
+        }
+        if (precoOriginal <= 0) {
+            alert('O produto precisa ter um preço definido.');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando...';
+        if (statusEl) statusEl.innerHTML = '<span class="text-muted">Enviando solicitação...</span>';
+
+        const fd = new FormData();
+        fd.append('produto_id', pid);
+        fd.append('produto_nome', prodNome);
+        fd.append('desconto_tipo', descontoTipo);
+        fd.append('desconto_valor', descontoValor);
+        fd.append('preco_original', precoOriginal);
+        fd.append('moeda', getSelectedMoeda());
+
+        fetch('/admin/desconto/solicitar', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) throw new Error(data.error || 'Erro ao solicitar');
+
+                const token = data.token;
+                const tokenInp = tr.querySelector('.descontoTokenInp');
+                if (tokenInp) tokenInp.value = token;
+
+                btn.innerHTML = '<i class="fas fa-clock"></i> Aguardando...';
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-outline-info');
+                if (statusEl) statusEl.innerHTML = '<span class="text-warning"><i class="fas fa-hourglass-half"></i> Aguardando autorização...</span>';
+
+                // Desabilitar edição do desconto enquanto aguarda
+                if (valorInp) valorInp.disabled = true;
+                if (tipoInp) tipoInp.disabled = true;
+
+                // Iniciar polling
+                iniciarPollingDesconto(tr, token);
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar desconto';
+                if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + escapeHtml(err.message) + '</span>';
+            });
+    }
+
+    function iniciarPollingDesconto(tr, token) {
+        // Limpar polling anterior se existir
+        if (window.__DESCONTO_POLLS__[token]) {
+            clearInterval(window.__DESCONTO_POLLS__[token]);
+        }
+
+        window.__DESCONTO_POLLS__[token] = setInterval(() => {
+            fetch('/admin/desconto/verificar?token=' + encodeURIComponent(token))
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.ok) return;
+
+                    const statusEl = tr.querySelector('.descontoStatus');
+                    const btn = tr.querySelector('.btnSolicitarDesconto');
+                    const valorInp = tr.querySelector('.descontoValorInp');
+                    const tipoInp = tr.querySelector('.descontoTipoInp');
+                    const precoInp = tr.querySelector('.valorInp');
+
+                    if (data.status === 'aprovado') {
+                        clearInterval(window.__DESCONTO_POLLS__[token]);
+                        delete window.__DESCONTO_POLLS__[token];
+
+                        if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Aprovado!</span>';
+                        if (btn) {
+                            btn.innerHTML = '<i class="fas fa-check"></i> Aprovado';
+                            btn.classList.remove('btn-outline-info', 'btn-outline-warning');
+                            btn.classList.add('btn-success');
+                            btn.disabled = true;
+                        }
+
+                        // Aplicar o preço com desconto
+                        if (precoInp && data.preco_final > 0) {
+                            precoInp.value = formatMoney(data.preco_final);
+                            calcTotal();
+                        }
+
+                    } else if (data.status === 'negado') {
+                        clearInterval(window.__DESCONTO_POLLS__[token]);
+                        delete window.__DESCONTO_POLLS__[token];
+
+                        const motivo = data.motivo ? ' - ' + data.motivo : '';
+                        if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Negado' + escapeHtml(motivo) + '</span>';
+                        if (btn) {
+                            btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar desconto';
+                            btn.classList.remove('btn-outline-info', 'btn-success');
+                            btn.classList.add('btn-outline-warning');
+                            btn.disabled = false;
+                        }
+                        if (valorInp) valorInp.disabled = false;
+                        if (tipoInp) tipoInp.disabled = false;
+                    }
+                })
+                .catch(() => {});
+        }, 3000); // Polling a cada 3 segundos
+    }
 });
 
 JS;

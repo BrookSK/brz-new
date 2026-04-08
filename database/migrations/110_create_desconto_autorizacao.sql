@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `desconto_autorizacoes` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `token` VARCHAR(64) NOT NULL,
+    `vendedor_id` INT(11) NOT NULL,
+    `vendedor_nome` VARCHAR(191) DEFAULT NULL,
+    `produto_id` INT(11) NOT NULL DEFAULT 0,
+    `produto_nome` VARCHAR(255) DEFAULT NULL,
+    `desconto_tipo` ENUM('percentual','fixo') NOT NULL DEFAULT 'percentual',
+    `desconto_valor` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `preco_original` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `preco_final` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    `moeda` VARCHAR(3) NOT NULL DEFAULT 'USD',
+    `status` ENUM('pendente','aprovado','negado','expirado') NOT NULL DEFAULT 'pendente',
+    `aprovado_por` VARCHAR(191) DEFAULT NULL,
+    `motivo` VARCHAR(500) DEFAULT NULL,
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_token` (`token`),
+    KEY `idx_vendedor` (`vendedor_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

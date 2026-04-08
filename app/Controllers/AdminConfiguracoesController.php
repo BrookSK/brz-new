@@ -4449,7 +4449,8 @@ HTML;
                 'scrapingbee' => ['api_key'],
                 'chatgpt' => ['api_key', 'model', 'temperature', 'max_tokens', 'peso_margem'],
                 'assessoria' => ['webhook_inicio_url', 'webhook_conclusao_url'],
-                'promocao' => ['taxa_servico_ativo', 'taxa_servico_tipo', 'taxa_servico_valor']
+                'promocao' => ['taxa_servico_ativo', 'taxa_servico_tipo', 'taxa_servico_valor'],
+                'desconto' => ['emails_autorizadores']
             ];
             
             $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo', 'conversao_moeda_ativa'];

@@ -394,6 +394,15 @@ $router->post('/admin/pedidos/novo-manual/criar', 'AdminPedidosManualController'
 $router->post('/admin/pedidos/novo-manual/gerar-link', 'AdminPedidosManualController', 'gerarLink');
 $router->post('/admin/pedidos/novo-manual/calcular-resumo', 'AdminPedidosManualController', 'calcularResumo');
 
+// Desconto com Autorização
+$router->post('/admin/desconto/solicitar', 'AdminDescontoAutorizacaoController', 'solicitar');
+$router->get('/admin/desconto/verificar', 'AdminDescontoAutorizacaoController', 'verificar');
+$router->get('/admin/desconto/autorizar', 'AdminDescontoAutorizacaoController', 'autorizarTela');
+$router->post('/admin/desconto/autorizar', 'AdminDescontoAutorizacaoController', 'autorizarTela');
+$router->get('/admin/desconto/email-autorizar', 'AdminDescontoAutorizacaoController', 'autorizarEmail');
+$router->get('/admin/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
+$router->post('/admin/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
+
 // Payment Links (Admin)
 $router->get('/admin/payment-links', 'AdminPaymentLinksController', 'index');
 $router->post('/admin/payment-links/criar', 'AdminPaymentLinksController', 'criar');
