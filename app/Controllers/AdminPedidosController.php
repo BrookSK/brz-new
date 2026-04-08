@@ -2844,6 +2844,8 @@ HTML;
                             <div class="small">Este pedido contém itens cujo preço foi informado manualmente pelo cliente (assessoria). Confira os valores antes de processar.</div>
                         </div>';
                 }
+            } catch (\Exception $e) {
+            }
 
             // Bloco: rastreio / etiqueta (Correios ou W-Express)
             try {
