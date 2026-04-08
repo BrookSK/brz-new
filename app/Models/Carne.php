@@ -12,6 +12,15 @@ class Carne extends Model {
         try {
             $carneId = $this->create($dados);
 
+            // Buscar dias de vencimento da config (padrão 7)
+            $diasVencimento = 7;
+            try {
+                $stCfg = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_dias_vencimento' LIMIT 1");
+                $stCfg->execute();
+                $v = (int) ($stCfg->fetchColumn() ?: 7);
+                if ($v > 0) $diasVencimento = $v;
+            } catch (\Exception $e) {}
+
             $valorProdutosParcela = floor($dados['total_produtos'] / $qtdParcelas * 100) / 100;
             $valorTaxasParcela = floor($dados['total_taxas'] / $qtdParcelas * 100) / 100;
 
@@ -26,7 +35,15 @@ class Carne extends Model {
                     ? round($dados['total_taxas'] - $somaTaxas, 2)
                     : $valorTaxasParcela;
 
-                $vencimento = date('Y-m-d', strtotime("+{$i} month"));
+                // Parcela 1: vence em X dias a partir de hoje
+                // Parcela 2+: vence mensalmente (mês anterior + 1 mês)
+                if ($i === 1) {
+                    $vencimento = date('Y-m-d', strtotime("+{$diasVencimento} days"));
+                } else {
+                    // Meses a partir da primeira parcela
+                    $mesesOffset = $i - 1;
+                    $vencimento = date('Y-m-d', strtotime("+{$diasVencimento} days +{$mesesOffset} months"));
+                }
 
                 $stmt = $this->connection->prepare("
                     INSERT INTO carne_parcelas 

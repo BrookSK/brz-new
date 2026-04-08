@@ -139,13 +139,70 @@ class CarneService {
                 );
 
                 if (!empty($crResult['success'])) {
+                    // Extrair URL do boleto - tentar múltiplos campos da resposta
+                    $crUrl = $crResult['bank_slip_url'] ?? ($crResult['invoice_url'] ?? '');
+                    $crDigitable = $crResult['digitable_line'] ?? '';
+                    $crPaymentId = $crResult['payment_id'] ?? '';
+
+                    // Se não encontrou URL nos campos padrão, buscar no raw da resposta
+                    if (empty($crUrl) && !empty($crResult['raw'])) {
+                        $raw = $crResult['raw'];
+                        $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+                        $tx = is_array($data['transaction'] ?? null) ? $data['transaction'] : [];
+
+                        // Campos possíveis para URL do boleto
+                        $urlCandidates = [
+                            $tx['ticket_url'] ?? '',
+                            $tx['url'] ?? '',
+                            $tx['boleto_url'] ?? '',
+                            $tx['bank_slip_url'] ?? '',
+                            $data['ticket_url'] ?? '',
+                            $data['url'] ?? '',
+                            $data['checkout_url'] ?? '',
+                            $data['boleto_url'] ?? '',
+                            $raw['ticket_url'] ?? '',
+                            $raw['url'] ?? '',
+                        ];
+                        foreach ($urlCandidates as $candidate) {
+                            if (!empty($candidate) && is_string($candidate) && strpos($candidate, 'http') === 0) {
+                                $crUrl = $candidate;
+                                break;
+                            }
+                        }
+
+                        // Campos possíveis para linha digitável
+                        if (empty($crDigitable)) {
+                            $lineCandidates = [
+                                $tx['digitable_line'] ?? '',
+                                $tx['linha_digitavel'] ?? '',
+                                $tx['barcode_number'] ?? '',
+                                $tx['barcode'] ?? '',
+                                $data['digitable_line'] ?? '',
+                                $data['linha_digitavel'] ?? '',
+                                $data['barcode'] ?? '',
+                            ];
+                            foreach ($lineCandidates as $candidate) {
+                                if (!empty($candidate) && is_string($candidate) && strlen($candidate) > 10) {
+                                    $crDigitable = $candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_produtos_url' => $crResult['bank_slip_url'] ?? ($crResult['invoice_url'] ?? ''),
-                        'boleto_produtos_codigo' => $crResult['digitable_line'] ?? '',
-                        'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
+                        'boleto_produtos_url' => $crUrl,
+                        'boleto_produtos_codigo' => $crDigitable,
+                        'boleto_produtos_id_externo' => $crPaymentId,
                     ]);
+
+                    // Log para debug
+                    error_log('[CARNE] Câmbio Real boleto gerado: url=' . $crUrl . ' line=' . substr($crDigitable, 0, 20) . '... id=' . $crPaymentId);
                 } else {
                     error_log('[CARNE] Erro Câmbio Real boleto: ' . ($crResult['error'] ?? 'desconhecido'));
+                    if (!empty($crResult['raw'])) {
+                        error_log('[CARNE] Câmbio Real raw: ' . json_encode($crResult['raw']));
+                    }
                 }
             } catch (\Exception $e) {
                 error_log('[CARNE] Exception Câmbio Real: ' . $e->getMessage());
