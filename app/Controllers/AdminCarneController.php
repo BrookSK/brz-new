@@ -205,7 +205,7 @@ class AdminCarneController extends Controller {
             $campos = [
                 'carne_ativo', 'carne_max_parcelas', 'carne_dias_vencimento',
                 'carne_webhook_url', 'carne_webhook_ativo', 'carne_email_ativo',
-                'carne_eventos_webhook', 'carne_eventos_email'
+                'carne_eventos_webhook', 'carne_eventos_email', 'cron_secret'
             ];
             foreach ($campos as $campo) {
                 $val = $request->getParam($campo);
@@ -222,7 +222,7 @@ class AdminCarneController extends Controller {
             $this->redirect('/admin/carnes/configuracoes');
         }
 
-        $stmt = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'carne_%'");
+        $stmt = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'carne_%' OR chave = 'cron_secret'");
         $stmt->execute();
         $config = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
 

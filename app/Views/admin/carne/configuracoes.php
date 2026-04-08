@@ -79,6 +79,42 @@
             </div>
         </div>
 
+        <!-- Cron -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header"><h6 class="mb-0"><i class="fas fa-clock me-1"></i> Cron / Automação</h6></div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Token de Segurança do Cron</label>
+                                    <div class="input-group">
+                                        <input type="text" name="cron_secret" id="cron_secret" class="form-control" value="<?= htmlspecialchars($config['cron_secret'] ?? '') ?>" placeholder="Deixe vazio para desabilitar proteção">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('cron_secret').value = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b=>b.toString(16).padStart(2,'0')).join('')">
+                                            <i class="fas fa-random"></i> Gerar
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Token usado para proteger o endpoint do cron contra acesso não autorizado.</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">URL do Cron</label>
+                                    <?php
+                                    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'seudominio.com.br');
+                                    $cronToken = htmlspecialchars($config['cron_secret'] ?? 'SEU_TOKEN');
+                                    ?>
+                                    <input type="text" class="form-control bg-light" readonly value="<?= $baseUrl ?>/cron/carne/processar?token=<?= $cronToken ?>" onclick="this.select()">
+                                    <small class="text-muted">Cole esta URL no painel de cron da hospedagem. Intervalo recomendado: 5 minutos.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="text-end">
             <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Salvar Configurações</button>
         </div>
