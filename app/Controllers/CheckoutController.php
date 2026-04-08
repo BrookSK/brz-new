@@ -4610,7 +4610,12 @@ class CheckoutController extends Controller {
             }
             if (is_array($colsItens) && in_array('variacao_id', $colsItens, true)) {
                 $cols[] = 'variacao_id';
-                $vals[] = $variacaoId;
+                // variacao_id pode vir como hash (assessoria) - só inserir se for numérico
+                $variacaoIdVal = $variacaoId;
+                if ($variacaoIdVal !== null && !is_numeric($variacaoIdVal)) {
+                    $variacaoIdVal = null;
+                }
+                $vals[] = $variacaoIdVal;
                 $placeholders[] = '?';
             }
             if (is_array($colsItens) && in_array('variacao_label', $colsItens, true)) {
