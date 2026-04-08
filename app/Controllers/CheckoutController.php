@@ -2917,8 +2917,7 @@ class CheckoutController extends Controller {
                         if ($qtdParcelas < 1 || $qtdParcelas > 12) $qtdParcelas = 1;
 
                         // Separar valores: produtos vs taxas/impostos/serviços
-                        // Usar os valores em BRL que o checkout JS calculou e exibiu ao cliente
-                        // Os valores no banco estão em USD, então não podemos confiar neles diretamente
+                        // Usar a mesma taxa de conversão que o JS do checkout usa (CAMBIOREAL_RATE_BRL)
                         $subtotalProdutos = 0;
                         $totalTaxas = 0;
                         $totalPedido = 0;
@@ -2926,66 +2925,74 @@ class CheckoutController extends Controller {
                         try {
                             $dbCarneSep = \Config\Database::getConnection();
 
-                            // Buscar taxa de conversão USD->BRL
+                            // Buscar taxa de conversão USD->BRL (mesma que o JS usa)
                             $taxaConv = 1.0;
-                            try {
-                                $stTx = $dbCarneSep->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
-                                $stTx->execute();
-                                $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
-                                if ($txVal > 1.01) $taxaConv = $txVal;
-                            } catch (\Exception $e) {}
+                            try { $r = (float) $this->carrinhoModel->getTaxaConversao('BRL'); if ($r > 1.01) $taxaConv = $r; } catch (\Exception $e) {}
                             if ($taxaConv <= 1.01) {
-                                try { $r = (float) $this->carrinhoModel->getTaxaConversao('BRL'); if ($r > 1.01) $taxaConv = $r; } catch (\Exception $e) {}
+                                try {
+                                    $stTx = $dbCarneSep->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+                                    $stTx->execute();
+                                    $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+                                    if ($txVal > 1.01) $taxaConv = $txVal;
+                                } catch (\Exception $e) {}
                             }
                             if ($taxaConv <= 1.01) $taxaConv = 5.5;
 
-                            // Buscar valores do pedido (em USD)
-                            $colsPedSep = [];
-                            try { $stColsSep = $dbCarneSep->query('DESCRIBE pedidos'); $colsPedSep = $stColsSep ? ($stColsSep->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
-
-                            $selCols = ['id'];
-                            $colMap = [
-                                'subtotal' => ['subtotal', 'subtotal_produtos'],
-                                'servicos' => ['servicos', 'taxa_servico'],
-                                'impostos' => ['impostos', 'valor_impostos'],
-                                'frete' => ['frete', 'valor_frete'],
-                                'total' => ['total', 'valor_total'],
-                            ];
-                            foreach ($colMap as $alias => $candidates) {
-                                foreach ($candidates as $c) {
-                                    if (in_array($c, $colsPedSep, true)) { $selCols[] = $c . ' AS ' . $alias; break; }
-                                }
+                            // Buscar valores do carrinho (fonte mais confiável, em USD)
+                            $subUsd = 0; $svcUsd = 0; $impUsd = 0; $freUsd = 0;
+                            $uid = (int) ($usuario['id'] ?? 0);
+                            if ($uid > 0) {
+                                try {
+                                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                                    if ($cartId > 0) {
+                                        $stCart = $dbCarneSep->prepare('SELECT subtotal_produtos, taxa_servico, valor_impostos, frete_manual FROM carrinhos WHERE id = ? LIMIT 1');
+                                        $stCart->execute([$cartId]);
+                                        $cartRow = $stCart->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                        $subUsd = (float) ($cartRow['subtotal_produtos'] ?? 0);
+                                        $svcUsd = (float) ($cartRow['taxa_servico'] ?? 0);
+                                        $impUsd = (float) ($cartRow['valor_impostos'] ?? 0);
+                                        $freUsd = (float) ($cartRow['frete_manual'] ?? 0);
+                                    }
+                                } catch (\Exception $e) {}
                             }
 
-                            $stPedSep = $dbCarneSep->prepare('SELECT ' . implode(', ', $selCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
-                            $stPedSep->execute([(int) $pedidoId]);
-                            $pedSep = $stPedSep->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            // Fallback: buscar do pedido se carrinho não tem valores
+                            if ($subUsd <= 0) {
+                                $colsPedSep = [];
+                                try { $stColsSep = $dbCarneSep->query('DESCRIBE pedidos'); $colsPedSep = $stColsSep ? ($stColsSep->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+                                $selCols = ['id'];
+                                foreach (['subtotal' => ['subtotal','subtotal_produtos'], 'servicos' => ['servicos','taxa_servico'], 'impostos' => ['impostos','valor_impostos'], 'frete' => ['frete','valor_frete']] as $alias => $candidates) {
+                                    foreach ($candidates as $c) { if (in_array($c, $colsPedSep, true)) { $selCols[] = $c . ' AS ' . $alias; break; } }
+                                }
+                                $stPedSep = $dbCarneSep->prepare('SELECT ' . implode(', ', $selCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                                $stPedSep->execute([(int) $pedidoId]);
+                                $pedSep = $stPedSep->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                $subUsd = (float) ($pedSep['subtotal'] ?? 0);
+                                $svcUsd = (float) ($pedSep['servicos'] ?? 0);
+                                $impUsd = (float) ($pedSep['impostos'] ?? 0);
+                                $freUsd = (float) ($pedSep['frete'] ?? 0);
+                            }
 
-                            // Valores em USD do banco
-                            $subUsd = (float) ($pedSep['subtotal'] ?? 0);
-                            $svcUsd = (float) ($pedSep['servicos'] ?? 0);
-                            $impUsd = (float) ($pedSep['impostos'] ?? 0);
-                            $freUsd = (float) ($pedSep['frete'] ?? 0);
-
-                            // Converter para BRL
+                            // Converter USD -> BRL
                             $subtotalProdutos = round($subUsd * $taxaConv, 2);
                             $totalTaxas = round(($svcUsd + $impUsd + $freUsd) * $taxaConv, 2);
                             $totalPedido = round($subtotalProdutos + $totalTaxas, 2);
 
-                            // Se subtotal é 0 mas total existe, usar total
-                            if ($subtotalProdutos <= 0) {
-                                $totalDb = (float) ($pedSep['total'] ?? 0);
-                                $totalPedido = round($totalDb * $taxaConv, 2);
-                                $subtotalProdutos = $totalPedido;
-                                $totalTaxas = 0;
-                            }
+                            error_log("[CARNE] Valores: subUsd={$subUsd} svcUsd={$svcUsd} impUsd={$impUsd} freUsd={$freUsd} taxa={$taxaConv} => prodBrl={$subtotalProdutos} taxasBrl={$totalTaxas} totalBrl={$totalPedido}");
+
                         } catch (\Exception $e) {
+                            error_log('[CARNE] Erro ao calcular valores: ' . $e->getMessage());
                             $totalPedido = (float) ($pedidoRowPay['total'] ?? 0);
                             $subtotalProdutos = $totalPedido;
                             $totalTaxas = 0;
                         }
 
                         if ($totalTaxas < 0) $totalTaxas = 0;
+                        if ($subtotalProdutos <= 0) {
+                            $subtotalProdutos = $totalPedido;
+                            $totalTaxas = 0;
+                        }
 
                         $clienteId = (int) ($usuario['id'] ?? 0);
                         if ($clienteId <= 0) {

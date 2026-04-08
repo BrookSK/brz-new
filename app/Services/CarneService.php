@@ -128,8 +128,17 @@ class CarneService {
 
         $descBase = "Carnê Braziliana - Pedido #{$pedidoId} - Parcela {$parcela['numero_parcela']}";
 
-        // 1. Boleto Produtos via Câmbio Real
+        // 1. Boleto Produtos via Câmbio Real (mínimo USD 1.00 na API)
         if ($parcela['valor_produtos'] > 0) {
+            // Câmbio Real exige mínimo de USD 1.00 - verificar antes de chamar
+            $minBrl = 6.0; // ~USD 1.00 com margem
+            if ($parcela['valor_produtos'] < $minBrl) {
+                error_log("[CARNE] Valor produtos R$ {$parcela['valor_produtos']} abaixo do mínimo Câmbio Real (R$ {$minBrl}). Boleto não gerado.");
+                $this->carneModel->atualizarParcela($parcelaId, [
+                    'boleto_produtos_url' => '',
+                    'boleto_produtos_codigo' => 'Valor abaixo do mínimo para geração de boleto',
+                ]);
+            } else {
             try {
                 $crResult = $paymentService->createCambioRealDirectPaymentProdutoBoleto(
                     (int) $pedidoId,
@@ -207,6 +216,7 @@ class CarneService {
             } catch (\Exception $e) {
                 error_log('[CARNE] Exception Câmbio Real: ' . $e->getMessage());
             }
+            } // fecha else do mínimo
         }
 
         // 2. Boleto Taxas via Appmax
