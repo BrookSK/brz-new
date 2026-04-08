@@ -22,11 +22,11 @@ ob_start();
                             <div class="d-flex align-items-start">
                                 <i class="fas fa-exclamation-triangle text-warning me-3 mt-1 fs-4"></i>
                                 <div>
-                                    <strong class="d-block mb-1">Atenção: copie a URL correta da variação</strong>
+                                    <strong class="d-block mb-1">Atenção: copie o link correto da variação</strong>
                                     <span>Sites como <strong>Target</strong>, <strong>Gap</strong>, <strong>Amazon</strong>, <strong>Costco</strong>, entre outros, 
-                                    alteram a URL quando você seleciona uma variação (cor, tamanho, modelo, etc).</span>
+                                    alteram o link quando você seleciona uma variação (cor, tamanho, modelo, etc).</span>
                                     <br>
-                                    <span>Para pegarmos as informações corretas, <strong>clique na variação desejada no site</strong> e depois copie a URL atualizada do navegador para colar aqui.</span>
+                                    <span>Para pegarmos as informações corretas, <strong>clique na variação desejada no site</strong> e depois copie o link atualizado do navegador para colar aqui.</span>
                                 </div>
                             </div>
                         </div>
