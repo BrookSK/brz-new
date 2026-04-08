@@ -278,6 +278,29 @@ class AdminPedidosController extends Controller {
             }
         }
 
+        // Valor informado pelo cliente (assessoria)
+        $colValorInformado = $this->pickColumn($colsItens, ['valor_informado_cliente']);
+        if ($colValorInformado) {
+            try {
+                $sql = 'SELECT pi.' . $colPedidoId . ' AS pedido_id, COUNT(*) AS cnt'
+                    . ' FROM ' . $itensTable . ' pi'
+                    . ' WHERE pi.' . $colPedidoId . ' IN (' . $placeholders . ')'
+                    . ' AND pi.' . $colValorInformado . ' = 1'
+                    . ' GROUP BY pi.' . $colPedidoId;
+
+                $st = $pdo->prepare($sql);
+                $st->execute($pedidoIds);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($rows as $r) {
+                    $pid = (int) ($r['pedido_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    if (!isset($out[$pid])) $out[$pid] = ['missing_cost' => false, 'missing_ncm' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
+                    $out[$pid]['valor_informado_cliente'] = true;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
         // Invalid CPF (from pedido or usuario)
         try {
             if ($this->tableExistsPdo($pdo, 'pedidos')) {
@@ -2157,7 +2180,7 @@ JS;
                     $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
                         ? $warningsMap[$pid]
                         : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
-                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']) || !empty($warn['valor_informado_cliente']));
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
@@ -2168,6 +2191,9 @@ JS;
                         }
                         if (!empty($warn['cpf_invalid'])) {
                             $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                        }
+                        if (!empty($warn['valor_informado_cliente'])) {
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
                         }
                     }
                     
@@ -2288,7 +2314,7 @@ JS;
                     $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
                         ? $warningsMap[$pid]
                         : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
-                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']) || !empty($warn['valor_informado_cliente']));
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
@@ -2299,6 +2325,9 @@ JS;
                         }
                         if (!empty($warn['cpf_invalid'])) {
                             $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                        }
+                        if (!empty($warn['valor_informado_cliente'])) {
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
                         }
                     }
 
@@ -2418,7 +2447,7 @@ JS;
                     $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
                         ? $warningsMap[$pid]
                         : ['missing_cost' => false, 'missing_ncm' => false, 'cpf_invalid' => false, 'missing_cost_count' => 0, 'missing_ncm_count' => 0];
-                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']));
+                    $needsReview = (!empty($warn['missing_cost']) || !empty($warn['missing_ncm']) || !empty($warn['cpf_invalid']) || !empty($warn['valor_informado_cliente']));
                     $reviewBadges = '';
                     if ($needsReview) {
                         if (!empty($warn['missing_cost'])) {
@@ -2429,6 +2458,9 @@ JS;
                         }
                         if (!empty($warn['cpf_invalid'])) {
                             $reviewBadges .= '<span class="badge bg-warning text-dark ms-2">CPF inválido</span>';
+                        }
+                        if (!empty($warn['valor_informado_cliente'])) {
+                            $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
                         }
                     }
 
@@ -2806,8 +2838,12 @@ HTML;
                             <div class="small">Encontrado item com ' . htmlspecialchars(implode(' e ', $parts)) . '. Edite o(s) produto(s) do pedido e cadastre corretamente.</div>
                         </div>';
                 }
-            } catch (\Exception $e) {
-            }
+                if (is_array($warn) && !empty($warn['valor_informado_cliente'])) {
+                    echo '<div class="alert alert-danger">
+                            <div style="font-weight:800;"><i class="fas fa-exclamation-triangle me-1"></i>Atenção: valor informado pelo cliente</div>
+                            <div class="small">Este pedido contém itens cujo preço foi informado manualmente pelo cliente (assessoria). Confira os valores antes de processar.</div>
+                        </div>';
+                }
 
             // Bloco: rastreio / etiqueta (Correios ou W-Express)
             try {
@@ -3161,7 +3197,20 @@ HTML;
                                                 $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Produto Gratuito</span>';
                                             }
 
+                                            // Badge de valor informado pelo cliente (assessoria - revisão pendente)
+                                            $isValorInformadoCliente = !empty($item['valor_informado_cliente']);
+                                            if ($isValorInformadoCliente) {
+                                                $nomeHtml .= ' <span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
+                                            }
+
                                             $extraHtml = '';
+
+                                            // Observação do cliente (assessoria)
+                                            $obsCliente = trim((string) ($item['observacao_cliente'] ?? ''));
+                                            if ($obsCliente !== '') {
+                                                $extraHtml .= '<div class="alert alert-warning py-1 px-2 mt-1 mb-1 small"><i class="fas fa-comment me-1"></i><strong>Obs. do cliente:</strong> ' . htmlspecialchars($obsCliente) . '</div>';
+                                            }
+
                                             if ($sku !== '') {
                                                 $extraHtml .= '<div class="small text-muted">SKU/Ref: ' . htmlspecialchars($sku) . '</div>';
                                             }

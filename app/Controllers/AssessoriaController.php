@@ -2398,8 +2398,12 @@ class AssessoriaController extends Controller {
                     $index = $produtoIndex['index'] ?? null;
                     $variacaoId = $produtoIndex['variacao_id'] ?? null;
                     $quantidade = (int) ($produtoIndex['quantidade'] ?? 1);
+                    $valorInformadoCliente = isset($produtoIndex['valor_informado_cliente']) ? floatval($produtoIndex['valor_informado_cliente']) : null;
+                    $observacaoCliente = isset($produtoIndex['observacao_cliente']) ? trim((string) $produtoIndex['observacao_cliente']) : '';
                 } else {
                     $index = $produtoIndex;
+                    $valorInformadoCliente = null;
+                    $observacaoCliente = '';
                 }
 
                 if ($quantidade <= 0) {
@@ -2447,6 +2451,13 @@ class AssessoriaController extends Controller {
                         $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $preco;
                     } else {
                         $preco = floatval($produto['valor'] ?? 0);
+
+                        // Se o cliente informou o valor manualmente, usar esse valor e marcar
+                        if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
+                            $preco = $valorInformadoCliente;
+                            $produto['valor'] = $valorInformadoCliente;
+                        }
+
                         $_SESSION['carrinho'][$itemKey] = [
                             'produto_id' => $produtoId,
                             'nome' => (string) ($produto['nome'] ?? ''),
@@ -2462,6 +2473,14 @@ class AssessoriaController extends Controller {
 
                         if (!empty($produto['variacao_selecionada'])) {
                             $_SESSION['carrinho'][$itemKey]['variacao'] = $produto['variacao_selecionada'];
+                        }
+
+                        // Marcar valor informado pelo cliente para revisão no admin
+                        if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
+                            $_SESSION['carrinho'][$itemKey]['valor_informado_cliente'] = true;
+                        }
+                        if ($observacaoCliente !== '') {
+                            $_SESSION['carrinho'][$itemKey]['observacao_cliente'] = $observacaoCliente;
                         }
                     }
                     

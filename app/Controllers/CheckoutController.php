@@ -4648,6 +4648,18 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
+            // Valor informado manualmente pelo cliente (assessoria - revisão pendente)
+            if (!empty($item['valor_informado_cliente']) && is_array($colsItens) && in_array('valor_informado_cliente', $colsItens, true)) {
+                $cols[] = 'valor_informado_cliente';
+                $vals[] = 1;
+                $placeholders[] = '?';
+            }
+            if (!empty($item['observacao_cliente']) && is_array($colsItens) && in_array('observacao_cliente', $colsItens, true)) {
+                $cols[] = 'observacao_cliente';
+                $vals[] = (string) $item['observacao_cliente'];
+                $placeholders[] = '?';
+            }
+
                 $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
                 $stmt = $db->prepare($sql);
                 $stmt->execute($vals);

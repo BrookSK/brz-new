@@ -217,7 +217,7 @@ ob_start();
                                     </div>
                                 </div>
                                 <div class="col-auto text-end">
-                                    <?php if (!empty($produto['valor_pendente'])): ?>
+                                    <?php if (!empty($produto['valor_pendente']) || floatval($produto['valor'] ?? 0) <= 0): ?>
                                         <div class="mb-1">
                                             <span class="badge bg-warning text-dark small">Preço não encontrado</span>
                                         </div>
@@ -232,6 +232,13 @@ ob_start();
                                         </div>
                                         <small class="text-muted d-block mt-1">Informe o valor (USD)</small>
                                         <small class="text-warning d-block">Será conferido pela equipe</small>
+                                        <div class="mt-2" style="max-width: 200px;">
+                                            <textarea class="form-control form-control-sm obs-manual-input" 
+                                                      data-index="<?= $index ?>"
+                                                      rows="2" 
+                                                      placeholder="Observação (opcional)"
+                                                      style="font-size: 0.8rem;"></textarea>
+                                        </div>
                                     <?php else: ?>
                                         <div class="fw-bold text-primary h5">
                                             $<span class="valor-text" data-base-valor="<?= htmlspecialchars((string) $produto['valor']) ?>"><?= number_format($produto['valor'], 2) ?></span>
@@ -550,7 +557,9 @@ $(document).ready(function() {
             selecionadosPayload.push({
                 index: index,
                 variacao_id: d.variacao_id,
-                quantidade: quantidade
+                quantidade: quantidade,
+                valor_informado_cliente: (p.valor_pendente || d.valor_pendente) ? (p.valor || 0) : null,
+                observacao_cliente: p.observacao_cliente || null
             });
 
             if (Array.isArray(p.variacoes) && p.variacoes.length > 0) {
@@ -604,7 +613,7 @@ $(document).ready(function() {
         $('.product-checkbox:checked').each(function() {
             const idx = parseInt($(this).val());
             const p = produtos[idx];
-            if (p && p.valor_pendente && (!p.valor || p.valor <= 0)) {
+            if (p && (!p.valor || p.valor <= 0)) {
                 hasValorPendente = true;
             }
         });
@@ -632,6 +641,14 @@ $(document).ready(function() {
             produtos[index].valor_pendente = (!isNaN(val) && val > 0) ? false : true;
         }
         calcularTotaisSelecionados();
+    });
+
+    // Handler para observação manual
+    $(document).on('input change', '.obs-manual-input', function() {
+        const index = parseInt($(this).data('index'));
+        if (!isNaN(index) && produtos[index]) {
+            produtos[index].observacao_cliente = $(this).val().trim();
+        }
     });
 
     $(document).on('click', '.variation-btn', function() {

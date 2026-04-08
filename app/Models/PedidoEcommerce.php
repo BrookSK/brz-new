@@ -1508,6 +1508,10 @@ class PedidoEcommerce {
             if ($pick(['free_offer_tax_teorico']) !== null) $selectParts[] = 'pi.free_offer_tax_teorico';
             if ($pick(['free_offer_taxa_servico']) !== null) $selectParts[] = 'pi.free_offer_taxa_servico';
 
+            // Colunas de valor informado pelo cliente (assessoria)
+            if ($pick(['valor_informado_cliente']) !== null) $selectParts[] = 'pi.valor_informado_cliente';
+            if ($pick(['observacao_cliente']) !== null) $selectParts[] = 'pi.observacao_cliente';
+
             // Fallback: buscar nome do produto na tabela produtos quando nome_produto do item estiver vazio
             if ($colProdutoId) {
                 try {
