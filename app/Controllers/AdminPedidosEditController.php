@@ -1231,6 +1231,17 @@ class AdminPedidosEditController extends Controller {
             }
             $statusReserva = $cicloFechado ? 'finalizada' : 'ativa';
 
+            // Garantir coluna nome_produto nas tabelas de itens (DDL antes da transação)
+            $itensTablesPreCheck = [];
+            if ($this->tableExists('pedido_itens')) $itensTablesPreCheck[] = 'pedido_itens';
+            if ($this->tableExists('pedido_items')) $itensTablesPreCheck[] = 'pedido_items';
+            if (empty($itensTablesPreCheck)) $itensTablesPreCheck[] = $this->getItensTable();
+            foreach ($itensTablesPreCheck as $t) {
+                if (!$this->columnExists($t, 'nome_produto')) {
+                    try { $this->connection->exec("ALTER TABLE {$t} ADD COLUMN nome_produto VARCHAR(255) DEFAULT NULL"); } catch (\Exception $e) {}
+                }
+            }
+
             $this->connection->beginTransaction();
 
             if ($cicloFechadoOld && !empty($oldQtyByProduto) && $this->tableExists('estoque_interno')) {
@@ -1290,13 +1301,6 @@ class AdminPedidosEditController extends Controller {
             if ($this->tableExists('pedido_itens')) $itensTables[] = 'pedido_itens';
             if ($this->tableExists('pedido_items')) $itensTables[] = 'pedido_items';
             if (empty($itensTables)) $itensTables[] = $this->getItensTable();
-
-            // Garantir coluna nome_produto nas tabelas de itens
-            foreach ($itensTables as $t) {
-                if (!$this->columnExists($t, 'nome_produto')) {
-                    try { $this->connection->exec("ALTER TABLE {$t} ADD COLUMN nome_produto VARCHAR(255) DEFAULT NULL"); } catch (\Exception $e) {}
-                }
-            }
 
             $subtotal = 0;
 
