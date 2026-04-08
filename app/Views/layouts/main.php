@@ -19,6 +19,8 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- AppMax: meta tag de verificação temporária (remover após validação) -->
+    <meta name="appmax-app-id" content="f3d696e4-4f04-4176-84e6-1319433b5dda">
     <title><?= $title ?? 'Braziliana - E-commerce Internacional' ?></title>
     <?php
     $siteFavicon = '';
