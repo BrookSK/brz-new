@@ -1,12 +1,10 @@
-<?php
-$pageTitle = 'Configurações Carnê - Admin';
-require __DIR__ . '/../../partials/admin-header.php';
-?>
+<?php $title = 'Configurações Carnê - Admin'; ?>
+<?php ob_start(); ?>
 
-<div class="container-fluid py-4">
+<div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3><i class="fas fa-cog"></i> Configurações — Carnê Braziliana</h3>
-        <a href="/admin/carnes" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+        <h1 class="h3 mb-0"><i class="fas fa-cog me-2"></i> Configurações — Carnê Braziliana</h1>
+        <a href="/admin/carnes" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i> Voltar</a>
     </div>
 
     <?php if (!empty($_SESSION['message'])): ?>
@@ -20,15 +18,16 @@ require __DIR__ . '/../../partials/admin-header.php';
     <form method="POST" action="/admin/carnes/configuracoes">
         <div class="row">
             <div class="col-lg-6">
-                <div class="card shadow-sm mb-4">
+                <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header"><h6 class="mb-0">Geral</h6></div>
                     <div class="card-body">
                         <div class="mb-3">
                             <div class="form-check form-switch">
                                 <input type="hidden" name="carne_ativo" value="0">
                                 <input type="checkbox" name="carne_ativo" value="1" class="form-check-input" <?= ($config['carne_ativo'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                <label class="form-check-label">Carnê Braziliana Ativo</label>
+                                <label class="form-check-label">Exibir Carnê Braziliana no Checkout</label>
                             </div>
+                            <small class="text-muted">Desativar não afeta carnês já existentes.</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Máximo de Parcelas</label>
@@ -43,7 +42,7 @@ require __DIR__ . '/../../partials/admin-header.php';
             </div>
 
             <div class="col-lg-6">
-                <div class="card shadow-sm mb-4">
+                <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header"><h6 class="mb-0">Notificações</h6></div>
                     <div class="card-body">
                         <div class="mb-3">
@@ -86,4 +85,5 @@ require __DIR__ . '/../../partials/admin-header.php';
     </form>
 </div>
 
-<?php require __DIR__ . '/../../partials/admin-footer.php'; ?>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../../layouts/admin.php'; ?>

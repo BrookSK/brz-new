@@ -1,15 +1,13 @@
-<?php
-$pageTitle = 'Detalhe Carnê #' . $carne['id'] . ' - Admin';
-require __DIR__ . '/../../partials/admin-header.php';
-?>
+<?php $title = 'Detalhe Carnê #' . $carne['id'] . ' - Admin'; ?>
+<?php ob_start(); ?>
 
-<div class="container-fluid py-4">
-    <a href="/admin/carnes" class="btn btn-sm btn-outline-secondary mb-3"><i class="fas fa-arrow-left"></i> Voltar</a>
+<div class="container-fluid">
+    <a href="/admin/carnes" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left"></i> Voltar</a>
 
     <div class="row">
         <!-- Info Principal -->
         <div class="col-lg-8">
-            <div class="card shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Carnê #<?= $carne['id'] ?> — Pedido #<?= $carne['pedido_id'] ?></h5>
                     <span class="badge bg-<?= $carne['status'] === 'quitado' ? 'success' : ($carne['status'] === 'com_atraso' ? 'danger' : 'primary') ?> fs-6">
@@ -37,17 +35,13 @@ require __DIR__ . '/../../partials/admin-header.php';
             </div>
 
             <!-- Parcelas -->
-            <div class="card shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0">Parcelas</h6></div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
-                                <tr>
-                                    <th>#</th><th>Vencimento</th><th>Valor</th>
-                                    <th>Prod. (Câmbio)</th><th>Taxa (Appmax)</th>
-                                    <th>Status</th><th>Ações</th>
-                                </tr>
+                                <tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Prod. (Câmbio)</th><th>Taxa (Appmax)</th><th>Status</th><th>Ações</th></tr>
                             </thead>
                             <tbody>
                             <?php foreach ($carne['parcelas'] as $p): ?>
@@ -55,24 +49,10 @@ require __DIR__ . '/../../partials/admin-header.php';
                                     <td><?= $p['numero_parcela'] ?></td>
                                     <td><?= date('d/m/Y', strtotime($p['vencimento'])) ?></td>
                                     <td>R$ <?= number_format($p['valor_total'], 2, ',', '.') ?></td>
-                                    <td>
-                                        <span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>">
-                                            R$ <?= number_format($p['valor_produtos'], 2, ',', '.') ?>
-                                            <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>">
-                                            R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?>
-                                            <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?>
-                                        </span>
-                                    </td>
+                                    <td><span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_produtos'], 2, ',', '.') ?> <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?></span></td>
+                                    <td><span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?> <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?></span></td>
                                     <td><span class="badge bg-<?= $p['status'] === 'paga' ? 'success' : ($p['status'] === 'em_atraso' ? 'danger' : 'secondary') ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span></td>
-                                    <td>
-                                        <form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Reemitir"><i class="fas fa-redo"></i></button>
-                                        </form>
-                                    </td>
+                                    <td><form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-warning" title="Reemitir"><i class="fas fa-redo"></i></button></form></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -84,8 +64,7 @@ require __DIR__ . '/../../partials/admin-header.php';
 
         <!-- Sidebar Ações -->
         <div class="col-lg-4">
-            <!-- Ações Manuais -->
-            <div class="card shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0">Ações</h6></div>
                 <div class="card-body">
                     <?php if ($carne['status'] === 'quitado' && !$carne['envio_liberado']): ?>
@@ -107,7 +86,6 @@ require __DIR__ . '/../../partials/admin-header.php';
                         <?php endif; ?>
                     <?php endif; ?>
 
-                    <!-- Produto Indisponível -->
                     <button class="btn btn-outline-danger w-100 mb-2" data-bs-toggle="collapse" data-bs-target="#prodIndisponivel">
                         <i class="fas fa-exclamation-triangle"></i> Produto Indisponível
                     </button>
@@ -132,7 +110,6 @@ require __DIR__ . '/../../partials/admin-header.php';
                         </form>
                     </div>
 
-                    <!-- Reenviar Notificação -->
                     <form method="POST" action="/admin/carnes/reenviar-notificacao/<?= $carne['id'] ?>" class="mt-2">
                         <div class="input-group input-group-sm">
                             <select name="evento" class="form-select form-select-sm">
@@ -147,42 +124,33 @@ require __DIR__ . '/../../partials/admin-header.php';
                 </div>
             </div>
 
-            <!-- Compra Interna -->
             <?php if ($compraInterna): ?>
-            <div class="card shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0">Compra Interna</h6></div>
                 <div class="card-body">
                     <p><strong>Status:</strong> <span class="badge bg-info"><?= ucfirst(str_replace('_', ' ', $compraInterna['status'])) ?></span></p>
-                    <?php if ($compraInterna['comprado_em']): ?>
-                        <p><strong>Comprado em:</strong> <?= date('d/m/Y H:i', strtotime($compraInterna['comprado_em'])) ?></p>
-                    <?php endif; ?>
-                    <?php if ($compraInterna['recebido_em']): ?>
-                        <p><strong>Recebido em:</strong> <?= date('d/m/Y H:i', strtotime($compraInterna['recebido_em'])) ?></p>
-                    <?php endif; ?>
-                    <?php if ($compraInterna['produto_indisponivel']): ?>
-                        <div class="alert alert-danger small">Produto indisponível — Ação: <?= $compraInterna['acao_indisponibilidade'] ?></div>
-                    <?php endif; ?>
+                    <?php if ($compraInterna['comprado_em']): ?><p><strong>Comprado em:</strong> <?= date('d/m/Y H:i', strtotime($compraInterna['comprado_em'])) ?></p><?php endif; ?>
+                    <?php if ($compraInterna['recebido_em']): ?><p><strong>Recebido em:</strong> <?= date('d/m/Y H:i', strtotime($compraInterna['recebido_em'])) ?></p><?php endif; ?>
+                    <?php if ($compraInterna['produto_indisponivel']): ?><div class="alert alert-danger small">Produto indisponível — Ação: <?= $compraInterna['acao_indisponibilidade'] ?></div><?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
 
-            <!-- Histórico -->
-            <div class="card shadow-sm mb-4">
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0">Histórico</h6></div>
                 <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
                     <ul class="list-group list-group-flush">
                         <?php foreach ($historico as $h): ?>
                         <li class="list-group-item small">
                             <strong><?= date('d/m H:i', strtotime($h['created_at'])) ?></strong> — <?= htmlspecialchars($h['descricao']) ?>
-                            <?php if ($h['usuario_nome']): ?><br><span class="text-muted">por <?= htmlspecialchars($h['usuario_nome']) ?></span><?php endif; ?>
+                            <?php if (!empty($h['usuario_nome'])): ?><br><span class="text-muted">por <?= htmlspecialchars($h['usuario_nome']) ?></span><?php endif; ?>
                         </li>
                         <?php endforeach; ?>
                     </ul>
                 </div>
             </div>
 
-            <!-- Notificações -->
-            <div class="card shadow-sm">
+            <div class="card border-0 shadow-sm">
                 <div class="card-header"><h6 class="mb-0">Notificações Enviadas</h6></div>
                 <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
                     <ul class="list-group list-group-flush">
@@ -199,4 +167,5 @@ require __DIR__ . '/../../partials/admin-header.php';
     </div>
 </div>
 
-<?php require __DIR__ . '/../../partials/admin-footer.php'; ?>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../../layouts/admin.php'; ?>

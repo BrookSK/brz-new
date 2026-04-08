@@ -1,16 +1,13 @@
-<?php
-$pageTitle = 'Compras Internas - Carnê Braziliana';
-require __DIR__ . '/../../partials/admin-header.php';
-?>
+<?php $title = 'Compras Internas - Carnê Braziliana'; ?>
+<?php ob_start(); ?>
 
-<div class="container-fluid py-4">
+<div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3><i class="fas fa-shopping-basket"></i> Lista de Compras — Carnê</h3>
-        <a href="/admin/carnes" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+        <h1 class="h3 mb-0"><i class="fas fa-shopping-basket me-2"></i> Lista de Compras — Carnê</h1>
+        <a href="/admin/carnes" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Voltar</a>
     </div>
 
-    <!-- Filtros -->
-    <div class="card shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end">
                 <div class="col-md-3">
@@ -30,21 +27,12 @@ require __DIR__ . '/../../partials/admin-header.php';
         </div>
     </div>
 
-    <div class="card shadow-sm">
+    <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover table-sm mb-0">
                     <thead class="table-light">
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Total Carnê</th>
-                            <th>Parcelas</th>
-                            <th>Status Carnê</th>
-                            <th>1ª Parcela</th>
-                            <th>Status Compra</th>
-                            <th>Ações</th>
-                        </tr>
+                        <tr><th>Pedido</th><th>Cliente</th><th>Total Carnê</th><th>Parcelas</th><th>Status Carnê</th><th>1ª Parcela</th><th>Status Compra</th><th>Ações</th></tr>
                     </thead>
                     <tbody>
                         <?php if (empty($compras)): ?>
@@ -57,7 +45,7 @@ require __DIR__ . '/../../partials/admin-header.php';
                                 <td>R$ <?= number_format($ci['total_geral'], 2, ',', '.') ?></td>
                                 <td><?= $ci['quantidade_parcelas'] ?>x</td>
                                 <td><span class="badge bg-primary"><?= ucfirst(str_replace('_', ' ', $ci['carne_status'])) ?></span></td>
-                                <td><span class="badge bg-<?= $ci['status_primeira_parcela'] === 'paga' ? 'success' : 'warning' ?>"><?= ucfirst(str_replace('_', ' ', $ci['status_primeira_parcela'] ?? 'pendente')) ?></span></td>
+                                <td><span class="badge bg-<?= ($ci['status_primeira_parcela'] ?? '') === 'paga' ? 'success' : 'warning' ?>"><?= ucfirst(str_replace('_', ' ', $ci['status_primeira_parcela'] ?? 'pendente')) ?></span></td>
                                 <td><span class="badge bg-info"><?= ucfirst(str_replace('_', ' ', $ci['status'])) ?></span></td>
                                 <td>
                                     <a href="/admin/carnes/detalhes/<?= $ci['carne_id'] ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
@@ -77,4 +65,5 @@ require __DIR__ . '/../../partials/admin-header.php';
     </div>
 </div>
 
-<?php require __DIR__ . '/../../partials/admin-footer.php'; ?>
+<?php $content = ob_get_clean(); ?>
+<?php include __DIR__ . '/../../layouts/admin.php'; ?>
