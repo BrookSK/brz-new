@@ -738,7 +738,16 @@
                                                 // Carnê Braziliana: só aparece para BRL + Brasil
                                                 $carneService = new \App\Services\CarneService();
                                                 $moedaCheckout = strtoupper(trim((string) ($moeda ?? 'BRL')));
-                                                $paisCheckout = strtoupper(trim((string) ($pais_entrega ?? 'BR')));
+                                                // Detectar país de entrega: variável da view, endereço prefill, ou fallback BR
+                                                $paisCheckout = 'BR';
+                                                if (!empty($pais_entrega)) {
+                                                    $paisCheckout = strtoupper(trim((string) $pais_entrega));
+                                                } elseif (!empty($endereco_prefill['pais'])) {
+                                                    $paisCheckout = strtoupper(trim((string) $endereco_prefill['pais']));
+                                                } elseif (!empty($cobra_impostos_br)) {
+                                                    $paisCheckout = 'BR';
+                                                }
+                                                if ($paisCheckout === '') $paisCheckout = 'BR';
                                                 if ($carneService->isCarneDisponivel($moedaCheckout, $paisCheckout)):
                                                 ?>
                                                 <option value="carne_braziliana">Carnê Braziliana (até 12x boleto)</option>

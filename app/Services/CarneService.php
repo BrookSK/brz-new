@@ -260,10 +260,15 @@ class CarneService {
      * Verifica se carnê está disponível para o contexto do checkout
      */
     public function isCarneDisponivel($moeda = 'BRL', $paisEnvio = 'BR') {
-        $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_ativo'");
-        $stmt->execute();
-        $ativo = $stmt->fetchColumn();
-
-        return $ativo && $moeda === 'BRL' && $paisEnvio === 'BR';
+        try {
+            $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_ativo' LIMIT 1");
+            $stmt->execute();
+            $ativo = $stmt->fetchColumn();
+            // Se não encontrou o registro, considerar desativado
+            if ($ativo === false || $ativo === null) return false;
+            return ((string) $ativo === '1') && $moeda === 'BRL' && $paisEnvio === 'BR';
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 }
