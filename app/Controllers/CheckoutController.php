@@ -3886,9 +3886,25 @@ class CheckoutController extends Controller {
                 ];
 
                 // Carnê Braziliana: redirecionar para a conclusão específica do carnê
-                if ($formaSelecionada === 'carne_braziliana' && !empty($_SESSION['carne_id_criado'])) {
-                    $response['redirect'] = '/carne/conclusao/' . (int) $_SESSION['carne_id_criado'];
-                    unset($_SESSION['carne_id_criado']);
+                if ($formaSelecionada === 'carne_braziliana') {
+                    $carneRedirectId = null;
+                    // Tentar da sessão primeiro
+                    if (!empty($_SESSION['carne_id_criado'])) {
+                        $carneRedirectId = (int) $_SESSION['carne_id_criado'];
+                        unset($_SESSION['carne_id_criado']);
+                    }
+                    // Fallback: buscar pelo pedido_id
+                    if (!$carneRedirectId) {
+                        try {
+                            $dbCr = \Config\Database::getConnection();
+                            $stCr = $dbCr->prepare("SELECT id FROM carnes WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $stCr->execute([(int) $pedidoId]);
+                            $carneRedirectId = (int) ($stCr->fetchColumn() ?: 0);
+                        } catch (\Exception $e) {}
+                    }
+                    if ($carneRedirectId > 0) {
+                        $response['redirect'] = '/carne/conclusao/' . $carneRedirectId;
+                    }
                 }
 
                 // Incluir dados do Stripe PIX na resposta (moeda USD)
