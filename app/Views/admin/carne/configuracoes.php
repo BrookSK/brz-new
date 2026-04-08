@@ -25,9 +25,9 @@
                             <div class="form-check form-switch">
                                 <input type="hidden" name="carne_ativo" value="0">
                                 <input type="checkbox" name="carne_ativo" value="1" class="form-check-input" <?= ($config['carne_ativo'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                <label class="form-check-label">Exibir Carnê Braziliana no Checkout</label>
+                                <label class="form-check-label">Publicar para todos os clientes</label>
                             </div>
-                            <small class="text-muted">Desativar não afeta carnês já existentes.</small>
+                            <small class="text-muted">Quando ativado, todos os clientes veem o Carnê no checkout. Desativar não afeta carnês já existentes.</small>
                         </div>
                         <div class="mb-3">
                             <div class="form-check form-switch">
@@ -35,7 +35,7 @@
                                 <input type="checkbox" name="carne_somente_admin" value="1" class="form-check-input" <?= ($config['carne_somente_admin'] ?? '0') === '1' ? 'checked' : '' ?>>
                                 <label class="form-check-label">Modo Teste (somente admin)</label>
                             </div>
-                            <small class="text-muted">Quando ativado, o Carnê só aparece no checkout para administradores. Clientes não veem.</small>
+                            <small class="text-muted">Quando ativado, só admins veem o Carnê no checkout (para testar). Tem prioridade sobre o toggle acima.</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Máximo de Parcelas</label>

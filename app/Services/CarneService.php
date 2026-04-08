@@ -498,26 +498,26 @@ class CarneService {
      */
     public function isCarneDisponivel($moeda = 'BRL', $paisEnvio = 'BR') {
         try {
-            $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_ativo' LIMIT 1");
-            $stmt->execute();
-            $ativo = $stmt->fetchColumn();
-            if ($ativo === false || $ativo === null) return false;
-            if ((string) $ativo !== '1') return false;
             if ($moeda !== 'BRL' || $paisEnvio !== 'BR') return false;
 
-            // Modo teste: só admin pode ver
-            $stmt2 = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_somente_admin' LIMIT 1");
-            $stmt2->execute();
-            $somenteAdmin = $stmt2->fetchColumn();
-            if ((string) ($somenteAdmin ?: '0') === '1') {
-                $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
-                if ($perfil === 'administrator' || $perfil === 'administrador') $perfil = 'admin';
-                if ($perfil !== 'admin') {
-                    return false;
-                }
+            $stmt = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('carne_ativo', 'carne_somente_admin')");
+            $stmt->execute();
+            $configs = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+            $ativo = (string) ($configs['carne_ativo'] ?? '0');
+            $somenteAdmin = (string) ($configs['carne_somente_admin'] ?? '0');
+
+            $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+            if ($perfil === 'administrator' || $perfil === 'administrador') $perfil = 'admin';
+            $isAdmin = ($perfil === 'admin');
+
+            // Modo teste ligado: só admin vê (independente do toggle principal)
+            if ($somenteAdmin === '1') {
+                return $isAdmin;
             }
 
-            return true;
+            // Modo normal: respeita o toggle principal
+            return ($ativo === '1');
         } catch (\Exception $e) {
             return false;
         }
