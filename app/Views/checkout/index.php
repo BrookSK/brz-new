@@ -2297,17 +2297,25 @@ function atualizarFormaPagamento() {
     if (typeof toggleCarneBraziliana === 'function') {
         const isCarne = (formaPagamento === 'carne_braziliana');
         if (isCarne) {
-            // Pegar valores do checkout para calcular parcelas
-            const totalProdsEl = document.getElementById('checkout_subtotal_produtos');
-            const totalTaxasEl = document.getElementById('checkout_total_taxas');
-            let tProds = 0, tTaxas = 0;
-            if (totalProdsEl) tProds = parseFloat(totalProdsEl.value || totalProdsEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-            if (totalTaxasEl) tTaxas = parseFloat(totalTaxasEl.value || totalTaxasEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-            // Fallback: usar total geral se não encontrar separação
-            if (tProds <= 0) {
-                const totalEl = document.getElementById('checkout_total') || document.querySelector('[data-checkout-total]');
-                if (totalEl) tProds = parseFloat(totalEl.value || totalEl.dataset.checkoutTotal || totalEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            // Valores em USD do checkout, converter para BRL
+            const rate = Number(window.CAMBIOREAL_RATE_BRL || 5.5);
+            let subtotalUsd = 0, taxasUsd = 0;
+            if (window.checkoutOriginalValues) {
+                subtotalUsd = Number(window.checkoutOriginalValues.subtotal || 0);
+                const taxaServico = Number(window.checkoutOriginalValues.taxaServico || 0);
+                const impostos = Number(window.checkoutOriginalValues.impostos || 0);
+                const impostoLocal = Number(window.checkoutOriginalValues.impostoLocal || 0);
+                taxasUsd = taxaServico + impostos + impostoLocal;
+            } else if (window.checkoutBaseValues) {
+                subtotalUsd = Number(window.checkoutBaseValues.subtotal || 0);
+                const taxaServico = Number(window.checkoutBaseValues.taxaServico || 0);
+                const impostos = Number(window.checkoutBaseValues.impostos || 0);
+                const impostoLocal = Number(window.checkoutBaseValues.impostoLocal || 0);
+                taxasUsd = taxaServico + impostos + impostoLocal;
             }
+            // Converter para BRL
+            const tProds = Math.round(subtotalUsd * rate * 100) / 100;
+            const tTaxas = Math.round(taxasUsd * rate * 100) / 100;
             toggleCarneBraziliana(true, tProds, tTaxas);
         } else {
             toggleCarneBraziliana(false, 0, 0);
