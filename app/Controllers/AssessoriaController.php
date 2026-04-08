@@ -2183,12 +2183,12 @@ class AssessoriaController extends Controller {
         
         foreach ($produtos as $produto) {
             $subtotal += $produto['valor'];
-            $pesoTotal += $produto['peso'];
+            // Arredondar peso de cada produto para cima (ex: 1.1 -> 2)
+            $pesoTotal += ceil((float) $produto['peso']);
         }
         
-        // Reutiliza funções de cálculo existentes
-        $pesoArredondado = ceil((float) $pesoTotal);
-        $taxaServico = $this->getTaxaServicoPorKg() * $pesoArredondado;
+        // pesoTotal já está arredondado por produto
+        $taxaServico = $this->getTaxaServicoPorKg() * $pesoTotal;
         $frete = $this->calcularFrete($subtotal, $pesoTotal);
         $impostos = $this->calcularImpostos($subtotal);
 
@@ -2201,6 +2201,8 @@ class AssessoriaController extends Controller {
             'subtotal' => $subtotal,
             'peso_total' => $pesoTotal,
             'taxa_servico' => $taxaServico,
+            'taxa_servico_por_kg' => $this->getTaxaServicoPorKg(),
+            'imposto_percentual' => ($subtotal > 0) ? round(($impostos / $subtotal) * 100, 2) : 80,
             'pix_desconto_taxa_servico_percent' => $pixPct,
             'taxa_servico_pix' => $taxaServicoPix,
             'frete' => $frete,

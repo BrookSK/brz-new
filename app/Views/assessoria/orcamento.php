@@ -571,18 +571,16 @@ $(document).ready(function() {
         });
 
         const subtotal = selecionados.reduce((sum, p) => sum + (p.valor * (p.quantidade || 1)), 0);
-        const pesoTotal = selecionados.reduce((sum, p) => sum + (p.peso * (p.quantidade || 1)), 0);
+        // Arredondar peso de cada produto para cima antes de somar
+        const pesoTotal = selecionados.reduce((sum, p) => sum + (Math.ceil(p.peso) * (p.quantidade || 1)), 0);
         
-        // Recalcular taxas proporcionalmente
-        const taxaServicoOriginal = totaisOriginais.taxa_servico;
-        const freteOriginal = totaisOriginais.frete;
-        const impostosOriginais = totaisOriginais.impostos;
+        // Calcular taxa de serviço diretamente: peso arredondado por produto * taxa por kg
+        const TAXA_POR_KG = <?= json_encode((float) $totais['taxa_servico_por_kg'] ?? 39) ?>;
+        const IMPOSTO_PCT = <?= json_encode((float) ($totais['imposto_percentual'] ?? 0)) ?>;
         
-        const proporcao = subtotal > 0 ? subtotal / totaisOriginais.subtotal : 0;
-        
-        const taxaServico = taxaServicoOriginal * proporcao;
-        const frete = freteOriginal * proporcao;
-        const impostos = impostosOriginais * proporcao;
+        const taxaServico = TAXA_POR_KG * pesoTotal;
+        const frete = 0; // frete calculado no backend
+        const impostos = IMPOSTO_PCT > 0 ? subtotal * (IMPOSTO_PCT / 100) : (totaisOriginais.subtotal > 0 ? totaisOriginais.impostos * (subtotal / totaisOriginais.subtotal) : 0);
         const total = subtotal + taxaServico + frete + impostos;
 
         let taxaPix = taxaServico;
