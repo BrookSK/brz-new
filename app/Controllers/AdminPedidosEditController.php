@@ -950,39 +950,36 @@ class AdminPedidosEditController extends Controller {
             window.calcularTotal();
 
             window.editarNomeItem = function(btn){
-                const td = btn.closest('td');
+                var td = btn.closest("td");
                 if (!td) return;
-                const display = td.querySelector('.item-nome-display');
-                const input = td.querySelector('.item-nome-input');
+                var display = td.querySelector(".item-nome-display");
+                var input = td.querySelector(".item-nome-input");
                 if (!display || !input) return;
 
-                if (input.style.display === 'none') {
-                    // Entrar em modo edição
+                if (input.style.display === "none") {
                     input.value = display.textContent.trim();
-                    display.style.display = 'none';
-                    input.style.display = '';
+                    display.style.display = "none";
+                    input.style.display = "";
                     input.focus();
                     input.select();
-                    btn.innerHTML = '<i class="fas fa-check" style="font-size:11px;"></i>';
-                    btn.classList.remove('btn-outline-secondary');
-                    btn.classList.add('btn-success');
+                    btn.innerHTML = "<i class=\"fas fa-check\" style=\"font-size:11px;\"></i>";
+                    btn.classList.remove("btn-outline-secondary");
+                    btn.classList.add("btn-success");
                 } else {
-                    // Salvar
-                    const novoNome = input.value.trim();
-                    if (novoNome === '') {
-                        alert('O nome não pode ficar vazio.');
+                    var novoNome = input.value.trim();
+                    if (novoNome === "") {
+                        alert("O nome não pode ficar vazio.");
                         input.focus();
                         return;
                     }
                     display.textContent = novoNome;
-                    display.style.display = '';
-                    input.style.display = 'none';
-                    btn.innerHTML = '<i class="fas fa-pencil-alt" style="font-size:11px;"></i>';
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-secondary');
+                    display.style.display = "";
+                    input.style.display = "none";
+                    btn.innerHTML = "<i class=\"fas fa-pencil-alt\" style=\"font-size:11px;\"></i>";
+                    btn.classList.remove("btn-success");
+                    btn.classList.add("btn-outline-secondary");
 
-                    // Atualizar o data attribute para o salvar pegar
-                    const row = btn.closest('.item-row');
+                    var row = btn.closest(".item-row");
                     if (row) row.dataset.nomeProduto = novoNome;
                 }
             };
