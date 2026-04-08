@@ -293,6 +293,7 @@
                             'cartao_debito' => __('checkout.payment.debit_card', 'Cartão de Débito'),
                             'boleto' => __('checkout.payment.boleto', 'Boleto Bancário'),
                             'pix' => 'PIX',
+                            'carne_braziliana' => 'Carnê Braziliana',
                         ];
                         $fp = (string) ($pedido['forma_pagamento'] ?? '');
                         echo $formas[$fp] ?? $fp;

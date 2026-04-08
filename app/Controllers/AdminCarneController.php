@@ -1,0 +1,231 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Request;
+use App\Models\Carne;
+use App\Services\CarneService;
+use Config\Database;
+
+class AdminCarneController extends Controller {
+    private $carneModel;
+    private $carneService;
+    private $db;
+
+    public function __construct() {
+        $this->carneModel = new Carne();
+        $this->carneService = new CarneService();
+        $this->db = Database::getConnection();
+    }
+
+    /**
+     * Listagem de carnês
+     */
+    public function index(Request $request) {
+        $filtros = [
+            'status' => $request->getParam('status', ''),
+            'cliente' => $request->getParam('cliente', ''),
+            'pedido_id' => $request->getParam('pedido_id', ''),
+            'com_atraso' => $request->getParam('com_atraso', ''),
+            'liberado_compra' => $request->getParam('liberado_compra', ''),
+            'liberado_envio' => $request->getParam('liberado_envio', '')
+        ];
+
+        $carnes = $this->carneModel->listarAdmin($filtros);
+        require __DIR__ . '/../Views/admin/carne/index.php';
+    }
+
+    /**
+     * Detalhe do carnê
+     */
+    public function detalhes(Request $request, $id) {
+        $carne = $this->carneModel->getCompleto($id);
+        if (!$carne) {
+            $_SESSION['message'] = 'Carnê não encontrado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+        }
+
+        $historico = $this->carneModel->getHistorico($id);
+        $notificacoes = $this->carneModel->getNotificacoes($id);
+
+        $stmt = $this->db->prepare("SELECT * FROM carne_compras_internas WHERE carne_id = :cid");
+        $stmt->execute([':cid' => $id]);
+        $compraInterna = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        require __DIR__ . '/../Views/admin/carne/detalhes.php';
+    }
+
+    /**
+     * Lista de compras internas do Carnê
+     */
+    public function comprasInternas(Request $request) {
+        $filtros = ['status' => $request->getParam('status', '')];
+        $compras = $this->carneModel->listarComprasInternas($filtros);
+        require __DIR__ . '/../Views/admin/carne/compras-internas.php';
+    }
+
+    /**
+     * Reemitir boleto (admin)
+     */
+    public function reemitirBoleto(Request $request, $parcelaId) {
+        $parcela = $this->carneModel->getParcela($parcelaId);
+        if (!$parcela) {
+            $_SESSION['message'] = 'Parcela não encontrada.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+        }
+
+        $this->carneModel->atualizarParcela($parcelaId, [
+            'reemissao_count' => $parcela['reemissao_count'] + 1,
+            'status' => 'reemitida'
+        ]);
+
+        $this->carneModel->registrarHistorico($parcela['carne_id'], $parcelaId, 'boleto_reemitido',
+            "Boleto reemitido pelo admin", null, $_SESSION['usuario_id'] ?? null);
+
+        $_SESSION['message'] = 'Boleto reemitido com sucesso.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$parcela['carne_id']}");
+    }
+
+    /**
+     * Marcar produto como comprado internamente
+     */
+    public function marcarComprado(Request $request, $id) {
+        $stmt = $this->db->prepare("
+            UPDATE carne_compras_internas SET status = 'comprado', comprado_em = NOW() WHERE id = :id
+        ");
+        $stmt->execute([':id' => $id]);
+
+        $stmt = $this->db->prepare("SELECT carne_id FROM carne_compras_internas WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $carneId = $stmt->fetchColumn();
+
+        $this->carneModel->registrarHistorico($carneId, null, 'produto_comprado',
+            'Produto marcado como comprado internamente', null, $_SESSION['usuario_id'] ?? null);
+
+        $_SESSION['message'] = 'Produto marcado como comprado.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$carneId}");
+    }
+
+    /**
+     * Marcar produto como recebido internamente
+     */
+    public function marcarRecebido(Request $request, $id) {
+        $stmt = $this->db->prepare("
+            UPDATE carne_compras_internas SET status = 'recebido', recebido_em = NOW() WHERE id = :id
+        ");
+        $stmt->execute([':id' => $id]);
+
+        $stmt = $this->db->prepare("SELECT carne_id FROM carne_compras_internas WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $carneId = $stmt->fetchColumn();
+
+        $this->carneModel->registrarHistorico($carneId, null, 'produto_recebido',
+            'Produto marcado como recebido internamente', null, $_SESSION['usuario_id'] ?? null);
+
+        $_SESSION['message'] = 'Produto marcado como recebido.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$carneId}");
+    }
+
+    /**
+     * Marcar produto indisponível
+     */
+    public function produtoIndisponivel(Request $request, $id) {
+        $acao = $request->getParam('acao', '');
+        $valor = floatval($request->getParam('valor', 0));
+        $obs = $request->getParam('observacoes', '');
+
+        if ($acao === 'credito_carteira') {
+            $this->carneService->gerarCreditoCarteira($id, $valor, $obs, $_SESSION['usuario_id'] ?? null);
+            $_SESSION['message'] = 'Crédito em carteira gerado com sucesso.';
+        } elseif ($acao === 'pedido_complementar') {
+            $stmt = $this->db->prepare("
+                UPDATE carne_compras_internas SET 
+                    status = 'substituido', produto_indisponivel = 1,
+                    acao_indisponibilidade = 'pedido_complementar', observacoes = :obs
+                WHERE carne_id = :cid
+            ");
+            $stmt->execute([':obs' => $obs, ':cid' => $id]);
+
+            $this->carneModel->registrarHistorico($id, null, 'pedido_complementar',
+                "Pedido complementar necessário. Diferença: R$ " . number_format($valor, 2, ',', '.'),
+                null, $_SESSION['usuario_id'] ?? null);
+
+            $_SESSION['message'] = 'Produto marcado como indisponível. Crie o pedido complementar.';
+        }
+
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$id}");
+    }
+
+    /**
+     * Liberar envio manualmente
+     */
+    public function liberarEnvio(Request $request, $id) {
+        $carne = $this->carneModel->find($id);
+        if (!$carne || $carne['status'] !== 'quitado') {
+            $_SESSION['message'] = 'Carnê precisa estar quitado para liberar envio.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect("/admin/carnes/detalhes/{$id}");
+        }
+
+        $this->carneModel->update($id, ['envio_liberado' => 1, 'status' => 'liberado_envio']);
+        $this->carneModel->registrarHistorico($id, null, 'envio_liberado',
+            'Envio liberado pelo admin', null, $_SESSION['usuario_id'] ?? null);
+
+        $this->carneService->dispararNotificacao($id, null, 'envio_liberado');
+
+        $_SESSION['message'] = 'Envio liberado com sucesso.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$id}");
+    }
+
+    /**
+     * Reenviar notificação
+     */
+    public function reenviarNotificacao(Request $request, $carneId) {
+        $evento = $request->getParam('evento', 'carne_criado');
+        $parcelaId = $request->getParam('parcela_id') ?: null;
+
+        $this->carneService->dispararNotificacao($carneId, $parcelaId, $evento);
+
+        $_SESSION['message'] = 'Notificação reenviada.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$carneId}");
+    }
+
+    /**
+     * Configurações do Carnê
+     */
+    public function configuracoes(Request $request) {
+        if ($request->getMethod() === 'POST') {
+            $campos = [
+                'carne_ativo', 'carne_max_parcelas', 'carne_dias_vencimento',
+                'carne_webhook_url', 'carne_webhook_ativo', 'carne_email_ativo',
+                'carne_eventos_webhook', 'carne_eventos_email'
+            ];
+            foreach ($campos as $campo) {
+                $val = $request->getParam($campo);
+                if ($val !== null) {
+                    $stmt = $this->db->prepare("
+                        INSERT INTO configuracoes_sistema (chave, valor) VALUES (:chave, :valor)
+                        ON DUPLICATE KEY UPDATE valor = :valor2
+                    ");
+                    $stmt->execute([':chave' => $campo, ':valor' => $val, ':valor2' => $val]);
+                }
+            }
+            $_SESSION['message'] = 'Configurações salvas.';
+            $_SESSION['message_type'] = 'success';
+            $this->redirect('/admin/carnes/configuracoes');
+        }
+
+        $stmt = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'carne_%'");
+        $stmt->execute();
+        $config = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+        require __DIR__ . '/../Views/admin/carne/configuracoes.php';
+    }
+}

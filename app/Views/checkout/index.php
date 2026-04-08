@@ -734,6 +734,15 @@
                                                 <option value="cartao_debito"><?= __('checkout.payment.debit_card', 'Cartão de Débito') ?></option>
                                                 <option value="pix">PIX</option>
                                                 <!-- <option value="boleto">Boleto</option> <!-- OCULTO TEMPORARIAMENTE -->
+                                                <?php
+                                                // Carnê Braziliana: só aparece para BRL + Brasil
+                                                $carneService = new \App\Services\CarneService();
+                                                $moedaCheckout = strtoupper(trim((string) ($moeda ?? 'BRL')));
+                                                $paisCheckout = strtoupper(trim((string) ($pais_entrega ?? 'BR')));
+                                                if ($carneService->isCarneDisponivel($moedaCheckout, $paisCheckout)):
+                                                ?>
+                                                <option value="carne_braziliana">Carnê Braziliana (até 12x boleto)</option>
+                                                <?php endif; ?>
                                             </select>
 
                                             <div id="cambioreal-fees-warning" class="alert alert-warning mt-2" style="display:none;">
@@ -779,6 +788,10 @@
                                             }, 100);
                                             </script>
                                         </div>
+
+                                        <!-- Carnê Braziliana -->
+                                        <?php require __DIR__ . '/../carne/checkout-partial.php'; ?>
+
                                         <div class="col-12" id="campos-cartao" style="display: none;">
                                             <div id="campos-cartao-stripe" style="display:none;">
                                                 <label class="form-label"><?= __('checkout.card', 'Cartão') ?></label>
@@ -1715,6 +1728,14 @@ async function processarPedidoDireto() {
         formData.append('forma_pagamento', formaPagamento);
         console.log(`🔍 [DIRETO] forma_pagamento: ${formaPagamento} (garantido)`);
 
+        // Carnê Braziliana: adicionar campos específicos
+        if (formaPagamento === 'carne_braziliana') {
+            const carneParcelasEl = document.getElementById('carne-parcelas-select');
+            const carneTermosEl = document.getElementById('carne-termos-check');
+            if (carneParcelasEl) formData.append('carne_parcelas', carneParcelasEl.value);
+            if (carneTermosEl) formData.append('carne_termos_aceitos', carneTermosEl.checked ? '1' : '');
+        }
+
         // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL)
         if ((formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito') && currentCurrency === 'BRL') {
             const camposCartao = document.getElementById('campos-cartao');
@@ -2228,6 +2249,10 @@ function atualizarFormaPagamento() {
                 botaoFinalizar.innerHTML = '<i class="fas fa-qrcode"></i> Gerar PIX';
                 console.log('🔍 [BOTÃO] Texto atualizado para PIX');
                 break;
+            case 'carne_braziliana':
+                botaoFinalizar.innerHTML = '<i class="fas fa-file-invoice-dollar"></i> Finalizar com Carnê Braziliana';
+                console.log('🔍 [BOTÃO] Texto atualizado para Carnê');
+                break;
             case 'transferencia':
                 botaoFinalizar.innerHTML = '<i class="fas fa-university"></i> Finalizar com Transferência';
                 console.log('🔍 [BOTÃO] Texto atualizado para transferência');
@@ -2245,6 +2270,27 @@ function atualizarFormaPagamento() {
     }
     
     console.log('🔍 [FIM] atualizarFormaPagamento() concluída');
+
+    // Carnê Braziliana: toggle seção
+    if (typeof toggleCarneBraziliana === 'function') {
+        const isCarne = (formaPagamento === 'carne_braziliana');
+        if (isCarne) {
+            // Pegar valores do checkout para calcular parcelas
+            const totalProdsEl = document.getElementById('checkout_subtotal_produtos');
+            const totalTaxasEl = document.getElementById('checkout_total_taxas');
+            let tProds = 0, tTaxas = 0;
+            if (totalProdsEl) tProds = parseFloat(totalProdsEl.value || totalProdsEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            if (totalTaxasEl) tTaxas = parseFloat(totalTaxasEl.value || totalTaxasEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            // Fallback: usar total geral se não encontrar separação
+            if (tProds <= 0) {
+                const totalEl = document.getElementById('checkout_total') || document.querySelector('[data-checkout-total]');
+                if (totalEl) tProds = parseFloat(totalEl.value || totalEl.dataset.checkoutTotal || totalEl.textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            }
+            toggleCarneBraziliana(true, tProds, tTaxas);
+        } else {
+            toggleCarneBraziliana(false, 0, 0);
+        }
+    }
 
     // Atualizar info PIX em BRL
     if (typeof updatePixBrlInfo === 'function') {

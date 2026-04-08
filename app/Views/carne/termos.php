@@ -1,0 +1,62 @@
+<?php
+$pageTitle = 'Termos do Carnê Braziliana';
+require __DIR__ . '/../partials/header.php';
+?>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h2 class="mb-4">Termos e Condições do Carnê Braziliana</h2>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5>1. Como funciona o Carnê</h5>
+                    <p>O Carnê Braziliana é um método de pagamento parcelado via boletos bancários. Ao escolher este método, o valor da compra será dividido em parcelas mensais (de 1 a 12 vezes), cada uma composta por dois boletos separados.</p>
+
+                    <h5>2. Estrutura das Parcelas</h5>
+                    <p>Cada parcela mensal gera dois boletos:</p>
+                    <ul>
+                        <li><strong>Boleto 1 (Câmbio Real):</strong> referente ao valor dos produtos</li>
+                        <li><strong>Boleto 2 (Appmax):</strong> referente às taxas de serviço, impostos e demais valores</li>
+                    </ul>
+                    <p>A parcela só será considerada quitada quando ambos os boletos forem pagos.</p>
+
+                    <h5>3. Prazo de Vencimento</h5>
+                    <p>Cada parcela possui prazo de 7 dias para pagamento a partir da data de geração. Parcelas não pagas dentro do prazo serão marcadas como vencidas e posteriormente em atraso.</p>
+
+                    <h5>4. Política de Envio</h5>
+                    <p><strong>O envio do pedido será realizado somente após a quitação total de todas as parcelas.</strong> Enquanto houver parcelas pendentes, o pedido permanecerá aguardando.</p>
+
+                    <h5>5. Inadimplência</h5>
+                    <p>Parcelas em atraso podem resultar em bloqueio do carnê. O sistema manterá o registro de todas as parcelas e seus respectivos status.</p>
+
+                    <h5>6. Segunda Via</h5>
+                    <p>O cliente pode solicitar segunda via de boletos a qualquer momento através da área "Meus Carnês" na sua conta.</p>
+
+                    <h5>7. Produto Indisponível</h5>
+                    <p>Caso o produto ou variação não esteja mais disponível no momento da compra interna, a equipe entrará em contato para oferecer alternativas: crédito em carteira ou pedido complementar com a diferença de valor.</p>
+
+                    <h5>8. Diferença de Valor</h5>
+                    <p>Se houver necessidade de ajuste de valor (produto substituto mais caro), será gerado um pedido complementar separado contendo apenas a diferença.</p>
+
+                    <h5>9. Adiantamento de Parcelas</h5>
+                    <p>O cliente pode pagar parcelas futuras antecipadamente, se desejar.</p>
+
+                    <h5>10. Regras Gerais</h5>
+                    <ul>
+                        <li>O Carnê Braziliana está disponível apenas para pagamentos em Reais (BRL) e envios para o Brasil</li>
+                        <li>Não se trata de assinatura ou recorrência automática</li>
+                        <li>O parcelamento é controlado internamente pelo sistema</li>
+                        <li>Todas as parcelas e boletos podem ser acompanhados na área do cliente</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="/" class="btn btn-outline-secondary"><i class="fas fa-home"></i> Voltar à Loja</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php require __DIR__ . '/../partials/footer.php'; ?>

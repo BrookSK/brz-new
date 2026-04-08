@@ -190,6 +190,7 @@ $router->get('/admin', function($request) {
         ['icon' => 'fas fa-users', 'label' => 'Usuários', 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-wallet', 'label' => 'Recargas Clube (Quick)', 'url' => '/admin/clube/recargas', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         ['icon' => 'fas fa-credit-card', 'label' => 'Pagamentos', 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
+        ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Carnê Braziliana', 'url' => '/admin/carnes', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-cog', 'label' => 'Configurações', 'url' => '/admin/configuracoes', 'roles' => ['admin']],
         ['icon' => 'fas fa-database', 'label' => 'Backup', 'url' => '/admin/backup', 'roles' => ['admin']],
     ];
@@ -484,6 +485,10 @@ $router->post('/webhook/appmax', 'WebhookController', 'appmax');
 $router->post('/webhook/mercadopago', 'WebhookController', 'mercadopago');
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
 
+// Webhooks Carnê Braziliana
+$router->post('/webhook/carne/cambioreal', 'WebhookCarneController', 'cambioReal');
+$router->post('/webhook/carne/appmax', 'WebhookCarneController', 'appmax');
+
 // API
 $router->get('/api/produtos/buscar', 'ApiController', 'buscarProdutos');
 $router->get('/api/produtos/destaque', 'ApiController', 'produtosDestaque');
@@ -592,6 +597,34 @@ $router->get('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir
 $router->post('/admin/usuarios/excluir/{id}', 'AdminUsuariosController', 'excluir');
 $router->get('/admin/usuarios/novo', 'AdminUsuariosController', 'novo');
 $router->post('/admin/usuarios/atualizar-status/{id}', 'AdminUsuariosController', 'atualizarStatus');
+
+// =====================================================
+// CARNÊ BRAZILIANA
+// =====================================================
+
+// Público / Cliente
+$router->get('/carne/termos', 'CarneController', 'termos');
+$router->get('/carne/conclusao/{id}', 'CarneController', 'conclusao');
+$router->get('/meus-carnes', 'CarneController', 'meusCarnes');
+$router->get('/meu-carne/{id}', 'CarneController', 'detalhe');
+$router->post('/carne/segunda-via/{parcelaId}', 'CarneController', 'segundaVia');
+$router->get('/carne/calcular-parcelas', 'CarneController', 'calcularParcelas');
+
+// Cron
+$router->get('/cron/carne/processar', 'CarneController', 'cron');
+
+// Admin
+$router->get('/admin/carnes', 'AdminCarneController', 'index');
+$router->get('/admin/carnes/detalhes/{id}', 'AdminCarneController', 'detalhes');
+$router->get('/admin/carnes/compras-internas', 'AdminCarneController', 'comprasInternas');
+$router->post('/admin/carnes/reemitir-boleto/{parcelaId}', 'AdminCarneController', 'reemitirBoleto');
+$router->post('/admin/carnes/marcar-comprado/{id}', 'AdminCarneController', 'marcarComprado');
+$router->post('/admin/carnes/marcar-recebido/{id}', 'AdminCarneController', 'marcarRecebido');
+$router->post('/admin/carnes/produto-indisponivel/{id}', 'AdminCarneController', 'produtoIndisponivel');
+$router->post('/admin/carnes/liberar-envio/{id}', 'AdminCarneController', 'liberarEnvio');
+$router->post('/admin/carnes/reenviar-notificacao/{carneId}', 'AdminCarneController', 'reenviarNotificacao');
+$router->get('/admin/carnes/configuracoes', 'AdminCarneController', 'configuracoes');
+$router->post('/admin/carnes/configuracoes', 'AdminCarneController', 'configuracoes');
 
 // Área do Representante
 $router->get('/admin/representante/produtos', 'AdminProdutosController', 'index');

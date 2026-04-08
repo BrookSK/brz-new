@@ -2901,6 +2901,71 @@ class CheckoutController extends Controller {
                     }
                 }
 
+                // =====================================================
+                // CARNÊ BRAZILIANA — Fluxo de pagamento parcelado
+                // =====================================================
+                if (!$reused && $formaSelecionada === 'carne_braziliana') {
+                    try {
+                        $carneService = new \App\Services\CarneService();
+
+                        // Validar aceite dos termos
+                        if (empty($dados['carne_termos_aceitos'])) {
+                            throw new \Exception('Você precisa aceitar os termos do Carnê Braziliana.');
+                        }
+
+                        $qtdParcelas = (int) ($dados['carne_parcelas'] ?? 1);
+                        if ($qtdParcelas < 1 || $qtdParcelas > 12) $qtdParcelas = 1;
+
+                        // Separar valores: produtos vs taxas/impostos/serviços
+                        $subtotalProdutos = (float) ($pedidoRowPay['subtotal'] ?? ($pedidoRowPay['subtotal_produtos'] ?? 0));
+                        $totalPedido = (float) ($pedidoRowPay['total'] ?? 0);
+                        $totalTaxas = round($totalPedido - $subtotalProdutos, 2);
+                        if ($totalTaxas < 0) $totalTaxas = 0;
+                        if ($subtotalProdutos <= 0) {
+                            $subtotalProdutos = $totalPedido;
+                            $totalTaxas = 0;
+                        }
+
+                        $clienteId = (int) ($usuario['id'] ?? 0);
+                        if ($clienteId <= 0) {
+                            throw new \Exception('Usuário não identificado para criar o carnê.');
+                        }
+
+                        $carneId = $carneService->criarCarne(
+                            (int) $pedidoId,
+                            $clienteId,
+                            $subtotalProdutos,
+                            $totalTaxas,
+                            $qtdParcelas
+                        );
+
+                        // Atualizar status do pedido para indicar carnê
+                        try {
+                            $dbCarne = \Config\Database::getConnection();
+                            $colsPedCarne = [];
+                            try { $stC = $dbCarne->query('DESCRIBE pedidos'); $colsPedCarne = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+
+                            $setCarne = ['status = ?'];
+                            $pCarne = ['carne_aguardando'];
+
+                            if (in_array('forma_pagamento', $colsPedCarne, true)) {
+                                $setCarne[] = 'forma_pagamento = ?';
+                                $pCarne[] = 'carne_braziliana';
+                            }
+
+                            $pCarne[] = (int) $pedidoId;
+                            $stUpdCarne = $dbCarne->prepare('UPDATE pedidos SET ' . implode(', ', $setCarne) . ' WHERE id = ?');
+                            $stUpdCarne->execute($pCarne);
+                        } catch (\Exception $e) {}
+
+                        // Guardar o carneId na sessão para o redirect
+                        $_SESSION['carne_id_criado'] = $carneId;
+
+                    } catch (\Exception $e) {
+                        throw new \Exception('Erro ao criar Carnê: ' . $e->getMessage());
+                    }
+                }
+
                 $moedaPedidoPay = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
                 if ($moedaPedidoPay === '') {
                     $moedaPedidoPay = 'BRL';
@@ -2910,7 +2975,7 @@ class CheckoutController extends Controller {
 
                 // Split (Câmbio Real + AppMax) quando moeda é BRL; Stripe quando USD
                 $useSplit = ($moedaPedidoPay === 'BRL');
-                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $useSplit && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
+                $shouldTrySplit = ($formaSelecionada !== 'carteira' && $formaSelecionada !== 'carne_braziliana' && $useSplit && in_array($formaSelecionada, ['pix', 'boleto', 'cartao_credito', 'cartao_debito'], true));
                 // Se o pedido foi reutilizado, ainda assim tentar gerar split caso ainda não exista split persistido.
                 if ($shouldTrySplit && $reused) {
                     $shouldTrySplit = !$this->pedidoJaTemSplitPagamentos((int) $pedidoId);
@@ -3738,6 +3803,12 @@ class CheckoutController extends Controller {
                     'stripe_required' => ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'cartao_credito' && $formaSelecionada !== 'carteira'),
                     'stripe_pix' => ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix'),
                 ];
+
+                // Carnê Braziliana: redirecionar para a conclusão específica do carnê
+                if ($formaSelecionada === 'carne_braziliana' && !empty($_SESSION['carne_id_criado'])) {
+                    $response['redirect'] = '/carne/conclusao/' . (int) $_SESSION['carne_id_criado'];
+                    unset($_SESSION['carne_id_criado']);
+                }
 
                 // Incluir dados do Stripe PIX na resposta (moeda USD)
                 if (!empty($pixResult['success']) && $moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix') {
@@ -5002,6 +5073,35 @@ class CheckoutController extends Controller {
         $formaPag = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
         if ($pais !== 'BR' && !in_array($formaPag, ['', 'cartao_credito', 'pix'], true)) {
             $erros[] = 'Para endereços fora do Brasil, apenas Cartão de Crédito e PIX (Stripe) estão disponíveis.';
+        }
+
+        // Validar Carnê Braziliana
+        if ($formaPag === 'carne_braziliana') {
+            // Verificar se o método está ativo
+            try {
+                $carneServiceVal = new \App\Services\CarneService();
+                $moedaVal = strtoupper(trim((string) ($dados['moeda'] ?? 'BRL')));
+                $paisVal = strtoupper(trim((string) ($dados['pais'] ?? $pais)));
+                if (!$carneServiceVal->isCarneDisponivel($moedaVal, $paisVal)) {
+                    $erros[] = 'O método Carnê Braziliana não está disponível no momento.';
+                }
+            } catch (\Exception $e) {
+                $erros[] = 'Erro ao verificar disponibilidade do Carnê Braziliana.';
+            }
+            if ($pais !== 'BR') {
+                $erros[] = 'Carnê Braziliana está disponível apenas para envios ao Brasil.';
+            }
+            $moedaCheckout = strtoupper(trim((string) ($dados['moeda'] ?? 'BRL')));
+            if ($moedaCheckout !== 'BRL') {
+                $erros[] = 'Carnê Braziliana está disponível apenas para pagamentos em Reais (BRL).';
+            }
+            if (empty($dados['carne_termos_aceitos'])) {
+                $erros[] = 'Você precisa aceitar os termos do Carnê Braziliana.';
+            }
+            $parcelas = (int) ($dados['carne_parcelas'] ?? 0);
+            if ($parcelas < 1 || $parcelas > 12) {
+                $erros[] = 'Selecione a quantidade de parcelas (1 a 12).';
+            }
         }
         
         // Dados pessoais

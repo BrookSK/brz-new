@@ -53,6 +53,9 @@
                         <a class="nav-link mb-2" href="/meus-pedidos">
                             <i class="fas fa-shopping-bag me-2"></i> <?= __('user.my_orders', 'Meus Pedidos') ?>
                         </a>
+                        <a class="nav-link mb-2" href="/meus-carnes">
+                            <i class="fas fa-file-invoice-dollar me-2"></i> Meus Carnês
+                        </a>
                         <a class="nav-link mb-2" href="/carrinho">
                             <i class="fas fa-shopping-cart me-2"></i> <?= __('user.my_cart', 'Meu Carrinho') ?>
                             <?php if (!empty($_SESSION['carrinho'])): ?>

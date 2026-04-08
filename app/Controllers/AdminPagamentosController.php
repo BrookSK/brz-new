@@ -1444,6 +1444,7 @@ class AdminPagamentosController extends Controller {
                 'pix_enabled',
                 'default_currency',
                 'default_payment_method',
+                'carne_ativo',
             ];
 
             if ($this->tableExistsPdo($pdo, 'configuracoes_sistema')) {
@@ -1453,6 +1454,18 @@ class AdminPagamentosController extends Controller {
                         $config[$k] = $v;
                     }
                 }
+            }
+
+            // Carnê: buscar diretamente da configuracoes_sistema (chave simples, sem categoria)
+            if (empty($config['carne_ativo'])) {
+                try {
+                    $stCarne = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_ativo' LIMIT 1");
+                    $stCarne->execute();
+                    $vCarne = $stCarne->fetchColumn();
+                    if ($vCarne !== false && $vCarne !== null) {
+                        $config['carne_ativo'] = (string) $vCarne;
+                    }
+                } catch (\Exception $e) {}
             }
 
             if ($this->tableExistsPdo($pdo, 'configuracoes')) {
@@ -1656,6 +1669,27 @@ class AdminPagamentosController extends Controller {
                         </div>
                     </div>
                     
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4 border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-file-invoice-dollar"></i> Carnê Braziliana</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted small mb-3">Controla se o método de pagamento Carnê Braziliana aparece no checkout para novas compras. Desativar não afeta carnês já existentes.</p>
+                                    <div class="form-check form-switch">
+                                        <input type="hidden" name="carne_ativo" value="0">
+                                        <input class="form-check-input" type="checkbox" name="carne_ativo" value="1" id="carne_ativo" ' . ((!empty($config['carne_ativo']) && (string) $config['carne_ativo'] !== '0') ? 'checked' : '') . '>
+                                        <label class="form-check-label" for="carne_ativo">Exibir Carnê Braziliana no Checkout</label>
+                                    </div>
+                                    <div class="mt-3">
+                                        <a href="/admin/carnes/configuracoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-cog"></i> Configurações avançadas do Carnê</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-end">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> Salvar Configurações
@@ -1696,6 +1730,7 @@ class AdminPagamentosController extends Controller {
             'pix_enabled',
             'default_currency',
             'default_payment_method',
+            'carne_ativo',
         ];
 
         try {
@@ -1716,11 +1751,23 @@ class AdminPagamentosController extends Controller {
 
             foreach ($keys as $k) {
                 $val = $dados[$k] ?? '';
-                if (in_array($k, ['stripe_enabled', 'mercadopago_enabled', 'pix_enabled', 'cambioreal_enabled'], true)) {
+                if (in_array($k, ['stripe_enabled', 'mercadopago_enabled', 'pix_enabled', 'cambioreal_enabled', 'carne_ativo'], true)) {
                     $val = !empty($dados[$k]) ? '1' : '0';
                 }
                 $this->saveConfigValueToKeyValueTable($pdo, $table, 'pagamentos', (string) $k, is_string($val) ? $val : (string) $val);
             }
+
+            // Carnê: salvar também diretamente na configuracoes_sistema (chave simples)
+            // para que o CarneService::isCarneDisponivel() funcione corretamente
+            try {
+                $carneVal = !empty($dados['carne_ativo']) ? '1' : '0';
+                $stCarne = $pdo->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'carne_ativo'");
+                $stCarne->execute([$carneVal]);
+                if ($stCarne->rowCount() === 0) {
+                    $stCarne = $pdo->prepare("INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES ('carne_ativo', ?)");
+                    $stCarne->execute([$carneVal]);
+                }
+            } catch (\Exception $e) {}
 
             if ($pdo->inTransaction()) {
                 $pdo->commit();
