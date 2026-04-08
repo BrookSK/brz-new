@@ -21,19 +21,41 @@ class CarneService {
         $total = $totalProdutos + $totalTaxas;
         $opcoes = [];
 
+        // Mínimo da Câmbio Real: USD 1.00 ≈ R$ 6.00 (com margem de segurança)
+        $minimoBoleto = 6.00;
+
         for ($i = 1; $i <= $maxParcelas; $i++) {
             $vProd = round($totalProdutos / $i, 2);
             $vTaxa = round($totalTaxas / $i, 2);
             $vTotal = round($total / $i, 2);
 
+            // Só incluir se ambos os boletos atendem o mínimo
+            // (ou se o valor é 0, ex: sem taxas ou sem produtos)
+            $prodOk = ($vProd <= 0 || $vProd >= $minimoBoleto);
+            $taxaOk = ($vTaxa <= 0 || $vTaxa >= $minimoBoleto);
+
+            if ($prodOk && $taxaOk) {
+                $opcoes[] = [
+                    'parcelas' => $i,
+                    'valor_parcela_produtos' => $vProd,
+                    'valor_parcela_taxas' => $vTaxa,
+                    'valor_parcela_total' => $vTotal,
+                    'total' => $total
+                ];
+            }
+        }
+
+        // Garantir que pelo menos 1x esteja disponível
+        if (empty($opcoes)) {
             $opcoes[] = [
-                'parcelas' => $i,
-                'valor_parcela_produtos' => $vProd,
-                'valor_parcela_taxas' => $vTaxa,
-                'valor_parcela_total' => $vTotal,
+                'parcelas' => 1,
+                'valor_parcela_produtos' => $totalProdutos,
+                'valor_parcela_taxas' => $totalTaxas,
+                'valor_parcela_total' => $total,
                 'total' => $total
             ];
         }
+
         return $opcoes;
     }
 
