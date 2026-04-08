@@ -16,6 +16,19 @@
         window.CARTEIRA_SALDO_DISPONIVEL = <?= json_encode((float) ($carteira_saldo_disponivel ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CARTEIRA_TURBO_BLOQUEADO = <?= json_encode((float) ($carteira_turbo_bloqueado ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CARTEIRA_TURBO_LIBERACAO_DATA = <?= json_encode((string) ($carteira_turbo_liberacao_data ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+        <?php
+        // Carnê Braziliana: verificar disponibilidade server-side e expor para o JS
+        $carneDispCheck = false;
+        try {
+            $carneServiceInit = new \App\Services\CarneService();
+            $moedaInit = strtoupper(trim((string) ($moeda ?? 'BRL')));
+            $paisInit = 'BR';
+            if (!empty($endereco_prefill['pais'])) $paisInit = strtoupper(trim((string) $endereco_prefill['pais']));
+            if ($paisInit === '') $paisInit = 'BR';
+            $carneDispCheck = $carneServiceInit->isCarneDisponivel($moedaInit, $paisInit);
+        } catch (\Exception $e) {}
+        ?>
+        window.CARNE_BRAZILIANA_DISPONIVEL = <?= $carneDispCheck ? 'true' : 'false' ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -2763,11 +2776,16 @@ function updatePaymentMethodsForCurrency(currency) {
 
     if (useSplit) {
         // Split: CR produtos + AppMax taxas
-        // Opções: PIX, Cartão de Crédito, Cartão de Débito, Carteira
+        // Opções: PIX, Cartão de Crédito, Cartão de Débito, Carteira, Carnê
         select.appendChild(optCarteira);
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
         select.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
         select.appendChild(new Option('PIX', 'pix'));
+
+        // Carnê Braziliana: só BRL + Brasil
+        if (isBRL && isBR && window.CARNE_BRAZILIANA_DISPONIVEL) {
+            select.appendChild(new Option('Carnê Braziliana (até 12x boleto)', 'carne_braziliana'));
+        }
     } else {
         // Fora do Brasil + USD: Stripe (tudo)
         // Opções: Cartão de Crédito, PIX (Stripe), Carteira
