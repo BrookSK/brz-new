@@ -4,55 +4,30 @@
 $__conversaoMoedaAtiva = false;
 try {
     $__pdo = \Config\Database::getConnection();
-
-    // Tentar schema categoria/chave primeiro (configuracoes_sistema com categoria + chave + valor)
-    $__found = false;
-    $__tableCandidates = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
-    foreach ($__tableCandidates as $__t) {
+    $__queries = [
+        // Schema categoria_chave (configuracoes_sistema)
+        "SELECT valor FROM configuracoes_sistema WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        "SELECT value FROM configuracoes_sistema WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        // Schema categoria_chave (configuracoes)
+        "SELECT valor FROM configuracoes WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        "SELECT value FROM configuracoes WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        // Schema chave_valor
+        "SELECT valor FROM configuracoes_sistema WHERE chave = 'loja_conversao_moeda_ativa' LIMIT 1",
+        "SELECT valor FROM configuracoes WHERE chave = 'loja_conversao_moeda_ativa' LIMIT 1",
+        "SELECT value FROM settings WHERE `key` = 'loja_conversao_moeda_ativa' LIMIT 1",
+        // Schema single_row
+        "SELECT loja_conversao_moeda_ativa FROM configuracoes_sistema ORDER BY id ASC LIMIT 1",
+        "SELECT conversao_moeda_ativa FROM configuracoes_sistema ORDER BY id ASC LIMIT 1",
+        "SELECT loja_conversao_moeda_ativa FROM configuracoes ORDER BY id ASC LIMIT 1",
+        "SELECT conversao_moeda_ativa FROM configuracoes ORDER BY id ASC LIMIT 1",
+    ];
+    foreach ($__queries as $__sql) {
         try {
-            $__stT = $__pdo->prepare("SHOW TABLES LIKE ?");
-            $__stT->execute([$__t]);
-            if (!$__stT->fetchColumn()) continue;
-
-            $__stD = $__pdo->query('DESCRIBE ' . $__t);
-            $__cols = $__stD ? ($__stD->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-
-            if (in_array('categoria', $__cols, true) && in_array('chave', $__cols, true)) {
-                // Schema categoria_chave
-                $__valCol = in_array('valor', $__cols, true) ? 'valor' : (in_array('value', $__cols, true) ? 'value' : null);
-                if ($__valCol) {
-                    $__st = $__pdo->prepare("SELECT {$__valCol} FROM {$__t} WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1");
-                    $__st->execute();
-                    $__v = (string) ($__st->fetchColumn() ?: '0');
-                    $__conversaoMoedaAtiva = ($__v === '1');
-                    $__found = true;
-                    break;
-                }
-            } elseif (in_array('id', $__cols, true)) {
-                // Schema single_row — procurar coluna direta
-                $__colCandidates = ['loja_conversao_moeda_ativa', 'conversao_moeda_ativa'];
-                foreach ($__colCandidates as $__cc) {
-                    if (in_array($__cc, $__cols, true)) {
-                        $__st = $__pdo->query("SELECT {$__cc} FROM {$__t} ORDER BY id ASC LIMIT 1");
-                        $__v = (string) ($__st->fetchColumn() ?: '0');
-                        $__conversaoMoedaAtiva = ($__v === '1');
-                        $__found = true;
-                        break 2;
-                    }
-                }
-            } else {
-                // Schema chave_valor
-                $__keyCandidates = ['chave', 'key', 'nome', 'config_key'];
-                $__valCandidates = ['valor', 'value', 'conteudo', 'config_value'];
-                $__kc = null; $__vc = null;
-                foreach ($__keyCandidates as $__k) { if (in_array($__k, $__cols, true)) { $__kc = $__k; break; } }
-                foreach ($__valCandidates as $__k) { if (in_array($__k, $__cols, true)) { $__vc = $__k; break; } }
-                if ($__kc && $__vc) {
-                    $__st = $__pdo->prepare("SELECT {$__vc} FROM {$__t} WHERE {$__kc} = ? LIMIT 1");
-                    $__st->execute(['loja_conversao_moeda_ativa']);
-                    $__v = (string) ($__st->fetchColumn() ?: '0');
-                    $__conversaoMoedaAtiva = ($__v === '1');
-                    $__found = true;
+            $__st = $__pdo->query($__sql);
+            if ($__st) {
+                $__v = $__st->fetchColumn();
+                if ($__v !== false) {
+                    $__conversaoMoedaAtiva = ((string) $__v === '1');
                     break;
                 }
             }

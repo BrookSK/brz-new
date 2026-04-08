@@ -4389,6 +4389,15 @@ HTML;
                         }
                     }
 
+                    // Garantir coluna de conversão de moeda
+                    if (!in_array('loja_conversao_moeda_ativa', $cols, true) && !in_array('conversao_moeda_ativa', $cols, true)) {
+                        try {
+                            $pdo->exec('ALTER TABLE ' . $table . ' ADD COLUMN loja_conversao_moeda_ativa TINYINT(1) NOT NULL DEFAULT 0');
+                            $addedAny = true;
+                        } catch (\Exception $e) {
+                        }
+                    }
+
                     if ($addedAny) {
                         $tableInfo = $this->getConfigTableInfo($pdo);
                         $table = $tableInfo['table'];
@@ -6858,6 +6867,26 @@ HTML;
                         if (in_array($col, $cols, true)) {
                             $columnMap['layout'] = $columnMap['layout'] ?? [];
                             $columnMap['layout'][$key] = $col;
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+
+                // Loja (conversão de moeda) em schema single_row
+                try {
+                    $lojaCols = [
+                        'loja_conversao_moeda_ativa' => 'conversao_moeda_ativa',
+                        'loja_nome' => 'nome',
+                        'loja_descricao' => 'descricao',
+                        'loja_email' => 'email',
+                        'loja_telefone' => 'telefone',
+                        'loja_endereco' => 'endereco',
+                        'loja_logo' => 'logo',
+                    ];
+                    foreach ($lojaCols as $col => $key) {
+                        if (in_array($col, $cols, true)) {
+                            $columnMap['loja'] = $columnMap['loja'] ?? [];
+                            $columnMap['loja'][$key] = $col;
                         }
                     }
                 } catch (\Exception $e) {
