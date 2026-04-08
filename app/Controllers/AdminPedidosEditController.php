@@ -212,7 +212,7 @@ class AdminPedidosEditController extends Controller {
         }
     }
 
-    private function upsertPendenciaCompra(int $pedidoId, int $produtoId, int $qtdFaltante): void {
+    private function upsertPendenciaCompra(int $pedidoId, int $produtoId, int $qtdFaltante, string $nomeProdutoCustom = ''): void {
         if ($pedidoId <= 0 || $produtoId <= 0 || $qtdFaltante <= 0) {
             return;
         }
@@ -221,12 +221,27 @@ class AdminPedidosEditController extends Controller {
         }
 
         $temPedido = $this->columnExists('lista_compras', 'pedido_id');
+        $temNomeProduto = $this->columnExists('lista_compras', 'nome_produto');
+
+        // Se não tem coluna nome_produto, tentar criar
+        if (!$temNomeProduto && $nomeProdutoCustom !== '') {
+            try {
+                $this->connection->exec("ALTER TABLE lista_compras ADD COLUMN nome_produto VARCHAR(255) DEFAULT NULL");
+                $temNomeProduto = true;
+            } catch (\Exception $e) {}
+        }
+
         try {
             $sqlSel = "SELECT id, quantidade_faltante FROM lista_compras WHERE produto_id = :produto_id AND status = 'pendente'";
             $params = [':produto_id' => $produtoId];
             if ($temPedido) {
                 $sqlSel .= ' AND pedido_id = :pedido_id';
                 $params[':pedido_id'] = $pedidoId;
+            }
+            // Se tem nome customizado, buscar pelo nome para não misturar com itens de nome diferente
+            if ($temNomeProduto && $nomeProdutoCustom !== '') {
+                $sqlSel .= ' AND nome_produto = :nome_produto';
+                $params[':nome_produto'] = $nomeProdutoCustom;
             }
             $sqlSel .= ' ORDER BY COALESCE(data_solicitacao, created_at) ASC, id ASC LIMIT 1';
             $stmtSel = $this->connection->prepare($sqlSel);
@@ -245,6 +260,11 @@ class AdminPedidosEditController extends Controller {
                 $cols[] = 'pedido_id';
                 $vals[] = ':pedido_id';
                 $params[':pedido_id'] = $pedidoId;
+            }
+            if ($temNomeProduto && $nomeProdutoCustom !== '') {
+                $cols[] = 'nome_produto';
+                $vals[] = ':nome_produto';
+                $params[':nome_produto'] = $nomeProdutoCustom;
             }
             $stmtIns = $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')');
             $stmtIns->execute($params);
@@ -606,8 +626,16 @@ class AdminPedidosEditController extends Controller {
             foreach ($itens as $item) {
                 echo '<tr class="item-row" data-item-id="' . (int) ($item['id'] ?? 0) . '" data-produto-id="' . (int) ($item['produto_id'] ?? 0) . '" data-nome-produto="' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '" data-nome-produto-sku="' . htmlspecialchars((string) ($item['nome_produto_sku'] ?? '')) . '" data-loja="' . htmlspecialchars((string) ($item['loja'] ?? 'outro')) . '">
                         <td>
-                            <strong>' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '</strong>
-                            <br><small class="text-muted">SKU: ' . htmlspecialchars((string) ($item['nome_produto_sku'] ?? 'N/A')) . '</small>
+                            <div class="d-flex align-items-start gap-1">
+                                <div class="flex-grow-1">
+                                    <strong class="item-nome-display">' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '</strong>
+                                    <input type="text" class="form-control form-control-sm item-nome-input" value="' . htmlspecialchars((string) ($item['nome_produto'] ?? '')) . '" style="display:none;">
+                                    <br><small class="text-muted">SKU: ' . htmlspecialchars((string) ($item['nome_produto_sku'] ?? 'N/A')) . '</small>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editarNomeItem(this)" title="Editar nome do produto">
+                                    <i class="fas fa-pencil-alt" style="font-size:11px;"></i>
+                                </button>
+                            </div>
                         </td>
                         <td>
                             <span class="badge bg-secondary">' . ucfirst((string) ($item['loja'] ?? 'outro')) . '</span>
@@ -920,6 +948,44 @@ class AdminPedidosEditController extends Controller {
             };
 
             window.calcularTotal();
+
+            window.editarNomeItem = function(btn){
+                const td = btn.closest('td');
+                if (!td) return;
+                const display = td.querySelector('.item-nome-display');
+                const input = td.querySelector('.item-nome-input');
+                if (!display || !input) return;
+
+                if (input.style.display === 'none') {
+                    // Entrar em modo edição
+                    input.value = display.textContent.trim();
+                    display.style.display = 'none';
+                    input.style.display = '';
+                    input.focus();
+                    input.select();
+                    btn.innerHTML = '<i class="fas fa-check" style="font-size:11px;"></i>';
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('btn-success');
+                } else {
+                    // Salvar
+                    const novoNome = input.value.trim();
+                    if (novoNome === '') {
+                        alert('O nome não pode ficar vazio.');
+                        input.focus();
+                        return;
+                    }
+                    display.textContent = novoNome;
+                    display.style.display = '';
+                    input.style.display = 'none';
+                    btn.innerHTML = '<i class="fas fa-pencil-alt" style="font-size:11px;"></i>';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+
+                    // Atualizar o data attribute para o salvar pegar
+                    const row = btn.closest('.item-row');
+                    if (row) row.dataset.nomeProduto = novoNome;
+                }
+            };
         })();
     </script>
 </body>
@@ -1306,7 +1372,20 @@ class AdminPedidosEditController extends Controller {
                     }
                     $faltante = $qtdPedido - $reservar;
                     if (!$cicloFechado && $faltante > 0) {
-                        $this->upsertPendenciaCompra($pedidoId, $produtoId, $faltante);
+                        // Se o nome do produto foi customizado, verificar se difere do nome original
+                        $nomeProdutoCustom = '';
+                        $nomeProdutoItem = trim((string) ($item['nome_produto'] ?? ''));
+                        if ($nomeProdutoItem !== '' && $produtoId > 0) {
+                            try {
+                                $stNome = $this->connection->prepare('SELECT COALESCE(name, nome, "") FROM produtos WHERE id = ? LIMIT 1');
+                                $stNome->execute([$produtoId]);
+                                $nomeOriginal = trim((string) ($stNome->fetchColumn() ?: ''));
+                                if ($nomeOriginal !== '' && $nomeProdutoItem !== $nomeOriginal) {
+                                    $nomeProdutoCustom = $nomeProdutoItem;
+                                }
+                            } catch (\Exception $e) {}
+                        }
+                        $this->upsertPendenciaCompra($pedidoId, $produtoId, $faltante, $nomeProdutoCustom);
                     }
                 }
             }

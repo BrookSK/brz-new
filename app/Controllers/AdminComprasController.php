@@ -1223,10 +1223,12 @@ class AdminComprasController extends Controller {
                 . ', agg.data_solicitacao as data_solicitacao'
                 . ', agg.loja_id as loja_id'
                 . ', agg.status as status'
+                . ', agg.nome_produto_custom as nome_produto_custom'
                 . ' FROM ('
                 . '   SELECT lc.produto_id, '
                 . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
                 . '     , lc.status as status'
+                . ($this->columnExists('lista_compras', 'nome_produto') ? ', COALESCE(lc.nome_produto, \'\') as nome_produto_custom' : ", '' as nome_produto_custom")
                 . '     , SUM(CASE WHEN COALESCE(lc.quantidade_faltante,0) > 0 THEN lc.quantidade_faltante ELSE COALESCE(lc.quantidade_necessaria,0) END) as quantidade_faltante'
                 . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
                 . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
@@ -1250,6 +1252,7 @@ class AdminComprasController extends Controller {
                         }, (array) $reabertos['items'])))) . ')'))
                     : '')
                 . '   GROUP BY lc.produto_id, '
+                . ($this->columnExists('lista_compras', 'nome_produto') ? 'COALESCE(lc.nome_produto, \'\'), ' : '')
                 . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0), lc.status' : '0, lc.status')
                 . ' ) agg'
                 . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
@@ -1574,6 +1577,12 @@ class AdminComprasController extends Controller {
                                     }
 
                                     $missingLoja = ($lojaIdRow <= 0);
+
+                                    // Usar nome customizado se disponível (item com nome editado no pedido)
+                                    $nomeCustom = trim((string) ($item['nome_produto_custom'] ?? ''));
+                                    if ($nomeCustom !== '') {
+                                        $item['produto_nome'] = $nomeCustom;
+                                    }
                                      
                                     $btnRemoverItem = '<button type="button" class="btn btn-outline-danger"'
                                         . ' data-bs-toggle="modal" data-bs-target="#modalRemoverItem"'
@@ -2598,11 +2607,13 @@ class AdminComprasController extends Controller {
             . ', agg.data_solicitacao as data_solicitacao'
             . ', agg.loja_id as loja_id'
             . ', agg.prioridade as prioridade'
+            . ', agg.nome_produto_custom as nome_produto_custom'
             . ", 'pendente' as status"
             . ' FROM ('
             . '   SELECT lc.produto_id, '
             . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
             . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(lc.pedido_id,0),0)) as pedido_id' : '')
+            . ($this->columnExists('lista_compras', 'nome_produto') ? ", COALESCE(lc.nome_produto, '') as nome_produto_custom" : ", '' as nome_produto_custom")
             . '     , SUM(COALESCE(lc.quantidade_faltante,0)) as quantidade_faltante'
             . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
             . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
@@ -2612,6 +2623,7 @@ class AdminComprasController extends Controller {
             . "   WHERE lc.status = 'pendente'"
             . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
             . '   GROUP BY lc.produto_id, '
+            . ($this->columnExists('lista_compras', 'nome_produto') ? "COALESCE(lc.nome_produto, ''), " : '')
             . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0)' : '0')
             . ' ) agg'
             . ' JOIN produtos p ON agg.produto_id = p.id';
@@ -2697,10 +2709,12 @@ class AdminComprasController extends Controller {
             $imgTag = $img ? '<img class="img" src="' . htmlspecialchars($img) . '" alt="">' : '<div class="img"></div>';
             $pedidoIdLinha = (int) ($r['pedido_id'] ?? 0);
             $obsLinha = ($pedidoIdLinha > 0 && isset($obsByPedido[$pedidoIdLinha])) ? trim((string) $obsByPedido[$pedidoIdLinha]) : '';
+            $nomeExibir = trim((string) ($r['nome_produto_custom'] ?? ''));
+            if ($nomeExibir === '') $nomeExibir = (string) ($r['produto_nome'] ?? '');
             echo '<tr>'
                 . '<td style="text-align:center;"><span class="check"></span></td>'
                 . '<td style="text-align:center;">' . $imgTag . '</td>'
-                . '<td><strong>' . htmlspecialchars((string) ($r['produto_nome'] ?? '')) . '</strong></td>'
+                . '<td><strong>' . htmlspecialchars($nomeExibir) . '</strong></td>'
                 . '<td style="text-align:center;font-size:14px;"><strong>' . $qf . '</strong></td>'
                 . ($temPedidoEmLista && $temObsVendedor ? ('<td>' . htmlspecialchars($obsLinha, ENT_QUOTES, 'UTF-8') . '</td>') : '')
                 . '</tr>';
