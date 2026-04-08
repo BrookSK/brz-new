@@ -4420,7 +4420,7 @@ HTML;
             
             // Mapeamento de configurações
             $configMap = [
-                'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo'],
+                'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo', 'conversao_moeda_ativa'],
                 'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'cambioreal_enabled', 'cambioreal_base_url', 'cambioreal_app_id', 'cambioreal_app_public', 'cambioreal_app_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
@@ -4443,7 +4443,7 @@ HTML;
                 'promocao' => ['taxa_servico_ativo', 'taxa_servico_tipo', 'taxa_servico_valor']
             ];
             
-            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo'];
+            $checkboxKeys = ['calcular_automatico', 'sitemap_gerado', 'manutencao', 'debug', 'cache_ativado', 'site_lock_enabled', 'welcome_popup_enabled', 'asaas_enabled', 'stripe_enabled', 'appmax_enabled', 'mercadopago_enabled', 'cambioreal_enabled', 'wexpress_enabled', 'sigep_enabled', 'correios_tracking_enabled', 'shipstation_enabled', 'taxa_servico_ativo', 'conversao_moeda_ativa'];
 
             foreach ($configMap as $categoria => $chaves) {
                 foreach ($chaves as $chave) {
