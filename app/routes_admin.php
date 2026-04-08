@@ -212,3 +212,12 @@ $router->post('/admin/migracao/importar', 'AdminMigracaoController', 'importar')
 
 // Webhooks
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
+
+// Desconto com Autorização
+$router->post('/admin/configuracoes/desconto/solicitar', 'AdminDescontoAutorizacaoController', 'solicitar');
+$router->get('/admin/configuracoes/desconto/verificar', 'AdminDescontoAutorizacaoController', 'verificar');
+$router->get('/admin/configuracoes/desconto/autorizar', 'AdminDescontoAutorizacaoController', 'autorizarTela');
+$router->post('/admin/configuracoes/desconto/autorizar', 'AdminDescontoAutorizacaoController', 'autorizarTela');
+$router->get('/admin/configuracoes/desconto/email-autorizar', 'AdminDescontoAutorizacaoController', 'autorizarEmail');
+$router->get('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
+$router->post('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');

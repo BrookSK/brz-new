@@ -343,9 +343,9 @@ class AdminDescontoAutorizacaoController
 
         try {
             $baseUrl = rtrim((string) ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? ''), '/');
-            $urlAprovar = $baseUrl . '/admin/desconto/email-autorizar?token=' . urlencode($token) . '&acao=aprovar';
-            $urlNegar   = $baseUrl . '/admin/desconto/email-autorizar?token=' . urlencode($token) . '&acao=negar';
-            $urlPainel  = $baseUrl . '/admin/desconto/autorizar?token=' . urlencode($token);
+            $urlAprovar = $baseUrl . '/admin/configuracoes/desconto/email-autorizar?token=' . urlencode($token) . '&acao=aprovar';
+            $urlNegar   = $baseUrl . '/admin/configuracoes/desconto/email-autorizar?token=' . urlencode($token) . '&acao=negar';
+            $urlPainel  = $baseUrl . '/admin/configuracoes/desconto/autorizar?token=' . urlencode($token);
 
             $sym = $moeda === 'BRL' ? 'R$' : '$';
             $descontoLabel = $tipo === 'percentual' ? number_format($valor, 2, ',', '.') . '%' : $sym . ' ' . number_format($valor, 2, ',', '.');
@@ -410,7 +410,7 @@ class AdminDescontoAutorizacaoController
 
             if ($sol['status'] === 'pendente') {
                 echo '<div class="card-footer">
-                    <form method="POST" action="/admin/desconto/autorizar?token=' . $h($token) . '">
+                    <form method="POST" action="/admin/configuracoes/desconto/autorizar?token=' . $h($token) . '">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Senha de autorização</label>
                             <input type="password" class="form-control" name="senha" required placeholder="Digite a senha...">

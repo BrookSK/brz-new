@@ -2046,7 +2046,7 @@ document.addEventListener('DOMContentLoaded', function(){
         fd.append('preco_original', precoOriginal);
         fd.append('moeda', getSelectedMoeda());
 
-        fetch('/admin/desconto/solicitar', { method: 'POST', body: fd })
+        fetch('/admin/configuracoes/desconto/solicitar', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (!data.ok) throw new Error(data.error || 'Erro ao solicitar');
@@ -2081,7 +2081,7 @@ document.addEventListener('DOMContentLoaded', function(){
         }
 
         window.__DESCONTO_POLLS__[token] = setInterval(() => {
-            fetch('/admin/desconto/verificar?token=' + encodeURIComponent(token))
+            fetch('/admin/configuracoes/desconto/verificar?token=' + encodeURIComponent(token))
                 .then(r => r.json())
                 .then(data => {
                     if (!data.ok) return;
