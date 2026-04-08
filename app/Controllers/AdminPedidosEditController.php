@@ -1385,11 +1385,14 @@ class AdminPedidosEditController extends Controller {
                         $nomeProdutoItem = trim((string) ($item['nome_produto'] ?? ''));
                         if ($nomeProdutoItem !== '' && $produtoId > 0) {
                             try {
-                                $stNome = $this->connection->prepare('SELECT COALESCE(name, nome, "") FROM produtos WHERE id = ? LIMIT 1');
-                                $stNome->execute([$produtoId]);
-                                $nomeOriginal = trim((string) ($stNome->fetchColumn() ?: ''));
-                                if ($nomeOriginal !== '' && $nomeProdutoItem !== $nomeOriginal) {
-                                    $nomeProdutoCustom = $nomeProdutoItem;
+                                $nomeCol = $this->columnExists('produtos', 'name') ? 'name' : ($this->columnExists('produtos', 'nome') ? 'nome' : null);
+                                if ($nomeCol) {
+                                    $stNome = $this->connection->prepare("SELECT {$nomeCol} FROM produtos WHERE id = ? LIMIT 1");
+                                    $stNome->execute([$produtoId]);
+                                    $nomeOriginal = trim((string) ($stNome->fetchColumn() ?: ''));
+                                    if ($nomeOriginal !== '' && $nomeProdutoItem !== $nomeOriginal) {
+                                        $nomeProdutoCustom = $nomeProdutoItem;
+                                    }
                                 }
                             } catch (\Exception $e) {}
                         }
@@ -1475,7 +1478,9 @@ class AdminPedidosEditController extends Controller {
                 $this->finalizarCicloPedido($pedidoId);
             }
 
-            $this->connection->commit();
+            if ($this->connection->inTransaction()) {
+                $this->connection->commit();
+            }
 
             try {
                 $newPedido = [];
