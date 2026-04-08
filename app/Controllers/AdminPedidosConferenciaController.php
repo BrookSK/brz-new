@@ -550,6 +550,44 @@ HTML;
                 $st->execute($params);
             }
 
+            // Salvar valores reais da conferência (quando preenchidos)
+            $valoresReais = $request->getParam('valor_real', []);
+            if (is_array($valoresReais) && !empty($valoresReais)) {
+                $itensTable = $this->getPedidoItensTable();
+                if ($itensTable) {
+                    $colsIt = [];
+                    try {
+                        $stC = $this->connection->query('DESCRIBE ' . $itensTable);
+                        $colsIt = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    } catch (\Exception $e) { $colsIt = []; }
+
+                    $temValorReal = in_array('valor_real_conferencia', $colsIt, true);
+                    $temConferidoEm = in_array('conferido_em', $colsIt, true);
+                    $temConferidoPor = in_array('conferido_por', $colsIt, true);
+                    $colProdId = $this->pickColumn($colsIt, ['produto_id']);
+
+                    if ($temValorReal && $colProdId !== '') {
+                        foreach ($valoresReais as $produtoId => $valorStr) {
+                            $valorStr = trim((string) $valorStr);
+                            if ($valorStr === '') continue;
+                            $valorReal = (float) $valorStr;
+                            if ($valorReal <= 0) continue;
+
+                            $setCols = ['valor_real_conferencia = ?'];
+                            $setVals = [$valorReal];
+                            if ($temConferidoEm) { $setCols[] = 'conferido_em = NOW()'; }
+                            if ($temConferidoPor && $usuarioId > 0) { $setCols[] = 'conferido_por = ?'; $setVals[] = $usuarioId; }
+                            $setVals[] = $id;
+                            $setVals[] = (int) $produtoId;
+
+                            $sqlUpd = 'UPDATE ' . $itensTable . ' SET ' . implode(', ', $setCols) . ' WHERE pedido_id = ? AND ' . $colProdId . ' = ?';
+                            $stUpd = $this->connection->prepare($sqlUpd);
+                            $stUpd->execute($setVals);
+                        }
+                    }
+                }
+            }
+
             // Compra online: exige comprovante, conclui o pedido e gera comissão do processador
             if ($tipoCompra === 'online') {
                 // Comprovante é opcional

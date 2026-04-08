@@ -1511,6 +1511,9 @@ class PedidoEcommerce {
             // Colunas de valor informado pelo cliente (assessoria)
             if ($pick(['valor_informado_cliente']) !== null) $selectParts[] = 'pi.valor_informado_cliente';
             if ($pick(['observacao_cliente']) !== null) $selectParts[] = 'pi.observacao_cliente';
+            if ($pick(['valor_real_conferencia']) !== null) $selectParts[] = 'pi.valor_real_conferencia';
+            if ($pick(['conferido_em']) !== null) $selectParts[] = 'pi.conferido_em';
+            if ($pick(['conferido_por']) !== null) $selectParts[] = 'pi.conferido_por';
 
             // Fallback: buscar nome do produto na tabela produtos quando nome_produto do item estiver vazio
             if ($colProdutoId) {

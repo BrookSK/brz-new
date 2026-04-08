@@ -3213,6 +3213,21 @@ HTML;
                                                 $extraHtml .= '<div class="alert alert-warning py-1 px-2 mt-1 mb-1 small"><i class="fas fa-comment me-1"></i><strong>Obs. do cliente:</strong> ' . htmlspecialchars($obsCliente) . '</div>';
                                             }
 
+                                            // Valor real conferido (assessoria)
+                                            $valorRealConf = isset($item['valor_real_conferencia']) ? (float) $item['valor_real_conferencia'] : 0;
+                                            $conferidoEm = trim((string) ($item['conferido_em'] ?? ''));
+                                            if ($valorRealConf > 0) {
+                                                $diffLabel = '';
+                                                $precoItem = (float) ($item['preco_unitario'] ?? 0);
+                                                if ($precoItem > 0 && abs($valorRealConf - $precoItem) > 0.01) {
+                                                    $diff = $valorRealConf - $precoItem;
+                                                    $diffLabel = ' (' . ($diff > 0 ? '+' : '') . number_format($diff, 2) . ')';
+                                                }
+                                                $extraHtml .= '<div class="alert alert-info py-1 px-2 mt-1 mb-1 small"><i class="fas fa-check-circle me-1"></i><strong>Valor conferido:</strong> $ ' . number_format($valorRealConf, 2) . $diffLabel
+                                                    . ($conferidoEm !== '' ? ' <span class="text-muted">em ' . htmlspecialchars(date('d/m/Y H:i', strtotime($conferidoEm))) . '</span>' : '')
+                                                    . '</div>';
+                                            }
+
                                             if ($sku !== '') {
                                                 $extraHtml .= '<div class="small text-muted">SKU/Ref: ' . htmlspecialchars($sku) . '</div>';
                                             }
