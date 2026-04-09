@@ -68,7 +68,11 @@
     } else if (url === '/carrinho') {
       ctx.pagina = 'carrinho'
       ctx.carrinho_itens = lerItensCarrinho()
-      ctx.carrinho_subtotal = parsearPreco(qs('.subtotal, [class*="subtotal"]'))
+      // Ler subtotal do data-attribute real
+      var subEl = qs('.subtotal-value')
+      ctx.carrinho_subtotal = subEl ? (parseFloat(subEl.getAttribute('data-original-value')) || parsearPreco(subEl)) : null
+      var totalEl = qs('.total-value')
+      ctx.carrinho_total = totalEl ? (parseFloat(totalEl.getAttribute('data-original-value')) || parsearPreco(totalEl)) : null
     } else if (url === '/checkout') ctx.pagina = 'checkout'
     else if (url === '/rastreamento') ctx.pagina = 'rastreamento'
     else if (url.match(/\/como-funciona/)) ctx.pagina = 'como-funciona'
@@ -120,12 +124,17 @@
   }
   function lerItensCarrinho () {
     var itens = []
-    document.querySelectorAll('.carrinho-item, [class*="cart-item"], tr[class*="item"]').forEach(function (el) {
-      itens.push({
-        nome: (qs('[class*="nome"], .product-name', el) || {}).textContent?.trim() || '',
-        preco: parsearPreco(qs('[class*="preco"], .product-price', el)),
-        quantidade: parseInt((qs('input[type="number"], [class*="quantidade"]', el) || {}).value || '1')
-      })
+    document.querySelectorAll('.cart-item').forEach(function (el) {
+      var nomeEl = el.querySelector('h6')
+      var precoEl = el.querySelector('.cart-item-subtotal')
+      var qtdEl = el.querySelector('input[type="number"]')
+      if (nomeEl) {
+        itens.push({
+          nome: nomeEl.textContent.trim(),
+          preco: precoEl ? (parseFloat(precoEl.getAttribute('data-original-price')) || parsearPreco(precoEl)) : null,
+          quantidade: qtdEl ? (parseInt(qtdEl.value) || 1) : 1
+        })
+      }
     })
     return itens
   }
