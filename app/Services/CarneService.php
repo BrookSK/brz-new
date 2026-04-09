@@ -22,6 +22,7 @@ class CarneService {
         $opcoes = [];
 
         // Mínimo por boleto/PIX: R$ 10,00 (Câmbio Real exige mínimo ~USD 1.00 + margem)
+        // Para Câmbio Real com take_rates, o valor líquido pode ser menor, então usar margem maior
         $minimoBoleto = 10.00;
 
         for ($i = 1; $i <= $maxParcelas; $i++) {
@@ -123,13 +124,30 @@ class CarneService {
         // 1. PIX Produtos via Câmbio Real
         if ($parcela['valor_produtos'] > 0) {
             try {
-                $crResult = $paymentService->createCambioRealPixPaymentProduto(
-                    (int) $pedidoId,
-                    (float) $parcela['valor_produtos'] / 5.85, // amountUsd aproximado
-                    (float) $parcela['valor_produtos'],
-                    $descBase . ' - Produtos',
-                    $clientData
-                );
+                // Buscar taxa de câmbio real do sistema
+                $taxaConv = 5.85;
+                try {
+                    $db = \Config\Database::getConnection();
+                    $stTx = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+                    $stTx->execute();
+                    $v = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+                    if ($v > 1.01) $taxaConv = $v;
+                } catch (\Exception $e) {}
+
+                $valorBrl = (float) $parcela['valor_produtos'];
+                $valorUsd = round($valorBrl / $taxaConv, 2);
+
+                // Câmbio Real exige mínimo USD 1.00
+                if ($valorUsd < 1.00) {
+                    error_log("[CARNE] PIX CR: valor USD {$valorUsd} abaixo do mínimo. Pulando.");
+                } else {
+                    $crResult = $paymentService->createCambioRealPixPaymentProduto(
+                        (int) $pedidoId,
+                        $valorUsd,
+                        $valorBrl,
+                        $descBase . ' - Produtos',
+                        $clientData
+                    );
 
                 if (!empty($crResult['success'])) {
                     $pix = $crResult['pix'] ?? [];
@@ -176,8 +194,9 @@ class CarneService {
                         error_log('[CARNE] PIX CR raw: ' . substr(json_encode($crResult['raw']), 0, 1000));
                     }
                 }
+                } // fecha else do mínimo USD
             } catch (\Exception $e) {
-                error_log('[CARNE] Exception PIX Câmbio Real: ' . $e->getMessage());
+                error_log('[CARNE] Exception PIX CR: ' . $e->getMessage());
             }
         }
 
