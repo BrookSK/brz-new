@@ -484,13 +484,7 @@ function alterarStatus(id) {
 
 function excluirProduto(id) {
     if (confirm((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.confirm_delete) ? window.ADMIN_PRODUCTS_I18N.confirm_delete : 'Deseja realmente excluir este produto? Esta ação não pode ser desfeita!')) {
-        // Criar form dinâmico para POST
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/admin/produtos/excluir/' + id;
-        form.style.display = 'none';
-        document.body.appendChild(form);
-        form.submit();
+        window.location.href = '/admin/produtos/excluir/' + id;
     }
 }
 
