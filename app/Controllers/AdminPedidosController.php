@@ -2254,7 +2254,7 @@ JS;
                                         <div class="text-center">
                                             <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
                                             <small class="text-muted">Total do Pedido</small>
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'Pago em R$' : 'Pago em US$') . '</span></div>
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
