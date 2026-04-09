@@ -172,23 +172,35 @@
     p = p || {}
     var acoes = {
       adicionar_carrinho: function () {
-        if (!p.produto_id) return
-        // Chamar API real do sistema para adicionar ao carrinho
+        if (!p.produto_id) {
+          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto para adicionar. Me diz o nome ou ID?')
+          return
+        }
+        adicionarMsg('assistant', '🛒 Adicionando produto #' + p.produto_id + ' ao carrinho...')
         return fetch('/api/carrinho/adicionar', {
           method: 'POST',
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
           body: 'produto_id=' + encodeURIComponent(p.produto_id) + '&quantidade=' + encodeURIComponent(p.quantidade || 1)
         }).then(function(r) { return r.json() }).then(function(d) {
+          // Remover mensagem de "adicionando"
+          var msgs = document.getElementById('bz-copiloto-messages')
+          if (msgs.lastChild) msgs.removeChild(msgs.lastChild)
+          historico.pop()
+
           if (d.error) {
             adicionarMsg('assistant', '❌ Não consegui adicionar: ' + d.error)
           } else {
-            // Atualizar badge do carrinho na página
             var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
             if (badge && d.total_itens) badge.textContent = d.total_itens
-            adicionarMsg('assistant', '✅ Produto adicionado ao carrinho!')
+            adicionarMsg('assistant', '✅ Produto adicionado ao carrinho! Recarregue a página para ver atualizado.')
+            // Recarregar após 2s para atualizar o carrinho visualmente
+            setTimeout(function() { if (window.location.pathname === '/carrinho') { salvarEstadoChat(); window.location.reload() } }, 2000)
           }
-        }).catch(function() {
-          adicionarMsg('assistant', 'Não consegui adicionar ao carrinho. Tenta pela página do produto.')
+        }).catch(function(err) {
+          var msgs = document.getElementById('bz-copiloto-messages')
+          if (msgs.lastChild) msgs.removeChild(msgs.lastChild)
+          historico.pop()
+          adicionarMsg('assistant', '❌ Erro ao adicionar ao carrinho: ' + (err.message || 'falha na conexão'))
         })
       },
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
