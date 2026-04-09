@@ -174,14 +174,33 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
         if (!empty($contexto['_produtos_encontrados'])) {
             $prods = $contexto['_produtos_encontrados'];
             $linhas = [];
+            $temClubeOnly = false;
+            $usuarioTemClube = false;
             foreach ($prods as $p) {
                 $linha = "- ID:{$p['id']} | {$p['nome']} | US\$ " . number_format((float)($p['preco'] ?? 0), 2);
                 if (!empty($p['peso'])) $linha .= " | {$p['peso']}kg";
                 if (!empty($p['grupo_nome'])) $linha .= " | Grupo: {$p['grupo_nome']} (/grupo/{$p['grupo_slug']})";
+                if (!empty($p['clube_only'])) {
+                    $linha .= " | ⚠️ EXCLUSIVO CLUBE";
+                    $temClubeOnly = true;
+                }
+                if (!empty($p['acesso_restrito'])) {
+                    $linha .= " | ❌ USUÁRIO NÃO TEM CLUBE ATIVO";
+                }
                 $linhas[] = $linha;
+                if (!empty($p['usuario_tem_clube'])) $usuarioTemClube = true;
+            }
+            $instrucaoClube = '';
+            if ($temClubeOnly) {
+                if ($usuarioTemClube) {
+                    $instrucaoClube = "\nNOTA: Alguns produtos são exclusivos do Clube Braziliana. O usuário TEM clube ativo, então pode acessar normalmente.";
+                } else {
+                    $instrucaoClube = "\nNOTA: Alguns produtos são exclusivos do Clube Braziliana. O usuário NÃO tem clube ativo. Informe que esses produtos são exclusivos para membros do Clube e ofereça explicar como ativar o Clube (acao: ir_para_clube).";
+                }
             }
             $secaoProdutosEncontrados = "\n\nPRODUTOS ENCONTRADOS NO BANCO DE DADOS PARA ESTA PERGUNTA:\n" . implode("\n", $linhas) .
-                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão. Use acao: ir_para_grupo com o slug do grupo para levar o cliente até lá.";
+                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão. Use acao: ir_para_grupo com o slug do grupo para levar o cliente até lá." .
+                $instrucaoClube;
         }
         $secaoReferencia = '';
         if (!empty($conteudoRef)) {
@@ -360,20 +379,51 @@ PROMPT;
 
             if ($temGrupo) {
                 $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
-                    COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
+                    COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug,
+                    COALESCE(gc.clube_only, 0) as clube_only
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
                     WHERE p.{$colNome} LIKE ?
                     ORDER BY p.{$colNome} ASC LIMIT 8");
             } else {
                 $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
-                    '' as grupo_nome, '' as grupo_slug
+                    '' as grupo_nome, '' as grupo_slug, 0 as clube_only
                     FROM produtos p
                     WHERE p.{$colNome} LIKE ?
                     ORDER BY p.{$colNome} ASC LIMIT 8");
             }
             $st->execute([$like]);
-            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Verificar se o usuário tem clube ativo
+            $usuarioClubeAtivo = false;
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId > 0) {
+                try {
+                    $stClube = $this->pdo->prepare("SELECT COALESCE(SUM(valor), 0) as total 
+                        FROM carteira_recargas 
+                        WHERE usuario_id = ? 
+                          AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
+                    $stClube->execute([$userId]);
+                    $saldoClube = (float) ($stClube->fetchColumn() ?: 0);
+                    $usuarioClubeAtivo = ($saldoClube > 0);
+                } catch (\Exception $e) {}
+            }
+
+            // Marcar produtos de grupos clube_only e se o usuário tem acesso
+            foreach ($produtos as &$p) {
+                $p['clube_only'] = (int) ($p['clube_only'] ?? 0);
+                $p['usuario_tem_clube'] = $usuarioClubeAtivo;
+                if ($p['clube_only'] && !$usuarioClubeAtivo) {
+                    $p['acesso_restrito'] = true;
+                } else {
+                    $p['acesso_restrito'] = false;
+                }
+            }
+            unset($p);
+
+            return $produtos;
         } catch (\Exception $e) {
             error_log('[CoPiloto] Erro busca produto no banco: ' . $e->getMessage());
             return [];

@@ -172,9 +172,24 @@
     p = p || {}
     var acoes = {
       adicionar_carrinho: function () {
-        var btn = qs('[data-produto-id="' + p.produto_id + '"] button, button[onclick*="' + p.produto_id + '"], .btn-adicionar[data-id="' + p.produto_id + '"]')
-        if (btn) { btn.click(); return }
-        if (typeof window.adicionarAoCarrinho === 'function') { window.adicionarAoCarrinho(p.produto_id, p.quantidade || 1); return }
+        if (!p.produto_id) return
+        // Chamar API real do sistema para adicionar ao carrinho
+        return fetch('/api/carrinho/adicionar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'produto_id=' + encodeURIComponent(p.produto_id) + '&quantidade=' + encodeURIComponent(p.quantidade || 1)
+        }).then(function(r) { return r.json() }).then(function(d) {
+          if (d.error) {
+            adicionarMsg('assistant', '❌ Não consegui adicionar: ' + d.error)
+          } else {
+            // Atualizar badge do carrinho na página
+            var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
+            if (badge && d.total_itens) badge.textContent = d.total_itens
+            adicionarMsg('assistant', '✅ Produto adicionado ao carrinho!')
+          }
+        }).catch(function() {
+          adicionarMsg('assistant', 'Não consegui adicionar ao carrinho. Tenta pela página do produto.')
+        })
       },
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
       trocar_moeda_usd: function () { salvarEstadoChat(); window.location.href = '/lang/en' },
