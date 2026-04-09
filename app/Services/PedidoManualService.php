@@ -504,9 +504,7 @@ class PedidoManualService {
             'taxa_servico_valor' => (string) round($valor, 2),
             'impostos_valor' => 0,
             'descricao' => $descricao,
-            'products' => [
-                ['name' => $descricao, 'value' => round($valor, 2)],
-            ],
+            'products' => [],
         ], $adminId);
 
         if (empty($linkResult['success'])) {
