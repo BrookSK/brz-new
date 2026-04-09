@@ -173,23 +173,16 @@
     var acoes = {
       adicionar_carrinho: function () {
         if (!p.produto_id) {
-          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto para adicionar. Me diz o nome ou ID?')
+          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o nome ou ID?')
           return
         }
-        adicionarMsg('assistant', '🛒 Adicionando produto #' + p.produto_id + '...')
-        return fetch('/api/carrinho/adicionar', {
+        adicionarMsg('assistant', '🛒 Adicionando...')
+        return fetch('/api/copiloto/carrinho/adicionar', {
           method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: 'produto_id=' + encodeURIComponent(p.produto_id) + '&quantidade=' + encodeURIComponent(p.quantidade || 1),
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ produto_id: p.produto_id, quantidade: p.quantidade || 1 }),
           credentials: 'same-origin'
-        }).then(function(r) {
-          var ct = r.headers.get('content-type') || ''
-          if (ct.indexOf('application/json') < 0) {
-            // API retornou HTML — provavelmente erro de rota ou redirect
-            return r.text().then(function(html) { throw new Error('API retornou HTML (status ' + r.status + ')') })
-          }
-          return r.json()
-        }).then(function(d) {
+        }).then(function(r) { return r.json() }).then(function(d) {
           var msgs = document.getElementById('bz-copiloto-messages')
           if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
           if (d.error) {
@@ -197,30 +190,13 @@
           } else {
             var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
             if (badge && d.total_itens) badge.textContent = d.total_itens
-            adicionarMsg('assistant', '✅ Adicionado ao carrinho!')
+            adicionarMsg('assistant', '✅ ' + (d.produto_nome || 'Produto') + ' adicionado ao carrinho!')
             if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1500) }
           }
         }).catch(function(err) {
           var msgs = document.getElementById('bz-copiloto-messages')
           if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
-          // Fallback: tentar via /carrinho/adicionar (rota alternativa)
-          fetch('/carrinho/adicionar', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'produto_id=' + encodeURIComponent(p.produto_id) + '&quantidade=' + encodeURIComponent(p.quantidade || 1),
-            credentials: 'same-origin',
-            redirect: 'manual'
-          }).then(function(r2) {
-            // Esta rota redireciona para /carrinho após adicionar — sucesso se status 302 ou 200
-            if (r2.status < 400 || r2.type === 'opaqueredirect') {
-              adicionarMsg('assistant', '✅ Adicionado ao carrinho!')
-              if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1500) }
-            } else {
-              adicionarMsg('assistant', '❌ Não consegui adicionar. Tenta pela página do produto.')
-            }
-          }).catch(function() {
-            adicionarMsg('assistant', '❌ Não consegui adicionar. Tenta pela página do produto.')
-          })
+          adicionarMsg('assistant', '❌ Erro: ' + (err.message || 'falha na conexão'))
         })
       },
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
