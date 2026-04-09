@@ -74,7 +74,13 @@ class AdminRelatorioPedidosController extends Controller {
         if ($itensTable && !empty($pedidos)) {
             $pids = array_column($pedidos, 'id');
             $in = implode(',', array_fill(0, count($pids), '?'));
-            $stIt = $this->db->prepare("SELECT i.*, p2.foto_principal AS produto_foto, p2.nome AS produto_nome_db
+            // Detectar coluna de nome do produto
+            $prodCols = [];
+            try { $stPC = $this->db->query('DESCRIBE produtos'); $prodCols = $stPC ? $stPC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $nomeCol = in_array('name', $prodCols, true) ? 'p2.name' : (in_array('nome', $prodCols, true) ? 'p2.nome' : "''");
+            $fotoCol = in_array('foto_principal', $prodCols, true) ? 'p2.foto_principal' : "''";
+
+            $stIt = $this->db->prepare("SELECT i.*, {$fotoCol} AS produto_foto, {$nomeCol} AS produto_nome_db
                 FROM {$itensTable} i LEFT JOIN produtos p2 ON p2.id = i.produto_id
                 WHERE i.pedido_id IN ({$in})");
             $stIt->execute($pids);
