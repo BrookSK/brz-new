@@ -352,6 +352,27 @@ class AdminRelatorioPedidosController extends Controller {
             'telefone' => (string)($pedido['destinatario_telefone'] ?? ''),
         ];
 
+        // Pré-carregar pesos dos produtos
+        $pesosProdutos = [];
+        if (!empty($itens)) {
+            $pids = [];
+            foreach ($itens as $it) { $pid = (int)($it['produto_id'] ?? 0); if ($pid > 0) $pids[$pid] = true; }
+            if (!empty($pids)) {
+                try {
+                    $prodCols = [];
+                    try { $stPC = $this->db->query('DESCRIBE produtos'); $prodCols = $stPC ? $stPC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $pesoCol = in_array('weight', $prodCols, true) ? 'weight' : (in_array('peso', $prodCols, true) ? 'peso' : '');
+                    if ($pesoCol !== '') {
+                        $in = implode(',', array_keys($pids));
+                        $stP = $this->db->query("SELECT id, {$pesoCol} AS peso FROM produtos WHERE id IN ({$in})");
+                        foreach ($stP->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                            $pesosProdutos[(int)$r['id']] = (float)($r['peso'] ?? 0);
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+        }
+
         $fmt = function($v) use ($moeda) {
             if ($moeda === 'BRL') return 'R$ ' . number_format((float)$v, 2, ',', '.');
             return 'US$ ' . number_format((float)$v, 2, '.', ',');
