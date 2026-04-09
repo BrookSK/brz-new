@@ -14,7 +14,7 @@ class CopilotoService {
     private array $configs = [];
 
     // Modelo obrigatório — NUNCA substituir
-    private const MODELO = 'claude-sonnet-4-5-20241022';
+    private const MODELO = 'claude-sonnet-4-5-20250929';
 
     // Faixas de peso reais
     private const FAIXAS_KG = [1,2,3,4,5,6,7,8,9,10,15,20,25,30];
@@ -91,7 +91,12 @@ class CopilotoService {
         curl_close($ch);
 
         if ($curlError || $httpCode !== 200) {
-            error_log("[CoPiloto] Claude API erro: HTTP $httpCode — $curlError — " . substr($response ?: '', 0, 500));
+            $errorDetail = '';
+            if ($response) {
+                $errData = json_decode($response, true);
+                $errorDetail = $errData['error']['message'] ?? substr($response, 0, 300);
+            }
+            error_log("[CoPiloto] Claude API erro: HTTP $httpCode — curl: $curlError — resposta: $errorDetail");
             return [
                 'texto' => 'Desculpa, tive um problema técnico. Tenta de novo em alguns segundos?',
                 'acao' => 'nenhuma', 'parametros' => [],

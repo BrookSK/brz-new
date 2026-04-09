@@ -1820,7 +1820,7 @@ try {
 } catch (\Exception $e) {}
 if ($__copilotoMostrar):
 ?>
-<script src="/assets/js/copiloto.js" async></script>
+<script src="/assets/js/copiloto.js?v=<?= substr(md5(filemtime(__DIR__ . '/../../public/assets/js/copiloto.js') ?: time()), 0, 8) ?>" async></script>
 <?php endif; ?>
 
 <!-- WhatsApp Floating Button -->
