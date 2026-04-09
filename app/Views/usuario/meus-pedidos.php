@@ -321,11 +321,36 @@
                                                            title="<?= htmlspecialchars(__('user_orders.actions.support', 'Suporte'), ENT_QUOTES, 'UTF-8') ?>">
                                                             <i class="fas fa-life-ring me-1"></i><span class="d-none d-md-inline">Abrir Ticket</span>
                                                         </a>
-                                                        <button class="btn btn-sm btn-outline-success" 
-                                                                onclick="rastrearPedido('<?= htmlspecialchars((string)($pedido['codigo_pedido'] ?? $pedido['codigo'] ?? $pedido['codigo_rastreamento'] ?? $pedido['rastreamento'] ?? $pedido['id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')"
-                                                                title="<?= htmlspecialchars(__('user_orders.actions.track', 'Rastrear'), ENT_QUOTES, 'UTF-8') ?>">
+                                                        <?php
+                                                        // Buscar código de rastreio real
+                                                        $codigoRastreioReal = '';
+                                                        $pedidoIdRastreio = (int) ($pedido['id'] ?? 0);
+                                                        $statusPedidoRastreio = strtolower(trim((string) ($pedido['status'] ?? '')));
+                                                        try {
+                                                            $dbRast = \Config\Database::getConnection();
+                                                            // Correios
+                                                            try { $stR = $dbRast->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {}
+                                                            // ShipStation
+                                                            if ($codigoRastreioReal === '') { try { $stR = $dbRast->prepare("SELECT tracking_number FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {} }
+                                                            // Stamps
+                                                            if ($codigoRastreioReal === '') { try { $stR = $dbRast->prepare("SELECT tracking_number FROM stamps_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {} }
+                                                            // W-Express
+                                                            if ($codigoRastreioReal === '') { try { $stR = $dbRast->prepare("SELECT courier_tracking_number FROM remessa_janela_pedidos WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {} }
+                                                        } catch (\Exception $e) {}
+                                                        ?>
+                                                        <?php if ($codigoRastreioReal !== ''): ?>
+                                                        <button class="btn btn-sm btn-outline-success"
+                                                                onclick="rastrearPedido('<?= htmlspecialchars($codigoRastreioReal, ENT_QUOTES, 'UTF-8') ?>')"
+                                                                title="Rastrear">
                                                             <i class="fas fa-search-location"></i>
                                                         </button>
+                                                        <?php else: ?>
+                                                        <button class="btn btn-sm btn-outline-secondary"
+                                                                onclick="alert('Seu pedido ainda não possui código de rastreio.\n\nStatus atual: <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $statusPedidoRastreio)), ENT_QUOTES, 'UTF-8') ?>\n\nA etiqueta de envio será gerada após o processamento do pedido.\n\nEm caso de dúvidas, entre em contato com o suporte.')"
+                                                                title="Rastreio indisponível">
+                                                            <i class="fas fa-search-location"></i>
+                                                        </button>
+                                                        <?php endif; ?>
                                                         <?php if ($pedido['status'] === 'entregue'): ?>
                                                         <button class="btn btn-sm btn-outline-info" 
                                                                 onclick="recomprarPedido(<?= $pedido['id'] ?>)"
