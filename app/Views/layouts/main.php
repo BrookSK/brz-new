@@ -1015,11 +1015,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                     <li class="nav-item">
                         <a class="nav-link" href="/contato"><i class="fas fa-envelope"></i> <?= __('nav.contact', 'Contato') ?></a>
                     </li>
-                    <!-- OCULTO TEMPORARIAMENTE
                     <li class="nav-item">
                         <a class="nav-link" href="/assessoria"><i class="fas fa-magic"></i> <?= __('nav.forwarding', 'Redirecionamento') ?></a>
                     </li>
-                    -->
                 </ul>
                 
                 <ul class="navbar-nav align-items-center gap-1">
@@ -1289,6 +1287,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         <li class="mb-2"><a href="/status-pedido" class="footer-link">Status do Pedido</a></li>
                         -->
                         <li class="mb-2"><a href="/como-funciona-clube" class="footer-link"><?= __('nav.club', 'Clube Braziliana') ?></a></li>
+                        <li class="mb-2"><a href="/assessoria" class="footer-link"><?= __('nav.forwarding', 'Redirecionamento') ?></a></li>
                     </ul>
                 </div>
                 
