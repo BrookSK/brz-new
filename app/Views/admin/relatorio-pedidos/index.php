@@ -33,7 +33,9 @@ $statusColors = [
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">
                         <option value="">Todos</option>
-                        <?php foreach ($statusList as $s): ?>
+                        <?php foreach ($statusList as $s):
+                            if (in_array($s, ['carne_pagando','carne_aguardando'], true)) continue;
+                        ?>
                             <option value="<?= htmlspecialchars($s) ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= htmlspecialchars($statusLabels[$s] ?? ucfirst($s)) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -65,12 +67,13 @@ $statusColors = [
         ?>
         <div class="card border-0 shadow-sm mb-2">
             <div class="card-header py-2 d-flex justify-content-between align-items-center" style="cursor:pointer;background:<?= $cor === 'purple' ? '#6f42c1' : '' ?>;" data-bs-toggle="collapse" data-bs-target="#pedido-<?= $pid ?>">
-                <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
                     <span class="badge bg-<?= $cor ?>"><?= $label ?></span>
                     <span class="fw-bold">#<?= str_pad($pid, 6, '0', STR_PAD_LEFT) ?></span>
                     <span class="text-muted small"><?= date('d/m/Y H:i', strtotime($p['created_at'])) ?></span>
-                    <span><?= htmlspecialchars($p['cliente_nome'] ?? '') ?></span>
-                    <span class="fw-bold"><?= $fmt($p['total'] ?? 0) ?></span>
+                    <span class="fw-semibold"><?= htmlspecialchars($p['cliente_nome'] ?? 'Sem nome') ?></span>
+                    <span class="small text-muted"><?= htmlspecialchars($p['cliente_email'] ?? '') ?></span>
+                    <span class="fw-bold text-primary"><?= $fmt($p['total'] ?? 0) ?></span>
                     <?php if ($imp['count'] > 0): ?>
                         <span class="badge bg-success small">Impresso <?= $imp['count'] ?>x por <?= htmlspecialchars($imp['by']) ?></span>
                     <?php else: ?>

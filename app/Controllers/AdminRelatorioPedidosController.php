@@ -29,6 +29,9 @@ class AdminRelatorioPedidosController extends Controller {
             $params[':st'] = $statusFilter;
         }
 
+        // Excluir pedidos de carnê da listagem
+        $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('carne_pagando','carne_aguardando')";
+
         // Detectar colunas
         $cols = [];
         try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
@@ -54,9 +57,15 @@ class AdminRelatorioPedidosController extends Controller {
             }
         }
 
-        $sql = "SELECT " . implode(', ', $select) . ", u.nome AS cliente_nome, u.email AS cliente_email, u.documento AS cliente_cpf
+        // Detectar coluna nome do usuario
+        $userCols = [];
+        try { $stUC = $this->db->query('DESCRIBE usuarios'); $userCols = $stUC ? $stUC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+        $userNomeCol = in_array('nome', $userCols, true) ? 'u.nome' : (in_array('name', $userCols, true) ? 'u.name' : "''");
+        $clienteJoinCol = in_array('cliente_id', $cols, true) ? 'cliente_id' : (in_array('usuario_id', $cols, true) ? 'usuario_id' : 'id');
+
+        $sql = "SELECT " . implode(', ', $select) . ", {$userNomeCol} AS cliente_nome, u.email AS cliente_email, u.documento AS cliente_cpf
                 FROM pedidos p
-                LEFT JOIN usuarios u ON u.id = p." . (in_array('cliente_id', $cols, true) ? 'cliente_id' : 'usuario_id') . "
+                LEFT JOIN usuarios u ON u.id = p.{$clienteJoinCol}
                 WHERE " . implode(' AND ', $where) . "
                 ORDER BY p.created_at DESC";
 
@@ -196,21 +205,62 @@ class AdminRelatorioPedidosController extends Controller {
             }
         } catch (\Exception $e) {}
 
-        // Endereço
-        $endereco = '';
+        // Dados do cliente
+        $cliente = [];
+        $clienteId = (int)($pedido['cliente_id'] ?? ($pedido['usuario_id'] ?? 0));
+        if ($clienteId > 0) {
+            try {
+                $st = $this->db->prepare("SELECT * FROM usuarios WHERE id = ? LIMIT 1");
+                $st->execute([$clienteId]);
+                $cliente = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {}
+        }
+
+        // Endereço de entrega (do pedido ou do cadastro)
+        $endEntrega = [];
         try {
-            $clienteId = (int)($pedido['cliente_id'] ?? ($pedido['usuario_id'] ?? 0));
-            if ($clienteId > 0) {
-                $st = $this->db->prepare("SELECT * FROM enderecos WHERE usuario_id = ? AND principal = 1 LIMIT 1");
+            // Primeiro tentar dados do pedido
+            $colsPed = [];
+            try { $stC = $this->db->query('DESCRIBE pedidos'); $colsPed = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+
+            $endFields = ['pais','cep','endereco','numero','complemento','bairro','cidade','estado'];
+            $temEndNoPedido = false;
+            foreach ($endFields as $ef) {
+                if (in_array($ef, $colsPed, true) && !empty($pedido[$ef])) { $temEndNoPedido = true; break; }
+            }
+
+            if ($temEndNoPedido) {
+                foreach ($endFields as $ef) {
+                    $endEntrega[$ef] = (string)($pedido[$ef] ?? '');
+                }
+            }
+
+            // Se não tem no pedido, buscar do cadastro
+            if (empty($endEntrega['endereco']) && $clienteId > 0) {
+                $st = $this->db->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
                 $st->execute([$clienteId]);
                 $end = $st->fetch(\PDO::FETCH_ASSOC);
                 if ($end) {
-                    $endereco = trim(($end['endereco'] ?? '') . ', ' . ($end['numero'] ?? '') . ' - ' . ($end['bairro'] ?? '') . ', ' . ($end['cidade'] ?? '') . ' - ' . ($end['estado'] ?? '') . ' CEP: ' . ($end['cep'] ?? ''));
+                    foreach ($endFields as $ef) {
+                        if (empty($endEntrega[$ef]) && !empty($end[$ef])) {
+                            $endEntrega[$ef] = (string)$end[$ef];
+                        }
+                    }
                 }
             }
         } catch (\Exception $e) {}
 
-        $fmt = function($v) use ($moeda, $taxa) {
+        // Suite do cliente
+        $suite = (string)($cliente['suite'] ?? ($pedido['suite_cliente'] ?? ''));
+
+        // Destinatário (se diferente do cliente)
+        $destinatario = [
+            'nome' => (string)($pedido['destinatario_nome'] ?? ''),
+            'documento' => (string)($pedido['destinatario_documento'] ?? ''),
+            'telefone' => (string)($pedido['destinatario_telefone'] ?? ''),
+        ];
+
+        $fmt = function($v) use ($moeda) {
             if ($moeda === 'BRL') return 'R$ ' . number_format((float)$v, 2, ',', '.');
             return 'US$ ' . number_format((float)$v, 2, '.', ',');
         };
