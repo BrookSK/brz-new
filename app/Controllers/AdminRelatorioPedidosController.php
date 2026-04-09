@@ -65,81 +65,44 @@ class AdminRelatorioPedidosController extends Controller {
         // Detectar coluna nome do usuario
         $userCols = [];
         try { $stUC = $this->db->query('DESCRIBE usuarios'); $userCols = $stUC ? $stUC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
-        $userNomeCol = in_array('nome', $userCols, true) ? 'u.nome' : (in_array('name', $userCols, true) ? 'u.name' : "''");
         $clienteJoinCol = in_array('cliente_id', $cols, true) ? 'cliente_id' : (in_array('usuario_id', $cols, true) ? 'usuario_id' : 'id');
 
-        // Buscar nome do cliente de múltiplas fontes (pedido ou usuario)
-        $nomeExprParts = [$userNomeCol];
-        foreach (['cliente_nome','nome','customer_name'] as $nc) {
-            if (in_array($nc, $cols, true)) { array_unshift($nomeExprParts, "p.{$nc}"); }
-        }
-        $nomeExpr = "COALESCE(NULLIF(" . implode(",''), NULLIF(", $nomeExprParts) . ",''), '')";
-
-        // Email do cliente
-        $emailExprParts = ['u.email'];
-        foreach (['cliente_email','email','customer_email'] as $ec) {
-            if (in_array($ec, $cols, true)) { array_unshift($emailExprParts, "p.{$ec}"); }
-        }
-        $emailExpr = "COALESCE(NULLIF(" . implode(",''), NULLIF(", $emailExprParts) . ",''), '')";
-
-        // CPF
-        $cpfExprParts = [];
-        foreach (['cliente_cpf_cnpj','cliente_documento','documento','cpf'] as $dc) {
-            if (in_array($dc, $cols, true)) { $cpfExprParts[] = "p.{$dc}"; }
-        }
-        if (in_array('documento', $userCols, true)) { $cpfExprParts[] = 'u.documento'; }
-        $cpfExpr = !empty($cpfExprParts) ? "COALESCE(NULLIF(" . implode(",''), NULLIF(", $cpfExprParts) . ",''), '')" : "''";
-
-        $sql = "SELECT " . implode(', ', $select) . ",
-                {$nomeExpr} AS cliente_nome,
-                {$emailExpr} AS cliente_email,
-                {$cpfExpr} AS cliente_cpf
-                FROM pedidos p
-                LEFT JOIN usuarios u ON u.id = p.{$clienteJoinCol}
-                WHERE " . implode(' AND ', $where) . "
-                ORDER BY p.created_at DESC";
+        $sql = "SELECT p.*, u.email AS u_email, u.documento AS u_documento, u.telefone AS u_telefone, u.celular AS u_celular, u.data_nascimento AS u_nascimento"
+            . (in_array('nome', $userCols, true) ? ", u.nome AS u_nome" : (in_array('name', $userCols, true) ? ", u.name AS u_nome" : ", '' AS u_nome"))
+            . " FROM pedidos p LEFT JOIN usuarios u ON u.id = p.{$clienteJoinCol}"
+            . " WHERE " . implode(' AND ', $where)
+            . " ORDER BY p.created_at DESC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        // Fallback: preencher dados do cliente de colunas do pedido ou do usuario
+        // Fallback: preencher dados do cliente de todas as fontes
         if (!empty($pedidos)) {
-            $clienteIds = [];
-            foreach ($pedidos as $p) {
-                $cid = (int)($p['cliente_id'] ?? ($p['usuario_id'] ?? 0));
-                if ($cid > 0) $clienteIds[$cid] = true;
-            }
-            $clienteData = [];
-            if (!empty($clienteIds)) {
-                try {
-                    $in = implode(',', array_keys($clienteIds));
-                    $stU = $this->db->query("SELECT * FROM usuarios WHERE id IN ({$in})");
-                    foreach ($stU->fetchAll(\PDO::FETCH_ASSOC) as $u) {
-                        $clienteData[(int)$u['id']] = $u;
-                    }
-                } catch (\Exception $e) {}
-            }
-
             foreach ($pedidos as &$_p) {
-                $cid = (int)($_p['cliente_id'] ?? ($_p['usuario_id'] ?? 0));
-                $u = $clienteData[$cid] ?? [];
-
+                // Nome
                 if (empty($_p['cliente_nome']) || trim((string)$_p['cliente_nome']) === '') {
-                    foreach (['cliente_nome','nome','customer_name'] as $k) { if (!empty($_p[$k])) { $_p['cliente_nome'] = (string)$_p[$k]; break; } }
-                    if (empty($_p['cliente_nome'])) { $_p['cliente_nome'] = (string)($u['nome'] ?? ($u['name'] ?? '')); }
+                    foreach (['cliente_nome','nome','customer_name','u_nome'] as $k) {
+                        if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_p['cliente_nome'] = (string)$_p[$k]; break; }
+                    }
                 }
-                if (empty($_p['cliente_email'])) {
-                    foreach (['cliente_email','email','customer_email'] as $k) { if (!empty($_p[$k])) { $_p['cliente_email'] = (string)$_p[$k]; break; } }
-                    if (empty($_p['cliente_email'])) { $_p['cliente_email'] = (string)($u['email'] ?? ''); }
+                // Email
+                if (empty($_p['cliente_email']) || trim((string)$_p['cliente_email']) === '') {
+                    foreach (['cliente_email','email','customer_email','u_email'] as $k) {
+                        if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_p['cliente_email'] = (string)$_p[$k]; break; }
+                    }
                 }
-                if (empty($_p['cliente_cpf'])) {
-                    foreach (['cliente_cpf','cliente_cpf_cnpj','cliente_documento','documento'] as $k) { if (!empty($_p[$k])) { $_p['cliente_cpf'] = (string)$_p[$k]; break; } }
-                    if (empty($_p['cliente_cpf'])) { $_p['cliente_cpf'] = (string)($u['documento'] ?? ''); }
+                // CPF
+                if (empty($_p['cliente_cpf']) || trim((string)$_p['cliente_cpf']) === '') {
+                    foreach (['cliente_cpf','cliente_cpf_cnpj','cliente_documento','documento','u_documento'] as $k) {
+                        if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_p['cliente_cpf'] = (string)$_p[$k]; break; }
+                    }
                 }
+                // Telefone
                 $_p['cliente_telefone'] = '';
-                foreach (['cliente_telefone','telefone'] as $k) { if (!empty($_p[$k])) { $_p['cliente_telefone'] = (string)$_p[$k]; break; } }
-                if (empty($_p['cliente_telefone'])) { $_p['cliente_telefone'] = (string)($u['telefone'] ?? ($u['celular'] ?? '')); }
+                foreach (['cliente_telefone','telefone','u_telefone','u_celular'] as $k) {
+                    if (!empty($_p[$k]) && trim((string)$_p[$k]) !== '') { $_p['cliente_telefone'] = (string)$_p[$k]; break; }
+                }
             }
             unset($_p);
         }
