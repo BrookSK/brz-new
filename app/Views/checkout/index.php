@@ -1,5 +1,7 @@
 <?php ob_start(); ?>
 <?php $isPaymentLink = !empty($is_payment_link); ?>
+<?php $isPaymentLinkTaxaOnlyGlobal = !empty($is_payment_link_taxa_only); ?>
+<script>window.__PAYMENT_LINK_TAXA_ONLY__ = <?= json_encode($isPaymentLinkTaxaOnlyGlobal) ?>;</script>
 <div class="container-fluid px-0">
     <form id="checkout-form" method="POST">
     <?php if ($isPaymentLink): ?>
@@ -3378,6 +3380,26 @@ main {
             <?= $content ?>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+        // Payment Link taxa only: ajustar labels
+        (function(){
+            if (!window.__PAYMENT_LINK_TAXA_ONLY__) return;
+            var lbl = document.getElementById('subtotal-label');
+            if (lbl) lbl.textContent = 'Taxa de Serviço + Impostos:';
+            // Ocultar linhas de taxa, impostos e frete
+            document.querySelectorAll('#taxa-servico, #taxa-servico-original').forEach(function(el){
+                var row = el.closest('.d-flex');
+                if (row) row.style.display = 'none';
+            });
+            var impRow = document.getElementById('impostos-row');
+            if (impRow) impRow.style.display = 'none';
+            var freteEl = document.getElementById('frete');
+            if (freteEl) {
+                var freteRow = freteEl.closest('.d-flex');
+                if (freteRow) freteRow.style.display = 'none';
+            }
+        })();
+        </script>
     </body>
     </html>
 <?php else: ?>
