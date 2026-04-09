@@ -2380,6 +2380,11 @@ class AdminProdutosController extends Controller {
                     <div class="small text-muted">Se marcado, o produto só aparece para admin/vendedor no pedido manual.</div>
                 </div>
                 <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitch" name="custo_igual_preco" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitch">Custo = Valor do produto</label>
+                    <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
+                </div>
+                <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="manterDadosSwitch">
                     <label class="form-check-label fw-semibold" for="manterDadosSwitch">Manter dados após salvar</label>
                 </div>
@@ -2416,11 +2421,6 @@ class AdminProdutosController extends Controller {
                     <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção" id="loteSalePriceInput"></div>
                     <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
                 </div>
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitchLote" name="custo_igual_preco" value="1" checked>
-                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitchLote">Custo = Valor do produto</label>
-                    <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
-                </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label fw-semibold">Estoque</label>
@@ -2437,6 +2437,11 @@ class AdminProdutosController extends Controller {
                     <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitchLote" name="oculto" value="1">
                     <label class="form-check-label fw-semibold" for="ocultoSwitchLote">Ocultar em todo o site</label>
                     <div class="small text-muted">Se marcado, os produtos só aparecem para admin/vendedor no pedido manual.</div>
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitchLote" name="custo_igual_preco" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitchLote">Custo = Valor do produto</label>
+                    <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">NCM</label>
