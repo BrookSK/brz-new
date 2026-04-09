@@ -27,6 +27,7 @@
   var enviando = false
   var historico = []
   var estado_suporte = { tentativas: 0, max_tentativas: null }
+  var ultimaBusca = [] // Guarda produtos da última busca para resolver IDs
 
   // ========== INIT ==========
   function init () {
@@ -173,7 +174,28 @@
     var acoes = {
       adicionar_carrinho: function () {
         var pid = p.produto_id
-        // Se Claude não mandou produto_id, tentar extrair do texto da última busca
+        // Fallback 1: buscar no array de última busca pelo nome mencionado pelo Claude
+        if (!pid && ultimaBusca.length > 0) {
+          // Se Claude mencionou um nome, tentar achar na última busca
+          var nomeBusca = (p.nome || p.produto_nome || '').toLowerCase()
+          if (nomeBusca) {
+            for (var bi = 0; bi < ultimaBusca.length; bi++) {
+              if ((ultimaBusca[bi].nome || '').toLowerCase().indexOf(nomeBusca) >= 0) {
+                pid = ultimaBusca[bi].id; break
+              }
+            }
+          }
+          // Se não achou por nome, pegar o mais barato (Claude geralmente pede "o mais barato")
+          if (!pid) {
+            var maisBarato = null
+            for (var bi2 = 0; bi2 < ultimaBusca.length; bi2++) {
+              var preco = parseFloat(ultimaBusca[bi2].preco) || 99999
+              if (!maisBarato || preco < parseFloat(maisBarato.preco)) maisBarato = ultimaBusca[bi2]
+            }
+            if (maisBarato) pid = maisBarato.id
+          }
+        }
+        // Fallback 2: extrair ID: do histórico de mensagens
         if (!pid && historico.length > 0) {
           for (var hi = historico.length - 1; hi >= 0; hi--) {
             var m = (historico[hi].content || '').match(/ID:(\d+)/)
@@ -287,9 +309,10 @@
       historico.pop()
 
       if (d.produtos && d.produtos.length > 0) {
+        ultimaBusca = d.produtos // Salvar para resolver IDs depois
         var texto = 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":\n\n'
         d.produtos.forEach(function (p, i) {
-          texto += '• ' + p.nome
+          texto += '• [ID:' + p.id + '] ' + p.nome
           if (p.preco) texto += ' — US$ ' + parseFloat(p.preco).toFixed(2)
           if (p.grupo_nome) texto += ' (no grupo ' + p.grupo_nome + ')'
           texto += '\n'
