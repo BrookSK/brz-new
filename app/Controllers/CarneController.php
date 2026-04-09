@@ -101,6 +101,49 @@ class CarneController extends Controller {
     }
 
     /**
+     * Regerar PIX de uma parcela (quando expirou)
+     */
+    public function regerarPix(Request $request, $parcelaId) {
+        if (empty($_SESSION['usuario_id'])) {
+            $this->json(['success' => false, 'message' => 'Não autenticado'], 401);
+        }
+
+        $parcela = $this->carneModel->getParcela($parcelaId);
+        if (!$parcela) {
+            $this->json(['success' => false, 'message' => 'Parcela não encontrada'], 404);
+        }
+
+        $carne = $this->carneModel->find($parcela['carne_id']);
+        if (!$carne || $carne['cliente_id'] != $_SESSION['usuario_id']) {
+            $this->json(['success' => false, 'message' => 'Acesso negado'], 403);
+        }
+
+        if ($parcela['status'] === 'paga') {
+            $this->json(['success' => false, 'message' => 'Parcela já está paga'], 400);
+        }
+
+        try {
+            $clientData = $this->carneService->buildClientData([], $carne['id']);
+            $descBase = "Carnê Braziliana - Pedido #{$carne['pedido_id']} - Parcela {$parcela['numero_parcela']}";
+            $this->carneService->gerarPixParcela($parcela, $carne['pedido_id'], $clientData, $descBase);
+
+            $this->carneModel->registrarHistorico($carne['id'], $parcelaId, 'pix_regerado',
+                "PIX regerado para parcela {$parcela['numero_parcela']}");
+
+            // Recarregar parcela com dados atualizados
+            $parcelaAtualizada = $this->carneModel->getParcela($parcelaId);
+
+            $this->json([
+                'success' => true,
+                'message' => 'PIX regerado com sucesso',
+                'parcela' => $parcelaAtualizada
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'message' => 'Erro ao regerar PIX: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Endpoint AJAX para calcular parcelas no checkout
      */
     public function calcularParcelas(Request $request) {

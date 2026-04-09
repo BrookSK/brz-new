@@ -96,160 +96,69 @@ class CarneService {
      * Gera os dois boletos de uma parcela (Câmbio Real + Appmax)
      */
     public function gerarBoletosParcela($parcela, $pedidoId, $dadosCliente = []) {
+        $parcelaId = $parcela['id'];
+        $clientData = $this->buildClientData($dadosCliente, $parcela['carne_id'] ?? 0);
+        $descBase = "Carnê Braziliana - Pedido #{$pedidoId} - Parcela {$parcela['numero_parcela']}";
+
+        // Primeira parcela: PIX. Demais: Boleto.
+        $isPrimeira = ((int) ($parcela['numero_parcela'] ?? 0) === 1);
+
+        if ($isPrimeira) {
+            $this->gerarPixParcela($parcela, $pedidoId, $clientData, $descBase);
+        } else {
+            $this->gerarBoletoParcela($parcela, $pedidoId, $clientData, $descBase);
+        }
+    }
+
+    /**
+     * Gera PIX para uma parcela (Câmbio Real + Appmax)
+     */
+    public function gerarPixParcela($parcela, $pedidoId, $clientData, $descBase) {
         $paymentService = new PaymentService();
         $parcelaId = $parcela['id'];
 
-        // Dados do cliente para os gateways
-        $clientData = [
-            'name' => $dadosCliente['nome'] ?? '',
-            'email' => $dadosCliente['email'] ?? '',
-            'document' => $dadosCliente['documento'] ?? '',
-            'birth_date' => $dadosCliente['data_nascimento'] ?? '',
-            'phone' => $dadosCliente['telefone'] ?? '',
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
-            'address' => [
-                'state' => $dadosCliente['estado'] ?? '',
-                'city' => $dadosCliente['cidade'] ?? '',
-                'zip_code' => $dadosCliente['cep'] ?? '',
-                'district' => $dadosCliente['bairro'] ?? '',
-                'street' => $dadosCliente['endereco'] ?? '',
-                'number' => $dadosCliente['numero'] ?? '',
-            ],
-        ];
+        // Marcar como PIX
+        $this->carneModel->atualizarParcela($parcelaId, ['metodo_pagamento' => 'pix']);
 
-        // Se não temos dados do cliente, buscar do banco
-        if (empty($clientData['name'])) {
-            try {
-                $stmt = $this->db->prepare("
-                    SELECT u.nome, u.email, u.documento, u.data_nascimento, u.telefone, u.celular,
-                           e.estado, e.cidade, e.cep, e.bairro, e.endereco, e.numero
-                    FROM carnes c
-                    JOIN usuarios u ON c.cliente_id = u.id
-                    LEFT JOIN enderecos e ON e.usuario_id = u.id AND e.principal = 1
-                    WHERE c.id = :cid LIMIT 1
-                ");
-                $stmt->execute([':cid' => $parcela['carne_id']]);
-                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-                if ($row) {
-                    $clientData['name'] = $row['nome'] ?? '';
-                    $clientData['email'] = $row['email'] ?? '';
-                    $clientData['document'] = $row['documento'] ?? '';
-                    $clientData['birth_date'] = $row['data_nascimento'] ?? '';
-                    $clientData['phone'] = $row['telefone'] ?? ($row['celular'] ?? '');
-                    $clientData['address'] = [
-                        'state' => $row['estado'] ?? '',
-                        'city' => $row['cidade'] ?? '',
-                        'zip_code' => $row['cep'] ?? '',
-                        'district' => $row['bairro'] ?? '',
-                        'street' => $row['endereco'] ?? '',
-                        'number' => $row['numero'] ?? '',
-                    ];
-                }
-            } catch (\Exception $e) {}
-        }
-
-        $descBase = "Carnê Braziliana - Pedido #{$pedidoId} - Parcela {$parcela['numero_parcela']}";
-
-        // 1. Boleto Produtos via Câmbio Real (mínimo USD 1.00 na API)
+        // 1. PIX Produtos via Câmbio Real
         if ($parcela['valor_produtos'] > 0) {
-            // Câmbio Real exige mínimo de USD 1.00 - verificar antes de chamar
-            $minBrl = 6.0; // ~USD 1.00 com margem
-            if ($parcela['valor_produtos'] < $minBrl) {
-                error_log("[CARNE] Valor produtos R$ {$parcela['valor_produtos']} abaixo do mínimo Câmbio Real (R$ {$minBrl}). Boleto não gerado.");
-                $this->carneModel->atualizarParcela($parcelaId, [
-                    'boleto_produtos_url' => '',
-                    'boleto_produtos_codigo' => 'Valor abaixo do mínimo para geração de boleto',
-                ]);
-            } else {
             try {
-                $crResult = $paymentService->createCambioRealDirectPaymentProdutoBoleto(
+                $crResult = $paymentService->createCambioRealPixPaymentProduto(
                     (int) $pedidoId,
+                    (float) $parcela['valor_produtos'] / 5.85, // amountUsd aproximado
                     (float) $parcela['valor_produtos'],
                     $descBase . ' - Produtos',
                     $clientData
                 );
 
                 if (!empty($crResult['success'])) {
-                    // Extrair URL do boleto - tentar múltiplos campos da resposta
-                    $crUrl = $crResult['bank_slip_url'] ?? ($crResult['invoice_url'] ?? '');
-                    $crDigitable = $crResult['digitable_line'] ?? '';
-                    $crPaymentId = $crResult['payment_id'] ?? '';
-
-                    // Se não encontrou URL nos campos padrão, buscar no raw da resposta
-                    if (empty($crUrl) && !empty($crResult['raw'])) {
-                        $raw = $crResult['raw'];
-                        $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
-                        $tx = is_array($data['transaction'] ?? null) ? $data['transaction'] : [];
-
-                        // Campos possíveis para URL do boleto
-                        $urlCandidates = [
-                            $tx['ticket_url'] ?? '',
-                            $tx['url'] ?? '',
-                            $tx['boleto_url'] ?? '',
-                            $tx['bank_slip_url'] ?? '',
-                            $data['ticket_url'] ?? '',
-                            $data['url'] ?? '',
-                            $data['checkout_url'] ?? '',
-                            $data['boleto_url'] ?? '',
-                            $raw['ticket_url'] ?? '',
-                            $raw['url'] ?? '',
-                        ];
-                        foreach ($urlCandidates as $candidate) {
-                            if (!empty($candidate) && is_string($candidate) && strpos($candidate, 'http') === 0) {
-                                $crUrl = $candidate;
-                                break;
-                            }
-                        }
-
-                        // Campos possíveis para linha digitável
-                        if (empty($crDigitable)) {
-                            $lineCandidates = [
-                                $tx['digitable_line'] ?? '',
-                                $tx['linha_digitavel'] ?? '',
-                                $tx['barcode_number'] ?? '',
-                                $tx['barcode'] ?? '',
-                                $data['digitable_line'] ?? '',
-                                $data['linha_digitavel'] ?? '',
-                                $data['barcode'] ?? '',
-                            ];
-                            foreach ($lineCandidates as $candidate) {
-                                if (!empty($candidate) && is_string($candidate) && strlen($candidate) > 10) {
-                                    $crDigitable = $candidate;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
+                    $pix = $crResult['pix'] ?? [];
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_produtos_url' => $crUrl,
-                        'boleto_produtos_codigo' => $crDigitable,
-                        'boleto_produtos_id_externo' => $crPaymentId,
+                        'boleto_produtos_url' => $crResult['invoice_url'] ?? '',
+                        'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
+                        'pix_produtos_qrcode' => $pix['encodedImage'] ?? '',
+                        'pix_produtos_payload' => $pix['payload'] ?? '',
+                        'pix_produtos_expiracao' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
-
-                    // Log para debug
-                    error_log('[CARNE] Câmbio Real boleto gerado: url=' . $crUrl . ' line=' . substr($crDigitable, 0, 20) . '... id=' . $crPaymentId);
+                    error_log('[CARNE] PIX Câmbio Real gerado: id=' . ($crResult['payment_id'] ?? '') . ' payload=' . substr($pix['payload'] ?? '', 0, 30) . '...');
                 } else {
-                    error_log('[CARNE] Erro Câmbio Real boleto: ' . ($crResult['error'] ?? 'desconhecido'));
-                    if (!empty($crResult['raw'])) {
-                        error_log('[CARNE] Câmbio Real raw: ' . json_encode($crResult['raw']));
-                    }
+                    error_log('[CARNE] Erro PIX Câmbio Real: ' . ($crResult['error'] ?? 'desconhecido'));
                 }
             } catch (\Exception $e) {
-                error_log('[CARNE] Exception Câmbio Real: ' . $e->getMessage());
+                error_log('[CARNE] Exception PIX Câmbio Real: ' . $e->getMessage());
             }
-            } // fecha else do mínimo
         }
 
-        // 2. Boleto Taxas via Appmax
+        // 2. PIX Taxas via Appmax
         if ($parcela['valor_taxas'] > 0) {
             try {
                 $appmaxDados = [
-                    'billingType' => 'BOLETO',
-                    'customer_name' => $clientData['name'],
-                    'customer_email' => $clientData['email'],
-                    'customer_document' => $clientData['document'],
-                    'customer_phone' => $clientData['phone'],
+                    'billingType' => 'PIX',
+                    'forma_pagamento' => 'pix',
+                    'customer_name' => $clientData['name'] ?? '',
+                    'customer_email' => $clientData['email'] ?? '',
+                    'customer_document' => $clientData['document'] ?? '',
+                    'customer_phone' => $clientData['phone'] ?? '',
                     'customer_zipcode' => $clientData['address']['zip_code'] ?? '',
                     'customer_address' => $clientData['address']['street'] ?? '',
                     'customer_address_number' => $clientData['address']['number'] ?? '',
@@ -257,7 +166,7 @@ class CarneService {
                     'customer_city' => $clientData['address']['city'] ?? '',
                     'customer_state' => $clientData['address']['state'] ?? '',
                     'products' => [[
-                        'sku' => 'CARNE_TAXA_' . $pedidoId . '_' . $parcela['numero_parcela'],
+                        'sku' => 'CARNE_TAXA_PIX_' . $pedidoId . '_' . $parcela['numero_parcela'],
                         'name' => $descBase . ' - Taxas',
                         'quantity' => 1,
                         'unit_value' => (int) round($parcela['valor_taxas'] * 100),
@@ -276,22 +185,141 @@ class CarneService {
                 );
 
                 if (!empty($appmaxResult['success'])) {
-                    $boletoUrl = $appmaxResult['bankSlipUrl'] ?? ($appmaxResult['invoiceUrl'] ?? '');
-                    $digitableLine = $appmaxResult['digitableLine'] ?? '';
-                    $paymentId = $appmaxResult['payment_id'] ?? '';
-
+                    $pix = $appmaxResult['pix'] ?? [];
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_taxas_url' => $boletoUrl,
-                        'boleto_taxas_codigo' => $digitableLine,
-                        'boleto_taxas_id_externo' => $paymentId,
+                        'boleto_taxas_url' => $appmaxResult['invoiceUrl'] ?? '',
+                        'boleto_taxas_id_externo' => $appmaxResult['payment_id'] ?? '',
+                        'pix_taxas_qrcode' => $pix['encodedImage'] ?? '',
+                        'pix_taxas_payload' => $pix['payload'] ?? '',
+                        'pix_taxas_expiracao' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
+                    error_log('[CARNE] PIX Appmax gerado: id=' . ($appmaxResult['payment_id'] ?? ''));
                 } else {
-                    error_log('[CARNE] Erro Appmax boleto: ' . ($appmaxResult['error'] ?? 'desconhecido'));
+                    error_log('[CARNE] Erro PIX Appmax: ' . ($appmaxResult['error'] ?? 'desconhecido'));
                 }
             } catch (\Exception $e) {
-                error_log('[CARNE] Exception Appmax: ' . $e->getMessage());
+                error_log('[CARNE] Exception PIX Appmax: ' . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Gera boletos para uma parcela (Câmbio Real + Appmax)
+     */
+    private function gerarBoletoParcela($parcela, $pedidoId, $clientData, $descBase) {
+        $paymentService = new PaymentService();
+        $parcelaId = $parcela['id'];
+
+        $this->carneModel->atualizarParcela($parcelaId, ['metodo_pagamento' => 'boleto']);
+
+        // 1. Boleto Produtos via Câmbio Real
+        if ($parcela['valor_produtos'] > 0) {
+            $minBrl = 6.0;
+            if ($parcela['valor_produtos'] < $minBrl) {
+                error_log("[CARNE] Valor produtos R$ {$parcela['valor_produtos']} abaixo do mínimo Câmbio Real.");
+            } else {
+                try {
+                    $crResult = $paymentService->createCambioRealDirectPaymentProdutoBoleto(
+                        (int) $pedidoId, (float) $parcela['valor_produtos'],
+                        $descBase . ' - Produtos', $clientData
+                    );
+                    if (!empty($crResult['success'])) {
+                        $crUrl = $crResult['bank_slip_url'] ?? ($crResult['invoice_url'] ?? '');
+                        if (empty($crUrl) && !empty($crResult['raw'])) {
+                            $raw = $crResult['raw'];
+                            $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+                            $tx = is_array($data['transaction'] ?? null) ? $data['transaction'] : [];
+                            foreach ([$tx['ticket_url']??'',$data['ticket_url']??'',$data['url']??'',$raw['url']??''] as $c) {
+                                if (!empty($c) && strpos($c,'http')===0) { $crUrl=$c; break; }
+                            }
+                        }
+                        $this->carneModel->atualizarParcela($parcelaId, [
+                            'boleto_produtos_url' => $crUrl,
+                            'boleto_produtos_codigo' => $crResult['digitable_line'] ?? '',
+                            'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
+                        ]);
+                    } else {
+                        error_log('[CARNE] Erro CR boleto: ' . ($crResult['error'] ?? ''));
+                    }
+                } catch (\Exception $e) {
+                    error_log('[CARNE] Exception CR boleto: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // 2. Boleto Taxas via Appmax
+        if ($parcela['valor_taxas'] > 0) {
+            try {
+                $appmaxDados = [
+                    'billingType' => 'BOLETO',
+                    'customer_name' => $clientData['name'] ?? '',
+                    'customer_email' => $clientData['email'] ?? '',
+                    'customer_document' => $clientData['document'] ?? '',
+                    'customer_phone' => $clientData['phone'] ?? '',
+                    'customer_zipcode' => $clientData['address']['zip_code'] ?? '',
+                    'customer_address' => $clientData['address']['street'] ?? '',
+                    'customer_address_number' => $clientData['address']['number'] ?? '',
+                    'customer_province' => $clientData['address']['district'] ?? '',
+                    'customer_city' => $clientData['address']['city'] ?? '',
+                    'customer_state' => $clientData['address']['state'] ?? '',
+                    'products' => [[
+                        'sku' => 'CARNE_TAXA_' . $pedidoId . '_' . $parcela['numero_parcela'],
+                        'name' => $descBase . ' - Taxas', 'quantity' => 1,
+                        'unit_value' => (int) round($parcela['valor_taxas'] * 100), 'type' => 'service',
+                    ]],
+                    'products_value_cents' => (int) round($parcela['valor_taxas'] * 100),
+                    'shipping_value_cents' => 0, 'discount_value_cents' => 0,
+                ];
+                $appmaxResult = $paymentService->processarPagamento($appmaxDados, (float) $parcela['valor_taxas'], 'BRL', $descBase . ' - Taxas');
+                if (!empty($appmaxResult['success'])) {
+                    $this->carneModel->atualizarParcela($parcelaId, [
+                        'boleto_taxas_url' => $appmaxResult['bankSlipUrl'] ?? ($appmaxResult['invoiceUrl'] ?? ''),
+                        'boleto_taxas_codigo' => $appmaxResult['digitableLine'] ?? '',
+                        'boleto_taxas_id_externo' => $appmaxResult['payment_id'] ?? '',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                error_log('[CARNE] Exception Appmax boleto: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Monta dados do cliente para os gateways
+     */
+    public function buildClientData($dadosCliente, $carneId = 0) {
+        $clientData = [
+            'name' => $dadosCliente['nome'] ?? '', 'email' => $dadosCliente['email'] ?? '',
+            'document' => $dadosCliente['documento'] ?? '', 'birth_date' => $dadosCliente['data_nascimento'] ?? '',
+            'phone' => $dadosCliente['telefone'] ?? '', 'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+            'address' => [
+                'state' => $dadosCliente['estado'] ?? '', 'city' => $dadosCliente['cidade'] ?? '',
+                'zip_code' => $dadosCliente['cep'] ?? '', 'district' => $dadosCliente['bairro'] ?? '',
+                'street' => $dadosCliente['endereco'] ?? '', 'number' => $dadosCliente['numero'] ?? '',
+            ],
+        ];
+        if (empty($clientData['name']) && $carneId > 0) {
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT u.nome, u.email, u.documento, u.data_nascimento, u.telefone, u.celular,
+                           e.estado, e.cidade, e.cep, e.bairro, e.endereco, e.numero
+                    FROM carnes c JOIN usuarios u ON c.cliente_id = u.id
+                    LEFT JOIN enderecos e ON e.usuario_id = u.id AND e.principal = 1
+                    WHERE c.id = :cid LIMIT 1
+                ");
+                $stmt->execute([':cid' => $carneId]);
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($row) {
+                    $clientData = [
+                        'name' => $row['nome'] ?? '', 'email' => $row['email'] ?? '',
+                        'document' => $row['documento'] ?? '', 'birth_date' => $row['data_nascimento'] ?? '',
+                        'phone' => $row['telefone'] ?? ($row['celular'] ?? ''), 'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+                        'address' => ['state'=>$row['estado']??'','city'=>$row['cidade']??'','zip_code'=>$row['cep']??'','district'=>$row['bairro']??'','street'=>$row['endereco']??'','number'=>$row['numero']??''],
+                    ];
+                }
+            } catch (\Exception $e) {}
+        }
+        return $clientData;
     }
 
     /**
