@@ -29,8 +29,13 @@ class AdminRelatorioPedidosController extends Controller {
             $params[':st'] = $statusFilter;
         }
 
-        // Excluir pedidos de carnê da listagem
-        $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('carne_pagando','carne_aguardando')";
+        // Excluir pedidos de carnê e deletados/cancelados da listagem
+        $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('carne_pagando','carne_aguardando','cancelado','cancelled','apagado','deleted','lixeira','trash')";
+
+        // Excluir soft-deleted (deleted_at)
+        if (in_array('deleted_at', $cols, true)) {
+            $where[] = "p.deleted_at IS NULL";
+        }
 
         // Detectar colunas
         $cols = [];
