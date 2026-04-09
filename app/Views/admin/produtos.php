@@ -484,18 +484,13 @@ function alterarStatus(id) {
 
 function excluirProduto(id) {
     if (confirm((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.confirm_delete) ? window.ADMIN_PRODUCTS_I18N.confirm_delete : 'Deseja realmente excluir este produto? Esta ação não pode ser desfeita!')) {
-        fetch(`/admin/produtos/excluir/${id}`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.deleted_success) ? window.ADMIN_PRODUCTS_I18N.deleted_success : 'Produto excluído com sucesso!');
-                location.reload();
-            } else {
-                alert(((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.error_delete_prefix) ? window.ADMIN_PRODUCTS_I18N.error_delete_prefix : 'Erro ao excluir produto:') + ' ' + data.error);
-            }
-        });
+        // Criar form dinâmico para POST
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/admin/produtos/excluir/' + id;
+        form.style.display = 'none';
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
