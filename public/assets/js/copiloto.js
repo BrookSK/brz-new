@@ -184,7 +184,7 @@
       ir_para_contato: function () { salvarEstadoChat(); window.location.href = '/contato' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
-      buscar_produto: function () { salvarEstadoChat(); window.location.href = '/produtos?busca=' + encodeURIComponent(p.termo || p.busca || '') },
+      buscar_produto: function () { return buscarProdutoInteligente(p.termo || p.busca || '') },
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
       criar_ticket_suporte: function () { return criarTicket('suporte', p) },
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
@@ -242,6 +242,38 @@
       adicionarMsg('assistant', 'Ops, tive um problema de conexão. Tenta de novo? 😅')
     }
     enviando = false
+  }
+
+  async function buscarProdutoInteligente (termo) {
+    if (!termo) return
+    adicionarMsg('assistant', '🔍 Buscando "' + termo + '"...')
+    try {
+      var r = await fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termo))
+      var d = await r.json()
+      // Remover mensagem de "buscando"
+      var msgs = document.getElementById('bz-copiloto-messages')
+      if (msgs.lastChild) msgs.removeChild(msgs.lastChild)
+      historico.pop()
+
+      if (d.produtos && d.produtos.length > 0) {
+        var texto = 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":\n\n'
+        d.produtos.forEach(function (p, i) {
+          texto += '• ' + p.nome
+          if (p.preco) texto += ' — US$ ' + parseFloat(p.preco).toFixed(2)
+          if (p.grupo_nome) texto += ' (no grupo ' + p.grupo_nome + ')'
+          texto += '\n'
+        })
+        if (d.grupos && d.grupos.length > 0) {
+          texto += '\nEsse produto está disponível nos Grupos de Compras. '
+          texto += 'Quer que eu te leve para algum deles?'
+        }
+        adicionarMsg('assistant', texto)
+      } else {
+        adicionarMsg('assistant', 'Não encontrei "' + termo + '" no catálogo. Pode ser que esteja em um Grupo de Compras que ainda não está ativo, ou com outro nome. Quer que eu te leve para a página de Grupos de Compras?')
+      }
+    } catch (e) {
+      adicionarMsg('assistant', 'Não consegui buscar agora. Tenta ir em Grupos de Compras e procurar por lá.')
+    }
   }
 
   // ========== WIDGET UI ==========

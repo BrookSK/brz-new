@@ -90,6 +90,56 @@ class CopilotoApiController extends Controller {
         $this->responderJson($service->calcularCustoTotal($preco, $peso, $imposto));
     }
 
+    /** GET /api/copiloto/buscar-produto — Busca produtos no banco incluindo grupos de compras */
+    public function buscarProduto(Request $request) {
+        $termo = trim((string) $request->getParam('q', ''));
+        if (mb_strlen($termo) < 2) {
+            $this->responderJson(['produtos' => [], 'grupos' => []]);
+        }
+        try {
+            $pdo = \Config\Database::getConnection();
+            $like = '%' . $termo . '%';
+
+            // Buscar nos produtos
+            $st = $pdo->prepare("SELECT p.id, p.nome, p.preco, p.peso, p.loja, 
+                COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
+                FROM produtos p
+                LEFT JOIN grupo_compras_produtos gcp ON gcp.produto_id = p.id
+                LEFT JOIN grupos_compras gc ON gc.id = gcp.grupo_id
+                WHERE p.nome LIKE ? AND (p.status = 'ativo' OR p.status IS NULL)
+                ORDER BY p.nome ASC LIMIT 10");
+            $st->execute([$like]);
+            $produtos = $st->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Identificar grupos que contêm o produto
+            $grupos = [];
+            $gruposVistos = [];
+            foreach ($produtos as $p) {
+                if (!empty($p['grupo_slug']) && !isset($gruposVistos[$p['grupo_slug']])) {
+                    $grupos[] = ['nome' => $p['grupo_nome'], 'slug' => $p['grupo_slug']];
+                    $gruposVistos[$p['grupo_slug']] = true;
+                }
+            }
+
+            $this->responderJson([
+                'produtos' => array_map(function($p) {
+                    return [
+                        'id' => $p['id'],
+                        'nome' => $p['nome'],
+                        'preco' => $p['preco'],
+                        'peso' => $p['peso'],
+                        'loja' => $p['loja'],
+                        'grupo' => $p['grupo_slug'] ?: null,
+                        'grupo_nome' => $p['grupo_nome'] ?: null,
+                    ];
+                }, $produtos),
+                'grupos' => $grupos,
+            ]);
+        } catch (\Exception $e) {
+            $this->responderJson(['produtos' => [], 'grupos' => [], 'erro' => $e->getMessage()]);
+        }
+    }
+
     /** POST /api/copiloto/ticket */
     public function ticket(Request $request) {
         $body = $request->getBody();
