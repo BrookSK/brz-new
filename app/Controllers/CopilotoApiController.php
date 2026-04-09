@@ -101,12 +101,13 @@ class CopilotoApiController extends Controller {
             $like = '%' . $termo . '%';
 
             // Buscar nos produtos (coluna name, vínculo via grupo_compras_id)
-            $st = $pdo->prepare("SELECT p.id, p.name AS nome, p.price AS preco, p.weight AS peso, p.loja,
+            $st = $pdo->prepare("SELECT p.id, p.name AS nome, p.price AS preco, p.weight AS peso,
                 p.grupo_compras_id,
                 COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
                 FROM produtos p
                 LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
-                WHERE p.name LIKE ? AND (p.status = 'ativo' OR p.status IS NULL OR p.status = '')
+                WHERE p.name LIKE ?
+                  AND (p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active',''))
                 ORDER BY p.name ASC LIMIT 10");
             $st->execute([$like]);
             $produtos = $st->fetchAll(\PDO::FETCH_ASSOC);
@@ -128,7 +129,6 @@ class CopilotoApiController extends Controller {
                         'nome' => $p['nome'],
                         'preco' => $p['preco'],
                         'peso' => $p['peso'],
-                        'loja' => $p['loja'],
                         'grupo' => $p['grupo_slug'] ?: null,
                         'grupo_nome' => $p['grupo_nome'] ?: null,
                     ];
