@@ -29,7 +29,7 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
-    private function gerarCobrancaAppmaxTaxaServicoSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao, string $componente = 'taxa_servico'): array {
+    private function gerarCobrancaAppmaxTaxaServicoSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao, string $componente = 'taxa_servico', ?float $valorRegistro = null): array {
         $billingType = strtoupper(trim($billingType));
         if (!in_array($billingType, ['PIX', 'BOLETO', 'CREDIT_CARD'], true)) {
             $billingType = 'BOLETO';
@@ -38,6 +38,8 @@ class CheckoutController extends Controller {
         if ($valor <= 0) {
             return ['success' => true, 'skipped' => true];
         }
+        // valorRegistro: valor a salvar no split (pode ser diferente do valor cobrado)
+        $valorParaSplit = ($valorRegistro !== null && $valorRegistro > 0) ? $valorRegistro : $valor;
 
         $nome = (string) ($usuario['nome'] ?? 'Cliente');
         $email = (string) ($usuario['email'] ?? '');
@@ -102,7 +104,7 @@ class CheckoutController extends Controller {
             'gateway' => 'appmax',
             'metodo' => strtolower($billingType),
             'moeda' => 'BRL',
-            'valor' => $valor,
+            'valor' => $valorParaSplit,
             'payment_id' => $paymentId,
             'status' => 'pending',
             'invoice_url' => $invoiceUrl,
@@ -3489,7 +3491,7 @@ class CheckoutController extends Controller {
                                     $clienteSplit['card_cvv'] = (string) ($dados['card_cvv'] ?? '');
                                 }
 
-                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico');
+                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico', (float) $valorTaxa);
                                 if (empty($taxa['success'])) {
                                     throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
                                 }
