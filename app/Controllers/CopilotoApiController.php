@@ -100,15 +100,35 @@ class CopilotoApiController extends Controller {
             $pdo = \Config\Database::getConnection();
             $like = '%' . $termo . '%';
 
-            // Buscar nos produtos (coluna name, vínculo via grupo_compras_id)
-            $st = $pdo->prepare("SELECT p.id, p.name AS nome, p.price AS preco, p.weight AS peso,
-                p.grupo_compras_id,
-                COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
-                FROM produtos p
-                LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
-                WHERE p.name LIKE ?
-                  AND (p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active',''))
-                ORDER BY p.name ASC LIMIT 10");
+            // Verificar quais colunas existem na tabela produtos
+            $cols = [];
+            try {
+                $stCols = $pdo->query('DESCRIBE produtos');
+                $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) { $cols = []; }
+
+            $temGrupoComprasId = in_array('grupo_compras_id', $cols, true);
+            $colNome = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
+            $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : 'price');
+            $colPeso = in_array('weight', $cols, true) ? 'weight' : (in_array('peso', $cols, true) ? 'peso' : 'weight');
+
+            if ($temGrupoComprasId) {
+                $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
+                    p.grupo_compras_id,
+                    COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
+                    FROM produtos p
+                    LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
+                    WHERE p.{$colNome} LIKE ?
+                    ORDER BY p.{$colNome} ASC LIMIT 10";
+            } else {
+                $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
+                    NULL as grupo_compras_id, '' as grupo_nome, '' as grupo_slug
+                    FROM produtos p
+                    WHERE p.{$colNome} LIKE ?
+                    ORDER BY p.{$colNome} ASC LIMIT 10";
+            }
+
+            $st = $pdo->prepare($sql);
             $st->execute([$like]);
             $produtos = $st->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -134,8 +154,10 @@ class CopilotoApiController extends Controller {
                     ];
                 }, $produtos),
                 'grupos' => $grupos,
+                'total' => count($produtos),
             ]);
         } catch (\Exception $e) {
+            error_log('[CoPiloto] Erro busca produto: ' . $e->getMessage());
             $this->responderJson(['produtos' => [], 'grupos' => [], 'erro' => $e->getMessage()]);
         }
     }
