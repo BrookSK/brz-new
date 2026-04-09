@@ -3116,6 +3116,13 @@ HTML;
                 </div>';
             }
 
+            // Determinar moeda de exibição para todo o pedido
+            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'USD')));
+            if ($moedaPedido === '') $moedaPedido = 'USD';
+            $taxaConvPedido = (float) ($pedido['taxa_conversao'] ?? 1);
+            if ($taxaConvPedido <= 0) $taxaConvPedido = 1;
+            $exibirEmBrl = ($moedaPedido === 'BRL');
+
             echo '<div class="row">
                     <div class="col-md-12">
                         <div class="card mb-4">
@@ -3744,14 +3751,7 @@ HTML;
                                             ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
                                             <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>';
 
-            // Determinar moeda de exibição: se pedido é BRL, mostrar R$ sem converter
-            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'USD')));
-            if ($moedaPedido === '') $moedaPedido = 'USD';
-            $taxaConvPedido = (float) ($pedido['taxa_conversao'] ?? 1);
-            if ($taxaConvPedido <= 0) $taxaConvPedido = 1;
-            $exibirEmBrl = ($moedaPedido === 'BRL');
-
-            // Função helper: só troca o símbolo, sem converter valores (já estão na moeda certa no banco)
+            // Função helper: só troca o símbolo, sem converter valores
             $fmtPedido = function(float $valor) use ($exibirEmBrl) {
                 if ($exibirEmBrl) {
                     return 'R$ ' . number_format($valor, 2, ',', '.');
