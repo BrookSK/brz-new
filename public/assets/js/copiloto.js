@@ -175,76 +175,48 @@
       adicionar_carrinho: function () {
         var pid = p.produto_id ? parseInt(p.produto_id) : 0
         var qtd = p.quantidade || 1
-
-        // Se tem produto_id, adicionar direto
         if (pid > 0) return addToCart(pid, qtd)
 
-        // Fallback 1: buscar em ultimaBusca pelo nome
-        var nomeBusca = (p.nome || p.produto_nome || p.termo || '').toLowerCase()
-        
-        // Fallback 1b: extrair nome do produto do texto da resposta do Claude
-        if (!nomeBusca && historico.length > 0) {
-          var ultimaResposta = historico[historico.length - 1]
-          if (ultimaResposta && ultimaResposta.role === 'assistant') {
-            var txt = ultimaResposta.content || ''
-            // Tentar extrair nome após "Adicionei" ou entre aspas ou após emoji
-            var mNome = txt.match(/(?:Adicionei|adicionei|Adiciono|adiciono)[^!.\n]*?(?:do|da|das|dos|o|a)?\s+(.{5,60?})(?:\s+no|\s+ao|\!|\n)/i)
-            if (mNome) nomeBusca = mNome[1].replace(/[!🛒💙🍳💧✅]/g, '').trim().toLowerCase()
-            if (!nomeBusca) {
-              // Tentar pegar nome de produto entre ** ou após bullet
-              var mBold = txt.match(/\*\*(.{5,60?})\*\*/i) || txt.match(/Downy[^—\n]*/i) || txt.match(/(?:^|\n)\s*(.{5,50?})\s*[-—]/m)
-              if (mBold) nomeBusca = mBold[1].replace(/\*/g, '').trim().toLowerCase()
-            }
-          }
-        }
-
-        if (nomeBusca && ultimaBusca.length > 0) {
-          for (var i = 0; i < ultimaBusca.length; i++) {
-            if ((ultimaBusca[i].nome || '').toLowerCase().indexOf(nomeBusca.substring(0, 15)) >= 0) {
-              return addToCart(ultimaBusca[i].id, qtd)
-            }
-          }
-          // Pegar o mais barato como fallback
-          var mb = ultimaBusca.reduce(function(a, b) { return (parseFloat(a.preco)||99999) < (parseFloat(b.preco)||99999) ? a : b })
-          if (mb && mb.id) return addToCart(mb.id, qtd)
-        }
-
-        // Fallback 2: extrair [ID:] do histórico
-        for (var hi = historico.length - 1; hi >= Math.max(0, historico.length - 6); hi--) {
-          var m = (historico[hi].content || '').match(/\[ID:(\d+)\]/)
-          if (m) return addToCart(parseInt(m[1]), qtd)
-        }
-
-        // Fallback 3: buscar na API pelo nome extraído
-        var termoBusca = nomeBusca || ''
-        if (!termoBusca) {
-          // Último recurso: pegar palavras-chave das últimas mensagens do usuário
-          for (var ui = historico.length - 1; ui >= Math.max(0, historico.length - 4); ui--) {
+        // Sem produto_id — resolver via busca na API
+        // Extrair termo de busca: nome do Claude OU mensagens recentes do usuário
+        var termo = (p.nome || p.produto_nome || '').trim()
+        if (!termo) {
+          // Pegar das últimas mensagens do usuário
+          for (var ui = historico.length - 1; ui >= Math.max(0, historico.length - 6); ui--) {
             if (historico[ui].role === 'user') {
-              termoBusca = historico[ui].content.toLowerCase().replace(/coloca|adiciona|carrinho|meu|por favor|no|2|3|dele|dela/gi, '').trim()
-              if (termoBusca.length >= 3) break
+              var msg = historico[ui].content.toLowerCase()
+              // Limpar palavras genéricas
+              msg = msg.replace(/\b(coloca|adiciona|carrinho|meu|por favor|no|dele|dela|delas|deles|também|tambem|pode|quero|unidades?|mais)\b/gi, ' ').trim()
+              // Pegar palavras com 3+ chars
+              var palavras = msg.split(/\s+/).filter(function(w) { return w.length >= 3 })
+              if (palavras.length > 0) { termo = palavras.join(' '); break }
             }
           }
         }
-        
-        if (termoBusca && termoBusca.length >= 3) {
-          adicionarMsg('assistant', '🔍 Buscando produto...')
-          return fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termoBusca))
-            .then(function(r) { return r.json() })
-            .then(function(d) {
-              var msgs = document.getElementById('bz-copiloto-messages')
-              if (msgs.lastChild) { msgs.removeChild(msgs.lastChild); historico.pop() }
-              if (d.produtos && d.produtos.length > 0) {
-                ultimaBusca = d.produtos
-                var prod = d.produtos.reduce(function(a, b) { return (parseFloat(a.preco)||99999) < (parseFloat(b.preco)||99999) ? a : b })
-                return addToCart(prod.id, qtd)
-              } else {
-                adicionarMsg('assistant', '⚠️ Não encontrei esse produto. Me diz o nome exato?')
-              }
-            }).catch(function() { adicionarMsg('assistant', '⚠️ Erro na busca. Tenta de novo?') })
+        if (!termo || termo.length < 2) {
+          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o nome?')
+          return
         }
-
-        adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o nome exato?')
+        // Buscar na API e adicionar o resultado mais relevante
+        return fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termo))
+          .then(function(r) { return r.json() })
+          .then(function(d) {
+            if (d.produtos && d.produtos.length > 0) {
+              ultimaBusca = d.produtos
+              // Tentar match exato primeiro
+              var found = null
+              for (var i = 0; i < d.produtos.length; i++) {
+                if ((d.produtos[i].nome || '').toLowerCase().indexOf(termo.toLowerCase()) >= 0) {
+                  found = d.produtos[i]; break
+                }
+              }
+              // Senão, pegar o mais barato
+              if (!found) found = d.produtos.reduce(function(a, b) { return (parseFloat(a.preco)||99999) < (parseFloat(b.preco)||99999) ? a : b })
+              return addToCart(found.id, qtd)
+            } else {
+              adicionarMsg('assistant', '⚠️ Não encontrei "' + termo + '". Me diz o nome exato?')
+            }
+          }).catch(function() { adicionarMsg('assistant', '⚠️ Erro na busca. Tenta de novo?') })
       },
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
       trocar_moeda_usd: function () { salvarEstadoChat(); window.location.href = '/lang/en' },
