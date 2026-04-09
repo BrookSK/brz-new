@@ -694,9 +694,14 @@ class AdminComprasController extends Controller {
             }
 
             // Estratégia 2: buscar pedidos que contêm esse produto na tabela de itens
+            // Excluir pedidos cancelados/apagados
+            $statusExcluidos = "('cancelado','cancelled','apagado','deleted','lixeira','trash','rejeitado','rejected')";
             try {
                 $stItens = $this->connection->prepare(
-                    "SELECT DISTINCT pedido_id FROM {$itensTable} WHERE produto_id = ? AND pedido_id IS NOT NULL AND pedido_id > 0"
+                    "SELECT DISTINCT i.pedido_id FROM {$itensTable} i
+                     INNER JOIN pedidos ped ON ped.id = i.pedido_id
+                     WHERE i.produto_id = ? AND i.pedido_id IS NOT NULL AND i.pedido_id > 0
+                     AND LOWER(COALESCE(ped.status,'')) NOT IN {$statusExcluidos}"
                 );
                 $stItens->execute([$produtoId]);
                 $pedidoIdsFromItens = $stItens->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -730,7 +735,7 @@ class AdminComprasController extends Controller {
                 }
             }
 
-            $stmtPedidos = $this->connection->prepare("SELECT {$selectPed} FROM pedidos p{$joinUser} WHERE p.id IN ({$in}) ORDER BY p.id DESC");
+            $stmtPedidos = $this->connection->prepare("SELECT {$selectPed} FROM pedidos p{$joinUser} WHERE p.id IN ({$in}) AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','apagado','deleted','lixeira','trash','rejeitado','rejected') ORDER BY p.id DESC");
             $stmtPedidos->execute(array_map('intval', $pedidoIds));
             $pedidosRows = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
