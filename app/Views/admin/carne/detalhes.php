@@ -157,7 +157,11 @@
                         .then(data => {
                             if (data.success) {
                                 document.getElementById('diferenca-resultado').style.display = 'block';
-                                document.getElementById('diferenca-link-url').value = data.link_url;
+                                var linkUrl = data.link_url || '';
+                                if (linkUrl && !linkUrl.startsWith('http')) {
+                                    linkUrl = window.location.origin + linkUrl;
+                                }
+                                document.getElementById('diferenca-link-url').value = linkUrl;
                                 btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Gerado';
                             } else {
                                 alert(data.error || 'Erro ao gerar link');
