@@ -40,7 +40,12 @@
                     <h5>9. Adiantamento de Parcelas</h5>
                     <p>O cliente pode pagar parcelas futuras antecipadamente, se desejar.</p>
 
-                    <h5>10. Regras Gerais</h5>
+                    <h5>10. Cancelamento por Inadimplência</h5>
+                    <p>Caso o cliente permaneça com parcelas em atraso por 2 (dois) meses consecutivos sem efetuar o pagamento, o sistema enviará um aviso de cancelamento por e-mail. A partir do recebimento desse aviso, o cliente terá 7 (sete) dias para regularizar todas as parcelas em atraso (quitando ambos os boletos de cada parcela pendente).</p>
+                    <p>Se a regularização não for realizada dentro do prazo, o carnê será automaticamente cancelado. Nesse caso, o cliente precisará realizar uma nova compra com um novo carnê para dar continuidade ao pedido.</p>
+                    <p>O cancelamento do carnê não gera reembolso automático das parcelas já pagas. Eventuais créditos serão analisados caso a caso pela equipe.</p>
+
+                    <h5>11. Regras Gerais</h5>
                     <ul>
                         <li>O Carnê Braziliana está disponível apenas para pagamentos em Reais (BRL) e envios para o Brasil</li>
                         <li>Não se trata de assinatura ou recorrência automática</li>

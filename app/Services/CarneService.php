@@ -395,7 +395,7 @@ class CarneService {
      */
     public function processarCron() {
         $hoje = date('Y-m-d');
-        $resultados = ['vencidas' => 0, 'geradas' => 0, 'notificadas' => 0, 'quitados' => 0];
+        $resultados = ['vencidas' => 0, 'geradas' => 0, 'notificadas' => 0, 'quitados' => 0, 'avisos_cancelamento' => 0, 'cancelados' => 0];
 
         // 1. Marcar parcelas vencidas
         $stmt = $this->db->prepare("
@@ -421,17 +421,23 @@ class CarneService {
         $stmt->execute([':prox' => $proximoVenc]);
         $resultados['geradas'] = $stmt->rowCount();
 
-        // 4. Atualizar status dos carnês
+        // 4. Atualizar status dos carnês com atraso
         $stmt = $this->db->query("SELECT DISTINCT carne_id FROM carne_parcelas WHERE status IN ('vencida','em_atraso')");
         $carnesComAtraso = $stmt->fetchAll(\PDO::FETCH_COLUMN);
         foreach ($carnesComAtraso as $cid) {
-            $this->carneModel->update($cid, ['status' => 'com_atraso']);
+            // Não sobrescrever se já está em aviso_cancelamento ou cancelado
+            $st = $this->db->prepare("SELECT status FROM carnes WHERE id = ? LIMIT 1");
+            $st->execute([$cid]);
+            $statusAtual = $st->fetchColumn();
+            if (!in_array($statusAtual, ['aviso_cancelamento', 'cancelado', 'quitado', 'liberado_envio', 'encerrado'])) {
+                $this->carneModel->update($cid, ['status' => 'com_atraso']);
+            }
         }
 
         // 5. Verificar carnês quitados
         $stmt = $this->db->query("
             SELECT c.id FROM carnes c
-            WHERE c.status NOT IN ('quitado','encerrado','liberado_envio')
+            WHERE c.status NOT IN ('quitado','encerrado','liberado_envio','cancelado')
             AND NOT EXISTS (
                 SELECT 1 FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status != 'paga'
             )
@@ -456,6 +462,64 @@ class CarneService {
         foreach ($proximasVencer as $p) {
             $this->dispararNotificacao($p['carne_id'], $p['id'], 'parcela_proxima_vencimento');
             $resultados['notificadas']++;
+        }
+
+        // 7. CANCELAMENTO POR ABANDONO
+        $mesesAtraso = 2;
+        $diasAviso = 7;
+        try {
+            $st = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('carne_meses_atraso_cancelamento','carne_dias_aviso_cancelamento')");
+            $st->execute();
+            $cfgs = $st->fetchAll(\PDO::FETCH_KEY_PAIR);
+            $mesesAtraso = (int) ($cfgs['carne_meses_atraso_cancelamento'] ?? 2);
+            $diasAviso = (int) ($cfgs['carne_dias_aviso_cancelamento'] ?? 7);
+            if ($mesesAtraso < 1) $mesesAtraso = 2;
+            if ($diasAviso < 1) $diasAviso = 7;
+        } catch (\Exception $e) {}
+
+        // 7a. Enviar aviso de cancelamento para carnês com X meses de atraso
+        $stmt = $this->db->prepare("
+            SELECT c.id FROM carnes c
+            WHERE c.status IN ('com_atraso','inadimplente')
+            AND c.aviso_cancelamento_em IS NULL
+            AND EXISTS (
+                SELECT 1 FROM carne_parcelas cp 
+                WHERE cp.carne_id = c.id AND cp.status IN ('vencida','em_atraso')
+                AND cp.vencimento < DATE_SUB(:hoje, INTERVAL :meses MONTH)
+            )
+        ");
+        $stmt->execute([':hoje' => $hoje, ':meses' => $mesesAtraso]);
+        $carnesParaAviso = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($carnesParaAviso as $cid) {
+            $this->carneModel->update($cid, [
+                'status' => 'aviso_cancelamento',
+                'aviso_cancelamento_em' => date('Y-m-d H:i:s')
+            ]);
+            $this->carneModel->registrarHistorico($cid, null, 'aviso_cancelamento',
+                "Aviso de cancelamento enviado. O cliente tem {$diasAviso} dias para regularizar.");
+            $this->dispararNotificacao($cid, null, 'aviso_cancelamento');
+            $resultados['avisos_cancelamento']++;
+        }
+
+        // 7b. Cancelar carnês cujo aviso expirou (X dias após o aviso)
+        $stmt = $this->db->prepare("
+            SELECT c.id FROM carnes c
+            WHERE c.status = 'aviso_cancelamento'
+            AND c.aviso_cancelamento_em IS NOT NULL
+            AND c.aviso_cancelamento_em < DATE_SUB(:hoje, INTERVAL :dias DAY)
+        ");
+        $stmt->execute([':hoje' => $hoje . ' 23:59:59', ':dias' => $diasAviso]);
+        $carnesParaCancelar = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($carnesParaCancelar as $cid) {
+            $this->carneModel->update($cid, [
+                'status' => 'cancelado',
+                'cancelado_em' => date('Y-m-d H:i:s'),
+                'motivo_cancelamento' => "Cancelado automaticamente por inadimplência ({$mesesAtraso} meses sem pagamento)"
+            ]);
+            $this->carneModel->registrarHistorico($cid, null, 'carne_cancelado',
+                "Carnê cancelado por inadimplência após aviso de {$diasAviso} dias.");
+            $this->dispararNotificacao($cid, null, 'carne_cancelado');
+            $resultados['cancelados']++;
         }
 
         return $resultados;

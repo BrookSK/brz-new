@@ -45,6 +45,18 @@
                             <label class="form-label">Dias para Vencimento</label>
                             <input type="number" name="carne_dias_vencimento" class="form-control" value="<?= htmlspecialchars($config['carne_dias_vencimento'] ?? '7') ?>" min="1" max="30">
                         </div>
+                        <hr>
+                        <h6 class="text-muted small mb-2">Cancelamento por Abandono</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Meses de atraso para aviso</label>
+                            <input type="number" name="carne_meses_atraso_cancelamento" class="form-control" value="<?= htmlspecialchars($config['carne_meses_atraso_cancelamento'] ?? '2') ?>" min="1" max="12">
+                            <small class="text-muted">Após X meses sem pagar, envia aviso de cancelamento.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Dias de prazo após aviso</label>
+                            <input type="number" name="carne_dias_aviso_cancelamento" class="form-control" value="<?= htmlspecialchars($config['carne_dias_aviso_cancelamento'] ?? '7') ?>" min="1" max="30">
+                            <small class="text-muted">Dias que o cliente tem para regularizar após o aviso, antes do cancelamento.</small>
+                        </div>
                     </div>
                 </div>
             </div>

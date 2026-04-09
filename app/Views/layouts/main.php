@@ -1288,6 +1288,17 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         -->
                         <li class="mb-2"><a href="/como-funciona-clube" class="footer-link"><?= __('nav.club', 'Clube Braziliana') ?></a></li>
                         <li class="mb-2"><a href="/assessoria" class="footer-link"><?= __('nav.forwarding', 'Redirecionamento') ?></a></li>
+                        <?php
+                        // Link do Carnê Braziliana: só aparece se ativo ou modo teste
+                        try {
+                            $carneFooter = new \App\Services\CarneService();
+                            $cfgFooter = [];
+                            try { $stF = \Config\Database::getConnection()->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('carne_ativo','carne_somente_admin')"); $stF->execute(); $cfgFooter = $stF->fetchAll(\PDO::FETCH_KEY_PAIR); } catch (\Exception $e) {}
+                            $mostrarCarne = (($cfgFooter['carne_ativo'] ?? '0') === '1') || (($cfgFooter['carne_somente_admin'] ?? '0') === '1');
+                            if ($mostrarCarne):
+                        ?>
+                        <li class="mb-2"><a href="/carne/termos" class="footer-link">Carnê Braziliana</a></li>
+                        <?php endif; } catch (\Exception $e) {} ?>
                     </ul>
                 </div>
                 
