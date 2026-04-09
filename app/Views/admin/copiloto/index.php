@@ -1,15 +1,10 @@
-<?php include __DIR__ . '/../../layouts/admin.php'; ?>
+<div class="py-4">
 
-<div class="container-fluid admin-shell">
-    <div class="row">
-        <?php renderAdminSidebar($activePage ?? 'copiloto'); ?>
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="mb-1"><i class="fas fa-robot me-2"></i>Co-Piloto Braziliana</h2>
-                    <p class="text-muted mb-0">Configurações do assistente inteligente do site</p>
-                </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-robot me-2"></i>Co-Piloto Braziliana</h2>
+            <p class="text-muted mb-0">Configurações do assistente inteligente do site</p>
+        </div>
                 <div class="d-flex gap-2">
                     <a href="/admin/copiloto/aprendizado" class="btn btn-outline-primary btn-sm">
                         <i class="fas fa-brain me-1"></i>Aprendizado
@@ -197,6 +192,4 @@
                 </div>
             </div>
 
-        </main>
-    </div>
 </div>

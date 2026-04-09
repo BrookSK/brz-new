@@ -1,19 +1,14 @@
-<?php include __DIR__ . '/../../layouts/admin.php'; ?>
+<div class="py-4">
 
-<div class="container-fluid admin-shell">
-    <div class="row">
-        <?php renderAdminSidebar($activePage ?? 'copiloto-cancelamentos'); ?>
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="mb-1"><i class="fas fa-times-circle me-2"></i>Cancelamentos via Co-Piloto</h2>
-                    <p class="text-muted mb-0">Solicitações de cancelamento feitas pelo copiloto</p>
-                </div>
-                <a href="/admin/copiloto" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-arrow-left me-1"></i>Voltar
-                </a>
-            </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-times-circle me-2"></i>Cancelamentos via Co-Piloto</h2>
+            <p class="text-muted mb-0">Solicitações de cancelamento feitas pelo copiloto</p>
+        </div>
+        <a href="/admin/copiloto" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i>Voltar
+        </a>
+    </div>
 
             <?php if (!empty($_SESSION['flash_success'])): ?>
                 <div class="alert alert-success alert-dismissible fade show">
@@ -114,6 +109,4 @@
                 <?php endforeach; ?>
             <?php endif; ?>
 
-        </main>
-    </div>
 </div>

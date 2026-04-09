@@ -12,13 +12,15 @@ class AdminCopilotoController extends Controller {
     public function index(Request $request) {
         $pdo = Database::getConnection();
         $configs = $this->carregarConfigs($pdo);
-
-        // Estatísticas básicas
         $stats = $this->carregarEstatisticas($pdo);
 
         $title = 'Co-Piloto Braziliana — Configurações';
-        $activePage = 'copiloto';
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
         include __DIR__ . '/../Views/admin/copiloto/index.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
 
     /**
@@ -91,8 +93,12 @@ class AdminCopilotoController extends Controller {
         }
 
         $title = 'Co-Piloto — Aprendizado da IA';
-        $activePage = 'copiloto-aprendizado';
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
         include __DIR__ . '/../Views/admin/copiloto/aprendizado.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
 
     /**
@@ -146,8 +152,12 @@ class AdminCopilotoController extends Controller {
         $arquivos = $st->fetchAll(\PDO::FETCH_ASSOC);
 
         $title = 'Co-Piloto — Conteúdo de Referência';
-        $activePage = 'copiloto-conteudo';
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
         include __DIR__ . '/../Views/admin/copiloto/conteudo.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
 
     /**
@@ -284,8 +294,12 @@ class AdminCopilotoController extends Controller {
         }
 
         $title = 'Co-Piloto — Cancelamentos';
-        $activePage = 'copiloto-cancelamentos';
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
         include __DIR__ . '/../Views/admin/copiloto/cancelamentos.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
 
     /**
