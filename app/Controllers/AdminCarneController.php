@@ -164,8 +164,58 @@ class AdminCarneController extends Controller {
     }
 
     /**
-     * Liberar envio manualmente
+     * Gerar link de diferença (AJAX)
      */
+    public function gerarLinkDiferenca(Request $request, $id) {
+        header('Content-Type: application/json; charset=UTF-8');
+        try {
+            $carne = $this->carneModel->find($id);
+            if (!$carne) { echo json_encode(['success' => false, 'error' => 'Carnê não encontrado']); return; }
+
+            $body = $request->getBody();
+            $valor = floatval($body['valor'] ?? 0);
+            $obs = trim((string) ($body['observacoes'] ?? ''));
+            if ($valor <= 0) { echo json_encode(['success' => false, 'error' => 'Valor deve ser maior que zero']); return; }
+
+            $pedidoId = (int) $carne['pedido_id'];
+            $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
+            $descricao = "Diferença Carnê #$id - Pedido #$pedidoId";
+
+            $svc = new \App\Services\PaymentLinkService();
+            $result = $svc->createLink([
+                'currency' => 'BRL',
+                'products' => [['name' => $descricao, 'value' => $valor]],
+                'taxa_servico_valor' => 0, 'impostos_valor' => 0, 'descricao' => $descricao,
+            ], $adminId);
+
+            if (empty($result['success'])) { echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Falha ao criar link']); return; }
+
+            // Registrar no pedido
+            try {
+                $colsPed = [];
+                try { $stC = $this->db->query('DESCRIBE pedidos'); $colsPed = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                foreach (['diferenca_link_id'=>'INT NULL','diferenca_valor'=>'DECIMAL(10,2) NULL','diferenca_vendedor_id'=>'INT NULL','diferenca_created_at'=>'DATETIME NULL'] as $col=>$tipo) {
+                    if (!in_array($col, $colsPed, true)) { try { $this->db->exec("ALTER TABLE pedidos ADD COLUMN {$col} {$tipo}"); } catch (\Exception $e) {} }
+                }
+                $this->db->prepare('UPDATE pedidos SET diferenca_link_id=?, diferenca_valor=?, diferenca_vendedor_id=?, diferenca_created_at=NOW() WHERE id=?')
+                    ->execute([(int)$result['id'], $valor, $adminId, $pedidoId]);
+            } catch (\Exception $e) {}
+
+            $this->carneModel->registrarHistorico($id, null, 'link_diferenca',
+                "Link de diferença: R$ " . number_format($valor, 2, ',', '.') . ($obs ? " — $obs" : ''),
+                ['link_id'=>$result['id'],'url'=>$result['public_url']??'','valor'=>$valor], $adminId);
+
+            try {
+                $this->db->prepare("UPDATE carne_compras_internas SET produto_indisponivel=1, acao_indisponibilidade='link_diferenca', observacoes=? WHERE carne_id=?")
+                    ->execute([$obs ?: "Diferença R$ ".number_format($valor,2,',','.'), $id]);
+            } catch (\Exception $e) {}
+
+            echo json_encode(['success'=>true, 'link_url'=>$result['public_url']??'', 'link_id'=>$result['id']??0, 'valor'=>$valor]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function liberarEnvio(Request $request, $id) {
         $carne = $this->carneModel->find($id);
         if (!$carne || $carne['status'] !== 'quitado') {

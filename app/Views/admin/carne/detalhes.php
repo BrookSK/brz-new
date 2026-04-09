@@ -91,32 +91,87 @@
                     </button>
                     <div class="collapse" id="prodIndisponivel">
                         <div class="border rounded p-2 mt-2">
-                            <p class="small text-muted mb-2">Escolha a ação para quando o produto não está mais disponível:</p>
-
-                            <!-- Opção 1: Crédito em Carteira -->
-                            <form method="POST" action="/admin/carnes/produto-indisponivel/<?= $carne['id'] ?>" class="mb-3">
-                                <input type="hidden" name="acao" value="credito_carteira">
-                                <div class="mb-2">
-                                    <label class="form-label small">Valor do crédito (R$)</label>
-                                    <input type="number" name="valor" step="0.01" class="form-control form-control-sm" required>
+                            <!-- Tabs -->
+                            <ul class="nav nav-tabs nav-fill mb-2" role="tablist">
+                                <li class="nav-item"><a class="nav-link active small" data-bs-toggle="tab" href="#tab-credito">Crédito Carteira</a></li>
+                                <li class="nav-item"><a class="nav-link small" data-bs-toggle="tab" href="#tab-diferenca">Cobrar Diferença</a></li>
+                            </ul>
+                            <div class="tab-content">
+                                <!-- Tab Crédito -->
+                                <div class="tab-pane active" id="tab-credito">
+                                    <form method="POST" action="/admin/carnes/produto-indisponivel/<?= $carne['id'] ?>">
+                                        <input type="hidden" name="acao" value="credito_carteira">
+                                        <div class="mb-2">
+                                            <label class="form-label small">Valor (R$)</label>
+                                            <input type="number" name="valor" step="0.01" class="form-control form-control-sm" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label small">Observações</label>
+                                            <textarea name="observacoes" class="form-control form-control-sm" rows="2"></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-warning w-100"><i class="fas fa-wallet me-1"></i>Gerar Crédito</button>
+                                    </form>
                                 </div>
-                                <div class="mb-2">
-                                    <label class="form-label small">Observações</label>
-                                    <textarea name="observacoes" class="form-control form-control-sm" rows="2"></textarea>
+                                <!-- Tab Diferença -->
+                                <div class="tab-pane" id="tab-diferenca">
+                                    <div class="mb-2">
+                                        <label class="form-label small">Valor da diferença (R$)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm" id="diferenca-valor" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small">Observações</label>
+                                        <textarea class="form-control form-control-sm" rows="2" id="diferenca-obs"></textarea>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-primary w-100" id="btn-gerar-diferenca" onclick="gerarLinkDiferenca()">
+                                        <i class="fas fa-link me-1"></i>Gerar Link de Pagamento
+                                    </button>
+                                    <div id="diferenca-resultado" class="mt-2" style="display:none;">
+                                        <div class="alert alert-success small py-2 mb-1">
+                                            <i class="fas fa-check-circle me-1"></i>Link gerado com sucesso!
+                                        </div>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control bg-light" readonly id="diferenca-link-url">
+                                            <button class="btn btn-outline-primary" onclick="navigator.clipboard.writeText(document.getElementById('diferenca-link-url').value);this.innerHTML='✓ Copiado'">
+                                                <i class="fas fa-copy"></i> Copiar
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button type="submit" class="btn btn-sm btn-warning w-100"><i class="fas fa-wallet me-1"></i>Gerar Crédito em Carteira</button>
-                            </form>
-
-                            <hr class="my-2">
-
-                            <!-- Opção 2: Cobrar diferença via link de pagamento -->
-                            <p class="small text-muted mb-1">Se o produto substituto custa mais caro:</p>
-                            <a href="/admin/pedidos/editar/<?= $carne['pedido_id'] ?>" class="btn btn-sm btn-outline-primary w-100" target="_blank">
-                                <i class="fas fa-edit me-1"></i>Editar Pedido e Cobrar Diferença
-                            </a>
-                            <small class="text-muted d-block mt-1">Use "Gerar Link de Diferença" na tela de edição do pedido.</small>
+                            </div>
                         </div>
                     </div>
+                    <script>
+                    function gerarLinkDiferenca() {
+                        const btn = document.getElementById('btn-gerar-diferenca');
+                        const valor = parseFloat(document.getElementById('diferenca-valor').value || 0);
+                        const obs = document.getElementById('diferenca-obs').value || '';
+                        if (valor <= 0) { alert('Informe o valor da diferença'); return; }
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
+                        fetch('/admin/carnes/gerar-link-diferenca/<?= $carne['id'] ?>', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({valor: valor, observacoes: obs})
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                document.getElementById('diferenca-resultado').style.display = 'block';
+                                document.getElementById('diferenca-link-url').value = data.link_url;
+                                btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Gerado';
+                            } else {
+                                alert(data.error || 'Erro ao gerar link');
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fas fa-link me-1"></i>Gerar Link de Pagamento';
+                            }
+                        })
+                        .catch(() => {
+                            alert('Erro de conexão');
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-link me-1"></i>Gerar Link de Pagamento';
+                        });
+                    }
+                    </script>
 
                     <form method="POST" action="/admin/carnes/reenviar-notificacao/<?= $carne['id'] ?>" class="mt-2">
                         <div class="input-group input-group-sm">

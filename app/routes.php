@@ -622,6 +622,7 @@ $router->post('/admin/carnes/reemitir-boleto/{parcelaId}', 'AdminCarneController
 $router->post('/admin/carnes/marcar-comprado/{id}', 'AdminCarneController', 'marcarComprado');
 $router->post('/admin/carnes/marcar-recebido/{id}', 'AdminCarneController', 'marcarRecebido');
 $router->post('/admin/carnes/produto-indisponivel/{id}', 'AdminCarneController', 'produtoIndisponivel');
+$router->post('/admin/carnes/gerar-link-diferenca/{id}', 'AdminCarneController', 'gerarLinkDiferenca');
 $router->post('/admin/carnes/liberar-envio/{id}', 'AdminCarneController', 'liberarEnvio');
 $router->post('/admin/carnes/reenviar-notificacao/{carneId}', 'AdminCarneController', 'reenviarNotificacao');
 $router->get('/admin/carnes/configuracoes', 'AdminCarneController', 'configuracoes');
