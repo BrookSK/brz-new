@@ -1970,6 +1970,11 @@ class AdminProdutosController extends Controller {
         $ocultoLote = $request->getParam('oculto') ? 1 : 0;
         if (in_array('oculto', $cols, true)) $data['oculto'] = $ocultoLote;
 
+        // Custo = valor do produto
+        if ($request->getParam('custo_igual_preco') && in_array('cost_price', $cols, true)) {
+            $data['cost_price'] = $price;
+        }
+
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
             $data['grupo_compras_id'] = $grupoId;
@@ -2298,6 +2303,11 @@ class AdminProdutosController extends Controller {
                     <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção"></div>
                     <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
                 </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitch" name="custo_igual_preco" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitch">Custo = Valor do produto</label>
+                    <div class="small text-muted">Se ativado, o custo do produto será preenchido automaticamente com o mesmo valor de venda.</div>
+                </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Estoque</label>
                     <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
@@ -2410,6 +2420,11 @@ class AdminProdutosController extends Controller {
                     <label class="form-label fw-semibold">Valor Promocional (USD) <span class="text-muted fw-normal small">Opcional</span></label>
                     <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção" id="loteSalePriceInput"></div>
                     <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitchLote" name="custo_igual_preco" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitchLote">Custo = Valor do produto</label>
+                    <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -2763,6 +2778,7 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         fd.append("stock", document.getElementById("loteStockInput").value);
         fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
         fd.append("oculto", document.getElementById("ocultoSwitchLote") && document.getElementById("ocultoSwitchLote").checked ? "1" : "0");
+        fd.append("custo_igual_preco", document.getElementById("custoIgualPrecoSwitchLote") && document.getElementById("custoIgualPrecoSwitchLote").checked ? "1" : "0");
         fd.append("name", descricoes[i]);
         const salePriceLote = document.getElementById("loteSalePriceInput").value.trim();
         if (salePriceLote) fd.append("sale_price", salePriceLote);
@@ -3469,6 +3485,11 @@ HTML;
         // Ocultar em todo o site (só pedido manual)
         $oculto = $request->getParam('oculto') ? 1 : 0;
         if (in_array('oculto', $cols, true)) $data['oculto'] = $oculto;
+
+        // Custo = valor do produto
+        if ($request->getParam('custo_igual_preco') && in_array('cost_price', $cols, true)) {
+            $data['cost_price'] = $price;
+        }
 
         $grupoId = (int) $request->getParam('grupo_compras_id', 0);
         if ($grupoId > 0 && in_array('grupo_compras_id', $cols, true)) {
