@@ -24,6 +24,10 @@ class AdminRelatorioPedidosController extends Controller {
         $where = ["p.created_at >= :ds", "p.created_at < DATE_ADD(:de, INTERVAL 1 DAY)"];
         $params = [':ds' => $dateStart, ':de' => $dateEnd];
 
+        // Detectar colunas
+        $cols = [];
+        try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+
         if ($statusFilter !== '') {
             $where[] = "p.status = :st";
             $params[':st'] = $statusFilter;
@@ -36,10 +40,6 @@ class AdminRelatorioPedidosController extends Controller {
         if (in_array('deleted_at', $cols, true)) {
             $where[] = "p.deleted_at IS NULL";
         }
-
-        // Detectar colunas
-        $cols = [];
-        try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
 
         $select = ['p.id', 'p.status', 'p.created_at'];
         $colMap = [
