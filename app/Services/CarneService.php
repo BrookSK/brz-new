@@ -21,8 +21,8 @@ class CarneService {
         $total = $totalProdutos + $totalTaxas;
         $opcoes = [];
 
-        // Mínimo da Câmbio Real: USD 1.00 ≈ R$ 6.00 (com margem de segurança)
-        $minimoBoleto = 6.00;
+        // Mínimo por boleto/PIX: R$ 10,00 (Câmbio Real exige mínimo ~USD 1.00 + margem)
+        $minimoBoleto = 10.00;
 
         for ($i = 1; $i <= $maxParcelas; $i++) {
             $vProd = round($totalProdutos / $i, 2);
