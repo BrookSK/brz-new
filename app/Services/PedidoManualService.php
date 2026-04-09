@@ -491,55 +491,65 @@ class PedidoManualService {
 
         $descricao = 'Pedido manual #' . $codigoPedido . ' (taxa de serviço + impostos)';
 
-        // Gerar um Payment Link interno (/pagar/{token}) para que o vendedor copie e envie ao cliente.
-        // Quando o cliente abrir o link, ele poderá pagar via PIX/Cartão pela AppMax.
-        if (session_status() === PHP_SESSION_NONE) {
-            @session_start();
+        $pg = new PaymentService();
+
+        $totalCents = (int) round($valor * 100);
+        $products = [
+            [
+                'sku' => 'TAXA_MANUAL_' . (string) $pedidoId,
+                'name' => $descricao,
+                'quantity' => 1,
+                'unit_value' => $totalCents,
+                'type' => 'service',
+                'freight_type' => 'normal',
+            ]
+        ];
+
+        $result = $pg->processarPagamento([
+            'billingType' => $billingType,
+            'customer_name' => $nome !== '' ? $nome : 'Cliente',
+            'customer_email' => $email,
+            'customer_phone' => $telefone,
+            'customer_document' => $documento,
+            'externalReference' => (string) $pedidoId,
+            'products' => $products,
+            'products_value_cents' => $totalCents,
+            'shipping_value_cents' => 0,
+            'discount_value_cents' => 0,
+        ], $valor, 'BRL', $descricao);
+
+        $paymentId = (string) ($result['payment_id'] ?? '');
+        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
+
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
         }
-        $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
-
-        $linkSvc = new PaymentLinkService();
-        $linkResult = $linkSvc->createLink([
-            'currency' => 'BRL',
-            'produto_valor' => 0,
-            'taxa_servico_valor' => (string) round($valor, 2),
-            'impostos_valor' => 0,
-            'descricao' => $descricao,
-            'products' => [
-                ['name' => $descricao, 'value' => round($valor, 2)],
-            ],
-        ], $adminId);
-
-        if (empty($linkResult['success'])) {
-            return ['success' => false, 'error' => (string) ($linkResult['error'] ?? 'Falha ao criar link de pagamento AppMax')];
-        }
-
-        $token = (string) ($linkResult['token'] ?? '');
-        $linkId = (int) ($linkResult['id'] ?? 0);
-        $publicPath = (string) ($linkResult['public_url'] ?? ('/pagar/' . $token));
-        $base = \App\Core\Url::base();
-        $publicUrl = rtrim($base, '/') . $publicPath;
 
         // Persistir split em pedido_pagamentos
-        $pg = new PaymentService();
         $pg->registrarPedidoPagamentoSplit([
             'pedido_id' => $pedidoId,
             'componente' => 'taxa_servico',
             'gateway' => 'appmax',
-            'metodo' => 'payment_link',
+            'metodo' => strtolower($billingType),
             'moeda' => 'BRL',
             'valor' => $valor,
-            'payment_id' => 'PAYLINK_' . $linkId,
+            'payment_id' => $paymentId,
             'status' => 'pending',
-            'invoice_url' => $publicUrl,
+            'invoice_url' => $invoiceUrl,
         ]);
 
         return [
             'success' => true,
             'pedido_id' => $pedidoId,
-            'payment_id' => 'PAYLINK_' . $linkId,
-            'invoiceUrl' => $publicUrl,
-            'billingType' => 'PAYMENT_LINK',
+            'payment_id' => $paymentId,
+            'invoiceUrl' => $invoiceUrl,
+            'pix' => $pix,
+            'bankSlipUrl' => $bankSlipUrl,
+            'digitableLine' => $digitableLine,
+            'billingType' => $billingType,
             'status' => 'pending',
         ];
     }
