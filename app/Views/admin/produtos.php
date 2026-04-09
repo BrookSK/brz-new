@@ -484,8 +484,8 @@ function alterarStatus(id) {
 
 function excluirProduto(id) {
     if (confirm((window.ADMIN_PRODUCTS_I18N && window.ADMIN_PRODUCTS_I18N.confirm_delete) ? window.ADMIN_PRODUCTS_I18N.confirm_delete : 'Deseja realmente excluir este produto? Esta ação não pode ser desfeita!')) {
-        fetch(`/admin/excluir-produto/${id}`, {
-            method: 'DELETE'
+        fetch(`/admin/produtos/excluir/${id}`, {
+            method: 'POST'
         })
         .then(response => response.json())
         .then(data => {

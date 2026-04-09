@@ -7109,6 +7109,11 @@ HTMLSCRIPT;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = $id ?? $request->getParam('id');
+
+        $isAjax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+            || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+            || (isset($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'json') !== false);
+
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
@@ -7119,7 +7124,6 @@ HTMLSCRIPT;
 
             $pdo->beginTransaction();
             
-            // Buscar produto para obter imagens
             $stmt = $pdo->prepare("SELECT * FROM produtos WHERE id = ?");
             $stmt->execute([$id]);
             $produto = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -7128,7 +7132,6 @@ HTMLSCRIPT;
                 throw new \Exception("Produto não encontrado");
             }
             
-            // Remover imagens físicas
             $stmtFotos = $pdo->prepare("SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ?");
             $stmtFotos->execute([$id]);
             $fotos = $stmtFotos->fetchAll(\PDO::FETCH_ASSOC);
@@ -7140,15 +7143,20 @@ HTMLSCRIPT;
                 }
             }
             
-            // Remover fotos do banco
             $stmt = $pdo->prepare("DELETE FROM produto_fotos WHERE produto_id = ?");
             $stmt->execute([$id]);
             
-            // Remover produto
             $stmt = $pdo->prepare("DELETE FROM produtos WHERE id = ?");
             $stmt->execute([$id]);
             
             $pdo->commit();
+
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true]);
+                exit;
+            }
+
             $perfil = $this->getSessionPerfil();
             header('Location: ' . ($perfil === 'representante' ? '/admin/representante/produtos?success=3' : '/admin/produtos?success=3'));
             exit;
@@ -7156,6 +7164,11 @@ HTMLSCRIPT;
         } catch (\Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
+            }
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                exit;
             }
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
             exit;
