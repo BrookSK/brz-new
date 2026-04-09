@@ -133,16 +133,48 @@ class CarneService {
 
                 if (!empty($crResult['success'])) {
                     $pix = $crResult['pix'] ?? [];
+                    $pixPayload = $pix['payload'] ?? '';
+                    $pixQrcode = $pix['encodedImage'] ?? '';
+
+                    // Se não veio nos campos padrão, buscar no raw
+                    if ((empty($pixPayload) || empty($pixQrcode)) && !empty($crResult['raw'])) {
+                        $raw = $crResult['raw'];
+                        $data = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+                        $tx = is_array($data['transaction'] ?? null) ? $data['transaction'] : [];
+
+                        // Payload (copia e cola)
+                        if (empty($pixPayload)) {
+                            foreach ([$tx['number']??'',$tx['pix_code']??'',$tx['pix_payload']??'',$tx['emv']??'',$tx['copy_paste']??'',$data['pix_code']??'',$data['number']??'',$data['emv']??''] as $c) {
+                                if (!empty($c) && is_string($c) && strlen($c) > 20) { $pixPayload = trim($c); break; }
+                            }
+                        }
+
+                        // QR Code image (pode ser SVG base64 ou PNG base64)
+                        if (empty($pixQrcode)) {
+                            foreach ([$tx['barcode']??'',$tx['qr_code']??'',$tx['qrcode']??'',$tx['qr_code_base64']??'',$data['barcode']??'',$data['qr_code']??''] as $c) {
+                                if (!empty($c) && is_string($c) && strlen($c) > 50) {
+                                    // Remover prefixo data:image se houver
+                                    $pixQrcode = preg_replace('#^data:image/[^;]+;base64,#', '', trim($c));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     $this->carneModel->atualizarParcela($parcelaId, [
                         'boleto_produtos_url' => $crResult['invoice_url'] ?? '',
                         'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
-                        'pix_produtos_qrcode' => $pix['encodedImage'] ?? '',
-                        'pix_produtos_payload' => $pix['payload'] ?? '',
+                        'pix_produtos_qrcode' => $pixQrcode,
+                        'pix_produtos_payload' => $pixPayload,
                         'pix_produtos_expiracao' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
-                    error_log('[CARNE] PIX Câmbio Real gerado: id=' . ($crResult['payment_id'] ?? '') . ' payload=' . substr($pix['payload'] ?? '', 0, 30) . '...');
+
+                    error_log('[CARNE] PIX CR: id=' . ($crResult['payment_id'] ?? '') . ' payload_len=' . strlen($pixPayload) . ' qr_len=' . strlen($pixQrcode));
                 } else {
-                    error_log('[CARNE] Erro PIX Câmbio Real: ' . ($crResult['error'] ?? 'desconhecido'));
+                    error_log('[CARNE] Erro PIX CR: ' . ($crResult['error'] ?? 'desconhecido'));
+                    if (!empty($crResult['raw'])) {
+                        error_log('[CARNE] PIX CR raw: ' . substr(json_encode($crResult['raw']), 0, 1000));
+                    }
                 }
             } catch (\Exception $e) {
                 error_log('[CARNE] Exception PIX Câmbio Real: ' . $e->getMessage());

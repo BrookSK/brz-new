@@ -49,9 +49,8 @@
                                 <p class="fs-4 fw-bold text-primary">R$ <?= number_format($primeiraParcela['valor_produtos'], 2, ',', '.') ?></p>
 
                                 <?php if ($isPix && !empty($primeiraParcela['pix_produtos_qrcode'])): ?>
-                                    <div class="mb-2">
-                                        <img src="data:image/png;base64,<?= htmlspecialchars($primeiraParcela['pix_produtos_qrcode']) ?>" alt="QR Code PIX" style="max-width: 200px;" class="img-fluid">
-                                    </div>
+                                    <?php $qrSrc = (strpos(base64_decode(substr($primeiraParcela['pix_produtos_qrcode'],0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,'; ?>
+                                    <div class="mb-2"><img src="<?= $qrSrc . htmlspecialchars($primeiraParcela['pix_produtos_qrcode']) ?>" alt="QR Code PIX" style="max-width: 200px;" class="img-fluid"></div>
                                 <?php endif; ?>
 
                                 <?php if ($isPix && !empty($primeiraParcela['pix_produtos_payload'])): ?>
