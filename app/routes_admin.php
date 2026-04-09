@@ -213,6 +213,31 @@ $router->post('/admin/migracao/importar', 'AdminMigracaoController', 'importar')
 // Webhooks
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
 
+// Co-Piloto Braziliana
+$router->get('/admin/copiloto', 'AdminCopilotoController', 'index');
+$router->post('/admin/copiloto/salvar', 'AdminCopilotoController', 'salvar');
+$router->get('/admin/copiloto/aprendizado', 'AdminCopilotoController', 'aprendizado');
+$router->post('/admin/copiloto/aprendizado/aceitar/{id}', 'AdminCopilotoController', 'aceitarPendencia');
+$router->post('/admin/copiloto/aprendizado/recusar/{id}', 'AdminCopilotoController', 'recusarPendencia');
+$router->get('/admin/copiloto/conteudo', 'AdminCopilotoController', 'conteudo');
+$router->post('/admin/copiloto/conteudo/upload', 'AdminCopilotoController', 'conteudoUpload');
+$router->post('/admin/copiloto/conteudo/remover/{id}', 'AdminCopilotoController', 'conteudoRemover');
+$router->post('/admin/copiloto/conteudo/toggle/{id}', 'AdminCopilotoController', 'conteudoToggle');
+$router->get('/admin/copiloto/cancelamentos', 'AdminCopilotoController', 'cancelamentos');
+$router->post('/admin/copiloto/cancelamentos/autorizar/{id}', 'AdminCopilotoController', 'autorizarCancelamento');
+$router->post('/admin/copiloto/cancelamentos/recusar/{id}', 'AdminCopilotoController', 'recusarCancelamento');
+$router->get('/api/copiloto/config', 'AdminCopilotoController', 'apiConfig');
+$router->get('/api/copiloto/status', 'AdminCopilotoController', 'apiStatus');
+$router->post('/api/copiloto/log', 'AdminCopilotoController', 'apiLog');
+$router->post('/api/copiloto/aprendizado', 'AdminCopilotoController', 'apiAprendizado');
+
+// Co-Piloto API (endpoints chamados pelo widget JS — 100% PHP)
+$router->post('/api/copiloto/chat', 'CopilotoApiController', 'chat');
+$router->get('/api/copiloto/context', 'CopilotoApiController', 'context');
+$router->post('/api/copiloto/calculo', 'CopilotoApiController', 'calculo');
+$router->post('/api/copiloto/ticket', 'CopilotoApiController', 'ticket');
+$router->get('/api/copiloto/cron', 'CopilotoApiController', 'cron');
+
 // Desconto com Autorização
 $router->post('/admin/configuracoes/desconto/solicitar', 'AdminDescontoAutorizacaoController', 'solicitar');
 $router->get('/admin/configuracoes/desconto/verificar', 'AdminDescontoAutorizacaoController', 'verificar');

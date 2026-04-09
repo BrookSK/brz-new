@@ -1793,6 +1793,36 @@ $popupLogo = !empty($siteLogo) ? $siteLogo : '';
 </script>
 <?php endif; ?>
 
+<!-- Co-Piloto Braziliana -->
+<?php
+$__copilotoMostrar = false;
+try {
+    $__pdoCop = \Config\Database::getConnection();
+    $__stCop = $__pdoCop->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('copiloto_ativo', 'copiloto_modo')");
+    $__stCop->execute();
+    $__copilotoAtivo = false;
+    $__copilotoModo = 'desativado';
+    while ($__rowCop = $__stCop->fetch(\PDO::FETCH_ASSOC)) {
+        if ($__rowCop['chave'] === 'copiloto_ativo') $__copilotoAtivo = ($__rowCop['valor'] === '1');
+        if ($__rowCop['chave'] === 'copiloto_modo') $__copilotoModo = $__rowCop['valor'];
+    }
+
+    if ($__copilotoAtivo) {
+        if ($__copilotoModo === 'publico') {
+            $__copilotoMostrar = true;
+        } elseif ($__copilotoModo === 'somente_admins') {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $__copPerfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+            if ($__copPerfil === 'administrator' || $__copPerfil === 'administrador') $__copPerfil = 'admin';
+            $__copilotoMostrar = ($__copPerfil === 'admin');
+        }
+    }
+} catch (\Exception $e) {}
+if ($__copilotoMostrar):
+?>
+<script src="/assets/js/copiloto.js" async></script>
+<?php endif; ?>
+
 <!-- WhatsApp Floating Button -->
 <a href="https://wa.me/5517991098286" target="_blank" rel="noopener noreferrer"
    id="whatsapp-float"
