@@ -100,14 +100,14 @@ class CopilotoApiController extends Controller {
             $pdo = \Config\Database::getConnection();
             $like = '%' . $termo . '%';
 
-            // Buscar nos produtos
-            $st = $pdo->prepare("SELECT p.id, p.nome, p.preco, p.peso, p.loja, 
+            // Buscar nos produtos (coluna name, vínculo via grupo_compras_id)
+            $st = $pdo->prepare("SELECT p.id, p.name AS nome, p.price AS preco, p.weight AS peso, p.loja,
+                p.grupo_compras_id,
                 COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
                 FROM produtos p
-                LEFT JOIN grupo_compras_produtos gcp ON gcp.produto_id = p.id
-                LEFT JOIN grupos_compras gc ON gc.id = gcp.grupo_id
-                WHERE p.nome LIKE ? AND (p.status = 'ativo' OR p.status IS NULL)
-                ORDER BY p.nome ASC LIMIT 10");
+                LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
+                WHERE p.name LIKE ? AND (p.status = 'ativo' OR p.status IS NULL OR p.status = '')
+                ORDER BY p.name ASC LIMIT 10");
             $st->execute([$like]);
             $produtos = $st->fetchAll(\PDO::FETCH_ASSOC);
 
