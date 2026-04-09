@@ -4054,9 +4054,7 @@ HTML;
                 . '<td>'
                 . '<div class="btn-group btn-group-sm" role="group">'
                 . '<a href="' . htmlspecialchars($urlEditar, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-warning" title="Editar"><i class="fas fa-edit"></i></a>'
-                . '<form method="POST" action="/admin/produtos/excluir/' . (int) $produto['id'] . '" style="display:inline;">'
-                . '<button type="submit" onclick="return confirm(\'Tem certeza?\')" class="btn btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>'
-                . '</form>'
+                . '<a href="/admin/produtos/excluir/' . (int) $produto['id'] . '" class="btn btn-outline-danger" title="Excluir" onclick="return confirm(\'Tem certeza que deseja excluir este produto?\')"><i class="fas fa-trash"></i></a>'
                 . '</div>'
                 . '</td>'
                 . '</tr>';
