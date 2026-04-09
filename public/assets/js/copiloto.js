@@ -173,61 +173,51 @@
     p = p || {}
     var acoes = {
       adicionar_carrinho: function () {
-        var pid = p.produto_id
-        // Fallback 1: buscar no array de última busca pelo nome mencionado pelo Claude
-        if (!pid && ultimaBusca.length > 0) {
-          // Se Claude mencionou um nome, tentar achar na última busca
-          var nomeBusca = (p.nome || p.produto_nome || '').toLowerCase()
-          if (nomeBusca) {
-            for (var bi = 0; bi < ultimaBusca.length; bi++) {
-              if ((ultimaBusca[bi].nome || '').toLowerCase().indexOf(nomeBusca) >= 0) {
-                pid = ultimaBusca[bi].id; break
+        var pid = p.produto_id ? parseInt(p.produto_id) : 0
+        var qtd = p.quantidade || 1
+
+        // Se tem produto_id, adicionar direto
+        if (pid > 0) return addToCart(pid, qtd)
+
+        // Fallback 1: buscar em ultimaBusca pelo nome
+        var nomeBusca = (p.nome || p.produto_nome || p.termo || '').toLowerCase()
+        if (nomeBusca && ultimaBusca.length > 0) {
+          for (var i = 0; i < ultimaBusca.length; i++) {
+            if ((ultimaBusca[i].nome || '').toLowerCase().indexOf(nomeBusca) >= 0) {
+              return addToCart(ultimaBusca[i].id, qtd)
+            }
+          }
+          // Pegar o mais barato como fallback
+          var mb = ultimaBusca.reduce(function(a, b) { return (parseFloat(a.preco)||99999) < (parseFloat(b.preco)||99999) ? a : b })
+          if (mb && mb.id) return addToCart(mb.id, qtd)
+        }
+
+        // Fallback 2: extrair ID do histórico
+        for (var hi = historico.length - 1; hi >= Math.max(0, historico.length - 6); hi--) {
+          var m = (historico[hi].content || '').match(/\[ID:(\d+)\]/)
+          if (m) return addToCart(parseInt(m[1]), qtd)
+        }
+
+        // Fallback 3: buscar na API pelo nome que o Claude mencionou
+        if (nomeBusca && nomeBusca.length >= 3) {
+          adicionarMsg('assistant', '🔍 Buscando produto...')
+          return fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(nomeBusca))
+            .then(function(r) { return r.json() })
+            .then(function(d) {
+              var msgs = document.getElementById('bz-copiloto-messages')
+              if (msgs.lastChild) { msgs.removeChild(msgs.lastChild); historico.pop() }
+              if (d.produtos && d.produtos.length > 0) {
+                ultimaBusca = d.produtos
+                // Pegar o mais barato ou o primeiro
+                var prod = d.produtos.reduce(function(a, b) { return (parseFloat(a.preco)||99999) < (parseFloat(b.preco)||99999) ? a : b })
+                return addToCart(prod.id, qtd)
+              } else {
+                adicionarMsg('assistant', '⚠️ Não encontrei esse produto. Me diz o nome exato?')
               }
-            }
-          }
-          // Se não achou por nome, pegar o mais barato (Claude geralmente pede "o mais barato")
-          if (!pid) {
-            var maisBarato = null
-            for (var bi2 = 0; bi2 < ultimaBusca.length; bi2++) {
-              var preco = parseFloat(ultimaBusca[bi2].preco) || 99999
-              if (!maisBarato || preco < parseFloat(maisBarato.preco)) maisBarato = ultimaBusca[bi2]
-            }
-            if (maisBarato) pid = maisBarato.id
-          }
+            }).catch(function() { adicionarMsg('assistant', '⚠️ Erro na busca. Tenta de novo?') })
         }
-        // Fallback 2: extrair ID: do histórico de mensagens
-        if (!pid && historico.length > 0) {
-          for (var hi = historico.length - 1; hi >= 0; hi--) {
-            var m = (historico[hi].content || '').match(/ID:(\d+)/)
-            if (m) { pid = parseInt(m[1]); break }
-          }
-        }
-        if (!pid) {
-          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o ID ou nome exato?')
-          return
-        }
-        adicionarMsg('assistant', '🛒 Adicionando...')
-        return fetch('/api/copiloto/add-cart', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ produto_id: pid, quantidade: p.quantidade || 1 }),
-          credentials: 'same-origin'
-        }).then(function(r) { return r.json() }).then(function(d) {
-          var msgs = document.getElementById('bz-copiloto-messages')
-          if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
-          if (d.error) {
-            adicionarMsg('assistant', '❌ ' + d.error)
-          } else {
-            var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
-            if (badge && d.total_itens) badge.textContent = d.total_itens
-            adicionarMsg('assistant', '✅ ' + (d.produto_nome || 'Produto') + ' adicionado ao carrinho!')
-            if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1500) }
-          }
-        }).catch(function(err) {
-          var msgs = document.getElementById('bz-copiloto-messages')
-          if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
-          adicionarMsg('assistant', '❌ Erro: ' + (err.message || 'falha na conexão'))
-        })
+
+        adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o nome exato?')
       },
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
       trocar_moeda_usd: function () { salvarEstadoChat(); window.location.href = '/lang/en' },
@@ -256,6 +246,32 @@
       var d = await r.json()
       if (d.sucesso) adicionarMsg('assistant', '✅ Chamado ' + d.numero_ticket + ' aberto! Resposta em até ' + d.prazo_resposta + '.')
     } catch (e) { adicionarMsg('assistant', 'Não consegui abrir o chamado. Tenta novamente?') }
+  }
+
+  function addToCart (produtoId, quantidade) {
+    quantidade = quantidade || 1
+    adicionarMsg('assistant', '🛒 Adicionando...')
+    return fetch('/api/copiloto/add-cart', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ produto_id: produtoId, quantidade: quantidade }),
+      credentials: 'same-origin'
+    }).then(function(r) { return r.json() }).then(function(d) {
+      var msgs = document.getElementById('bz-copiloto-messages')
+      if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+      if (d.error) {
+        adicionarMsg('assistant', '❌ ' + d.error)
+      } else {
+        var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
+        if (badge && d.total_itens) badge.textContent = d.total_itens
+        adicionarMsg('assistant', '✅ ' + (d.produto_nome || 'Produto') + ' adicionado ao carrinho!')
+        if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1500) }
+      }
+    }).catch(function(err) {
+      var msgs = document.getElementById('bz-copiloto-messages')
+      if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+      adicionarMsg('assistant', '❌ Erro: ' + (err.message || 'falha'))
+    })
   }
 
   // ========== ENVIO DE MENSAGEM ==========
