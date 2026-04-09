@@ -489,67 +489,55 @@ class PedidoManualService {
             return ['success' => true, 'skipped' => true];
         }
 
-        $descricao = 'Pedido manual #' . $codigoPedido . ' (taxa de serviço + impostos)';
+        $descricao = 'Pedido #' . $codigoPedido . ' (taxa de serviço + impostos)';
 
-        $pg = new PaymentService();
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+        $adminId = (int) ($_SESSION['usuario_id'] ?? 0);
 
-        $totalCents = (int) round($valor * 100);
-        $products = [
-            [
-                'sku' => 'TAXA_MANUAL_' . (string) $pedidoId,
-                'name' => $descricao,
-                'quantity' => 1,
-                'unit_value' => $totalCents,
-                'type' => 'service',
-                'freight_type' => 'normal',
-            ]
-        ];
+        // Gerar Payment Link interno (/pagar/{token}) somente com taxa + impostos (sem produtos)
+        $linkSvc = new PaymentLinkService();
+        $linkResult = $linkSvc->createLink([
+            'currency' => 'BRL',
+            'produto_valor' => 0,
+            'taxa_servico_valor' => (string) round($valor, 2),
+            'impostos_valor' => 0,
+            'descricao' => $descricao,
+            'products' => [
+                ['name' => $descricao, 'value' => round($valor, 2)],
+            ],
+        ], $adminId);
 
-        $result = $pg->processarPagamento([
-            'billingType' => $billingType,
-            'customer_name' => $nome !== '' ? $nome : 'Cliente',
-            'customer_email' => $email,
-            'customer_phone' => $telefone,
-            'customer_document' => $documento,
-            'externalReference' => (string) $pedidoId,
-            'products' => $products,
-            'products_value_cents' => $totalCents,
-            'shipping_value_cents' => 0,
-            'discount_value_cents' => 0,
-        ], $valor, 'BRL', $descricao);
-
-        $paymentId = (string) ($result['payment_id'] ?? '');
-        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
-        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
-        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
-        $digitableLine = (string) ($result['digitableLine'] ?? '');
-
-        if ($paymentId === '') {
-            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
+        if (empty($linkResult['success'])) {
+            return ['success' => false, 'error' => (string) ($linkResult['error'] ?? 'Falha ao criar link de pagamento')];
         }
 
-        // Persistir split em pedido_pagamentos
+        $token = (string) ($linkResult['token'] ?? '');
+        $linkId = (int) ($linkResult['id'] ?? 0);
+        $publicPath = (string) ($linkResult['public_url'] ?? ('/pagar/' . $token));
+        $base = \App\Core\Url::base();
+        $publicUrl = rtrim($base, '/') . $publicPath;
+
+        $pg = new PaymentService();
         $pg->registrarPedidoPagamentoSplit([
             'pedido_id' => $pedidoId,
             'componente' => 'taxa_servico',
             'gateway' => 'appmax',
-            'metodo' => strtolower($billingType),
+            'metodo' => 'payment_link',
             'moeda' => 'BRL',
             'valor' => $valor,
-            'payment_id' => $paymentId,
+            'payment_id' => 'PAYLINK_' . $linkId,
             'status' => 'pending',
-            'invoice_url' => $invoiceUrl,
+            'invoice_url' => $publicUrl,
         ]);
 
         return [
             'success' => true,
             'pedido_id' => $pedidoId,
-            'payment_id' => $paymentId,
-            'invoiceUrl' => $invoiceUrl,
-            'pix' => $pix,
-            'bankSlipUrl' => $bankSlipUrl,
-            'digitableLine' => $digitableLine,
-            'billingType' => $billingType,
+            'payment_id' => 'PAYLINK_' . $linkId,
+            'invoiceUrl' => $publicUrl,
+            'billingType' => 'PAYMENT_LINK',
             'status' => 'pending',
         ];
     }
