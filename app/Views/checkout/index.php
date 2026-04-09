@@ -885,7 +885,13 @@
                             <hr>
 
                             <!-- Valores -->
-                            <?php $isPaymentLinkTaxaOnly = !empty($is_payment_link_taxa_only); ?>
+                            <?php
+                                $isPaymentLinkTaxaOnly = !empty($is_payment_link_taxa_only);
+                                // Fallback: detectar automaticamente quando é link só de taxa
+                                if (!$isPaymentLinkTaxaOnly && !empty($is_payment_link) && (float)($taxa_servico ?? 0) == 0 && (float)($impostos ?? 0) == 0 && (float)($frete ?? 0) == 0) {
+                                    $isPaymentLinkTaxaOnly = true;
+                                }
+                            ?>
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
                                     <span id="subtotal-label"><?= $isPaymentLinkTaxaOnly ? 'Taxa de Serviço + Impostos:' : __('checkout.subtotal_products', 'Subtotal Produtos:') ?></span>
