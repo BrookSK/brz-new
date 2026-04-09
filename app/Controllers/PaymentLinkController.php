@@ -45,8 +45,12 @@ class PaymentLinkController extends Controller {
         } else {
             // Sem produtos: o total é só taxa + impostos
             // Mostrar como item único e zerar taxa/impostos separados para não duplicar
+            $itemNome = $descricao;
+            if (stripos($itemNome, 'taxa') === false && stripos($itemNome, 'imposto') === false) {
+                $itemNome .= ' (taxa de serviço + impostos)';
+            }
             $items[] = [
-                'nome' => $descricao . ' (taxa de serviço + impostos)',
+                'nome' => $itemNome,
                 'quantidade' => 1,
                 'subtotal' => $total,
             ];
@@ -54,6 +58,8 @@ class PaymentLinkController extends Controller {
             $taxa = 0;
             $impostos = 0;
         }
+
+        $isPaymentLinkTaxaOnly = ($produto <= 0);
 
         // Checkout usa valores base em USD e converte via exchangeRates.
         // No Payment Link em BRL, os valores já estão em BRL e NÃO devem ser convertidos.
@@ -80,6 +86,7 @@ class PaymentLinkController extends Controller {
 
         $this->view('checkout/index', [
             'is_payment_link' => true,
+            'is_payment_link_taxa_only' => $isPaymentLinkTaxaOnly,
             'carrinho' => [],
             'items' => $items,
             'subtotal' => $subtotalView,

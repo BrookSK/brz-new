@@ -885,9 +885,10 @@
                             <hr>
 
                             <!-- Valores -->
+                            <?php $isPaymentLinkTaxaOnly = !empty($is_payment_link_taxa_only); ?>
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between">
-                                    <span id="subtotal-label"><?= __('checkout.subtotal_products', 'Subtotal Produtos:') ?></span>
+                                    <span id="subtotal-label"><?= $isPaymentLinkTaxaOnly ? 'Taxa de Serviço + Impostos:' : __('checkout.subtotal_products', 'Subtotal Produtos:') ?></span>
                                     <span id="subtotal" class="cart-currency" data-original-value="<?= $subtotal ?>"><?= number_format($subtotal, 2, '.', ',') ?></span>
                                 </div>
                                 <?php if (!empty($free_offer_info)): ?>
@@ -922,7 +923,7 @@
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
-                                <div class="d-flex justify-content-between">
+                                <div class="d-flex justify-content-between" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
                                     <span><?= $isPaymentLink ? 'Taxa de Serviço' : __('cart.service_fee_kg', 'Taxa de Serviço ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
                                     <?php if (!empty($taxa_servico_desconto_aplicado) && (float) $taxa_servico_desconto_aplicado > 0): ?>
                                         <span id="taxa-servico-original" class="cart-currency text-decoration-line-through text-muted" data-original-value="<?= $taxa_servico_original ?? 0 ?>"><?= number_format(($taxa_servico_original ?? 0), 2, '.', ',') ?></span>
@@ -952,7 +953,7 @@
                                     <div class="alert alert-info small mt-2 mb-2" id="pixTaxaServicoInfo" style="display:none;"></div>
                                 <?php endif; ?>
                                 <?php if (!empty($cobra_impostos_br)): ?>
-                                    <div class="d-flex justify-content-between" id="impostos-row">
+                                    <div class="d-flex justify-content-between" id="impostos-row" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
                                         <span><?= __('cart.taxes', 'Impostos') ?>:</span>
                                         <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
                                     </div>
@@ -985,7 +986,7 @@
                                         <span id="imposto-local" class="cart-currency" data-original-value="<?= $imposto_local ?>"><?= number_format($imposto_local, 2, '.', ',') ?></span>
                                     </div>
                                 <?php endif; ?>
-                                <div class="d-flex justify-content-between">
+                                <div class="d-flex justify-content-between" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
                                     <span><?= $isPaymentLink ? 'Frete:' : __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) . ':' ?></span>
                                     <span id="frete" class="cart-currency frete-value" data-original-value="<?= (float) ($frete ?? 0) ?>">
                                         <?= (((float) ($frete ?? 0)) <= 0) ? __('cart.free_shipping', 'Frete grátis') : ('$' . number_format(($frete ?? 0), 2, '.', ',')) ?>
