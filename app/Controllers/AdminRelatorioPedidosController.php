@@ -68,7 +68,32 @@ class AdminRelatorioPedidosController extends Controller {
         $userNomeCol = in_array('nome', $userCols, true) ? 'u.nome' : (in_array('name', $userCols, true) ? 'u.name' : "''");
         $clienteJoinCol = in_array('cliente_id', $cols, true) ? 'cliente_id' : (in_array('usuario_id', $cols, true) ? 'usuario_id' : 'id');
 
-        $sql = "SELECT " . implode(', ', $select) . ", {$userNomeCol} AS cliente_nome, u.email AS cliente_email, u.documento AS cliente_cpf
+        // Buscar nome do cliente de múltiplas fontes (pedido ou usuario)
+        $nomeExprParts = [$userNomeCol];
+        foreach (['cliente_nome','nome','customer_name'] as $nc) {
+            if (in_array($nc, $cols, true)) { array_unshift($nomeExprParts, "p.{$nc}"); }
+        }
+        $nomeExpr = "COALESCE(NULLIF(" . implode(",''), NULLIF(", $nomeExprParts) . ",''), '')";
+
+        // Email do cliente
+        $emailExprParts = ['u.email'];
+        foreach (['cliente_email','email','customer_email'] as $ec) {
+            if (in_array($ec, $cols, true)) { array_unshift($emailExprParts, "p.{$ec}"); }
+        }
+        $emailExpr = "COALESCE(NULLIF(" . implode(",''), NULLIF(", $emailExprParts) . ",''), '')";
+
+        // CPF
+        $cpfExprParts = [];
+        foreach (['cliente_cpf_cnpj','cliente_documento','documento','cpf'] as $dc) {
+            if (in_array($dc, $cols, true)) { $cpfExprParts[] = "p.{$dc}"; }
+        }
+        if (in_array('documento', $userCols, true)) { $cpfExprParts[] = 'u.documento'; }
+        $cpfExpr = !empty($cpfExprParts) ? "COALESCE(NULLIF(" . implode(",''), NULLIF(", $cpfExprParts) . ",''), '')" : "''";
+
+        $sql = "SELECT " . implode(', ', $select) . ",
+                {$nomeExpr} AS cliente_nome,
+                {$emailExpr} AS cliente_email,
+                {$cpfExpr} AS cliente_cpf
                 FROM pedidos p
                 LEFT JOIN usuarios u ON u.id = p.{$clienteJoinCol}
                 WHERE " . implode(' AND ', $where) . "
