@@ -38,12 +38,12 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 <div class="section">
     <div class="section-title">Informações do Cliente</div>
     <table>
-        <tr><th>Nome</th><td><?= htmlspecialchars($pedido['cliente_nome'] ?? ($cliente['nome'] ?? ($cliente['name'] ?? ''))) ?></td></tr>
-        <tr><th>Email</th><td><?= htmlspecialchars($pedido['cliente_email'] ?? ($cliente['email'] ?? '')) ?></td></tr>
-        <tr><th>CPF/CNPJ</th><td><?= htmlspecialchars($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($cliente['documento'] ?? ''))) ?></td></tr>
-        <tr><th>Telefone</th><td><?= htmlspecialchars($pedido['cliente_telefone'] ?? ($cliente['telefone'] ?? ($cliente['celular'] ?? ''))) ?></td></tr>
-        <?php if ($suite): ?><tr><th>Suite</th><td class="highlight"><?= htmlspecialchars($suite) ?></td></tr><?php endif; ?>
-        <tr><th>Data Nascimento</th><td><?= htmlspecialchars($cliente['data_nascimento'] ?? '') ?></td></tr>
+        <tr><th>Nome</th><td><?= htmlspecialchars($clienteConsolidado['nome']) ?></td></tr>
+        <tr><th>Email</th><td><?= htmlspecialchars($clienteConsolidado['email']) ?></td></tr>
+        <tr><th>CPF/CNPJ</th><td><?= htmlspecialchars($clienteConsolidado['cpf']) ?></td></tr>
+        <tr><th>Telefone</th><td><?= htmlspecialchars($clienteConsolidado['telefone']) ?></td></tr>
+        <?php if ($clienteConsolidado['suite']): ?><tr><th>Suite</th><td class="highlight"><?= htmlspecialchars($clienteConsolidado['suite']) ?></td></tr><?php endif; ?>
+        <?php if ($clienteConsolidado['data_nascimento']): ?><tr><th>Data Nascimento</th><td><?= htmlspecialchars($clienteConsolidado['data_nascimento']) ?></td></tr><?php endif; ?>
         <?php if ($tracking): ?><tr><th>Código de Rastreio</th><td class="highlight"><?= htmlspecialchars($tracking) ?></td></tr><?php endif; ?>
     </table>
 </div>

@@ -103,6 +103,47 @@ class AdminRelatorioPedidosController extends Controller {
         $stmt->execute($params);
         $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+        // Fallback: preencher dados do cliente de colunas do pedido ou do usuario
+        if (!empty($pedidos)) {
+            $clienteIds = [];
+            foreach ($pedidos as $p) {
+                $cid = (int)($p['cliente_id'] ?? 0);
+                if ($cid > 0) $clienteIds[$cid] = true;
+            }
+            $clienteData = [];
+            if (!empty($clienteIds)) {
+                try {
+                    $in = implode(',', array_keys($clienteIds));
+                    $stU = $this->db->query("SELECT * FROM usuarios WHERE id IN ({$in})");
+                    foreach ($stU->fetchAll(\PDO::FETCH_ASSOC) as $u) {
+                        $clienteData[(int)$u['id']] = $u;
+                    }
+                } catch (\Exception $e) {}
+            }
+
+            foreach ($pedidos as &$_p) {
+                $cid = (int)($_p['cliente_id'] ?? 0);
+                $u = $clienteData[$cid] ?? [];
+
+                if (empty($_p['cliente_nome']) || trim((string)$_p['cliente_nome']) === '') {
+                    foreach (['cliente_nome','nome','customer_name'] as $k) { if (!empty($_p[$k])) { $_p['cliente_nome'] = (string)$_p[$k]; break; } }
+                    if (empty($_p['cliente_nome'])) { $_p['cliente_nome'] = (string)($u['nome'] ?? ($u['name'] ?? '')); }
+                }
+                if (empty($_p['cliente_email'])) {
+                    foreach (['cliente_email','email','customer_email'] as $k) { if (!empty($_p[$k])) { $_p['cliente_email'] = (string)$_p[$k]; break; } }
+                    if (empty($_p['cliente_email'])) { $_p['cliente_email'] = (string)($u['email'] ?? ''); }
+                }
+                if (empty($_p['cliente_cpf'])) {
+                    foreach (['cliente_cpf','cliente_cpf_cnpj','cliente_documento','documento'] as $k) { if (!empty($_p[$k])) { $_p['cliente_cpf'] = (string)$_p[$k]; break; } }
+                    if (empty($_p['cliente_cpf'])) { $_p['cliente_cpf'] = (string)($u['documento'] ?? ''); }
+                }
+                $_p['cliente_telefone'] = '';
+                foreach (['cliente_telefone','telefone'] as $k) { if (!empty($_p[$k])) { $_p['cliente_telefone'] = (string)$_p[$k]; break; } }
+                if (empty($_p['cliente_telefone'])) { $_p['cliente_telefone'] = (string)($u['telefone'] ?? ($u['celular'] ?? '')); }
+            }
+            unset($_p);
+        }
+
         // Buscar itens de cada pedido
         $itensTable = null;
         foreach (['pedido_itens','pedido_items'] as $t) {
@@ -281,7 +322,27 @@ class AdminRelatorioPedidosController extends Controller {
         } catch (\Exception $e) {}
 
         // Suite do cliente
-        $suite = (string)($cliente['suite'] ?? ($pedido['suite_cliente'] ?? ''));
+        $suite = (string)($cliente['suite'] ?? ($pedido['suite_cliente'] ?? ($pedido['suite'] ?? '')));
+
+        // Consolidar dados do cliente de todas as fontes
+        $pick = function(array $keys) use ($pedido, $cliente) {
+            foreach ($keys as $k) {
+                if (!empty($pedido[$k]) && trim((string)$pedido[$k]) !== '') return (string)$pedido[$k];
+            }
+            foreach ($keys as $k) {
+                if (!empty($cliente[$k]) && trim((string)$cliente[$k]) !== '') return (string)$cliente[$k];
+            }
+            return '';
+        };
+
+        $clienteConsolidado = [
+            'nome' => $pick(['cliente_nome','nome','customer_name','name']),
+            'email' => $pick(['cliente_email','email','customer_email']),
+            'cpf' => $pick(['cliente_cpf_cnpj','cliente_documento','documento','cpf','cpf_cnpj']),
+            'telefone' => $pick(['cliente_telefone','telefone','celular','phone']),
+            'data_nascimento' => $pick(['data_nascimento','birth_date','birthdate']),
+            'suite' => $suite,
+        ];
 
         // Destinatário (se diferente do cliente)
         $destinatario = [

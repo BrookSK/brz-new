@@ -94,6 +94,7 @@ $statusColors = [
                                 <tr><th style="width:35%">Nome</th><td><?= htmlspecialchars($p['cliente_nome'] ?? '') ?></td></tr>
                                 <tr><th>Email</th><td><?= htmlspecialchars($p['cliente_email'] ?? '') ?></td></tr>
                                 <tr><th>CPF</th><td><?= htmlspecialchars($p['cliente_cpf'] ?? '') ?></td></tr>
+                                <tr><th>Telefone</th><td><?= htmlspecialchars($p['cliente_telefone'] ?? '') ?></td></tr>
                                 <tr><th>Código</th><td><?= htmlspecialchars($p['codigo_pedido'] ?? '') ?></td></tr>
                                 <?php if ($tracking): ?><tr><th>Rastreio</th><td class="text-danger fw-bold"><?= htmlspecialchars($tracking) ?></td></tr><?php endif; ?>
                             </table>
