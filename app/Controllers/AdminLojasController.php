@@ -83,6 +83,10 @@ class AdminLojasController extends Controller {
     public function salvar(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $isAjax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+            || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+
         try {
             $pdo = $this->getPdo();
             $this->ensureTable($pdo);
@@ -93,6 +97,11 @@ class AdminLojasController extends Controller {
             $ativo = (int) $request->getParam('ativo', 1) ? 1 : 0;
 
             if ($nome === '') {
+                if ($isAjax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => 'Informe o nome da loja.']);
+                    exit;
+                }
                 $_SESSION['message'] = 'Informe o nome da loja.';
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/lojas');
@@ -106,6 +115,11 @@ class AdminLojasController extends Controller {
             }
 
             if ($slug === '') {
+                if ($isAjax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => 'Slug inválido.']);
+                    exit;
+                }
                 $_SESSION['message'] = 'Slug inválido.';
                 $_SESSION['message_type'] = 'danger';
                 header('Location: /admin/lojas');
@@ -119,20 +133,36 @@ class AdminLojasController extends Controller {
                 $stmt->bindValue(':ativo', $ativo, \PDO::PARAM_INT);
                 $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
                 $stmt->execute();
+                $lojaId = $id;
             } else {
+                // Verificar slug duplicado
+                $chk = $pdo->prepare('SELECT id FROM lojas WHERE slug = ? LIMIT 1');
+                $chk->execute([$slug]);
+                if ($chk->fetchColumn()) {
+                    $slug .= '-' . bin2hex(random_bytes(2));
+                }
                 $stmt = $pdo->prepare('INSERT INTO lojas (nome, slug, ativo) VALUES (:nome, :slug, :ativo)');
                 $stmt->bindValue(':nome', $nome);
                 $stmt->bindValue(':slug', $slug);
                 $stmt->bindValue(':ativo', $ativo, \PDO::PARAM_INT);
                 $stmt->execute();
+                $lojaId = (int) $pdo->lastInsertId();
+            }
+
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'ok' => true, 'loja' => ['id' => $lojaId, 'nome' => $nome, 'slug' => $slug]]);
+                exit;
             }
 
             $_SESSION['message'] = 'Loja salva com sucesso.';
             $_SESSION['message_type'] = 'success';
-        } catch (\PDOException $e) {
-            $_SESSION['message'] = 'Erro ao salvar loja.';
-            $_SESSION['message_type'] = 'danger';
         } catch (\Exception $e) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Erro ao salvar loja: ' . $e->getMessage()]);
+                exit;
+            }
             $_SESSION['message'] = 'Erro ao salvar loja.';
             $_SESSION['message_type'] = 'danger';
         }

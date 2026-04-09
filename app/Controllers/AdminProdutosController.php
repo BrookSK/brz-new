@@ -2956,7 +2956,7 @@ populateLojaSelect("lojaSelectSingle");
         btnSalvar.disabled = true; msg.innerHTML = \'<i class="fas fa-spinner fa-spin"></i>\';
         try {
             var fd = new FormData(); fd.append("nome", nome);
-            var r = await fetch("/admin/lojas/salvar", { method: "POST", body: fd });
+            var r = await fetch("/admin/lojas/salvar", { method: "POST", body: fd, headers: {"X-Requested-With": "XMLHttpRequest"} });
             var j = await r.json();
             if (j.success || j.ok) {
                 var novaLoja = j.loja || { id: j.id, nome: nome };
