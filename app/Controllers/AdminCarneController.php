@@ -141,21 +141,23 @@ class AdminCarneController extends Controller {
         if ($acao === 'credito_carteira') {
             $this->carneService->gerarCreditoCarteira($id, $valor, $obs, $_SESSION['usuario_id'] ?? null);
             $_SESSION['message'] = 'Crédito em carteira gerado com sucesso.';
-        } elseif ($acao === 'pedido_complementar') {
+        } else {
+            $_SESSION['message'] = 'Ação inválida.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect("/admin/carnes/detalhes/{$id}");
+            return;
+        }
+
+        // Marcar produto como indisponível na compra interna
+        try {
             $stmt = $this->db->prepare("
                 UPDATE carne_compras_internas SET 
-                    status = 'substituido', produto_indisponivel = 1,
-                    acao_indisponibilidade = 'pedido_complementar', observacoes = :obs
+                    status = 'produto_indisponivel', produto_indisponivel = 1,
+                    acao_indisponibilidade = :acao, valor_credito = :val, observacoes = :obs
                 WHERE carne_id = :cid
             ");
-            $stmt->execute([':obs' => $obs, ':cid' => $id]);
-
-            $this->carneModel->registrarHistorico($id, null, 'pedido_complementar',
-                "Pedido complementar necessário. Diferença: R$ " . number_format($valor, 2, ',', '.'),
-                null, $_SESSION['usuario_id'] ?? null);
-
-            $_SESSION['message'] = 'Produto marcado como indisponível. Crie o pedido complementar.';
-        }
+            $stmt->execute([':acao' => $acao, ':val' => $valor, ':obs' => $obs, ':cid' => $id]);
+        } catch (\Exception $e) {}
 
         $_SESSION['message_type'] = 'success';
         $this->redirect("/admin/carnes/detalhes/{$id}");

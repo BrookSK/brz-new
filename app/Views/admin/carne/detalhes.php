@@ -90,24 +90,32 @@
                         <i class="fas fa-exclamation-triangle"></i> Produto Indisponível
                     </button>
                     <div class="collapse" id="prodIndisponivel">
-                        <form method="POST" action="/admin/carnes/produto-indisponivel/<?= $carne['id'] ?>" class="border rounded p-2 mt-2">
-                            <div class="mb-2">
-                                <label class="form-label small">Ação</label>
-                                <select name="acao" class="form-select form-select-sm" required>
-                                    <option value="credito_carteira">Gerar Crédito em Carteira</option>
-                                    <option value="pedido_complementar">Pedido Complementar (diferença)</option>
-                                </select>
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label small">Valor (R$)</label>
-                                <input type="number" name="valor" step="0.01" class="form-control form-control-sm" required>
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label small">Observações</label>
-                                <textarea name="observacoes" class="form-control form-control-sm" rows="2"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-sm btn-danger w-100">Confirmar</button>
-                        </form>
+                        <div class="border rounded p-2 mt-2">
+                            <p class="small text-muted mb-2">Escolha a ação para quando o produto não está mais disponível:</p>
+
+                            <!-- Opção 1: Crédito em Carteira -->
+                            <form method="POST" action="/admin/carnes/produto-indisponivel/<?= $carne['id'] ?>" class="mb-3">
+                                <input type="hidden" name="acao" value="credito_carteira">
+                                <div class="mb-2">
+                                    <label class="form-label small">Valor do crédito (R$)</label>
+                                    <input type="number" name="valor" step="0.01" class="form-control form-control-sm" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small">Observações</label>
+                                    <textarea name="observacoes" class="form-control form-control-sm" rows="2"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-warning w-100"><i class="fas fa-wallet me-1"></i>Gerar Crédito em Carteira</button>
+                            </form>
+
+                            <hr class="my-2">
+
+                            <!-- Opção 2: Cobrar diferença via link de pagamento -->
+                            <p class="small text-muted mb-1">Se o produto substituto custa mais caro:</p>
+                            <a href="/admin/pedidos/editar/<?= $carne['pedido_id'] ?>" class="btn btn-sm btn-outline-primary w-100" target="_blank">
+                                <i class="fas fa-edit me-1"></i>Editar Pedido e Cobrar Diferença
+                            </a>
+                            <small class="text-muted d-block mt-1">Use "Gerar Link de Diferença" na tela de edição do pedido.</small>
+                        </div>
                     </div>
 
                     <form method="POST" action="/admin/carnes/reenviar-notificacao/<?= $carne['id'] ?>" class="mt-2">
