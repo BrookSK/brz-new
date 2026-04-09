@@ -60,7 +60,7 @@
                             <?php if ($isPix && !empty($p['pix_produtos_payload'])): ?>
                                 <?php if (!empty($p['pix_produtos_qrcode'])): ?>
                                     <?php $qrSrc = (strpos(base64_decode(substr($p['pix_produtos_qrcode'],0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,'; ?>
-                                    <div class="mb-2"><img src="<?= $qrSrc . htmlspecialchars($p['pix_produtos_qrcode']) ?>" alt="QR" style="max-width:160px;" class="img-fluid"></div>
+                                    <div class="mb-2"><img src="<?= $qrSrc . htmlspecialchars($p['pix_produtos_qrcode']) ?>" alt="QR" style="max-width:220px; width:220px; height:220px; image-rendering:pixelated;" class="img-fluid"></div>
                                 <?php endif; ?>
                                 <div class="input-group input-group-sm">
                                     <input type="text" class="form-control bg-light" readonly value="<?= htmlspecialchars($p['pix_produtos_payload']) ?>" id="pix-prod-<?= $p['id'] ?>">
@@ -87,7 +87,7 @@
                         <?php if (!$paga && $p['valor_taxas'] > 0): ?>
                             <?php if ($isPix && !empty($p['pix_taxas_payload'])): ?>
                                 <?php if (!empty($p['pix_taxas_qrcode'])): ?>
-                                    <div class="mb-2"><img src="data:image/png;base64,<?= htmlspecialchars($p['pix_taxas_qrcode']) ?>" alt="QR" style="max-width:160px;" class="img-fluid"></div>
+                                    <div class="mb-2"><img src="data:image/png;base64,<?= htmlspecialchars($p['pix_taxas_qrcode']) ?>" alt="QR" style="max-width:220px; width:220px; height:220px; image-rendering:pixelated;" class="img-fluid"></div>
                                 <?php endif; ?>
                                 <div class="input-group input-group-sm">
                                     <input type="text" class="form-control bg-light" readonly value="<?= htmlspecialchars($p['pix_taxas_payload']) ?>" id="pix-taxa-<?= $p['id'] ?>">
