@@ -3029,7 +3029,7 @@ class CheckoutController extends Controller {
                             try { $stC = $dbCarne->query('DESCRIBE pedidos'); $colsPedCarne = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
 
                             $setCarne = ['status = ?'];
-                            $pCarne = ['carne_aguardando'];
+                            $pCarne = ['carne_pagando'];
 
                             if (in_array('forma_pagamento', $colsPedCarne, true)) {
                                 $setCarne[] = 'forma_pagamento = ?';

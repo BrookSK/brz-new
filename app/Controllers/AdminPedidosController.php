@@ -2247,7 +2247,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2381,7 +2381,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2514,7 +2514,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2713,6 +2713,8 @@ HTML;
         echo '<style>
         .status-pendente { background-color: #ffc107; }
         .status-pago { background-color: #28a745; }
+        .status-carne_pagando { background-color: #6f42c1; }
+        .status-carne_aguardando { background-color: #6f42c1; }
         .status-processando { background-color: #0d6efd; }
         .status-produto_consolidado { background-color: #212529; }
         .status-em_transporte { background-color: #17a2b8; }
@@ -4584,6 +4586,15 @@ LINKSCRIPT;
         }
     }
 
+    private function getCarneBadgeHtml(array $pedido): string {
+        $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+        $st = strtolower(trim((string) ($pedido['status'] ?? '')));
+        if ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true)) {
+            return ' <span class="badge text-white" style="background:#6f42c1;font-size:.7rem;"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>';
+        }
+        return '';
+    }
+
     private function formatarMoeda($valor, $moeda) {
         if ($moeda === 'USD') {
             return '$ ' . number_format($valor, 2, '.', ',');
@@ -4610,6 +4621,10 @@ LINKSCRIPT;
             'pagamento' => 'Pagamento',
             'aprovado' => 'Aprovado',
             'separacao' => 'Separação',
+
+            // carnê
+            'carne_pagando' => 'Carnê em Pagamento',
+            'carne_aguardando' => 'Carnê Aguardando',
         ];
         $status = trim($status);
         return $map[$status] ?? ($status !== '' ? ucfirst($status) : '');

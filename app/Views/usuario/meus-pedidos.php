@@ -263,9 +263,13 @@
                                                         'caixa_fechada' => ['bg' => 'rgba(148, 163, 184, 0.18)', 'border' => 'rgba(148, 163, 184, 0.35)', 'color' => 'rgba(15, 23, 42, 0.82)'],
                                                         'aguardando_liberacao_aduaneira' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
                                                         'aguardando_lib_alfandegaria' => ['bg' => 'rgba(245, 158, 11, 0.14)', 'border' => 'rgba(245, 158, 11, 0.35)', 'color' => 'rgba(124, 45, 18, 1)'],
+                                                        'carne_pagando' => ['bg' => 'rgba(111, 66, 193, 0.12)', 'border' => 'rgba(111, 66, 193, 0.25)', 'color' => 'rgba(111, 66, 193, 1)'],
+                                                        'carne_aguardando' => ['bg' => 'rgba(111, 66, 193, 0.12)', 'border' => 'rgba(111, 66, 193, 0.25)', 'color' => 'rgba(111, 66, 193, 1)'],
                                                     ];
                                                     $statusLabels = [
                                                         'enviado' => __('order_status.label_generated', 'Etiqueta gerada'),
+                                                        'carne_pagando' => 'Carnê em Pagamento',
+                                                        'carne_aguardando' => 'Carnê Aguardando',
                                                     ];
                                                     $badge = $statusColors[$statusPedidoKey] ?? $statusColors['selecao'];
                                                     $label = $statusLabels[$statusPedidoKey] ?? (trim($statusPedido) !== '' ? ucfirst($statusPedido) : __('order_status.pending', 'Pendente'));
@@ -273,6 +277,18 @@
                                                     <span class="badge px-3 py-2" style="background: <?= $badge['bg'] ?>; border: 1px solid <?= $badge['border'] ?>; color: <?= $badge['color'] ?>;">
                                                         <?= $label ?>
                                                     </span>
+                                                    <?php
+                                                    $fpCarne = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+                                                    if ($fpCarne === 'carne_braziliana' || in_array($statusPedidoKey, ['carne_pagando', 'carne_aguardando'], true)):
+                                                        $carneIdCliente = 0;
+                                                        try { $stCl = \Config\Database::getConnection()->prepare("SELECT id FROM carnes WHERE pedido_id = ? LIMIT 1"); $stCl->execute([(int)$pedido['id']]); $carneIdCliente = (int)($stCl->fetchColumn() ?: 0); } catch (\Exception $e) {}
+                                                    ?>
+                                                    <div class="mt-1">
+                                                        <a href="<?= $carneIdCliente > 0 ? '/meu-carne/' . $carneIdCliente : '/meus-carnes' ?>" class="badge text-white text-decoration-none" style="background:#6f42c1;font-size:.7rem;">
+                                                            <i class="fas fa-file-invoice-dollar me-1"></i>Ver Carnê
+                                                        </a>
+                                                    </div>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="fw-semibold">
                                                     <?php
