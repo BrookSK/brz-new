@@ -67,9 +67,15 @@ class AdminRelatorioPedidosController extends Controller {
         try { $stUC = $this->db->query('DESCRIBE usuarios'); $userCols = $stUC ? $stUC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
         $clienteJoinCol = in_array('cliente_id', $cols, true) ? 'cliente_id' : (in_array('usuario_id', $cols, true) ? 'usuario_id' : 'id');
 
-        $sql = "SELECT p.*, u.email AS u_email, u.documento AS u_documento, u.telefone AS u_telefone, u.celular AS u_celular, u.data_nascimento AS u_nascimento"
-            . (in_array('nome', $userCols, true) ? ", u.nome AS u_nome" : (in_array('name', $userCols, true) ? ", u.name AS u_nome" : ", '' AS u_nome"))
-            . " FROM pedidos p LEFT JOIN usuarios u ON u.id = p.{$clienteJoinCol}"
+        $sql = "SELECT p.*";
+        // Adicionar campos do usuario apenas se existirem
+        $uFields = ['email'=>'u_email','documento'=>'u_documento','telefone'=>'u_telefone','celular'=>'u_celular','data_nascimento'=>'u_nascimento'];
+        foreach ($uFields as $uf => $alias) {
+            if (in_array($uf, $userCols, true)) { $sql .= ", u.{$uf} AS {$alias}"; }
+        }
+        if (in_array('nome', $userCols, true)) { $sql .= ", u.nome AS u_nome"; }
+        elseif (in_array('name', $userCols, true)) { $sql .= ", u.name AS u_nome"; }
+        $sql .= " FROM pedidos p LEFT JOIN usuarios u ON u.id = p.{$clienteJoinCol}"
             . " WHERE " . implode(' AND ', $where)
             . " ORDER BY p.created_at DESC";
 
