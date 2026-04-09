@@ -420,7 +420,7 @@ class AdminPedidosController extends Controller {
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
             $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
-            $sql = "SELECT p.*, COALESCE(NULLIF(u." . $colUserName . ",''), " . (in_array('cliente_nome', $colsPedidos, true) ? "NULLIF(p.cliente_nome,''), " : "") . (in_array('customer_name', $colsPedidos, true) ? "NULLIF(p.customer_name,''), " : "") . "'') as cliente_nome, COALESCE(NULLIF(u." . $colUserEmail . ",''), " . (in_array('cliente_email', $colsPedidos, true) ? "NULLIF(p.cliente_email,''), " : "") . "'') as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array('cliente_id', $colsPedidos, true) ? 'cliente_id' : 'usuario_id') . " = u.id WHERE 1=1";
+            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("cliente_id", $colsPedidos, true) ? "cliente_id" : "usuario_id") . " = u.id WHERE 1=1";
             $params = [];
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
@@ -1855,7 +1855,7 @@ JS;
             } catch (\Exception $e) {
             }
             
-            $sql = "SELECT p.*, COALESCE(NULLIF(u." . $colUserName . ",''), " . (in_array('cliente_nome', $colsPedidos, true) ? "NULLIF(p.cliente_nome,''), " : "") . (in_array('customer_name', $colsPedidos, true) ? "NULLIF(p.customer_name,''), " : "") . "'') as cliente_nome, COALESCE(NULLIF(u." . $colUserEmail . ",''), " . (in_array('cliente_email', $colsPedidos, true) ? "NULLIF(p.cliente_email,''), " : "") . "'') as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array('cliente_id', $colsPedidos, true) ? 'cliente_id' : 'usuario_id') . " = u.id WHERE 1=1";
+            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("cliente_id", $colsPedidos, true) ? "cliente_id" : "usuario_id") . " = u.id WHERE 1=1";
             $params = [];
 
             if ($temDeletedAt) {
@@ -1905,6 +1905,29 @@ JS;
             $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
             $stmt->execute();
             $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Fallback: preencher cliente_nome de colunas do pedido quando JOIN não trouxe
+            if (is_array($pedidos)) {
+                foreach ($pedidos as &$_p) {
+                    if (empty($_p['cliente_nome']) || trim((string)$_p['cliente_nome']) === '') {
+                        foreach (['cliente_nome','nome','customer_name'] as $_nc) {
+                            if (!empty($_p[$_nc]) && trim((string)$_p[$_nc]) !== '') {
+                                $_p['cliente_nome'] = (string)$_p[$_nc];
+                                break;
+                            }
+                        }
+                    }
+                    if (empty($_p['cliente_email']) || trim((string)$_p['cliente_email']) === '') {
+                        foreach (['cliente_email','email','customer_email'] as $_ec) {
+                            if (!empty($_p[$_ec]) && trim((string)$_p[$_ec]) !== '') {
+                                $_p['cliente_email'] = (string)$_p[$_ec];
+                                break;
+                            }
+                        }
+                    }
+                }
+                unset($_p);
+            }
 
             $warningsMap = [];
             try {
