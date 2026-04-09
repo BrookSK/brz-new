@@ -501,6 +501,11 @@ $router->post('/api/carrinho/limpar', 'ApiController', 'limparCarrinho');
 $router->get('/api/cep/{cep}', 'ApiController', 'consultarCEP');
 $router->get('/api/frete/calcular', 'ApiController', 'calcularFrete');
 
+// Relatório de Pedidos
+$router->get('/admin/relatorio-pedidos', 'AdminRelatorioPedidosController', 'index');
+$router->get('/admin/relatorio-pedidos/imprimir/{id}', 'AdminRelatorioPedidosController', 'imprimir');
+$router->post('/admin/relatorio-pedidos/registrar-impressao', 'AdminRelatorioPedidosController', 'registrarImpressao');
+
 // Rotas do Módulo de Estoque Interno
 $router->get('/admin/estoque', 'AdminEstoqueController', 'index');
 $router->get('/admin/estoque/entrada', 'AdminEstoqueController', 'entrada');
