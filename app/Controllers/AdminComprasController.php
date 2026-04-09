@@ -662,65 +662,75 @@ class AdminComprasController extends Controller {
         }
 
         try {
-            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
-            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
-
-            if (!$temPedidoEmLista) {
+            // Detectar tabela de itens do pedido
+            $itensTable = $this->findPedidoItensTable();
+            if (!$itensTable) {
                 echo json_encode(['success' => true, 'pedidos' => []]);
                 return;
             }
 
-            // Detectar tabela de itens do pedido
-            $itensTable = null;
-            try {
-                $stmtT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
-                $stmtT->execute(['pedido_itens']);
-                if ((int) $stmtT->fetchColumn() > 0) {
-                    $itensTable = 'pedido_itens';
-                } else {
-                    $stmtT->execute(['pedido_items']);
-                    if ((int) $stmtT->fetchColumn() > 0) {
-                        $itensTable = 'pedido_items';
+            // Estratégia 1: buscar pedidos via lista_compras.pedido_id
+            $pedidoIds = [];
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+
+            if ($temPedidoEmLista) {
+                $whereLoja = '';
+                $params = [':produto_id' => $produtoId];
+                if ($temLojaIdEmLista) {
+                    if ($semLoja) {
+                        $whereLoja = ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
+                    } elseif ($lojaId > 0) {
+                        $whereLoja = ' AND lc.loja_id = :loja_id';
+                        $params[':loja_id'] = $lojaId;
                     }
                 }
-            } catch (\Exception $e) {
-                $itensTable = null;
+                $stmt = $this->connection->prepare(
+                    "SELECT DISTINCT lc.pedido_id FROM lista_compras lc
+                     WHERE lc.produto_id = :produto_id AND lc.pedido_id IS NOT NULL AND lc.pedido_id <> 0" . $whereLoja
+                );
+                $stmt->execute($params);
+                $pedidoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             }
 
-            $whereLoja = '';
-            $params = [':produto_id' => $produtoId];
-            if ($temLojaIdEmLista) {
-                if ($semLoja) {
-                    $whereLoja = ' AND (lc.loja_id IS NULL OR lc.loja_id = 0)';
-                } elseif ($lojaId > 0) {
-                    $whereLoja = ' AND lc.loja_id = :loja_id';
-                    $params[':loja_id'] = $lojaId;
-                }
-            }
-
-            $stmt = $this->connection->prepare(
-                "SELECT DISTINCT lc.pedido_id
-                 FROM lista_compras lc
-                 WHERE lc.produto_id = :produto_id
-                   AND lc.pedido_id IS NOT NULL
-                   AND lc.pedido_id <> 0" . $whereLoja .
-                " ORDER BY lc.pedido_id DESC"
-            );
-            $stmt->execute($params);
-            $pedidoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            // Estratégia 2: buscar pedidos que contêm esse produto na tabela de itens
+            try {
+                $stItens = $this->connection->prepare(
+                    "SELECT DISTINCT pedido_id FROM {$itensTable} WHERE produto_id = ? AND pedido_id IS NOT NULL AND pedido_id > 0"
+                );
+                $stItens->execute([$produtoId]);
+                $pedidoIdsFromItens = $stItens->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                $pedidoIds = array_values(array_unique(array_merge($pedidoIds, $pedidoIdsFromItens)));
+            } catch (\Exception $e) {}
 
             if (empty($pedidoIds)) {
                 echo json_encode(['success' => true, 'pedidos' => []]);
                 return;
             }
 
+            // Buscar dados dos pedidos
             $in = implode(',', array_fill(0, count($pedidoIds), '?'));
-            $stmtPedidos = $this->connection->prepare(
-                "SELECT p.*, u.nome as cliente_nome, u.email as cliente_email
-                 FROM pedidos p
-                 LEFT JOIN usuarios u ON u.id = p.cliente_id
-                 WHERE p.id IN ($in)"
-            );
+
+            // Detectar coluna de cliente
+            $colsPed = [];
+            try { $stC = $this->connection->query('DESCRIBE pedidos'); $colsPed = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $clienteCol = in_array('cliente_id', $colsPed, true) ? 'cliente_id' : (in_array('usuario_id', $colsPed, true) ? 'usuario_id' : '');
+            $totalCol = in_array('total', $colsPed, true) ? 'total' : (in_array('valor_total', $colsPed, true) ? 'valor_total' : '');
+
+            $selectPed = 'p.*';
+            $joinUser = '';
+            if ($clienteCol !== '') {
+                // Detectar coluna nome do usuario
+                $colsUser = [];
+                try { $stU = $this->connection->query('DESCRIBE usuarios'); $colsUser = $stU ? $stU->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $nomeCol = in_array('nome', $colsUser, true) ? 'nome' : (in_array('name', $colsUser, true) ? 'name' : '');
+                if ($nomeCol !== '') {
+                    $selectPed .= ", u.{$nomeCol} as cliente_nome, u.email as cliente_email";
+                    $joinUser = " LEFT JOIN usuarios u ON u.id = p.{$clienteCol}";
+                }
+            }
+
+            $stmtPedidos = $this->connection->prepare("SELECT {$selectPed} FROM pedidos p{$joinUser} WHERE p.id IN ({$in}) ORDER BY p.id DESC");
             $stmtPedidos->execute(array_map('intval', $pedidoIds));
             $pedidosRows = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -729,47 +739,43 @@ class AdminComprasController extends Controller {
                 $pid = (int) ($p['id'] ?? 0);
                 $pedidos[$pid] = [
                     'id' => $pid,
-                    'codigo_pedido' => (string) ($p['codigo_pedido'] ?? ''),
+                    'codigo_pedido' => (string) ($p['codigo_pedido'] ?? ($p['numero_pedido'] ?? '')),
                     'status' => (string) ($p['status'] ?? ''),
-                    'valor_total' => isset($p['valor_total']) ? (float) $p['valor_total'] : null,
+                    'valor_total' => $totalCol ? (float) ($p[$totalCol] ?? 0) : null,
                     'moeda' => (string) ($p['moeda'] ?? ''),
                     'created_at' => (string) ($p['created_at'] ?? ''),
-                    'pago_em' => isset($p['pago_em']) ? (string) $p['pago_em'] : '',
+                    'pago_em' => (string) ($p['pago_em'] ?? ''),
                     'cliente_nome' => (string) ($p['cliente_nome'] ?? ''),
                     'cliente_email' => (string) ($p['cliente_email'] ?? ''),
+                    'payment_gateway' => (string) ($p['payment_gateway'] ?? ($p['gateway'] ?? '')),
+                    'payment_id' => (string) ($p['payment_id'] ?? ($p['asaas_payment_id'] ?? '')),
                     'itens' => [],
                 ];
             }
 
-            if ($itensTable) {
-                $stmtItens = $this->connection->prepare(
-                    "SELECT i.*
-                     FROM $itensTable i
-                     WHERE i.pedido_id IN ($in) AND i.produto_id = ?"
-                );
-                $vals = array_map('intval', $pedidoIds);
-                $vals[] = $produtoId;
-                $stmtItens->execute($vals);
-                $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                foreach ($itens as $it) {
-                    $pid = (int) ($it['pedido_id'] ?? 0);
-                    if (!isset($pedidos[$pid])) continue;
-                    $pedidos[$pid]['itens'][] = [
-                        'produto_id' => (int) ($it['produto_id'] ?? 0),
-                        'quantidade' => (int) ($it['quantidade'] ?? 0),
-                        'preco_unitario' => isset($it['preco_unitario']) ? (float) $it['preco_unitario'] : null,
-                        'subtotal' => isset($it['subtotal']) ? (float) $it['subtotal'] : null,
-                        'nome_produto' => (string) ($it['nome_produto'] ?? ''),
-                        'nome_produto_sku' => (string) ($it['nome_produto_sku'] ?? ''),
-                    ];
-                }
+            // Buscar itens desse produto nos pedidos
+            $stmtItens = $this->connection->prepare(
+                "SELECT i.* FROM {$itensTable} i WHERE i.pedido_id IN ({$in}) AND i.produto_id = ?"
+            );
+            $vals = array_map('intval', $pedidoIds);
+            $vals[] = $produtoId;
+            $stmtItens->execute($vals);
+            $itens = $stmtItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($itens as $it) {
+                $pid = (int) ($it['pedido_id'] ?? 0);
+                if (!isset($pedidos[$pid])) continue;
+                $pedidos[$pid]['itens'][] = [
+                    'produto_id' => (int) ($it['produto_id'] ?? 0),
+                    'quantidade' => (int) ($it['quantidade'] ?? 0),
+                    'preco_unitario' => isset($it['preco_unitario']) ? (float) $it['preco_unitario'] : null,
+                    'subtotal' => isset($it['subtotal']) ? (float) $it['subtotal'] : null,
+                    'nome_produto' => (string) ($it['nome_produto'] ?? ($it['nome_produto_sku'] ?? '')),
+                ];
             }
 
             echo json_encode(['success' => true, 'pedidos' => array_values($pedidos)]);
-            return;
         } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Erro ao buscar pedidos.']);
-            return;
+            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
         }
     }
 
