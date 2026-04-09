@@ -3304,12 +3304,12 @@ HTML;
                                             echo '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . ($isFreeOfferItem
-                                                    ? '<span class="text-decoration-line-through text-muted">US$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, '.', ',') . '</span>'
-                                                    : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ',')
+                                                    ? '<span class="text-decoration-line-through text-muted">' . ($exibirEmBrl ? 'R$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, '.', ',')) . '</span>'
+                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . ($isFreeOfferItem
                                                     ? '<span class="badge bg-success">GRÁTIS</span>'
-                                                    : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ',')
+                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
                                                 <td>' . $acoesHtml . '</td>
@@ -3742,21 +3742,38 @@ HTML;
                                             <tr><td><strong>Usuário ID</strong></td><td>' . $pedido['usuario_id'] . '</td></tr>
                                             <tr><td><strong>Cliente ID</strong></td><td>' . $pedido['cliente_id'] . '</td></tr>
                                             ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
-                                            <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>
-                                            <tr><td><strong>Subtotal</strong></td><td>' . $this->formatarMoeda((float) ($pedido['subtotal'] ?? 0), 'USD') . '</td></tr>
-                                            ' . ($temItemGratuito ? '<tr><td><strong><i class="fas fa-gift text-success me-1"></i>Brinde (valor original)</strong></td><td><span class="text-decoration-line-through text-muted">' . $this->formatarMoeda((float) ($freeOfferItemInfo['free_offer_original_price'] ?? 0), 'USD') . '</span> <span class="badge bg-success">GRÁTIS</span></td></tr>' : '') . '
-                                            <tr><td><strong>Serviços</strong></td><td>' . $this->formatarMoeda((float) ($pedido['servicos'] ?? 0), 'USD') . '</td></tr>
+                                            <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>';
+
+            // Determinar moeda de exibição: se pedido é BRL, mostrar R$ sem converter
+            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'USD')));
+            if ($moedaPedido === '') $moedaPedido = 'USD';
+            $taxaConvPedido = (float) ($pedido['taxa_conversao'] ?? 1);
+            if ($taxaConvPedido <= 0) $taxaConvPedido = 1;
+            $exibirEmBrl = ($moedaPedido === 'BRL');
+
+            // Função helper: só troca o símbolo, sem converter valores (já estão na moeda certa no banco)
+            $fmtPedido = function(float $valor) use ($exibirEmBrl) {
+                if ($exibirEmBrl) {
+                    return 'R$ ' . number_format($valor, 2, ',', '.');
+                }
+                return $this->formatarMoeda($valor, 'USD');
+            };
+
+            echo '
+                                            <tr><td><strong>Subtotal</strong></td><td>' . $fmtPedido((float) ($pedido['subtotal'] ?? 0)) . '</td></tr>
+                                            ' . ($temItemGratuito ? '<tr><td><strong><i class="fas fa-gift text-success me-1"></i>Brinde (valor original)</strong></td><td><span class="text-decoration-line-through text-muted">' . $fmtPedido((float) ($freeOfferItemInfo['free_offer_original_price'] ?? 0)) . '</span> <span class="badge bg-success">GRÁTIS</span></td></tr>' : '') . '
+                                            <tr><td><strong>Serviços</strong></td><td>' . $fmtPedido((float) ($pedido['servicos'] ?? 0)) . '</td></tr>
                                             ' . (((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) > 0 ? '
-                                            <tr><td class="small text-muted ps-3">Taxa de serviço original</td><td class="small text-muted">' . $this->formatarMoeda((float) ($pedido['taxa_servico_original'] ?? 0), 'USD') . '</td></tr>
-                                            <tr><td class="small text-success ps-3"><i class="fas fa-tags me-1"></i>Desconto promocional' . ((string) ($pedido['taxa_servico_desconto_tipo'] ?? '') === 'percentual' ? ' (' . number_format((float) ($pedido['taxa_servico_desconto_valor'] ?? 0), 2) . '%)' : ' (fixo)') . '</td><td class="small text-success">-' . $this->formatarMoeda((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0), 'USD') . '</td></tr>
-                                            <tr><td class="small fw-semibold ps-3">Taxa de serviço final cobrada</td><td class="small fw-semibold">' . $this->formatarMoeda((float) ($pedido['servicos'] ?? 0), 'USD') . '</td></tr>
+                                            <tr><td class="small text-muted ps-3">Taxa de serviço original</td><td class="small text-muted">' . $fmtPedido((float) ($pedido['taxa_servico_original'] ?? 0)) . '</td></tr>
+                                            <tr><td class="small text-success ps-3"><i class="fas fa-tags me-1"></i>Desconto promocional' . ((string) ($pedido['taxa_servico_desconto_tipo'] ?? '') === 'percentual' ? ' (' . number_format((float) ($pedido['taxa_servico_desconto_valor'] ?? 0), 2) . '%)' : ' (fixo)') . '</td><td class="small text-success">-' . $fmtPedido((float) ($pedido['taxa_servico_desconto_aplicado'] ?? 0)) . '</td></tr>
+                                            <tr><td class="small fw-semibold ps-3">Taxa de serviço final cobrada</td><td class="small fw-semibold">' . $fmtPedido((float) ($pedido['servicos'] ?? 0)) . '</td></tr>
                                             ' : '') . '
-                                            <tr><td><strong>Impostos</strong></td><td>' . $this->formatarMoeda((float) ($pedido['impostos'] ?? 0), 'USD') . '</td></tr>
-                                            ' . ($temItemGratuito ? '<tr><td class="small text-muted ps-3">Imposto do brinde (não cobrado)</td><td><span class="text-decoration-line-through text-muted small">' . $this->formatarMoeda(round($freeOrigPrice * (($pedido['subtotal'] > 0 && $pedido['impostos'] > 0) ? ($pedido['impostos'] / $pedido['subtotal']) : 0), 2), 'USD') . '</span> <span class="small text-success">pago pela Braziliana</span></td></tr>' : '') . '
-                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>Imposto local</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $this->formatarMoeda((float) $pedido['imposto_local'], 'USD') . '</span></td></tr>' : '') . '
-                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $this->formatarMoeda((float) ($pedido['frete'] ?? 0), 'USD')) . '</td></tr>
-                                            <tr><td><strong>Desconto</strong></td><td>' . $this->formatarMoeda((float) ($pedido['desconto'] ?? 0), 'USD') . '</td></tr>
-                                            <tr><td><strong>Total</strong></td><td><strong>' . $this->formatarMoeda((float) ($pedido['total'] ?? 0), 'USD') . '</strong></td></tr>
+                                            <tr><td><strong>Impostos</strong></td><td>' . $fmtPedido((float) ($pedido['impostos'] ?? 0)) . '</td></tr>
+                                            ' . ($temItemGratuito ? '<tr><td class="small text-muted ps-3">Imposto do brinde (não cobrado)</td><td><span class="text-decoration-line-through text-muted small">' . $fmtPedido(round($freeOrigPrice * (($pedido['subtotal'] > 0 && $pedido['impostos'] > 0) ? ($pedido['impostos'] / $pedido['subtotal']) : 0), 2)) . '</span> <span class="small text-success">pago pela Braziliana</span></td></tr>' : '') . '
+                                            ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>Imposto local</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $fmtPedido((float) $pedido['imposto_local']) . '</span></td></tr>' : '') . '
+                                            <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $fmtPedido((float) ($pedido['frete'] ?? 0))) . '</td></tr>
+                                            <tr><td><strong>Desconto</strong></td><td>' . $fmtPedido((float) ($pedido['desconto'] ?? 0)) . '</td></tr>
+                                            <tr><td><strong>Total</strong></td><td><strong>' . $fmtPedido((float) ($pedido['total'] ?? 0)) . '</strong></td></tr>
                                             <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars((string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
                                             <tr><td><strong>Taxa Conversão</strong></td><td>' . (
                                                 (strtoupper((string) ($pedido['moeda'] ?? '')) === 'BRL' && (float) ($pedido['taxa_conversao'] ?? 1) > 1.01)
