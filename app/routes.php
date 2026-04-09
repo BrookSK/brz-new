@@ -327,6 +327,8 @@ $router->post('/admin/produtos/cadastro-rapido', 'AdminProdutosController', 'cad
 $router->post('/admin/produtos/cadastro-rapido/salvar', 'AdminProdutosController', 'cadastroRapidoSalvar');
 $router->get('/admin/produtos/cadastro-representante', 'AdminProdutosNovoController', 'index');
 $router->post('/admin/produtos/salvar', 'AdminProdutosController', 'salvar');
+$router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
+$router->post('/admin/produtos/acoes-massa', 'AdminProdutosController', 'acoesMassa');
 $router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'importarProdutosModelo');
 $router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');
 $router->post('/admin/produtos/importar/processar', 'AdminProdutosController', 'importarProdutosProcessar');
@@ -346,8 +348,6 @@ $router->post('/admin/produtos/galeria/ordem/{id}', 'AdminProdutosController', '
 $router->post('/admin/produtos/variacoes/{id}/fotos/upload', 'AdminProdutosController', 'uploadFotosVariacao');
 $router->post('/admin/produtos/variacoes/fotos/remover/{id}', 'AdminProdutosController', 'removerFotoVariacao');
 $router->post('/admin/produtos/variacoes/{id}/fotos/ordem', 'AdminProdutosController', 'salvarOrdemFotosVariacao');
-$router->post('/admin/produtos/excluir/{id}', 'AdminProdutosController', 'excluir');
-$router->post('/admin/produtos/acoes-massa', 'AdminProdutosController', 'acoesMassa');
 
 // Lojas
 $router->get('/admin/lojas', 'AdminLojasController', 'index');
