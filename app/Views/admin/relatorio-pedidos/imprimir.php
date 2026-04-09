@@ -93,7 +93,16 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
             $qtd = (int)($it['quantidade'] ?? 1);
             $preco = (float)($it['preco_unitario'] ?? 0);
             $sub = (float)($it['subtotal'] ?? ($preco * $qtd));
-            $peso = (float)($it['peso'] ?? 0);
+            $peso = (float)($it['peso'] ?? ($it['weight'] ?? 0));
+            // Buscar peso do produto se não veio no item
+            if ($peso <= 0 && !empty($it['produto_id'])) {
+                try {
+                    $dbP = \Config\Database::getConnection();
+                    $stP = $dbP->prepare("SELECT COALESCE(peso, weight, 0) AS peso FROM produtos WHERE id = ? LIMIT 1");
+                    $stP->execute([(int)$it['produto_id']]);
+                    $peso = (float)($stP->fetchColumn() ?: 0);
+                } catch (\Exception $e) {}
+            }
             $pesoTotal += $peso * $qtd;
         ?>
             <tr>

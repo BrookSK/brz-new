@@ -107,7 +107,7 @@ class AdminRelatorioPedidosController extends Controller {
         if (!empty($pedidos)) {
             $clienteIds = [];
             foreach ($pedidos as $p) {
-                $cid = (int)($p['cliente_id'] ?? 0);
+                $cid = (int)($p['cliente_id'] ?? ($p['usuario_id'] ?? 0));
                 if ($cid > 0) $clienteIds[$cid] = true;
             }
             $clienteData = [];
@@ -122,7 +122,7 @@ class AdminRelatorioPedidosController extends Controller {
             }
 
             foreach ($pedidos as &$_p) {
-                $cid = (int)($_p['cliente_id'] ?? 0);
+                $cid = (int)($_p['cliente_id'] ?? ($_p['usuario_id'] ?? 0));
                 $u = $clienteData[$cid] ?? [];
 
                 if (empty($_p['cliente_nome']) || trim((string)$_p['cliente_nome']) === '') {
@@ -308,13 +308,32 @@ class AdminRelatorioPedidosController extends Controller {
 
             // Se não tem no pedido, buscar do cadastro
             if (empty($endEntrega['endereco']) && $clienteId > 0) {
-                $st = $this->db->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
-                $st->execute([$clienteId]);
-                $end = $st->fetch(\PDO::FETCH_ASSOC);
+                try {
+                    // Tentar com principal primeiro
+                    $st = $this->db->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
+                    $st->execute([$clienteId]);
+                    $end = $st->fetch(\PDO::FETCH_ASSOC);
+                } catch (\Exception $e) {
+                    // Se falhar (coluna principal não existe), buscar sem
+                    try {
+                        $st = $this->db->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1");
+                        $st->execute([$clienteId]);
+                        $end = $st->fetch(\PDO::FETCH_ASSOC);
+                    } catch (\Exception $e) { $end = null; }
+                }
                 if ($end) {
                     foreach ($endFields as $ef) {
                         if (empty($endEntrega[$ef]) && !empty($end[$ef])) {
                             $endEntrega[$ef] = (string)$end[$ef];
+                        }
+                    }
+                }
+
+                // Fallback: dados do usuario
+                if (empty($endEntrega['endereco']) && !empty($cliente)) {
+                    foreach ($endFields as $ef) {
+                        if (empty($endEntrega[$ef]) && !empty($cliente[$ef])) {
+                            $endEntrega[$ef] = (string)$cliente[$ef];
                         }
                     }
                 }
