@@ -185,6 +185,10 @@ class AdminComissoesGlobalController
         echo '<h1 class="h2"><i class="fas fa-users-cog me-2"></i>Comissões - Visão Global</h1>';
         echo '</div>';
 
+        echo '<div class="alert alert-light border mb-4 small">';
+        echo '<strong>Fórmula:</strong> Bruto = total vendido pelo vendedor | Líquido = Bruto - Custo do Produto - Impostos | Comissão = Líquido × % da faixa';
+        echo '</div>';
+
         // Filtros
         echo '<div class="card mb-4"><div class="card-body">';
         echo '<form method="GET" class="row g-2 align-items-end">';
@@ -198,9 +202,9 @@ class AdminComissoesGlobalController
             echo '<div class="card mb-4"><div class="card-header bg-success bg-opacity-10"><strong><i class="fas fa-leaf me-1"></i>Vendas Orgânicas (sem vendedor atribuído)</strong></div><div class="card-body">';
             foreach ($organico as $m => $t) {
                 echo '<div class="mb-2"><span class="badge bg-secondary">' . htmlspecialchars($m) . '</span> ';
-                echo $t['qtd'] . ' pedidos | Faturado: <strong>' . $this->fmt($t['faturado'], $m) . '</strong>';
-                echo ' | Impostos: ' . $this->fmt($t['impostos'], $m);
+                echo $t['qtd'] . ' pedidos | Bruto: <strong>' . $this->fmt($t['faturado'], $m) . '</strong>';
                 echo ' | Custo: ' . $this->fmt($t['custo'], $m);
+                echo ' | Impostos: ' . $this->fmt($t['impostos'], $m);
                 echo ' | Líquido: <strong>' . $this->fmt($t['liquido'], $m) . '</strong></div>';
             }
             echo '</div></div>';
@@ -209,7 +213,7 @@ class AdminComissoesGlobalController
         // Tabela por vendedor
         echo '<div class="card mb-4"><div class="card-header"><strong>Comissões por Vendedor (Pedidos Manuais + Processamento)</strong></div><div class="card-body">';
         echo '<div class="table-responsive"><table class="table table-hover table-sm">';
-        echo '<thead><tr><th>Vendedor</th><th>Moeda</th><th class="text-end">Pedidos</th><th class="text-end">Faturado</th><th class="text-end">Impostos</th><th class="text-end">Custo</th><th class="text-end">Líquido</th><th class="text-end">% Comissão</th><th class="text-end">Comissão Manual</th><th class="text-end">Comissão Proc.</th><th class="text-end">Total Comissão</th></tr></thead><tbody>';
+        echo '<thead><tr><th>Vendedor</th><th>Moeda</th><th class="text-end">Pedidos</th><th class="text-end">Bruto (Total Vendido)</th><th class="text-end">Custo Produto</th><th class="text-end">Impostos</th><th class="text-end">Líquido</th><th class="text-end">% Comissão</th><th class="text-end">Comissão Manual</th><th class="text-end">Comissão Proc.</th><th class="text-end">Total Comissão</th></tr></thead><tbody>';
 
         $allUids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
         sort($allUids);
@@ -234,8 +238,8 @@ class AdminComissoesGlobalController
                 echo '<td>' . htmlspecialchars($m) . '</td>';
                 echo '<td class="text-end">' . $t['qtd'] . '</td>';
                 echo '<td class="text-end">' . $this->fmt($t['faturado'], $m) . '</td>';
-                echo '<td class="text-end">' . $this->fmt($t['impostos'], $m) . '</td>';
                 echo '<td class="text-end">' . $this->fmt($t['custo'], $m) . '</td>';
+                echo '<td class="text-end">' . $this->fmt($t['impostos'], $m) . '</td>';
                 echo '<td class="text-end">' . $this->fmt($t['liquido'], $m) . '</td>';
                 echo '<td class="text-end">' . number_format($pct, 2, ',', '.') . '%</td>';
                 echo '<td class="text-end">' . $this->fmt($comManual, $m) . '</td>';
