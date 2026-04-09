@@ -321,6 +321,14 @@ class SupportTicketsController extends Controller {
 
         if ($id > 0) {
             $this->markClienteSeen($pdo, $id, $uid);
+            // Marcar mensagens do admin como lidas pelo cliente
+            try {
+                $cols = [];
+                try { $stC = $pdo->query('DESCRIBE support_ticket_messages'); $cols = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) { $cols = []; }
+                if (in_array('read_at', $cols, true)) {
+                    $pdo->prepare("UPDATE support_ticket_messages SET read_at = NOW(), read_by_user_id = ? WHERE ticket_id = ? AND autor_tipo = 'admin' AND read_at IS NULL")->execute([$uid, $id]);
+                }
+            } catch (\Exception $e) {}
         }
 
         $st = $pdo->prepare('SELECT * FROM support_tickets WHERE id = ? AND usuario_id = ? LIMIT 1');

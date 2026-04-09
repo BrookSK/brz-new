@@ -193,6 +193,14 @@
                                             <?php endif; ?>
                                             <span class="opacity-75">•</span>
                                             <span class="opacity-75"><?= htmlspecialchars((string) ($m['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php if ($isMe): ?>
+                                                <?php $readAt = trim((string) ($m['read_at'] ?? '')); ?>
+                                                <?php if ($readAt !== ''): ?>
+                                                    <span title="Lida em <?= htmlspecialchars($readAt, ENT_QUOTES, 'UTF-8') ?>" style="margin-left:4px;color:#53bdeb;">✓✓</span>
+                                                <?php else: ?>
+                                                    <span title="Enviada" style="margin-left:4px;opacity:.5;">✓✓</span>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="brz-text"><?= htmlspecialchars((string) ($m['mensagem'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
 

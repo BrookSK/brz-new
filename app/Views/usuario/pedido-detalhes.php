@@ -498,6 +498,9 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                 <a href="/meus-pedidos" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-2"></i> <?= __('common.back', 'Voltar') ?>
                 </a>
+                <a href="/meu-ticket/abrir/pedido/<?= (int) ($pedido['id'] ?? 0) ?>" class="btn btn-outline-dark">
+                    <i class="fas fa-life-ring me-2"></i> <?= __('user_orders.actions.open_ticket', 'Abrir Ticket para este Pedido') ?>
+                </a>
                 <button class="btn btn-primary" onclick="window.print()">
                     <i class="fas fa-print me-2"></i> <?= __('common.print', 'Imprimir') ?>
                 </button>
