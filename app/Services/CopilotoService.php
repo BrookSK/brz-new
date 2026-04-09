@@ -50,6 +50,12 @@ class CopilotoService {
             return ['texto' => 'O Co-Piloto ainda não está configurado. Peça ao administrador para inserir a API Key.', 'acao' => 'nenhuma', 'parametros' => []];
         }
 
+        // Busca automática de produtos no banco quando a mensagem parece ser sobre um produto
+        $resultadoBusca = $this->buscarProdutoNoBanco($mensagem);
+        if (!empty($resultadoBusca)) {
+            $contexto['_produtos_encontrados'] = $resultadoBusca;
+        }
+
         $systemPrompt = $this->montarSystemPrompt($contexto, $mensagem);
 
         // Montar mensagens para o Claude
@@ -162,6 +168,21 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
 
         // Buscar conteúdo de referência relevante
         $conteudoRef = $this->buscarConteudoRelevante($mensagemUsuario);
+
+        // Produtos encontrados no banco (busca automática)
+        $secaoProdutosEncontrados = '';
+        if (!empty($contexto['_produtos_encontrados'])) {
+            $prods = $contexto['_produtos_encontrados'];
+            $linhas = [];
+            foreach ($prods as $p) {
+                $linha = "- ID:{$p['id']} | {$p['nome']} | US\$ " . number_format((float)($p['preco'] ?? 0), 2);
+                if (!empty($p['peso'])) $linha .= " | {$p['peso']}kg";
+                if (!empty($p['grupo_nome'])) $linha .= " | Grupo: {$p['grupo_nome']} (/grupo/{$p['grupo_slug']})";
+                $linhas[] = $linha;
+            }
+            $secaoProdutosEncontrados = "\n\nPRODUTOS ENCONTRADOS NO BANCO DE DADOS PARA ESTA PERGUNTA:\n" . implode("\n", $linhas) .
+                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão. Use acao: ir_para_grupo com o slug do grupo para levar o cliente até lá.";
+        }
         $secaoReferencia = '';
         if (!empty($conteudoRef)) {
             $trechos = '';
@@ -297,8 +318,66 @@ BASE DE CONHECIMENTO — VERSÃO ATUAL DO SITE ({$dataAtual})
 Se um documento estiver indisponível, diga ao usuário e ofereça verificar mais tarde.
 Se um campo vier null, reformule a resposta sem ele.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{$secaoProdutosEncontrados}
 {$secaoReferencia}
 PROMPT;
+    }
+
+    // ========== BUSCA DE PRODUTOS NO BANCO ==========
+
+    private function buscarProdutoNoBanco(string $mensagem): array {
+        // Detectar se a mensagem parece ser sobre busca de produto
+        $padroes = [
+            '/tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40})\??/iu',
+            '/(?:procur|busc|quer|precis)\w*\s+(?:o|a|um|uma|de)?\s*(.{3,40})/iu',
+            '/(?:vende|vendem)\s+(.{3,40})\??/iu',
+            '/(?:tineco|dyson|aveeno|clorox|downy|tide|kirkland|vitamix|ninja|instant\s*pot|bath\s*&?\s*body)/iu',
+        ];
+
+        $termo = null;
+        foreach ($padroes as $padrao) {
+            if (preg_match($padrao, $mensagem, $m)) {
+                $termo = isset($m[1]) ? trim($m[1], ' ?.!,') : trim($m[0], ' ?.!,');
+                break;
+            }
+        }
+
+        if (!$termo || mb_strlen($termo) < 2) return [];
+
+        try {
+            $cols = [];
+            try {
+                $stCols = $this->pdo->query('DESCRIBE produtos');
+                $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) { return []; }
+
+            $colNome = in_array('name', $cols, true) ? 'name' : 'nome';
+            $colPreco = in_array('price', $cols, true) ? 'price' : 'preco';
+            $colPeso = in_array('weight', $cols, true) ? 'weight' : 'peso';
+            $temGrupo = in_array('grupo_compras_id', $cols, true);
+
+            $like = '%' . $termo . '%';
+
+            if ($temGrupo) {
+                $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
+                    COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
+                    FROM produtos p
+                    LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
+                    WHERE p.{$colNome} LIKE ?
+                    ORDER BY p.{$colNome} ASC LIMIT 8");
+            } else {
+                $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
+                    '' as grupo_nome, '' as grupo_slug
+                    FROM produtos p
+                    WHERE p.{$colNome} LIKE ?
+                    ORDER BY p.{$colNome} ASC LIMIT 8");
+            }
+            $st->execute([$like]);
+            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            error_log('[CoPiloto] Erro busca produto no banco: ' . $e->getMessage());
+            return [];
+        }
     }
 
     // ========== CÁLCULO DE CUSTO (Recurso 4) ==========
