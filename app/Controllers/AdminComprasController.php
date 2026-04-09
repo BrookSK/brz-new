@@ -716,9 +716,9 @@ class AdminComprasController extends Controller {
 
             $in = implode(',', array_fill(0, count($pedidoIds), '?'));
             $stmtPedidos = $this->connection->prepare(
-                "SELECT p.*, u.name as cliente_nome, u.email as cliente_email
+                "SELECT p.*, u.nome as cliente_nome, u.email as cliente_email
                  FROM pedidos p
-                 LEFT JOIN usuarios u ON u.id = p.usuario_id
+                 LEFT JOIN usuarios u ON u.id = p.cliente_id
                  WHERE p.id IN ($in)"
             );
             $stmtPedidos->execute(array_map('intval', $pedidoIds));
@@ -1226,7 +1226,9 @@ class AdminComprasController extends Controller {
                 . ', agg.nome_produto_custom as nome_produto_custom'
                 . ' FROM ('
                 . '   SELECT lc.produto_id, '
-                . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
+                . ($temLojaIdEmLista && $temLojaIdEmProdutos
+                    ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0) as loja_id'
+                    : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id'))
                 . '     , lc.status as status'
                 . ($this->columnExists('lista_compras', 'nome_produto') ? ', COALESCE(lc.nome_produto, \'\') as nome_produto_custom' : ", '' as nome_produto_custom")
                 . '     , SUM(CASE WHEN COALESCE(lc.quantidade_faltante,0) > 0 THEN lc.quantidade_faltante ELSE COALESCE(lc.quantidade_necessaria,0) END) as quantidade_faltante'
@@ -1234,6 +1236,7 @@ class AdminComprasController extends Controller {
                 . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
                 . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
                 . '   FROM lista_compras lc'
+                . ($temLojaIdEmProdutos ? ' LEFT JOIN produtos p_inner ON p_inner.id = lc.produto_id' : '')
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
@@ -1253,7 +1256,9 @@ class AdminComprasController extends Controller {
                     : '')
                 . '   GROUP BY lc.produto_id, '
                 . ($this->columnExists('lista_compras', 'nome_produto') ? 'COALESCE(lc.nome_produto, \'\'), ' : '')
-                . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0), lc.status' : '0, lc.status')
+                . ($temLojaIdEmLista && $temLojaIdEmProdutos
+                    ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0), lc.status'
+                    : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0), lc.status' : '0, lc.status'))
                 . ' ) agg'
                 . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
 
@@ -2564,167 +2569,135 @@ class AdminComprasController extends Controller {
     }
 
     public function gerarPDF($request) {
-        $lojaId = (int) $request->getParam('loja_id', 0);
+        $lojaIdFiltro = (int) $request->getParam('loja_id', 0);
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
+        $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
         $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
-        $temCost = $this->columnExists('produtos', 'cost_price');
         $temFoto = $this->columnExists('produtos', 'foto_principal');
         $temImages = $this->columnExists('produtos', 'images');
-
         $temObsVendedor = $this->columnExists('pedidos', 'observacao_vendedor');
 
-        $lojaNome = 'Compras';
-        if ($lojaId > 0 && $this->tableExists('lojas')) {
-            try {
-                $stmt = $this->connection->prepare('SELECT nome FROM lojas WHERE id = :id LIMIT 1');
-                $stmt->execute([':id' => $lojaId]);
-                $n = $stmt->fetchColumn();
-                if ($n !== false && (string) $n !== '') $lojaNome = (string) $n;
-            } catch (\Exception $e) {
-            }
-        }
-
-        $selectCols = [
-            'p.id as produto_id',
-            'p.sku as sku',
-        ];
-        if ($this->columnExists('produtos', 'name')) {
-            $selectCols[] = 'p.name as produto_nome';
-        } elseif ($this->columnExists('produtos', 'nome')) {
-            $selectCols[] = 'p.nome as produto_nome';
-        } else {
-            $selectCols[] = "'' as produto_nome";
-        }
-        if ($temCost) $selectCols[] = 'p.cost_price as cost_price';
+        $selectCols = ['p.id as produto_id', 'p.sku as sku'];
+        if ($this->columnExists('produtos', 'nome')) { $selectCols[] = 'p.nome as produto_nome'; }
+        elseif ($this->columnExists('produtos', 'name')) { $selectCols[] = 'p.name as produto_nome'; }
+        else { $selectCols[] = "'' as produto_nome"; }
         if ($temFoto) $selectCols[] = 'p.foto_principal as foto_principal';
         if ($temImages) $selectCols[] = 'p.images as images';
 
-        // PDF consolidado por produto + loja
         $rankExpr = "CASE lc.prioridade WHEN 'urgente' THEN 4 WHEN 'alta' THEN 3 WHEN 'media' THEN 2 WHEN 'baixa' THEN 1 ELSE 0 END";
+
+        $lojaIdExpr = '0 as loja_id';
+        if ($temLojaIdEmLista && $temLojaIdEmProdutos) {
+            $lojaIdExpr = 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0) as loja_id';
+        } elseif ($temLojaIdEmLista) {
+            $lojaIdExpr = 'COALESCE(lc.loja_id,0) as loja_id';
+        }
+
         $sql = 'SELECT ' . implode(', ', $selectCols)
-            . ', agg.quantidade_faltante as quantidade_faltante'
-            . ', agg.quantidade_necessaria as quantidade_necessaria'
-            . ', agg.data_solicitacao as data_solicitacao'
-            . ', agg.loja_id as loja_id'
-            . ', agg.prioridade as prioridade'
-            . ', agg.nome_produto_custom as nome_produto_custom'
-            . ", 'pendente' as status"
+            . ', agg.quantidade_faltante, agg.quantidade_necessaria, agg.loja_id, agg.prioridade, agg.nome_produto_custom'
+            . ($temPedidoEmLista ? ', agg.pedido_id' : '')
             . ' FROM ('
-            . '   SELECT lc.produto_id, '
-            . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id')
-            . ($temPedidoEmLista ? '     , MIN(NULLIF(COALESCE(lc.pedido_id,0),0)) as pedido_id' : '')
+            . '   SELECT lc.produto_id, ' . $lojaIdExpr
+            . ($temPedidoEmLista ? ', MIN(NULLIF(COALESCE(lc.pedido_id,0),0)) as pedido_id' : '')
             . ($this->columnExists('lista_compras', 'nome_produto') ? ", COALESCE(lc.nome_produto, '') as nome_produto_custom" : ", '' as nome_produto_custom")
-            . '     , SUM(COALESCE(lc.quantidade_faltante,0)) as quantidade_faltante'
-            . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
-            . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
-            . '     , CASE MAX(' . $rankExpr . ") WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
-            . "   FROM lista_compras lc"
+            . ', SUM(COALESCE(lc.quantidade_faltante,0)) as quantidade_faltante'
+            . ', SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
+            . ", CASE MAX({$rankExpr}) WHEN 4 THEN 'urgente' WHEN 3 THEN 'alta' WHEN 2 THEN 'media' WHEN 1 THEN 'baixa' ELSE 'media' END as prioridade"
+            . '   FROM lista_compras lc'
+            . ($temLojaIdEmProdutos ? ' LEFT JOIN produtos p_inner ON p_inner.id = lc.produto_id' : '')
             . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
             . "   WHERE lc.status = 'pendente'"
             . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
             . '   GROUP BY lc.produto_id, '
             . ($this->columnExists('lista_compras', 'nome_produto') ? "COALESCE(lc.nome_produto, ''), " : '')
-            . ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0)' : '0')
+            . ($temLojaIdEmLista && $temLojaIdEmProdutos ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0)' : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0)' : '0'))
             . ' ) agg'
             . ' JOIN produtos p ON agg.produto_id = p.id';
 
         $params = [];
-        if ($lojaId > 0 && $temLojaIdEmLista) {
+        if ($lojaIdFiltro > 0) {
             $sql .= ' WHERE agg.loja_id = :loja_id';
-            $params[':loja_id'] = $lojaId;
+            $params[':loja_id'] = $lojaIdFiltro;
         }
-        $sql .= ' ORDER BY agg.prioridade DESC, agg.data_solicitacao ASC';
+        $sql .= ' ORDER BY agg.loja_id ASC, agg.prioridade DESC';
         $stmt = $this->connection->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        $totalItens = 0;
-        $totalValor = 0.0;
-        foreach ($rows as $r) {
-            $qf = (int) ($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
-            $totalItens += $qf;
-            $cost = isset($r['cost_price']) ? (float) $r['cost_price'] : 0.0;
-            $totalValor += ($qf * $cost);
+        // Agrupar por loja
+        $lojaNames = [];
+        if ($this->tableExists('lojas')) {
+            try { $stL = $this->connection->query('SELECT id, nome FROM lojas'); foreach ($stL->fetchAll(\PDO::FETCH_ASSOC) as $l) { $lojaNames[(int)$l['id']] = $l['nome']; } } catch (\Exception $e) {}
         }
 
-        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">'
-            . '<meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>Lista de Compras - ' . htmlspecialchars($lojaNome) . '</title>'
-            . '<style>
-                body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:18px;}
-                h1{font-size:18px;margin:0 0 8px 0;}
-                .meta{font-size:12px;color:#444;margin-bottom:14px;}
-                table{width:100%;border-collapse:collapse;}
-                th,td{border:1px solid #ddd;padding:8px;vertical-align:middle;}
-                th{background:#f6f6f6;text-align:left;font-size:12px;}
-                td{font-size:12px;}
-                .img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #ddd;background:#fafafa;}
-                .check{width:18px;height:18px;border:1px solid #111;display:inline-block;}
-                .totais{margin-top:12px;font-size:12px;}
-                @media print{a{color:inherit;text-decoration:none;} .no-print{display:none;}}
-            </style></head><body>';
+        $porLoja = [];
+        foreach ($rows as $r) {
+            $lid = (int) ($r['loja_id'] ?? 0);
+            $porLoja[$lid][] = $r;
+        }
 
-        echo '<h1>Lista de Compras - ' . htmlspecialchars($lojaNome) . '</h1>'
-            . '<div class="meta">Gerado em: ' . date('d/m/Y H:i') . '</div>';
-
-        echo '<table><thead><tr>'
-            . '<th style="width:40px;">Ok</th>'
-            . '<th style="width:60px;">Foto</th>'
-            . '<th>Produto</th>'
-            . '<th style="width:70px;">Qtd</th>'
-            . ($temPedidoEmLista && $temObsVendedor ? '<th>Obs. Pedido</th>' : '')
-            . '</tr></thead><tbody>';
-
+        // Obs por pedido
         $obsByPedido = [];
         if ($temPedidoEmLista && $temObsVendedor) {
-            $pedidoIds = [];
-            foreach ($rows as $r) {
-                $pid = (int) ($r['pedido_id'] ?? 0);
-                if ($pid > 0) {
-                    $pedidoIds[$pid] = true;
-                }
-            }
-            $pedidoIds = array_keys($pedidoIds);
-            if (!empty($pedidoIds)) {
-                $in = implode(',', array_fill(0, count($pedidoIds), '?'));
-                try {
-                    $stmtObs = $this->connection->prepare('SELECT id, observacao_vendedor FROM pedidos WHERE id IN (' . $in . ')');
-                    $stmtObs->execute($pedidoIds);
-                    $obsRows = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                    foreach ($obsRows as $or) {
-                        $id = (int) ($or['id'] ?? 0);
-                        if ($id > 0) {
-                            $obsByPedido[$id] = (string) ($or['observacao_vendedor'] ?? '');
-                        }
-                    }
-                } catch (\Exception $e) {
-                    $obsByPedido = [];
-                }
+            $pids = [];
+            foreach ($rows as $r) { $pid = (int)($r['pedido_id']??0); if ($pid>0) $pids[$pid]=true; }
+            if (!empty($pids)) {
+                $in = implode(',', array_keys($pids));
+                try { $st = $this->connection->query("SELECT id, observacao_vendedor FROM pedidos WHERE id IN ({$in})"); foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $o) { $obsByPedido[(int)$o['id']] = $o['observacao_vendedor']??''; } } catch (\Exception $e) {}
             }
         }
 
-        foreach ($rows as $r) {
-            $qf = (int) ($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
-            $img = $this->resolveProdutoImagem($r);
-            $imgTag = $img ? '<img class="img" src="' . htmlspecialchars($img) . '" alt="">' : '<div class="img"></div>';
-            $pedidoIdLinha = (int) ($r['pedido_id'] ?? 0);
-            $obsLinha = ($pedidoIdLinha > 0 && isset($obsByPedido[$pedidoIdLinha])) ? trim((string) $obsByPedido[$pedidoIdLinha]) : '';
-            $nomeExibir = trim((string) ($r['nome_produto_custom'] ?? ''));
-            if ($nomeExibir === '') $nomeExibir = (string) ($r['produto_nome'] ?? '');
-            echo '<tr>'
-                . '<td style="text-align:center;"><span class="check"></span></td>'
-                . '<td style="text-align:center;">' . $imgTag . '</td>'
-                . '<td><strong>' . htmlspecialchars($nomeExibir) . '</strong></td>'
-                . '<td style="text-align:center;font-size:14px;"><strong>' . $qf . '</strong></td>'
-                . ($temPedidoEmLista && $temObsVendedor ? ('<td>' . htmlspecialchars($obsLinha, ENT_QUOTES, 'UTF-8') . '</td>') : '')
-                . '</tr>';
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lista de Compras</title>
+        <style>
+            body{font-family:Arial,sans-serif;color:#111;margin:18px;font-size:12px;}
+            h1{font-size:18px;margin:0 0 4px;}
+            h2{font-size:14px;margin:20px 0 6px;padding:6px 10px;background:#e8e8e8;border-radius:4px;}
+            .meta{font-size:11px;color:#666;margin-bottom:14px;}
+            table{width:100%;border-collapse:collapse;margin-bottom:10px;}
+            th,td{border:1px solid #ccc;padding:6px 8px;vertical-align:middle;}
+            th{background:#f0f0f0;text-align:left;font-size:11px;}
+            .img{width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #ddd;}
+            .check{width:16px;height:16px;border:1.5px solid #333;display:inline-block;}
+            .qtd-comprada{width:60px;height:22px;border:1px solid #999;border-radius:3px;}
+            @media print{.no-print{display:none;} h2{break-before:auto;}}
+        </style></head><body>';
+
+        echo '<h1>Lista de Compras</h1><div class="meta">Gerado em: ' . date('d/m/Y H:i') . '</div>';
+
+        foreach ($porLoja as $lid => $items) {
+            $nomeLoja = ($lid > 0 && isset($lojaNames[$lid])) ? $lojaNames[$lid] : 'Sem Loja Definida';
+            echo '<h2>' . htmlspecialchars($nomeLoja) . ' (' . count($items) . ' itens)</h2>';
+            echo '<table><thead><tr>'
+                . '<th style="width:30px;">Ok</th>'
+                . '<th style="width:50px;">Foto</th>'
+                . '<th>Produto</th>'
+                . '<th style="width:55px;">Qtd</th>'
+                . '<th style="width:70px;">Qtd Comprada</th>'
+                . ($temObsVendedor ? '<th>Obs. Pedido</th>' : '')
+                . '</tr></thead><tbody>';
+
+            foreach ($items as $r) {
+                $qf = (int)($r['quantidade_faltante'] ?? $r['quantidade_necessaria'] ?? 0);
+                $img = $this->resolveProdutoImagem($r);
+                $imgTag = $img ? '<img class="img" src="'.htmlspecialchars($img).'">' : '';
+                $nome = trim((string)($r['nome_produto_custom'] ?? ''));
+                if ($nome === '') $nome = (string)($r['produto_nome'] ?? '');
+                $pidLinha = (int)($r['pedido_id'] ?? 0);
+                $obs = ($pidLinha > 0 && isset($obsByPedido[$pidLinha])) ? trim($obsByPedido[$pidLinha]) : '';
+
+                echo '<tr>'
+                    . '<td style="text-align:center;"><span class="check"></span></td>'
+                    . '<td style="text-align:center;">' . $imgTag . '</td>'
+                    . '<td><strong>' . htmlspecialchars($nome) . '</strong></td>'
+                    . '<td style="text-align:center;font-weight:bold;">' . $qf . '</td>'
+                    . '<td style="text-align:center;"><input type="text" class="qtd-comprada"></td>'
+                    . ($temObsVendedor ? '<td style="font-size:11px;">' . htmlspecialchars($obs) . '</td>' : '')
+                    . '</tr>';
+            }
+            echo '</tbody></table>';
         }
 
-        echo '</tbody></table>';
-
-        echo '<div class="no-print" style="margin-top:14px;">
-                <button onclick="window.print()">Imprimir / Salvar como PDF</button>
-              </div>';
+        echo '<div class="no-print" style="margin-top:14px;"><button onclick="window.print()">Imprimir / Salvar como PDF</button></div>';
         echo '</body></html>';
         exit;
     }
