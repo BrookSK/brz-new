@@ -68,11 +68,14 @@
     } else if (url === '/carrinho') {
       ctx.pagina = 'carrinho'
       ctx.carrinho_itens = lerItensCarrinho()
-      // Ler subtotal do data-attribute real
+      // Ler subtotal do data-attribute real (USD interno)
       var subEl = qs('.subtotal-value')
       ctx.carrinho_subtotal = subEl ? (parseFloat(subEl.getAttribute('data-original-value')) || parsearPreco(subEl)) : null
       var totalEl = qs('.total-value')
       ctx.carrinho_total = totalEl ? (parseFloat(totalEl.getAttribute('data-original-value')) || parsearPreco(totalEl)) : null
+      // Ler valores visíveis na tela (na moeda ativa do usuário)
+      ctx.carrinho_subtotal_visivel = subEl ? subEl.textContent.trim() : null
+      ctx.carrinho_total_visivel = totalEl ? totalEl.textContent.trim() : null
     } else if (url === '/checkout') ctx.pagina = 'checkout'
     else if (url === '/rastreamento') ctx.pagina = 'rastreamento'
     else if (url.match(/\/como-funciona/)) ctx.pagina = 'como-funciona'
@@ -91,8 +94,24 @@
     return !!(document.cookie.includes('PHPSESSID') && qs('[href*="logout"], [href*="sair"]'))
   }
   function detectarMoeda () {
-    var p = qs('[class*="preco"]')
-    if (p && (p.textContent.indexOf('US$') >= 0 || p.textContent.indexOf('$') >= 0)) return 'USD'
+    // Verificar seletor de moeda no header do site
+    var moedaEl = qs('[class*="currency-select"], .moeda-selecionada, [data-moeda]')
+    if (moedaEl) {
+      var t = moedaEl.textContent.trim().toUpperCase()
+      if (t.indexOf('USD') >= 0 || t === '$') return 'USD'
+      if (t.indexOf('BRL') >= 0 || t.indexOf('R$') >= 0) return 'BRL'
+    }
+    // Verificar o texto "BRL" ou "USD" no header/navbar
+    var navText = (qs('nav') || document.body).textContent || ''
+    if (/\bBRL\b/.test(navText)) return 'BRL'
+    if (/\bUSD\b/.test(navText)) return 'USD'
+    // Verificar símbolo nos preços da página
+    var precoEl = qs('.cart-item-subtotal, [class*="preco"], .product-price')
+    if (precoEl) {
+      var txt = precoEl.textContent || ''
+      if (txt.indexOf('R$') >= 0) return 'BRL'
+      if (txt.indexOf('US$') >= 0 || txt.indexOf('$') >= 0) return 'USD'
+    }
     return 'BRL'
   }
   function parsearPreco (el) {

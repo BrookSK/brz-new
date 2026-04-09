@@ -188,10 +188,15 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             }
             $carrinhoTexto = implode("\n", $linhas);
         }
-        $subtotal = !empty($contexto['carrinho_subtotal']) ? "US\$ {$contexto['carrinho_subtotal']}" : 'N/A';
+        $subtotalVisivel = $contexto['carrinho_subtotal_visivel'] ?? null;
+        $totalVisivel = $contexto['carrinho_total_visivel'] ?? null;
+        $subtotal = !empty($subtotalVisivel) ? $subtotalVisivel : (!empty($contexto['carrinho_subtotal']) ? "US\$ {$contexto['carrinho_subtotal']}" : 'N/A');
+        $totalCarrinho = !empty($totalVisivel) ? $totalVisivel : '';
         $logado = !empty($contexto['usuario_logado']) ? 'Sim' : 'Não';
         $nomeUsuario = $contexto['usuario_nome'] ?? 'Visitante';
         $moeda = $contexto['moeda_atual'] ?? 'BRL';
+        $cambio = (float) ($this->configs['cambio_usd_brl'] ?? 5.80);
+        $cambioStr = number_format($cambio, 2, '.', '');
         $pagina = $contexto['pagina'] ?? 'desconhecida';
         $url = $contexto['url_atual'] ?? '';
         $produtoNome = $contexto['produto_nome'] ?? 'nenhum';
@@ -247,12 +252,20 @@ Grupo em tela: {$grupo}
 
 CARRINHO ATUAL:
 {$carrinhoTexto}
-Subtotal: {$subtotal}
+Subtotal (como o usuário vê na tela): {$subtotal}
+Total (como o usuário vê na tela): {$totalCarrinho}
 
 USUÁRIO:
 Logado: {$logado}
 Nome: {$nomeUsuario}
 Moeda atual: {$moeda}
+
+REGRA DE MOEDA OBRIGATÓRIA:
+O usuário está vendo o site em {$moeda}.
+- Se moeda = BRL: SEMPRE responda valores em Reais (R$). Converta USD para BRL usando câmbio {$cambioStr}. Exemplo: "R$ 251,49" e não "US$ 42.99".
+- Se moeda = USD: responda em Dólar (US$).
+- Quando mostrar valores do carrinho, use os valores que o usuário VÊ na tela, não os valores internos em USD.
+- Use formato brasileiro para BRL: R$ 1.234,56 (ponto para milhar, vírgula para decimal).
 
 {$calculoProduto}
 
