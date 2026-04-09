@@ -65,7 +65,7 @@ class AdminRelatorioPedidosController extends Controller {
         // Detectar coluna nome do usuario
         $userCols = [];
         try { $stUC = $this->db->query('DESCRIBE usuarios'); $userCols = $stUC ? $stUC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
-        $clienteJoinCol = in_array('cliente_id', $cols, true) ? 'cliente_id' : (in_array('usuario_id', $cols, true) ? 'usuario_id' : 'id');
+        $clienteJoinCol = in_array('usuario_id', $cols, true) ? 'usuario_id' : (in_array('cliente_id', $cols, true) ? 'cliente_id' : 'id');
 
         $sql = "SELECT p.*";
         // Adicionar campos do usuario apenas se existirem
@@ -247,7 +247,7 @@ class AdminRelatorioPedidosController extends Controller {
 
         // Dados do cliente
         $cliente = [];
-        $clienteId = (int)($pedido['cliente_id'] ?? ($pedido['usuario_id'] ?? ($pedido['user_id'] ?? 0)));
+        $clienteId = (int)($pedido['usuario_id'] ?? ($pedido['cliente_id'] ?? ($pedido['user_id'] ?? 0)));
         // Fallback: buscar do banco se não veio no model
         if ($clienteId <= 0) {
             try {
