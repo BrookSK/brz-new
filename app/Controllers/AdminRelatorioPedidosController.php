@@ -247,7 +247,20 @@ class AdminRelatorioPedidosController extends Controller {
 
         // Dados do cliente
         $cliente = [];
-        $clienteId = (int)($pedido['cliente_id'] ?? ($pedido['usuario_id'] ?? 0));
+        $clienteId = (int)($pedido['cliente_id'] ?? ($pedido['usuario_id'] ?? ($pedido['user_id'] ?? 0)));
+        // Fallback: buscar do banco se não veio no model
+        if ($clienteId <= 0) {
+            try {
+                $colsPedCheck = [];
+                try { $stC = $this->db->query('DESCRIBE pedidos'); $colsPedCheck = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $cidCol = in_array('cliente_id', $colsPedCheck, true) ? 'cliente_id' : (in_array('usuario_id', $colsPedCheck, true) ? 'usuario_id' : '');
+                if ($cidCol !== '') {
+                    $st = $this->db->prepare("SELECT {$cidCol} FROM pedidos WHERE id = ? LIMIT 1");
+                    $st->execute([(int)$id]);
+                    $clienteId = (int)($st->fetchColumn() ?: 0);
+                }
+            } catch (\Exception $e) {}
+        }
         if ($clienteId > 0) {
             try {
                 $st = $this->db->prepare("SELECT * FROM usuarios WHERE id = ? LIMIT 1");
