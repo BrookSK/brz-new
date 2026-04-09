@@ -420,7 +420,7 @@ class AdminPedidosController extends Controller {
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
             $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
-            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
+            $sql = "SELECT p.*, COALESCE(NULLIF(u." . $colUserName . ",''), " . (in_array('cliente_nome', $colsPedidos, true) ? "NULLIF(p.cliente_nome,''), " : "") . (in_array('customer_name', $colsPedidos, true) ? "NULLIF(p.customer_name,''), " : "") . "'') as cliente_nome, COALESCE(NULLIF(u." . $colUserEmail . ",''), " . (in_array('cliente_email', $colsPedidos, true) ? "NULLIF(p.cliente_email,''), " : "") . "'') as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array('cliente_id', $colsPedidos, true) ? 'cliente_id' : 'usuario_id') . " = u.id WHERE 1=1";
             $params = [];
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
@@ -1855,7 +1855,7 @@ JS;
             } catch (\Exception $e) {
             }
             
-            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE 1=1";
+            $sql = "SELECT p.*, COALESCE(NULLIF(u." . $colUserName . ",''), " . (in_array('cliente_nome', $colsPedidos, true) ? "NULLIF(p.cliente_nome,''), " : "") . (in_array('customer_name', $colsPedidos, true) ? "NULLIF(p.customer_name,''), " : "") . "'') as cliente_nome, COALESCE(NULLIF(u." . $colUserEmail . ",''), " . (in_array('cliente_email', $colsPedidos, true) ? "NULLIF(p.cliente_email,''), " : "") . "'') as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array('cliente_id', $colsPedidos, true) ? 'cliente_id' : 'usuario_id') . " = u.id WHERE 1=1";
             $params = [];
 
             if ($temDeletedAt) {
