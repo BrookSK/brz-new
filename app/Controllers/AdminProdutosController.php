@@ -2145,6 +2145,16 @@ class AdminProdutosController extends Controller {
         }
 
         $gruposJson = json_encode($grupos);
+
+        // Buscar lojas para o campo de seleção (produto para o site)
+        $lojas = [];
+        try {
+            $pdoL = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $stL = $pdoL->query("SELECT id, nome FROM lojas WHERE ativo = 1 ORDER BY nome ASC");
+            $lojas = $stL ? ($stL->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Throwable $e) {}
+        $lojasJson = json_encode($lojas);
+
         $successHtmlJs = json_encode($successHtml);
 
         echo '<!DOCTYPE html>
@@ -2208,6 +2218,17 @@ class AdminProdutosController extends Controller {
             </div>
             <div id="listaGrupos" class="row g-2"></div>
             <div id="emptyGrupos" class="text-center text-muted py-3 small" style="display:none">Nenhum grupo cadastrado. Crie o primeiro!</div>
+        </div>
+        <!-- Opção: Produto para o Site (sem grupo) -->
+        <div class="glass p-3 mb-3">
+            <div class="card border-0 shadow-sm grupo-card p-3 d-flex flex-row align-items-center gap-3" id="btnProdutoSite" style="cursor:pointer;border:2px solid transparent;">
+                <i class="fas fa-globe fa-lg text-success"></i>
+                <div class="flex-fill">
+                    <div class="fw-semibold">Produto para o Site</div>
+                    <div class="small text-muted">Cadastrar produto avulso (sem grupo de compras)</div>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+            </div>
         </div>
         <!-- Form novo grupo (inline) -->
         <div class="glass p-3" id="formNovoGrupo" style="display:none">
@@ -2280,6 +2301,27 @@ class AdminProdutosController extends Controller {
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Estoque</label>
                     <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
+                </div>
+                <div class="mb-3" id="lojaFieldSingle" style="display:none">
+                    <label class="form-label fw-semibold">Loja <span class="text-danger">*</span></label>
+                    <div class="d-flex gap-2 align-items-start">
+                        <div class="flex-fill">
+                            <input type="text" class="form-control" id="lojaSearchSingle" placeholder="Pesquisar loja..." autocomplete="off">
+                            <select class="form-select mt-2" name="loja_id" id="lojaSelectSingle">
+                                <option value="">Selecione a loja...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary mt-0" id="btnNovaLojaSingle" title="Nova loja" style="border-radius:14px;min-width:42px;height:42px;"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="novaLojaFormSingle" style="display:none" class="mt-2 p-2 border rounded">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="novaLojaNomeSingle" placeholder="Nome da nova loja">
+                            <button type="button" class="btn btn-primary btn-sm" id="btnSalvarLojaSingle"><i class="fas fa-check"></i></button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelarLojaSingle"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div id="novaLojaMsgSingle" class="small mt-1"></div>
+                    </div>
+                    <small class="text-muted">Obrigatório para produtos do site (sem grupo de compras).</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">NCM</label>
@@ -2457,7 +2499,9 @@ class AdminProdutosController extends Controller {
 <script>
 const GRUPOS = ' . $gruposJson . ';
 const NCM_OPTIONS = ' . $ncmOptionsJson . ';
+const LOJAS = ' . $lojasJson . ';
 let grupoSelecionado = null;
+let modoProdutoSite = false;
 let currentStep = 1;
 
 // Popular selects de NCM
@@ -2532,6 +2576,8 @@ function renderGrupos() {
 
 function selecionarGrupo(g) {
     grupoSelecionado = g;
+    modoProdutoSite = false;
+    document.getElementById("lojaFieldSingle").style.display = "none";
     document.getElementById("grupoSelecionadoNome").textContent = g.nome;
     document.getElementById("grupoNomeProduto").textContent = g.nome;
     document.getElementById("grupoNomeLote").textContent = g.nome;
@@ -2848,6 +2894,82 @@ document.getElementById("formProduto").addEventListener("submit", async function
 });
 
 renderGrupos();
+
+// ─── Produto para o Site (sem grupo) ───
+document.getElementById("btnProdutoSite").addEventListener("click", function() {
+    modoProdutoSite = true;
+    grupoSelecionado = null;
+    document.getElementById("inputGrupoId").value = "";
+    document.getElementById("grupoNomeProduto").textContent = "Produto para o Site";
+    document.getElementById("grupoSelecionadoNome").textContent = "Produto para o Site";
+    document.getElementById("lojaFieldSingle").style.display = "";
+    document.getElementById("loteArea").style.display = "none";
+    document.getElementById("formProduto").style.display = "";
+    showStep(3);
+});
+
+// Popular select de lojas
+function populateLojaSelect(selectId) {
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = \'<option value="">Selecione a loja...</option>\';
+    LOJAS.forEach(function(l) {
+        var opt = document.createElement("option");
+        opt.value = l.id;
+        opt.textContent = l.nome;
+        sel.appendChild(opt);
+    });
+}
+populateLojaSelect("lojaSelectSingle");
+
+// Filtro de pesquisa de loja
+(function() {
+    var input = document.getElementById("lojaSearchSingle");
+    var select = document.getElementById("lojaSelectSingle");
+    if (!input || !select) return;
+    input.addEventListener("input", function() {
+        var q = (input.value || "").toLowerCase().trim();
+        Array.from(select.options).forEach(function(opt) {
+            if (opt.value === "") { opt.hidden = q !== ""; return; }
+            opt.hidden = q !== "" && !(opt.text || "").toLowerCase().includes(q);
+        });
+        var visible = Array.from(select.options).find(function(o) { return !o.hidden && o.value !== ""; });
+        if (q !== "" && visible) select.value = visible.value;
+        else if (q === "") select.value = "";
+    });
+})();
+
+// Nova loja inline
+(function() {
+    var btn = document.getElementById("btnNovaLojaSingle");
+    var form = document.getElementById("novaLojaFormSingle");
+    var input = document.getElementById("novaLojaNomeSingle");
+    var btnSalvar = document.getElementById("btnSalvarLojaSingle");
+    var btnCancelar = document.getElementById("btnCancelarLojaSingle");
+    var msg = document.getElementById("novaLojaMsgSingle");
+    if (!btn || !form) return;
+    btn.addEventListener("click", function() { form.style.display = ""; input.value = ""; msg.innerHTML = ""; input.focus(); });
+    btnCancelar.addEventListener("click", function() { form.style.display = "none"; });
+    btnSalvar.addEventListener("click", async function() {
+        var nome = input.value.trim();
+        if (!nome) { msg.innerHTML = \'<span class="text-danger">Nome obrigatório.</span>\'; return; }
+        btnSalvar.disabled = true; msg.innerHTML = \'<i class="fas fa-spinner fa-spin"></i>\';
+        try {
+            var fd = new FormData(); fd.append("nome", nome);
+            var r = await fetch("/admin/lojas/salvar", { method: "POST", body: fd });
+            var j = await r.json();
+            if (j.success || j.ok) {
+                var novaLoja = j.loja || { id: j.id, nome: nome };
+                LOJAS.push(novaLoja);
+                populateLojaSelect("lojaSelectSingle");
+                document.getElementById("lojaSelectSingle").value = novaLoja.id;
+                form.style.display = "none"; msg.innerHTML = "";
+            } else { msg.innerHTML = \'<span class="text-danger">\' + (j.error || j.message || "Erro") + \'</span>\'; }
+        } catch(e) { msg.innerHTML = \'<span class="text-danger">Erro de conexão.</span>\'; }
+        btnSalvar.disabled = false;
+    });
+    input.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); btnSalvar.click(); } });
+})();
 
 // ─── Categorias ───
 let CATEGORIAS = [];
@@ -3373,6 +3495,12 @@ HTML;
                         if ($autoLojaId2 > 0) $data['loja_id'] = $autoLojaId2;
                     }
                 } catch (\Throwable $e) {}
+            }
+        } else {
+            // Produto para o site (sem grupo): usar loja_id do formulário
+            $lojaIdManual = (int) $request->getParam('loja_id', 0);
+            if ($lojaIdManual > 0 && in_array('loja_id', $cols, true)) {
+                $data['loja_id'] = $lojaIdManual;
             }
         }
 
