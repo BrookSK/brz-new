@@ -185,7 +185,7 @@
           return
         }
         adicionarMsg('assistant', '🛒 Adicionando...')
-        return fetch('/api/copiloto/carrinho/adicionar', {
+        return fetch('/api/copiloto/add-cart', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ produto_id: pid, quantidade: p.quantidade || 1 }),

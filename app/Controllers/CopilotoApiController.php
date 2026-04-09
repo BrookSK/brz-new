@@ -90,14 +90,17 @@ class CopilotoApiController extends Controller {
         $this->responderJson($service->calcularCustoTotal($preco, $peso, $imposto));
     }
 
-    /** POST /api/copiloto/carrinho/adicionar — Adicionar produto ao carrinho via copiloto */
+    /** POST /api/copiloto/add-cart — Adicionar produto ao carrinho via copiloto */
     public function carrinhoAdicionar(Request $request) {
         try {
             if (session_status() === PHP_SESSION_NONE) @session_start();
-            $body = $request->getBody();
-            $params = !empty($body) ? $body : $request->getParams();
-            $produtoId = (int) ($params['produto_id'] ?? 0);
-            $quantidade = max(1, (int) ($params['quantidade'] ?? 1));
+            
+            // Ler body de múltiplas formas (form-data, JSON, query params)
+            $raw = file_get_contents('php://input');
+            $body = json_decode($raw ?: '', true);
+            if (!is_array($body)) $body = [];
+            $produtoId = (int) ($body['produto_id'] ?? $request->getParam('produto_id', 0));
+            $quantidade = max(1, (int) ($body['quantidade'] ?? $request->getParam('quantidade', 1)));
 
             if ($produtoId <= 0) {
                 $this->responderJson(['error' => 'produto_id é obrigatório'], 400);
@@ -105,7 +108,6 @@ class CopilotoApiController extends Controller {
 
             $pdo = \Config\Database::getConnection();
 
-            // Verificar se produto existe
             $st = $pdo->prepare("SELECT id, name, price, weight FROM produtos WHERE id = ? LIMIT 1");
             $st->execute([$produtoId]);
             $produto = $st->fetch(\PDO::FETCH_ASSOC);
@@ -115,7 +117,7 @@ class CopilotoApiController extends Controller {
 
             $userId = (int) ($_SESSION['usuario_id'] ?? 0);
             if ($userId <= 0) {
-                $this->responderJson(['error' => 'Você precisa estar logado para adicionar ao carrinho'], 401);
+                $this->responderJson(['error' => 'Você precisa estar logado'], 401);
             }
 
             $carrinho = new \App\Models\Carrinho();
@@ -123,28 +125,26 @@ class CopilotoApiController extends Controller {
             $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
 
             if ($cartId <= 0) {
-                $this->responderJson(['error' => 'Não foi possível criar o carrinho'], 500);
+                $this->responderJson(['error' => 'Erro ao criar carrinho'], 500);
             }
 
             $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
             if (!$ok) {
-                $this->responderJson(['error' => 'Não foi possível adicionar o item'], 500);
+                $this->responderJson(['error' => 'Não foi possível adicionar'], 500);
             }
 
-            // Contar itens
             $stCnt = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
             $stCnt->execute([$cartId]);
             $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
 
             $this->responderJson([
                 'success' => true,
-                'message' => 'Produto adicionado',
                 'produto_nome' => $produto['name'] ?? '',
                 'total_itens' => $totalItens
             ]);
         } catch (\Throwable $e) {
-            error_log('[CoPiloto] Erro carrinho adicionar: ' . $e->getMessage());
-            $this->responderJson(['error' => 'Erro interno: ' . $e->getMessage()], 500);
+            error_log('[CoPiloto] Erro carrinho: ' . $e->getMessage());
+            $this->responderJson(['error' => $e->getMessage()], 500);
         }
     }
 
