@@ -172,15 +172,23 @@
     p = p || {}
     var acoes = {
       adicionar_carrinho: function () {
-        if (!p.produto_id) {
-          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o nome ou ID?')
+        var pid = p.produto_id
+        // Se Claude não mandou produto_id, tentar extrair do texto da última busca
+        if (!pid && historico.length > 0) {
+          for (var hi = historico.length - 1; hi >= 0; hi--) {
+            var m = (historico[hi].content || '').match(/ID:(\d+)/)
+            if (m) { pid = parseInt(m[1]); break }
+          }
+        }
+        if (!pid) {
+          adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o ID ou nome exato?')
           return
         }
         adicionarMsg('assistant', '🛒 Adicionando...')
         return fetch('/api/copiloto/carrinho/adicionar', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ produto_id: p.produto_id, quantidade: p.quantidade || 1 }),
+          body: JSON.stringify({ produto_id: pid, quantidade: p.quantidade || 1 }),
           credentials: 'same-origin'
         }).then(function(r) { return r.json() }).then(function(d) {
           var msgs = document.getElementById('bz-copiloto-messages')

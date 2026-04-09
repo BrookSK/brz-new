@@ -199,7 +199,10 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
                 }
             }
             $secaoProdutosEncontrados = "\n\nPRODUTOS ENCONTRADOS NO BANCO DE DADOS PARA ESTA PERGUNTA:\n" . implode("\n", $linhas) .
-                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão. Use acao: ir_para_grupo com o slug do grupo para levar o cliente até lá." .
+                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão." .
+                "\nPara adicionar ao carrinho, use acao: adicionar_carrinho com parametros: {\"produto_id\": <ID_NUMERICO>, \"quantidade\": N}" .
+                "\nO produto_id é o número após 'ID:' na lista acima. NUNCA omita o produto_id." .
+                "\nPara levar ao grupo, use acao: ir_para_grupo com parametros: {\"slug\": \"nome-do-grupo\"}" .
                 $instrucaoClube;
         }
         $secaoReferencia = '';
@@ -252,7 +255,7 @@ Quando o usuário pede algo que pode ser feito, você instrui o sistema a fazer.
 Tom: direto, informal, português brasileiro. Nunca robótico.
 
 AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
-- adicionar_carrinho: adiciona produto ao carrinho do usuário
+- adicionar_carrinho: adiciona produto ao carrinho do usuário. OBRIGATÓRIO: parametros.produto_id (número inteiro). Sem produto_id a ação FALHA.
 - trocar_moeda_brl: muda exibição do site para Real (navega para /lang/pt)
 - trocar_moeda_usd: muda exibição do site para Dólar (navega para /lang/en)
 - consultar_status_pedido: consulta status via API e exibe resultado NO CHAT
