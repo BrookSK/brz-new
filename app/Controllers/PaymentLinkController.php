@@ -43,12 +43,16 @@ class PaymentLinkController extends Controller {
             ];
             $subtotalView = (float) $produto;
         } else {
+            // Sem produtos: o total é só taxa + impostos
+            // Mostrar como item único e zerar taxa/impostos separados para não duplicar
             $items[] = [
-                'nome' => $descricao,
+                'nome' => $descricao . ' (taxa de serviço + impostos)',
                 'quantidade' => 1,
                 'subtotal' => $total,
             ];
             $subtotalView = (float) $total;
+            $taxa = 0;
+            $impostos = 0;
         }
 
         // Checkout usa valores base em USD e converte via exchangeRates.
