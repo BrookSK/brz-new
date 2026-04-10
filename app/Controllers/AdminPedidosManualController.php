@@ -2702,7 +2702,13 @@ JS;
             $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
 
             if (!$row) {
+                // Fallback: buscar endereço da tabela usuarios (preenchido via "Meus Dados")
+                $row = $this->buscarEnderecoDoUsuario($pdo, $clienteId);
+            }
+
+            if (!$row) {
                 $this->json(['success' => true, 'endereco' => null]);
+                return;
             }
 
             $this->json([
@@ -2719,6 +2725,65 @@ JS;
             ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Busca dados de endereço diretamente da tabela usuarios (preenchidos via "Meus Dados")
+     * como fallback quando o cliente não tem registro na tabela enderecos.
+     */
+    private function buscarEnderecoDoUsuario(\PDO $pdo, int $clienteId): ?array {
+        try {
+            $colsUsr = [];
+            $st = $pdo->query('DESCRIBE usuarios');
+            $colsUsr = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (empty($colsUsr)) {
+                return null;
+            }
+
+            $map = [
+                'cep' => ['cep', 'zip_code'],
+                'endereco' => ['endereco', 'address', 'logradouro'],
+                'numero' => ['numero', 'number'],
+                'complemento' => ['complemento'],
+                'bairro' => ['bairro', 'neighborhood'],
+                'cidade' => ['cidade', 'city'],
+                'estado' => ['estado', 'state', 'uf'],
+            ];
+
+            $selectCols = [];
+            foreach ($map as $key => $candidates) {
+                foreach ($candidates as $c) {
+                    if (in_array($c, $colsUsr, true)) {
+                        $selectCols[] = $c . ' AS ' . $key;
+                        break;
+                    }
+                }
+            }
+
+            if (empty($selectCols)) {
+                return null;
+            }
+
+            $stUsr = $pdo->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM usuarios WHERE id = ? LIMIT 1');
+            $stUsr->execute([$clienteId]);
+            $row = $stUsr->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                return null;
+            }
+
+            $cep = trim((string) ($row['cep'] ?? ''));
+            $endereco = trim((string) ($row['endereco'] ?? ''));
+            $cidade = trim((string) ($row['cidade'] ?? ''));
+
+            // Precisa ter pelo menos CEP ou endereço+cidade
+            if ($cep === '' && ($endereco === '' || $cidade === '')) {
+                return null;
+            }
+
+            return $row;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }

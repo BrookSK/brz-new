@@ -666,19 +666,170 @@ class Usuario extends Model {
 
     public function getEnderecos($usuarioId) {
         $orderBy = 'created_at DESC';
+        $colsEnd = [];
         try {
             $stmtCols = $this->connection->query("DESCRIBE enderecos");
-            $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
-            if (is_array($cols) && in_array('principal', $cols, true)) {
+            $colsEnd = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (is_array($colsEnd) && in_array('principal', $colsEnd, true)) {
                 $orderBy = 'principal DESC, created_at DESC';
             }
         } catch (\Exception $e) {
+            $colsEnd = [];
         }
 
         $stmt = $this->connection->prepare("SELECT * FROM enderecos WHERE usuario_id = :id ORDER BY {$orderBy}");
         $stmt->bindParam(':id', $usuarioId);
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $enderecos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Fallback: se não tem endereço na tabela enderecos, tentar criar a partir
+        // dos dados de endereço salvos na tabela usuarios (página "Meus Dados").
+        if (empty($enderecos)) {
+            $enderecoId = $this->criarEnderecoAPartirDoUsuario((int) $usuarioId, $colsEnd);
+            if ($enderecoId > 0) {
+                $stmt->execute();
+                $enderecos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            }
+        }
+
+        return $enderecos;
+    }
+
+    /**
+     * Cria um registro na tabela enderecos a partir dos campos de endereço
+     * armazenados diretamente na tabela usuarios (preenchidos via "Meus Dados").
+     * Retorna o ID do endereço criado ou 0 se não foi possível.
+     */
+    private function criarEnderecoAPartirDoUsuario(int $usuarioId, array $colsEnd = []): int {
+        if ($usuarioId <= 0) {
+            return 0;
+        }
+
+        try {
+            // Buscar colunas de endereço na tabela usuarios
+            $colsUsr = [];
+            try {
+                $st = $this->connection->query('DESCRIBE usuarios');
+                $colsUsr = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                return 0;
+            }
+
+            // Mapear campos de endereço da tabela usuarios
+            $mapUsr = [
+                'cep' => ['cep', 'zip_code'],
+                'endereco' => ['endereco', 'address', 'logradouro'],
+                'numero' => ['numero', 'number'],
+                'complemento' => ['complemento'],
+                'bairro' => ['bairro', 'neighborhood'],
+                'cidade' => ['cidade', 'city'],
+                'estado' => ['estado', 'state', 'uf'],
+            ];
+
+            $selectCols = [];
+            $aliasMap = [];
+            foreach ($mapUsr as $key => $candidates) {
+                foreach ($candidates as $c) {
+                    if (in_array($c, $colsUsr, true)) {
+                        $selectCols[] = $c . ' AS usr_' . $key;
+                        $aliasMap[$key] = 'usr_' . $key;
+                        break;
+                    }
+                }
+            }
+
+            if (empty($selectCols)) {
+                return 0;
+            }
+
+            $stUsr = $this->connection->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM usuarios WHERE id = ? LIMIT 1');
+            $stUsr->execute([$usuarioId]);
+            $row = $stUsr->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                return 0;
+            }
+
+            $cep = trim((string) ($row[$aliasMap['cep'] ?? ''] ?? ''));
+            $endereco = trim((string) ($row[$aliasMap['endereco'] ?? ''] ?? ''));
+            $cidade = trim((string) ($row[$aliasMap['cidade'] ?? ''] ?? ''));
+            $estado = trim((string) ($row[$aliasMap['estado'] ?? ''] ?? ''));
+
+            // Precisa ter pelo menos CEP ou endereço+cidade para valer a pena criar
+            if ($cep === '' && ($endereco === '' || $cidade === '')) {
+                return 0;
+            }
+
+            // Buscar colunas da tabela enderecos se não foram passadas
+            if (empty($colsEnd)) {
+                try {
+                    $st = $this->connection->query('DESCRIBE enderecos');
+                    $colsEnd = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+                } catch (\Exception $e) {
+                    return 0;
+                }
+            }
+
+            if (empty($colsEnd) || !in_array('usuario_id', $colsEnd, true)) {
+                return 0;
+            }
+
+            $mapEnd = [
+                'cep' => ['cep'],
+                'endereco' => ['endereco', 'logradouro'],
+                'numero' => ['numero'],
+                'complemento' => ['complemento'],
+                'bairro' => ['bairro'],
+                'cidade' => ['cidade'],
+                'estado' => ['estado', 'uf'],
+            ];
+
+            $cols = ['usuario_id'];
+            $vals = [':usuario_id'];
+            $params = [':usuario_id' => $usuarioId];
+
+            foreach ($mapEnd as $key => $candidates) {
+                $col = null;
+                foreach ($candidates as $c) {
+                    if (in_array($c, $colsEnd, true)) {
+                        $col = $c;
+                        break;
+                    }
+                }
+                if ($col === null) {
+                    continue;
+                }
+                $val = trim((string) ($row[$aliasMap[$key] ?? ''] ?? ''));
+                $cols[] = $col;
+                $vals[] = ':' . $key;
+                $params[':' . $key] = $val;
+            }
+
+            if (in_array('tipo', $colsEnd, true)) {
+                $cols[] = 'tipo';
+                $vals[] = ':tipo';
+                $params[':tipo'] = 'entrega';
+            }
+
+            if (in_array('pais', $colsEnd, true)) {
+                $cols[] = 'pais';
+                $vals[] = ':pais';
+                $params[':pais'] = 'BR';
+            }
+
+            if (in_array('principal', $colsEnd, true)) {
+                $cols[] = 'principal';
+                $vals[] = ':principal';
+                $params[':principal'] = 1;
+            }
+
+            $sql = 'INSERT INTO enderecos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+            $st = $this->connection->prepare($sql);
+            $st->execute($params);
+            $newId = (int) $this->connection->lastInsertId();
+            return $newId > 0 ? $newId : 0;
+        } catch (\Exception $e) {
+            return 0;
+        }
     }
 
     public function getPedidos($usuarioId, $limit = 50, $offset = 0) {

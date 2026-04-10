@@ -151,7 +151,10 @@ class PedidoManualService {
         $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ''));
 
         if ($cep === '' || $endereco === '' || $numero === '' || $bairro === '' || $cidade === '' || $estado === '') {
-            return 0;
+            // Permitir criação com dados parciais se pelo menos CEP ou endereço+cidade existirem
+            if ($cep === '' && ($endereco === '' || $cidade === '')) {
+                return 0;
+            }
         }
 
         try {
@@ -168,6 +171,8 @@ class PedidoManualService {
                 'bairro' => ['bairro'],
                 'cidade' => ['cidade'],
                 'estado' => ['estado', 'uf'],
+                'tipo' => ['tipo'],
+                'pais' => ['pais'],
             ];
 
             $cols = ['usuario_id'];
@@ -190,6 +195,8 @@ class PedidoManualService {
                 'bairro' => $bairro,
                 'cidade' => $cidade,
                 'estado' => $estado,
+                'tipo' => 'entrega',
+                'pais' => 'BR',
             ];
 
             foreach ($resolved as $key => $col) {
@@ -209,6 +216,74 @@ class PedidoManualService {
             $stmt->execute($params);
             $newId = (int) $this->db->lastInsertId();
             return $newId > 0 ? $newId : 0;
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Cria um registro na tabela enderecos a partir dos campos de endereço
+     * armazenados na tabela usuarios (preenchidos via "Meus Dados").
+     */
+    private function criarEnderecoAPartirDoUsuario(int $clienteId): int {
+        if ($clienteId <= 0) {
+            return 0;
+        }
+
+        try {
+            $colsUsr = $this->getCols('usuarios');
+            if (empty($colsUsr)) {
+                return 0;
+            }
+
+            $map = [
+                'cep' => ['cep', 'zip_code'],
+                'endereco' => ['endereco', 'address', 'logradouro'],
+                'numero' => ['numero', 'number'],
+                'complemento' => ['complemento'],
+                'bairro' => ['bairro', 'neighborhood'],
+                'cidade' => ['cidade', 'city'],
+                'estado' => ['estado', 'state', 'uf'],
+            ];
+
+            $selectCols = [];
+            $aliasMap = [];
+            foreach ($map as $key => $candidates) {
+                foreach ($candidates as $c) {
+                    if (in_array($c, $colsUsr, true)) {
+                        $selectCols[] = $c . ' AS usr_' . $key;
+                        $aliasMap[$key] = 'usr_' . $key;
+                        break;
+                    }
+                }
+            }
+
+            if (empty($selectCols)) {
+                return 0;
+            }
+
+            $stUsr = $this->db->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM usuarios WHERE id = ? LIMIT 1');
+            $stUsr->execute([$clienteId]);
+            $row = $stUsr->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                return 0;
+            }
+
+            $cep = trim((string) ($row[$aliasMap['cep'] ?? ''] ?? ''));
+            $endereco = trim((string) ($row[$aliasMap['endereco'] ?? ''] ?? ''));
+            $cidade = trim((string) ($row[$aliasMap['cidade'] ?? ''] ?? ''));
+
+            if ($cep === '' && ($endereco === '' || $cidade === '')) {
+                return 0;
+            }
+
+            // Montar array no formato esperado por criarEnderecoEntregaParaCliente
+            $enderecoData = [];
+            foreach ($map as $key => $candidates) {
+                $enderecoData[$key] = trim((string) ($row[$aliasMap[$key] ?? ''] ?? ''));
+            }
+
+            return $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoData);
         } catch (\Exception $e) {
             return 0;
         }
@@ -1073,9 +1148,16 @@ class PedidoManualService {
 
             if ($enderecoEntregaId <= 0) {
                 $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
-                if ($enderecoEntregaId <= 0) {
-                    throw new \Exception('Cliente sem endereço de entrega cadastrado. Informe o endereço de entrega para criar o pedido manual.');
-                }
+            }
+
+            // Fallback: se ainda não tem endereço e o formulário veio vazio,
+            // tentar criar a partir dos dados de endereço da tabela usuarios ("Meus Dados").
+            if ($enderecoEntregaId <= 0) {
+                $enderecoEntregaId = $this->criarEnderecoAPartirDoUsuario($clienteId);
+            }
+
+            if ($enderecoEntregaId <= 0) {
+                throw new \Exception('Cliente sem endereço de entrega cadastrado. Informe o endereço de entrega para criar o pedido manual.');
             }
         }
 
