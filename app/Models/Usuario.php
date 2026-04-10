@@ -742,6 +742,16 @@ class Usuario extends Model {
                 return 0;
             }
 
+            // Buscar também o nome do usuário
+            $nomeCol = '';
+            foreach (['nome', 'name', 'nome_completo'] as $nc) {
+                if (in_array($nc, $colsUsr, true)) {
+                    $selectCols[] = $nc . ' AS usr_nome';
+                    $nomeCol = 'usr_nome';
+                    break;
+                }
+            }
+
             $stUsr = $this->connection->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM usuarios WHERE id = ? LIMIT 1');
             $stUsr->execute([$usuarioId]);
             $row = $stUsr->fetch(\PDO::FETCH_ASSOC);
@@ -752,74 +762,94 @@ class Usuario extends Model {
             $cep = trim((string) ($row[$aliasMap['cep'] ?? ''] ?? ''));
             $endereco = trim((string) ($row[$aliasMap['endereco'] ?? ''] ?? ''));
             $cidade = trim((string) ($row[$aliasMap['cidade'] ?? ''] ?? ''));
-            $estado = trim((string) ($row[$aliasMap['estado'] ?? ''] ?? ''));
+            $nomeCliente = trim((string) ($row[$nomeCol] ?? ''));
 
             // Precisa ter pelo menos CEP ou endereço+cidade para valer a pena criar
             if ($cep === '' && ($endereco === '' || $cidade === '')) {
                 return 0;
             }
 
-            // Buscar colunas da tabela enderecos se não foram passadas
-            if (empty($colsEnd)) {
-                try {
-                    $st = $this->connection->query('DESCRIBE enderecos');
-                    $colsEnd = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
-                } catch (\Exception $e) {
-                    return 0;
-                }
-            }
-
-            if (empty($colsEnd) || !in_array('usuario_id', $colsEnd, true)) {
+            // Usar DESCRIBE para obter info completa das colunas da tabela enderecos
+            $stDesc = $this->connection->query('DESCRIBE enderecos');
+            $colsInfo = $stDesc ? $stDesc->fetchAll(\PDO::FETCH_ASSOC) : [];
+            if (empty($colsInfo)) {
                 return 0;
             }
 
-            $mapEnd = [
-                'cep' => ['cep'],
-                'endereco' => ['endereco', 'logradouro'],
-                'numero' => ['numero'],
-                'complemento' => ['complemento'],
-                'bairro' => ['bairro'],
-                'cidade' => ['cidade'],
-                'estado' => ['estado', 'uf'],
+            $colNames = array_column($colsInfo, 'Field');
+            if (!in_array('usuario_id', $colNames, true)) {
+                return 0;
+            }
+
+            $numero = trim((string) ($row[$aliasMap['numero'] ?? ''] ?? ''));
+            $complemento = trim((string) ($row[$aliasMap['complemento'] ?? ''] ?? ''));
+            $bairro = trim((string) ($row[$aliasMap['bairro'] ?? ''] ?? ''));
+            $estado = trim((string) ($row[$aliasMap['estado'] ?? ''] ?? ''));
+
+            // Valores conhecidos para preencher colunas
+            $knownValues = [
+                'usuario_id' => $usuarioId,
+                'user_id' => $usuarioId,
+                'cep' => $cep,
+                'zip_code' => $cep,
+                'endereco' => $endereco,
+                'logradouro' => $endereco,
+                'address' => $endereco,
+                'numero' => $numero,
+                'number' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'neighborhood' => $bairro,
+                'cidade' => $cidade,
+                'city' => $cidade,
+                'estado' => $estado,
+                'uf' => $estado,
+                'state' => $estado,
+                'tipo' => 'entrega',
+                'type' => 'entrega',
+                'pais' => 'BR',
+                'country' => 'BR',
+                'nome' => $nomeCliente,
+                'name' => $nomeCliente,
+                'principal' => 1,
+                'is_principal' => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ];
 
-            $cols = ['usuario_id'];
-            $vals = [':usuario_id'];
-            $params = [':usuario_id' => $usuarioId];
+            $cols = [];
+            $vals = [];
+            $params = [];
 
-            foreach ($mapEnd as $key => $candidates) {
-                $col = null;
-                foreach ($candidates as $c) {
-                    if (in_array($c, $colsEnd, true)) {
-                        $col = $c;
-                        break;
-                    }
-                }
-                if ($col === null) {
+            foreach ($colsInfo as $colInfo) {
+                $field = (string) ($colInfo['Field'] ?? '');
+                $extra = strtolower((string) ($colInfo['Extra'] ?? ''));
+                $isAutoIncrement = (strpos($extra, 'auto_increment') !== false);
+                $isNullable = (strtoupper((string) ($colInfo['Null'] ?? 'YES')) === 'YES');
+                $hasDefault = ($colInfo['Default'] !== null);
+
+                if ($isAutoIncrement) {
                     continue;
                 }
-                $val = trim((string) ($row[$aliasMap[$key] ?? ''] ?? ''));
-                $cols[] = $col;
-                $vals[] = ':' . $key;
-                $params[':' . $key] = $val;
+
+                if (array_key_exists($field, $knownValues)) {
+                    $placeholder = ':v_' . $field;
+                    $cols[] = $field;
+                    $vals[] = $placeholder;
+                    $params[$placeholder] = $knownValues[$field];
+                    continue;
+                }
+
+                if (!$isNullable && !$hasDefault) {
+                    $placeholder = ':v_' . $field;
+                    $cols[] = $field;
+                    $vals[] = $placeholder;
+                    $params[$placeholder] = '';
+                }
             }
 
-            if (in_array('tipo', $colsEnd, true)) {
-                $cols[] = 'tipo';
-                $vals[] = ':tipo';
-                $params[':tipo'] = 'entrega';
-            }
-
-            if (in_array('pais', $colsEnd, true)) {
-                $cols[] = 'pais';
-                $vals[] = ':pais';
-                $params[':pais'] = 'BR';
-            }
-
-            if (in_array('principal', $colsEnd, true)) {
-                $cols[] = 'principal';
-                $vals[] = ':principal';
-                $params[':principal'] = 1;
+            if (empty($cols)) {
+                return 0;
             }
 
             $sql = 'INSERT INTO enderecos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
@@ -828,6 +858,7 @@ class Usuario extends Model {
             $newId = (int) $this->connection->lastInsertId();
             return $newId > 0 ? $newId : 0;
         } catch (\Exception $e) {
+            error_log('Usuario::criarEnderecoAPartirDoUsuario ERRO: ' . $e->getMessage());
             return 0;
         }
     }

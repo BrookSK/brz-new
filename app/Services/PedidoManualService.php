@@ -150,65 +150,105 @@ class PedidoManualService {
         $estado = trim((string) ($enderecoEntrega['estado'] ?? ''));
         $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ''));
 
-        if ($cep === '' || $endereco === '' || $numero === '' || $bairro === '' || $cidade === '' || $estado === '') {
-            // Permitir criação com dados parciais se pelo menos CEP ou endereço+cidade existirem
-            if ($cep === '' && ($endereco === '' || $cidade === '')) {
-                return 0;
-            }
+        // Precisa ter pelo menos CEP ou endereço+cidade
+        if ($cep === '' && ($endereco === '' || $cidade === '')) {
+            return 0;
         }
 
         try {
-            $colsEnd = $this->getCols('enderecos');
-            if (empty($colsEnd) || !in_array('id', $colsEnd, true) || !in_array('usuario_id', $colsEnd, true)) {
+            // Usar DESCRIBE para obter info completa das colunas (NOT NULL, Default, etc.)
+            $stDesc = $this->db->query('DESCRIBE enderecos');
+            $colsInfo = $stDesc ? $stDesc->fetchAll(\PDO::FETCH_ASSOC) : [];
+            if (empty($colsInfo)) {
                 return 0;
             }
 
-            $map = [
-                'cep' => ['cep'],
-                'endereco' => ['endereco', 'logradouro'],
-                'numero' => ['numero'],
-                'complemento' => ['complemento'],
-                'bairro' => ['bairro'],
-                'cidade' => ['cidade'],
-                'estado' => ['estado', 'uf'],
-                'tipo' => ['tipo'],
-                'pais' => ['pais'],
+            $colNames = array_column($colsInfo, 'Field');
+            if (!in_array('id', $colNames, true) || !in_array('usuario_id', $colNames, true)) {
+                return 0;
+            }
+
+            // Buscar nome do cliente (pode ser NOT NULL na tabela enderecos)
+            $nomeCliente = '';
+            try {
+                $colsUsr = $this->getCols('usuarios');
+                $usrNomeCol = '';
+                foreach (['nome', 'name', 'nome_completo'] as $nc) {
+                    if (in_array($nc, $colsUsr, true)) { $usrNomeCol = $nc; break; }
+                }
+                if ($usrNomeCol !== '') {
+                    $stNome = $this->db->prepare('SELECT ' . $usrNomeCol . ' FROM usuarios WHERE id = ? LIMIT 1');
+                    $stNome->execute([$clienteId]);
+                    $nomeCliente = trim((string) ($stNome->fetchColumn() ?: ''));
+                }
+            } catch (\Exception $e) {}
+
+            // Valores conhecidos para preencher colunas
+            $knownValues = [
+                'usuario_id' => $clienteId,
+                'user_id' => $clienteId,
+                'cep' => $cep,
+                'zip_code' => $cep,
+                'endereco' => $endereco,
+                'logradouro' => $endereco,
+                'address' => $endereco,
+                'numero' => $numero,
+                'number' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'neighborhood' => $bairro,
+                'cidade' => $cidade,
+                'city' => $cidade,
+                'estado' => $estado,
+                'uf' => $estado,
+                'state' => $estado,
+                'tipo' => 'entrega',
+                'type' => 'entrega',
+                'pais' => 'BR',
+                'country' => 'BR',
+                'nome' => $nomeCliente,
+                'name' => $nomeCliente,
+                'principal' => 1,
+                'is_principal' => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ];
 
-            $cols = ['usuario_id'];
-            $vals = [':usuario_id'];
-            $params = [':usuario_id' => $clienteId];
+            $cols = [];
+            $vals = [];
+            $params = [];
 
-            $resolved = [];
-            foreach ($map as $key => $cands) {
-                $col = $this->pickFirstExistingColumn($colsEnd, $cands);
-                if ($col !== '') {
-                    $resolved[$key] = $col;
+            foreach ($colsInfo as $colInfo) {
+                $field = (string) ($colInfo['Field'] ?? '');
+                $extra = strtolower((string) ($colInfo['Extra'] ?? ''));
+                $isAutoIncrement = (strpos($extra, 'auto_increment') !== false);
+                $isNullable = (strtoupper((string) ($colInfo['Null'] ?? 'YES')) === 'YES');
+                $hasDefault = ($colInfo['Default'] !== null);
+
+                if ($isAutoIncrement) {
+                    continue;
+                }
+
+                // Se temos um valor conhecido, incluir sempre
+                if (array_key_exists($field, $knownValues)) {
+                    $placeholder = ':v_' . $field;
+                    $cols[] = $field;
+                    $vals[] = $placeholder;
+                    $params[$placeholder] = $knownValues[$field];
+                    continue;
+                }
+
+                // Se a coluna é NOT NULL sem default, preencher com string vazia
+                if (!$isNullable && !$hasDefault) {
+                    $placeholder = ':v_' . $field;
+                    $cols[] = $field;
+                    $vals[] = $placeholder;
+                    $params[$placeholder] = '';
                 }
             }
 
-            $valueByKey = [
-                'cep' => $cep,
-                'endereco' => $endereco,
-                'numero' => $numero,
-                'complemento' => $complemento,
-                'bairro' => $bairro,
-                'cidade' => $cidade,
-                'estado' => $estado,
-                'tipo' => 'entrega',
-                'pais' => 'BR',
-            ];
-
-            foreach ($resolved as $key => $col) {
-                $cols[] = $col;
-                $vals[] = ':' . $key;
-                $params[':' . $key] = $valueByKey[$key] ?? '';
-            }
-
-            if (in_array('principal', $colsEnd, true)) {
-                $cols[] = 'principal';
-                $vals[] = ':principal';
-                $params[':principal'] = 1;
+            if (empty($cols)) {
+                return 0;
             }
 
             $sql = 'INSERT INTO enderecos (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
@@ -217,6 +257,7 @@ class PedidoManualService {
             $newId = (int) $this->db->lastInsertId();
             return $newId > 0 ? $newId : 0;
         } catch (\Exception $e) {
+            error_log('criarEnderecoEntregaParaCliente ERRO: ' . $e->getMessage());
             return 0;
         }
     }
@@ -1157,7 +1198,7 @@ class PedidoManualService {
             }
 
             if ($enderecoEntregaId <= 0) {
-                throw new \Exception('Cliente sem endereço de entrega cadastrado. Informe o endereço de entrega para criar o pedido manual.');
+                throw new \Exception('Não foi possível criar o endereço de entrega. Verifique se todos os campos de endereço estão preenchidos (CEP, endereço, número, bairro, cidade e estado).');
             }
         }
 
