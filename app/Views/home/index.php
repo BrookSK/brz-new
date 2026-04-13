@@ -170,12 +170,11 @@
     </div>
 </section>
 
-<!-- Resultados da busca (catálogo inline, escondido por padrão) -->
+<!-- Resultados da busca (catálogo inline, aparece entre busca e conteúdo) -->
 <section class="py-5" id="homeBuscaResultados" style="display:none;">
     <div class="container">
         <div class="d-flex align-items-center justify-content-between mb-4">
             <p class="text-muted mb-0" id="homeBuscaInfo"></p>
-            <button class="btn btn-sm btn-outline-secondary" id="homeBuscaVoltar"><i class="fas fa-arrow-left me-1"></i> Voltar</button>
         </div>
         <div class="row g-4" id="homeBuscaGrid"></div>
         <div class="text-center mt-4" id="homeBuscaLoadMore" style="display:none;">
@@ -183,9 +182,6 @@
         </div>
     </div>
 </section>
-
-<!-- Conteúdo original da home (escondido quando busca ativa) -->
-<div id="homeConteudoOriginal">
 
 <!-- Features Section -->
 <section class="py-5 bg-light">
@@ -413,8 +409,6 @@
     </div>
 </section>
 
-</div><!-- /homeConteudoOriginal -->
-
 <script>
 $(document).ready(function() {
     const UI = {
@@ -602,14 +596,12 @@ $(document).ready(function() {
 (function(){
     const inp = document.getElementById('buscaGlobalInput');
     const clearBtn = document.getElementById('buscaGlobalClear');
-    const original = document.getElementById('homeConteudoOriginal');
     const resultados = document.getElementById('homeBuscaResultados');
     const grid = document.getElementById('homeBuscaGrid');
     const infoEl = document.getElementById('homeBuscaInfo');
     const loadMoreWrap = document.getElementById('homeBuscaLoadMore');
     const btnLoadMore = document.getElementById('homeBtnLoadMore');
-    const btnVoltar = document.getElementById('homeBuscaVoltar');
-    if (!inp || !original || !resultados || !grid) return;
+    if (!inp || !resultados || !grid) return;
 
     let timer = null, lastQ = '', currentPage = 0, allProducts = [], clubeAcesso = false;
 
@@ -625,37 +617,80 @@ $(document).ready(function() {
         const isGrupo = p.is_grupo || (p.grupo_compras_id && Number(p.grupo_compras_id)>0);
         const isClubeBlocked = (Number(p.clube_only||0)===1) && !clubeAcesso;
         const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
-        const link = isGrupo ? '/grupo/'+esc(p.grupo_slug||'') : '/produto/detalhes/'+p.id;
-        const href = isClubeBlocked ? '/como-funciona-clube' : link;
+        const detalhesLink = '/produto/detalhes/'+p.id;
+        const grupoLink = isGrupo && p.grupo_slug ? '/grupo/'+esc(p.grupo_slug)+'?q='+encodeURIComponent(p.nome) : '';
 
-        let badges = '';
-        if (isGrupo && p.grupo_nome) {
-            badges += '<span class="badge bg-primary bg-opacity-10 text-primary me-1" style="font-size:.72rem"><i class="fas fa-users me-1"></i>'+esc(p.grupo_nome)+'</span>';
+        // Badge do grupo clicável
+        let grupoBadge = '';
+        if (isGrupo && p.grupo_nome && p.grupo_slug) {
+            grupoBadge = '<a href="/grupo/'+esc(p.grupo_slug)+'" class="badge bg-primary bg-opacity-10 text-primary text-decoration-none grupo-badge-link" style="font-size:.72rem"><i class="fas fa-users me-1"></i>'+esc(p.grupo_nome)+'</a>';
         }
         if (isClubeBlocked) {
-            badges += '<span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.72rem"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>';
+            grupoBadge += '<span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.72rem"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>';
         }
 
         const priceHtml = isClubeBlocked
             ? '<span class="badge" style="background:#0b1f3a;font-size:.75rem"><i class="fas fa-lock me-1"></i>Clube</span>'
             : '<span class="h6 mb-0 text-primary">'+fmtMoney(p.valor, p.moeda)+'</span>';
 
-        const btnHtml = isClubeBlocked
-            ? '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais</a>'
-            : '<a href="'+href+'" class="btn btn-outline-primary btn-sm w-100"><i class="fas fa-eye me-2"></i>Ver detalhes</a>';
+        let btns = '';
+        if (isClubeBlocked) {
+            btns = '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais</a>';
+        } else {
+            btns += '<a href="'+detalhesLink+'" class="btn btn-outline-primary btn-sm w-100 mb-2"><i class="fas fa-eye me-1"></i> Ver detalhes</a>';
+            if (grupoLink) {
+                btns += '<a href="'+grupoLink+'" class="btn btn-outline-secondary btn-sm w-100 mb-2"><i class="fas fa-store me-1"></i> Ver no grupo</a>';
+            }
+            btns += '<button type="button" class="btn btn-primary btn-sm w-100 btn-add-cart" data-id="'+p.id+'"><i class="fas fa-cart-plus me-1"></i> Adicionar ao carrinho</button>';
+        }
 
         return '<div class="col-lg-3 col-md-4 col-sm-6">'
             + '<div class="card border-0 shadow-sm h-100 home-busca-card'+(isClubeBlocked?' clube-blocked':'')+'">'
-            + '<a href="'+href+'" class="text-decoration-none">'
+            + '<a href="'+(isClubeBlocked?'/como-funciona-clube':detalhesLink)+'" class="text-decoration-none">'
             + '<img src="'+esc(foto)+'" alt="'+esc(p.nome)+'" class="card-img-top" style="height:180px;object-fit:cover;">'
             + '</a>'
-            + '<div class="card-body">'
-            + '<div class="mb-2">'+badges+'</div>'
+            + '<div class="card-body d-flex flex-column">'
+            + '<div class="mb-2 d-flex flex-wrap gap-1">'+grupoBadge+'</div>'
             + '<h6 class="card-title mb-1" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(p.nome)+'</h6>'
-            + '<div class="d-flex align-items-center justify-content-between mb-3">'+priceHtml+'</div>'
-            + btnHtml
+            + '<div class="mb-3">'+priceHtml+'</div>'
+            + '<div class="mt-auto">'+btns+'</div>'
             + '</div></div></div>';
     }
+
+    function handleAddToCart(e){
+        const btn = e.target.closest('.btn-add-cart');
+        if (!btn) return;
+        const pid = btn.dataset.id;
+        if (!pid) return;
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Adicionando...';
+        fetch('/api/carrinho/adicionar', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:'produto_id='+pid+'&quantidade=1'
+        })
+        .then(r=>r.json())
+        .then(function(resp){
+            if (resp.success) {
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> Adicionado!';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-success');
+                setTimeout(function(){ btn.innerHTML=origHtml; btn.disabled=false; btn.classList.remove('btn-success'); btn.classList.add('btn-primary'); }, 2000);
+                // Atualizar badge do carrinho no header se existir
+                const cartBadge = document.querySelector('.cart-count, #cart-count, [data-cart-count]');
+                if (cartBadge && resp.total_itens !== undefined) cartBadge.textContent = resp.total_itens;
+            } else {
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> '+(resp.error||'Erro');
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-danger');
+                setTimeout(function(){ btn.innerHTML=origHtml; btn.disabled=false; btn.classList.remove('btn-danger'); btn.classList.add('btn-primary'); }, 2500);
+            }
+        })
+        .catch(function(){ btn.innerHTML=origHtml; btn.disabled=false; });
+    }
+
+    grid.addEventListener('click', handleAddToCart);
 
     function showResults(data){
         allProducts = data.produtos || [];
@@ -672,7 +707,6 @@ $(document).ready(function() {
             loadPage();
         }
 
-        original.style.display = 'none';
         resultados.style.display = '';
     }
 
@@ -688,7 +722,6 @@ $(document).ready(function() {
     }
 
     function resetSearch(){
-        original.style.display = '';
         resultados.style.display = 'none';
         grid.innerHTML = '';
         lastQ = '';
@@ -700,7 +733,6 @@ $(document).ready(function() {
         if (q.length < 2){ resetSearch(); return; }
         if (q === lastQ) return;
         lastQ = q;
-        original.style.display = 'none';
         resultados.style.display = '';
         grid.innerHTML = '<div class="col-12 text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>';
         infoEl.textContent = 'Buscando...';
@@ -725,12 +757,6 @@ $(document).ready(function() {
         inp.focus();
     });
 
-    if (btnVoltar) btnVoltar.addEventListener('click', function(){
-        inp.value = '';
-        clearBtn.classList.add('d-none');
-        resetSearch();
-    });
-
     if (btnLoadMore) btnLoadMore.addEventListener('click', loadPage);
 })();
 </script>
@@ -740,6 +766,7 @@ $(document).ready(function() {
 .home-busca-card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(15,23,42,.1)!important; }
 .home-busca-card.clube-blocked .card-img-top,
 .home-busca-card.clube-blocked .card-body { filter:blur(4px); pointer-events:none; user-select:none; }
+.grupo-badge-link:hover { opacity:.85; text-decoration:none!important; }
 </style>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>
