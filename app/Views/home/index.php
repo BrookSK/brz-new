@@ -155,6 +155,24 @@
     <?php endif; ?>
 </section>
 
+<!-- Busca de Produtos -->
+<section class="py-4" style="background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-7 col-md-9">
+                <div class="position-relative" id="buscaGlobalWrap">
+                    <div class="input-group input-group-lg shadow-sm" style="border-radius:50px;overflow:hidden;">
+                        <span class="input-group-text bg-white border-0 ps-4"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" id="buscaGlobalInput" class="form-control border-0 py-3" placeholder="<?= __('home.search_placeholder', 'Buscar produtos...') ?>" autocomplete="off" style="box-shadow:none;">
+                        <span class="input-group-text bg-white border-0 pe-4 d-none" id="buscaGlobalClear" style="cursor:pointer"><i class="fas fa-times text-muted"></i></span>
+                    </div>
+                    <div id="buscaGlobalResults" class="position-absolute w-100 bg-white shadow rounded-3 mt-1" style="z-index:1050;display:none;max-height:420px;overflow-y:auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- Features Section -->
 <section class="py-5 bg-light">
     <div class="container">
@@ -562,6 +580,108 @@ $(document).ready(function() {
         font-size: 0.9rem !important;
     }
 }
+</style>
+
+<script>
+(function(){
+    const inp = document.getElementById('buscaGlobalInput');
+    const wrap = document.getElementById('buscaGlobalResults');
+    const clearBtn = document.getElementById('buscaGlobalClear');
+    if (!inp || !wrap) return;
+
+    let timer = null;
+    let lastQ = '';
+
+    function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+    function formatMoney(v, moeda){
+        const n = Number(v||0);
+        const sym = (moeda||'USD')==='BRL' ? 'R$' : '$';
+        try { return sym + ' ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+        catch(e){ return sym + ' ' + n.toFixed(2); }
+    }
+
+    function renderResults(data){
+        if (!data.produtos || data.produtos.length === 0){
+            wrap.innerHTML = '<div class="p-3 text-center text-muted small">Nenhum produto encontrado.</div>';
+            wrap.style.display = 'block';
+            return;
+        }
+        const clubeAcesso = data.clube_acesso || false;
+        let html = '';
+        data.produtos.forEach(function(p){
+            const isGrupo = p.is_grupo || (p.grupo_compras_id && Number(p.grupo_compras_id) > 0);
+            const isClubeBlocked = (Number(p.clube_only||0) === 1) && !clubeAcesso;
+            const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
+            const link = isGrupo ? '/grupo/' + esc(p.grupo_slug || '') : '/produto/detalhes/' + p.id;
+
+            let badges = '';
+            if (isGrupo && p.grupo_nome) {
+                badges += '<span class="badge bg-primary bg-opacity-10 text-primary me-1" style="font-size:.7rem"><i class="fas fa-users me-1"></i>' + esc(p.grupo_nome) + '</span>';
+            }
+            if (isClubeBlocked) {
+                badges += '<span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.7rem"><i class="fas fa-crown me-1"></i>Clube</span>';
+            }
+
+            const blurStyle = isClubeBlocked ? 'filter:blur(3px);pointer-events:none;user-select:none;' : '';
+            const priceHtml = isClubeBlocked
+                ? '<span class="text-muted small">Exclusivo Clube</span>'
+                : '<span class="fw-bold text-primary small">' + formatMoney(p.valor, p.moeda) + '</span>';
+
+            html += '<a href="' + (isClubeBlocked ? '/como-funciona-clube' : link) + '" class="d-flex align-items-center gap-3 px-3 py-2 text-decoration-none border-bottom busca-result-item" style="color:inherit;">';
+            html += '<img src="' + esc(foto) + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;' + blurStyle + '">';
+            html += '<div class="flex-grow-1 overflow-hidden">';
+            html += '<div class="fw-semibold text-truncate" style="font-size:.9rem;' + blurStyle + '">' + esc(p.nome) + '</div>';
+            html += '<div class="d-flex align-items-center gap-1 flex-wrap">' + badges + priceHtml + '</div>';
+            html += '</div>';
+            html += '</a>';
+        });
+        wrap.innerHTML = html;
+        wrap.style.display = 'block';
+    }
+
+    function doSearch(){
+        const q = inp.value.trim();
+        if (q.length < 2){ wrap.style.display='none'; lastQ=''; return; }
+        if (q === lastQ) return;
+        lastQ = q;
+        wrap.innerHTML = '<div class="p-3 text-center"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
+        wrap.style.display = 'block';
+        fetch('/api/produtos/buscar-todos?q=' + encodeURIComponent(q) + '&context=home&limit=15')
+            .then(r => r.json())
+            .then(renderResults)
+            .catch(function(){ wrap.innerHTML='<div class="p-3 text-center text-muted small">Erro ao buscar.</div>'; });
+    }
+
+    inp.addEventListener('input', function(){
+        clearBtn.classList.toggle('d-none', inp.value.trim() === '');
+        clearTimeout(timer);
+        timer = setTimeout(doSearch, 350);
+    });
+
+    clearBtn.addEventListener('click', function(){
+        inp.value = '';
+        wrap.style.display = 'none';
+        clearBtn.classList.add('d-none');
+        lastQ = '';
+        inp.focus();
+    });
+
+    document.addEventListener('click', function(e){
+        if (!document.getElementById('buscaGlobalWrap').contains(e.target)){
+            wrap.style.display = 'none';
+        }
+    });
+
+    inp.addEventListener('focus', function(){
+        if (inp.value.trim().length >= 2 && wrap.innerHTML.trim() !== '') wrap.style.display = 'block';
+    });
+})();
+</script>
+
+<style>
+.busca-result-item:hover { background: #f8fafc; }
+.busca-result-item:last-child { border-bottom: none !important; }
 </style>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

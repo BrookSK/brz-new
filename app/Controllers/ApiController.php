@@ -205,6 +205,128 @@ class ApiController extends Controller {
         ]);
     }
 
+    /**
+     * Busca global de produtos (normais + grupo de compras).
+     * Retorna info do grupo e flag clube_only quando aplicável.
+     * GET /api/produtos/buscar-todos?q=termo&limit=20&context=home|grupos
+     */
+    public function buscarProdutosTodos(Request $request) {
+        $term = trim((string) $request->getParam('q', ''));
+        $limit = min(30, max(1, (int) $request->getParam('limit', 20)));
+        $context = (string) $request->getParam('context', 'home'); // home = todos, grupos = só grupo de compras
+
+        if ($term === '' || mb_strlen($term) < 2) {
+            $this->json(['success' => true, 'produtos' => [], 'total' => 0]);
+            return;
+        }
+
+        try {
+            $pdo = $this->produtoModel->getConnection();
+
+            $cols = [];
+            try {
+                $stCols = $pdo->query('DESCRIBE produtos');
+                $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) { $cols = []; }
+
+            $nameCol = in_array('name', $cols, true) ? 'p.name' : 'p.nome';
+            $descCol = in_array('description', $cols, true) ? 'p.description' : (in_array('descricao', $cols, true) ? 'p.descricao' : '');
+            $priceCol = in_array('price', $cols, true) ? 'p.price' : (in_array('preco', $cols, true) ? 'p.preco' : 'p.price');
+            $stockCol = in_array('stock', $cols, true) ? 'p.stock' : (in_array('estoque', $cols, true) ? 'p.estoque' : 'p.stock');
+            $currencyCol = in_array('currency', $cols, true) ? 'p.currency' : (in_array('moeda', $cols, true) ? 'p.moeda' : "''");
+
+            $where = [];
+            $params = [];
+
+            // Busca por nome (e descrição se existir)
+            $searchClause = $nameCol . ' LIKE :term';
+            if ($descCol !== '') {
+                $searchClause = '(' . $nameCol . ' LIKE :term OR ' . $descCol . ' LIKE :term)';
+            }
+            $where[] = $searchClause;
+            $params[':term'] = '%' . $term . '%';
+
+            // Filtros de ativo/publicado
+            if (in_array('active', $cols, true)) {
+                $where[] = "(p.active = 1)";
+            } elseif (in_array('ativo', $cols, true)) {
+                $where[] = "(p.ativo = 1)";
+            }
+            if (in_array('status', $cols, true)) {
+                $where[] = "(p.status IS NULL OR LOWER(p.status) IN ('published','publish','publicado','ativo','active'))";
+            }
+
+            // Excluir assessoria e ocultos
+            $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+            if (in_array('oculto', $cols, true)) {
+                $where[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            }
+
+            // Contexto: se "grupos", só produtos de grupo de compras
+            if ($context === 'grupos') {
+                if (in_array('grupo_compras_id', $cols, true)) {
+                    $where[] = "(p.grupo_compras_id IS NOT NULL AND p.grupo_compras_id > 0)";
+                }
+            }
+
+            $select = "p.id, {$nameCol} AS nome, {$priceCol} AS valor, {$stockCol} AS estoque, {$currencyCol} AS moeda, p.foto_principal, p.grupo_compras_id";
+            if (in_array('slug', $cols, true)) {
+                $select .= ', p.slug';
+            }
+
+            $sql = "SELECT {$select},
+                           g.nome AS grupo_nome, g.slug AS grupo_slug, COALESCE(g.clube_only, 0) AS clube_only,
+                           g.banner AS grupo_banner
+                    FROM produtos p
+                    LEFT JOIN grupos_compras g ON g.id = p.grupo_compras_id AND g.ativo = 1
+                    WHERE " . implode(' AND ', $where) . "
+                    ORDER BY p.grupo_compras_id IS NOT NULL DESC, {$nameCol} ASC
+                    LIMIT :limit";
+
+            $stmt = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                $stmt->bindValue($k, $v);
+            }
+            $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Buscar fotos para produtos sem foto_principal
+            $produtos = [];
+            foreach ($rows as $row) {
+                if (empty($row['foto_principal'])) {
+                    $foto = $this->produtoFotoModel->getFotoPrincipal((int) $row['id']);
+                    $row['foto_principal'] = $foto ? $foto['nome_arquivo'] : null;
+                }
+                $row['is_grupo'] = (!empty($row['grupo_compras_id']) && (int) $row['grupo_compras_id'] > 0);
+                $produtos[] = $row;
+            }
+
+            // Verificar acesso ao clube
+            $clubeAcesso = false;
+            try {
+                if ($this->authService->estaLogado()) {
+                    $u = $this->authService->getUsuarioLogado();
+                    $uid = (int) ($u['id'] ?? 0);
+                    if ($uid > 0) {
+                        $stW = $pdo->prepare('SELECT saldo_usd FROM carteiras WHERE usuario_id = ? LIMIT 1');
+                        $stW->execute([$uid]);
+                        $clubeAcesso = ((float) ($stW->fetchColumn() ?: 0)) >= 39.00;
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            $this->json([
+                'success' => true,
+                'produtos' => $produtos,
+                'total' => count($produtos),
+                'clube_acesso' => $clubeAcesso,
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao buscar produtos', 'produtos' => []]);
+        }
+    }
+
     public function adicionarAoCarrinho(Request $request) {
         $produtoId = $request->getParam('produto_id');
         $quantidade = $request->getParam('quantidade', 1);
