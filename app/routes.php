@@ -504,6 +504,7 @@ $router->get('/api/frete/calcular', 'ApiController', 'calcularFrete');
 
 // Relatório de Pedidos
 $router->get('/admin/relatorio-pedidos', 'AdminRelatorioPedidosController', 'index');
+$router->get('/admin/relatorio-geral', 'AdminRelatorioGeralController', 'index');
 $router->get('/admin/relatorio-pedidos/imprimir/{id}', 'AdminRelatorioPedidosController', 'imprimir');
 $router->post('/admin/relatorio-pedidos/registrar-impressao', 'AdminRelatorioPedidosController', 'registrarImpressao');
 
