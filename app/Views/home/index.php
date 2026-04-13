@@ -160,18 +160,32 @@
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-lg-7 col-md-9">
-                <div class="position-relative" id="buscaGlobalWrap">
-                    <div class="input-group input-group-lg shadow-sm" style="border-radius:50px;overflow:hidden;">
-                        <span class="input-group-text bg-white border-0 ps-4"><i class="fas fa-search text-muted"></i></span>
-                        <input type="text" id="buscaGlobalInput" class="form-control border-0 py-3" placeholder="<?= __('home.search_placeholder', 'Buscar produtos...') ?>" autocomplete="off" style="box-shadow:none;">
-                        <span class="input-group-text bg-white border-0 pe-4 d-none" id="buscaGlobalClear" style="cursor:pointer"><i class="fas fa-times text-muted"></i></span>
-                    </div>
-                    <div id="buscaGlobalResults" class="position-absolute w-100 bg-white shadow rounded-3 mt-1" style="z-index:1050;display:none;max-height:420px;overflow-y:auto;"></div>
+                <div class="input-group input-group-lg shadow-sm" style="border-radius:50px;overflow:hidden;">
+                    <span class="input-group-text bg-white border-0 ps-4"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="buscaGlobalInput" class="form-control border-0 py-3" placeholder="<?= __('home.search_placeholder', 'Buscar produtos...') ?>" autocomplete="off" style="box-shadow:none;">
+                    <span class="input-group-text bg-white border-0 pe-4 d-none" id="buscaGlobalClear" style="cursor:pointer"><i class="fas fa-times text-muted"></i></span>
                 </div>
             </div>
         </div>
     </div>
 </section>
+
+<!-- Resultados da busca (catálogo inline, escondido por padrão) -->
+<section class="py-5" id="homeBuscaResultados" style="display:none;">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <p class="text-muted mb-0" id="homeBuscaInfo"></p>
+            <button class="btn btn-sm btn-outline-secondary" id="homeBuscaVoltar"><i class="fas fa-arrow-left me-1"></i> Voltar</button>
+        </div>
+        <div class="row g-4" id="homeBuscaGrid"></div>
+        <div class="text-center mt-4" id="homeBuscaLoadMore" style="display:none;">
+            <button class="btn btn-outline-primary" id="homeBtnLoadMore">Carregar mais</button>
+        </div>
+    </div>
+</section>
+
+<!-- Conteúdo original da home (escondido quando busca ativa) -->
+<div id="homeConteudoOriginal">
 
 <!-- Features Section -->
 <section class="py-5 bg-light">
@@ -399,6 +413,8 @@
     </div>
 </section>
 
+</div><!-- /homeConteudoOriginal -->
+
 <script>
 $(document).ready(function() {
     const UI = {
@@ -585,103 +601,145 @@ $(document).ready(function() {
 <script>
 (function(){
     const inp = document.getElementById('buscaGlobalInput');
-    const wrap = document.getElementById('buscaGlobalResults');
     const clearBtn = document.getElementById('buscaGlobalClear');
-    if (!inp || !wrap) return;
+    const original = document.getElementById('homeConteudoOriginal');
+    const resultados = document.getElementById('homeBuscaResultados');
+    const grid = document.getElementById('homeBuscaGrid');
+    const infoEl = document.getElementById('homeBuscaInfo');
+    const loadMoreWrap = document.getElementById('homeBuscaLoadMore');
+    const btnLoadMore = document.getElementById('homeBtnLoadMore');
+    const btnVoltar = document.getElementById('homeBuscaVoltar');
+    if (!inp || !original || !resultados || !grid) return;
 
-    let timer = null;
-    let lastQ = '';
+    let timer = null, lastQ = '', currentPage = 0, allProducts = [], clubeAcesso = false;
 
     function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-
-    function formatMoney(v, moeda){
+    function fmtMoney(v, moeda){
         const n = Number(v||0);
         const sym = (moeda||'USD')==='BRL' ? 'R$' : '$';
-        try { return sym + ' ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-        catch(e){ return sym + ' ' + n.toFixed(2); }
+        try { return sym+' '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+        catch(e){ return sym+' '+n.toFixed(2); }
     }
 
-    function renderResults(data){
-        if (!data.produtos || data.produtos.length === 0){
-            wrap.innerHTML = '<div class="p-3 text-center text-muted small">Nenhum produto encontrado.</div>';
-            wrap.style.display = 'block';
-            return;
+    function buildCard(p){
+        const isGrupo = p.is_grupo || (p.grupo_compras_id && Number(p.grupo_compras_id)>0);
+        const isClubeBlocked = (Number(p.clube_only||0)===1) && !clubeAcesso;
+        const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
+        const link = isGrupo ? '/grupo/'+esc(p.grupo_slug||'') : '/produto/detalhes/'+p.id;
+        const href = isClubeBlocked ? '/como-funciona-clube' : link;
+
+        let badges = '';
+        if (isGrupo && p.grupo_nome) {
+            badges += '<span class="badge bg-primary bg-opacity-10 text-primary me-1" style="font-size:.72rem"><i class="fas fa-users me-1"></i>'+esc(p.grupo_nome)+'</span>';
         }
-        const clubeAcesso = data.clube_acesso || false;
+        if (isClubeBlocked) {
+            badges += '<span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.72rem"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>';
+        }
+
+        const priceHtml = isClubeBlocked
+            ? '<span class="badge" style="background:#0b1f3a;font-size:.75rem"><i class="fas fa-lock me-1"></i>Clube</span>'
+            : '<span class="h6 mb-0 text-primary">'+fmtMoney(p.valor, p.moeda)+'</span>';
+
+        const btnHtml = isClubeBlocked
+            ? '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais</a>'
+            : '<a href="'+href+'" class="btn btn-outline-primary btn-sm w-100"><i class="fas fa-eye me-2"></i>Ver detalhes</a>';
+
+        return '<div class="col-lg-3 col-md-4 col-sm-6">'
+            + '<div class="card border-0 shadow-sm h-100 home-busca-card'+(isClubeBlocked?' clube-blocked':'')+'">'
+            + '<a href="'+href+'" class="text-decoration-none">'
+            + '<img src="'+esc(foto)+'" alt="'+esc(p.nome)+'" class="card-img-top" style="height:180px;object-fit:cover;">'
+            + '</a>'
+            + '<div class="card-body">'
+            + '<div class="mb-2">'+badges+'</div>'
+            + '<h6 class="card-title mb-1" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(p.nome)+'</h6>'
+            + '<div class="d-flex align-items-center justify-content-between mb-3">'+priceHtml+'</div>'
+            + btnHtml
+            + '</div></div></div>';
+    }
+
+    function showResults(data){
+        allProducts = data.produtos || [];
+        clubeAcesso = data.clube_acesso || false;
+        currentPage = 0;
+
+        if (allProducts.length === 0){
+            grid.innerHTML = '<div class="col-12 text-center py-5"><i class="fas fa-search fa-3x text-muted mb-3 d-block opacity-50"></i><h5 class="text-muted">Nenhum produto encontrado</h5><p class="text-muted small">Tente buscar com outros termos</p></div>';
+            infoEl.textContent = '';
+            loadMoreWrap.style.display = 'none';
+        } else {
+            infoEl.innerHTML = '<i class="fas fa-search me-1"></i> <strong>'+allProducts.length+'</strong> produto'+(allProducts.length!==1?'s':'')+' encontrado'+(allProducts.length!==1?'s':'');
+            grid.innerHTML = '';
+            loadPage();
+        }
+
+        original.style.display = 'none';
+        resultados.style.display = '';
+    }
+
+    function loadPage(){
+        const perPage = 12;
+        const start = currentPage * perPage;
+        const slice = allProducts.slice(start, start + perPage);
         let html = '';
-        data.produtos.forEach(function(p){
-            const isGrupo = p.is_grupo || (p.grupo_compras_id && Number(p.grupo_compras_id) > 0);
-            const isClubeBlocked = (Number(p.clube_only||0) === 1) && !clubeAcesso;
-            const foto = p.foto_principal || '/uploads/produtos/placeholder.jpg';
-            const link = isGrupo ? '/grupo/' + esc(p.grupo_slug || '') : '/produto/detalhes/' + p.id;
+        slice.forEach(function(p){ html += buildCard(p); });
+        grid.insertAdjacentHTML('beforeend', html);
+        currentPage++;
+        loadMoreWrap.style.display = ((currentPage * perPage) < allProducts.length) ? 'block' : 'none';
+    }
 
-            let badges = '';
-            if (isGrupo && p.grupo_nome) {
-                badges += '<span class="badge bg-primary bg-opacity-10 text-primary me-1" style="font-size:.7rem"><i class="fas fa-users me-1"></i>' + esc(p.grupo_nome) + '</span>';
-            }
-            if (isClubeBlocked) {
-                badges += '<span class="badge" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:.7rem"><i class="fas fa-crown me-1"></i>Clube</span>';
-            }
-
-            const blurStyle = isClubeBlocked ? 'filter:blur(3px);pointer-events:none;user-select:none;' : '';
-            const priceHtml = isClubeBlocked
-                ? '<span class="text-muted small">Exclusivo Clube</span>'
-                : '<span class="fw-bold text-primary small">' + formatMoney(p.valor, p.moeda) + '</span>';
-
-            html += '<a href="' + (isClubeBlocked ? '/como-funciona-clube' : link) + '" class="d-flex align-items-center gap-3 px-3 py-2 text-decoration-none border-bottom busca-result-item" style="color:inherit;">';
-            html += '<img src="' + esc(foto) + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;' + blurStyle + '">';
-            html += '<div class="flex-grow-1 overflow-hidden">';
-            html += '<div class="fw-semibold text-truncate" style="font-size:.9rem;' + blurStyle + '">' + esc(p.nome) + '</div>';
-            html += '<div class="d-flex align-items-center gap-1 flex-wrap">' + badges + priceHtml + '</div>';
-            html += '</div>';
-            html += '</a>';
-        });
-        wrap.innerHTML = html;
-        wrap.style.display = 'block';
+    function resetSearch(){
+        original.style.display = '';
+        resultados.style.display = 'none';
+        grid.innerHTML = '';
+        lastQ = '';
+        allProducts = [];
     }
 
     function doSearch(){
         const q = inp.value.trim();
-        if (q.length < 2){ wrap.style.display='none'; lastQ=''; return; }
+        if (q.length < 2){ resetSearch(); return; }
         if (q === lastQ) return;
         lastQ = q;
-        wrap.innerHTML = '<div class="p-3 text-center"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
-        wrap.style.display = 'block';
-        fetch('/api/produtos/buscar-todos?q=' + encodeURIComponent(q) + '&context=home&limit=15')
-            .then(r => r.json())
-            .then(renderResults)
-            .catch(function(){ wrap.innerHTML='<div class="p-3 text-center text-muted small">Erro ao buscar.</div>'; });
+        original.style.display = 'none';
+        resultados.style.display = '';
+        grid.innerHTML = '<div class="col-12 text-center py-4"><i class="fas fa-spinner fa-spin fa-2x text-muted"></i></div>';
+        infoEl.textContent = 'Buscando...';
+        loadMoreWrap.style.display = 'none';
+
+        fetch('/api/produtos/buscar-todos?q='+encodeURIComponent(q)+'&context=home&limit=60')
+            .then(r=>r.json())
+            .then(showResults)
+            .catch(function(){ grid.innerHTML='<div class="col-12 text-center py-4 text-muted">Erro ao buscar.</div>'; });
     }
 
     inp.addEventListener('input', function(){
-        clearBtn.classList.toggle('d-none', inp.value.trim() === '');
+        clearBtn.classList.toggle('d-none', inp.value.trim()==='');
         clearTimeout(timer);
-        timer = setTimeout(doSearch, 350);
+        timer = setTimeout(doSearch, 400);
     });
 
     clearBtn.addEventListener('click', function(){
         inp.value = '';
-        wrap.style.display = 'none';
         clearBtn.classList.add('d-none');
-        lastQ = '';
+        resetSearch();
         inp.focus();
     });
 
-    document.addEventListener('click', function(e){
-        if (!document.getElementById('buscaGlobalWrap').contains(e.target)){
-            wrap.style.display = 'none';
-        }
+    if (btnVoltar) btnVoltar.addEventListener('click', function(){
+        inp.value = '';
+        clearBtn.classList.add('d-none');
+        resetSearch();
     });
 
-    inp.addEventListener('focus', function(){
-        if (inp.value.trim().length >= 2 && wrap.innerHTML.trim() !== '') wrap.style.display = 'block';
-    });
+    if (btnLoadMore) btnLoadMore.addEventListener('click', loadPage);
 })();
 </script>
 
 <style>
-.busca-result-item:hover { background: #f8fafc; }
-.busca-result-item:last-child { border-bottom: none !important; }
+.home-busca-card { border-radius:14px; transition:transform .15s ease,box-shadow .15s ease; overflow:hidden; }
+.home-busca-card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(15,23,42,.1)!important; }
+.home-busca-card.clube-blocked .card-img-top,
+.home-busca-card.clube-blocked .card-body { filter:blur(4px); pointer-events:none; user-select:none; }
 </style>
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

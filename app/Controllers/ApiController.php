@@ -212,7 +212,7 @@ class ApiController extends Controller {
      */
     public function buscarProdutosTodos(Request $request) {
         $term = trim((string) $request->getParam('q', ''));
-        $limit = min(30, max(1, (int) $request->getParam('limit', 20)));
+        $limit = min(80, max(1, (int) $request->getParam('limit', 20)));
         $context = (string) $request->getParam('context', 'home'); // home = todos, grupos = só grupo de compras
 
         if ($term === '' || mb_strlen($term) < 2) {
