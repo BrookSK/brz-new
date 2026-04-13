@@ -73,17 +73,24 @@ class AdminRelatorioGeralController extends Controller {
         $stmt->execute($params);
         $totais = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-        // Totais por status
-        $sqlStatus = "SELECT p.status, COUNT(*) AS qtd, COALESCE(SUM(p.{$colTotal}), 0) AS total"
+        // Totais por status (agrupado por status + moeda para conversão correta)
+        $porStatusRaw = [];
+        $moedaSelect = ($colMoeda !== '') ? ", UPPER(COALESCE(p.{$colMoeda},'USD')) AS moeda" : ", 'USD' AS moeda";
+        $moedaGroup = ($colMoeda !== '') ? ", p.{$colMoeda}" : '';
+        $sqlStatus = "SELECT p.status{$moedaSelect}, COUNT(*) AS qtd, COALESCE(SUM(p.{$colTotal}), 0) AS total"
             . ($colSubtotal ? ", COALESCE(SUM(p.{$colSubtotal}), 0) AS subtotal" : '')
             . ($colServicos ? ", COALESCE(SUM(p.{$colServicos}), 0) AS servicos" : '')
             . ($colImpostos ? ", COALESCE(SUM(p.{$colImpostos}), 0) AS impostos" : '')
             . ($colFrete ? ", COALESCE(SUM(p.{$colFrete}), 0) AS frete" : '')
             . ($colImpostoLocal ? ", COALESCE(SUM(p.{$colImpostoLocal}), 0) AS imposto_local" : '')
-            . " FROM pedidos p WHERE {$whereStr} GROUP BY p.status ORDER BY total DESC";
+            . " FROM pedidos p WHERE {$whereStr} GROUP BY p.status{$moedaGroup} ORDER BY p.status, moeda";
         $stmt2 = $this->db->prepare($sqlStatus);
         $stmt2->execute($params);
-        $porStatus = $stmt2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $porStatusRaw = $stmt2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Consolidar por status (converter USD→BRL usando taxa)
+        // Será feito na view com acesso à $taxaUsdBrl
+        $porStatus = $porStatusRaw;
 
         // Totais por moeda
         $porMoeda = [];

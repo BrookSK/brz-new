@@ -144,9 +144,29 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white border-0 pt-3">
-                    <h6 class="fw-bold mb-0"><i class="fas fa-list-alt me-2"></i>Por Status</h6>
+                    <h6 class="fw-bold mb-0"><i class="fas fa-list-alt me-2"></i>Por Status <small class="text-muted fw-normal">(valores em R$)</small></h6>
                 </div>
                 <div class="card-body p-0">
+                    <?php
+                    // Consolidar porStatus (que vem agrupado por status+moeda) em uma linha por status, convertendo USD→BRL
+                    $statusConsolidado = [];
+                    foreach ($porStatus as $row) {
+                        $st = $row['status'] ?? 'N/A';
+                        if (!isset($statusConsolidado[$st])) {
+                            $statusConsolidado[$st] = ['status' => $st, 'qtd' => 0, 'subtotal' => 0, 'servicos' => 0, 'impostos' => 0, 'imposto_local' => 0, 'frete' => 0, 'total' => 0];
+                        }
+                        $moedaRow = strtoupper($row['moeda'] ?? 'USD');
+                        $fator = ($moedaRow === 'BRL') ? 1.0 : $taxaUsdBrl;
+                        $statusConsolidado[$st]['qtd'] += (int)($row['qtd'] ?? 0);
+                        $statusConsolidado[$st]['subtotal'] += (float)($row['subtotal'] ?? 0) * $fator;
+                        $statusConsolidado[$st]['servicos'] += (float)($row['servicos'] ?? 0) * $fator;
+                        $statusConsolidado[$st]['impostos'] += (float)($row['impostos'] ?? 0) * $fator;
+                        $statusConsolidado[$st]['imposto_local'] += (float)($row['imposto_local'] ?? 0) * $fator;
+                        $statusConsolidado[$st]['frete'] += (float)($row['frete'] ?? 0) * $fator;
+                        $statusConsolidado[$st]['total'] += (float)($row['total'] ?? 0) * $fator;
+                    }
+                    usort($statusConsolidado, function($a, $b) { return $b['total'] <=> $a['total']; });
+                    ?>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
@@ -157,14 +177,14 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                                     <th class="text-end">Serviço</th>
                                     <th class="text-end">Impostos</th>
                                     <th class="text-end">Frete</th>
-                                    <th class="text-end">Total</th>
+                                    <th class="text-end">Total (R$)</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($porStatus)): ?>
+                                <?php if (empty($statusConsolidado)): ?>
                                 <tr><td colspan="7" class="text-center text-muted py-3">Nenhum dado</td></tr>
                                 <?php else: ?>
-                                <?php foreach ($porStatus as $row): ?>
+                                <?php foreach ($statusConsolidado as $row): ?>
                                 <tr>
                                     <td>
                                         <a href="/admin/relatorio-geral?date_start=<?= $dateStart ?>&date_end=<?= $dateEnd ?>&status=<?= urlencode($row['status'] ?? '') ?>&moeda=<?= urlencode($moedaFilter) ?>" class="text-decoration-none">
