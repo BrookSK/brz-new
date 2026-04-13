@@ -117,7 +117,59 @@ class AdminRelatorioGeralController extends Controller {
             $statusList = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
         } catch (\Exception $e) {}
 
-        $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList');
+        // Taxa de conversão USD→BRL do sistema
+        $taxaUsdBrl = 5.5;
+        try {
+            $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'configuracoes_moeda'];
+            foreach ($tablesToTry as $t) {
+                try {
+                    $stT = $this->db->prepare('SHOW TABLES LIKE ?');
+                    $stT->execute([$t]);
+                    if (!$stT->fetchColumn()) continue;
+
+                    if ($t === 'configuracoes_moeda') {
+                        $stR = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem='USD' AND moeda_destino='BRL' ORDER BY data_atualizacao DESC LIMIT 1");
+                        $r = (float)($stR->fetchColumn() ?: 0);
+                        if ($r > 1) { $taxaUsdBrl = $r; break; }
+                    } else {
+                        $stCols = $this->db->query('DESCRIBE ' . $t);
+                        $tCols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                        if (in_array('categoria', $tCols, true) && in_array('chave', $tCols, true)) {
+                            $valCol = in_array('valor', $tCols, true) ? 'valor' : (in_array('value', $tCols, true) ? 'value' : '');
+                            if ($valCol !== '') {
+                                $stR = $this->db->prepare("SELECT {$valCol} FROM {$t} WHERE categoria='moeda' AND chave='taxa_conversao_usd_brl' LIMIT 1");
+                                $stR->execute();
+                                $r = (float)($stR->fetchColumn() ?: 0);
+                                if ($r > 1) { $taxaUsdBrl = $r; break; }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+        } catch (\Exception $e) {}
+
+        // Totais separados por moeda (para os cards)
+        $totaisPorMoedaCards = [];
+        if ($colMoeda !== '') {
+            $sumFields = [];
+            if ($colTotal !== '') $sumFields[] = "COALESCE(SUM(p.{$colTotal}), 0) AS total";
+            if ($colSubtotal !== '') $sumFields[] = "COALESCE(SUM(p.{$colSubtotal}), 0) AS subtotal";
+            if ($colServicos !== '') $sumFields[] = "COALESCE(SUM(p.{$colServicos}), 0) AS servicos";
+            if ($colImpostos !== '') $sumFields[] = "COALESCE(SUM(p.{$colImpostos}), 0) AS impostos";
+            if ($colFrete !== '') $sumFields[] = "COALESCE(SUM(p.{$colFrete}), 0) AS frete";
+            if ($colImpostoLocal !== '') $sumFields[] = "COALESCE(SUM(p.{$colImpostoLocal}), 0) AS imposto_local";
+            $sumFields[] = "COUNT(*) AS qtd";
+
+            $sqlTM = "SELECT UPPER(COALESCE(p.{$colMoeda},'USD')) AS moeda, " . implode(', ', $sumFields)
+                . " FROM pedidos p WHERE {$whereStr} GROUP BY moeda";
+            $stTM = $this->db->prepare($sqlTM);
+            $stTM->execute($params);
+            foreach ($stTM->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $row) {
+                $totaisPorMoedaCards[strtoupper($row['moeda'] ?? 'USD')] = $row;
+            }
+        }
+
+        $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'totaisPorMoedaCards', 'taxaUsdBrl', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList');
         extract($data);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';

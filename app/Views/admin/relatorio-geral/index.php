@@ -3,23 +3,31 @@ $totais = $totais ?? [];
 $porStatus = $porStatus ?? [];
 $porMoeda = $porMoeda ?? [];
 $porPagamento = $porPagamento ?? [];
+$totaisPorMoedaCards = $totaisPorMoedaCards ?? [];
+$taxaUsdBrl = (float)($taxaUsdBrl ?? 5.5);
 $statusList = $statusList ?? [];
 $dateStart = $dateStart ?? date('Y-m-01');
 $dateEnd = $dateEnd ?? date('Y-m-d');
 $statusFilter = $statusFilter ?? '';
 $moedaFilter = $moedaFilter ?? '';
 
-function fmtVal($v, $moeda = '') {
-    $n = (float)($v ?? 0);
-    $sym = strtoupper($moeda) === 'BRL' ? 'R$' : '$';
-    return $sym . ' ' . number_format($n, 2, ',', '.');
-}
+$usd = $totaisPorMoedaCards['USD'] ?? [];
+$brl = $totaisPorMoedaCards['BRL'] ?? [];
+
 function fmtNum($v) { return number_format((float)($v ?? 0), 2, ',', '.'); }
+
+// Calcula total convertido para BRL
+function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
+    $vUsd = (float)($usdRow[$campo] ?? 0);
+    $vBrl = (float)($brlRow[$campo] ?? 0);
+    return $vBrl + ($vUsd * $taxa);
+}
 ?>
 
 <div class="container-fluid py-4">
     <div class="d-flex align-items-center justify-content-between mb-4">
         <h4 class="fw-bold mb-0"><i class="fas fa-chart-bar me-2"></i>Relatório Geral</h4>
+        <span class="text-muted small">Taxa USD→BRL: <strong><?= fmtNum($taxaUsdBrl) ?></strong></span>
     </div>
 
     <!-- Filtros -->
@@ -49,7 +57,6 @@ function fmtNum($v) { return number_format((float)($v ?? 0), 2, ',', '.'); }
                         <option value="">Todas</option>
                         <option value="USD" <?= $moedaFilter === 'USD' ? 'selected' : '' ?>>USD</option>
                         <option value="BRL" <?= $moedaFilter === 'BRL' ? 'selected' : '' ?>>BRL</option>
-                        <option value="EUR" <?= $moedaFilter === 'EUR' ? 'selected' : '' ?>>EUR</option>
                     </select>
                 </div>
                 <div class="col-md-2 col-sm-12">
@@ -59,69 +66,77 @@ function fmtNum($v) { return number_format((float)($v ?? 0), 2, ',', '.'); }
         </div>
     </div>
 
-    <!-- Cards de Totais -->
-    <div class="row g-3 mb-4">
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-receipt me-1"></i>Pedidos</div>
-                    <div class="fs-3 fw-bold text-dark"><?= number_format((int)($totais['qtd_pedidos'] ?? 0), 0, '', '.') ?></div>
+    <!-- Pedidos -->
+    <div class="row g-3 mb-2">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div><i class="fas fa-receipt me-2 text-muted"></i><span class="fw-semibold">Total de Pedidos</span></div>
+                    <span class="fs-4 fw-bold"><?= number_format((int)($totais['qtd_pedidos'] ?? 0), 0, '', '.') ?></span>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100" style="border-left:4px solid #0d6efd!important">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-dollar-sign me-1"></i>Total Geral</div>
-                    <div class="fs-4 fw-bold text-primary"><?= fmtNum($totais['total_geral'] ?? 0) ?></div>
-                    <?php if (!empty($totais['total_geral_brl']) && (float)$totais['total_geral_brl'] > 0): ?>
-                    <div class="text-muted small">BRL: R$ <?= fmtNum($totais['total_geral_brl']) ?></div>
+    </div>
+
+    <!-- Cards financeiros com breakdown por moeda -->
+    <?php
+    $campos = [
+        ['key' => 'total', 'label' => 'Total Geral', 'icon' => 'fas fa-dollar-sign', 'color' => 'primary', 'totaisKey' => 'total_geral'],
+        ['key' => 'subtotal', 'label' => 'Subtotal Produtos', 'icon' => 'fas fa-box', 'color' => 'dark', 'totaisKey' => 'total_subtotal'],
+        ['key' => 'servicos', 'label' => 'Taxa de Serviço', 'icon' => 'fas fa-concierge-bell', 'color' => 'info', 'totaisKey' => 'total_servicos'],
+        ['key' => 'impostos', 'label' => 'Impostos', 'icon' => 'fas fa-landmark', 'color' => 'warning', 'totaisKey' => 'total_impostos'],
+        ['key' => 'imposto_local', 'label' => 'Imposto Local', 'icon' => 'fas fa-flag', 'color' => 'danger', 'totaisKey' => 'total_imposto_local'],
+        ['key' => 'frete', 'label' => 'Frete', 'icon' => 'fas fa-truck', 'color' => 'success', 'totaisKey' => 'total_frete'],
+    ];
+    ?>
+    <div class="row g-3 mb-4">
+        <?php foreach ($campos as $c):
+            $totalGeral = (float)($totais[$c['totaisKey']] ?? 0);
+            if ($c['key'] === 'imposto_local' && $totalGeral <= 0) continue;
+            $vUsd = (float)($usd[$c['key']] ?? 0);
+            $vBrl = (float)($brl[$c['key']] ?? 0);
+            $convertidoBrl = totalEmBrl($usd, $brl, $c['key'], $taxaUsdBrl);
+            $temDuasMoedas = ($vUsd > 0 && $vBrl > 0);
+        ?>
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="border-left:4px solid var(--bs-<?= $c['color'] ?>)!important">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small"><i class="<?= $c['icon'] ?> me-1"></i><?= $c['label'] ?></span>
+                    </div>
+
+                    <?php if ($vUsd > 0): ?>
+                    <div class="d-flex align-items-baseline justify-content-between">
+                        <span class="text-muted small">USD</span>
+                        <span class="fs-5 fw-bold">$ <?= fmtNum($vUsd) ?></span>
+                    </div>
+                    <div class="d-flex align-items-baseline justify-content-between">
+                        <span class="text-muted small" style="font-size:.75rem">≈ BRL</span>
+                        <span class="text-muted small">R$ <?= fmtNum($vUsd * $taxaUsdBrl) ?></span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($vBrl > 0): ?>
+                    <div class="d-flex align-items-baseline justify-content-between <?= $vUsd > 0 ? 'mt-1 pt-1 border-top' : '' ?>">
+                        <span class="text-muted small">BRL</span>
+                        <span class="fs-5 fw-bold">R$ <?= fmtNum($vBrl) ?></span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($temDuasMoedas): ?>
+                    <div class="mt-2 pt-2 border-top d-flex align-items-baseline justify-content-between">
+                        <span class="fw-semibold small text-<?= $c['color'] ?>">Total em BRL</span>
+                        <span class="fw-bold text-<?= $c['color'] ?>">R$ <?= fmtNum($convertidoBrl) ?></span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!$vUsd && !$vBrl && $totalGeral > 0): ?>
+                    <div class="fs-5 fw-bold"><?= fmtNum($totalGeral) ?></div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-box me-1"></i>Subtotal Produtos</div>
-                    <div class="fs-5 fw-bold"><?= fmtNum($totais['total_subtotal'] ?? 0) ?></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-concierge-bell me-1"></i>Taxa de Serviço</div>
-                    <div class="fs-5 fw-bold text-info"><?= fmtNum($totais['total_servicos'] ?? 0) ?></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-landmark me-1"></i>Impostos</div>
-                    <div class="fs-5 fw-bold text-warning"><?= fmtNum($totais['total_impostos'] ?? 0) ?></div>
-                </div>
-            </div>
-        </div>
-        <?php if (isset($totais['total_imposto_local']) && (float)$totais['total_imposto_local'] > 0): ?>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-flag me-1"></i>Imposto Local</div>
-                    <div class="fs-5 fw-bold text-danger"><?= fmtNum($totais['total_imposto_local']) ?></div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-        <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1"><i class="fas fa-truck me-1"></i>Frete</div>
-                    <div class="fs-5 fw-bold text-success"><?= fmtNum($totais['total_frete'] ?? 0) ?></div>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </div>
 
     <div class="row g-4">
