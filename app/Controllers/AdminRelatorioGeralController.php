@@ -125,35 +125,22 @@ class AdminRelatorioGeralController extends Controller {
         } catch (\Exception $e) {}
 
         // Taxa de conversão USD→BRL do sistema
-        $taxaUsdBrl = 5.5;
+        $taxaUsdBrl = 5.85;
         try {
-            $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'configuracoes_moeda'];
-            foreach ($tablesToTry as $t) {
-                try {
-                    $stT = $this->db->prepare('SHOW TABLES LIKE ?');
-                    $stT->execute([$t]);
-                    if (!$stT->fetchColumn()) continue;
-
-                    if ($t === 'configuracoes_moeda') {
-                        $stR = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem='USD' AND moeda_destino='BRL' ORDER BY data_atualizacao DESC LIMIT 1");
-                        $r = (float)($stR->fetchColumn() ?: 0);
-                        if ($r > 1) { $taxaUsdBrl = $r; break; }
-                    } else {
-                        $stCols = $this->db->query('DESCRIBE ' . $t);
-                        $tCols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
-                        if (in_array('categoria', $tCols, true) && in_array('chave', $tCols, true)) {
-                            $valCol = in_array('valor', $tCols, true) ? 'valor' : (in_array('value', $tCols, true) ? 'value' : '');
-                            if ($valCol !== '') {
-                                $stR = $this->db->prepare("SELECT {$valCol} FROM {$t} WHERE categoria='moeda' AND chave='taxa_conversao_usd_brl' LIMIT 1");
-                                $stR->execute();
-                                $r = (float)($stR->fetchColumn() ?: 0);
-                                if ($r > 1) { $taxaUsdBrl = $r; break; }
-                            }
-                        }
-                    }
-                } catch (\Exception $e) {}
+            // Usar PedidoManualService que já tem a lógica robusta de busca
+            $svc = new \App\Services\PedidoManualService();
+            $r = $svc->getTaxaConversaoUSDBRL();
+            if ($r > 1) {
+                $taxaUsdBrl = $r;
             }
-        } catch (\Exception $e) {}
+        } catch (\Exception $e) {
+            // Fallback: buscar direto da tabela
+            try {
+                $stR = $this->db->query("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                $r = (float)($stR->fetchColumn() ?: 0);
+                if ($r > 1) { $taxaUsdBrl = $r; }
+            } catch (\Exception $e2) {}
+        }
 
         // Totais separados por moeda (para os cards)
         $totaisPorMoedaCards = [];
