@@ -136,7 +136,7 @@ class CopilotoApiController extends Controller {
             }
 
             // Verificar se item já existe no carrinho
-            $stItem = $pdo->prepare("SELECT id, quantidade FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1");
+            $stItem = $pdo->prepare("SELECT id, quantidade FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? AND (produto_variacao_id IS NULL OR produto_variacao_id = 0) LIMIT 1");
             $stItem->execute([$cartId, $produtoId]);
             $itemExistente = $stItem->fetch(\PDO::FETCH_ASSOC);
 
@@ -145,15 +145,10 @@ class CopilotoApiController extends Controller {
             if ($itemExistente) {
                 $novaQtd = (int) $itemExistente['quantidade'] + $quantidade;
                 $subtotal = $novaQtd * $preco;
-                $pdo->prepare("UPDATE carrinho_items SET quantidade = ?, subtotal = ? WHERE id = ?")->execute([$novaQtd, $subtotal, $itemExistente['id']]);
+                $pdo->prepare("UPDATE carrinho_items SET quantidade = ?, valor_unitario = ?, subtotal = ?, updated_at = NOW() WHERE id = ?")->execute([$novaQtd, $preco, $subtotal, $itemExistente['id']]);
             } else {
                 $subtotal = $quantidade * $preco;
-                // Detectar colunas disponíveis
-                $cols = [];
-                try { $cols = $pdo->query('DESCRIBE carrinho_items')->fetchAll(\PDO::FETCH_COLUMN) ?: []; } catch (\Exception $e) {}
-                $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
-                
-                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal) VALUES (?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, quantidade, valor_unitario, subtotal) VALUES (?, ?, NULL, ?, ?, ?)";
                 $pdo->prepare($sql)->execute([$cartId, $produtoId, $quantidade, $preco, $subtotal]);
             }
 
