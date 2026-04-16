@@ -220,6 +220,20 @@
       },
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
       trocar_moeda_usd: function () { salvarEstadoChat(); window.location.href = '/lang/en' },
+      limpar_carrinho: function () {
+        return fetch('/carrinho/limpar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          credentials: 'same-origin'
+        }).then(function() {
+          adicionarMsg('assistant', '🗑️ Carrinho limpo!')
+          var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
+          if (badge) badge.textContent = '0'
+          if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1000) }
+        }).catch(function() {
+          adicionarMsg('assistant', '❌ Não consegui limpar. Tenta pelo botão "Limpar Carrinho" na página.')
+        })
+      },
       consultar_status_pedido: function () { adicionarMsg('assistant', '📦 Use a página de rastreamento: /rastreamento com seu código dos Correios.') },
       abrir_whatsapp_vendas: function () { window.open('https://wa.me/' + CONFIG.whatsapp_vendas + (p.mensagem ? '?text=' + encodeURIComponent(p.mensagem) : ''), '_blank') },
       ir_para_checkout: function () { salvarEstadoChat(); window.location.href = '/checkout' },
