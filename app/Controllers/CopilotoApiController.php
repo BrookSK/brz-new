@@ -4,6 +4,11 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\CopilotoService;
 
+// Forçar recarga do OPcache para este arquivo (remover após deploy estabilizar)
+if (function_exists('opcache_invalidate')) {
+    @opcache_invalidate(__FILE__, true);
+}
+
 /**
  * CopilotoApiController — Endpoints da API do Co-Piloto (100% PHP)
  * Widget JS chama estas rotas via fetch() no mesmo domínio
