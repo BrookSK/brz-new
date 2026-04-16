@@ -153,8 +153,8 @@ class CopilotoApiController extends Controller {
                 try { $cols = $pdo->query('DESCRIBE carrinho_items')->fetchAll(\PDO::FETCH_COLUMN) ?: []; } catch (\Exception $e) {}
                 $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
                 
-                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, nome) VALUES (?, ?, ?, ?, ?, ?)";
-                $pdo->prepare($sql)->execute([$cartId, $produtoId, $quantidade, $preco, $subtotal, $produto['name'] ?? '']);
+                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal) VALUES (?, ?, ?, ?, ?)";
+                $pdo->prepare($sql)->execute([$cartId, $produtoId, $quantidade, $preco, $subtotal]);
             }
 
             // Recalcular total do carrinho
