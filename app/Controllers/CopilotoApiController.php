@@ -111,9 +111,17 @@ class CopilotoApiController extends Controller {
             }
 
             $pdo = \Config\Database::getConnection();
-            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            $userId = (int) ($_SESSION['usuario_id'] ?? $_SESSION['user_id'] ?? $_SESSION['logado_id'] ?? 0);
+            // Fallback: tentar buscar pelo remember_token se sessão não tem user
+            if ($userId <= 0 && !empty($_COOKIE['remember_token'])) {
+                try {
+                    $stUser = $pdo->prepare("SELECT id FROM usuarios WHERE remember_token = ? LIMIT 1");
+                    $stUser->execute([$_COOKIE['remember_token']]);
+                    $userId = (int) ($stUser->fetchColumn() ?: 0);
+                } catch (\Exception $e) {}
+            }
             if ($userId <= 0) {
-                $this->responderJson(['error' => 'Você precisa estar logado'], 401);
+                $this->responderJson(['error' => 'Não logado', 'debug_session_keys' => array_keys($_SESSION ?? [])], 401);
             }
 
             // Verificar produto
@@ -167,7 +175,9 @@ class CopilotoApiController extends Controller {
             $this->responderJson([
                 'success' => true,
                 'produto_nome' => $produto['name'] ?? '',
-                'total_itens' => $totalItens
+                'total_itens' => $totalItens,
+                'debug_user_id' => $userId,
+                'debug_cart_id' => $cartId
             ]);
         } catch (\Throwable $e) {
             error_log('[CoPiloto] Erro carrinho: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
