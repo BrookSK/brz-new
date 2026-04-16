@@ -176,8 +176,14 @@ class CopilotoApiController extends Controller {
                 'success' => true,
                 'produto_nome' => $produto['name'] ?? '',
                 'total_itens' => $totalItens,
-                'debug_user_id' => $userId,
-                'debug_cart_id' => $cartId
+                'debug' => [
+                    'user_id' => $userId,
+                    'cart_id' => $cartId,
+                    'produto_id' => $produtoId,
+                    'quantidade' => $quantidade,
+                    'all_cart_ids' => array_map('intval', $cartIds ?: []),
+                    'session_keys' => array_keys($_SESSION ?? [])
+                ]
             ]);
         } catch (\Throwable $e) {
             error_log('[CoPiloto] Erro carrinho: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
