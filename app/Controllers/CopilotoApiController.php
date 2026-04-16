@@ -127,14 +127,33 @@ class CopilotoApiController extends Controller {
             // Garantir estoque suficiente
             $pdo->prepare("UPDATE produtos SET stock = GREATEST(COALESCE(stock, 0), 999) WHERE id = ?")->execute([$produtoId]);
 
-            // Usar o model Carrinho que conhece a estrutura real da tabela
-            $carrinho = new \App\Models\Carrinho();
-            $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
-            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+            // Buscar o carrinho CORRETO do usuário (mesma lógica do CarrinhoController)
+            $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
+            $stCarts->execute([$userId]);
+            $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            
+            $cartId = 0;
+            // Preferir carrinho que já tem itens (é o que o site exibe)
+            foreach ($cartIds as $cid) {
+                $stCnt = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                $stCnt->execute([(int)$cid]);
+                if ((int)$stCnt->fetchColumn() > 0) { $cartId = (int)$cid; break; }
+            }
+            // Fallback: carrinho mais recente
+            if ($cartId <= 0 && !empty($cartIds)) $cartId = (int)$cartIds[0];
+            // Último recurso: criar novo
             if ($cartId <= 0) {
-                $this->responderJson(['error' => 'Erro ao criar carrinho'], 500);
+                $carrinho = new \App\Models\Carrinho();
+                $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
+                $cartId = is_array($cart) ? (int)($cart['id'] ?? 0) : (int)$cart;
             }
 
+            if ($cartId <= 0) {
+                $this->responderJson(['error' => 'Erro ao encontrar carrinho'], 500);
+            }
+
+            // Adicionar item usando o model (que conhece a estrutura da tabela)
+            $carrinho = new \App\Models\Carrinho();
             $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
             if (!$ok) {
                 $this->responderJson(['error' => 'Falha ao adicionar (model retornou false)'], 500);
@@ -166,13 +185,15 @@ class CopilotoApiController extends Controller {
             }
 
             $pdo = \Config\Database::getConnection();
-            $stCart = $pdo->prepare("SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1");
-            $stCart->execute([$userId]);
-            $cartId = (int) ($stCart->fetchColumn() ?: 0);
+            // Buscar o carrinho correto (mesma lógica do site)
+            $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
+            $stCarts->execute([$userId]);
+            $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
-            if ($cartId > 0) {
-                $pdo->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ?")->execute([$cartId]);
-                $pdo->prepare("UPDATE carrinhos SET valor_total = 0 WHERE id = ?")->execute([$cartId]);
+            // Limpar TODOS os carrinhos do usuário
+            foreach ($cartIds as $cid) {
+                $pdo->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ?")->execute([(int)$cid]);
+                $pdo->prepare("UPDATE carrinhos SET valor_total = 0 WHERE id = ?")->execute([(int)$cid]);
             }
 
             $this->responderJson(['success' => true, 'message' => 'Carrinho limpo']);
