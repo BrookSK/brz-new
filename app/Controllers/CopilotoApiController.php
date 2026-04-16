@@ -142,13 +142,21 @@ class CopilotoApiController extends Controller {
 
             $preco = (float) ($produto['price'] ?? 0);
 
+            // Detectar nome real da coluna de preço unitário
+            $itemCols = [];
+            try { $itemCols = $pdo->query('DESCRIBE carrinho_items')->fetchAll(\PDO::FETCH_COLUMN) ?: []; } catch (\Exception $e) {}
+            $unitCol = 'valor_unitario';
+            if (in_array('preco_unitario', $itemCols, true)) $unitCol = 'preco_unitario';
+            elseif (in_array('valor_unitario', $itemCols, true)) $unitCol = 'valor_unitario';
+            elseif (in_array('price', $itemCols, true)) $unitCol = 'price';
+
             if ($itemExistente) {
                 $novaQtd = (int) $itemExistente['quantidade'] + $quantidade;
                 $subtotal = $novaQtd * $preco;
-                $pdo->prepare("UPDATE carrinho_items SET quantidade = ?, valor_unitario = ?, subtotal = ?, updated_at = NOW() WHERE id = ?")->execute([$novaQtd, $preco, $subtotal, $itemExistente['id']]);
+                $pdo->prepare("UPDATE carrinho_items SET quantidade = ?, {$unitCol} = ?, subtotal = ?, updated_at = NOW() WHERE id = ?")->execute([$novaQtd, $preco, $subtotal, $itemExistente['id']]);
             } else {
                 $subtotal = $quantidade * $preco;
-                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, quantidade, valor_unitario, subtotal) VALUES (?, ?, NULL, ?, ?, ?)";
+                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, quantidade, {$unitCol}, subtotal) VALUES (?, ?, NULL, ?, ?, ?)";
                 $pdo->prepare($sql)->execute([$cartId, $produtoId, $quantidade, $preco, $subtotal]);
             }
 
