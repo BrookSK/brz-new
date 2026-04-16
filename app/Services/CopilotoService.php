@@ -351,10 +351,11 @@ PROMPT;
     private function buscarProdutoNoBanco(string $mensagem): array {
         // Detectar se a mensagem parece ser sobre busca de produto
         $padroes = [
-            '/(?:adiciona|coloca|bota|põe|quero)\s+(?:o|a|um|uma|esse|essa|aquele|aquela|2|3|4|5|6)?\s*(.{3,80}?)(?:\s+no\s+(?:meu\s+)?carrinho|\s+pra\s+mim|\s+por\s+favor|$)/iu',
+            '/(?:adiciona|coloca|bota|põe|quero)\s+(?:o|a|um|uma|esse|essa|aquele|aquela|qualquer|algum|2|3|4|5|6)?\s*(.{3,80}?)(?:\s+no\s+(?:meu\s+)?carrinho|\s+pra\s+mim|\s+por\s+favor|$)/iu',
             '/tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40})\??/iu',
             '/(?:procur|busc|quer|precis)\w*\s+(?:o|a|um|uma|de)?\s*(.{3,40})/iu',
             '/(?:vende|vendem)\s+(.{3,40})\??/iu',
+            '/(?:shampoo|condicionador|sabonete|creme|loção|perfume|desodorante|pasta de dente|escova|toalha|panela|aspirador|vitamina|proteína|suplemento)/iu',
         ];
 
         $termo = null;
