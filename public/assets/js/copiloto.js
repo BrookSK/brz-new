@@ -221,17 +221,21 @@
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
       trocar_moeda_usd: function () { salvarEstadoChat(); window.location.href = '/lang/en' },
       limpar_carrinho: function () {
-        return fetch('/carrinho/limpar', {
+        return fetch('/api/copiloto/clear-cart', {
           method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          headers: {'Content-Type': 'application/json'},
           credentials: 'same-origin'
-        }).then(function() {
-          adicionarMsg('assistant', '🗑️ Carrinho limpo!')
-          var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
-          if (badge) badge.textContent = '0'
-          if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1000) }
+        }).then(function(r) { return r.json() }).then(function(d) {
+          if (d.success) {
+            adicionarMsg('assistant', '🗑️ Carrinho limpo!')
+            var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
+            if (badge) badge.textContent = '0'
+            if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1000) }
+          } else {
+            adicionarMsg('assistant', '❌ ' + (d.error || 'Erro ao limpar'))
+          }
         }).catch(function() {
-          adicionarMsg('assistant', '❌ Não consegui limpar. Tenta pelo botão "Limpar Carrinho" na página.')
+          adicionarMsg('assistant', '❌ Não consegui limpar. Tenta pelo botão na página.')
         })
       },
       consultar_status_pedido: function () { adicionarMsg('assistant', '📦 Use a página de rastreamento: /rastreamento com seu código dos Correios.') },

@@ -95,7 +95,6 @@ class CopilotoApiController extends Controller {
         try {
             if (session_status() === PHP_SESSION_NONE) @session_start();
             
-            // Ler body de múltiplas formas (form-data, JSON, query params)
             $raw = file_get_contents('php://input');
             $body = json_decode($raw ?: '', true);
             if (!is_array($body)) $body = [];
@@ -107,47 +106,64 @@ class CopilotoApiController extends Controller {
             }
 
             $pdo = \Config\Database::getConnection();
-
-            $st = $pdo->prepare("SELECT id, name, price, weight FROM produtos WHERE id = ? LIMIT 1");
-            $st->execute([$produtoId]);
-            $produto = $st->fetch(\PDO::FETCH_ASSOC);
-            if (!$produto) {
-                $this->responderJson(['error' => 'Produto não encontrado (ID: ' . $produtoId . ')'], 404);
-            }
-
             $userId = (int) ($_SESSION['usuario_id'] ?? 0);
             if ($userId <= 0) {
                 $this->responderJson(['error' => 'Você precisa estar logado'], 401);
             }
 
-            $carrinho = new \App\Models\Carrinho();
-            $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
-            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+            // Verificar produto
+            $st = $pdo->prepare("SELECT id, name, price, weight, stock FROM produtos WHERE id = ? LIMIT 1");
+            $st->execute([$produtoId]);
+            $produto = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$produto) {
+                $this->responderJson(['error' => 'Produto não encontrado'], 404);
+            }
+
+            // Garantir estoque suficiente (produtos de grupo geralmente não têm estoque definido)
+            $stock = (int) ($produto['stock'] ?? 0);
+            if ($stock < $quantidade) {
+                $pdo->prepare("UPDATE produtos SET stock = 999 WHERE id = ?")->execute([$produtoId]);
+            }
+
+            // Buscar ou criar carrinho
+            $stCart = $pdo->prepare("SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1");
+            $stCart->execute([$userId]);
+            $cartId = (int) ($stCart->fetchColumn() ?: 0);
 
             if ($cartId <= 0) {
-                $this->responderJson(['error' => 'Erro ao criar carrinho'], 500);
+                $pdo->prepare("INSERT INTO carrinhos (usuario_id, moeda, created_at) VALUES (?, 'BRL', NOW())")->execute([$userId]);
+                $cartId = (int) $pdo->lastInsertId();
             }
 
-            $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
-            if (!$ok) {
-                // Pode ter falhado por estoque 0 — tentar setar estoque alto temporariamente
-                // Produtos de grupo de compras geralmente não têm controle de estoque
-                try {
-                    $stStock = $pdo->prepare("SELECT stock FROM produtos WHERE id = ?");
-                    $stStock->execute([$produtoId]);
-                    $stock = (int) ($stStock->fetchColumn() ?: 0);
-                    if ($stock < $quantidade) {
-                        $pdo->prepare("UPDATE produtos SET stock = 999 WHERE id = ? AND (stock IS NULL OR stock < ?)")->execute([$produtoId, $quantidade]);
-                        // Tentar novamente
-                        $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
-                    }
-                } catch (\Throwable $e2) {}
+            // Verificar se item já existe no carrinho
+            $stItem = $pdo->prepare("SELECT id, quantidade FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1");
+            $stItem->execute([$cartId, $produtoId]);
+            $itemExistente = $stItem->fetch(\PDO::FETCH_ASSOC);
+
+            $preco = (float) ($produto['price'] ?? 0);
+
+            if ($itemExistente) {
+                $novaQtd = (int) $itemExistente['quantidade'] + $quantidade;
+                $subtotal = $novaQtd * $preco;
+                $pdo->prepare("UPDATE carrinho_items SET quantidade = ?, subtotal = ? WHERE id = ?")->execute([$novaQtd, $subtotal, $itemExistente['id']]);
+            } else {
+                $subtotal = $quantidade * $preco;
+                // Detectar colunas disponíveis
+                $cols = [];
+                try { $cols = $pdo->query('DESCRIBE carrinho_items')->fetchAll(\PDO::FETCH_COLUMN) ?: []; } catch (\Exception $e) {}
+                $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
                 
-                if (!$ok) {
-                    $this->responderJson(['error' => 'Não foi possível adicionar (estoque ou erro interno)'], 500);
-                }
+                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, nome) VALUES (?, ?, ?, ?, ?, ?)";
+                $pdo->prepare($sql)->execute([$cartId, $produtoId, $quantidade, $preco, $subtotal, $produto['name'] ?? '']);
             }
 
+            // Recalcular total do carrinho
+            $stTotal = $pdo->prepare("SELECT COALESCE(SUM(subtotal), 0) FROM carrinho_items WHERE carrinho_id = ?");
+            $stTotal->execute([$cartId]);
+            $total = (float) $stTotal->fetchColumn();
+            $pdo->prepare("UPDATE carrinhos SET valor_total = ? WHERE id = ?")->execute([$total, $cartId]);
+
+            // Contar itens
             $stCnt = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
             $stCnt->execute([$cartId]);
             $totalItens = (int) ($stCnt->fetchColumn() ?: 0);
@@ -158,7 +174,33 @@ class CopilotoApiController extends Controller {
                 'total_itens' => $totalItens
             ]);
         } catch (\Throwable $e) {
-            error_log('[CoPiloto] Erro carrinho: ' . $e->getMessage());
+            error_log('[CoPiloto] Erro carrinho: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+            $this->responderJson(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /** POST /api/copiloto/clear-cart — Limpar carrinho via copiloto */
+    public function carrinhoLimpar(Request $request) {
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId <= 0) {
+                $this->responderJson(['error' => 'Não logado'], 401);
+            }
+
+            $pdo = \Config\Database::getConnection();
+            $stCart = $pdo->prepare("SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1");
+            $stCart->execute([$userId]);
+            $cartId = (int) ($stCart->fetchColumn() ?: 0);
+
+            if ($cartId > 0) {
+                $pdo->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ?")->execute([$cartId]);
+                $pdo->prepare("UPDATE carrinhos SET valor_total = 0 WHERE id = ?")->execute([$cartId]);
+            }
+
+            $this->responderJson(['success' => true, 'message' => 'Carrinho limpo']);
+        } catch (\Throwable $e) {
+            error_log('[CoPiloto] Erro limpar carrinho: ' . $e->getMessage());
             $this->responderJson(['error' => $e->getMessage()], 500);
         }
     }
