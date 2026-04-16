@@ -287,7 +287,7 @@
       } else {
         var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
         if (badge && d.total_itens) badge.textContent = d.total_itens
-        adicionarMsg('assistant', '✅ ' + (d.produto_nome || 'Produto') + ' adicionado!' + (d.debug ? ' [user:' + d.debug.user_id + ' cart:' + d.debug.cart_id + ' carts:' + JSON.stringify(d.debug.all_cart_ids) + ']' : ''))
+        adicionarMsg('assistant', '✅ ' + (d.produto_nome || 'Produto') + ' adicionado ao carrinho!')
         if (window.location.pathname === '/carrinho') { salvarEstadoChat(); setTimeout(function(){ window.location.reload() }, 1500) }
       }
     }).catch(function(err) {

@@ -4,11 +4,6 @@ namespace App\Controllers;
 use App\Core\Request;
 use App\Services\CopilotoService;
 
-// Forçar recarga do OPcache para este arquivo (remover após deploy estabilizar)
-if (function_exists('opcache_invalidate')) {
-    @opcache_invalidate(__FILE__, true);
-}
-
 /**
  * CopilotoApiController — Endpoints da API do Co-Piloto (100% PHP)
  * Widget JS chama estas rotas via fetch() no mesmo domínio
@@ -132,24 +127,18 @@ class CopilotoApiController extends Controller {
                 $this->responderJson(['error' => 'Produto não encontrado'], 404);
             }
 
-            // Garantir estoque suficiente
-            $pdo->prepare("UPDATE produtos SET stock = GREATEST(COALESCE(stock, 0), 999) WHERE id = ?")->execute([$produtoId]);
-
             // Buscar o carrinho CORRETO do usuário (mesma lógica do CarrinhoController)
             $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
             $stCarts->execute([$userId]);
             $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             
             $cartId = 0;
-            // Preferir carrinho que já tem itens (é o que o site exibe)
             foreach ($cartIds as $cid) {
                 $stCnt = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
                 $stCnt->execute([(int)$cid]);
                 if ((int)$stCnt->fetchColumn() > 0) { $cartId = (int)$cid; break; }
             }
-            // Fallback: carrinho mais recente
             if ($cartId <= 0 && !empty($cartIds)) $cartId = (int)$cartIds[0];
-            // Último recurso: criar novo
             if ($cartId <= 0) {
                 $carrinho = new \App\Models\Carrinho();
                 $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
@@ -160,11 +149,11 @@ class CopilotoApiController extends Controller {
                 $this->responderJson(['error' => 'Erro ao encontrar carrinho'], 500);
             }
 
-            // Adicionar item usando o model (que conhece a estrutura da tabela)
+            // Adicionar item — respeita estoque do cadastro do produto
             $carrinho = new \App\Models\Carrinho();
             $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
             if (!$ok) {
-                $this->responderJson(['error' => 'Falha ao adicionar (model retornou false)'], 500);
+                $this->responderJson(['error' => 'Produto indisponível ou sem estoque no momento'], 400);
             }
 
             // Contar itens
@@ -175,15 +164,7 @@ class CopilotoApiController extends Controller {
             $this->responderJson([
                 'success' => true,
                 'produto_nome' => $produto['name'] ?? '',
-                'total_itens' => $totalItens,
-                'debug' => [
-                    'user_id' => $userId,
-                    'cart_id' => $cartId,
-                    'produto_id' => $produtoId,
-                    'quantidade' => $quantidade,
-                    'all_cart_ids' => array_map('intval', $cartIds ?: []),
-                    'session_keys' => array_keys($_SESSION ?? [])
-                ]
+                'total_itens' => $totalItens
             ]);
         } catch (\Throwable $e) {
             error_log('[CoPiloto] Erro carrinho: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
