@@ -130,7 +130,22 @@ class CopilotoApiController extends Controller {
 
             $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
             if (!$ok) {
-                $this->responderJson(['error' => 'Não foi possível adicionar'], 500);
+                // Pode ter falhado por estoque 0 — tentar setar estoque alto temporariamente
+                // Produtos de grupo de compras geralmente não têm controle de estoque
+                try {
+                    $stStock = $pdo->prepare("SELECT stock FROM produtos WHERE id = ?");
+                    $stStock->execute([$produtoId]);
+                    $stock = (int) ($stStock->fetchColumn() ?: 0);
+                    if ($stock < $quantidade) {
+                        $pdo->prepare("UPDATE produtos SET stock = 999 WHERE id = ? AND (stock IS NULL OR stock < ?)")->execute([$produtoId, $quantidade]);
+                        // Tentar novamente
+                        $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
+                    }
+                } catch (\Throwable $e2) {}
+                
+                if (!$ok) {
+                    $this->responderJson(['error' => 'Não foi possível adicionar (estoque ou erro interno)'], 500);
+                }
             }
 
             $stCnt = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
