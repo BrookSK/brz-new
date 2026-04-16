@@ -87,12 +87,18 @@
     else if (url === '/produtos') ctx.pagina = 'catalogo'
     var badge = qs('[class*="carrinho"] [class*="count"], .cart-count')
     if (badge) ctx.carrinho_qtd = parseInt(badge.textContent) || 0
-    var nomeEl = qs('[class*="user-name"], [class*="usuario-nome"]')
-    if (nomeEl) ctx.usuario_nome = nomeEl.textContent.trim()
+    var nomeEl = qs('.user-menu .dropdown-toggle, #userDropdown, [class*="user-name"], [class*="usuario-nome"]')
+    if (nomeEl) ctx.usuario_nome = nomeEl.textContent.trim().replace(/[\n\r]+/g, ' ').trim()
     return ctx
   }
   function verificarLogin () {
-    return !!(document.cookie.includes('PHPSESSID') && qs('[href*="logout"], [href*="sair"]'))
+    // Cookie de sessão é httpOnly — não dá pra ler via JS
+    // Detectar login pela presença de elementos de UI
+    return !!(
+      qs('[href*="logout"], [href*="sair"], a[href="/logout"]') ||
+      qs('[class*="minha-conta"], [class*="my-account"], [href*="meus-dados"], [href*="meus-pedidos"]') ||
+      qs('.user-menu, .dropdown-user, [class*="usuario-logado"]')
+    )
   }
   function detectarMoeda () {
     // Verificar seletor de moeda no header do site
