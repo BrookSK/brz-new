@@ -124,52 +124,21 @@ class CopilotoApiController extends Controller {
                 $this->responderJson(['error' => 'Produto não encontrado'], 404);
             }
 
-            // Garantir estoque suficiente (produtos de grupo geralmente não têm estoque definido)
-            $stock = (int) ($produto['stock'] ?? 0);
-            if ($stock < $quantidade) {
-                $pdo->prepare("UPDATE produtos SET stock = 999 WHERE id = ?")->execute([$produtoId]);
-            }
+            // Garantir estoque suficiente
+            $pdo->prepare("UPDATE produtos SET stock = GREATEST(COALESCE(stock, 0), 999) WHERE id = ?")->execute([$produtoId]);
 
-            // Buscar ou criar carrinho
-            $stCart = $pdo->prepare("SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1");
-            $stCart->execute([$userId]);
-            $cartId = (int) ($stCart->fetchColumn() ?: 0);
-
+            // Usar o model Carrinho que conhece a estrutura real da tabela
+            $carrinho = new \App\Models\Carrinho();
+            $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
+            $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
             if ($cartId <= 0) {
-                $pdo->prepare("INSERT INTO carrinhos (usuario_id, moeda, created_at) VALUES (?, 'BRL', NOW())")->execute([$userId]);
-                $cartId = (int) $pdo->lastInsertId();
+                $this->responderJson(['error' => 'Erro ao criar carrinho'], 500);
             }
 
-            // Verificar se item já existe no carrinho
-            $stItem = $pdo->prepare("SELECT id, quantidade FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? AND (produto_variacao_id IS NULL OR produto_variacao_id = 0) LIMIT 1");
-            $stItem->execute([$cartId, $produtoId]);
-            $itemExistente = $stItem->fetch(\PDO::FETCH_ASSOC);
-
-            $preco = (float) ($produto['price'] ?? 0);
-
-            // Detectar nome real da coluna de preço unitário
-            $itemCols = [];
-            try { $itemCols = $pdo->query('DESCRIBE carrinho_items')->fetchAll(\PDO::FETCH_COLUMN) ?: []; } catch (\Exception $e) {}
-            $unitCol = 'valor_unitario';
-            if (in_array('preco_unitario', $itemCols, true)) $unitCol = 'preco_unitario';
-            elseif (in_array('valor_unitario', $itemCols, true)) $unitCol = 'valor_unitario';
-            elseif (in_array('price', $itemCols, true)) $unitCol = 'price';
-
-            if ($itemExistente) {
-                $novaQtd = (int) $itemExistente['quantidade'] + $quantidade;
-                $subtotal = $novaQtd * $preco;
-                $pdo->prepare("UPDATE carrinho_items SET quantidade = ?, {$unitCol} = ?, subtotal = ?, updated_at = NOW() WHERE id = ?")->execute([$novaQtd, $preco, $subtotal, $itemExistente['id']]);
-            } else {
-                $subtotal = $quantidade * $preco;
-                $sql = "INSERT INTO carrinho_items (carrinho_id, produto_id, produto_variacao_id, quantidade, {$unitCol}, subtotal) VALUES (?, ?, NULL, ?, ?, ?)";
-                $pdo->prepare($sql)->execute([$cartId, $produtoId, $quantidade, $preco, $subtotal]);
+            $ok = $carrinho->adicionarItem($cartId, $produtoId, $quantidade, null, null);
+            if (!$ok) {
+                $this->responderJson(['error' => 'Falha ao adicionar (model retornou false)'], 500);
             }
-
-            // Recalcular total do carrinho
-            $stTotal = $pdo->prepare("SELECT COALESCE(SUM(subtotal), 0) FROM carrinho_items WHERE carrinho_id = ?");
-            $stTotal->execute([$cartId]);
-            $total = (float) $stTotal->fetchColumn();
-            $pdo->prepare("UPDATE carrinhos SET valor_total = ? WHERE id = ?")->execute([$total, $cartId]);
 
             // Contar itens
             $stCnt = $pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
