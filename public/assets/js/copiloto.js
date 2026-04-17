@@ -323,9 +323,24 @@
       if (typing.parentNode) typing.parentNode.removeChild(typing)
       if (!r.ok) throw new Error('HTTP ' + r.status)
       var d = await r.json()
-      adicionarMsg('assistant', d.resposta || 'Hmm, não consegui processar. Tenta de novo?')
-      if (d.acao_frontend && d.acao_frontend.tipo && d.acao_frontend.tipo !== 'nenhuma') {
-        await executarAcao(d.acao_frontend.tipo, d.acao_frontend.parametros)
+
+      // Para ações de carrinho: executar ANTES de mostrar a resposta do Claude
+      // Assim não mostramos "Adicionei!" se a ação falhar
+      var acaoTipo = (d.acao_frontend && d.acao_frontend.tipo) ? d.acao_frontend.tipo : 'nenhuma'
+      if (acaoTipo === 'adicionar_carrinho' || acaoTipo === 'limpar_carrinho') {
+        // Executar ação primeiro — a função addToCart/limpar já mostra mensagem de sucesso/erro
+        await executarAcao(acaoTipo, d.acao_frontend.parametros)
+        // Mostrar resposta do Claude só se não for sobre "adicionei" (evitar duplicação)
+        var textoResp = d.resposta || ''
+        if (!textoResp.match(/adicion|✅|carrinho.*limpo|zerado/i)) {
+          adicionarMsg('assistant', textoResp)
+        }
+      } else {
+        // Para outras ações: mostrar resposta e executar depois (comportamento normal)
+        adicionarMsg('assistant', d.resposta || 'Hmm, não consegui processar. Tenta de novo?')
+        if (acaoTipo !== 'nenhuma') {
+          await executarAcao(acaoTipo, d.acao_frontend.parametros)
+        }
       }
       if (d.max_tentativas_problema != null) estado_suporte.max_tentativas = d.max_tentativas_problema
       if (d.oferecer_ticket) estado_suporte.tentativas = 999
