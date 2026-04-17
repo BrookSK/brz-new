@@ -368,14 +368,72 @@ class CopilotoApiController extends Controller {
 
     /** POST /api/copiloto/ticket */
     public function ticket(Request $request) {
-        $body = $request->getBody();
-        $assunto = $this->sanitizar((string) ($body['assunto'] ?? ''));
-        $mensagem = $this->sanitizar((string) ($body['mensagem'] ?? ''));
-        if (empty($assunto) || empty($mensagem)) {
-            $this->responderJson(['erro' => 'Assunto e mensagem são obrigatórios.'], 400);
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            
+            $raw = file_get_contents('php://input');
+            $body = json_decode($raw ?: '', true);
+            if (!is_array($body)) $body = [];
+            
+            $assunto = trim((string) ($body['assunto'] ?? $request->getParam('assunto', '')));
+            $mensagem = trim((string) ($body['mensagem'] ?? $request->getParam('mensagem', '')));
+            $categoria = trim((string) ($body['categoria'] ?? 'duvidas_gerais'));
+            $numeroPedido = trim((string) ($body['numero_pedido'] ?? ''));
+
+            // Se assunto ou mensagem vazios, usar defaults
+            if (empty($assunto)) $assunto = 'Dúvida via Co-Piloto';
+            if (empty($mensagem)) $mensagem = 'Ticket aberto via Co-Piloto Braziliana.';
+
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId <= 0) {
+                $this->responderJson(['erro' => 'Você precisa estar logado para abrir um ticket.'], 401);
+            }
+
+            $pdo = \Config\Database::getConnection();
+
+            // Criar ticket real no sistema
+            $colsTickets = [];
+            try {
+                $st = $pdo->query('DESCRIBE support_tickets');
+                $colsTickets = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) {
+                $this->responderJson(['erro' => 'Sistema de tickets não disponível.'], 500);
+            }
+
+            $pedidoId = null;
+            if ($numeroPedido) {
+                // Tentar encontrar o pedido pelo número
+                try {
+                    $stPed = $pdo->prepare("SELECT id FROM pedidos WHERE id = ? OR codigo = ? LIMIT 1");
+                    $stPed->execute([$numeroPedido, $numeroPedido]);
+                    $pedidoId = $stPed->fetchColumn() ?: null;
+                } catch (\Exception $e) {}
+            }
+
+            $motivo = $categoria === 'suporte' ? 'Suporte do Pedido' : 'Dúvida Geral';
+
+            if (in_array('motivo', $colsTickets, true)) {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, motivo, status) VALUES (?, ?, ?, ?, 'open')");
+                $stIns->execute([$userId, $pedidoId, $assunto, $motivo]);
+            } else {
+                $stIns = $pdo->prepare("INSERT INTO support_tickets (usuario_id, pedido_id, assunto, status) VALUES (?, ?, ?, 'open')");
+                $stIns->execute([$userId, $pedidoId, $assunto]);
+            }
+            $ticketId = (int) $pdo->lastInsertId();
+
+            // Adicionar mensagem inicial
+            $pdo->prepare('INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, ?, ?, ?)')
+                ->execute([$ticketId, 'cliente', $userId, $mensagem]);
+
+            $this->responderJson([
+                'sucesso' => true,
+                'numero_ticket' => '#' . $ticketId,
+                'prazo_resposta' => '48h úteis',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[CoPiloto] Erro ticket: ' . $e->getMessage());
+            $this->responderJson(['erro' => $e->getMessage()], 500);
         }
-        $numero = 'TKT-' . strtoupper(base_convert((string) time(), 10, 36));
-        $this->responderJson(['sucesso' => true, 'numero_ticket' => $numero, 'prazo_resposta' => '48h úteis']);
     }
 
     /** GET /api/copiloto/cron */

@@ -276,13 +276,35 @@
   }
 
   async function criarTicket (cat, p) {
+    // Extrair assunto e mensagem do contexto da conversa se não fornecidos
+    var assunto = p.assunto || ''
+    var mensagem = p.mensagem || p.descricao || ''
+    
+    // Se mensagem vazia, montar a partir do histórico da conversa
+    if (!mensagem) {
+      var msgs = []
+      for (var i = Math.max(0, historico.length - 6); i < historico.length; i++) {
+        if (historico[i].role === 'user') msgs.push(historico[i].content)
+      }
+      mensagem = msgs.join('\n')
+    }
+    if (!assunto) assunto = 'Dúvida via Co-Piloto'
+    if (!mensagem) mensagem = 'Ticket aberto via Co-Piloto.'
+
     try {
       var r = await fetch('/api/copiloto/ticket', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ categoria: cat, assunto: p.assunto || 'Via Co-Piloto', mensagem: p.mensagem || p.descricao || '' })
+        credentials: 'same-origin',
+        body: JSON.stringify({ 
+          categoria: cat, 
+          assunto: assunto, 
+          mensagem: mensagem,
+          numero_pedido: p.numero_pedido || null
+        })
       })
       var d = await r.json()
       if (d.sucesso) adicionarMsg('assistant', '✅ Chamado ' + d.numero_ticket + ' aberto! Resposta em até ' + d.prazo_resposta + '.')
+      else adicionarMsg('assistant', '❌ ' + (d.erro || 'Erro ao abrir ticket'))
     } catch (e) { adicionarMsg('assistant', 'Não consegui abrir o chamado. Tenta novamente?') }
   }
 
