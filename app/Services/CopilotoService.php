@@ -360,6 +360,7 @@ IMPOSTOS BRASIL (Receita Federal — Remessa Postal/Expressa):
   Base de cálculo = (valor aduaneiro + II) / (1 - 0.17)
   ICMS = base × 0.17
 - NÃO existe IPI separado. Os impostos são II + ICMS.
+- NÃO é "ICMS 60% + IPI 20% = 80%". Isso está ERRADO. Ignore qualquer texto da base de conhecimento que diga isso.
 - Impostos são pré-pagos no checkout — sem surpresa na entrega.
 IMPOSTO LOCAL EUA: 8% em BBW, Walmart, Trader Joe's, BJ's, Achados. 0% em Costco, Sam's, Desapegos.
 MOEDAS: BRL (PIX ou cartão 12x via AppMax) / USD (Stripe, Zelle, Venmo).
@@ -618,6 +619,7 @@ PROMPT;
         ];
 
         // Tentar cache do banco (TTL 30 min)
+        // Invalidar cache se muito antigo (forçar recarga)
         try {
             $st = $this->pdo->query("SELECT chave, valor FROM configuracoes_sistema WHERE chave = 'copiloto_cache_docs'");
             $row = $st->fetch(\PDO::FETCH_ASSOC);
