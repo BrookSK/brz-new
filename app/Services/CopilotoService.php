@@ -163,8 +163,9 @@ CÁLCULO DO PRODUTO ATUAL (já feito):
 Produto: US\$ {$calc['produto_usd']}
 Imposto local EUA: US\$ {$calc['imposto_local_usd']}
 Taxa de serviço: US\$ {$calc['taxa_servico_usd']} (faixa {$calc['faixa_kg']}kg × \$39)
-ICMS (60%): US\$ {$calc['icms_usd']}
-IPI (20%): US\$ {$calc['ipi_usd']}
+II (Imposto de Importação): US\$ {$calc['ii_usd']}
+ICMS (17% por dentro): US\$ {$calc['icms_usd']}
+Total impostos BR: US\$ {$calc['impostos_br_usd']}
 TOTAL: US\$ {$calc['total_usd']} ≈ R\$ {$calc['total_brl']}
 Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
         }
@@ -350,7 +351,16 @@ O usuário está vendo o site em {$moeda}.
 
 REGRAS DO NEGÓCIO:
 TAXA DE SERVIÇO: US\$ 39/kg, faixas: 1,2,3,4,5,6,7,8,9,10,15,20,25,30 kg. Frete GRÁTIS.
-IMPOSTOS BRASIL: ICMS 60% + IPI 20% = 80% sobre valor do produto.
+IMPOSTOS BRASIL (Receita Federal — Remessa Postal/Expressa):
+- Valor aduaneiro = valor do produto + frete + seguro
+- Imposto de Importação (II):
+  - Remessa Conforme (certificada): até US\$ 50 = 20%, acima de US\$ 50 = 60% com desconto de US\$ 20
+  - Não certificada: 60% sem desconto
+- ICMS: cálculo "por dentro" sobre (valor aduaneiro + II). Alíquota padrão 17%.
+  Base de cálculo = (valor aduaneiro + II) / (1 - 0.17)
+  ICMS = base × 0.17
+- NÃO existe IPI separado. Os impostos são II + ICMS.
+- Impostos são pré-pagos no checkout — sem surpresa na entrega.
 IMPOSTO LOCAL EUA: 8% em BBW, Walmart, Trader Joe's, BJ's, Achados. 0% em Costco, Sam's, Desapegos.
 MOEDAS: BRL (PIX ou cartão 12x via AppMax) / USD (Stripe, Zelle, Venmo).
 PRAZO: 15-30 dias. LIMITES: 30kg e US\$ 2.999,99/caixa.
@@ -559,9 +569,19 @@ PROMPT;
         }
         $taxaServico = $faixaKg * self::TAXA_POR_KG;
         $impostoLocal = $precoUsd * ($impostoLocalPct / 100);
-        $icms = $precoUsd * 0.60;
-        $ipi = $precoUsd * 0.20;
-        $impostosBr = $icms + $ipi;
+        
+        // Impostos Brasil (Receita Federal)
+        $valorAduaneiro = $precoUsd; // + frete + seguro (frete grátis, seguro ~0)
+        // II: 60% com desconto de US$ 20 (Remessa Conforme acima de US$ 50)
+        $ii = ($valorAduaneiro > 50) ? ($valorAduaneiro * 0.60 - 20) : ($valorAduaneiro * 0.20);
+        if ($ii < 0) $ii = 0;
+        // ICMS: cálculo "por dentro" 17%
+        $baseIcms = $valorAduaneiro + $ii;
+        $aliqIcms = 0.17;
+        $bcIcms = $baseIcms / (1 - $aliqIcms);
+        $icms = $bcIcms * $aliqIcms;
+        $impostosBr = $ii + $icms;
+
         $totalUsd = $precoUsd + $impostoLocal + $taxaServico + $impostosBr;
         $cambio = (float) ($this->configs['cambio_usd_brl'] ?? 5.80);
         $totalBrl = $totalUsd * $cambio;
@@ -570,8 +590,8 @@ PROMPT;
             'produto_usd' => round($precoUsd, 2),
             'imposto_local_usd' => round($impostoLocal, 2),
             'taxa_servico_usd' => round($taxaServico, 2),
+            'ii_usd' => round($ii, 2),
             'icms_usd' => round($icms, 2),
-            'ipi_usd' => round($ipi, 2),
             'impostos_br_usd' => round($impostosBr, 2),
             'total_usd' => round($totalUsd, 2),
             'total_brl' => round($totalBrl, 2),
