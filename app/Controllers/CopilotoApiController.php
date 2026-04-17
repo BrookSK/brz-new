@@ -203,6 +203,9 @@ class CopilotoApiController extends Controller {
     /** GET /api/copiloto/buscar-produto — Busca produtos no banco incluindo grupos de compras */
     public function buscarProduto(Request $request) {
         $termo = trim((string) $request->getParam('q', ''));
+        // Limpar pontuação e caracteres especiais
+        $termo = preg_replace('/[?!.,;:()"\'\[\]{}]/', '', $termo);
+        $termo = trim($termo);
         if (mb_strlen($termo) < 2) {
             $this->responderJson(['produtos' => [], 'grupos' => []]);
         }

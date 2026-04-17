@@ -204,8 +204,8 @@
               // Limpar palavras genéricas
               msg = msg.replace(/\b(coloca|adiciona|carrinho|meu|por favor|no|dele|dela|delas|deles|também|tambem|pode|quero|unidades?|mais|tem|temos|qual|quais|mostra|lista|que|o que)\b/gi, ' ').trim()
               // Pegar palavras com 3+ chars
-              var palavras = msg.split(/\s+/).filter(function(w) { return w.length >= 3 })
-              if (palavras.length > 0) { termo = palavras.join(' '); break }
+              var palavras = msg.split(/\s+/).filter(function(w) { return w.replace(/[?!.,]/g,'').length >= 3 })
+              if (palavras.length > 0) { termo = palavras.map(function(w){return w.replace(/[?!.,]/g,'')}).join(' '); break }
             }
           }
         }
