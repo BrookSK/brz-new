@@ -70,14 +70,23 @@
     } else if (url === '/carrinho') {
       ctx.pagina = 'carrinho'
       ctx.carrinho_itens = lerItensCarrinho()
-      // Ler subtotal do data-attribute real (USD interno)
+      // Ler todos os valores visíveis do Resumo do Pedido
       var subEl = qs('.subtotal-value')
-      ctx.carrinho_subtotal = subEl ? (parseFloat(subEl.getAttribute('data-original-value')) || parsearPreco(subEl)) : null
       var totalEl = qs('.total-value')
-      ctx.carrinho_total = totalEl ? (parseFloat(totalEl.getAttribute('data-original-value')) || parsearPreco(totalEl)) : null
-      // Ler valores visíveis na tela (na moeda ativa do usuário)
+      var taxaEl = qs('.taxa-servico-value')
+      var impostosEl = qs('.impostos-value')
+      var impostoLocalEl = qs('.imposto-local-value')
+      var freteEl = qs('.frete-value')
       ctx.carrinho_subtotal_visivel = subEl ? subEl.textContent.trim() : null
       ctx.carrinho_total_visivel = totalEl ? totalEl.textContent.trim() : null
+      ctx.carrinho_taxa_servico_visivel = taxaEl ? taxaEl.textContent.trim() : null
+      ctx.carrinho_impostos_br_visivel = impostosEl ? impostosEl.textContent.trim() : null
+      ctx.carrinho_imposto_local_visivel = impostoLocalEl ? impostoLocalEl.textContent.trim() : null
+      ctx.carrinho_frete_visivel = freteEl ? freteEl.textContent.trim() : null
+      // Quantidade total de itens (do header do resumo)
+      var qtdMatch = (qs('.card-header h5, .card-header') || {}).textContent || ''
+      var mQtd = qtdMatch.match(/(\d+)\s*iten/i)
+      ctx.carrinho_total_itens = mQtd ? parseInt(mQtd[1]) : ctx.carrinho_itens.length
     } else if (url === '/checkout') ctx.pagina = 'checkout'
     else if (url === '/rastreamento') ctx.pagina = 'rastreamento'
     else if (url.match(/\/como-funciona/)) ctx.pagina = 'como-funciona'

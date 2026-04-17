@@ -239,14 +239,33 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
         if (!empty($contexto['carrinho_itens']) && is_array($contexto['carrinho_itens'])) {
             $linhas = [];
             foreach ($contexto['carrinho_itens'] as $item) {
-                $linhas[] = "- {$item['nome']}: US\$ {$item['preco']} × {$item['quantidade']}";
+                $qtd = (int) ($item['quantidade'] ?? 1);
+                $linhas[] = "- {$item['nome']}: US\$ {$item['preco']} × {$qtd}";
             }
             $carrinhoTexto = implode("\n", $linhas);
         }
         $subtotalVisivel = $contexto['carrinho_subtotal_visivel'] ?? null;
         $totalVisivel = $contexto['carrinho_total_visivel'] ?? null;
-        $subtotal = !empty($subtotalVisivel) ? $subtotalVisivel : (!empty($contexto['carrinho_subtotal']) ? "US\$ {$contexto['carrinho_subtotal']}" : 'N/A');
-        $totalCarrinho = !empty($totalVisivel) ? $totalVisivel : '';
+        $taxaServicoVisivel = $contexto['carrinho_taxa_servico_visivel'] ?? null;
+        $impostosBrVisivel = $contexto['carrinho_impostos_br_visivel'] ?? null;
+        $impostoLocalVisivel = $contexto['carrinho_imposto_local_visivel'] ?? null;
+        $freteVisivel = $contexto['carrinho_frete_visivel'] ?? null;
+        $totalItens = $contexto['carrinho_total_itens'] ?? null;
+        $subtotal = $subtotalVisivel ?: 'N/A';
+        $totalCarrinho = $totalVisivel ?: '';
+        
+        $resumoCarrinho = '';
+        if ($subtotalVisivel || $totalVisivel) {
+            $resumoCarrinho = "\nRESUMO DO PEDIDO (valores exatos da tela):";
+            if ($totalItens) $resumoCarrinho .= "\nTotal de itens: {$totalItens}";
+            if ($subtotalVisivel) $resumoCarrinho .= "\nSubtotal: {$subtotalVisivel}";
+            if ($taxaServicoVisivel) $resumoCarrinho .= "\nTaxa de Serviço: {$taxaServicoVisivel}";
+            if ($impostosBrVisivel) $resumoCarrinho .= "\nImpostos do Brasil: {$impostosBrVisivel}";
+            if ($impostoLocalVisivel) $resumoCarrinho .= "\nImposto local: {$impostoLocalVisivel}";
+            if ($freteVisivel) $resumoCarrinho .= "\nFrete: {$freteVisivel}";
+            if ($totalVisivel) $resumoCarrinho .= "\nTOTAL: {$totalVisivel}";
+            $resumoCarrinho .= "\nIMPORTANTE: Use EXATAMENTE estes valores ao falar do carrinho. NÃO calcule por conta própria.";
+        }
         $logado = !empty($contexto['usuario_logado']) ? 'Sim' : 'Não';
         $nomeUsuario = $contexto['usuario_nome'] ?? 'Visitante';
         $moeda = $contexto['moeda_atual'] ?? 'BRL';
@@ -310,6 +329,7 @@ CARRINHO ATUAL:
 {$carrinhoTexto}
 Subtotal (como o usuário vê na tela): {$subtotal}
 Total (como o usuário vê na tela): {$totalCarrinho}
+{$resumoCarrinho}
 
 USUÁRIO:
 Logado: {$logado}
