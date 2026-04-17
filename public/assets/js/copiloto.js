@@ -214,7 +214,7 @@
           return
         }
         // Buscar na API
-        return fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termo))
+        return fetch('/api/copiloto/buscarproduto?q=' + encodeURIComponent(termo))
           .then(function(r) { return r.json() })
           .then(function(d) {
             if (d.produtos && d.produtos.length > 0) {
@@ -372,7 +372,7 @@
     if (!termo) return
     adicionarMsg('assistant', '🔍 Buscando "' + termo + '"...')
     try {
-      var r = await fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termo))
+      var r = await fetch('/api/copiloto/buscarproduto?q=' + encodeURIComponent(termo))
       var d = await r.json()
       var msgs = document.getElementById('bz-copiloto-messages')
       if (msgs.lastChild) msgs.removeChild(msgs.lastChild)
