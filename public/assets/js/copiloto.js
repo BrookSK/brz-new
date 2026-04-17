@@ -535,12 +535,17 @@
       var msgs = document.getElementById('bz-copiloto-messages')
       if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
 
-      if (d.sucesso) {
+      if (d.sucesso || d.success) {
+        var orcUrl = d.orcamento_url || (d.data && d.data.orcamento_url) || ''
+        var totalLinks = d.total_links || (d.data && d.data.total) || links.length
+        var orcId = d.orcamento_id || (d.data && d.data.orcamento_id) || ''
+        if (!orcUrl && orcId) orcUrl = '/assessoria/orcamento?orcamento_id=' + orcId
+        
         adicionarMsg('assistant', '✅ Orçamento gerado!\n\n' +
-          '📋 ' + d.total_links + ' produto(s) sendo processado(s)\n' +
-          '🔗 Acompanhe aqui: ' + d.orcamento_url + '\n\n' +
-          'O sistema está analisando os produtos agora. Em alguns minutos você terá os valores detalhados com preço, peso, taxa de serviço e impostos.\n\n' +
-          'Se alguma informação estiver errada, me avisa ou entre em contato com o suporte!')
+          '📋 ' + totalLinks + ' produto(s) sendo processado(s)\n' +
+          '🔗 Acompanhe aqui: ' + orcUrl + '\n\n' +
+          'O sistema está analisando os produtos agora. Em alguns minutos você terá os valores detalhados.\n\n' +
+          'Se alguma informação estiver errada, me avisa!')
       } else {
         adicionarMsg('assistant', '❌ ' + (d.erro || 'Erro ao gerar orçamento'))
       }
