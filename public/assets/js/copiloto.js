@@ -539,13 +539,16 @@
         var orcUrl = d.orcamento_url || (d.data && d.data.orcamento_url) || ''
         var totalLinks = d.total_links || (d.data && d.data.total) || links.length
         var orcId = d.orcamento_id || (d.data && d.data.orcamento_id) || ''
+        var jobId = d.job_id || (d.data && d.data.job_id) || ''
         if (!orcUrl && orcId) orcUrl = '/assessoria/orcamento?orcamento_id=' + orcId
         
-        adicionarMsg('assistant', '✅ Orçamento gerado!\n\n' +
-          '📋 ' + totalLinks + ' produto(s) sendo processado(s)\n' +
-          '🔗 Acompanhe aqui: ' + orcUrl + '\n\n' +
-          'O sistema está analisando os produtos agora. Em alguns minutos você terá os valores detalhados.\n\n' +
-          'Se alguma informação estiver errada, me avisa!')
+        adicionarMsg('assistant', '✅ Orçamento criado! Processando ' + totalLinks + ' produto(s)...\n\nVou te levar para a página do orçamento em instantes! ⏳')
+        
+        // Aguardar processamento e depois redirecionar
+        salvarEstadoChat()
+        setTimeout(function() {
+          window.location.href = orcUrl
+        }, 2000)
       } else {
         adicionarMsg('assistant', '❌ ' + (d.erro || 'Erro ao gerar orçamento'))
       }
