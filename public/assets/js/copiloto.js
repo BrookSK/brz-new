@@ -269,6 +269,7 @@
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
       criar_ticket_suporte: function () { return criarTicket('suporte', p) },
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
+      gerar_orcamento: function () { return gerarOrcamento(p.links || []) },
       nenhuma: function () {}
     }
     var fn = acoes[acao] || acoes.nenhuma
@@ -499,6 +500,53 @@
   // Função global para o onclick dos cards
   window._bzAddCart = function (produtoId) {
     addToCart(produtoId, 1)
+  }
+
+  async function gerarOrcamento (links) {
+    // Se links não vieram dos parâmetros do Claude, extrair do histórico
+    if (!links || links.length === 0) {
+      links = []
+      for (var i = 0; i < historico.length; i++) {
+        var txt = historico[i].content || ''
+        var urlMatches = txt.match(/https?:\/\/[^\s<>"']+/gi)
+        if (urlMatches) {
+          urlMatches.forEach(function (u) {
+            // Ignorar URLs do próprio site
+            if (u.indexOf('brazilianashop') < 0 && u.indexOf('wa.me') < 0) {
+              links.push(u.replace(/[.,;:!?)]+$/, ''))
+            }
+          })
+        }
+      }
+    }
+    if (links.length === 0) {
+      adicionarMsg('assistant', '⚠️ Não encontrei nenhum link de produto na conversa. Me manda os links dos produtos que você quer orçar!')
+      return
+    }
+    adicionarMsg('assistant', '📋 Gerando orçamento com ' + links.length + ' link(s)... Isso pode levar alguns segundos.')
+    try {
+      var r = await fetch('/api/copiloto/orcamento', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({ links: links })
+      })
+      var d = await r.json()
+      var msgs = document.getElementById('bz-copiloto-messages')
+      if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+
+      if (d.sucesso) {
+        adicionarMsg('assistant', '✅ Orçamento gerado!\n\n' +
+          '📋 ' + d.total_links + ' produto(s) sendo processado(s)\n' +
+          '🔗 Acompanhe aqui: ' + d.orcamento_url + '\n\n' +
+          'O sistema está analisando os produtos agora. Em alguns minutos você terá os valores detalhados com preço, peso, taxa de serviço e impostos.\n\n' +
+          'Se alguma informação estiver errada, me avisa ou entre em contato com o suporte!')
+      } else {
+        adicionarMsg('assistant', '❌ ' + (d.erro || 'Erro ao gerar orçamento'))
+      }
+    } catch (e) {
+      adicionarMsg('assistant', '❌ Erro ao gerar orçamento. Tenta de novo?')
+    }
   }
 
   // ========== WIDGET UI ==========

@@ -240,6 +240,7 @@ $router->post('/api/copiloto/clearcart', 'CopilotoApiController', 'carrinhoLimpa
 $router->get('/api/copiloto/buscarproduto', 'CopilotoApiController', 'buscarProduto');
 $router->get('/api/copiloto/meucarrinho', 'CopilotoApiController', 'meuCarrinho');
 $router->post('/api/copiloto/ticket', 'CopilotoApiController', 'ticket');
+$router->post('/api/copiloto/orcamento', 'CopilotoApiController', 'orcamento');
 $router->get('/api/copiloto/cron', 'CopilotoApiController', 'cron');
 
 // Desconto com Autorização

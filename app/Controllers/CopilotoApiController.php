@@ -436,6 +436,86 @@ class CopilotoApiController extends Controller {
         }
     }
 
+    /** POST /api/copiloto/orcamento — Gerar orçamento de assessoria via copiloto */
+    public function orcamento(Request $request) {
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            
+            $raw = file_get_contents('php://input');
+            $body = json_decode($raw ?: '', true);
+            if (!is_array($body)) $body = [];
+            
+            $links = $body['links'] ?? [];
+            if (!is_array($links) || empty($links)) {
+                $this->responderJson(['erro' => 'Nenhum link fornecido'], 400);
+            }
+
+            // Limpar e validar links
+            $cleanLinks = [];
+            foreach ($links as $l) {
+                $l = trim((string) $l);
+                if ($l !== '' && filter_var($l, FILTER_VALIDATE_URL)) {
+                    $cleanLinks[] = $l;
+                }
+            }
+            if (empty($cleanLinks)) {
+                $this->responderJson(['erro' => 'Nenhum link válido'], 400);
+            }
+
+            // Chamar o endpoint de assessoria internamente
+            $assessoria = new \App\Controllers\AssessoriaController();
+            
+            // Simular o request para enfileirarLinks
+            $_POST = []; // Limpar POST
+            $fakeRequest = new Request();
+            // Injetar os links no body
+            $tempInput = json_encode(['links' => $cleanLinks]);
+            
+            // Usar cURL para chamar a própria API (mais seguro que instanciar direto)
+            $baseUrl = rtrim((string) ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'), '/');
+            $sessionName = session_name();
+            $sessionId = session_id();
+            
+            $ch = curl_init($baseUrl . '/assessoria/enfileirar');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS => json_encode(['links' => $cleanLinks]),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_COOKIE => $sessionName . '=' . $sessionId,
+                CURLOPT_FOLLOWLOCATION => true,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            $result = json_decode($response ?: '', true);
+
+            if (!empty($result['success']) && !empty($result['data'])) {
+                $data = $result['data'];
+                $orcamentoUrl = $baseUrl . ($data['orcamento_url'] ?? '/assessoria/orcamento');
+                
+                $this->responderJson([
+                    'sucesso' => true,
+                    'job_id' => $data['job_id'] ?? null,
+                    'orcamento_id' => $data['orcamento_id'] ?? null,
+                    'orcamento_url' => $orcamentoUrl,
+                    'total_links' => $data['total'] ?? count($cleanLinks),
+                    'mensagem' => 'Orçamento sendo gerado! Acompanhe em: ' . $orcamentoUrl,
+                ]);
+            } else {
+                $this->responderJson([
+                    'erro' => $result['message'] ?? 'Erro ao gerar orçamento',
+                    'debug_response' => substr($response ?: '', 0, 500),
+                ], 500);
+            }
+        } catch (\Throwable $e) {
+            error_log('[CoPiloto] Erro orçamento: ' . $e->getMessage());
+            $this->responderJson(['erro' => $e->getMessage()], 500);
+        }
+    }
+
     /** GET /api/copiloto/cron */
     public function cron(Request $request) {
         $token = $request->getParam('token', '');
