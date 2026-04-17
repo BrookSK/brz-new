@@ -237,7 +237,7 @@
       trocar_moeda_brl: function () { salvarEstadoChat(); window.location.href = '/lang/pt' },
       trocar_moeda_usd: function () { salvarEstadoChat(); window.location.href = '/lang/en' },
       limpar_carrinho: function () {
-        return fetch('/api/copiloto/clear-cart', {
+        return fetch('/api/copiloto/clearcart', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           credentials: 'same-origin'
@@ -284,7 +284,7 @@
   function addToCart (produtoId, quantidade) {
     quantidade = quantidade || 1
     adicionarMsg('assistant', '🛒 Adicionando...')
-    return fetch('/api/copiloto/add-cart', {
+    return fetch('/api/copiloto/addcart', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ produto_id: produtoId, quantidade: quantidade }),

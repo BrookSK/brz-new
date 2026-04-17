@@ -235,8 +235,8 @@ $router->post('/api/copiloto/aprendizado', 'AdminCopilotoController', 'apiAprend
 $router->post('/api/copiloto/chat', 'CopilotoApiController', 'chat');
 $router->get('/api/copiloto/context', 'CopilotoApiController', 'context');
 $router->post('/api/copiloto/calculo', 'CopilotoApiController', 'calculo');
-$router->post('/api/copiloto/add-cart', 'CopilotoApiController', 'carrinhoAdicionar');
-$router->post('/api/copiloto/clear-cart', 'CopilotoApiController', 'carrinhoLimpar');
+$router->post('/api/copiloto/addcart', 'CopilotoApiController', 'carrinhoAdicionar');
+$router->post('/api/copiloto/clearcart', 'CopilotoApiController', 'carrinhoLimpar');
 $router->get('/api/copiloto/buscar-produto', 'CopilotoApiController', 'buscarProduto');
 $router->post('/api/copiloto/ticket', 'CopilotoApiController', 'ticket');
 $router->get('/api/copiloto/cron', 'CopilotoApiController', 'cron');
