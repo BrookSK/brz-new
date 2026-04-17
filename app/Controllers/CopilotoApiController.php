@@ -450,7 +450,6 @@ class CopilotoApiController extends Controller {
                 $this->responderJson(['erro' => 'Nenhum link fornecido'], 400);
             }
 
-            // Limpar e validar links
             $cleanLinks = [];
             foreach ($links as $l) {
                 $l = trim((string) $l);
@@ -462,39 +461,42 @@ class CopilotoApiController extends Controller {
                 $this->responderJson(['erro' => 'Nenhum link válido'], 400);
             }
 
-            // Chamar o endpoint de assessoria internamente
-            $assessoria = new \App\Controllers\AssessoriaController();
-            
-            // Simular o request para enfileirarLinks
-            $_POST = []; // Limpar POST
-            $fakeRequest = new Request();
-            // Injetar os links no body
-            $tempInput = json_encode(['links' => $cleanLinks]);
-            
-            // Usar cURL para chamar a própria API (mais seguro que instanciar direto)
-            $baseUrl = rtrim((string) ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'), '/');
-            $sessionName = session_name();
-            $sessionId = session_id();
-            
-            $ch = curl_init($baseUrl . '/assessoria/enfileirar');
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_POSTFIELDS => json_encode(['links' => $cleanLinks]),
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_COOKIE => $sessionName . '=' . $sessionId,
-                CURLOPT_FOLLOWLOCATION => true,
-            ]);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId <= 0) {
+                $this->responderJson(['erro' => 'Você precisa estar logado'], 401);
+            }
 
-            $result = json_decode($response ?: '', true);
+            // Chamar o AssessoriaController diretamente
+            // Injetar links no $_POST para que getBody() os encontre
+            $originalPost = $_POST;
+            $originalContentType = $_SERVER['CONTENT_TYPE'] ?? '';
+            $_POST = ['links' => $cleanLinks];
+            $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded'; // Forçar getBody a ler $_POST
+            
+            // Fechar sessão atual para que enfileirarLinks possa abrir
+            session_write_close();
+            
+            ob_start();
+            try {
+                $assessoria = new \App\Controllers\AssessoriaController();
+                $fakeRequest = new Request();
+                $fakeRequest->setParam('links', $cleanLinks); // Backup
+                $assessoria->enfileirarLinks($fakeRequest);
+            } catch (\Throwable $e) {
+                // Capturar exceções do controller
+            }
+            $output = ob_get_clean();
+            
+            // Restaurar
+            $_POST = $originalPost;
+            $_SERVER['CONTENT_TYPE'] = $originalContentType;
+
+            $result = json_decode($output ?: '', true);
 
             if (!empty($result['success']) && !empty($result['data'])) {
                 $data = $result['data'];
-                $orcamentoUrl = $baseUrl . ($data['orcamento_url'] ?? '/assessoria/orcamento');
+                $baseUrl = rtrim((string) ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br'), '/');
+                $orcamentoUrl = $baseUrl . '/assessoria/orcamento?orcamento_id=' . (int)($data['orcamento_id'] ?? 0);
                 
                 $this->responderJson([
                     'sucesso' => true,
@@ -502,16 +504,15 @@ class CopilotoApiController extends Controller {
                     'orcamento_id' => $data['orcamento_id'] ?? null,
                     'orcamento_url' => $orcamentoUrl,
                     'total_links' => $data['total'] ?? count($cleanLinks),
-                    'mensagem' => 'Orçamento sendo gerado! Acompanhe em: ' . $orcamentoUrl,
                 ]);
             } else {
                 $this->responderJson([
                     'erro' => $result['message'] ?? 'Erro ao gerar orçamento',
-                    'debug_response' => substr($response ?: '', 0, 500),
+                    'debug' => substr($output ?: '', 0, 500),
                 ], 500);
             }
         } catch (\Throwable $e) {
-            error_log('[CoPiloto] Erro orçamento: ' . $e->getMessage());
+            error_log('[CoPiloto] Erro orçamento: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
             $this->responderJson(['erro' => $e->getMessage()], 500);
         }
     }
