@@ -28,6 +28,7 @@
   var historico = []
   var estado_suporte = { tentativas: 0, max_tentativas: null }
   var ultimaBusca = [] // Guarda produtos da última busca para resolver IDs
+  var ultimoProdutoAdicionado = null // Guarda o último produto adicionado com sucesso
 
   // ========== INIT ==========
   function init () {
@@ -183,6 +184,15 @@
         var qtd = p.quantidade || 1
         if (pid > 0) return addToCart(pid, qtd)
 
+        // Detectar "mais um", "de novo", "outro igual" → usar último produto adicionado
+        var ultimaMsg = ''
+        for (var ui = historico.length - 1; ui >= Math.max(0, historico.length - 3); ui--) {
+          if (historico[ui].role === 'user') { ultimaMsg = historico[ui].content.toLowerCase(); break }
+        }
+        if (ultimoProdutoAdicionado && ultimaMsg.match(/mais\s*(um|1|uma|\d)|de\s*novo|outro\s*(igual|desse|dessa)|mesm[oa]|repet|novamente/i)) {
+          return addToCart(ultimoProdutoAdicionado.id, qtd)
+        }
+
         // Sem produto_id — resolver via busca na API
         // Extrair termo de busca: nome do Claude OU mensagens recentes do usuário
         var termo = (p.nome || p.produto_nome || '').trim()
@@ -285,6 +295,7 @@
       if (d.error) {
         adicionarMsg('assistant', '❌ ' + d.error)
       } else {
+        ultimoProdutoAdicionado = { id: produtoId, nome: d.produto_nome || '', quantidade: quantidade }
         var badge = qs('.cart-count, [class*="carrinho"] [class*="count"]')
         if (badge && d.total_itens) badge.textContent = d.total_itens
         adicionarMsg('assistant', '✅ ' + (d.produto_nome || 'Produto') + ' adicionado ao carrinho!')
