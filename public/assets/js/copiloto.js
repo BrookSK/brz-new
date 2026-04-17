@@ -340,9 +340,8 @@
       
       // Detectar se Claude disse que adicionou mas não mandou a ação
       var textoResp = d.resposta || ''
-      if (acaoTipo === 'nenhuma' && textoResp.match(/adicion|coloquei|✅.*carrinho|no seu carrinho/i)) {
+      if (acaoTipo === 'nenhuma' && textoResp.match(/(?:^|\n)\s*✅.*adicion/i)) {
         acaoTipo = 'adicionar_carrinho'
-        // Tentar extrair produto_id do texto
         var mId = textoResp.match(/ID[:\s]*(\d+)/i)
         if (mId) acaoParams.produto_id = parseInt(mId[1])
       }
