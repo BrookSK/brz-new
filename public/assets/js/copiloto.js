@@ -376,31 +376,83 @@
     try {
       var r = await fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termo))
       var d = await r.json()
-      // Remover mensagem de "buscando"
       var msgs = document.getElementById('bz-copiloto-messages')
       if (msgs.lastChild) msgs.removeChild(msgs.lastChild)
       historico.pop()
 
       if (d.produtos && d.produtos.length > 0) {
-        ultimaBusca = d.produtos // Salvar para resolver IDs depois
-        var texto = 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":\n\n'
-        d.produtos.forEach(function (p, i) {
-          texto += '• [ID:' + p.id + '] ' + p.nome
-          if (p.preco) texto += ' — US$ ' + parseFloat(p.preco).toFixed(2)
-          if (p.grupo_nome) texto += ' (no grupo ' + p.grupo_nome + ')'
-          texto += '\n'
-        })
-        if (d.grupos && d.grupos.length > 0) {
-          texto += '\nEsse produto está disponível nos Grupos de Compras. '
-          texto += 'Quer que eu te leve para algum deles?'
-        }
-        adicionarMsg('assistant', texto)
+        ultimaBusca = d.produtos
+        adicionarMsg('assistant', 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":')
+        // Renderizar carrossel de cards
+        renderizarCarrosselProdutos(d.produtos)
       } else {
-        adicionarMsg('assistant', 'Não encontrei "' + termo + '" no catálogo. Pode ser que esteja em um Grupo de Compras que ainda não está ativo, ou com outro nome. Quer que eu te leve para a página de Grupos de Compras?')
+        adicionarMsg('assistant', 'Não encontrei "' + termo + '" no catálogo. Quer que eu te leve para os Grupos de Compras?')
       }
     } catch (e) {
-      adicionarMsg('assistant', 'Não consegui buscar agora. Tenta ir em Grupos de Compras e procurar por lá.')
+      adicionarMsg('assistant', 'Não consegui buscar agora. Tenta de novo?')
     }
+  }
+
+  function renderizarCarrosselProdutos (produtos) {
+    var msgs = document.getElementById('bz-copiloto-messages')
+    var wrapper = document.createElement('div')
+    wrapper.className = 'bz-carousel-wrapper'
+
+    var track = document.createElement('div')
+    track.className = 'bz-carousel-track'
+
+    produtos.forEach(function (p) {
+      var foto = p.foto || '/uploads/produtos/placeholder.jpg'
+      if (foto && foto.indexOf('http') !== 0 && foto.indexOf('/') !== 0) foto = '/uploads/produtos/' + foto
+      var preco = parseFloat(p.preco || 0)
+      var precoBrl = (preco * 5.85).toFixed(2).replace('.', ',')
+
+      var card = document.createElement('div')
+      card.className = 'bz-product-card'
+      card.innerHTML =
+        '<div class="bz-pc-img" style="background-image:url(' + foto + ')"></div>' +
+        '<div class="bz-pc-body">' +
+          '<div class="bz-pc-name">' + (p.nome || '').substring(0, 50) + '</div>' +
+          (p.grupo_nome ? '<div class="bz-pc-grupo">' + p.grupo_nome + '</div>' : '') +
+          '<div class="bz-pc-price">R$ ' + precoBrl + '</div>' +
+          '<div class="bz-pc-actions">' +
+            '<button class="bz-pc-btn" onclick="window._bzAddCart(' + p.id + ')">🛒 Adicionar</button>' +
+            '<a href="/produto/detalhes/' + p.id + '" class="bz-pc-link">Ver</a>' +
+          '</div>' +
+        '</div>'
+      track.appendChild(card)
+    })
+
+    wrapper.appendChild(track)
+
+    // Setas de navegação
+    if (produtos.length > 1) {
+      var btnLeft = document.createElement('button')
+      btnLeft.className = 'bz-carousel-arrow bz-arrow-left'
+      btnLeft.innerHTML = '‹'
+      btnLeft.onclick = function () { track.scrollBy({ left: -180, behavior: 'smooth' }) }
+
+      var btnRight = document.createElement('button')
+      btnRight.className = 'bz-carousel-arrow bz-arrow-right'
+      btnRight.innerHTML = '›'
+      btnRight.onclick = function () { track.scrollBy({ left: 180, behavior: 'smooth' }) }
+
+      wrapper.appendChild(btnLeft)
+      wrapper.appendChild(btnRight)
+    }
+
+    msgs.appendChild(wrapper)
+    scrollBottom()
+
+    // Salvar no histórico como texto (para o Claude ter contexto)
+    var textoHist = produtos.map(function (p) { return '[ID:' + p.id + '] ' + p.nome + ' US$' + p.preco }).join('\n')
+    historico.push({ role: 'assistant', content: 'Produtos encontrados:\n' + textoHist })
+    salvarHistorico()
+  }
+
+  // Função global para o onclick dos cards
+  window._bzAddCart = function (produtoId) {
+    addToCart(produtoId, 1)
   }
 
   // ========== WIDGET UI ==========
@@ -570,7 +622,25 @@
       '#bz-copiloto-send:hover{background:#1d4ed8}' +
       '#bz-copiloto-send svg{width:16px;height:16px}' +
       '@media(max-width:480px){#bz-copiloto{bottom:14px;right:10px}#bz-copiloto-panel{width:calc(100vw - 20px);height:calc(100vh - 120px);bottom:46px;right:-2px}#bz-copiloto-launcher{padding:8px 14px 8px 10px;font-size:12px}}' +
-      '@media(max-width:991.98px){#bz-copiloto{bottom:76px}}'
+      '@media(max-width:991.98px){#bz-copiloto{bottom:76px}}' +
+      // Carrossel de produtos
+      '.bz-carousel-wrapper{position:relative;margin:4px 0;width:100%}' +
+      '.bz-carousel-track{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:4px 0}' +
+      '.bz-carousel-track::-webkit-scrollbar{display:none}' +
+      '.bz-product-card{flex:0 0 160px;scroll-snap-align:start;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;font-size:12px}' +
+      '.bz-pc-img{width:100%;height:100px;background-size:cover;background-position:center;background-color:#f1f5f9}' +
+      '.bz-pc-body{padding:8px}' +
+      '.bz-pc-name{font-weight:600;font-size:11px;line-height:1.3;height:28px;overflow:hidden;color:#1e293b}' +
+      '.bz-pc-grupo{font-size:10px;color:#64748b;margin-top:2px}' +
+      '.bz-pc-price{font-weight:700;color:#0b1f3a;font-size:13px;margin-top:4px}' +
+      '.bz-pc-actions{display:flex;gap:4px;margin-top:6px}' +
+      '.bz-pc-btn{flex:1;background:#0b1f3a;color:#fff;border:none;border-radius:6px;padding:5px 0;font-size:10px;cursor:pointer;font-weight:600}' +
+      '.bz-pc-btn:hover{background:#1d4ed8}' +
+      '.bz-pc-link{flex:0 0 auto;background:#f1f5f9;color:#0b1f3a;border-radius:6px;padding:5px 8px;font-size:10px;text-decoration:none;font-weight:600;text-align:center}' +
+      '.bz-pc-link:hover{background:#e2e8f0}' +
+      '.bz-carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:rgba(11,31,58,.8);color:#fff;border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1}' +
+      '.bz-arrow-left{left:2px}' +
+      '.bz-arrow-right{right:2px}'
     document.head.appendChild(s)
   }
 

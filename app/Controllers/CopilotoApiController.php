@@ -237,10 +237,14 @@ class CopilotoApiController extends Controller {
             }
             $filtroSQL = !empty($filtros) ? ' AND ' . implode(' AND ', $filtros) : '';
 
+            $temFoto = in_array('foto_principal', $cols, true);
+            $fotoSelect = $temFoto ? ", p.foto_principal" : ", NULL as foto_principal";
+
             if ($temGrupoComprasId) {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     p.grupo_compras_id,
                     COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
+                    {$fotoSelect}
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
                     WHERE p.{$colNome} LIKE ?{$filtroSQL}
@@ -248,6 +252,7 @@ class CopilotoApiController extends Controller {
             } else {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     NULL as grupo_compras_id, '' as grupo_nome, '' as grupo_slug
+                    {$fotoSelect}
                     FROM produtos p
                     WHERE p.{$colNome} LIKE ?{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 10";
@@ -269,6 +274,10 @@ class CopilotoApiController extends Controller {
 
             $this->responderJson([
                 'produtos' => array_map(function($p) {
+                    $foto = $p['foto_principal'] ?? null;
+                    if ($foto && strpos($foto, 'http') !== 0 && strpos($foto, '/') !== 0) {
+                        $foto = '/uploads/produtos/' . $foto;
+                    }
                     return [
                         'id' => $p['id'],
                         'nome' => $p['nome'],
@@ -276,6 +285,7 @@ class CopilotoApiController extends Controller {
                         'peso' => $p['peso'],
                         'grupo' => $p['grupo_slug'] ?: null,
                         'grupo_nome' => $p['grupo_nome'] ?: null,
+                        'foto' => $foto,
                     ];
                 }, $produtos),
                 'grupos' => $grupos,
