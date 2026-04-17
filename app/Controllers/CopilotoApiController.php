@@ -227,25 +227,34 @@ class CopilotoApiController extends Controller {
             $st->execute([$cartId]);
             $itens = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            // Buscar resumo do carrinho
-            $stCart = $pdo->prepare("SELECT valor_total, taxa_servico, valor_impostos, peso_total FROM carrinhos WHERE id = ?");
+            // Buscar resumo do carrinho com taxa de conversão
+            $stCart = $pdo->prepare("SELECT valor_total, taxa_servico, valor_impostos, peso_total, taxa_conversao, moeda FROM carrinhos WHERE id = ?");
             $stCart->execute([$cartId]);
             $resumo = $stCart->fetch(\PDO::FETCH_ASSOC);
+            
+            $taxaConversao = (float)($resumo['taxa_conversao'] ?? 1);
+            if ($taxaConversao <= 0) $taxaConversao = 1;
+            $moeda = $resumo['moeda'] ?? 'BRL';
 
             $this->responderJson([
-                'itens' => array_map(function($i) {
+                'itens' => array_map(function($i) use ($taxaConversao) {
                     return [
                         'nome' => $i['nome'],
                         'preco' => (float)$i['price'],
                         'quantidade' => (int)$i['quantidade'],
                         'subtotal' => (float)$i['subtotal'],
+                        'subtotal_brl' => round((float)$i['subtotal'] * $taxaConversao, 2),
                     ];
                 }, $itens),
                 'resumo' => $resumo ? [
-                    'total' => (float)($resumo['valor_total'] ?? 0),
-                    'taxa_servico' => (float)($resumo['taxa_servico'] ?? 0),
-                    'impostos' => (float)($resumo['valor_impostos'] ?? 0),
+                    'total_usd' => (float)($resumo['valor_total'] ?? 0),
+                    'total_brl' => round((float)($resumo['valor_total'] ?? 0) * $taxaConversao, 2),
+                    'taxa_servico_usd' => (float)($resumo['taxa_servico'] ?? 0),
+                    'taxa_servico_brl' => round((float)($resumo['taxa_servico'] ?? 0) * $taxaConversao, 2),
+                    'impostos_usd' => (float)($resumo['valor_impostos'] ?? 0),
+                    'impostos_brl' => round((float)($resumo['valor_impostos'] ?? 0) * $taxaConversao, 2),
                     'peso' => (float)($resumo['peso_total'] ?? 0),
+                    'cambio' => $taxaConversao,
                 ] : null,
                 'total_itens' => array_sum(array_column($itens, 'quantidade')),
             ]);

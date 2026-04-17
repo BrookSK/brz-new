@@ -342,11 +342,11 @@
             ctx.carrinho_itens = cartData.itens
             ctx.carrinho_total_itens = cartData.total_itens
             if (cartData.resumo) {
-              var cambio = 5.85
-              ctx.carrinho_subtotal_visivel = 'R$ ' + (cartData.itens.reduce(function(s,i){return s+i.subtotal},0) * cambio).toFixed(2).replace('.', ',')
-              ctx.carrinho_total_visivel = 'R$ ' + (cartData.resumo.total * cambio).toFixed(2).replace('.', ',')
-              ctx.carrinho_taxa_servico_visivel = 'R$ ' + (cartData.resumo.taxa_servico * cambio).toFixed(2).replace('.', ',')
-              ctx.carrinho_impostos_br_visivel = 'R$ ' + (cartData.resumo.impostos * cambio).toFixed(2).replace('.', ',')
+              ctx.carrinho_subtotal_visivel = 'R$ ' + cartData.itens.reduce(function(s,i){return s+(i.subtotal_brl||0)},0).toFixed(2).replace('.', ',')
+              ctx.carrinho_total_visivel = 'R$ ' + (cartData.resumo.total_brl || 0).toFixed(2).replace('.', ',')
+              ctx.carrinho_taxa_servico_visivel = 'R$ ' + (cartData.resumo.taxa_servico_brl || 0).toFixed(2).replace('.', ',')
+              ctx.carrinho_impostos_br_visivel = 'R$ ' + (cartData.resumo.impostos_brl || 0).toFixed(2).replace('.', ',')
+              ctx.carrinho_frete_visivel = 'Frete grátis'
             }
           }
         } catch (e) {}
