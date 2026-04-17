@@ -222,18 +222,15 @@ class CopilotoApiController extends Controller {
             $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : 'price');
             $colPeso = in_array('weight', $cols, true) ? 'weight' : (in_array('peso', $cols, true) ? 'peso' : 'weight');
 
-            // Filtros de visibilidade (mesma lógica do Produto model)
+            // Filtros de visibilidade — usar mesma lógica do Produto model
+            // Apenas filtrar ocultos e status inválidos, sem ser restritivo demais
             $filtros = [];
-            if (in_array('status', $cols, true)) {
-                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
-            }
-            if (in_array('active', $cols, true)) {
-                $filtros[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
-            } elseif (in_array('ativo', $cols, true)) {
-                $filtros[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
-            }
             if (in_array('oculto', $cols, true)) {
                 $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            }
+            if (in_array('status', $cols, true)) {
+                // Excluir apenas status explicitamente inválidos
+                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('archived','deleted','trash','lixeira'))";
             }
             $filtroSQL = !empty($filtros) ? ' AND ' . implode(' AND ', $filtros) : '';
 

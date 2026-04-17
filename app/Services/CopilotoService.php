@@ -447,18 +447,13 @@ PROMPT;
             }
             $likeSQL = '(' . implode(' OR ', $likeClauses) . ')';
 
-            // Montar filtros de visibilidade (mesma lógica do Produto model)
+            // Filtros de visibilidade — excluir apenas ocultos e arquivados
             $filtros = [];
-            if ($temStatus) {
-                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
-            }
-            if ($temActive) {
-                $filtros[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
-            } elseif ($temAtivo) {
-                $filtros[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
-            }
             if ($temOculto) {
                 $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            }
+            if ($temStatus) {
+                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('archived','deleted','trash','lixeira'))";
             }
             $filtroSQL = !empty($filtros) ? ' AND ' . implode(' AND ', $filtros) : '';
 
