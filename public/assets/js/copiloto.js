@@ -202,7 +202,7 @@
             if (historico[ui].role === 'user') {
               var msg = historico[ui].content.toLowerCase()
               // Limpar palavras genéricas
-              msg = msg.replace(/\b(coloca|adiciona|carrinho|meu|por favor|no|dele|dela|delas|deles|também|tambem|pode|quero|unidades?|mais)\b/gi, ' ').trim()
+              msg = msg.replace(/\b(coloca|adiciona|carrinho|meu|por favor|no|dele|dela|delas|deles|também|tambem|pode|quero|unidades?|mais|tem|temos|qual|quais|mostra|lista|que|o que)\b/gi, ' ').trim()
               // Pegar palavras com 3+ chars
               var palavras = msg.split(/\s+/).filter(function(w) { return w.length >= 3 })
               if (palavras.length > 0) { termo = palavras.join(' '); break }
@@ -213,22 +213,20 @@
           adicionarMsg('assistant', '⚠️ Não consegui identificar o produto. Me diz o nome?')
           return
         }
-        // Buscar na API e adicionar o resultado mais relevante
+        // Buscar na API
         return fetch('/api/copiloto/buscar-produto?q=' + encodeURIComponent(termo))
           .then(function(r) { return r.json() })
           .then(function(d) {
             if (d.produtos && d.produtos.length > 0) {
               ultimaBusca = d.produtos
-              // Tentar match exato primeiro
-              var found = null
-              for (var i = 0; i < d.produtos.length; i++) {
-                if ((d.produtos[i].nome || '').toLowerCase().indexOf(termo.toLowerCase()) >= 0) {
-                  found = d.produtos[i]; break
-                }
+              if (d.produtos.length === 1) {
+                // Só 1 resultado → adicionar direto
+                return addToCart(d.produtos[0].id, qtd)
+              } else {
+                // Múltiplos resultados → mostrar carrossel para o usuário escolher
+                adicionarMsg('assistant', 'Encontrei ' + d.produtos.length + ' opções. Qual você quer?')
+                renderizarCarrosselProdutos(d.produtos)
               }
-              // Senão, pegar o mais barato
-              if (!found) found = d.produtos.reduce(function(a, b) { return (parseFloat(a.preco)||99999) < (parseFloat(b.preco)||99999) ? a : b })
-              return addToCart(found.id, qtd)
             } else {
               adicionarMsg('assistant', '⚠️ Não encontrei "' + termo + '". Me diz o nome exato?')
             }
