@@ -1,7 +1,7 @@
 <?php
 namespace App\Services;
 
-// Invalidar OPcache para garantir código atualizado
+// Invalidar OPcache para garantir código atualizado (v2)
 if (function_exists('opcache_invalidate')) { @opcache_invalidate(__FILE__, true); }
 
 use Config\Database;
