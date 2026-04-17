@@ -361,13 +361,37 @@ PROMPT;
     // ========== BUSCA DE PRODUTOS NO BANCO ==========
 
     private function buscarProdutoNoBanco(string $mensagem): array {
+        // Mapa de tradução PT→EN para termos comuns de produtos
+        $traducoes = [
+            'detergente' => 'dish soap', 'amaciante' => 'downy,fabric softener',
+            'sabão em pó' => 'laundry detergent,tide', 'sabao em po' => 'laundry detergent,tide',
+            'desinfetante' => 'lysol,clorox,disinfectant', 'limpeza' => 'cleaning,clean,wipe',
+            'shampoo' => 'shampoo', 'condicionador' => 'conditioner',
+            'creme' => 'cream,lotion,moisturizer', 'protetor solar' => 'sunscreen',
+            'pasta de dente' => 'toothpaste', 'escova de dente' => 'toothbrush',
+            'sabonete' => 'soap,body wash', 'desodorante' => 'deodorant',
+            'perfume' => 'perfume,fragrance,cologne', 'hidratante' => 'moisturizer,lotion',
+            'panela' => 'cookware,pan,pot', 'aspirador' => 'vacuum',
+            'vitamina' => 'vitamin', 'suplemento' => 'supplement',
+            'fralda' => 'diaper', 'lenço' => 'wipe,tissue',
+            'papel toalha' => 'paper towel', 'papel higiênico' => 'toilet paper',
+            'café' => 'coffee', 'chá' => 'tea',
+            'biscoito' => 'cookie,cracker', 'chocolate' => 'chocolate',
+            'cereal' => 'cereal,granola', 'tempero' => 'seasoning,spice',
+            'molho' => 'sauce', 'azeite' => 'olive oil',
+            'produto de cabelo' => 'shampoo,conditioner,hair',
+            'produto de limpeza' => 'cleaning,clean,wipe,lysol,clorox',
+            'produto de bebe' => 'baby', 'produto de bebê' => 'baby',
+            'roupa' => 'laundry,clothes', 'pele' => 'skin,lotion,cream',
+        ];
+
         // Detectar se a mensagem parece ser sobre busca de produto
         $padroes = [
             '/(?:adiciona|coloca|bota|põe|quero)\s+(?:o|a|um|uma|esse|essa|aquele|aquela|qualquer|algum|2|3|4|5|6)?\s*(.{3,80}?)(?:\s+no\s+(?:meu\s+)?carrinho|\s+pra\s+mim|\s+por\s+favor|$)/iu',
             '/tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40})\??/iu',
+            '/(?:o que tem de|o que temos de|quais?|mostra|lista)\s+(.{3,40})\??/iu',
             '/(?:procur|busc|quer|precis)\w*\s+(?:o|a|um|uma|de)?\s*(.{3,40})/iu',
             '/(?:vende|vendem)\s+(.{3,40})\??/iu',
-            '/(?:shampoo|condicionador|sabonete|creme|loção|perfume|desodorante|pasta de dente|escova|toalha|panela|aspirador|vitamina|proteína|suplemento)/iu',
         ];
 
         $termo = null;
@@ -379,6 +403,20 @@ PROMPT;
         }
 
         if (!$termo || mb_strlen($termo) < 2) return [];
+
+        // Traduzir termos em português para inglês (produtos cadastrados em EN)
+        $termoOriginal = $termo;
+        $termosParaBuscar = [$termo];
+        $termoLower = mb_strtolower($termo);
+        foreach ($traducoes as $pt => $en) {
+            if (mb_stripos($termoLower, $pt) !== false) {
+                foreach (explode(',', $en) as $t) {
+                    $termosParaBuscar[] = trim($t);
+                }
+            }
+        }
+        // Remover duplicatas
+        $termosParaBuscar = array_unique(array_filter($termosParaBuscar));
 
         try {
             $cols = [];
@@ -399,6 +437,15 @@ PROMPT;
             $temStock = in_array('stock', $cols, true);
 
             $like = '%' . $termo . '%';
+
+            // Montar LIKE para múltiplos termos (original + traduções)
+            $likeClauses = [];
+            $likeParams = [];
+            foreach ($termosParaBuscar as $t) {
+                $likeClauses[] = "p.{$colNome} LIKE ?";
+                $likeParams[] = '%' . trim($t) . '%';
+            }
+            $likeSQL = '(' . implode(' OR ', $likeClauses) . ')';
 
             // Montar filtros de visibilidade (mesma lógica do Produto model)
             $filtros = [];
@@ -427,17 +474,17 @@ PROMPT;
                     {$selectExtra}
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
-                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
+                    WHERE {$likeSQL}{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 8");
             } else {
                 $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     '' as grupo_nome, '' as grupo_slug, 0 as clube_only
                     {$selectExtra}
                     FROM produtos p
-                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
+                    WHERE {$likeSQL}{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 8");
             }
-            $st->execute([$like]);
+            $st->execute($likeParams);
             $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             // Verificar se o usuário tem clube ativo
