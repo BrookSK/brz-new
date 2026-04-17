@@ -200,7 +200,61 @@ class CopilotoApiController extends Controller {
         }
     }
 
-    /** GET /api/copiloto/buscar-produto — Busca produtos no banco incluindo grupos de compras */
+    /** GET /api/copiloto/meucarrinho — Retorna itens do carrinho do usuário logado */
+    public function meuCarrinho(Request $request) {
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId <= 0) {
+                $this->responderJson(['itens' => [], 'resumo' => null]);
+            }
+
+            $pdo = \Config\Database::getConnection();
+            $carrinho = new \App\Models\Carrinho();
+            $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
+            $cartId = is_array($cart) ? (int)($cart['id'] ?? 0) : (int)$cart;
+
+            if ($cartId <= 0) {
+                $this->responderJson(['itens' => [], 'resumo' => null]);
+            }
+
+            // Buscar itens com dados do produto
+            $st = $pdo->prepare("SELECT ci.produto_id, ci.quantidade, ci.subtotal,
+                p.name AS nome, p.price, p.weight
+                FROM carrinho_items ci
+                JOIN produtos p ON p.id = ci.produto_id
+                WHERE ci.carrinho_id = ?");
+            $st->execute([$cartId]);
+            $itens = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Buscar resumo do carrinho
+            $stCart = $pdo->prepare("SELECT valor_total, taxa_servico, valor_impostos, peso_total FROM carrinhos WHERE id = ?");
+            $stCart->execute([$cartId]);
+            $resumo = $stCart->fetch(\PDO::FETCH_ASSOC);
+
+            $this->responderJson([
+                'itens' => array_map(function($i) {
+                    return [
+                        'nome' => $i['nome'],
+                        'preco' => (float)$i['price'],
+                        'quantidade' => (int)$i['quantidade'],
+                        'subtotal' => (float)$i['subtotal'],
+                    ];
+                }, $itens),
+                'resumo' => $resumo ? [
+                    'total' => (float)($resumo['valor_total'] ?? 0),
+                    'taxa_servico' => (float)($resumo['taxa_servico'] ?? 0),
+                    'impostos' => (float)($resumo['valor_impostos'] ?? 0),
+                    'peso' => (float)($resumo['peso_total'] ?? 0),
+                ] : null,
+                'total_itens' => array_sum(array_column($itens, 'quantidade')),
+            ]);
+        } catch (\Throwable $e) {
+            $this->responderJson(['itens' => [], 'resumo' => null, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /** GET /api/copiloto/buscarproduto — Busca produtos no banco incluindo grupos de compras */
     public function buscarProduto(Request $request) {
         $termo = trim((string) $request->getParam('q', ''));
         // Limpar pontuação e caracteres especiais

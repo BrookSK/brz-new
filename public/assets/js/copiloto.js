@@ -70,7 +70,6 @@
     } else if (url === '/carrinho') {
       ctx.pagina = 'carrinho'
       ctx.carrinho_itens = lerItensCarrinho()
-      // Ler todos os valores visíveis do Resumo do Pedido
       var subEl = qs('.subtotal-value')
       var totalEl = qs('.total-value')
       var taxaEl = qs('.taxa-servico-value')
@@ -83,7 +82,6 @@
       ctx.carrinho_impostos_br_visivel = impostosEl ? impostosEl.textContent.trim() : null
       ctx.carrinho_imposto_local_visivel = impostoLocalEl ? impostoLocalEl.textContent.trim() : null
       ctx.carrinho_frete_visivel = freteEl ? freteEl.textContent.trim() : null
-      // Quantidade total de itens (do header do resumo)
       var qtdMatch = (qs('.card-header h5, .card-header') || {}).textContent || ''
       var mQtd = qtdMatch.match(/(\d+)\s*iten/i)
       ctx.carrinho_total_itens = mQtd ? parseInt(mQtd[1]) : ctx.carrinho_itens.length
@@ -334,6 +332,26 @@
 
     try {
       var ctx = lerContextoPagina()
+      
+      // Se não está na página do carrinho, buscar dados do carrinho via API
+      if (ctx.pagina !== 'carrinho' && ctx.carrinho_itens.length === 0) {
+        try {
+          var cartResp = await fetch('/api/copiloto/meucarrinho', { credentials: 'same-origin' })
+          var cartData = await cartResp.json()
+          if (cartData.itens && cartData.itens.length > 0) {
+            ctx.carrinho_itens = cartData.itens
+            ctx.carrinho_total_itens = cartData.total_itens
+            if (cartData.resumo) {
+              var cambio = 5.85
+              ctx.carrinho_subtotal_visivel = 'R$ ' + (cartData.itens.reduce(function(s,i){return s+i.subtotal},0) * cambio).toFixed(2).replace('.', ',')
+              ctx.carrinho_total_visivel = 'R$ ' + (cartData.resumo.total * cambio).toFixed(2).replace('.', ',')
+              ctx.carrinho_taxa_servico_visivel = 'R$ ' + (cartData.resumo.taxa_servico * cambio).toFixed(2).replace('.', ',')
+              ctx.carrinho_impostos_br_visivel = 'R$ ' + (cartData.resumo.impostos * cambio).toFixed(2).replace('.', ',')
+            }
+          }
+        } catch (e) {}
+      }
+
       var r = await fetch('/api/copiloto/chat', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ mensagem: texto, contexto: ctx, historico: historico.slice(-(CONFIG.max_historico_enviado * 2)) })
