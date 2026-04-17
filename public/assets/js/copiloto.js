@@ -327,19 +327,27 @@
       // Para ações de carrinho: executar ANTES de mostrar a resposta do Claude
       // Assim não mostramos "Adicionei!" se a ação falhar
       var acaoTipo = (d.acao_frontend && d.acao_frontend.tipo) ? d.acao_frontend.tipo : 'nenhuma'
+      var acaoParams = (d.acao_frontend && d.acao_frontend.parametros) ? d.acao_frontend.parametros : {}
+      
+      // Detectar se Claude disse que adicionou mas não mandou a ação
+      var textoResp = d.resposta || ''
+      if (acaoTipo === 'nenhuma' && textoResp.match(/adicion|coloquei|✅.*carrinho|no seu carrinho/i)) {
+        acaoTipo = 'adicionar_carrinho'
+        // Tentar extrair produto_id do texto
+        var mId = textoResp.match(/ID[:\s]*(\d+)/i)
+        if (mId) acaoParams.produto_id = parseInt(mId[1])
+      }
+      
       if (acaoTipo === 'adicionar_carrinho' || acaoTipo === 'limpar_carrinho') {
         // Executar ação primeiro — a função addToCart/limpar já mostra mensagem de sucesso/erro
-        await executarAcao(acaoTipo, d.acao_frontend.parametros)
-        // Mostrar resposta do Claude só se não for sobre "adicionei" (evitar duplicação)
-        var textoResp = d.resposta || ''
+        await executarAcao(acaoTipo, acaoParams)
         if (!textoResp.match(/adicion|✅|carrinho.*limpo|zerado/i)) {
           adicionarMsg('assistant', textoResp)
         }
       } else {
-        // Para outras ações: mostrar resposta e executar depois (comportamento normal)
-        adicionarMsg('assistant', d.resposta || 'Hmm, não consegui processar. Tenta de novo?')
+        adicionarMsg('assistant', textoResp || 'Hmm, não consegui processar. Tenta de novo?')
         if (acaoTipo !== 'nenhuma') {
-          await executarAcao(acaoTipo, d.acao_frontend.parametros)
+          await executarAcao(acaoTipo, acaoParams)
         }
       }
       if (d.max_tentativas_problema != null) estado_suporte.max_tentativas = d.max_tentativas_problema
