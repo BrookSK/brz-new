@@ -222,19 +222,34 @@ class CopilotoApiController extends Controller {
             $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : 'price');
             $colPeso = in_array('weight', $cols, true) ? 'weight' : (in_array('peso', $cols, true) ? 'peso' : 'weight');
 
+            // Filtros de visibilidade (mesma lógica do Produto model)
+            $filtros = [];
+            if (in_array('status', $cols, true)) {
+                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
+            }
+            if (in_array('active', $cols, true)) {
+                $filtros[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
+            } elseif (in_array('ativo', $cols, true)) {
+                $filtros[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
+            }
+            if (in_array('oculto', $cols, true)) {
+                $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            }
+            $filtroSQL = !empty($filtros) ? ' AND ' . implode(' AND ', $filtros) : '';
+
             if ($temGrupoComprasId) {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     p.grupo_compras_id,
                     COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
-                    WHERE p.{$colNome} LIKE ?
+                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 10";
             } else {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     NULL as grupo_compras_id, '' as grupo_nome, '' as grupo_slug
                     FROM produtos p
-                    WHERE p.{$colNome} LIKE ?
+                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 10";
             }
 

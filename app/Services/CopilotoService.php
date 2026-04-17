@@ -181,11 +181,18 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
                 if (!empty($p['peso'])) $linha .= " | {$p['peso']}kg";
                 if (!empty($p['grupo_nome'])) $linha .= " | Grupo: {$p['grupo_nome']} (/grupo/{$p['grupo_slug']})";
                 if (!empty($p['clube_only'])) {
-                    $linha .= " | ⚠️ EXCLUSIVO CLUBE";
+                    $linha .= " | ⚠️ GRUPO EXCLUSIVO CLUBE";
+                    $temClubeOnly = true;
+                }
+                if (!empty($p['produto_clube_ativo'])) {
+                    $linha .= " | ⚠️ PRODUTO EXCLUSIVO CLUBE";
                     $temClubeOnly = true;
                 }
                 if (!empty($p['acesso_restrito'])) {
                     $linha .= " | ❌ USUÁRIO NÃO TEM CLUBE ATIVO";
+                }
+                if (!empty($p['sem_estoque'])) {
+                    $linha .= " | ❌ SEM ESTOQUE — NÃO PODE ADICIONAR AO CARRINHO";
                 }
                 $linhas[] = $linha;
                 if (!empty($p['usuario_tem_clube'])) $usuarioTemClube = true;
@@ -202,6 +209,11 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
                 "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão." .
                 "\nPara adicionar ao carrinho, use acao: adicionar_carrinho com parametros: {\"produto_id\": <ID_NUMERICO>, \"quantidade\": N}" .
                 "\nO produto_id é o número após 'ID:' na lista acima. NUNCA omita o produto_id." .
+                "\nREGRAS DE PRODUTOS:" .
+                "\n- Produtos marcados ❌ SEM ESTOQUE: informe que está indisponível. NÃO tente adicionar ao carrinho." .
+                "\n- Produtos marcados ⚠️ EXCLUSIVO CLUBE: informe que é exclusivo para membros do Clube e ofereça explicar como ativar." .
+                "\n- Produtos marcados ❌ USUÁRIO NÃO TEM CLUBE: o usuário não pode comprar. Ofereça acao: ir_para_clube." .
+                "\n- NUNCA mencione informações sobre oferta gratuita ou elegibilidade para brinde — isso é surpresa para o cliente." .
                 "\nPara levar ao grupo, use acao: ir_para_grupo com parametros: {\"slug\": \"nome-do-grupo\"}" .
                 $instrucaoClube;
         }
@@ -379,22 +391,50 @@ PROMPT;
             $colPreco = in_array('price', $cols, true) ? 'price' : 'preco';
             $colPeso = in_array('weight', $cols, true) ? 'weight' : 'peso';
             $temGrupo = in_array('grupo_compras_id', $cols, true);
+            $temOculto = in_array('oculto', $cols, true);
+            $temActive = in_array('active', $cols, true);
+            $temAtivo = in_array('ativo', $cols, true);
+            $temStatus = in_array('status', $cols, true);
+            $temClubeAtivo = in_array('clube_ativo', $cols, true);
+            $temStock = in_array('stock', $cols, true);
 
             $like = '%' . $termo . '%';
+
+            // Montar filtros de visibilidade (mesma lógica do Produto model)
+            $filtros = [];
+            if ($temStatus) {
+                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
+            }
+            if ($temActive) {
+                $filtros[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
+            } elseif ($temAtivo) {
+                $filtros[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
+            }
+            if ($temOculto) {
+                $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            }
+            $filtroSQL = !empty($filtros) ? ' AND ' . implode(' AND ', $filtros) : '';
+
+            // Selects extras
+            $selectExtra = '';
+            if ($temClubeAtivo) $selectExtra .= ', COALESCE(p.clube_ativo, 0) as produto_clube_ativo';
+            if ($temStock) $selectExtra .= ', p.stock';
 
             if ($temGrupo) {
                 $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug,
                     COALESCE(gc.clube_only, 0) as clube_only
+                    {$selectExtra}
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
-                    WHERE p.{$colNome} LIKE ?
+                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 8");
             } else {
                 $st = $this->pdo->prepare("SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     '' as grupo_nome, '' as grupo_slug, 0 as clube_only
+                    {$selectExtra}
                     FROM produtos p
-                    WHERE p.{$colNome} LIKE ?
+                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
                     ORDER BY p.{$colNome} ASC LIMIT 8");
             }
             $st->execute([$like]);
@@ -416,15 +456,25 @@ PROMPT;
                 } catch (\Exception $e) {}
             }
 
-            // Marcar produtos de grupos clube_only e se o usuário tem acesso
+            // Marcar produtos com regras de visibilidade
             foreach ($produtos as &$p) {
                 $p['clube_only'] = (int) ($p['clube_only'] ?? 0);
                 $p['usuario_tem_clube'] = $usuarioClubeAtivo;
+                $p['produto_clube_ativo'] = (int) ($p['produto_clube_ativo'] ?? 0);
+                $p['stock'] = isset($p['stock']) ? (int) $p['stock'] : null;
+                
+                // Produto é de grupo exclusivo do clube E usuário não tem clube
                 if ($p['clube_only'] && !$usuarioClubeAtivo) {
+                    $p['acesso_restrito'] = true;
+                // Produto individual marcado como clube_ativo E usuário não tem clube
+                } elseif ($p['produto_clube_ativo'] && !$usuarioClubeAtivo) {
                     $p['acesso_restrito'] = true;
                 } else {
                     $p['acesso_restrito'] = false;
                 }
+                
+                // Sem estoque
+                $p['sem_estoque'] = ($p['stock'] !== null && $p['stock'] <= 0);
             }
             unset($p);
 
