@@ -481,7 +481,7 @@
         if (mId) acaoParams.produto_id = parseInt(mId[1])
       }
       // Detectar se Claude disse que vai levar pro checkout mas não mandou a ação
-      if (acaoTipo === 'nenhuma' && textoResp.match(/levo.*checkout|partiu.*checkout|levando.*checkout|bora.*checkout|finalizar.*compra/i)) {
+      if (acaoTipo === 'nenhuma' && textoResp.match(/lev[oa].*checkout|partiu.*checkout|levando.*checkout|bora.*checkout|finalizar.*compra|te levo.*finalizar|levo lá agora|pro checkout/i)) {
         acaoTipo = 'ir_para_checkout'
       }
       // Detectar se Claude disse que limpou o carrinho
