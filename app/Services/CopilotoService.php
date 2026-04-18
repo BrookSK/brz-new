@@ -270,6 +270,27 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             if ($totalVisivel) $resumoCarrinho .= "\nTOTAL: {$totalVisivel}";
             $resumoCarrinho .= "\nIMPORTANTE: Use EXATAMENTE estes valores ao falar do carrinho. NÃO calcule por conta própria.";
         }
+        
+        // Dados do orçamento (quando na página de orçamento)
+        $resumoOrcamento = '';
+        if (($contexto['pagina'] ?? '') === 'orcamento') {
+            $resumoOrcamento = "\n\nORÇAMENTO DE ASSESSORIA (dados da tela):";
+            if (!empty($contexto['orcamento_id'])) $resumoOrcamento .= "\nID do orçamento: {$contexto['orcamento_id']}";
+            if (!empty($contexto['orcamento_subtotal'])) $resumoOrcamento .= "\nSubtotal: {$contexto['orcamento_subtotal']}";
+            if (!empty($contexto['orcamento_taxa_servico'])) $resumoOrcamento .= "\nTaxa de Serviço: {$contexto['orcamento_taxa_servico']}";
+            if (!empty($contexto['orcamento_frete'])) $resumoOrcamento .= "\nFrete: {$contexto['orcamento_frete']}";
+            if (!empty($contexto['orcamento_impostos'])) $resumoOrcamento .= "\nImpostos: {$contexto['orcamento_impostos']}";
+            if (!empty($contexto['orcamento_total'])) $resumoOrcamento .= "\nTOTAL: {$contexto['orcamento_total']}";
+            if (!empty($contexto['orcamento_produtos'])) {
+                $resumoOrcamento .= "\nProdutos:";
+                foreach ($contexto['orcamento_produtos'] as $p) {
+                    $resumoOrcamento .= "\n- {$p['nome']} — {$p['preco']}";
+                }
+            }
+            $resumoOrcamento .= "\n\nVocê pode informar estes valores ao cliente. Para adicionar ao carrinho, o cliente precisa aceitar os termos na página e clicar em 'Adicionar ao Carrinho'.";
+            $resumoOrcamento .= "\nIMPORTANTE: Use EXATAMENTE estes valores. NÃO calcule por conta própria.";
+        }
+
         $logado = !empty($contexto['usuario_logado']) ? 'Sim' : 'Não';
         $nomeUsuario = $contexto['usuario_nome'] ?? 'Visitante';
         $moeda = $contexto['moeda_atual'] ?? 'BRL';
@@ -305,6 +326,7 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
 - criar_ticket_suporte: abre ticket na categoria "suporte"
 - criar_ticket_duvida: abre ticket na categoria "duvidas_gerais"
 - gerar_orcamento: gera orçamento de assessoria com links de produtos externos. OBRIGATÓRIO: parametros.links (array de URLs)
+- aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento)
 - verificar_cancelamento: verifica elegibilidade de cancelamento
 - solicitar_cancelamento: solicita cancelamento (requer confirmação)
 - nenhuma: apenas responder no chat
@@ -344,6 +366,7 @@ CARRINHO ATUAL:
 Subtotal (como o usuário vê na tela): {$subtotal}
 Total (como o usuário vê na tela): {$totalCarrinho}
 {$resumoCarrinho}
+{$resumoOrcamento}
 
 USUÁRIO:
 Logado: {$logado}

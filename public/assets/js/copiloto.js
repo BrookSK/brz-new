@@ -93,6 +93,31 @@
     else if (url === '/contato') ctx.pagina = 'contato'
     else if (url === '/faq') ctx.pagina = 'faq'
     else if (url === '/produtos') ctx.pagina = 'catalogo'
+    else if (url.match(/\/assessoria\/orcamento/)) {
+      ctx.pagina = 'orcamento'
+      // Ler dados do orçamento da tela
+      var subEl = qs('#subtotal')
+      var taxaEl = qs('#taxaServico')
+      var freteEl = qs('#frete')
+      var impostosEl = qs('#impostos')
+      var totalEl = qs('#total')
+      ctx.orcamento_subtotal = subEl ? subEl.textContent.trim() : null
+      ctx.orcamento_taxa_servico = taxaEl ? taxaEl.textContent.trim() : null
+      ctx.orcamento_frete = freteEl ? freteEl.textContent.trim() : null
+      ctx.orcamento_impostos = impostosEl ? impostosEl.textContent.trim() : null
+      ctx.orcamento_total = totalEl ? totalEl.textContent.trim() : null
+      // Ler produtos do orçamento
+      ctx.orcamento_produtos = []
+      document.querySelectorAll('[data-produto-id]').forEach(function(el) {
+        ctx.orcamento_produtos.push({
+          nome: (qs('h6, .fw-semibold', el) || {}).textContent?.trim() || '',
+          preco: (qs('[class*="price"], .text-primary', el) || {}).textContent?.trim() || '',
+        })
+      })
+      // Ler ID do orçamento da URL
+      var mOrcId = url.match(/orcamento_id=(\d+)/)
+      ctx.orcamento_id = mOrcId ? parseInt(mOrcId[1]) : null
+    }
     var badge = qs('[class*="carrinho"] [class*="count"], .cart-count')
     if (badge) ctx.carrinho_qtd = parseInt(badge.textContent) || 0
     var nomeEl = qs('.user-menu .dropdown-toggle, #userDropdown, [class*="user-name"], [class*="usuario-nome"]')
@@ -270,6 +295,14 @@
       criar_ticket_suporte: function () { return criarTicket('suporte', p) },
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
       gerar_orcamento: function () { return gerarOrcamento(p.links || []) },
+      aceitar_termos_assessoria: function () {
+        // Clicar no checkbox de termos e no botão de adicionar
+        var checkbox = qs('input[type="checkbox"]')
+        if (checkbox && !checkbox.checked) { checkbox.click() }
+        var btnAdd = qs('[onclick*="adicionarAoCarrinho"], button.btn-primary, .btn-lg')
+        if (btnAdd) { setTimeout(function() { btnAdd.click() }, 500) }
+        adicionarMsg('assistant', '✅ Termos aceitos e produtos adicionados ao carrinho!')
+      },
       nenhuma: function () {}
     }
     var fn = acoes[acao] || acoes.nenhuma
