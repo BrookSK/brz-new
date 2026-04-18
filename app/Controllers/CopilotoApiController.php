@@ -194,9 +194,13 @@ class CopilotoApiController extends Controller {
             $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
             // Limpar TODOS os carrinhos do usuário
+            $carrinho = new \App\Models\Carrinho();
             foreach ($cartIds as $cid) {
-                $pdo->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ?")->execute([(int)$cid]);
-                $pdo->prepare("UPDATE carrinhos SET valor_total = 0 WHERE id = ?")->execute([(int)$cid]);
+                $cid = (int)$cid;
+                $pdo->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ?")->execute([$cid]);
+                $pdo->prepare("UPDATE carrinhos SET valor_total = 0, taxa_servico = 0, valor_impostos = 0, peso_total = 0, updated_at = NOW() WHERE id = ?")->execute([$cid]);
+                // Recalcular para garantir consistência
+                try { $carrinho->recalcularTotais($cid); } catch (\Throwable $e) {}
             }
 
             $this->responderJson(['success' => true, 'message' => 'Carrinho limpo']);
