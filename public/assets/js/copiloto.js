@@ -287,10 +287,9 @@
       consultar_status_pedido: function () { adicionarMsg('assistant', '📦 Use a página de rastreamento: /rastreamento com seu código dos Correios.') },
       abrir_whatsapp_vendas: function () { window.open('https://wa.me/' + CONFIG.whatsapp_vendas + (p.mensagem ? '?text=' + encodeURIComponent(p.mensagem) : ''), '_blank') },
       ir_para_checkout: function () {
-        // Setar flag de sessão que o checkout exige (via API)
-        fetch('/api/copiloto/prepararcheckout', { method: 'POST', credentials: 'same-origin' })
-          .then(function() { salvarEstadoChat(); window.location.href = '/checkout' })
-          .catch(function() { salvarEstadoChat(); window.location.href = '/checkout' })
+        // Usar a rota do carrinho que seta a sessão e redireciona pro checkout
+        salvarEstadoChat()
+        window.location.href = '/carrinho/checkout'
       },
       ir_para_contato: function () { salvarEstadoChat(); window.location.href = '/contato' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
