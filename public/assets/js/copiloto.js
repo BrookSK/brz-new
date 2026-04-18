@@ -296,28 +296,60 @@
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
       gerar_orcamento: function () { return gerarOrcamento(p.links || []) },
       aceitar_termos_assessoria: function () {
-        // Marcar checkbox de termos
-        var checkboxes = document.querySelectorAll('input[type="checkbox"]')
-        checkboxes.forEach(function(cb) { if (!cb.checked) cb.click() })
+        // Chamar a API de adicionar ao carrinho da assessoria diretamente
+        var orcamentoId = null
+        var mOrcId = window.location.search.match(/orcamento_id=(\d+)/)
+        if (mOrcId) orcamentoId = parseInt(mOrcId[1])
+        // Também tentar pegar do job_id
+        if (!orcamentoId) {
+          var mJobId = window.location.search.match(/job_id=([a-f0-9]+)/)
+          // Se só tem job_id, precisamos do orcamento_id — tentar do DOM
+        }
         
-        // Aguardar e clicar no botão de adicionar ao carrinho
-        setTimeout(function() {
-          var btnAdd = qs('.btn-lg.btn-primary, [onclick*="adicionar"], button.btn-primary.btn-lg')
-          if (!btnAdd) {
-            // Tentar encontrar por texto
-            document.querySelectorAll('button, .btn').forEach(function(b) {
-              if (b.textContent.match(/adicionar.*carrinho/i)) btnAdd = b
-            })
-          }
-          if (btnAdd) {
-            btnAdd.click()
-            adicionarMsg('assistant', '✅ Termos aceitos e produtos adicionados ao carrinho! Te levo pro carrinho em instantes...')
+        // Coletar produtos selecionados (checkboxes marcados)
+        var selecionados = []
+        document.querySelectorAll('.product-checkbox').forEach(function(cb, i) {
+          if (!cb.checked) cb.checked = true // Marcar todos
+          selecionados.push({ index: parseInt(cb.value || i), variacao_id: null })
+        })
+        
+        // Marcar checkbox de termos
+        var termosCheckbox = qs('#termosAceitos, input[type="checkbox"]')
+        if (termosCheckbox && !termosCheckbox.checked) termosCheckbox.checked = true
+
+        if (!orcamentoId && selecionados.length === 0) {
+          adicionarMsg('assistant', '⚠️ Não encontrei o orçamento nesta página. Vai para a página do orçamento primeiro.')
+          return
+        }
+
+        adicionarMsg('assistant', '🛒 Aceitando termos e adicionando ao carrinho...')
+        
+        return fetch('/assessoria/adicionar-ao-carrinho', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            orcamento_id: orcamentoId,
+            termos_aceitos: true,
+            produtos_selecionados: selecionados
+          })
+        }).then(function(r) { return r.json() }).then(function(d) {
+          var msgs = document.getElementById('bz-copiloto-messages')
+          if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+          
+          if (d.success) {
+            adicionarMsg('assistant', '✅ Termos aceitos e produtos adicionados ao carrinho!\nTe levo pro carrinho agora...')
             salvarEstadoChat()
-            setTimeout(function() { window.location.href = '/carrinho' }, 2000)
+            setTimeout(function() { window.location.href = d.redirect || '/carrinho' }, 1500)
           } else {
-            adicionarMsg('assistant', '⚠️ Não encontrei o botão de adicionar. Clica no botão "Adicionar ao Carrinho" na página.')
+            adicionarMsg('assistant', '❌ ' + (d.message || 'Erro ao adicionar'))
+            if (d.redirect) { salvarEstadoChat(); setTimeout(function() { window.location.href = d.redirect }, 2000) }
           }
-        }, 500)
+        }).catch(function(err) {
+          var msgs = document.getElementById('bz-copiloto-messages')
+          if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+          adicionarMsg('assistant', '❌ Erro: ' + (err.message || 'falha'))
+        })
       },
       nenhuma: function () {}
     }

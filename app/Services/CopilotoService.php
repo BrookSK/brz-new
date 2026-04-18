@@ -289,9 +289,10 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             }
             $resumoOrcamento .= "\n\nVocê pode informar estes valores ao cliente.";
             $resumoOrcamento .= "\nQuando o cliente pedir para adicionar ao carrinho ou finalizar:";
-            $resumoOrcamento .= "\n1. Primeiro pergunte: 'Você aceita os termos da assessoria? (Os valores são experimentais e podem variar)'";
-            $resumoOrcamento .= "\n2. Se o cliente aceitar, use acao: aceitar_termos_assessoria";
-            $resumoOrcamento .= "\n3. Depois use acao: ir_para_checkout para levar ao checkout";
+            $resumoOrcamento .= "\n1. Informe os termos: 'Os valores são de assessoria experimental e podem variar. Aceita os termos?'";
+            $resumoOrcamento .= "\n2. Se o cliente disser sim/aceito/pode/beleza/ok, use IMEDIATAMENTE acao: aceitar_termos_assessoria";
+            $resumoOrcamento .= "\n3. Se o cliente pedir direto 'adiciona no carrinho' sem ter perguntado antes, pergunte sobre os termos primeiro";
+            $resumoOrcamento .= "\n4. Depois do carrinho, ofereça ir_para_checkout";
             $resumoOrcamento .= "\nIMPORTANTE: Use EXATAMENTE estes valores. NÃO calcule por conta própria.";
         }
 
