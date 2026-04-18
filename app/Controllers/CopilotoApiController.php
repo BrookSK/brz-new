@@ -440,6 +440,13 @@ class CopilotoApiController extends Controller {
         }
     }
 
+    /** POST /api/copiloto/prepararcheckout — Setar sessão para permitir acesso ao checkout */
+    public function prepararCheckout(Request $request) {
+        if (session_status() === PHP_SESSION_NONE) @session_start();
+        $_SESSION['checkout_from_cart_at'] = time();
+        $this->responderJson(['success' => true]);
+    }
+
     /** POST /api/copiloto/orcamento — Gerar orçamento de assessoria via copiloto */
     public function orcamento(Request $request) {
         try {
