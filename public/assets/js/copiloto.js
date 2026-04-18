@@ -476,6 +476,14 @@
         var mId = textoResp.match(/ID[:\s]*(\d+)/i)
         if (mId) acaoParams.produto_id = parseInt(mId[1])
       }
+      // Detectar se Claude disse que vai levar pro checkout mas não mandou a ação
+      if (acaoTipo === 'nenhuma' && textoResp.match(/levo.*checkout|partiu.*checkout|levando.*checkout|bora.*checkout|finalizar.*compra/i)) {
+        acaoTipo = 'ir_para_checkout'
+      }
+      // Detectar se Claude disse que limpou o carrinho
+      if (acaoTipo === 'nenhuma' && textoResp.match(/carrinho.*limpo|carrinho.*zerado|limpo.*carrinho|zerado.*carrinho/i)) {
+        acaoTipo = 'limpar_carrinho'
+      }
       
       if (acaoTipo === 'adicionar_carrinho' || acaoTipo === 'limpar_carrinho') {
         // Executar ação primeiro — a função addToCart/limpar já mostra mensagem de sucesso/erro
