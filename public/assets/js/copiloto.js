@@ -296,12 +296,28 @@
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
       gerar_orcamento: function () { return gerarOrcamento(p.links || []) },
       aceitar_termos_assessoria: function () {
-        // Clicar no checkbox de termos e no botão de adicionar
-        var checkbox = qs('input[type="checkbox"]')
-        if (checkbox && !checkbox.checked) { checkbox.click() }
-        var btnAdd = qs('[onclick*="adicionarAoCarrinho"], button.btn-primary, .btn-lg')
-        if (btnAdd) { setTimeout(function() { btnAdd.click() }, 500) }
-        adicionarMsg('assistant', '✅ Termos aceitos e produtos adicionados ao carrinho!')
+        // Marcar checkbox de termos
+        var checkboxes = document.querySelectorAll('input[type="checkbox"]')
+        checkboxes.forEach(function(cb) { if (!cb.checked) cb.click() })
+        
+        // Aguardar e clicar no botão de adicionar ao carrinho
+        setTimeout(function() {
+          var btnAdd = qs('.btn-lg.btn-primary, [onclick*="adicionar"], button.btn-primary.btn-lg')
+          if (!btnAdd) {
+            // Tentar encontrar por texto
+            document.querySelectorAll('button, .btn').forEach(function(b) {
+              if (b.textContent.match(/adicionar.*carrinho/i)) btnAdd = b
+            })
+          }
+          if (btnAdd) {
+            btnAdd.click()
+            adicionarMsg('assistant', '✅ Termos aceitos e produtos adicionados ao carrinho! Te levo pro carrinho em instantes...')
+            salvarEstadoChat()
+            setTimeout(function() { window.location.href = '/carrinho' }, 2000)
+          } else {
+            adicionarMsg('assistant', '⚠️ Não encontrei o botão de adicionar. Clica no botão "Adicionar ao Carrinho" na página.')
+          }
+        }, 500)
       },
       nenhuma: function () {}
     }
