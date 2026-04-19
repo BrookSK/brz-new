@@ -16,6 +16,18 @@ if (function_exists('opcache_invalidate')) {
  */
 class CopilotoApiController extends Controller {
 
+    private function validarCpf(string $cpf): bool {
+        $cpf = preg_replace('/\D/', '', $cpf);
+        if (strlen($cpf) !== 11 || preg_match('/^(\d)\1{10}$/', $cpf)) return false;
+        for ($t = 9; $t < 11; $t++) {
+            $d = 0;
+            for ($c = 0; $c < $t; $c++) $d += $cpf[$c] * (($t + 1) - $c);
+            $d = ((10 * $d) % 11) % 10;
+            if ($cpf[$c] != $d) return false;
+        }
+        return true;
+    }
+
     private function responderJson(array $data, int $status = 200): void {
         http_response_code($status);
         header('Content-Type: application/json; charset=UTF-8');
@@ -504,6 +516,73 @@ class CopilotoApiController extends Controller {
 
             $campos = $body['campos'];
             $pdo = \Config\Database::getConnection();
+
+            // Validações
+            $erros = [];
+            
+            // Validar CPF/Documento
+            if (isset($campos['documento']) || isset($campos['cpf'])) {
+                $doc = $campos['documento'] ?? $campos['cpf'] ?? '';
+                $docLimpo = preg_replace('/\D/', '', $doc);
+                if (strlen($docLimpo) === 11) {
+                    // Validar CPF
+                    if (!$this->validarCpf($docLimpo)) {
+                        $erros[] = 'CPF inválido';
+                    } else {
+                        // Verificar se já está em uso por outro usuário
+                        $stDoc = $pdo->prepare("SELECT id FROM usuarios WHERE (documento = ? OR documento = ?) AND id != ?");
+                        $stDoc->execute([$doc, $docLimpo, $userId]);
+                        if ($stDoc->fetchColumn()) $erros[] = 'CPF já está em uso por outro usuário';
+                    }
+                    // Formatar CPF
+                    if (empty($erros)) {
+                        $campos['documento'] = substr($docLimpo,0,3).'.'.substr($docLimpo,3,3).'.'.substr($docLimpo,6,3).'-'.substr($docLimpo,9,2);
+                        unset($campos['cpf']);
+                    }
+                } elseif (strlen($docLimpo) === 14) {
+                    // CNPJ — aceitar sem validação complexa
+                    $campos['documento'] = $doc;
+                } elseif (!empty($doc)) {
+                    $erros[] = 'CPF deve ter 11 dígitos';
+                }
+            }
+
+            // Validar email
+            if (isset($campos['email'])) {
+                $email = trim($campos['email']);
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $erros[] = 'Email inválido';
+                } else {
+                    $stEmail = $pdo->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
+                    $stEmail->execute([$email, $userId]);
+                    if ($stEmail->fetchColumn()) $erros[] = 'Email já está em uso por outro usuário';
+                }
+            }
+
+            // Validar telefone
+            if (isset($campos['telefone'])) {
+                $tel = preg_replace('/\D/', '', $campos['telefone']);
+                if (strlen($tel) < 10 || strlen($tel) > 15) {
+                    $erros[] = 'Telefone inválido (mínimo 10 dígitos)';
+                }
+            }
+
+            // Validar data de nascimento
+            if (isset($campos['data_nascimento'])) {
+                $dt = $campos['data_nascimento'];
+                // Aceitar dd/mm/yyyy ou yyyy-mm-dd
+                if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $dt, $m)) {
+                    $dt = $m[3] . '-' . $m[2] . '-' . $m[1];
+                    $campos['data_nascimento'] = $dt;
+                }
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dt) || !strtotime($dt)) {
+                    $erros[] = 'Data de nascimento inválida';
+                }
+            }
+
+            if (!empty($erros)) {
+                $this->responderJson(['error' => implode('. ', $erros)], 400);
+            }
 
             // Mapear campos permitidos para colunas do banco
             $permitidos = [
