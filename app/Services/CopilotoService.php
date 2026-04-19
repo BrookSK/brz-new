@@ -287,9 +287,14 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             if (!empty($campos['cep'])) $resumoCheckout .= "\nEndereço: {$campos['endereco']}, {$campos['numero']} - {$campos['bairro']}, {$campos['cidade']}/{$campos['estado']} CEP {$campos['cep']}";
             if (!empty($faltando)) {
                 $resumoCheckout .= "\n\n⚠️ CAMPOS FALTANDO: " . implode(', ', $faltando);
-                $resumoCheckout .= "\nPergunte ao cliente os dados faltantes UM POR UM antes de finalizar.";
+                $resumoCheckout .= "\nPergunte ao cliente APENAS os dados faltantes. NÃO peça dados que já estão preenchidos.";
             } else {
-                $resumoCheckout .= "\n\n✅ Todos os campos obrigatórios estão preenchidos. Pergunte a forma de pagamento e confirme para finalizar.";
+                $resumoCheckout .= "\n\n✅ Todos os campos obrigatórios estão preenchidos.";
+                if (empty($campos['forma_pagamento'])) {
+                    $resumoCheckout .= "\nSó falta a forma de pagamento. Pergunte: PIX ou Cartão?";
+                } else {
+                    $resumoCheckout .= "\nTudo pronto! Confirme com o cliente e use acao: finalizar_pedido.";
+                }
             }
         }
 
