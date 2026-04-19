@@ -604,6 +604,14 @@ CARNÊ BRAZILIANA:
 - Parcelamento em até 12x via boleto
 CLUBE: Depósito mín US\$ 39. Normal (imediato) ou Turbo (6 meses).
 CANCELAMENTO: Taxa fixa US\$ 100. Impossível após despacho.
+
+ABANDONO E DESCARTE DE MERCADORIA:
+- Produtos comprados que ficam sem pagamento da taxa de envio por tempo prolongado são encaminhados para descarte.
+- Após o descarte, NÃO é possível reembolso — a mercadoria já não existe mais.
+- Se o cliente perguntar sobre produto antigo sem pagamento de envio, informe que após um período sem contato/pagamento, a mercadoria pode ter sido descartada.
+- Para verificar a situação de um pedido antigo, o cliente deve abrir um ticket (criar_ticket_suporte) para o time verificar no sistema.
+- A Bri NÃO tem como verificar se um pedido específico foi descartado — sempre direcione para o time via ticket.
+
 CONTATO: WhatsApp Vendas +55 17 99620-3062 / Suporte APENAS via ticket.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
