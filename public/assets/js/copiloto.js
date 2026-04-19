@@ -577,13 +577,19 @@
             salvarEstadoChat()
             setTimeout(function() { window.location.href = d.redirect || '/carrinho' }, 1500)
           } else {
-            adicionarMsg('assistant', '❌ ' + (d.message || 'Erro ao adicionar'))
-            if (d.redirect) { salvarEstadoChat(); setTimeout(function() { window.location.href = d.redirect }, 2000) }
+            adicionarMsg('assistant', '❌ ' + (d.message || 'Erro ao adicionar ao carrinho.'))
+            if (d.redirect) {
+              adicionarMsg('assistant', '🔄 Redirecionando para atualizar...')
+              salvarEstadoChat()
+              setTimeout(function() { window.location.href = d.redirect }, 2000)
+            } else {
+              adicionarMsg('assistant', 'Tenta clicar no botão "Adicionar ao Carrinho" na página do orçamento, ou me avisa que eu abro um ticket pro time verificar.')
+            }
           }
         }).catch(function(err) {
           var msgs = document.getElementById('bz-copiloto-messages')
           if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
-          adicionarMsg('assistant', '❌ Erro: ' + (err.message || 'falha'))
+          adicionarMsg('assistant', '❌ Não consegui adicionar ao carrinho. Tenta pelo botão na página do orçamento ou me avisa que eu abro um ticket.')
         })
       },
       nenhuma: function () {}
