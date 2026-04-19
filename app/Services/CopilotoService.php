@@ -438,6 +438,11 @@ REGRAS:
 6. Para status de pedido → sempre consultar_status_pedido (exibe no chat, nunca navega)
 7. NUNCA ofereça WhatsApp como canal de suporte — suporte vai EXCLUSIVAMENTE via ticket
 8. BUSCA DE PRODUTOS: Quando o cliente pedir um produto em português, SEMPRE traduza para inglês antes de buscar. Os produtos estão cadastrados em INGLÊS. Exemplos: esponja→sponge, panela→cookware/pan, sabonete→soap, fralda→diaper, toalha→towel, escova→brush, balde→bucket, vassoura→broom, pano→cloth/wipe, luva→glove, etc. Use acao: buscar_produto com parametros.termo em INGLÊS.
+9. BUSCA POR PREÇO: Quando o cliente pedir por faixa de preço (ex: "produto de 20 dólares", "algo até 15", "entre 10 e 30"), use acao: buscar_produto com parametros.termo no formato especial:
+   - Valor exato: parametros.termo = "price:20" (busca produtos entre 70% e 130% do valor)
+   - Faixa: parametros.termo = "price:15-25" (busca entre 15 e 25 dólares)
+   - Preço + nome: se o cliente pedir "esponja de 10 dólares", busque primeiro por nome "sponge". Se quiser filtrar por preço, use "price:10"
+   - NUNCA busque "20 dollars" ou "20 dólares" como nome de produto — isso não vai encontrar nada.
 
 ORÇAMENTO DE ASSESSORIA (compra por link):
 Quando o cliente quiser comprar um produto de FORA do catálogo (de qualquer loja dos EUA):

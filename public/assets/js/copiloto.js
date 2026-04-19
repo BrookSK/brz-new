@@ -730,7 +730,8 @@
 
   async function buscarProdutoInteligente (termo) {
     if (!termo) return
-    adicionarMsg('assistant', '🔍 Buscando "' + termo + '"...')
+    var msgBusca = termo.match(/^price:/) ? '🔍 Buscando produtos nessa faixa de preço...' : '🔍 Buscando "' + termo + '"...'
+    adicionarMsg('assistant', msgBusca)
     try {
       var r = await fetch('/api/copiloto/buscarproduto?q=' + encodeURIComponent(termo))
       var d = await r.json()
@@ -740,11 +741,17 @@
 
       if (d.produtos && d.produtos.length > 0) {
         ultimaBusca = d.produtos
-        adicionarMsg('assistant', 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":')
+        var msgResultado = termo.match(/^price:/) 
+          ? 'Encontrei ' + d.produtos.length + ' produto(s) nessa faixa de preço:'
+          : 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":'
+        adicionarMsg('assistant', msgResultado)
         // Renderizar carrossel de cards
         renderizarCarrosselProdutos(d.produtos)
       } else {
-        adicionarMsg('assistant', 'Não encontrei "' + termo + '" no catálogo. Quer que eu te leve para os Grupos de Compras?')
+        var msgNaoEncontrou = termo.match(/^price:/)
+          ? 'Não encontrei produtos nessa faixa de preço. Quer tentar outro valor ou ver os Grupos de Compras?'
+          : 'Não encontrei "' + termo + '" no catálogo. Quer que eu te leve para os Grupos de Compras?'
+        adicionarMsg('assistant', msgNaoEncontrou)
       }
     } catch (e) {
       adicionarMsg('assistant', 'Não consegui buscar agora. Tenta de novo?')

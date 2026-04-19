@@ -335,10 +335,28 @@ class CopilotoApiController extends Controller {
     /** GET /api/copiloto/buscarproduto — Busca produtos no banco incluindo grupos de compras */
     public function buscarProduto(Request $request) {
         $termo = trim((string) $request->getParam('q', ''));
+        $precoMin = (float) $request->getParam('preco_min', 0);
+        $precoMax = (float) $request->getParam('preco_max', 0);
+        
+        // Detectar busca por preço no próprio termo: "price:20", "price:15-25"
+        if (preg_match('/^price:(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/', $termo, $m)) {
+            $precoMin = (float) $m[1];
+            $precoMax = (float) $m[2];
+            $termo = '';
+        } elseif (preg_match('/^price:(\d+(?:\.\d+)?)$/', $termo, $m)) {
+            $precoAlvo = (float) $m[1];
+            $precoMin = $precoAlvo * 0.7;
+            $precoMax = $precoAlvo * 1.3;
+            $termo = '';
+        }
+        
         // Limpar pontuação e caracteres especiais
         $termo = preg_replace('/[?!.,;:()"\'\[\]{}]/', '', $termo);
         $termo = trim($termo);
-        if (mb_strlen($termo) < 2) {
+        
+        $buscaPorPreco = ($precoMin > 0 || $precoMax > 0);
+        
+        if (!$buscaPorPreco && mb_strlen($termo) < 2) {
             $this->responderJson(['produtos' => [], 'grupos' => []]);
         }
         try {
@@ -372,6 +390,36 @@ class CopilotoApiController extends Controller {
             $temFoto = in_array('foto_principal', $cols, true);
             $fotoSelect = $temFoto ? ", p.foto_principal" : ", NULL as foto_principal";
 
+            // Construir WHERE clause
+            $whereClause = '';
+            $params = [];
+            
+            if ($buscaPorPreco) {
+                // Busca por faixa de preço
+                if ($precoMin > 0 && $precoMax > 0) {
+                    $whereClause = "p.{$colPreco} BETWEEN ? AND ?";
+                    $params = [$precoMin, $precoMax];
+                } elseif ($precoMin > 0) {
+                    $whereClause = "p.{$colPreco} >= ?";
+                    $params = [$precoMin];
+                } elseif ($precoMax > 0) {
+                    $whereClause = "p.{$colPreco} <= ?";
+                    $params = [$precoMax];
+                }
+                // Se também tem termo de busca, combinar
+                if (!empty($termo)) {
+                    $whereClause .= " AND p.{$colNome} LIKE ?";
+                    $params[] = '%' . $termo . '%';
+                }
+                $orderBy = "ABS(p.{$colPreco} - ?) ASC";
+                $params[] = ($precoMin + $precoMax) / 2; // Ordenar pelo mais próximo do valor alvo
+            } else {
+                // Busca por nome
+                $whereClause = "p.{$colNome} LIKE ?";
+                $params = ['%' . $termo . '%'];
+                $orderBy = "p.{$colNome} ASC";
+            }
+
             if ($temGrupoComprasId) {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     p.grupo_compras_id,
@@ -379,19 +427,19 @@ class CopilotoApiController extends Controller {
                     {$fotoSelect}
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
-                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
-                    ORDER BY p.{$colNome} ASC LIMIT 10";
+                    WHERE {$whereClause}{$filtroSQL}
+                    ORDER BY {$orderBy} LIMIT 10";
             } else {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     NULL as grupo_compras_id, '' as grupo_nome, '' as grupo_slug
                     {$fotoSelect}
                     FROM produtos p
-                    WHERE p.{$colNome} LIKE ?{$filtroSQL}
-                    ORDER BY p.{$colNome} ASC LIMIT 10";
+                    WHERE {$whereClause}{$filtroSQL}
+                    ORDER BY {$orderBy} LIMIT 10";
             }
 
             $st = $pdo->prepare($sql);
-            $st->execute([$like]);
+            $st->execute($params);
             $produtos = $st->fetchAll(\PDO::FETCH_ASSOC);
 
             // Identificar grupos que contêm o produto
