@@ -346,8 +346,30 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             if (!empty($contexto['orcamento_total'])) $resumoOrcamento .= "\nTOTAL: {$contexto['orcamento_total']}";
             if (!empty($contexto['orcamento_produtos'])) {
                 $resumoOrcamento .= "\nProdutos:";
+                $temVariacoesPendentes = false;
                 foreach ($contexto['orcamento_produtos'] as $p) {
                     $resumoOrcamento .= "\n- {$p['nome']} — {$p['preco']}";
+                    if (!empty($p['variacoes']) && is_array($p['variacoes'])) {
+                        foreach ($p['variacoes'] as $key => $opcoes) {
+                            $selecionada = $p['variacoes_selecionadas'][$key] ?? null;
+                            if ($selecionada) {
+                                $resumoOrcamento .= "\n  {$key}: {$selecionada} ✅";
+                            } else {
+                                $opcoesStr = implode(', ', is_array($opcoes) ? $opcoes : []);
+                                $resumoOrcamento .= "\n  {$key}: ❌ NÃO SELECIONADO — Opções: {$opcoesStr}";
+                                $temVariacoesPendentes = true;
+                            }
+                        }
+                    }
+                    if (isset($p['variacoes_completas']) && !$p['variacoes_completas']) {
+                        $temVariacoesPendentes = true;
+                    }
+                }
+                if ($temVariacoesPendentes) {
+                    $resumoOrcamento .= "\n\n⚠️ VARIAÇÕES PENDENTES: Alguns produtos têm variações (tamanho, cor, etc.) que PRECISAM ser selecionadas antes de adicionar ao carrinho.";
+                    $resumoOrcamento .= "\nPergunte ao cliente qual opção ele quer para cada variação pendente.";
+                    $resumoOrcamento .= "\nQuando o cliente escolher, use acao: selecionar_variacao_orcamento com parametros: {\"indice\": 0, \"variacao\": {\"Size\": \"Extra-Small\", \"Color\": \"Green\"}}";
+                    $resumoOrcamento .= "\nSó depois de TODAS as variações selecionadas, prossiga com aceitar_termos_assessoria.";
                 }
             }
             $resumoOrcamento .= "\n\nVocê pode informar estes valores ao cliente.";
@@ -433,7 +455,8 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
 - criar_ticket_duvida: abre ticket na categoria "duvidas_gerais"
 - atualizar_perfil: atualiza dados do perfil do usuário. parametros.campos = {"telefone":"novo_valor","documento":"novo_cpf","cep":"15000-000","endereco":"Rua Nova","numero":"456","bairro":"Centro","cidade":"SP","estado":"SP",...}. Campos permitidos: nome, email, telefone, documento (CPF), data_nascimento, cep, endereco, numero, complemento, bairro, cidade, estado, pais. NUNCA atualizar senha pelo chat.
 - gerar_orcamento: gera orçamento de assessoria com links de produtos externos. OBRIGATÓRIO: parametros.links (array de URLs)
-- aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento)
+- aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento). IMPORTANTE: só use DEPOIS que todas as variações estiverem selecionadas.
+- selecionar_variacao_orcamento: seleciona variações de um produto no orçamento. parametros.indice = índice do produto (0, 1, 2...), parametros.variacao = {"Size": "Extra-Small", "Color": "Green"}. Use os nomes exatos das opções mostradas no contexto.
 - preencher_checkout: preenche campos do checkout. parametros.campos = {"nome":"valor","email":"valor","documento":"CPF","telefone":"+5517991190528","data_nascimento":"2000-01-15",...}. Campos válidos: nome, email, documento (CPF), telefone (com DDI), data_nascimento (yyyy-mm-dd). Para endereço: cep, endereco, numero, complemento, bairro, cidade, estado, pais. NÃO preencha campos de destinatário (entrega para outra pessoa) — essa funcionalidade está desativada.
 - selecionar_pagamento: seleciona forma de pagamento. parametros.metodo = "pix"|"cartao_credito"|"cartao_debito"|"carteira"|"carne_braziliana"
 - selecionar_endereco: seleciona endereço de entrega no checkout. parametros.indice = número do endereço (1, 2, 3...)

@@ -150,10 +150,34 @@
       // Ler produtos do orçamento
       ctx.orcamento_produtos = []
       document.querySelectorAll('[data-produto-id]').forEach(function(el) {
-        ctx.orcamento_produtos.push({
+        var prod = {
           nome: (qs('h6, .fw-semibold', el) || {}).textContent?.trim() || '',
           preco: (qs('[class*="price"], .text-primary', el) || {}).textContent?.trim() || '',
-        })
+        }
+        // Ler variações disponíveis
+        var varCombo = qs('.variation-combo', el)
+        if (varCombo) {
+          prod.variacoes = {}
+          prod.variacoes_selecionadas = {}
+          prod.variacoes_completas = true
+          varCombo.querySelectorAll('.variation-btn').forEach(function(btn) {
+            var key = decodeURIComponent(btn.getAttribute('data-key') || '')
+            var val = decodeURIComponent(btn.getAttribute('data-value') || '')
+            if (!prod.variacoes[key]) prod.variacoes[key] = []
+            prod.variacoes[key].push(val)
+            if (btn.classList.contains('btn-primary')) {
+              prod.variacoes_selecionadas[key] = val
+            }
+          })
+          // Verificar se todas as variações foram selecionadas
+          var keys = Object.keys(prod.variacoes)
+          var selKeys = Object.keys(prod.variacoes_selecionadas)
+          prod.variacoes_completas = (keys.length === selKeys.length && keys.length > 0) || keys.length === 0
+          // Verificar mensagem de "selecione"
+          var selMsg = qs('.text-muted', varCombo)
+          if (selMsg && selMsg.textContent.match(/selecione/i)) prod.variacoes_completas = false
+        }
+        ctx.orcamento_produtos.push(prod)
       })
       // Ler ID do orçamento da URL
       var mOrcId = url.match(/orcamento_id=(\d+)/)
@@ -531,6 +555,16 @@
       },
       gerar_orcamento: function () { return gerarOrcamento(p.links || []) },
       aceitar_termos_assessoria: function () {
+        // Verificar se há variações pendentes antes de aceitar
+        var variacoesPendentes = false
+        document.querySelectorAll('.variation-combo').forEach(function(combo) {
+          var selMsg = qs('.text-muted', combo)
+          if (selMsg && selMsg.textContent.match(/selecione/i)) variacoesPendentes = true
+        })
+        if (variacoesPendentes) {
+          adicionarMsg('assistant', '⚠️ Antes de adicionar ao carrinho, preciso que você escolha as variações do produto (tamanho, cor, etc.). Quais opções você prefere?')
+          return
+        }
         // Chamar a API de adicionar ao carrinho da assessoria diretamente
         var orcamentoId = null
         var mOrcId = window.location.search.match(/orcamento_id=(\d+)/)
@@ -591,6 +625,38 @@
           if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
           adicionarMsg('assistant', '❌ Não consegui adicionar ao carrinho. Tenta pelo botão na página do orçamento ou me avisa que eu abro um ticket.')
         })
+      },
+      selecionar_variacao_orcamento: function () {
+        // Selecionar variações nos botões da página de orçamento
+        var variacao = p.variacao || {}
+        var indice = parseInt(p.indice || 0)
+        var combo = document.querySelectorAll('.variation-combo')[indice]
+        if (!combo) {
+          // Tentar pelo data-index
+          combo = qs('.variation-combo[data-index="' + indice + '"]')
+        }
+        if (!combo) {
+          adicionarMsg('assistant', '⚠️ Não encontrei o produto para selecionar a variação.')
+          return
+        }
+        var selecionou = false
+        Object.keys(variacao).forEach(function(key) {
+          var valor = variacao[key]
+          // Encontrar o botão correspondente
+          combo.querySelectorAll('.variation-btn').forEach(function(btn) {
+            var btnKey = decodeURIComponent(btn.getAttribute('data-key') || '')
+            var btnVal = decodeURIComponent(btn.getAttribute('data-value') || '')
+            if (btnKey.toLowerCase() === key.toLowerCase() && btnVal.toLowerCase() === valor.toLowerCase()) {
+              btn.click()
+              selecionou = true
+            }
+          })
+        })
+        if (selecionou) {
+          adicionarMsg('assistant', '✅ Variação selecionada!')
+        } else {
+          adicionarMsg('assistant', '⚠️ Não encontrei essa opção de variação. Tenta selecionar direto na página.')
+        }
       },
       nenhuma: function () {}
     }
