@@ -352,9 +352,16 @@
             var termos = document.querySelectorAll('input[type="checkbox"]')
             termos.forEach(function(cb) { if (!cb.checked) cb.click() })
             setTimeout(function() {
-              var btn = qs('#btnFinalizar,button[type="submit"],.btn-finalizar,.btn-primary[type="submit"]')
-              if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
-              else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar. Clica no botão na página.')
+              // Chamar a função de processamento do checkout diretamente
+              if (typeof window.processarPedidoDireto === 'function') {
+                window.processarPedidoDireto()
+                adicionarMsg('assistant', '🚀 Pedido sendo processado...')
+              } else {
+                // Fallback: clicar no botão
+                var btn = qs('#btn-finalizar,#btnFinalizar,button[type="submit"],.btn-finalizar')
+                if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
+                else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar.')
+              }
             }, 500)
           }).catch(function() {
             // Se falhar a verificação, tentar finalizar mesmo assim
