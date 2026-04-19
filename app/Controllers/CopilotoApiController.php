@@ -491,7 +491,7 @@ class CopilotoApiController extends Controller {
             $this->responderJson([
                 'sucesso' => true,
                 'numero_ticket' => '#' . $ticketId,
-                'prazo_resposta' => '48h úteis',
+                'prazo_resposta' => 'em breve',
             ]);
         } catch (\Throwable $e) {
             error_log('[CoPiloto] Erro ticket: ' . $e->getMessage());

@@ -89,15 +89,32 @@
       ctx.pagina = 'checkout'
       ctx.checkout_campos = {}
       ctx.checkout_campos_faltando = []
-      ;['nome','email','telefone','documento'].forEach(function(c) {
+      ;['nome','email','telefone','documento','data_nascimento'].forEach(function(c) {
         var el = qs('[name="'+c+'"]') || qs('#'+c)
         ctx.checkout_campos[c] = el ? (el.value||'').trim() : ''
-        if (!ctx.checkout_campos[c]) ctx.checkout_campos_faltando.push(c === 'documento' ? 'CPF' : c)
+        if (!ctx.checkout_campos[c] && c !== 'data_nascimento') ctx.checkout_campos_faltando.push(c === 'documento' ? 'CPF' : c)
       })
-      ;['cep','endereco','numero','bairro','cidade','estado','pais'].forEach(function(c) {
-        var el = qs('[name="'+c+'"]') || qs('#'+c)
-        ctx.checkout_campos[c] = el ? (el.value||'').trim() : ''
-      })
+      // Endereço: verificar se tem endereço selecionado no dropdown
+      var enderecoSelect = qs('#endereco-select,[name="endereco_selecionado"]')
+      if (enderecoSelect && enderecoSelect.value) {
+        ctx.checkout_campos.endereco_selecionado = enderecoSelect.value
+        // Ler dados do endereço selecionado via data attributes
+        var opt = enderecoSelect.options[enderecoSelect.selectedIndex]
+        if (opt) {
+          ctx.checkout_campos.cep = opt.getAttribute('data-cep') || ''
+          ctx.checkout_campos.endereco = opt.getAttribute('data-endereco') || ''
+          ctx.checkout_campos.numero = opt.getAttribute('data-numero') || ''
+          ctx.checkout_campos.bairro = opt.getAttribute('data-bairro') || ''
+          ctx.checkout_campos.cidade = opt.getAttribute('data-cidade') || ''
+          ctx.checkout_campos.estado = opt.getAttribute('data-estado') || ''
+          ctx.checkout_campos.pais = opt.getAttribute('data-pais') || 'BR'
+        }
+      } else {
+        ;['cep','endereco','numero','bairro','cidade','estado','pais'].forEach(function(c) {
+          var el = qs('[name="'+c+'"]') || qs('#'+c)
+          ctx.checkout_campos[c] = el ? (el.value||'').trim() : ''
+        })
+      }
       var moedaEl = qs('#moeda_hidden,[name="moeda"]')
       ctx.checkout_campos.moeda = moedaEl ? moedaEl.value : 'BRL'
       var fpEl = qs('#forma_pagamento,[name="forma_pagamento"]')
@@ -314,8 +331,51 @@
       preencher_checkout: function () {
         if (p.campos && typeof p.campos === 'object') {
           Object.keys(p.campos).forEach(function(k) {
+            var val = p.campos[k]
+            // Telefone: campo composto (DDI + número) — tratar especialmente
+            if (k === 'telefone') {
+              // Tentar separar DDI do número: +55 17991190528 ou 17991190528
+              var telRaw = (val || '').replace(/[^\d+]/g, '')
+              var ddiSel = qs('#telefone_ddi')
+              var numInput = qs('#telefone_numero')
+              var hiddenTel = qs('#telefone')
+              if (telRaw.match(/^\+?55/)) {
+                // DDI Brasil
+                if (ddiSel) { ddiSel.value = '55'; ddiSel.dispatchEvent(new Event('change',{bubbles:true})) }
+                var numPart = telRaw.replace(/^\+?55/, '')
+                if (numInput) { numInput.value = numPart; numInput.dispatchEvent(new Event('input',{bubbles:true})) }
+              } else if (telRaw.match(/^\+?1/)) {
+                if (ddiSel) { ddiSel.value = '1'; ddiSel.dispatchEvent(new Event('change',{bubbles:true})) }
+                var numPart = telRaw.replace(/^\+?1/, '')
+                if (numInput) { numInput.value = numPart; numInput.dispatchEvent(new Event('input',{bubbles:true})) }
+              } else {
+                // Sem DDI reconhecido — assumir BR
+                if (ddiSel) { ddiSel.value = '55'; ddiSel.dispatchEvent(new Event('change',{bubbles:true})) }
+                if (numInput) { numInput.value = telRaw; numInput.dispatchEvent(new Event('input',{bubbles:true})) }
+              }
+              if (hiddenTel) { hiddenTel.value = val; hiddenTel.dispatchEvent(new Event('change',{bubbles:true})) }
+              return
+            }
+            // Endereço selecionado: usar o dropdown
+            if (k === 'endereco_id' || k === 'endereco_selecionado') {
+              var sel = qs('#endereco-select,[name="endereco_selecionado"]')
+              if (sel) { sel.value = val; sel.dispatchEvent(new Event('change',{bubbles:true})) }
+              return
+            }
+            // CPF: mapear para documento
+            if (k === 'cpf') k = 'documento'
+            // Campos normais
             var el = qs('[name="'+k+'"]') || qs('#'+k)
-            if (el) { el.value = p.campos[k]; el.dispatchEvent(new Event('change',{bubbles:true})) }
+            if (el) {
+              if (el.tagName === 'SELECT') {
+                el.value = val
+                el.dispatchEvent(new Event('change',{bubbles:true}))
+              } else {
+                el.value = val
+                el.dispatchEvent(new Event('input',{bubbles:true}))
+                el.dispatchEvent(new Event('change',{bubbles:true}))
+              }
+            }
           })
           adicionarMsg('assistant', '✅ Dados preenchidos!')
         }
@@ -370,35 +430,29 @@
           return
         }
 
-        // 3. Preencher destinatário com dados do comprador se vazio
-        var destNome = qs('#destinatario_nome,[name="destinatario_nome"]')
-        var destTel = qs('#destinatario_telefone,[name="destinatario_telefone"]')
-        var destDoc = qs('#destinatario_documento,[name="destinatario_documento"]')
-        var nomeComp = qs('[name="nome"]')
-        var telComp = qs('#telefone,[name="telefone"]')
-        var docComp = qs('#documento,[name="documento"]')
-        if (destNome && !destNome.value && nomeComp && nomeComp.value) { destNome.value = nomeComp.value; destNome.dispatchEvent(new Event('change',{bubbles:true})) }
-        if (destTel && !destTel.value && telComp && telComp.value) { destTel.value = telComp.value; destTel.dispatchEvent(new Event('change',{bubbles:true})) }
-        if (destDoc && !destDoc.value && docComp && docComp.value) { destDoc.value = docComp.value; destDoc.dispatchEvent(new Event('change',{bubbles:true})) }
+        // 3. NÃO mexer nos campos de destinatário (entrega para outra pessoa) — seção oculta
+        // A entrega usa os dados do próprio cliente (comprador) que já estão preenchidos no form
+        // Garantir que o checkbox "entrega_para_outro" NÃO esteja marcado
+        var entregaOutro = qs('#entrega_para_outro,input[name="entrega_para_outro"]')
+        if (entregaOutro && entregaOutro.checked) {
+          entregaOutro.checked = false
+          entregaOutro.dispatchEvent(new Event('change', {bubbles:true}))
+        }
 
-        // 4. Marcar checkbox de "enviar para mim mesmo" se existir
-        var enviarParaMim = qs('#enviar_para_mim,#mesmo_destinatario,input[name="mesmo_destinatario"]')
-        if (enviarParaMim && !enviarParaMim.checked) enviarParaMim.click()
-
-        // 5. Aceitar termos (checkbox consentimento_legal)
+        // 4. Aceitar termos (checkbox consentimento_legal)
         var consentimento = qs('#consentimento_legal')
         if (consentimento && !consentimento.checked) {
           consentimento.checked = true
           consentimento.dispatchEvent(new Event('change', {bubbles:true}))
         }
 
-        // 6. Habilitar botão se estiver desabilitado
+        // 5. Habilitar botão se estiver desabilitado
         var btnFinalizar = qs('#btn-finalizar')
         if (btnFinalizar) btnFinalizar.disabled = false
 
         adicionarMsg('assistant', '🚀 Pedido sendo processado...')
 
-        // 7. Aguardar um pouco para os eventos de change propagarem, depois chamar processarPedidoDireto
+        // 6. Aguardar um pouco para os eventos de change propagarem, depois chamar processarPedidoDireto
         setTimeout(function() {
           if (typeof window.processarPedidoDireto === 'function') {
             window.processarPedidoDireto()
@@ -878,7 +932,7 @@
     salvarHistorico(); scrollBottom()
   }
   function formatarTexto (t) {
-    return (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    return (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" style="color:#1d4ed8;text-decoration:underline">$1</a>')
   }
   function scrollBottom () { var m = document.getElementById('bz-copiloto-messages'); if (m) m.scrollTop = m.scrollHeight }
 
