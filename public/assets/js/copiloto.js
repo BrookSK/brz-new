@@ -362,14 +362,6 @@
             }, 500)
           })
       },
-        var termos = document.querySelectorAll('input[type="checkbox"]')
-        termos.forEach(function(cb) { if (!cb.checked) cb.click() })
-        setTimeout(function() {
-          var btn = qs('#btnFinalizar,button[type="submit"],.btn-finalizar,.btn-primary[type="submit"]')
-          if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
-          else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar. Clica no botão na página.')
-        }, 500)
-      },
       ir_para_contato: function () { salvarEstadoChat(); window.location.href = '/contato' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
