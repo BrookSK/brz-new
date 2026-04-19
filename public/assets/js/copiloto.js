@@ -85,7 +85,27 @@
       var qtdMatch = (qs('.card-header h5, .card-header') || {}).textContent || ''
       var mQtd = qtdMatch.match(/(\d+)\s*iten/i)
       ctx.carrinho_total_itens = mQtd ? parseInt(mQtd[1]) : ctx.carrinho_itens.length
-    } else if (url === '/checkout') ctx.pagina = 'checkout'
+    } else if (url.match(/\/checkout/)) {
+      ctx.pagina = 'checkout'
+      ctx.checkout_campos = {}
+      ctx.checkout_campos_faltando = []
+      ;['nome','email','telefone','cpf'].forEach(function(c) {
+        var el = qs('[name="'+c+'"]') || qs('#'+c)
+        ctx.checkout_campos[c] = el ? (el.value||'').trim() : ''
+        if (!ctx.checkout_campos[c]) ctx.checkout_campos_faltando.push(c)
+      })
+      ;['cep','endereco','numero','bairro','cidade','estado','pais'].forEach(function(c) {
+        var el = qs('[name="'+c+'"]') || qs('#'+c)
+        ctx.checkout_campos[c] = el ? (el.value||'').trim() : ''
+      })
+      var moedaEl = qs('#moeda_hidden,[name="moeda"]')
+      ctx.checkout_campos.moeda = moedaEl ? moedaEl.value : 'BRL'
+      var fpEl = qs('#forma_pagamento,[name="forma_pagamento"]')
+      ctx.checkout_campos.forma_pagamento = fpEl ? fpEl.value : ''
+      if (!ctx.checkout_campos.forma_pagamento) ctx.checkout_campos_faltando.push('forma_pagamento')
+      var termosEl = qs('#termos,[name="termos"],#aceito_termos')
+      ctx.checkout_campos.termos_aceitos = termosEl ? termosEl.checked : false
+    }
     else if (url === '/rastreamento') ctx.pagina = 'rastreamento'
     else if (url.match(/\/como-funciona/)) ctx.pagina = 'como-funciona'
     else if (url.match(/\/clube/)) ctx.pagina = 'clube'
@@ -286,10 +306,28 @@
       },
       consultar_status_pedido: function () { adicionarMsg('assistant', '📦 Use a página de rastreamento: /rastreamento com seu código dos Correios.') },
       abrir_whatsapp_vendas: function () { window.open('https://wa.me/' + CONFIG.whatsapp_vendas + (p.mensagem ? '?text=' + encodeURIComponent(p.mensagem) : ''), '_blank') },
-      ir_para_checkout: function () {
-        // Usar a rota do carrinho que seta a sessão e redireciona pro checkout
-        salvarEstadoChat()
-        window.location.href = '/carrinho/checkout'
+      ir_para_checkout: function () { salvarEstadoChat(); window.location.href = '/carrinho/checkout' },
+      preencher_checkout: function () {
+        if (p.campos && typeof p.campos === 'object') {
+          Object.keys(p.campos).forEach(function(k) {
+            var el = qs('[name="'+k+'"]') || qs('#'+k)
+            if (el) { el.value = p.campos[k]; el.dispatchEvent(new Event('change',{bubbles:true})) }
+          })
+          adicionarMsg('assistant', '✅ Dados preenchidos!')
+        }
+      },
+      selecionar_pagamento: function () {
+        var fp = qs('#forma_pagamento,[name="forma_pagamento"]')
+        if (fp && p.metodo) { fp.value = p.metodo; fp.dispatchEvent(new Event('change',{bubbles:true})) }
+      },
+      finalizar_pedido: function () {
+        var termos = document.querySelectorAll('input[type="checkbox"]')
+        termos.forEach(function(cb) { if (!cb.checked) cb.click() })
+        setTimeout(function() {
+          var btn = qs('#btnFinalizar,button[type="submit"],.btn-finalizar,.btn-primary[type="submit"]')
+          if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
+          else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar. Clica no botão na página.')
+        }, 500)
       },
       ir_para_contato: function () { salvarEstadoChat(); window.location.href = '/contato' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },

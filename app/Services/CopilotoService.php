@@ -271,6 +271,28 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             $resumoCarrinho .= "\nIMPORTANTE: Use EXATAMENTE estes valores ao falar do carrinho. NÃO calcule por conta própria.";
         }
         
+        // Dados do checkout (quando na página de checkout)
+        $resumoCheckout = '';
+        if (($contexto['pagina'] ?? '') === 'checkout' && !empty($contexto['checkout_campos'])) {
+            $campos = $contexto['checkout_campos'];
+            $faltando = $contexto['checkout_campos_faltando'] ?? [];
+            $resumoCheckout = "\n\nCHECKOUT — DADOS DO FORMULÁRIO:";
+            $resumoCheckout .= "\nNome: " . ($campos['nome'] ?: '❌ VAZIO');
+            $resumoCheckout .= "\nEmail: " . ($campos['email'] ?: '❌ VAZIO');
+            $resumoCheckout .= "\nTelefone: " . ($campos['telefone'] ?: '❌ VAZIO');
+            $resumoCheckout .= "\nCPF: " . ($campos['cpf'] ?: '❌ VAZIO');
+            $resumoCheckout .= "\nMoeda: " . ($campos['moeda'] ?: 'BRL');
+            $resumoCheckout .= "\nForma pagamento: " . ($campos['forma_pagamento'] ?: '❌ NÃO SELECIONADA');
+            $resumoCheckout .= "\nTermos aceitos: " . ($campos['termos_aceitos'] ? 'Sim' : 'Não');
+            if (!empty($campos['cep'])) $resumoCheckout .= "\nEndereço: {$campos['endereco']}, {$campos['numero']} - {$campos['bairro']}, {$campos['cidade']}/{$campos['estado']} CEP {$campos['cep']}";
+            if (!empty($faltando)) {
+                $resumoCheckout .= "\n\n⚠️ CAMPOS FALTANDO: " . implode(', ', $faltando);
+                $resumoCheckout .= "\nPergunte ao cliente os dados faltantes UM POR UM antes de finalizar.";
+            } else {
+                $resumoCheckout .= "\n\n✅ Todos os campos obrigatórios estão preenchidos. Pergunte a forma de pagamento e confirme para finalizar.";
+            }
+        }
+
         // Dados do orçamento (quando na página de orçamento)
         $resumoOrcamento = '';
         if (($contexto['pagina'] ?? '') === 'orcamento') {
@@ -332,6 +354,9 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
 - criar_ticket_duvida: abre ticket na categoria "duvidas_gerais"
 - gerar_orcamento: gera orçamento de assessoria com links de produtos externos. OBRIGATÓRIO: parametros.links (array de URLs)
 - aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento)
+- preencher_checkout: preenche campos do checkout. parametros.campos = {"nome":"valor","cpf":"valor",...}
+- selecionar_pagamento: seleciona forma de pagamento. parametros.metodo = "pix"|"credit_card"|"boleto"
+- finalizar_pedido: aceita termos e clica no botão de finalizar pedido (só na página de checkout)
 - verificar_cancelamento: verifica elegibilidade de cancelamento
 - solicitar_cancelamento: solicita cancelamento (requer confirmação)
 - nenhuma: apenas responder no chat
@@ -371,6 +396,7 @@ CARRINHO ATUAL:
 Subtotal (como o usuário vê na tela): {$subtotal}
 Total (como o usuário vê na tela): {$totalCarrinho}
 {$resumoCarrinho}
+{$resumoCheckout}
 {$resumoOrcamento}
 
 USUÁRIO:
@@ -404,6 +430,36 @@ IMPOSTO LOCAL EUA: 8% em BBW, Walmart, Trader Joe's, BJ's, Achados. 0% em Costco
 MOEDAS: BRL (PIX ou cartão 12x via AppMax) / USD (Stripe, Zelle, Venmo).
 PRAZO: 15-30 dias. LIMITES: 30kg e US\$ 2.999,99/caixa. Valor mínimo do pedido: US\$ 5,00.
 VALOR MÍNIMO: O subtotal dos produtos precisa ser de pelo menos US\$ 5,00 para finalizar a compra. Se o carrinho tiver menos que US\$ 5, avise o cliente que precisa adicionar mais produtos para atingir o mínimo.
+
+CHECKOUT ASSISTIDO (quando pagina = checkout):
+Você está na página de checkout. NÃO redirecione para o checkout — já estamos nele.
+
+SEGURANÇA — REGRAS ABSOLUTAS:
+- NUNCA peça senha, dados de cartão de crédito ou código de segurança pelo chat
+- Para senha: diga ao cliente para preencher o campo de senha diretamente na tela
+- Para cartão: diga ao cliente para preencher os dados do cartão nos campos da tela
+- Esses dados são sensíveis e não devem transitar pelo chat
+
+USUÁRIO NÃO LOGADO:
+Se usuario_logado = Não:
+- Informe: "Vi que você não está logado. Se já tem uma conta, faça login para continuar. Se não tem, podemos criar uma agora!"
+- Se o cliente quiser fazer login: use acao: navegar com parametros: {url: "/login?redirect=/checkout"}
+- Se o cliente quiser criar conta: colete nome, email e peça para ele preencher a senha no campo da tela
+- NUNCA peça a senha pelo chat
+
+FLUXO DO CHECKOUT:
+1. Verifique os campos preenchidos em checkout_campos
+2. Se faltar algum campo (checkout_campos_faltando), pergunte ao cliente UM POR UM
+3. Quando o cliente informar um dado (CPF, telefone, etc.), use acao: preencher_checkout com parametros.campos
+4. Pergunte a forma de pagamento: PIX, Cartão (até 12x), ou Carteira
+5. Use acao: selecionar_pagamento com parametros.metodo
+6. Confirme com o cliente: "Posso finalizar o pedido?"
+7. Se confirmar, use acao: finalizar_pedido
+8. Após finalizar, se for PIX: "Escaneie o QR Code que apareceu na tela para pagar"
+9. Se for cartão: "Preencha os dados do cartão nos campos da tela e me avisa quando terminar"
+FORMAS DE PAGAMENTO DISPONÍVEIS:
+- BRL: PIX (à vista), Cartão nacional (até 12x sem juros)
+- USD: Cartão internacional, Zelle, Venmo
 CLUBE: Depósito mín US\$ 39. Normal (imediato) ou Turbo (6 meses).
 CANCELAMENTO: Taxa fixa US\$ 100. Impossível após despacho.
 CONTATO: WhatsApp Vendas +55 17 99620-3062 / Suporte APENAS via ticket.
