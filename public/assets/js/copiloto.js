@@ -333,6 +333,18 @@
         }
       },
       finalizar_pedido: function () {
+        // Verificar valor mínimo antes de finalizar
+        var subtotalEl = qs('#subtotal,[class*="subtotal"]')
+        if (subtotalEl) {
+          var subtotalText = subtotalEl.textContent || ''
+          var subtotalNum = parseFloat(subtotalText.replace(/[^0-9.]/g, '')) || 0
+          // Se o valor parece ser em USD e menor que 5
+          if (subtotalText.indexOf('$') >= 0 && subtotalText.indexOf('R$') < 0 && subtotalNum < 5) {
+            adicionarMsg('assistant', '⚠️ O valor mínimo para finalizar é US$ 5,00. Seu subtotal é US$ ' + subtotalNum.toFixed(2) + '. Adicione mais produtos!')
+            return
+          }
+        }
+        // Aceitar termos e submeter
         var termos = document.querySelectorAll('input[type="checkbox"]')
         termos.forEach(function(cb) { if (!cb.checked) cb.click() })
         setTimeout(function() {
