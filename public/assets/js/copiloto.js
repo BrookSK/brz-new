@@ -505,7 +505,7 @@
       ir_para_carrinho: function () { salvarEstadoChat(); window.location.href = '/carrinho' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
-      buscar_produto: function () { return buscarProdutoInteligente(p.termo || p.busca || '') },
+      buscar_produto: function () { return buscarProdutoInteligente(p.termo || p.busca || '', true) },
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
       navegar: function () {
         var url = p.url || p.pagina || ''
@@ -813,30 +813,36 @@
     enviando = false
   }
 
-  async function buscarProdutoInteligente (termo) {
+  async function buscarProdutoInteligente (termo, skipBuscandoMsg) {
     if (!termo) return
-    var msgBusca = termo.match(/^price:/) ? '🔍 Buscando produtos nessa faixa de preço...' : '🔍 Buscando "' + termo + '"...'
-    adicionarMsg('assistant', msgBusca)
+    if (!skipBuscandoMsg) {
+      var msgBusca = termo.match(/^price:/) ? '🔍 Buscando produtos nessa faixa de preço...' : '🔍 Buscando "' + termo + '"...'
+      adicionarMsg('assistant', msgBusca)
+    }
     try {
       var r = await fetch('/api/copiloto/buscarproduto?q=' + encodeURIComponent(termo))
       var d = await r.json()
       var msgs = document.getElementById('bz-copiloto-messages')
-      if (msgs.lastChild) msgs.removeChild(msgs.lastChild)
-      historico.pop()
+      // Remove "Buscando..." message if we added one
+      if (!skipBuscandoMsg && msgs.lastChild) { msgs.removeChild(msgs.lastChild); historico.pop() }
 
       if (d.produtos && d.produtos.length > 0) {
         ultimaBusca = d.produtos
-        var msgResultado = termo.match(/^price:/) 
-          ? 'Encontrei ' + d.produtos.length + ' produto(s) nessa faixa de preço:'
-          : 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":'
-        adicionarMsg('assistant', msgResultado)
+        if (!skipBuscandoMsg) {
+          var msgResultado = termo.match(/^price:/) 
+            ? 'Encontrei ' + d.produtos.length + ' produto(s) nessa faixa de preço:'
+            : 'Encontrei ' + d.produtos.length + ' resultado(s) para "' + termo + '":'
+          adicionarMsg('assistant', msgResultado)
+        }
         // Renderizar carrossel de cards
         renderizarCarrosselProdutos(d.produtos)
       } else {
-        var msgNaoEncontrou = termo.match(/^price:/)
-          ? 'Não encontrei produtos nessa faixa de preço. Quer tentar outro valor ou ver os Grupos de Compras?'
-          : 'Não encontrei "' + termo + '" no catálogo. Quer que eu te leve para os Grupos de Compras?'
-        adicionarMsg('assistant', msgNaoEncontrou)
+        if (!skipBuscandoMsg) {
+          var msgNaoEncontrou = termo.match(/^price:/)
+            ? 'Não encontrei produtos nessa faixa de preço. Quer tentar outro valor ou ver os Grupos de Compras?'
+            : 'Não encontrei "' + termo + '" no catálogo. Quer que eu te leve para os Grupos de Compras?'
+          adicionarMsg('assistant', msgNaoEncontrou)
+        }
       }
     } catch (e) {
       adicionarMsg('assistant', 'Não consegui buscar agora. Tenta de novo?')

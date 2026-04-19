@@ -210,7 +210,10 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
                 }
             }
             $secaoProdutosEncontrados = "\n\nPRODUTOS ENCONTRADOS NO BANCO DE DADOS PARA ESTA PERGUNTA:\n" . implode("\n", $linhas) .
-                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Informe ao cliente que encontrou e em qual grupo de compras estão." .
+                "\n\nIMPORTANTE: Estes produtos EXISTEM no sistema. Use acao: buscar_produto com parametros.termo para que o carrossel visual apareça no chat." .
+                "\nSua resposta em texto deve ser CURTA (ex: 'Encontrei! Temos Tineco sim! 🎉'). O carrossel com fotos e botões aparece automaticamente." .
+                "\nNÃO liste os produtos em texto — o carrossel já mostra tudo visualmente." .
+                "\nSe quiser complementar, adicione info sobre envio/impostos DEPOIS, mas mantenha curto." .
                 "\nPara adicionar ao carrinho, use acao: adicionar_carrinho com parametros: {\"produto_id\": <ID_NUMERICO>, \"quantidade\": N}" .
                 "\nO produto_id é o número após 'ID:' na lista acima. NUNCA omita o produto_id." .
                 "\nREGRAS DE PRODUTOS:" .
