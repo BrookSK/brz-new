@@ -316,9 +316,9 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             } else {
                 $resumoCheckout .= "\n\n✅ Todos os campos obrigatórios estão preenchidos.";
                 if (empty($campos['forma_pagamento'])) {
-                    $resumoCheckout .= "\nSó falta a forma de pagamento. Pergunte: PIX ou Cartão?";
+                    $resumoCheckout .= "\nSó falta a forma de pagamento. Pergunte qual forma: PIX, Cartão de Crédito, Cartão de Débito, Carteira ou Carnê?";
                 } else {
-                    $resumoCheckout .= "\nTudo pronto! Confirme com o cliente e use acao: finalizar_pedido.";
+                    $resumoCheckout .= "\nTudo pronto! Pergunte se o cliente aceita os Termos de Uso e Política de Privacidade. Se já aceitou, use acao: finalizar_pedido IMEDIATAMENTE.";
                 }
             }
         }
@@ -414,7 +414,7 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
 - gerar_orcamento: gera orçamento de assessoria com links de produtos externos. OBRIGATÓRIO: parametros.links (array de URLs)
 - aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento)
 - preencher_checkout: preenche campos do checkout. parametros.campos = {"nome":"valor","cpf":"valor",...}
-- selecionar_pagamento: seleciona forma de pagamento. parametros.metodo = "pix"|"credit_card"|"boleto"
+- selecionar_pagamento: seleciona forma de pagamento. parametros.metodo = "pix"|"cartao_credito"|"cartao_debito"|"carteira"|"carne_braziliana"
 - selecionar_endereco: seleciona endereço de entrega no checkout. parametros.indice = número do endereço (1, 2, 3...)
 - finalizar_pedido: aceita termos e clica no botão de finalizar pedido (só na página de checkout)
 - verificar_cancelamento: verifica elegibilidade de cancelamento
@@ -518,15 +518,19 @@ FLUXO DO CHECKOUT:
 1. Verifique os campos preenchidos em checkout_campos
 2. Se faltar algum campo (checkout_campos_faltando), pergunte ao cliente UM POR UM
 3. Quando o cliente informar um dado (CPF, telefone, etc.), use acao: preencher_checkout com parametros.campos
-4. Pergunte a forma de pagamento: PIX, Cartão (até 12x), ou Carteira
-5. Use acao: selecionar_pagamento com parametros.metodo
-6. Confirme com o cliente: "Posso finalizar o pedido?"
-7. ANTES de finalizar, pergunte sobre os termos: "Para finalizar, preciso que você aceite os Termos de Uso e Política de Privacidade da Braziliana. Você leu e aceita os termos? (Pode consultar em /termos-uso e /politica-privacidade)"
-8. Se o cliente aceitar (sim/aceito/ok/pode), use acao: finalizar_pedido
-9. Se o cliente NÃO aceitar, NÃO finalize. Ofereça os links para leitura.
-10. Após finalizar, se for PIX: "Escaneie o QR Code que apareceu na tela para pagar"
-11. Se for cartão: "Preencha os dados do cartão nos campos da tela e me avisa quando terminar que eu finalizo pra você"
-12. Quando o cliente avisar que preencheu o cartão (ex: "pronto", "coloquei", "já preenchi", "pode finalizar"), use acao: finalizar_pedido IMEDIATAMENTE
+4. Pergunte a forma de pagamento: PIX, Cartão de Crédito, Cartão de Débito, Carteira ou Carnê
+5. Use acao: selecionar_pagamento com parametros.metodo. Valores válidos: "pix", "cartao_credito", "cartao_debito", "carteira", "carne_braziliana"
+6. ANTES de finalizar, pergunte sobre os termos: "Para finalizar, preciso que você aceite os Termos de Uso e Política de Privacidade da Braziliana. Você leu e aceita os termos? (Pode consultar em /termos-uso e /politica-privacidade)"
+7. Se o cliente aceitar (sim/aceito/ok/pode/beleza/aceito sim), use acao: finalizar_pedido IMEDIATAMENTE. NÃO responda apenas com texto — SEMPRE inclua a ação.
+8. Se o cliente NÃO aceitar, NÃO finalize. Ofereça os links para leitura.
+9. Após finalizar, se for PIX: "O sistema vai te redirecionar para a página de pagamento com o QR Code do PIX. Escaneie para pagar!"
+10. Se for cartão: "Preencha os dados do cartão nos campos da tela e me avisa quando terminar que eu finalizo pra você"
+11. Quando o cliente avisar que preencheu o cartão (ex: "pronto", "coloquei", "já preenchi", "pode finalizar"), use acao: finalizar_pedido IMEDIATAMENTE
+IMPORTANTE SOBRE FINALIZAR:
+- Quando o cliente diz "aceito", "aceito sim", "sim", "pode", "ok", "beleza", "manda", "finaliza" após você ter perguntado sobre os termos, SEMPRE responda com acao: finalizar_pedido
+- NÃO responda apenas com texto dizendo que vai finalizar — a ação é OBRIGATÓRIA
+- O sistema cuida de marcar o checkbox de termos, selecionar pagamento e clicar no botão automaticamente
+- Após o processamento, o sistema redireciona automaticamente para a página de conclusão com QR Code PIX ou confirmação
 FORMAS DE PAGAMENTO DISPONÍVEIS:
 PAGAMENTO EM BRL (Real):
 - PIX: pagamento à vista, pode ter desconto na taxa de serviço

@@ -107,7 +107,7 @@
       ctx.checkout_campos.carteira_saldo = typeof window.CARTEIRA_SALDO_DISPONIVEL !== 'undefined' ? window.CARTEIRA_SALDO_DISPONIVEL : 0
       ctx.checkout_campos.carteira_turbo_bloqueado = typeof window.CARTEIRA_TURBO_BLOQUEADO !== 'undefined' ? window.CARTEIRA_TURBO_BLOQUEADO : 0
       ctx.checkout_campos.carne_disponivel = typeof window.CARNE_BRAZILIANA_DISPONIVEL !== 'undefined' ? window.CARNE_BRAZILIANA_DISPONIVEL : false
-      var termosEl = qs('#termos,[name="termos"],#aceito_termos')
+      var termosEl = qs('#consentimento_legal,[name="consentimento_legal"],#termos,[name="termos"],#aceito_termos')
       ctx.checkout_campos.termos_aceitos = termosEl ? termosEl.checked : false
     }
     else if (url === '/rastreamento') ctx.pagina = 'rastreamento'
@@ -322,7 +322,14 @@
       },
       selecionar_pagamento: function () {
         var fp = qs('#forma_pagamento,[name="forma_pagamento"]')
-        if (fp && p.metodo) { fp.value = p.metodo; fp.dispatchEvent(new Event('change',{bubbles:true})) }
+        if (fp && p.metodo) {
+          fp.value = p.metodo
+          fp.dispatchEvent(new Event('change', {bubbles:true}))
+          // Chamar a função de atualização do checkout se existir
+          if (typeof window.atualizarFormaPagamento === 'function') {
+            window.atualizarFormaPagamento()
+          }
+        }
       },
       selecionar_endereco: function () {
         // Selecionar endereço no dropdown do checkout
@@ -337,41 +344,71 @@
         }
       },
       finalizar_pedido: function () {
-        // Verificar valor mínimo US$ 5.00 antes de finalizar
-        // Buscar subtotal USD do carrinho via API
-        return fetch('/api/copiloto/meucarrinho', { credentials: 'same-origin' })
-          .then(function(r) { return r.json() })
-          .then(function(cart) {
-            var subtotalUsd = 0
-            if (cart.itens) subtotalUsd = cart.itens.reduce(function(s,i){return s+(i.subtotal||0)},0)
-            if (subtotalUsd > 0 && subtotalUsd < 5) {
-              adicionarMsg('assistant', '⚠️ O valor mínimo para finalizar é US$ 5,00. Seu subtotal é US$ ' + subtotalUsd.toFixed(2) + '. Adicione mais produtos para atingir o mínimo!')
-              return
-            }
-            // Aceitar termos e submeter
-            var termos = document.querySelectorAll('input[type="checkbox"]')
-            termos.forEach(function(cb) { if (!cb.checked) cb.click() })
-            setTimeout(function() {
-              // Chamar a função de processamento do checkout diretamente
-              if (typeof window.processarPedidoDireto === 'function') {
-                window.processarPedidoDireto()
-                adicionarMsg('assistant', '🚀 Pedido sendo processado...')
-              } else {
-                // Fallback: clicar no botão
-                var btn = qs('#btn-finalizar,#btnFinalizar,button[type="submit"],.btn-finalizar')
-                if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
-                else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar.')
-              }
-            }, 500)
-          }).catch(function() {
-            // Se falhar a verificação, tentar finalizar mesmo assim
-            var termos = document.querySelectorAll('input[type="checkbox"]')
-            termos.forEach(function(cb) { if (!cb.checked) cb.click() })
-            setTimeout(function() {
-              var btn = qs('#btnFinalizar,button[type="submit"],.btn-finalizar,.btn-primary[type="submit"]')
-              if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
-            }, 500)
-          })
+        // 1. Garantir que forma de pagamento está selecionada
+        var fp = qs('#forma_pagamento,[name="forma_pagamento"]')
+        if (fp && !fp.value) {
+          // Tentar pegar do histórico qual pagamento o cliente escolheu
+          var metodoDetectado = ''
+          for (var hi = historico.length - 1; hi >= Math.max(0, historico.length - 20); hi--) {
+            var msg = (historico[hi].content || '').toLowerCase()
+            if (msg.match(/\bpix\b/i)) { metodoDetectado = 'pix'; break }
+            if (msg.match(/cart[aã]o.*cr[eé]dito|cr[eé]dito/i)) { metodoDetectado = 'cartao_credito'; break }
+            if (msg.match(/cart[aã]o.*d[eé]bito|d[eé]bito/i)) { metodoDetectado = 'cartao_debito'; break }
+            if (msg.match(/carteira|saldo/i)) { metodoDetectado = 'carteira'; break }
+            if (msg.match(/carn[eê]/i)) { metodoDetectado = 'carne_braziliana'; break }
+            if (msg.match(/\bcart[aã]o\b/i)) { metodoDetectado = 'cartao_credito'; break }
+          }
+          if (metodoDetectado) {
+            fp.value = metodoDetectado
+            fp.dispatchEvent(new Event('change', {bubbles:true}))
+          }
+        }
+
+        // 2. Verificar se forma de pagamento foi selecionada
+        if (fp && !fp.value) {
+          adicionarMsg('assistant', '⚠️ Preciso saber a forma de pagamento antes de finalizar. PIX, Cartão de Crédito, Cartão de Débito, Carteira ou Carnê?')
+          return
+        }
+
+        // 3. Preencher destinatário com dados do comprador se vazio
+        var destNome = qs('#destinatario_nome,[name="destinatario_nome"]')
+        var destTel = qs('#destinatario_telefone,[name="destinatario_telefone"]')
+        var destDoc = qs('#destinatario_documento,[name="destinatario_documento"]')
+        var nomeComp = qs('[name="nome"]')
+        var telComp = qs('#telefone,[name="telefone"]')
+        var docComp = qs('#documento,[name="documento"]')
+        if (destNome && !destNome.value && nomeComp && nomeComp.value) { destNome.value = nomeComp.value; destNome.dispatchEvent(new Event('change',{bubbles:true})) }
+        if (destTel && !destTel.value && telComp && telComp.value) { destTel.value = telComp.value; destTel.dispatchEvent(new Event('change',{bubbles:true})) }
+        if (destDoc && !destDoc.value && docComp && docComp.value) { destDoc.value = docComp.value; destDoc.dispatchEvent(new Event('change',{bubbles:true})) }
+
+        // 4. Marcar checkbox de "enviar para mim mesmo" se existir
+        var enviarParaMim = qs('#enviar_para_mim,#mesmo_destinatario,input[name="mesmo_destinatario"]')
+        if (enviarParaMim && !enviarParaMim.checked) enviarParaMim.click()
+
+        // 5. Aceitar termos (checkbox consentimento_legal)
+        var consentimento = qs('#consentimento_legal')
+        if (consentimento && !consentimento.checked) {
+          consentimento.checked = true
+          consentimento.dispatchEvent(new Event('change', {bubbles:true}))
+        }
+
+        // 6. Habilitar botão se estiver desabilitado
+        var btnFinalizar = qs('#btn-finalizar')
+        if (btnFinalizar) btnFinalizar.disabled = false
+
+        adicionarMsg('assistant', '🚀 Pedido sendo processado...')
+
+        // 7. Aguardar um pouco para os eventos de change propagarem, depois chamar processarPedidoDireto
+        setTimeout(function() {
+          if (typeof window.processarPedidoDireto === 'function') {
+            window.processarPedidoDireto()
+          } else {
+            // Fallback: clicar no botão
+            var btn = qs('#btn-finalizar')
+            if (btn) btn.click()
+            else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar nesta página.')
+          }
+        }, 600)
       },
       ir_para_contato: function () { salvarEstadoChat(); window.location.href = '/contato' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
@@ -587,7 +624,7 @@
         acaoTipo = 'ir_para_checkout'
       }
       // Detectar se Claude disse que finalizou/processou o pedido
-      if (acaoTipo === 'nenhuma' && textoResp.match(/pedido.*finalizado|finalizado.*sucesso|processando.*pedido|pedido.*processado|🚀.*pedido|QR.*Code.*aparec|escane.*QR|pagamento.*PIX.*confirm/i)) {
+      if (acaoTipo === 'nenhuma' && textoResp.match(/pedido.*finalizado|finalizado.*sucesso|processando.*pedido|pedido.*processado|🚀.*pedido|QR.*Code.*aparec|escane.*QR|pagamento.*PIX.*confirm|vou finalizar|finalizando.*pedido|processando pra voc|vou processar/i)) {
         acaoTipo = 'finalizar_pedido'
       }
       // Detectar se Claude selecionou forma de pagamento mas não mandou a ação
@@ -598,6 +635,18 @@
       if (acaoTipo === 'nenhuma' && textoResp.match(/cartão.*selecionad|selecion.*cartão|forma.*pagamento.*cartão|crédito.*selecionad/i)) {
         acaoTipo = 'selecionar_pagamento'
         acaoParams.metodo = 'cartao_credito'
+      }
+      if (acaoTipo === 'nenhuma' && textoResp.match(/carteira.*selecionad|selecion.*carteira|forma.*pagamento.*carteira|crédito.*carteira/i)) {
+        acaoTipo = 'selecionar_pagamento'
+        acaoParams.metodo = 'carteira'
+      }
+      if (acaoTipo === 'nenhuma' && textoResp.match(/carn[eê].*selecionad|selecion.*carn[eê]|forma.*pagamento.*carn[eê]/i)) {
+        acaoTipo = 'selecionar_pagamento'
+        acaoParams.metodo = 'carne_braziliana'
+      }
+      if (acaoTipo === 'nenhuma' && textoResp.match(/d[eé]bito.*selecionad|selecion.*d[eé]bito|forma.*pagamento.*d[eé]bito/i)) {
+        acaoTipo = 'selecionar_pagamento'
+        acaoParams.metodo = 'cartao_debito'
       }
       // Detectar se Claude disse que limpou o carrinho
       if (acaoTipo === 'nenhuma' && textoResp.match(/carrinho.*limpo|carrinho.*zerado|limpo.*carrinho|zerado.*carrinho/i)) {
