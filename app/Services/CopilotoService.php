@@ -351,11 +351,14 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                 }
             }
             $resumoOrcamento .= "\n\nVocê pode informar estes valores ao cliente.";
-            $resumoOrcamento .= "\nQuando o cliente pedir para adicionar ao carrinho ou finalizar:";
-            $resumoOrcamento .= "\n1. Informe os termos: 'Os valores são de assessoria experimental e podem variar. Aceita os termos?'";
-            $resumoOrcamento .= "\n2. Se o cliente disser sim/aceito/pode/beleza/ok, use IMEDIATAMENTE acao: aceitar_termos_assessoria";
-            $resumoOrcamento .= "\n3. Se o cliente pedir direto 'adiciona no carrinho' sem ter perguntado antes, pergunte sobre os termos primeiro";
-            $resumoOrcamento .= "\n4. Depois do carrinho, ofereça ir_para_checkout";
+            $resumoOrcamento .= "\nQuando o cliente pedir para adicionar ao carrinho, finalizar, ou disser 'gostei', 'vamos finalizar', 'quero esse', 'bora':";
+            $resumoOrcamento .= "\n1. Confirme: 'Quer que eu adicione esses produtos do orçamento no seu carrinho?'";
+            $resumoOrcamento .= "\n2. Informe os termos: 'Os valores são de assessoria experimental e podem variar. Aceita os termos?'";
+            $resumoOrcamento .= "\n3. Se o cliente disser sim/aceito/pode/beleza/ok, use IMEDIATAMENTE acao: aceitar_termos_assessoria";
+            $resumoOrcamento .= "\n4. Se o cliente pedir direto 'adiciona no carrinho' sem ter perguntado antes, pergunte sobre os termos primeiro";
+            $resumoOrcamento .= "\n5. Depois que os produtos forem adicionados ao carrinho, ofereça ir_para_checkout";
+            $resumoOrcamento .= "\nIMPORTANTE: Quando pagina = orcamento e o cliente diz 'finalizar'/'gostei'/'vamos lá', ele quer finalizar O ORÇAMENTO (aceitar termos + adicionar ao carrinho), NÃO ir direto pro checkout.";
+            $resumoOrcamento .= "\nO fluxo correto é: aceitar termos → adicionar ao carrinho → depois ir pro checkout.";
             $resumoOrcamento .= "\nIMPORTANTE: Use EXATAMENTE estes valores. NÃO calcule por conta própria.";
         }
 
