@@ -402,7 +402,8 @@ IMPOSTOS BRASIL (Receita Federal — Remessa Postal/Expressa):
 - Impostos são pré-pagos no checkout — sem surpresa na entrega.
 IMPOSTO LOCAL EUA: 8% em BBW, Walmart, Trader Joe's, BJ's, Achados. 0% em Costco, Sam's, Desapegos.
 MOEDAS: BRL (PIX ou cartão 12x via AppMax) / USD (Stripe, Zelle, Venmo).
-PRAZO: 15-30 dias. LIMITES: 30kg e US\$ 2.999,99/caixa.
+PRAZO: 15-30 dias. LIMITES: 30kg e US\$ 2.999,99/caixa. Valor mínimo do pedido: US\$ 5,00.
+VALOR MÍNIMO: O subtotal dos produtos precisa ser de pelo menos US\$ 5,00 para finalizar a compra. Se o carrinho tiver menos que US\$ 5, avise o cliente que precisa adicionar mais produtos para atingir o mínimo.
 CLUBE: Depósito mín US\$ 39. Normal (imediato) ou Turbo (6 meses).
 CANCELAMENTO: Taxa fixa US\$ 100. Impossível após despacho.
 CONTATO: WhatsApp Vendas +55 17 99620-3062 / Suporte APENAS via ticket.
