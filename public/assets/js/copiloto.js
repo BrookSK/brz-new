@@ -325,7 +325,44 @@
           adicionarMsg('assistant', '❌ Não consegui limpar. Tenta pelo botão na página.')
         })
       },
-      consultar_status_pedido: function () { adicionarMsg('assistant', '📦 Use a página de rastreamento: /rastreamento com seu código dos Correios.') },
+      consultar_status_pedido: function () {
+        var numeroPedido = p.numero_pedido || p.pedido_id || p.numero || ''
+        adicionarMsg('assistant', '� Consultando seus pedidos...')
+        return fetch('/api/copiloto/meuspedidos' + (numeroPedido ? '?numero=' + encodeURIComponent(numeroPedido) : ''), { credentials: 'same-origin' })
+          .then(function(r) { return r.json() })
+          .then(function(d) {
+            var msgs = document.getElementById('bz-copiloto-messages')
+            if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+            if (d.error) {
+              adicionarMsg('assistant', '❌ ' + d.error)
+              return
+            }
+            if (!d.pedidos || d.pedidos.length === 0) {
+              adicionarMsg('assistant', 'Não encontrei pedidos na sua conta. Se você tem um número de pedido específico, me passa que eu verifico!')
+              return
+            }
+            var texto = '📦 Seus pedidos:\n\n'
+            d.pedidos.forEach(function(ped) {
+              var statusEmoji = {'pendente':'⏳','processando':'🔄','pago':'✅','enviado':'✈️','entregue':'📬','cancelado':'❌','aguardando_pagamento':'💳'}
+              var emoji = statusEmoji[(ped.status||'').toLowerCase()] || '📋'
+              texto += emoji + ' **Pedido ' + (ped.codigo || '#' + ped.id) + '**\n'
+              texto += 'Status: ' + (ped.status || 'N/A') + '\n'
+              if (ped.total) texto += 'Total: ' + (ped.moeda === 'BRL' ? 'R$ ' : 'US$ ') + parseFloat(ped.total).toFixed(2) + '\n'
+              if (ped.data) texto += 'Data: ' + ped.data.substring(0, 10) + '\n'
+              if (ped.tracking) texto += 'Rastreio: ' + ped.tracking + '\n'
+              if (ped.itens && ped.itens.length > 0) {
+                texto += 'Itens: ' + ped.itens.map(function(i) { return i.nome }).join(', ') + '\n'
+              }
+              texto += '[Ver detalhes](' + (ped.link || '/meus-pedidos') + ')\n\n'
+            })
+            texto += 'Para mais detalhes sobre qualquer pedido, clique em "Ver detalhes" ou me passe o número do pedido. Se precisar de ajuda com algum pedido específico, posso abrir um ticket pro time! 😊'
+            adicionarMsg('assistant', texto)
+          }).catch(function() {
+            var msgs = document.getElementById('bz-copiloto-messages')
+            if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+            adicionarMsg('assistant', '❌ Não consegui consultar seus pedidos agora. Tenta de novo?')
+          })
+      },
       abrir_whatsapp_vendas: function () { window.open('https://wa.me/' + CONFIG.whatsapp_vendas + (p.mensagem ? '?text=' + encodeURIComponent(p.mensagem) : ''), '_blank') },
       ir_para_checkout: function () { salvarEstadoChat(); window.location.href = '/carrinho/checkout' },
       preencher_checkout: function () {

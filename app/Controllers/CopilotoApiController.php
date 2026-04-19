@@ -809,6 +809,126 @@ class CopilotoApiController extends Controller {
         }
     }
 
+    /** GET /api/copiloto/meuspedidos — Lista pedidos do usuário logado com status */
+    public function meusPedidos(Request $request) {
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId <= 0) {
+                $this->responderJson(['error' => 'Não logado', 'pedidos' => []], 401);
+            }
+
+            $pdo = \Config\Database::getConnection();
+            
+            // Descobrir colunas disponíveis
+            $cols = [];
+            try {
+                $stCols = $pdo->query('DESCRIBE pedidos');
+                $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) { $cols = []; }
+
+            $pickCol = function(array $candidates) use ($cols) {
+                foreach ($candidates as $c) { if (in_array($c, $cols, true)) return $c; }
+                return '';
+            };
+
+            $colUsuario = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
+            $colStatus = $pickCol(['status', 'status_pedido', 'pedido_status']);
+            $colTotal = $pickCol(['valor_total', 'total', 'amount', 'valor']);
+            $colMoeda = $pickCol(['moeda', 'currency', 'order_currency']);
+            $colTracking = $pickCol(['tracking_code', 'codigo_rastreio', 'rastreamento']);
+            $colCodigo = $pickCol(['codigo_pedido', 'numero_pedido', 'codigo', 'order_number']);
+            $colFormaPag = $pickCol(['forma_pagamento', 'payment_method']);
+            $colCreatedAt = $pickCol(['created_at', 'criado_em', 'data_pedido']);
+
+            if (!$colUsuario) {
+                $this->responderJson(['error' => 'Tabela pedidos não configurada', 'pedidos' => []], 500);
+            }
+
+            // Buscar pedidos do usuário (últimos 20)
+            $selectCols = ['p.id'];
+            if ($colStatus) $selectCols[] = "p.{$colStatus} AS status";
+            if ($colTotal) $selectCols[] = "p.{$colTotal} AS total";
+            if ($colMoeda) $selectCols[] = "p.{$colMoeda} AS moeda";
+            if ($colTracking) $selectCols[] = "p.{$colTracking} AS tracking";
+            if ($colCodigo) $selectCols[] = "p.{$colCodigo} AS codigo";
+            if ($colFormaPag) $selectCols[] = "p.{$colFormaPag} AS forma_pagamento";
+            if ($colCreatedAt) $selectCols[] = "p.{$colCreatedAt} AS data_pedido";
+
+            $filtroDeleted = in_array('deleted_at', $cols, true) ? ' AND (p.deleted_at IS NULL)' : '';
+            $orderCol = $colCreatedAt ?: 'p.id';
+
+            $sql = "SELECT " . implode(', ', $selectCols) . " FROM pedidos p WHERE p.{$colUsuario} = ?{$filtroDeleted} ORDER BY {$orderCol} DESC LIMIT 20";
+            $st = $pdo->prepare($sql);
+            $st->execute([$userId]);
+            $pedidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Buscar itens de cada pedido (resumo)
+            $temPedidoItems = false;
+            try {
+                $pdo->query('SELECT 1 FROM pedido_items LIMIT 1');
+                $temPedidoItems = true;
+            } catch (\Exception $e) {}
+
+            $resultado = [];
+            foreach ($pedidos as $ped) {
+                $pedidoId = (int) $ped['id'];
+                $itens = [];
+                if ($temPedidoItems) {
+                    try {
+                        $stItems = $pdo->prepare("SELECT pi.produto_nome, pi.quantidade, pi.preco_unitario FROM pedido_items pi WHERE pi.pedido_id = ? LIMIT 10");
+                        $stItems->execute([$pedidoId]);
+                        $itens = $stItems->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Exception $e) {}
+                }
+                // Se não tem pedido_items, tentar carrinho_items via carrinho_id
+                if (empty($itens) && in_array('carrinho_id', $cols, true)) {
+                    try {
+                        $stCart = $pdo->prepare("SELECT p.name AS produto_nome, ci.quantidade, ci.subtotal AS preco_unitario FROM carrinho_items ci JOIN produtos p ON p.id = ci.produto_id WHERE ci.carrinho_id = (SELECT carrinho_id FROM pedidos WHERE id = ? LIMIT 1) LIMIT 10");
+                        $stCart->execute([$pedidoId]);
+                        $itens = $stCart->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Exception $e) {}
+                }
+
+                $resultado[] = [
+                    'id' => $pedidoId,
+                    'codigo' => $ped['codigo'] ?? ('#' . $pedidoId),
+                    'status' => $ped['status'] ?? 'desconhecido',
+                    'total' => isset($ped['total']) ? (float) $ped['total'] : null,
+                    'moeda' => $ped['moeda'] ?? 'USD',
+                    'forma_pagamento' => $ped['forma_pagamento'] ?? null,
+                    'tracking' => $ped['tracking'] ?? null,
+                    'data' => $ped['data_pedido'] ?? null,
+                    'itens' => array_map(function($i) {
+                        return [
+                            'nome' => $i['produto_nome'] ?? '',
+                            'quantidade' => (int) ($i['quantidade'] ?? 1),
+                            'preco' => (float) ($i['preco_unitario'] ?? 0),
+                        ];
+                    }, $itens),
+                    'link' => '/meus-pedidos/' . $pedidoId,
+                ];
+            }
+
+            // Filtro por número de pedido se fornecido
+            $numeroPedido = trim((string) $request->getParam('numero', ''));
+            if ($numeroPedido) {
+                $resultado = array_values(array_filter($resultado, function($p) use ($numeroPedido) {
+                    return stripos((string) $p['id'], $numeroPedido) !== false 
+                        || stripos((string) ($p['codigo'] ?? ''), $numeroPedido) !== false;
+                }));
+            }
+
+            $this->responderJson([
+                'pedidos' => $resultado,
+                'total' => count($resultado),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[CoPiloto] Erro meus pedidos: ' . $e->getMessage());
+            $this->responderJson(['error' => $e->getMessage(), 'pedidos' => []], 500);
+        }
+    }
+
     /** GET /api/copiloto/cron */
     public function cron(Request $request) {
         $token = $request->getParam('token', '');
