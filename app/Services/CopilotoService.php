@@ -269,6 +269,19 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             if ($freteVisivel) $resumoCarrinho .= "\nFrete: {$freteVisivel}";
             if ($totalVisivel) $resumoCarrinho .= "\nTOTAL: {$totalVisivel}";
             $resumoCarrinho .= "\nIMPORTANTE: Use EXATAMENTE estes valores ao falar do carrinho. NÃO calcule por conta própria.";
+            // Verificar valor mínimo
+            $subtotalUsd = 0;
+            if (!empty($contexto['carrinho_itens'])) {
+                foreach ($contexto['carrinho_itens'] as $item) {
+                    $subtotalUsd += (float)($item['preco'] ?? 0) * (int)($item['quantidade'] ?? 1);
+                }
+            }
+            if (!empty($contexto['carrinho_subtotal_usd'])) $subtotalUsd = (float)$contexto['carrinho_subtotal_usd'];
+            if ($subtotalUsd > 0 && $subtotalUsd < 5) {
+                $resumoCarrinho .= "\n\n🚫 ATENÇÃO: Subtotal do carrinho é US\$ " . number_format($subtotalUsd, 2) . " — ABAIXO do mínimo de US\$ 5,00!";
+                $resumoCarrinho .= "\nNÃO finalize o pedido. Informe o cliente que precisa adicionar mais produtos.";
+                $resumoCarrinho .= "\nNÃO use acao: finalizar_pedido. NÃO use acao: ir_para_checkout.";
+            }
         }
         
         // Dados do checkout (quando na página de checkout)

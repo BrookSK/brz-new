@@ -333,18 +333,35 @@
         }
       },
       finalizar_pedido: function () {
-        // Verificar valor mínimo antes de finalizar
-        var subtotalEl = qs('#subtotal,[class*="subtotal"]')
-        if (subtotalEl) {
-          var subtotalText = subtotalEl.textContent || ''
-          var subtotalNum = parseFloat(subtotalText.replace(/[^0-9.]/g, '')) || 0
-          // Se o valor parece ser em USD e menor que 5
-          if (subtotalText.indexOf('$') >= 0 && subtotalText.indexOf('R$') < 0 && subtotalNum < 5) {
-            adicionarMsg('assistant', '⚠️ O valor mínimo para finalizar é US$ 5,00. Seu subtotal é US$ ' + subtotalNum.toFixed(2) + '. Adicione mais produtos!')
-            return
-          }
-        }
-        // Aceitar termos e submeter
+        // Verificar valor mínimo US$ 5.00 antes de finalizar
+        // Buscar subtotal USD do carrinho via API
+        return fetch('/api/copiloto/meucarrinho', { credentials: 'same-origin' })
+          .then(function(r) { return r.json() })
+          .then(function(cart) {
+            var subtotalUsd = 0
+            if (cart.itens) subtotalUsd = cart.itens.reduce(function(s,i){return s+(i.subtotal||0)},0)
+            if (subtotalUsd > 0 && subtotalUsd < 5) {
+              adicionarMsg('assistant', '⚠️ O valor mínimo para finalizar é US$ 5,00. Seu subtotal é US$ ' + subtotalUsd.toFixed(2) + '. Adicione mais produtos para atingir o mínimo!')
+              return
+            }
+            // Aceitar termos e submeter
+            var termos = document.querySelectorAll('input[type="checkbox"]')
+            termos.forEach(function(cb) { if (!cb.checked) cb.click() })
+            setTimeout(function() {
+              var btn = qs('#btnFinalizar,button[type="submit"],.btn-finalizar,.btn-primary[type="submit"]')
+              if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
+              else adicionarMsg('assistant', '⚠️ Não encontrei o botão de finalizar. Clica no botão na página.')
+            }, 500)
+          }).catch(function() {
+            // Se falhar a verificação, tentar finalizar mesmo assim
+            var termos = document.querySelectorAll('input[type="checkbox"]')
+            termos.forEach(function(cb) { if (!cb.checked) cb.click() })
+            setTimeout(function() {
+              var btn = qs('#btnFinalizar,button[type="submit"],.btn-finalizar,.btn-primary[type="submit"]')
+              if (btn) { btn.click(); adicionarMsg('assistant', '🚀 Pedido sendo processado...') }
+            }, 500)
+          })
+      },
         var termos = document.querySelectorAll('input[type="checkbox"]')
         termos.forEach(function(cb) { if (!cb.checked) cb.click() })
         setTimeout(function() {
@@ -522,6 +539,7 @@
             ctx.carrinho_itens = cartData.itens
             ctx.carrinho_total_itens = cartData.total_itens
             if (cartData.resumo) {
+              ctx.carrinho_subtotal_usd = cartData.itens.reduce(function(s,i){return s+(i.subtotal||0)},0)
               ctx.carrinho_subtotal_visivel = 'R$ ' + cartData.itens.reduce(function(s,i){return s+(i.subtotal_brl||0)},0).toFixed(2).replace('.', ',')
               ctx.carrinho_total_visivel = 'R$ ' + (cartData.resumo.total_brl || 0).toFixed(2).replace('.', ',')
               ctx.carrinho_taxa_servico_visivel = 'R$ ' + (cartData.resumo.taxa_servico_brl || 0).toFixed(2).replace('.', ',')
