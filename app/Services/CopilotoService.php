@@ -444,7 +444,9 @@ REGRAS:
 5. Nunca invente produtos — use apenas os fornecidos no contexto
 6. Para status de pedido → sempre consultar_status_pedido (busca no banco e exibe no chat com links clicáveis). Se o cliente não souber o número, lista os últimos pedidos. Se quiser mais detalhes, ofereça abrir ticket.
 7. NUNCA ofereça WhatsApp como canal de suporte — suporte vai EXCLUSIVAMENTE via ticket
-8. BUSCA DE PRODUTOS: Quando o cliente pedir um produto em português, SEMPRE traduza para inglês antes de buscar. Os produtos estão cadastrados em INGLÊS. Exemplos: esponja→sponge, panela→cookware/pan, sabonete→soap, fralda→diaper, toalha→towel, escova→brush, balde→bucket, vassoura→broom, pano→cloth/wipe, luva→glove, etc. Use acao: buscar_produto com parametros.termo em INGLÊS.
+8. BUSCA DE PRODUTOS: Quando o cliente pedir um produto em português, SEMPRE traduza para inglês antes de buscar. Os produtos estão cadastrados em INGLÊS. Exemplos: esponja→sponge, panela→cookware/pan, sabonete→soap, fralda→diaper, toalha→towel, escova→brush, balde→bucket, vassoura→broom, pano→cloth/wipe, luva→glove, aspirador→vacuum, secador→dryer/hair dryer, etc. Use acao: buscar_produto com parametros.termo em INGLÊS.
+   A busca procura tanto no catálogo direto quanto nos produtos dos Grupos de Compras. Se encontrar em um grupo, o resultado mostra qual grupo.
+   Se o cliente perguntar por uma MARCA específica (ex: Tineco, Dyson, KitchenAid, Ninja), busque pelo nome da marca diretamente — marcas não precisam de tradução.
 9. BUSCA POR PREÇO: Quando o cliente pedir por faixa de preço (ex: "produto de 20 dólares", "algo até 15", "entre 10 e 30", "produto de 100 reais"), use acao: buscar_produto com parametros.termo no formato especial:
    - Os preços no banco estão em USD. SEMPRE converta para dólares antes de buscar.
    - Se o cliente falar em REAIS (R$, reais, BRL): divida pelo câmbio ({$cambioStr}) para converter para USD. Ex: "produto de R$ 100" → 100 / {$cambioStr} ≈ US$ 17 → use "price:17"
@@ -685,7 +687,8 @@ PROMPT;
         // Detectar se a mensagem parece ser sobre busca de produto
         $padroes = [
             '/(?:adiciona|coloca|bota|põe|quero)\s+(?:o|a|um|uma|esse|essa|aquele|aquela|qualquer|algum|2|3|4|5|6)?\s*(.{3,80}?)(?:\s+no\s+(?:meu\s+)?carrinho|\s+pra\s+mim|\s+por\s+favor|$)/iu',
-            '/tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40})\??/iu',
+            '/(?:ainda\s+)?tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40}?)(?:\s+disponível|\s+em\s+estoque|\s+pra\s+vender)?\s*\??/iu',
+            '/(?:voc[eê]s?|vcs)\s+(?:ainda\s+)?(?:tem|têm|vendem?)\s+(?:o|a|um|uma|algum)?\s*(.{3,40}?)\s*\??/iu',
             '/(?:o que tem de|o que temos de|quais?|mostra|lista)\s+(.{3,40})\??/iu',
             '/(?:procur|busc|quer|precis)\w*\s+(?:o|a|um|uma|de)?\s*(.{3,40})/iu',
             '/(?:vende|vendem)\s+(.{3,40})\??/iu',
@@ -699,6 +702,11 @@ PROMPT;
             }
         }
 
+        if (!$termo || mb_strlen($termo) < 2) return [];
+
+        // Limpar palavras genéricas do termo extraído
+        $termo = preg_replace('/\b(disponível|disponivel|em\s+estoque|pra\s+vender|quanto\s+(?:fica|custa|é)|quanto|ficaria|custa|envio|frete)\b/iu', '', $termo);
+        $termo = trim(preg_replace('/\s+/', ' ', $termo), ' ?.!,');
         if (!$termo || mb_strlen($termo) < 2) return [];
 
         // Traduzir termos em português para inglês (produtos cadastrados em EN)
@@ -738,9 +746,15 @@ PROMPT;
             // Montar LIKE para múltiplos termos (original + traduções)
             $likeClauses = [];
             $likeParams = [];
+            $temSku = in_array('sku', $cols, true);
             foreach ($termosParaBuscar as $t) {
+                $trimmed = '%' . trim($t) . '%';
                 $likeClauses[] = "p.{$colNome} LIKE ?";
-                $likeParams[] = '%' . trim($t) . '%';
+                $likeParams[] = $trimmed;
+                if ($temSku) {
+                    $likeClauses[] = "p.sku LIKE ?";
+                    $likeParams[] = $trimmed;
+                }
             }
             $likeSQL = '(' . implode(' OR ', $likeClauses) . ')';
 

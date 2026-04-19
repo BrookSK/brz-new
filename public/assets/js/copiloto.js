@@ -857,17 +857,33 @@
       var preco = parseFloat(p.preco || 0)
       var precoBrl = (preco * 5.85).toFixed(2).replace('.', ',')
 
+      var badge = ''
+      var btnDisabled = ''
+      var btnLabel = '🛒 Adicionar'
+      if (p.sem_estoque) {
+        badge = '<div class="bz-pc-badge bz-badge-danger">Sem estoque</div>'
+        btnDisabled = ' disabled style="opacity:0.5;cursor:not-allowed"'
+        btnLabel = '❌ Indisponível'
+      } else if (p.acesso_restrito) {
+        badge = '<div class="bz-pc-badge bz-badge-warning">🔒 Clube</div>'
+        btnDisabled = ' disabled style="opacity:0.5;cursor:not-allowed"'
+        btnLabel = '🔒 Exclusivo Clube'
+      } else if (p.clube_only) {
+        badge = '<div class="bz-pc-badge bz-badge-info">⭐ Clube</div>'
+      }
+
       var card = document.createElement('div')
       card.className = 'bz-product-card'
       card.innerHTML =
-        '<div class="bz-pc-img" style="background-image:url(' + foto + ')"></div>' +
+        '<div class="bz-pc-img" style="background-image:url(' + foto + ')">' + badge + '</div>' +
         '<div class="bz-pc-body">' +
           '<div class="bz-pc-name">' + (p.nome || '').substring(0, 50) + '</div>' +
           (p.grupo_nome ? '<div class="bz-pc-grupo">' + p.grupo_nome + '</div>' : '') +
           '<div class="bz-pc-price">R$ ' + precoBrl + '</div>' +
+          (p.imposto_local_pct > 0 ? '<div class="bz-pc-tax">+' + p.imposto_local_pct + '% imp. local EUA</div>' : '') +
           '<div class="bz-pc-actions">' +
-            '<button class="bz-pc-btn" onclick="window._bzAddCart(' + p.id + ')">🛒 Adicionar</button>' +
-            '<a href="/produto/detalhes/' + p.id + '" class="bz-pc-link">Ver</a>' +
+            '<button class="bz-pc-btn"' + btnDisabled + ' onclick="window._bzAddCart(' + p.id + ')">' + btnLabel + '</button>' +
+            '<a href="/produto/detalhes/' + p.id + '" class="bz-pc-link" target="_blank">Ver</a>' +
           '</div>' +
         '</div>'
       track.appendChild(card)
@@ -1133,11 +1149,16 @@
       '.bz-carousel-track{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:4px 0}' +
       '.bz-carousel-track::-webkit-scrollbar{display:none}' +
       '.bz-product-card{flex:0 0 160px;scroll-snap-align:start;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;font-size:12px}' +
-      '.bz-pc-img{width:100%;height:100px;background-size:cover;background-position:center;background-color:#f1f5f9}' +
+      '.bz-pc-img{width:100%;height:100px;background-size:cover;background-position:center;background-color:#f1f5f9;position:relative}' +
       '.bz-pc-body{padding:8px}' +
       '.bz-pc-name{font-weight:600;font-size:11px;line-height:1.3;height:28px;overflow:hidden;color:#1e293b}' +
       '.bz-pc-grupo{font-size:10px;color:#64748b;margin-top:2px}' +
       '.bz-pc-price{font-weight:700;color:#0b1f3a;font-size:13px;margin-top:4px}' +
+      '.bz-pc-tax{font-size:9px;color:#b45309;margin-top:1px}' +
+      '.bz-pc-badge{position:absolute;top:4px;left:4px;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;color:#fff}' +
+      '.bz-badge-danger{background:#dc2626}' +
+      '.bz-badge-warning{background:#d97706}' +
+      '.bz-badge-info{background:#2563eb}' +
       '.bz-pc-actions{display:flex;gap:4px;margin-top:6px}' +
       '.bz-pc-btn{flex:1;background:#0b1f3a;color:#fff;border:none;border-radius:6px;padding:5px 0;font-size:10px;cursor:pointer;font-weight:600}' +
       '.bz-pc-btn:hover{background:#1d4ed8}' +

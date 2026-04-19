@@ -389,6 +389,10 @@ class CopilotoApiController extends Controller {
 
             $temFoto = in_array('foto_principal', $cols, true);
             $fotoSelect = $temFoto ? ", p.foto_principal" : ", NULL as foto_principal";
+            $temStock = in_array('stock', $cols, true);
+            $temClubeAtivo = in_array('clube_ativo', $cols, true);
+            $stockSelect = $temStock ? ", p.stock" : "";
+            $clubeAtivoSelect = $temClubeAtivo ? ", COALESCE(p.clube_ativo, 0) as produto_clube_ativo" : ", 0 as produto_clube_ativo";
 
             // Construir WHERE clause
             $whereClause = '';
@@ -414,25 +418,36 @@ class CopilotoApiController extends Controller {
                 $orderBy = "ABS(p.{$colPreco} - ?) ASC";
                 $params[] = ($precoMin + $precoMax) / 2; // Ordenar pelo mais próximo do valor alvo
             } else {
-                // Busca por nome
-                $whereClause = "p.{$colNome} LIKE ?";
-                $params = ['%' . $termo . '%'];
+                // Busca por nome (e SKU se existir)
+                $temSku = in_array('sku', $cols, true);
+                if ($temSku) {
+                    $whereClause = "(p.{$colNome} LIKE ? OR p.sku LIKE ?)";
+                    $params = ['%' . $termo . '%', '%' . $termo . '%'];
+                } else {
+                    $whereClause = "p.{$colNome} LIKE ?";
+                    $params = ['%' . $termo . '%'];
+                }
                 $orderBy = "p.{$colNome} ASC";
             }
 
             if ($temGrupoComprasId) {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
                     p.grupo_compras_id,
-                    COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug
-                    {$fotoSelect}
+                    COALESCE(gc.nome, '') as grupo_nome, COALESCE(gc.slug, '') as grupo_slug,
+                    COALESCE(gc.clube_only, 0) as clube_only,
+                    COALESCE(gc.cobra_imposto_eua, 0) as cobra_imposto_eua,
+                    COALESCE(gc.imposto_local_percent, 0) as imposto_local_percent,
+                    COALESCE(gc.ativo, 1) as grupo_ativo
+                    {$fotoSelect}{$stockSelect}{$clubeAtivoSelect}
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
                     WHERE {$whereClause}{$filtroSQL}
                     ORDER BY {$orderBy} LIMIT 10";
             } else {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
-                    NULL as grupo_compras_id, '' as grupo_nome, '' as grupo_slug
-                    {$fotoSelect}
+                    NULL as grupo_compras_id, '' as grupo_nome, '' as grupo_slug,
+                    0 as clube_only, 0 as cobra_imposto_eua, 0 as imposto_local_percent, 1 as grupo_ativo
+                    {$fotoSelect}{$stockSelect}{$clubeAtivoSelect}
                     FROM produtos p
                     WHERE {$whereClause}{$filtroSQL}
                     ORDER BY {$orderBy} LIMIT 10";
@@ -452,11 +467,32 @@ class CopilotoApiController extends Controller {
                 }
             }
 
+            // Verificar se o usuário tem clube ativo
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            $usuarioClubeAtivo = false;
+            if ($userId > 0) {
+                try {
+                    $stClube = $pdo->prepare("SELECT COALESCE(SUM(valor), 0) as total FROM carteira_recargas WHERE usuario_id = ? AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')");
+                    $stClube->execute([$userId]);
+                    $saldoClube = (float) ($stClube->fetchColumn() ?: 0);
+                    $usuarioClubeAtivo = ($saldoClube > 0);
+                } catch (\Exception $e) {}
+            }
+
             $this->responderJson([
-                'produtos' => array_map(function($p) {
+                'produtos' => array_map(function($p) use ($usuarioClubeAtivo) {
                     $foto = $p['foto_principal'] ?? null;
                     if ($foto && strpos($foto, 'http') !== 0 && strpos($foto, '/') !== 0) {
                         $foto = '/uploads/produtos/' . $foto;
+                    }
+                    $clubeOnly = (int) ($p['clube_only'] ?? 0);
+                    $produtoClubeAtivo = (int) ($p['produto_clube_ativo'] ?? 0);
+                    $stock = isset($p['stock']) ? (int) $p['stock'] : null;
+                    $semEstoque = ($stock !== null && $stock <= 0);
+                    $acessoRestrito = false;
+                    if (($clubeOnly || $produtoClubeAtivo) && !$usuarioClubeAtivo) {
+                        $acessoRestrito = true;
                     }
                     return [
                         'id' => $p['id'],
@@ -466,6 +502,11 @@ class CopilotoApiController extends Controller {
                         'grupo' => $p['grupo_slug'] ?: null,
                         'grupo_nome' => $p['grupo_nome'] ?: null,
                         'foto' => $foto,
+                        'clube_only' => $clubeOnly,
+                        'acesso_restrito' => $acessoRestrito,
+                        'sem_estoque' => $semEstoque,
+                        'imposto_local_pct' => (float) ($p['imposto_local_percent'] ?? 0),
+                        'cobra_imposto_eua' => (int) ($p['cobra_imposto_eua'] ?? 0),
                     ];
                 }, $produtos),
                 'grupos' => $grupos,
