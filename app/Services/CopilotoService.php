@@ -446,7 +446,7 @@ REGRAS:
 7. NUNCA ofereça WhatsApp como canal de suporte — suporte vai EXCLUSIVAMENTE via ticket
 8. BUSCA DE PRODUTOS: Quando o cliente pedir um produto em português, SEMPRE traduza para inglês antes de buscar. Os produtos estão cadastrados em INGLÊS. Exemplos: esponja→sponge, panela→cookware/pan, sabonete→soap, fralda→diaper, toalha→towel, escova→brush, balde→bucket, vassoura→broom, pano→cloth/wipe, luva→glove, aspirador→vacuum, secador→dryer/hair dryer, etc. Use acao: buscar_produto com parametros.termo em INGLÊS.
    A busca procura tanto no catálogo direto quanto nos produtos dos Grupos de Compras. Se encontrar em um grupo, o resultado mostra qual grupo.
-   Se o cliente perguntar por uma MARCA específica (ex: Tineco, Dyson, KitchenAid, Ninja), busque pelo nome da marca diretamente — marcas não precisam de tradução.
+   Se o cliente perguntar por uma MARCA específica (ex: Tineco, Dyson, KitchenAid, Ninja, Scrub Daddy, Bar Keepers, Dawn, Tide), busque pelo nome da marca diretamente — marcas não precisam de tradução. NUNCA traduza nomes de marcas para inglês genérico (ex: NÃO busque "vacuum" quando o cliente pedir "Tineco").
 9. BUSCA POR PREÇO: Quando o cliente pedir por faixa de preço (ex: "produto de 20 dólares", "algo até 15", "entre 10 e 30", "produto de 100 reais"), use acao: buscar_produto com parametros.termo no formato especial:
    - Os preços no banco estão em USD. SEMPRE converta para dólares antes de buscar.
    - Se o cliente falar em REAIS (R$, reais, BRL): divida pelo câmbio ({$cambioStr}) para converter para USD. Ex: "produto de R$ 100" → 100 / {$cambioStr} ≈ US$ 17 → use "price:17"
@@ -687,8 +687,8 @@ PROMPT;
         // Detectar se a mensagem parece ser sobre busca de produto
         $padroes = [
             '/(?:adiciona|coloca|bota|põe|quero)\s+(?:o|a|um|uma|esse|essa|aquele|aquela|qualquer|algum|2|3|4|5|6)?\s*(.{3,80}?)(?:\s+no\s+(?:meu\s+)?carrinho|\s+pra\s+mim|\s+por\s+favor|$)/iu',
-            '/(?:ainda\s+)?tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40}?)(?:\s+disponível|\s+em\s+estoque|\s+pra\s+vender)?\s*\??/iu',
-            '/(?:voc[eê]s?|vcs)\s+(?:ainda\s+)?(?:tem|têm|vendem?)\s+(?:o|a|um|uma|algum)?\s*(.{3,40}?)\s*\??/iu',
+            '/(?:ainda\s+)?tem\s+(?:o|a|um|uma|algum)?\s*(.{3,40}?)(?:\?|$)/iu',
+            '/(?:voc[eê]s?|vcs)\s+(?:ainda\s+)?(?:tem|têm|vendem?)\s+(?:o|a|um|uma|algum)?\s*(.{3,40}?)(?:\?|$)/iu',
             '/(?:o que tem de|o que temos de|quais?|mostra|lista)\s+(.{3,40})\??/iu',
             '/(?:procur|busc|quer|precis)\w*\s+(?:o|a|um|uma|de)?\s*(.{3,40})/iu',
             '/(?:vende|vendem)\s+(.{3,40})\??/iu',
@@ -705,7 +705,9 @@ PROMPT;
         if (!$termo || mb_strlen($termo) < 2) return [];
 
         // Limpar palavras genéricas do termo extraído
-        $termo = preg_replace('/\b(disponível|disponivel|em\s+estoque|pra\s+vender|quanto\s+(?:fica|custa|é)|quanto|ficaria|custa|envio|frete)\b/iu', '', $termo);
+        $termo = preg_replace('/\b(disponível|disponivel|em\s+estoque|pra\s+vender|quanto\s+(?:fica|custa|é|ficaria|custaria)|quanto|ficaria|custa|custaria|envio|frete|entrega|o\s+envio|a\s+entrega|o\s+frete)\b/iu', '', $termo);
+        // Remover tudo após ponto de interrogação (segunda pergunta)
+        $termo = preg_replace('/\?.*$/u', '', $termo);
         $termo = trim(preg_replace('/\s+/', ' ', $termo), ' ?.!,');
         if (!$termo || mb_strlen($termo) < 2) return [];
 

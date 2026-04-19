@@ -375,15 +375,13 @@ class CopilotoApiController extends Controller {
             $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : 'price');
             $colPeso = in_array('weight', $cols, true) ? 'weight' : (in_array('peso', $cols, true) ? 'peso' : 'weight');
 
-            // Filtros de visibilidade — usar mesma lógica do Produto model
-            // Apenas filtrar ocultos e status inválidos, sem ser restritivo demais
+            // Filtros de visibilidade — mesma lógica da página de grupos
             $filtros = [];
             if (in_array('oculto', $cols, true)) {
                 $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
             }
             if (in_array('status', $cols, true)) {
-                // Excluir apenas status explicitamente inválidos
-                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('archived','deleted','trash','lixeira'))";
+                $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('archived','deleted','trash','lixeira','draft','rascunho'))";
             }
             $filtroSQL = !empty($filtros) ? ' AND ' . implode(' AND ', $filtros) : '';
 
@@ -442,6 +440,7 @@ class CopilotoApiController extends Controller {
                     FROM produtos p
                     LEFT JOIN grupos_compras gc ON gc.id = p.grupo_compras_id
                     WHERE {$whereClause}{$filtroSQL}
+                    AND (p.grupo_compras_id IS NULL OR gc.ativo = 1 OR gc.ativo IS NULL)
                     ORDER BY {$orderBy} LIMIT 10";
             } else {
                 $sql = "SELECT p.id, p.{$colNome} AS nome, p.{$colPreco} AS preco, p.{$colPeso} AS peso,
