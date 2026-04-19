@@ -320,6 +320,18 @@
         var fp = qs('#forma_pagamento,[name="forma_pagamento"]')
         if (fp && p.metodo) { fp.value = p.metodo; fp.dispatchEvent(new Event('change',{bubbles:true})) }
       },
+      selecionar_endereco: function () {
+        // Selecionar endereço no dropdown do checkout
+        var sel = qs('#endereco_select,select[name="endereco_id"],.form-select')
+        if (sel && p.indice) {
+          var idx = parseInt(p.indice) - 1 // Converter de 1-based para 0-based
+          if (sel.options && sel.options[idx]) {
+            sel.selectedIndex = idx
+            sel.dispatchEvent(new Event('change', {bubbles:true}))
+            adicionarMsg('assistant', '✅ Endereço selecionado!')
+          }
+        }
+      },
       finalizar_pedido: function () {
         var termos = document.querySelectorAll('input[type="checkbox"]')
         termos.forEach(function(cb) { if (!cb.checked) cb.click() })
@@ -336,6 +348,16 @@
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
       criar_ticket_suporte: function () { return criarTicket('suporte', p) },
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
+      atualizar_perfil: function () {
+        if (!p.campos || typeof p.campos !== 'object') return
+        return fetch('/api/copiloto/atualizarperfil', {
+          method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin',
+          body: JSON.stringify({ campos: p.campos })
+        }).then(function(r) { return r.json() }).then(function(d) {
+          if (d.success) adicionarMsg('assistant', '✅ Dados atualizados!')
+          else adicionarMsg('assistant', '❌ ' + (d.error || 'Erro ao atualizar'))
+        }).catch(function() { adicionarMsg('assistant', '❌ Erro ao atualizar dados') })
+      },
       gerar_orcamento: function () { return gerarOrcamento(p.links || []) },
       aceitar_termos_assessoria: function () {
         // Chamar a API de adicionar ao carrinho da assessoria diretamente
@@ -479,7 +501,7 @@
     try {
       var ctx = lerContextoPagina()
       
-      // Se não está na página do carrinho, buscar dados do carrinho via API
+      // Se não está na página do carrinho, buscar dados do carrinho e perfil via API
       if (ctx.pagina !== 'carrinho' && ctx.carrinho_itens.length === 0) {
         try {
           var cartResp = await fetch('/api/copiloto/meucarrinho', { credentials: 'same-origin' })
@@ -495,6 +517,15 @@
               ctx.carrinho_frete_visivel = 'Frete grátis'
             }
           }
+        } catch (e) {}
+      }
+
+      // Buscar perfil do usuário (dados cadastrais)
+      if (!ctx.usuario_perfil) {
+        try {
+          var ctxResp = await fetch('/api/copiloto/context', { credentials: 'same-origin' })
+          var ctxData = await ctxResp.json()
+          if (ctxData.perfil) ctx.usuario_perfil = ctxData.perfil
         } catch (e) {}
       }
 

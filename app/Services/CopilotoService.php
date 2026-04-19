@@ -330,6 +330,34 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
         $cambioStr = number_format($cambio, 2, '.', '');
         $pagina = $contexto['pagina'] ?? 'desconhecida';
         $url = $contexto['url_atual'] ?? '';
+
+        // Dados do perfil do usuário (cadastro)
+        $perfilUsuario = '';
+        if (!empty($contexto['usuario_perfil']) && is_array($contexto['usuario_perfil'])) {
+            $p = $contexto['usuario_perfil'];
+            $perfilUsuario = "DADOS CADASTRAIS DO USUÁRIO (do banco de dados):";
+            if (!empty($p['nome'])) $perfilUsuario .= "\nNome: {$p['nome']}";
+            if (!empty($p['email'])) $perfilUsuario .= "\nEmail: {$p['email']}";
+            if (!empty($p['telefone'])) $perfilUsuario .= "\nTelefone: {$p['telefone']}";
+            if (!empty($p['documento'])) $perfilUsuario .= "\nCPF/Documento: {$p['documento']}";
+            if (!empty($p['data_nascimento'])) $perfilUsuario .= "\nData nascimento: {$p['data_nascimento']}";
+            if (!empty($p['endereco']) && is_array($p['endereco'])) {
+                $e = $p['endereco'];
+                $perfilUsuario .= "\nEndereço principal: {$e['endereco']}, {$e['numero']} - {$e['bairro']}, {$e['cidade']}/{$e['estado']} CEP {$e['cep']}";
+            }
+            if (!empty($p['enderecos']) && is_array($p['enderecos']) && count($p['enderecos']) > 1) {
+                $perfilUsuario .= "\n\nENDEREÇOS CADASTRADOS (" . count($p['enderecos']) . "):";
+                foreach ($p['enderecos'] as $i => $e) {
+                    $n = $i + 1;
+                    $principal = !empty($e['principal']) ? ' ⭐ PRINCIPAL' : '';
+                    $perfilUsuario .= "\n{$n}. {$e['endereco']}, {$e['numero']} - {$e['bairro']}, {$e['cidade']}/{$e['estado']} CEP {$e['cep']}{$principal}";
+                }
+                $perfilUsuario .= "\nSe o cliente tiver mais de 1 endereço, pergunte qual quer usar. Use acao: selecionar_endereco com parametros.indice (1, 2, 3...)";
+            }
+            $perfilUsuario .= "\nIMPORTANTE: Estes dados já estão cadastrados. NÃO peça dados que já existem. Apenas confirme: 'Vi que seu CPF é XXX, está correto?'";
+            $perfilUsuario .= "\nSe o cliente quiser alterar algum dado, peça o novo valor e use acao: atualizar_perfil com parametros.campos.";
+            $perfilUsuario .= "\nNUNCA altere ou peça senha pelo chat.";
+        }
         $produtoNome = $contexto['produto_nome'] ?? 'nenhum';
         $produtoId = $contexto['produto_id'] ?? '';
         $grupo = $contexto['produto_grupo'] ?? 'nenhum';
@@ -357,10 +385,12 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
 - ir_para_grupo: navega para /grupo/:slug
 - criar_ticket_suporte: abre ticket na categoria "suporte"
 - criar_ticket_duvida: abre ticket na categoria "duvidas_gerais"
+- atualizar_perfil: atualiza dados do perfil do usuário. parametros.campos = {"telefone":"novo_valor","documento":"novo_cpf","cep":"15000-000","endereco":"Rua Nova","numero":"456","bairro":"Centro","cidade":"SP","estado":"SP",...}. Campos permitidos: nome, email, telefone, documento (CPF), data_nascimento, cep, endereco, numero, complemento, bairro, cidade, estado, pais. NUNCA atualizar senha pelo chat.
 - gerar_orcamento: gera orçamento de assessoria com links de produtos externos. OBRIGATÓRIO: parametros.links (array de URLs)
 - aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento)
 - preencher_checkout: preenche campos do checkout. parametros.campos = {"nome":"valor","cpf":"valor",...}
 - selecionar_pagamento: seleciona forma de pagamento. parametros.metodo = "pix"|"credit_card"|"boleto"
+- selecionar_endereco: seleciona endereço de entrega no checkout. parametros.indice = número do endereço (1, 2, 3...)
 - finalizar_pedido: aceita termos e clica no botão de finalizar pedido (só na página de checkout)
 - verificar_cancelamento: verifica elegibilidade de cancelamento
 - solicitar_cancelamento: solicita cancelamento (requer confirmação)
@@ -408,6 +438,7 @@ USUÁRIO:
 Logado: {$logado}
 Nome: {$nomeUsuario}
 Moeda atual: {$moeda}
+{$perfilUsuario}
 
 REGRA DE MOEDA OBRIGATÓRIA:
 O usuário está vendo o site em {$moeda}.

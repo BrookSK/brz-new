@@ -74,12 +74,59 @@ class CopilotoApiController extends Controller {
     public function context(Request $request) {
         if (session_status() === PHP_SESSION_NONE) @session_start();
         $service = new CopilotoService();
+        
+        // Dados do perfil do usuário logado
+        $perfil = [];
+        $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+        if ($userId > 0) {
+            try {
+                $pdo = \Config\Database::getConnection();
+                $st = $pdo->prepare("SELECT * FROM usuarios WHERE id = ? LIMIT 1");
+                $st->execute([$userId]);
+                $u = $st->fetch(\PDO::FETCH_ASSOC);
+                if ($u) {
+                    $perfil = [
+                        'nome' => $u['nome'] ?? $u['name'] ?? '',
+                        'email' => $u['email'] ?? '',
+                        'telefone' => $u['telefone'] ?? $u['phone'] ?? '',
+                        'documento' => $u['documento'] ?? $u['cpf'] ?? '',
+                        'data_nascimento' => $u['data_nascimento'] ?? $u['birth_date'] ?? '',
+                    ];
+                    // Buscar TODOS os endereços
+                    try {
+                        $stEnd = $pdo->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC");
+                        $stEnd->execute([$userId]);
+                        $enderecos = $stEnd->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        $perfil['enderecos'] = [];
+                        foreach ($enderecos as $end) {
+                            $perfil['enderecos'][] = [
+                                'id' => $end['id'] ?? null,
+                                'cep' => $end['cep'] ?? '',
+                                'endereco' => $end['endereco'] ?? $end['logradouro'] ?? '',
+                                'numero' => $end['numero'] ?? '',
+                                'complemento' => $end['complemento'] ?? '',
+                                'bairro' => $end['bairro'] ?? '',
+                                'cidade' => $end['cidade'] ?? '',
+                                'estado' => $end['estado'] ?? '',
+                                'pais' => $end['pais'] ?? 'BR',
+                                'principal' => !empty($end['principal']),
+                            ];
+                        }
+                        if (!empty($perfil['enderecos'])) {
+                            $perfil['endereco'] = $perfil['enderecos'][0]; // Principal
+                        }
+                    } catch (\Exception $e) {}
+                }
+            } catch (\Exception $e) {}
+        }
+
         $this->responderJson([
             'usuario_logado' => !empty($_SESSION['logado']),
             'usuario_nome' => $_SESSION['usuario_nome'] ?? null,
             'moeda' => $_SESSION['moeda'] ?? 'BRL',
             'cambio' => (float) $service->getConfig('cambio_usd_brl', 5.80),
             'gatilho_tempo_ms' => (int) $service->getConfig('gatilho_tempo_ms', 30000),
+            'perfil' => $perfil,
         ]);
     }
 
@@ -437,6 +484,113 @@ class CopilotoApiController extends Controller {
         } catch (\Throwable $e) {
             error_log('[CoPiloto] Erro ticket: ' . $e->getMessage());
             $this->responderJson(['erro' => $e->getMessage()], 500);
+        }
+    }
+
+    /** POST /api/copiloto/atualizarperfil — Atualizar dados do perfil do usuário */
+    public function atualizarPerfil(Request $request) {
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+            if ($userId <= 0) {
+                $this->responderJson(['error' => 'Não logado'], 401);
+            }
+
+            $raw = file_get_contents('php://input');
+            $body = json_decode($raw ?: '', true);
+            if (!is_array($body) || empty($body['campos'])) {
+                $this->responderJson(['error' => 'Nenhum campo para atualizar'], 400);
+            }
+
+            $campos = $body['campos'];
+            $pdo = \Config\Database::getConnection();
+
+            // Mapear campos permitidos para colunas do banco
+            $permitidos = [
+                'nome' => 'nome', 'name' => 'nome',
+                'email' => 'email',
+                'telefone' => 'telefone', 'phone' => 'telefone',
+                'documento' => 'documento', 'cpf' => 'documento',
+                'data_nascimento' => 'data_nascimento', 'birth_date' => 'data_nascimento',
+            ];
+
+            // Verificar quais colunas existem na tabela
+            $cols = [];
+            try { $cols = $pdo->query('DESCRIBE usuarios')->fetchAll(\PDO::FETCH_COLUMN) ?: []; } catch (\Exception $e) {}
+
+            $updates = [];
+            $params = [];
+            foreach ($campos as $campo => $valor) {
+                $coluna = $permitidos[$campo] ?? null;
+                if (!$coluna) continue;
+                // Verificar se a coluna existe
+                if (!in_array($coluna, $cols, true)) {
+                    // Tentar alternativas
+                    $alternativas = ['nome' => 'name', 'name' => 'nome', 'telefone' => 'phone', 'phone' => 'telefone', 'documento' => 'cpf', 'cpf' => 'documento'];
+                    $coluna = $alternativas[$coluna] ?? $coluna;
+                    if (!in_array($coluna, $cols, true)) continue;
+                }
+                $updates[] = "{$coluna} = ?";
+                $params[] = trim((string) $valor);
+            }
+
+            if (empty($updates)) {
+                $this->responderJson(['error' => 'Nenhum campo válido para atualizar'], 400);
+            }
+
+            $params[] = $userId;
+            $sql = "UPDATE usuarios SET " . implode(', ', $updates) . " WHERE id = ?";
+            $pdo->prepare($sql)->execute($params);
+
+            // Atualizar endereço se campos de endereço foram enviados
+            $endCampos = ['cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'pais'];
+            $endUpdates = [];
+            $endParams = [];
+            foreach ($endCampos as $c) {
+                if (isset($campos[$c])) {
+                    // Verificar se coluna existe na tabela enderecos
+                    $colEnd = $c;
+                    if ($c === 'endereco' && !in_array('endereco', $colsEnd ?? [], true)) $colEnd = 'logradouro';
+                    $endUpdates[] = "{$colEnd} = ?";
+                    $endParams[] = trim((string) $campos[$c]);
+                }
+            }
+            if (!empty($endUpdates)) {
+                try {
+                    $colsEnd = $pdo->query('DESCRIBE enderecos')->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                } catch (\Exception $e) { $colsEnd = []; }
+                
+                // Atualizar endereço principal
+                $endParams[] = $userId;
+                $sqlEnd = "UPDATE enderecos SET " . implode(', ', $endUpdates) . " WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1";
+                $stEnd = $pdo->prepare($sqlEnd);
+                $stEnd->execute($endParams);
+                
+                // Se não atualizou nenhum (não tem endereço), criar um novo
+                if ($stEnd->rowCount() === 0) {
+                    $insertCols = ['usuario_id'];
+                    $insertVals = ['?'];
+                    $insertParams = [$userId];
+                    foreach ($endCampos as $c) {
+                        if (isset($campos[$c])) {
+                            $insertCols[] = $c;
+                            $insertVals[] = '?';
+                            $insertParams[] = trim((string) $campos[$c]);
+                        }
+                    }
+                    $insertCols[] = 'principal';
+                    $insertVals[] = '1';
+                    $pdo->prepare("INSERT INTO enderecos (" . implode(',', $insertCols) . ") VALUES (" . implode(',', $insertVals) . ")")->execute($insertParams);
+                }
+            }
+
+            // Atualizar sessão se nome mudou
+            if (isset($campos['nome'])) $_SESSION['usuario_nome'] = $campos['nome'];
+
+            $this->responderJson(['success' => true, 'campos_atualizados' => array_keys($campos)]);
+        } catch (\Throwable $e) {
+            error_log('[CoPiloto] Erro atualizar perfil: ' . $e->getMessage());
+            $this->responderJson(['error' => $e->getMessage()], 500);
         }
     }
 
