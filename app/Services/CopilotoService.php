@@ -513,7 +513,8 @@ FLUXO DO CHECKOUT:
 8. Se o cliente aceitar (sim/aceito/ok/pode), use acao: finalizar_pedido
 9. Se o cliente NÃO aceitar, NÃO finalize. Ofereça os links para leitura.
 10. Após finalizar, se for PIX: "Escaneie o QR Code que apareceu na tela para pagar"
-11. Se for cartão: "Preencha os dados do cartão nos campos da tela e me avisa quando terminar"
+11. Se for cartão: "Preencha os dados do cartão nos campos da tela e me avisa quando terminar que eu finalizo pra você"
+12. Quando o cliente avisar que preencheu o cartão (ex: "pronto", "coloquei", "já preenchi", "pode finalizar"), use acao: finalizar_pedido IMEDIATAMENTE
 FORMAS DE PAGAMENTO DISPONÍVEIS:
 - BRL: PIX (à vista), Cartão nacional (até 12x sem juros)
 - USD: Cartão internacional, Zelle, Venmo
