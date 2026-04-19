@@ -987,7 +987,7 @@
     salvarHistorico(); scrollBottom()
   }
   function formatarTexto (t) {
-    return (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" style="color:#1d4ed8;text-decoration:underline">$1</a>')
+    return (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:underline">$1</a>')
   }
   function scrollBottom () { var m = document.getElementById('bz-copiloto-messages'); if (m) m.scrollTop = m.scrollHeight }
 
