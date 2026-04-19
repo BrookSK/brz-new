@@ -297,6 +297,18 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             $resumoCheckout .= "\nMoeda: " . ($campos['moeda'] ?: 'BRL');
             $resumoCheckout .= "\nForma pagamento: " . ($campos['forma_pagamento'] ?: '❌ NÃO SELECIONADA');
             $resumoCheckout .= "\nTermos aceitos: " . ($campos['termos_aceitos'] ? 'Sim' : 'Não');
+            // Carteira e Carnê
+            $saldoCarteira = (float) ($campos['carteira_saldo'] ?? 0);
+            if ($saldoCarteira > 0) {
+                $resumoCheckout .= "\nSaldo Carteira: US\$ " . number_format($saldoCarteira, 2) . " disponível";
+            }
+            $turboBloq = (float) ($campos['carteira_turbo_bloqueado'] ?? 0);
+            if ($turboBloq > 0) {
+                $resumoCheckout .= "\nTurbo bloqueado: US\$ " . number_format($turboBloq, 2);
+            }
+            if (!empty($campos['carne_disponivel'])) {
+                $resumoCheckout .= "\nCarnê Braziliana: ✅ Disponível";
+            }
             if (!empty($campos['cep'])) $resumoCheckout .= "\nEndereço: {$campos['endereco']}, {$campos['numero']} - {$campos['bairro']}, {$campos['cidade']}/{$campos['estado']} CEP {$campos['cep']}";
             if (!empty($faltando)) {
                 $resumoCheckout .= "\n\n⚠️ CAMPOS FALTANDO: " . implode(', ', $faltando);
@@ -516,8 +528,32 @@ FLUXO DO CHECKOUT:
 11. Se for cartão: "Preencha os dados do cartão nos campos da tela e me avisa quando terminar que eu finalizo pra você"
 12. Quando o cliente avisar que preencheu o cartão (ex: "pronto", "coloquei", "já preenchi", "pode finalizar"), use acao: finalizar_pedido IMEDIATAMENTE
 FORMAS DE PAGAMENTO DISPONÍVEIS:
-- BRL: PIX (à vista), Cartão nacional (até 12x sem juros)
-- USD: Cartão internacional, Zelle, Venmo
+PAGAMENTO EM BRL (Real):
+- PIX: pagamento à vista, pode ter desconto na taxa de serviço
+- Cartão de Crédito: via AppMax, até 12x sem juros
+- Cartão de Débito: via AppMax
+- Crédito da Carteira: usa saldo da carteira interna (se tiver saldo suficiente)
+- Carnê Braziliana: parcelamento em até 12x via boleto (só disponível para BRL + entrega no Brasil, se ativo no sistema)
+IMPORTANTE BRL: O pagamento em reais é processado em duas cobranças:
+  1. Câmbio Real: valor dos produtos (convertido pelo câmbio do dia)
+  2. AppMax: taxa de serviço + impostos
+  Avise o cliente que verá duas cobranças separadas.
+
+PAGAMENTO EM USD (Dólar):
+- Cartão de Crédito/Débito: via Stripe
+- PIX via Stripe
+- Crédito da Carteira: usa saldo da carteira interna
+NÃO tem parcelamento em USD.
+
+CRÉDITO DA CARTEIRA:
+- Só pode usar se o saldo disponível for >= total do pedido
+- Se saldo insuficiente, a opção aparece desabilitada
+- Saldo Turbo pode estar bloqueado (liberação após 6 meses)
+
+CARNÊ BRAZILIANA:
+- Só disponível para BRL + entrega no Brasil
+- Só se o sistema tiver o carnê ativo
+- Parcelamento em até 12x via boleto
 CLUBE: Depósito mín US\$ 39. Normal (imediato) ou Turbo (6 meses).
 CANCELAMENTO: Taxa fixa US\$ 100. Impossível após despacho.
 CONTATO: WhatsApp Vendas +55 17 99620-3062 / Suporte APENAS via ticket.

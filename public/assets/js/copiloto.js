@@ -103,6 +103,10 @@
       var fpEl = qs('#forma_pagamento,[name="forma_pagamento"]')
       ctx.checkout_campos.forma_pagamento = fpEl ? fpEl.value : ''
       if (!ctx.checkout_campos.forma_pagamento) ctx.checkout_campos_faltando.push('forma_pagamento')
+      // Ler saldo da carteira e carnê disponível
+      ctx.checkout_campos.carteira_saldo = typeof window.CARTEIRA_SALDO_DISPONIVEL !== 'undefined' ? window.CARTEIRA_SALDO_DISPONIVEL : 0
+      ctx.checkout_campos.carteira_turbo_bloqueado = typeof window.CARTEIRA_TURBO_BLOQUEADO !== 'undefined' ? window.CARTEIRA_TURBO_BLOQUEADO : 0
+      ctx.checkout_campos.carne_disponivel = typeof window.CARNE_BRAZILIANA_DISPONIVEL !== 'undefined' ? window.CARNE_BRAZILIANA_DISPONIVEL : false
       var termosEl = qs('#termos,[name="termos"],#aceito_termos')
       ctx.checkout_campos.termos_aceitos = termosEl ? termosEl.checked : false
     }
