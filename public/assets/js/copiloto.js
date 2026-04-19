@@ -586,6 +586,19 @@
       if (acaoTipo === 'nenhuma' && textoResp.match(/lev[oa].*checkout|partiu.*checkout|levando.*checkout|bora.*checkout|finalizar.*compra|te levo.*finalizar|levo lá agora|pro checkout/i)) {
         acaoTipo = 'ir_para_checkout'
       }
+      // Detectar se Claude disse que finalizou/processou o pedido
+      if (acaoTipo === 'nenhuma' && textoResp.match(/pedido.*finalizado|finalizado.*sucesso|processando.*pedido|pedido.*processado|🚀.*pedido|QR.*Code.*aparec|escane.*QR|pagamento.*PIX.*confirm/i)) {
+        acaoTipo = 'finalizar_pedido'
+      }
+      // Detectar se Claude selecionou forma de pagamento mas não mandou a ação
+      if (acaoTipo === 'nenhuma' && textoResp.match(/PIX.*selecionad|selecion.*PIX|forma.*pagamento.*PIX/i)) {
+        acaoTipo = 'selecionar_pagamento'
+        acaoParams.metodo = 'pix'
+      }
+      if (acaoTipo === 'nenhuma' && textoResp.match(/cartão.*selecionad|selecion.*cartão|forma.*pagamento.*cartão|crédito.*selecionad/i)) {
+        acaoTipo = 'selecionar_pagamento'
+        acaoParams.metodo = 'cartao_credito'
+      }
       // Detectar se Claude disse que limpou o carrinho
       if (acaoTipo === 'nenhuma' && textoResp.match(/carrinho.*limpo|carrinho.*zerado|limpo.*carrinho|zerado.*carrinho/i)) {
         acaoTipo = 'limpar_carrinho'
