@@ -366,10 +366,12 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                     }
                 }
                 if ($temVariacoesPendentes) {
-                    $resumoOrcamento .= "\n\n⚠️ VARIAÇÕES PENDENTES: Alguns produtos têm variações (tamanho, cor, etc.) que PRECISAM ser selecionadas antes de adicionar ao carrinho.";
-                    $resumoOrcamento .= "\nPergunte ao cliente qual opção ele quer para cada variação pendente.";
-                    $resumoOrcamento .= "\nQuando o cliente escolher, use acao: selecionar_variacao_orcamento com parametros: {\"indice\": 0, \"variacao\": {\"Size\": \"Extra-Small\", \"Color\": \"Green\"}}";
-                    $resumoOrcamento .= "\nSó depois de TODAS as variações selecionadas, prossiga com aceitar_termos_assessoria.";
+                    $resumoOrcamento .= "\n\n⚠️ VARIAÇÕES PENDENTES: Alguns produtos têm variações que PRECISAM ser selecionadas antes de adicionar ao carrinho.";
+                    $resumoOrcamento .= "\nAs opções disponíveis estão listadas acima ao lado de cada variação. Use APENAS essas opções — NÃO invente outras.";
+                    $resumoOrcamento .= "\nSe uma variação tem APENAS 1 opção disponível, selecione-a automaticamente sem perguntar ao cliente.";
+                    $resumoOrcamento .= "\nSe uma variação tem MÚLTIPLAS opções, pergunte ao cliente qual prefere.";
+                    $resumoOrcamento .= "\nUse acao: selecionar_variacao_orcamento com parametros: {\"indice\": 0, \"variacao\": {\"Size\": \"Extra-Small\", \"Color\": \"Green\"}}";
+                    $resumoOrcamento .= "\nUse os nomes EXATOS das opções mostradas acima. Depois de selecionar, prossiga com aceitar_termos_assessoria.";
                 }
             }
             $resumoOrcamento .= "\n\nVocê pode informar estes valores ao cliente.";
