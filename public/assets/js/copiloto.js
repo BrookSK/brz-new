@@ -89,10 +89,10 @@
       ctx.pagina = 'checkout'
       ctx.checkout_campos = {}
       ctx.checkout_campos_faltando = []
-      ;['nome','email','telefone','cpf'].forEach(function(c) {
+      ;['nome','email','telefone','documento'].forEach(function(c) {
         var el = qs('[name="'+c+'"]') || qs('#'+c)
         ctx.checkout_campos[c] = el ? (el.value||'').trim() : ''
-        if (!ctx.checkout_campos[c]) ctx.checkout_campos_faltando.push(c)
+        if (!ctx.checkout_campos[c]) ctx.checkout_campos_faltando.push(c === 'documento' ? 'CPF' : c)
       })
       ;['cep','endereco','numero','bairro','cidade','estado','pais'].forEach(function(c) {
         var el = qs('[name="'+c+'"]') || qs('#'+c)

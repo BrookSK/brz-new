@@ -280,7 +280,7 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             $resumoCheckout .= "\nNome: " . ($campos['nome'] ?: '❌ VAZIO');
             $resumoCheckout .= "\nEmail: " . ($campos['email'] ?: '❌ VAZIO');
             $resumoCheckout .= "\nTelefone: " . ($campos['telefone'] ?: '❌ VAZIO');
-            $resumoCheckout .= "\nCPF: " . ($campos['cpf'] ?: '❌ VAZIO');
+            $resumoCheckout .= "\nCPF/Documento: " . ($campos['documento'] ?? ($campos['cpf'] ?? '❌ VAZIO'));
             $resumoCheckout .= "\nMoeda: " . ($campos['moeda'] ?: 'BRL');
             $resumoCheckout .= "\nForma pagamento: " . ($campos['forma_pagamento'] ?: '❌ NÃO SELECIONADA');
             $resumoCheckout .= "\nTermos aceitos: " . ($campos['termos_aceitos'] ? 'Sim' : 'Não');
