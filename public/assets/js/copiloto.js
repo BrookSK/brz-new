@@ -470,6 +470,16 @@
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
       buscar_produto: function () { return buscarProdutoInteligente(p.termo || p.busca || '') },
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
+      navegar: function () {
+        var url = p.url || p.pagina || ''
+        if (!url) return
+        // Segurança: só permitir URLs internas (começam com /)
+        if (url.indexOf('/') !== 0) url = '/' + url
+        // Bloquear URLs admin
+        if (url.match(/^\/admin/i)) { adicionarMsg('assistant', '⚠️ Não posso navegar para páginas administrativas.'); return }
+        salvarEstadoChat()
+        window.location.href = url
+      },
       criar_ticket_suporte: function () { return criarTicket('suporte', p) },
       criar_ticket_duvida: function () { return criarTicket('duvidas_gerais', p) },
       atualizar_perfil: function () {
@@ -685,6 +695,35 @@
       // Corrigir: se Claude mandou ir_para_checkout mas o texto fala de carrinho (não checkout)
       if (acaoTipo === 'ir_para_checkout' && textoResp.match(/carrinho/i) && !textoResp.match(/checkout|finalizar|pagar|pagamento/i)) {
         acaoTipo = 'ir_para_carrinho'
+      }
+      // Detectar navegação genérica: "te levo pra home", "vamos pra home", etc.
+      if (acaoTipo === 'nenhuma') {
+        var navMatch = textoResp.match(/(?:lev[oa]|levando|vamos|bora|te levo).*(?:pra |para |pro |à )(?:a )?(?:página (?:de |do |da )?)?(\w[\w\s-]*)/i)
+        if (navMatch) {
+          var destino = (navMatch[1] || '').toLowerCase().trim()
+          var mapaNav = {
+            'home': '/', 'início': '/', 'inicio': '/', 'principal': '/',
+            'produtos': '/produtos', 'catálogo': '/produtos', 'catalogo': '/produtos',
+            'faq': '/faq', 'perguntas': '/faq',
+            'como funciona': '/como-funciona',
+            'meus pedidos': '/meus-pedidos', 'pedidos': '/meus-pedidos',
+            'rastreamento': '/rastreamento', 'rastreio': '/rastreamento',
+            'contato': '/contato',
+            'meus dados': '/meus-dados', 'minha conta': '/meus-dados', 'perfil': '/meus-dados',
+            'clube': '/clube/recarga',
+            'termos': '/termos-uso', 'termos de uso': '/termos-uso',
+            'privacidade': '/politica-privacidade',
+            'login': '/login', 'entrar': '/login',
+            'cadastro': '/register', 'registro': '/register', 'criar conta': '/register'
+          }
+          for (var key in mapaNav) {
+            if (destino.indexOf(key) >= 0) {
+              acaoTipo = 'navegar'
+              acaoParams.url = mapaNav[key]
+              break
+            }
+          }
+        }
       }
       // Detectar se Claude disse que finalizou/processou o pedido
       if (acaoTipo === 'nenhuma' && textoResp.match(/pedido.*finalizado|finalizado.*sucesso|processando.*pedido|pedido.*processado|🚀.*pedido|QR.*Code.*aparec|escane.*QR|pagamento.*PIX.*confirm|vou finalizar|finalizando.*pedido|processando pra voc|vou processar/i)) {

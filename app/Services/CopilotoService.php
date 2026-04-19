@@ -415,8 +415,14 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
 - ir_para_contato: navega para /contato com campos pré-preenchidos
 - ir_para_clube: navega para /clube/recarga
 - ir_para_meus_dados: navega para /meus-dados
-- buscar_produto: navega para /produtos?busca=termo
+- buscar_produto: busca produtos no catálogo. parametros.termo = "sponge" ou "price:20"
 - ir_para_grupo: navega para /grupo/:slug
+- navegar: navega para QUALQUER página pública do site. parametros.url = "/caminho". Use para qualquer navegação que não tenha ação específica.
+  Páginas públicas disponíveis:
+  / (home), /produtos (catálogo), /carrinho, /checkout, /contato, /faq, /como-funciona, /clube/recarga, /clube/como-funciona-clube,
+  /meus-dados, /meus-pedidos, /rastreamento, /termos-uso, /politica-privacidade, /login, /register,
+  /grupo/{slug} (grupos de compras), /produto/detalhes/{id} (detalhe do produto)
+  NUNCA navegue para páginas /admin/*.
 - criar_ticket_suporte: abre ticket na categoria "suporte"
 - criar_ticket_duvida: abre ticket na categoria "duvidas_gerais"
 - atualizar_perfil: atualiza dados do perfil do usuário. parametros.campos = {"telefone":"novo_valor","documento":"novo_cpf","cep":"15000-000","endereco":"Rua Nova","numero":"456","bairro":"Centro","cidade":"SP","estado":"SP",...}. Campos permitidos: nome, email, telefone, documento (CPF), data_nascimento, cep, endereco, numero, complemento, bairro, cidade, estado, pais. NUNCA atualizar senha pelo chat.
