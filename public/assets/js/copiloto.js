@@ -465,6 +465,7 @@
         }, 600)
       },
       ir_para_contato: function () { salvarEstadoChat(); window.location.href = '/contato' },
+      ir_para_carrinho: function () { salvarEstadoChat(); window.location.href = '/carrinho' },
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
       buscar_produto: function () { return buscarProdutoInteligente(p.termo || p.busca || '') },
@@ -676,6 +677,14 @@
       // Detectar se Claude disse que vai levar pro checkout mas não mandou a ação
       if (acaoTipo === 'nenhuma' && textoResp.match(/lev[oa].*checkout|partiu.*checkout|levando.*checkout|bora.*checkout|finalizar.*compra|te levo.*finalizar|levo lá agora|pro checkout/i)) {
         acaoTipo = 'ir_para_checkout'
+      }
+      // Detectar se Claude disse que vai levar pro carrinho mas não mandou a ação
+      if (acaoTipo === 'nenhuma' && textoResp.match(/lev[oa].*carrinho|partiu.*carrinho|levando.*carrinho|bora.*carrinho|te levo.*carrinho|pro carrinho|vamos.*carrinho/i)) {
+        acaoTipo = 'ir_para_carrinho'
+      }
+      // Corrigir: se Claude mandou ir_para_checkout mas o texto fala de carrinho (não checkout)
+      if (acaoTipo === 'ir_para_checkout' && textoResp.match(/carrinho/i) && !textoResp.match(/checkout|finalizar|pagar|pagamento/i)) {
+        acaoTipo = 'ir_para_carrinho'
       }
       // Detectar se Claude disse que finalizou/processou o pedido
       if (acaoTipo === 'nenhuma' && textoResp.match(/pedido.*finalizado|finalizado.*sucesso|processando.*pedido|pedido.*processado|🚀.*pedido|QR.*Code.*aparec|escane.*QR|pagamento.*PIX.*confirm|vou finalizar|finalizando.*pedido|processando pra voc|vou processar/i)) {
