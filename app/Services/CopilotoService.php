@@ -417,6 +417,7 @@ REGRAS:
 5. Nunca invente produtos — use apenas os fornecidos no contexto
 6. Para status de pedido → sempre consultar_status_pedido (exibe no chat, nunca navega)
 7. NUNCA ofereça WhatsApp como canal de suporte — suporte vai EXCLUSIVAMENTE via ticket
+8. BUSCA DE PRODUTOS: Quando o cliente pedir um produto em português, SEMPRE traduza para inglês antes de buscar. Os produtos estão cadastrados em INGLÊS. Exemplos: esponja→sponge, panela→cookware/pan, sabonete→soap, fralda→diaper, toalha→towel, escova→brush, balde→bucket, vassoura→broom, pano→cloth/wipe, luva→glove, etc. Use acao: buscar_produto com parametros.termo em INGLÊS.
 
 ORÇAMENTO DE ASSESSORIA (compra por link):
 Quando o cliente quiser comprar um produto de FORA do catálogo (de qualquer loja dos EUA):
@@ -566,6 +567,22 @@ PROMPT;
             'produto de limpeza' => 'cleaning,clean,wipe,lysol,clorox',
             'produto de bebe' => 'baby', 'produto de bebê' => 'baby',
             'roupa' => 'laundry,clothes', 'pele' => 'skin,lotion,cream',
+            'esponja' => 'sponge,scrub,eraser', 'pano' => 'cloth,wipe,towel',
+            'luva' => 'glove', 'balde' => 'bucket', 'vassoura' => 'broom,sweep',
+            'toalha' => 'towel', 'escova' => 'brush', 'sabão' => 'soap,detergent',
+            'alvejante' => 'bleach', 'amaciante de roupa' => 'fabric softener,downy',
+            'lava louça' => 'dish soap,dishwasher', 'lava roupa' => 'laundry detergent',
+            'brinquedo' => 'toy', 'boneca' => 'doll', 'carrinho' => 'toy car',
+            'maquiagem' => 'makeup,cosmetic', 'batom' => 'lipstick',
+            'rímel' => 'mascara', 'base' => 'foundation', 'pó' => 'powder',
+            'proteína' => 'protein', 'whey' => 'whey', 'creatina' => 'creatine',
+            'colchão' => 'mattress', 'travesseiro' => 'pillow', 'lençol' => 'sheet,bedding',
+            'cobertor' => 'blanket', 'edredom' => 'comforter,duvet',
+            'tênis' => 'sneaker,shoe', 'sapato' => 'shoe', 'sandália' => 'sandal',
+            'mochila' => 'backpack', 'bolsa' => 'bag,purse', 'carteira' => 'wallet',
+            'relógio' => 'watch', 'óculos' => 'glasses,sunglasses',
+            'fone' => 'headphone,earphone,earbud', 'carregador' => 'charger',
+            'cabo' => 'cable', 'capa' => 'case,cover',
         ];
 
         // Detectar se a mensagem parece ser sobre busca de produto
