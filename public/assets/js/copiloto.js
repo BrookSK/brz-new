@@ -44,26 +44,18 @@
     restaurarEstado()
     iniciarGatilhos(lerContextoPagina())
 
-    // Detectar QR Code: ?bri=1 na URL → abrir widget e enviar mensagem de boas-vindas
+    // Detectar QR Code: ?bri=1 na URL → abrir widget com mensagem de boas-vindas
     if (window.location.search.match(/[?&]bri=1/)) {
       // Limpar o parâmetro da URL sem recarregar
       try {
         var cleanUrl = window.location.pathname + window.location.search.replace(/[?&]bri=1/, '').replace(/^\?$/, '')
         window.history.replaceState({}, '', cleanUrl || window.location.pathname)
       } catch(e) {}
-      // Só mostrar boas-vindas se não tem histórico (primeira vez)
-      var jaTemHistorico = historico.length > 0
+      // Abrir widget e mostrar mensagem de boas-vindas (mantém histórico)
       setTimeout(function() {
         abrir()
-        if (!jaTemHistorico) {
-          // Limpar mensagem padrão de boas-vindas se existir
-          var msgs = document.getElementById('bz-copiloto-messages')
-          if (msgs) msgs.innerHTML = ''
-          historico = []
-          // Mensagem de boas-vindas do QR Code
-          var msgQr = CONFIG.qrcode_mensagem || 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉\n\nEu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar a encontrar produtos, fazer orçamentos, tirar dúvidas e muito mais!\n\nMe conta o que você procura! 💚'
-          adicionarMsg('assistant', msgQr)
-        }
+        var msgQr = CONFIG.qrcode_mensagem || 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉\n\nEu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar a encontrar produtos, fazer orçamentos, tirar dúvidas e muito mais!\n\nMe conta o que você procura! 💚'
+        adicionarMsg('assistant', msgQr)
       }, 500)
     }
   }
