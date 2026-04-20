@@ -33,31 +33,37 @@
   // ========== INIT ==========
   function init () {
     // Carregar config do servidor
+    var briMode = !!window.location.search.match(/[?&]bri=1/)
+    
     fetch('/api/copiloto/context').then(function (r) { return r.json() }).then(function (cfg) {
       if (cfg.gatilho_tempo_ms) CONFIG.gatilho_tempo_ms = cfg.gatilho_tempo_ms
-      // Guardar mensagem de boas-vindas do QR Code
       if (cfg.qrcode_mensagem) CONFIG.qrcode_mensagem = cfg.qrcode_mensagem
-    }).catch(function () {})
+      // Se veio pelo QR Code, mostrar mensagem DEPOIS de ter a config carregada
+      if (briMode) showBriWelcome()
+    }).catch(function () {
+      if (briMode) showBriWelcome()
+    })
 
     injetarCSS()
     criarWidget()
     restaurarEstado()
     iniciarGatilhos(lerContextoPagina())
 
-    // Detectar QR Code: ?bri=1 na URL → abrir widget com mensagem de boas-vindas
-    if (window.location.search.match(/[?&]bri=1/)) {
-      // Limpar o parâmetro da URL sem recarregar
+    // Detectar QR Code: limpar ?bri=1 da URL
+    if (briMode) {
       try {
         var cleanUrl = window.location.pathname + window.location.search.replace(/[?&]bri=1/, '').replace(/^\?$/, '')
         window.history.replaceState({}, '', cleanUrl || window.location.pathname)
       } catch(e) {}
-      // Abrir widget e mostrar mensagem de boas-vindas (mantém histórico)
-      setTimeout(function() {
-        abrir()
-        var msgQr = CONFIG.qrcode_mensagem || 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉\n\nEu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar a encontrar produtos, fazer orçamentos, tirar dúvidas e muito mais!\n\nMe conta o que você procura! 💚'
-        adicionarMsg('assistant', msgQr)
-      }, 500)
+      // Abrir widget imediatamente
+      setTimeout(function() { abrir() }, 300)
     }
+  }
+
+  function showBriWelcome() {
+    var msgQr = CONFIG.qrcode_mensagem || 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉\n\nEu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar a encontrar produtos, fazer orçamentos, tirar dúvidas e muito mais!\n\nMe conta o que você procura! 💚'
+    adicionarMsg('assistant', msgQr)
+    scrollBottom()
   }
 
   // ========== LEITURA DO DOM ==========
