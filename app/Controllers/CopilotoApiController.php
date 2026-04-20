@@ -138,6 +138,7 @@ class CopilotoApiController extends Controller {
             'moeda' => $_SESSION['moeda'] ?? 'BRL',
             'cambio' => (float) $service->getConfig('cambio_usd_brl', 5.80),
             'gatilho_tempo_ms' => (int) $service->getConfig('gatilho_tempo_ms', 30000),
+            'qrcode_mensagem' => (string) $service->getConfig('qrcode_mensagem', ''),
             'perfil' => $perfil,
         ]);
     }

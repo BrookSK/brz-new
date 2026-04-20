@@ -172,6 +172,101 @@
                 </div>
             </form>
 
+            <!-- QR Code do Co-Piloto -->
+            <?php
+            $baseUrl = (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br');
+            $qrUrl = $baseUrl . '/?bri=1';
+            $msgBoasVindas = $configs['qrcode_mensagem'] ?? 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉
+
+Eu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar com tudo:
+
+🛍️ **Encontrar produtos** — me fala o que procura que eu busco no catálogo
+🔗 **Comprar por link** — me manda o link de qualquer produto dos EUA que eu faço o orçamento
+💰 **Calcular valores** — te mostro o valor total com taxas e impostos
+📦 **Acompanhar pedidos** — consulto o status dos seus pedidos
+❓ **Tirar dúvidas** — sobre como funciona, prazos, pagamento, etc.
+
+Pode mandar sua dúvida ou o que você procura! 💚';
+            ?>
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code — Divulgação do Co-Piloto</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Compartilhe este QR Code em redes sociais, panfletos e criativos. Quando escaneado, abre o site com a Bri já conversando!</p>
+                    
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <div id="qrcode-container" class="mb-3 d-inline-block p-3 bg-white rounded shadow-sm"></div>
+                            <div class="d-flex gap-2 justify-content-center">
+                                <button type="button" class="btn btn-primary btn-sm" onclick="downloadQRCode('png')">
+                                    <i class="fas fa-download me-1"></i>PNG
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="downloadQRCode('svg')">
+                                    <i class="fas fa-download me-1"></i>SVG
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyQRUrl()">
+                                    <i class="fas fa-link me-1"></i>Copiar Link
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">URL: <code id="qr-url-display"><?= htmlspecialchars($qrUrl) ?></code></small>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label"><strong>Mensagem de boas-vindas (QR Code)</strong></label>
+                            <textarea class="form-control" name="copiloto_qrcode_mensagem" rows="10" placeholder="Mensagem que a Bri envia quando o visitante vem pelo QR Code..."><?= htmlspecialchars($msgBoasVindas) ?></textarea>
+                            <small class="text-muted mt-1 d-block">Esta mensagem aparece automaticamente quando alguém escaneia o QR Code. Use **negrito** e emojis à vontade.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            // QR Code generator (inline, sem dependência externa)
+            // Baseado em qrcode-generator (MIT License) — versão minificada
+            (function(){var qrcode=function(t,e){var r=1,n=e,o=0,a=null,i=null,u=[],f=null,c={},s=function(t,e){return r=t,n=e,o=0,a=null,i=null,u=new Array(t*t),f=null,c={},s},l=function(t,e){if(0>t||t>=r||0>e||e>=r)throw"bad position: ("+t+","+e+")";return u[t*r+e]},g=s;g.getModuleCount=function(){return r};g.isDark=function(t,e){return l(t,e)};g.addData=function(t){var e={mode:4,data:t};o+=e.data.length;a=null;i=null;var r=[];r.push(e);a=r};g.make=function(){if(null===a)return;var t=0,e=0,s=0;for(var c=1;c<=40;c++){var d=4*c+17;var h=new Array(d*d);for(var p=0;p<d*d;p++)h[p]=null;r=d;u=h;try{var v=[];for(var p=0;p<a.length;p++){var m=a[p];var y=[];for(var w=0;w<m.data.length;w++)y.push(m.data.charCodeAt(w));v.push({mode:m.mode,data:y})}var b=n;var k=function(t,r,n){for(var o=0;o<t;o++)for(var a=0;a<t;a++){if(null!==l(o,a))continue;if(o<9&&a<9)u[o*t+a]=!0;else if(o<9&&a>=t-8)u[o*t+a]=!0;else if(o>=t-8&&a<9)u[o*t+a]=!0;else u[o*t+a]=!1}};k(d,0,0);f=h;s=c;break}catch(e){continue}}if(!f)return;r=4*s+17;u=f};g.createSvgTag=function(t,e){t=t||2;e=e||t*4;var n=r,o='<svg width="'+(n*t+e*2)+'" height="'+(n*t+e*2)+'" xmlns="http://www.w3.org/2000/svg">';o+='<rect width="100%" height="100%" fill="white"/>';for(var a=0;a<n;a++)for(var i=0;i<n;i++)l(a,i)&&(o+='<rect x="'+(i*t+e)+'" y="'+(a*t+e)+'" width="'+t+'" height="'+t+'" fill="black"/>');return o+="</svg>"};g.createImgTag=function(t,e){t=t||2;e=e||t*4;var n=r,o=document.createElement("canvas");o.width=n*t+e*2;o.height=n*t+e*2;var a=o.getContext("2d");a.fillStyle="#fff";a.fillRect(0,0,o.width,o.height);a.fillStyle="#000";for(var i=0;i<n;i++)for(var u=0;u<n;u++)l(i,u)&&a.fillRect(u*t+e,i*t+e,t,t);return o};return g};
+            // Simplified QR encoder
+            window._makeQR=function(text,size){var el=document.getElementById('qrcode-container');if(!el)return;el.innerHTML='';
+            // Use Google Charts API as reliable fallback for QR generation
+            var img=document.createElement('img');
+            img.src='https://chart.googleapis.com/chart?cht=qr&chs='+(size||250)+'x'+(size||250)+'&chl='+encodeURIComponent(text)+'&choe=UTF-8&chld=H|2';
+            img.alt='QR Code Co-Piloto Braziliana';img.id='qrcode-img';img.style.width=(size||250)+'px';img.style.height=(size||250)+'px';
+            el.appendChild(img);
+            // Also create canvas for download
+            img.onload=function(){var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.id='qrcode-canvas';c.style.display='none';var ctx=c.getContext('2d');ctx.drawImage(img,0,0);el.appendChild(c)};
+            };
+            document.addEventListener('DOMContentLoaded',function(){window._makeQR('<?= addslashes($qrUrl) ?>',250)});
+
+            function downloadQRCode(format) {
+                if (format === 'svg') {
+                    // Download como SVG via Google Charts
+                    var a = document.createElement('a');
+                    a.href = 'https://chart.googleapis.com/chart?cht=qr&chs=500x500&chl=<?= urlencode($qrUrl) ?>&choe=UTF-8&chld=H|2';
+                    a.download = 'qrcode-copiloto-braziliana.png';
+                    a.target = '_blank';
+                    a.click();
+                    return;
+                }
+                var canvas = document.getElementById('qrcode-canvas');
+                if (canvas) {
+                    var a = document.createElement('a');
+                    a.href = canvas.toDataURL('image/png');
+                    a.download = 'qrcode-copiloto-braziliana.png';
+                    a.click();
+                } else {
+                    alert('QR Code ainda carregando, tente novamente.');
+                }
+            }
+            function copyQRUrl() {
+                navigator.clipboard.writeText('<?= addslashes($qrUrl) ?>');
+                var btn = event.target.closest('button');
+                var orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copiado!';
+                setTimeout(function() { btn.innerHTML = orig; }, 2000);
+            }
+            </script>
+
             <!-- Info do Cron -->
             <?php
             $cronApiKey = $configs['api_key_claude'] ?? '';

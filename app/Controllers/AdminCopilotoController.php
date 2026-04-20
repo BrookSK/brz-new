@@ -42,6 +42,7 @@ class AdminCopilotoController extends Controller {
             'cambio_usd_brl' => (string) max(0.01, (float) $request->getParam('cambio_usd_brl', 5.80)),
             'gatilho_tempo_ms' => (string) max(5000, (int) $request->getParam('gatilho_tempo_ms', 30000)),
             'max_historico_enviado' => (string) max(1, (int) $request->getParam('max_historico_enviado', 10)),
+            'qrcode_mensagem' => trim((string) $request->getParam('copiloto_qrcode_mensagem', '')),
         ];
 
         // Sincronizar 'ativo' com 'modo'
