@@ -176,7 +176,7 @@
             <?php
             $baseUrl = (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br');
             $qrUrl = $baseUrl . '/?bri=1';
-            $msgBoasVindas = $configs['qrcode_mensagem'] ?? 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉
+            $msgBoasVindas = !empty($configs['qrcode_mensagem']) ? $configs['qrcode_mensagem'] : 'Oi! Vi que você veio pelo nosso QR Code! 😊🎉
 
 Eu sou a Bri, sua assistente de compras da Braziliana. Posso te ajudar com tudo:
 
