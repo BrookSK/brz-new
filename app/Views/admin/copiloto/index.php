@@ -170,7 +170,6 @@
                         <i class="fas fa-save me-2"></i>Salvar Configurações
                     </button>
                 </div>
-            </form>
 
             <!-- QR Code do Co-Piloto -->
             <?php
@@ -309,6 +308,8 @@ Pode mandar sua dúvida ou o que você procura! 💚';
                 setTimeout(function() { btn.innerHTML = orig; }, 2000);
             }
             </script>
+
+            </form>
 
             <!-- Info do Cron -->
             <?php
