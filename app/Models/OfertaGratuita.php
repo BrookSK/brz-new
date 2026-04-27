@@ -162,6 +162,9 @@ class OfertaGratuita extends Model {
         if (!in_array('elegivel_oferta_gratis', $cols, true)) return null;
 
         try {
+            // Regra de preço por peso:
+            // - Produto até ~1kg (weight < 2): máximo $5
+            // - Produto 2kg+  (weight >= 2):   máximo $10
             $sql = "
                 SELECT id, name, price, weight, stock, category_id, foto_principal
                 FROM produtos 
@@ -174,6 +177,10 @@ class OfertaGratuita extends Model {
                   AND (grupo_compras_id IS NULL OR grupo_compras_id = 0)
                   AND (oculto IS NULL OR oculto = 0)
                   AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
+                  AND (
+                      (weight < 2 AND price <= 5)
+                      OR (weight >= 2 AND price <= 10)
+                  )
             ";
             $params = [$categoriaId];
 
@@ -261,6 +268,7 @@ class OfertaGratuita extends Model {
         try {
             // Marcar como elegíveis: produtos do site (sem grupo de compras), ativos, publicados, peso >= 0.5 kg, com estoque
             // Exclui produtos ocultos e de assessoria (SKU ASS-*)
+            // Regra de preço: até ~1.9kg max $5, 2kg+ max $10
             $stmt = $this->connection->prepare("
                 UPDATE produtos 
                 SET elegivel_oferta_gratis = 1 
@@ -272,13 +280,17 @@ class OfertaGratuita extends Model {
                   AND (oculto IS NULL OR oculto = 0)
                   AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
                   AND (attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
+                  AND (
+                      (weight < 2 AND price <= 5)
+                      OR (weight >= 2 AND price <= 10)
+                  )
                   AND elegivel_oferta_gratis = 0
             ");
             $stmt->execute();
             $adicionados = $stmt->rowCount();
 
             // Remover elegibilidade de produtos que não atendem mais os critérios
-            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, sem estoque, ocultos, assessoria)
+            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, sem estoque, ocultos, assessoria, fora da faixa de preço)
             $stmt = $this->connection->prepare("
                 UPDATE produtos 
                 SET elegivel_oferta_gratis = 0 
@@ -292,6 +304,8 @@ class OfertaGratuita extends Model {
                       OR (oculto IS NOT NULL AND oculto = 1)
                       OR (sku IS NOT NULL AND sku LIKE 'ASS-%')
                       OR (attributes IS NOT NULL AND attributes LIKE '%\"fonte\":\"assessoria\"%')
+                      OR (weight < 2 AND price > 5)
+                      OR (weight >= 2 AND price > 10)
                   )
             ");
             $stmt->execute();
