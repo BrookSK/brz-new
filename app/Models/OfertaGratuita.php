@@ -172,6 +172,8 @@ class OfertaGratuita extends Model {
                   AND stock > 0
                   AND weight >= 0.5
                   AND (grupo_compras_id IS NULL OR grupo_compras_id = 0)
+                  AND (oculto IS NULL OR oculto = 0)
+                  AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
             ";
             $params = [$categoriaId];
 
@@ -258,6 +260,7 @@ class OfertaGratuita extends Model {
 
         try {
             // Marcar como elegíveis: produtos do site (sem grupo de compras), ativos, publicados, peso >= 0.5 kg, com estoque
+            // Exclui produtos ocultos e de assessoria (SKU ASS-*)
             $stmt = $this->connection->prepare("
                 UPDATE produtos 
                 SET elegivel_oferta_gratis = 1 
@@ -266,13 +269,16 @@ class OfertaGratuita extends Model {
                   AND status = 'published'
                   AND weight >= 0.5
                   AND stock > 0
+                  AND (oculto IS NULL OR oculto = 0)
+                  AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
+                  AND (attributes IS NULL OR attributes NOT LIKE '%\"fonte\":\"assessoria\"%')
                   AND elegivel_oferta_gratis = 0
             ");
             $stmt->execute();
             $adicionados = $stmt->rowCount();
 
             // Remover elegibilidade de produtos que não atendem mais os critérios
-            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, sem estoque, etc.)
+            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, sem estoque, ocultos, assessoria)
             $stmt = $this->connection->prepare("
                 UPDATE produtos 
                 SET elegivel_oferta_gratis = 0 
@@ -283,6 +289,9 @@ class OfertaGratuita extends Model {
                       OR status != 'published'
                       OR weight < 0.5
                       OR stock <= 0
+                      OR (oculto IS NOT NULL AND oculto = 1)
+                      OR (sku IS NOT NULL AND sku LIKE 'ASS-%')
+                      OR (attributes IS NOT NULL AND attributes LIKE '%\"fonte\":\"assessoria\"%')
                   )
             ");
             $stmt->execute();

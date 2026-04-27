@@ -366,6 +366,8 @@ class AdminOfertaGratuitaController extends Controller {
                       AND weight >= 0.5
                       AND stock > 0
                       AND (grupo_compras_id IS NULL OR grupo_compras_id = 0)
+                      AND (oculto IS NULL OR oculto = 0)
+                      AND (sku IS NULL OR sku NOT LIKE 'ASS-%')
                     ORDER BY name ASC LIMIT 20
                 ");
                 $stmt->execute(['%' . $q . '%', (int) $q]);
