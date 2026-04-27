@@ -632,23 +632,51 @@
                 return resolve()
               }
 
-              // 3. Marcar termos e produtos
+              // 3. Marcar termos e produtos — usar jQuery trigger se disponível (a página usa jQuery)
               var termosCheckbox = qs('#termosAceitos')
-              if (termosCheckbox && !termosCheckbox.checked) { termosCheckbox.checked = true; termosCheckbox.dispatchEvent(new Event('change', {bubbles:true})) }
-              document.querySelectorAll('.product-checkbox').forEach(function(cb) { if (!cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', {bubbles:true})) } })
+              if (termosCheckbox && !termosCheckbox.checked) {
+                termosCheckbox.checked = true
+                if (typeof jQuery !== 'undefined') jQuery('#termosAceitos').trigger('change')
+                else termosCheckbox.dispatchEvent(new Event('change', {bubbles:true}))
+              }
+              document.querySelectorAll('.product-checkbox').forEach(function(cb) {
+                if (!cb.checked) {
+                  cb.checked = true
+                  if (typeof jQuery !== 'undefined') jQuery(cb).trigger('change')
+                  else cb.dispatchEvent(new Event('change', {bubbles:true}))
+                }
+              })
+              // Forçar recálculo dos totais se a função existir
+              if (typeof window.calcularTotaisSelecionados === 'function') {
+                window.calcularTotaisSelecionados()
+              } else if (typeof jQuery !== 'undefined') {
+                // Trigger change no checkbox de termos para forçar recálculo
+                jQuery('#termosAceitos').trigger('change')
+              }
 
               // 4. Tentar clicar no botão nativo
               var btnAddCart = qs('#addToCartBtn')
               if (btnAddCart) {
                 setTimeout(function() {
+                  // Forçar habilitar o botão se ainda estiver desabilitado
                   if (btnAddCart.disabled) {
-                    adicionarMsg('assistant', '⚠️ O botão está desabilitado. Verifique se aceitou os termos e selecionou as variações na página.')
-                    return resolve()
+                    // Tentar trigger jQuery novamente
+                    if (typeof jQuery !== 'undefined') {
+                      jQuery('#termosAceitos').prop('checked', true).trigger('change')
+                      jQuery('.product-checkbox').prop('checked', true).trigger('change')
+                    }
                   }
-                  adicionarMsg('assistant', '🛒 Aceitando termos e adicionando ao carrinho...')
-                  btnAddCart.click()
-                  setTimeout(function() { resolve() }, 3000)
-                }, 300)
+                  // Aguardar mais um pouco para o recálculo
+                  setTimeout(function() {
+                    if (btnAddCart.disabled) {
+                      // Forçar habilitar como último recurso
+                      btnAddCart.disabled = false
+                    }
+                    adicionarMsg('assistant', '🛒 Aceitando termos e adicionando ao carrinho...')
+                    btnAddCart.click()
+                    setTimeout(function() { resolve() }, 3000)
+                  }, 500)
+                }, 500)
               } else {
                 // Fallback API
                 var orcamentoId = null
