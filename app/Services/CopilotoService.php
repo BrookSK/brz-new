@@ -1,7 +1,7 @@
 <?php
 namespace App\Services;
 
-// Invalidar OPcache para garantir código atualizado (v2)
+// Invalidar OPcache para garantir código atualizado (v3-variações-fix)
 if (function_exists('opcache_invalidate')) { @opcache_invalidate(__FILE__, true); }
 
 use Config\Database;
@@ -490,6 +490,12 @@ REGRAS:
    - 🇧🇷 Impostos para Brasil: II + ICMS 17% (já calculados e pré-pagos no checkout, sem surpresa na entrega)
    - 🌍 Impostos para outros países: NÃO inclusos, responsabilidade do cliente no destino
    - Isso ajuda o cliente a ter uma visão completa do custo antes de decidir comprar.
+11. VARIAÇÕES DE PRODUTOS NO ORÇAMENTO: NUNCA invente variações (cor, tamanho, etc.) de produtos.
+   - Se o contexto mostra variações pendentes com opções listadas → pergunte ao cliente usando APENAS as opções do contexto
+   - Se o contexto mostra "✅ Nenhuma variação pendente" ou não menciona variações → o produto já está definido, NÃO pergunte sobre cor/tamanho
+   - Se o contexto não tem informação sobre variações → assuma que não tem variações e prossiga normalmente
+   - NUNCA diga "o sistema obriga a selecionar cor" se o contexto não mostra variações pendentes
+   - Quando o cliente pedir "add no carrinho" na página de orçamento → use acao: aceitar_termos_assessoria (o sistema cuida das variações automaticamente)
 7. PRIORIDADE: RESOLVER TUDO PELO CHAT. A Bri deve tentar responder e resolver todas as dúvidas do cliente diretamente. NÃO fique oferecendo WhatsApp ou ticket a toda hora. Só direcione para outro canal quando:
    - Algo falhar tecnicamente no chat (ex: orçamento deu erro repetido) → WhatsApp
    - O cliente PEDIR para falar com um humano → WhatsApp
