@@ -170,6 +170,8 @@ class OfertaGratuita extends Model {
                   AND active = 1 
                   AND status = 'published'
                   AND stock > 0
+                  AND weight >= 0.5
+                  AND (grupo_compras_id IS NULL OR grupo_compras_id = 0)
             ";
             $params = [$categoriaId];
 
@@ -220,7 +222,7 @@ class OfertaGratuita extends Model {
             $total = (int) $stmtCount->fetchColumn();
 
             $stmt = $this->connection->prepare("
-                SELECT p.id, p.name, p.price, p.stock, p.active, p.status, p.category_id, p.foto_principal,
+                SELECT p.id, p.name, p.price, p.stock, p.weight, p.active, p.status, p.category_id, p.foto_principal,
                        c.name AS categoria_nome
                 FROM produtos p
                 LEFT JOIN categorias c ON c.id = p.category_id
@@ -238,6 +240,59 @@ class OfertaGratuita extends Model {
             ];
         } catch (\Exception $e) {
             return ['items' => [], 'total' => 0];
+        }
+    }
+
+    /**
+     * Sincroniza produtos do site (sem grupo de compras) com peso >= 500g como elegíveis.
+     * Retorna array com contadores de adicionados e removidos.
+     */
+    public function sincronizarProdutosSite(): array {
+        $cols = $this->getTableColumns('produtos');
+        if (!in_array('elegivel_oferta_gratis', $cols, true)) {
+            return ['adicionados' => 0, 'removidos' => 0, 'total' => 0];
+        }
+
+        $adicionados = 0;
+        $removidos = 0;
+
+        try {
+            // Marcar como elegíveis: produtos do site (sem grupo de compras), ativos, publicados, peso >= 0.5 kg
+            $stmt = $this->connection->prepare("
+                UPDATE produtos 
+                SET elegivel_oferta_gratis = 1 
+                WHERE (grupo_compras_id IS NULL OR grupo_compras_id = 0)
+                  AND active = 1 
+                  AND status = 'published'
+                  AND weight >= 0.5
+                  AND elegivel_oferta_gratis = 0
+            ");
+            $stmt->execute();
+            $adicionados = $stmt->rowCount();
+
+            // Remover elegibilidade de produtos que não atendem mais os critérios
+            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, etc.)
+            $stmt = $this->connection->prepare("
+                UPDATE produtos 
+                SET elegivel_oferta_gratis = 0 
+                WHERE elegivel_oferta_gratis = 1
+                  AND (
+                      (grupo_compras_id IS NOT NULL AND grupo_compras_id > 0)
+                      OR active != 1
+                      OR status != 'published'
+                      OR weight < 0.5
+                  )
+            ");
+            $stmt->execute();
+            $removidos = $stmt->rowCount();
+
+            // Contar total atual
+            $stmtTotal = $this->connection->query("SELECT COUNT(*) FROM produtos WHERE elegivel_oferta_gratis = 1");
+            $total = (int) $stmtTotal->fetchColumn();
+
+            return ['adicionados' => $adicionados, 'removidos' => $removidos, 'total' => $total];
+        } catch (\Exception $e) {
+            return ['adicionados' => 0, 'removidos' => 0, 'total' => 0, 'erro' => $e->getMessage()];
         }
     }
 

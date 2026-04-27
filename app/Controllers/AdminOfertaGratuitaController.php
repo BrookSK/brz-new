@@ -87,6 +87,17 @@ class AdminOfertaGratuitaController extends Controller {
             <div class="col-md-4"><div class="card text-center"><div class="card-body"><h5 class="text-danger">' . $stats['removidas'] . '</h5><small class="text-muted">Removidas do Carrinho</small></div></div></div>
         </div>';
 
+        // Sincronização automática
+        echo '<div class="card mb-4">
+            <div class="card-header bg-white"><strong><i class="fas fa-sync-alt"></i> Sincronização Automática</strong></div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">Marca automaticamente como elegíveis todos os produtos do catálogo do site (sem grupo de compras) com peso &ge; 500g. Produtos que não atendem mais os critérios são removidos.</p>
+                <form method="POST" action="/admin/oferta-gratuita/sincronizar" class="d-inline">
+                    <button type="submit" class="btn btn-outline-success" onclick="return confirm(\'Sincronizar produtos do site com peso >= 500g como elegíveis para oferta gratuita?\')"><i class="fas fa-sync-alt me-1"></i> Sincronizar Produtos do Site</button>
+                </form>
+            </div>
+        </div>';
+
         // Lista de produtos elegíveis
         echo '<div class="card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -100,7 +111,7 @@ class AdminOfertaGratuitaController extends Controller {
         } else {
             echo '<div class="table-responsive"><table class="table table-hover align-middle">
                 <thead><tr>
-                    <th>ID</th><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th>
+                    <th>ID</th><th>Produto</th><th>Categoria</th><th>Peso</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th>
                 </tr></thead><tbody>';
 
             foreach ($produtos as $p) {
@@ -110,11 +121,17 @@ class AdminOfertaGratuitaController extends Controller {
                 $stockBadge = ((int) ($p['stock'] ?? 0) > 0)
                     ? '<span class="badge bg-info">' . (int) $p['stock'] . '</span>'
                     : '<span class="badge bg-danger">Sem estoque</span>';
+                $pesoKg = (float) ($p['weight'] ?? 0);
+                $pesoG = round($pesoKg * 1000);
+                $pesoBadge = $pesoKg >= 0.5
+                    ? '<span class="badge bg-success">' . $pesoG . 'g</span>'
+                    : '<span class="badge bg-warning">' . $pesoG . 'g</span>';
 
                 echo '<tr>
                     <td>' . (int) $p['id'] . '</td>
                     <td>' . htmlspecialchars((string) ($p['name'] ?? '')) . '</td>
                     <td>' . htmlspecialchars((string) ($p['categoria_nome'] ?? 'Sem categoria')) . '</td>
+                    <td>' . $pesoBadge . '</td>
                     <td>$ ' . number_format((float) ($p['price'] ?? 0), 2) . '</td>
                     <td>' . $stockBadge . '</td>
                     <td>' . $statusBadge . '</td>
@@ -267,6 +284,32 @@ class AdminOfertaGratuitaController extends Controller {
     }
 
     /**
+     * Sincronizar produtos do site (sem grupo de compras, peso >= 500g) como elegíveis
+     */
+    public function sincronizar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $model = new OfertaGratuita();
+        $result = $model->sincronizarProdutosSite();
+
+        if (session_status() === PHP_SESSION_NONE) session_start();
+
+        if (isset($result['erro'])) {
+            $_SESSION['message'] = 'Erro na sincronização: ' . $result['erro'];
+            $_SESSION['message_type'] = 'danger';
+        } else {
+            $msg = 'Sincronização concluída: ' . $result['adicionados'] . ' produto(s) adicionado(s), '
+                 . $result['removidos'] . ' removido(s). Total elegíveis: ' . $result['total'] . '.';
+            $_SESSION['message'] = $msg;
+            $_SESSION['message_type'] = 'success';
+        }
+
+        header('Location: /admin/oferta-gratuita');
+        exit;
+    }
+
+    /**
      * Buscar produtos para adicionar (AJAX)
      */
     public function buscarProdutos(Request $request) {
@@ -280,11 +323,13 @@ class AdminOfertaGratuitaController extends Controller {
             try {
                 $pdo = Database::getConnection();
                 $stmt = $pdo->prepare("
-                    SELECT id, name, price, stock, active, status
+                    SELECT id, name, price, stock, weight, active, status
                     FROM produtos 
                     WHERE (name LIKE ? OR id = ?)
                       AND active = 1 AND status = 'published'
                       AND (elegivel_oferta_gratis = 0 OR elegivel_oferta_gratis IS NULL)
+                      AND weight >= 0.5
+                      AND (grupo_compras_id IS NULL OR grupo_compras_id = 0)
                     ORDER BY name ASC LIMIT 20
                 ");
                 $stmt->execute(['%' . $q . '%', (int) $q]);
