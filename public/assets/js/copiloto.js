@@ -1181,7 +1181,8 @@
       '<div id="bz-copiloto-badge" style="display:none"></div>' +
       '<div id="bz-copiloto-panel" style="display:none" role="dialog" aria-label="Co-Piloto Braziliana">' +
         '<div id="bz-copiloto-header"><div class="bz-header-info"><strong>Bri</strong><small>Co-Piloto Braziliana</small></div>' +
-        '<button id="bz-copiloto-close" aria-label="Fechar">&times;</button></div>' +
+        '<div class="bz-header-actions"><button id="bz-copiloto-clear" aria-label="Limpar conversa" title="Limpar conversa">🗑</button>' +
+        '<button id="bz-copiloto-close" aria-label="Fechar">&times;</button></div></div>' +
         '<div id="bz-copiloto-messages"></div>' +
         '<div id="bz-copiloto-input-area">' +
           '<input type="text" id="bz-copiloto-input" placeholder="Fala comigo..." maxlength="2000" autocomplete="off" />' +
@@ -1191,6 +1192,7 @@
 
     var launcher = document.getElementById('bz-copiloto-launcher')
     var closeBtn = document.getElementById('bz-copiloto-close')
+    var clearBtn = document.getElementById('bz-copiloto-clear')
     var sendBtn = document.getElementById('bz-copiloto-send')
     var input = document.getElementById('bz-copiloto-input')
     var badge = document.getElementById('bz-copiloto-badge')
@@ -1198,12 +1200,23 @@
     launcher.addEventListener('click', function () { toggle() })
     launcher.addEventListener('keydown', function (e) { if (e.key === 'Enter') toggle() })
     closeBtn.addEventListener('click', function () { fechar() })
+    clearBtn.addEventListener('click', function () { limparChat() })
     sendBtn.addEventListener('click', function () { enviarMensagem() })
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem() } })
     badge.addEventListener('click', function () { badge.style.display = 'none'; abrir() })
   }
 
   function toggle () { widgetAberto ? fechar() : abrir() }
+  function limparChat () {
+    historico = []
+    ultimaBusca = []
+    ultimoProdutoAdicionado = null
+    var msgs = document.getElementById('bz-copiloto-messages')
+    if (msgs) msgs.innerHTML = ''
+    localStorage.removeItem(STORAGE.historico)
+    localStorage.removeItem(STORAGE.estado_pendente)
+    adicionarMsg('assistant', 'Oi! Sou a Bri, sua copiloto de compras na Braziliana. 😊\n\nPosso te ajudar com:\n🛍️ Buscar e adicionar produtos ao carrinho\n🔗 Orçar produtos de qualquer loja dos EUA (assessoria)\n💰 Calcular valores com taxas e impostos\n📦 Consultar status dos seus pedidos\n🛒 Finalizar compras pelo checkout\n❓ Tirar dúvidas sobre como funciona\n\nMe conta o que você precisa! 💚')
+  }
   function abrir () {
     widgetAberto = true
     document.getElementById('bz-copiloto-panel').style.display = 'flex'
@@ -1323,6 +1336,8 @@
       '#bz-copiloto-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#0b1f3a 0%,#1d4ed8 100%);color:#fff}' +
       '.bz-header-info strong{display:block;font-size:14px}.bz-header-info small{opacity:.8;font-size:11px}' +
       '#bz-copiloto-close{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:0 2px;line-height:1;opacity:.8}#bz-copiloto-close:hover{opacity:1}' +
+      '.bz-header-actions{display:flex;align-items:center;gap:4px}' +
+      '#bz-copiloto-clear{background:none;border:none;color:#fff;font-size:14px;cursor:pointer;padding:2px 4px;line-height:1;opacity:.5;border-radius:4px}#bz-copiloto-clear:hover{opacity:1;background:rgba(255,255,255,.15)}' +
       '#bz-copiloto-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}' +
       '.bz-msg{display:flex}.bz-msg-user{justify-content:flex-end}.bz-msg-assistant{justify-content:flex-start}' +
       '.bz-msg-bubble{max-width:88%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.45;word-wrap:break-word}' +
