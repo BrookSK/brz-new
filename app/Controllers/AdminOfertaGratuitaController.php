@@ -146,6 +146,41 @@ class AdminOfertaGratuitaController extends Controller {
             }
 
             echo '</tbody></table></div>';
+
+            // Paginação
+            $perPage = 50;
+            $totalPages = max(1, (int) ceil($total / $perPage));
+            if ($totalPages > 1) {
+                echo '<nav class="mt-3"><ul class="pagination pagination-sm justify-content-center mb-0">';
+                // Anterior
+                if ($page > 1) {
+                    echo '<li class="page-item"><a class="page-link" href="/admin/oferta-gratuita?page=' . ($page - 1) . '">&laquo;</a></li>';
+                } else {
+                    echo '<li class="page-item disabled"><span class="page-link">&laquo;</span></li>';
+                }
+                // Páginas
+                $start = max(1, $page - 3);
+                $end = min($totalPages, $page + 3);
+                if ($start > 1) {
+                    echo '<li class="page-item"><a class="page-link" href="/admin/oferta-gratuita?page=1">1</a></li>';
+                    if ($start > 2) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                }
+                for ($i = $start; $i <= $end; $i++) {
+                    $active = $i === $page ? ' active' : '';
+                    echo '<li class="page-item' . $active . '"><a class="page-link" href="/admin/oferta-gratuita?page=' . $i . '">' . $i . '</a></li>';
+                }
+                if ($end < $totalPages) {
+                    if ($end < $totalPages - 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                    echo '<li class="page-item"><a class="page-link" href="/admin/oferta-gratuita?page=' . $totalPages . '">' . $totalPages . '</a></li>';
+                }
+                // Próximo
+                if ($page < $totalPages) {
+                    echo '<li class="page-item"><a class="page-link" href="/admin/oferta-gratuita?page=' . ($page + 1) . '">&raquo;</a></li>';
+                } else {
+                    echo '<li class="page-item disabled"><span class="page-link">&raquo;</span></li>';
+                }
+                echo '</ul></nav>';
+            }
         }
 
         echo '</div></div>';
@@ -329,6 +364,7 @@ class AdminOfertaGratuitaController extends Controller {
                       AND active = 1 AND status = 'published'
                       AND (elegivel_oferta_gratis = 0 OR elegivel_oferta_gratis IS NULL)
                       AND weight >= 0.5
+                      AND stock > 0
                       AND (grupo_compras_id IS NULL OR grupo_compras_id = 0)
                     ORDER BY name ASC LIMIT 20
                 ");

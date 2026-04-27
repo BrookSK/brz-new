@@ -257,7 +257,7 @@ class OfertaGratuita extends Model {
         $removidos = 0;
 
         try {
-            // Marcar como elegíveis: produtos do site (sem grupo de compras), ativos, publicados, peso >= 0.5 kg
+            // Marcar como elegíveis: produtos do site (sem grupo de compras), ativos, publicados, peso >= 0.5 kg, com estoque
             $stmt = $this->connection->prepare("
                 UPDATE produtos 
                 SET elegivel_oferta_gratis = 1 
@@ -265,13 +265,14 @@ class OfertaGratuita extends Model {
                   AND active = 1 
                   AND status = 'published'
                   AND weight >= 0.5
+                  AND stock > 0
                   AND elegivel_oferta_gratis = 0
             ");
             $stmt->execute();
             $adicionados = $stmt->rowCount();
 
             // Remover elegibilidade de produtos que não atendem mais os critérios
-            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, etc.)
+            // (ficaram inativos, mudaram de peso, foram vinculados a grupo de compras, sem estoque, etc.)
             $stmt = $this->connection->prepare("
                 UPDATE produtos 
                 SET elegivel_oferta_gratis = 0 
@@ -281,6 +282,7 @@ class OfertaGratuita extends Model {
                       OR active != 1
                       OR status != 'published'
                       OR weight < 0.5
+                      OR stock <= 0
                   )
             ");
             $stmt->execute();
