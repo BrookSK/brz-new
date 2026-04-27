@@ -139,6 +139,7 @@ $router->get('/admin/resumo-financeiro', 'AdminComissoesGlobalController', 'resu
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
 $router->post('/admin/oferta-gratuita/toggle-global', 'AdminOfertaGratuitaController', 'toggleGlobal');
 $router->post('/admin/oferta-gratuita/sincronizar', 'AdminOfertaGratuitaController', 'sincronizar');
+$router->post('/admin/oferta-gratuita/acao-massa', 'AdminOfertaGratuitaController', 'acaoMassa');
 $router->post('/admin/oferta-gratuita/adicionar', 'AdminOfertaGratuitaController', 'adicionar');
 $router->post('/admin/oferta-gratuita/remover', 'AdminOfertaGratuitaController', 'remover');
 $router->get('/admin/oferta-gratuita/buscar-produtos', 'AdminOfertaGratuitaController', 'buscarProdutos');

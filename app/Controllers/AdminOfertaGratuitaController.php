@@ -27,6 +27,13 @@ class AdminOfertaGratuitaController extends Controller {
         $produtos = $result['items'];
         $total = $result['total'];
 
+        // Buscar categorias para ação em massa
+        $categorias = [];
+        try {
+            $stCat = $pdo->query("SELECT id, name FROM categorias ORDER BY name ASC");
+            $categorias = $stCat ? ($stCat->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Exception $e) {}
+
         // Buscar estatísticas
         $stats = ['aceitas' => 0, 'recusadas' => 0, 'removidas' => 0];
         try {
@@ -109,8 +116,24 @@ class AdminOfertaGratuitaController extends Controller {
         if (empty($produtos)) {
             echo '<div class="text-muted text-center py-4">Nenhum produto marcado como elegível para oferta gratuita.</div>';
         } else {
+            // Barra de ação em massa
+            echo '<div id="bulkBar" class="alert alert-info d-none align-items-center gap-3 mb-3">
+                <span><strong id="bulkCount">0</strong> produto(s) selecionado(s)</span>
+                <form method="POST" action="/admin/oferta-gratuita/acao-massa" class="d-flex align-items-center gap-2 ms-auto" id="bulkForm">
+                    <input type="hidden" name="produto_ids" id="bulkIds" value="">
+                    <select name="categoria_id" class="form-select form-select-sm" style="width:auto;" required>
+                        <option value="">Alterar categoria para...</option>';
+            foreach ($categorias as $cat) {
+                echo '<option value="' . (int) $cat['id'] . '">' . htmlspecialchars($cat['name']) . '</option>';
+            }
+            echo '</select>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save me-1"></i> Aplicar</button>
+                </form>
+            </div>';
+
             echo '<div class="table-responsive"><table class="table table-hover align-middle">
                 <thead><tr>
+                    <th style="width:40px"><input type="checkbox" id="checkAll" class="form-check-input"></th>
                     <th>ID</th><th>Produto</th><th>Categoria</th><th>Peso</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th>
                 </tr></thead><tbody>';
 
@@ -128,6 +151,7 @@ class AdminOfertaGratuitaController extends Controller {
                     : '<span class="badge bg-warning">' . $pesoG . 'g</span>';
 
                 echo '<tr>
+                    <td><input type="checkbox" class="form-check-input bulk-check" value="' . (int) $p['id'] . '"></td>
                     <td>' . (int) $p['id'] . '</td>
                     <td>' . htmlspecialchars((string) ($p['name'] ?? '')) . '</td>
                     <td>' . htmlspecialchars((string) ($p['categoria_nome'] ?? 'Sem categoria')) . '</td>
@@ -202,6 +226,53 @@ class AdminOfertaGratuitaController extends Controller {
         </div>';
 
         echo '<script>
+        // Ação em massa: checkboxes
+        (function() {
+            var checkAll = document.getElementById("checkAll");
+            var bulkBar = document.getElementById("bulkBar");
+            var bulkCount = document.getElementById("bulkCount");
+            var bulkIds = document.getElementById("bulkIds");
+            var bulkForm = document.getElementById("bulkForm");
+
+            function updateBulk() {
+                var checks = document.querySelectorAll(".bulk-check:checked");
+                var ids = [];
+                checks.forEach(function(c) { ids.push(c.value); });
+                bulkIds.value = ids.join(",");
+                bulkCount.textContent = ids.length;
+                if (ids.length > 0) {
+                    bulkBar.classList.remove("d-none");
+                    bulkBar.classList.add("d-flex");
+                } else {
+                    bulkBar.classList.add("d-none");
+                    bulkBar.classList.remove("d-flex");
+                }
+            }
+
+            if (checkAll) {
+                checkAll.addEventListener("change", function() {
+                    document.querySelectorAll(".bulk-check").forEach(function(c) { c.checked = checkAll.checked; });
+                    updateBulk();
+                });
+            }
+            document.querySelectorAll(".bulk-check").forEach(function(c) {
+                c.addEventListener("change", function() {
+                    var total = document.querySelectorAll(".bulk-check").length;
+                    var checked = document.querySelectorAll(".bulk-check:checked").length;
+                    if (checkAll) checkAll.checked = (checked === total);
+                    updateBulk();
+                });
+            });
+
+            if (bulkForm) {
+                bulkForm.addEventListener("submit", function(e) {
+                    var sel = bulkForm.querySelector("select[name=categoria_id]");
+                    if (!sel.value) { e.preventDefault(); alert("Selecione uma categoria."); return; }
+                    if (!bulkIds.value) { e.preventDefault(); alert("Selecione ao menos um produto."); return; }
+                });
+            }
+        })();
+
         document.getElementById("buscaProduto")?.addEventListener("input", async function() {
             const q = this.value.trim();
             const container = document.getElementById("resultadosBusca");
@@ -338,6 +409,44 @@ class AdminOfertaGratuitaController extends Controller {
                  . $result['removidos'] . ' removido(s). Total elegíveis: ' . $result['total'] . '.';
             $_SESSION['message'] = $msg;
             $_SESSION['message_type'] = 'success';
+        }
+
+        header('Location: /admin/oferta-gratuita');
+        exit;
+    }
+
+    /**
+     * Ação em massa: alterar categoria dos produtos selecionados
+     */
+    public function acaoMassa(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        $ids = array_filter(array_map('intval', explode(',', (string) $request->getParam('produto_ids', ''))));
+        $categoriaId = (int) $request->getParam('categoria_id', 0);
+
+        if (session_status() === PHP_SESSION_NONE) session_start();
+
+        if (empty($ids) || $categoriaId <= 0) {
+            $_SESSION['message'] = 'Selecione produtos e uma categoria.';
+            $_SESSION['message_type'] = 'warning';
+            header('Location: /admin/oferta-gratuita');
+            exit;
+        }
+
+        try {
+            $pdo = Database::getConnection();
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $params = array_merge([$categoriaId], $ids);
+            $stmt = $pdo->prepare("UPDATE produtos SET category_id = ? WHERE id IN ($placeholders)");
+            $stmt->execute($params);
+            $affected = $stmt->rowCount();
+
+            $_SESSION['message'] = "Categoria atualizada em {$affected} produto(s).";
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            $_SESSION['message'] = 'Erro ao atualizar categoria: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
         }
 
         header('Location: /admin/oferta-gratuita');
