@@ -973,12 +973,11 @@
         // Renderizar carrossel de cards
         renderizarCarrosselProdutos(d.produtos)
       } else {
-        if (!skipBuscandoMsg) {
-          var msgNaoEncontrou = termo.match(/^price:/)
-            ? 'Não encontrei produtos nessa faixa de preço. Quer tentar outro valor ou ver os Grupos de Compras?'
-            : 'Não encontrei "' + termo + '" no catálogo. Quer que eu te leve para os Grupos de Compras?'
-          adicionarMsg('assistant', msgNaoEncontrou)
-        }
+        // SEMPRE mostrar mensagem de não encontrado, mesmo quando chamado via ação
+        var msgNaoEncontrou = termo.match(/^price:/)
+          ? 'Não encontrei produtos nessa faixa de preço no catálogo. Quer tentar outro valor ou me mandar o link do produto pra eu fazer um orçamento de assessoria?'
+          : 'Não encontrei "' + termo + '" no catálogo. Mas posso te ajudar de outra forma!\n\n🔗 Se você tem o link do produto de qualquer loja dos EUA, me manda aqui que eu faço um orçamento completo pra você (assessoria).\n\nOu quer que eu busque outro termo?'
+        adicionarMsg('assistant', msgNaoEncontrou)
       }
     } catch (e) {
       adicionarMsg('assistant', 'Não consegui buscar agora. Tenta de novo?')
@@ -1066,20 +1065,40 @@
   async function gerarOrcamento (links) {
     // Se links não vieram dos parâmetros do Claude, extrair do histórico
     if (!links || links.length === 0) {
-      links = []
+      var linkSet = {}
       for (var i = 0; i < historico.length; i++) {
+        // Só extrair links de mensagens do USUÁRIO (não do assistant que repete)
+        if (historico[i].role !== 'user') continue
         var txt = historico[i].content || ''
         var urlMatches = txt.match(/https?:\/\/[^\s<>"']+/gi)
         if (urlMatches) {
           urlMatches.forEach(function (u) {
-            // Ignorar URLs do próprio site
-            if (u.indexOf('brazilianashop') < 0 && u.indexOf('wa.me') < 0) {
-              links.push(u.replace(/[.,;:!?)]+$/, ''))
+            var cleanUrl = u.replace(/[.,;:!?)]+$/, '')
+            // Ignorar URLs do próprio site e WhatsApp
+            if (cleanUrl.indexOf('brazilianashop') < 0 && cleanUrl.indexOf('wa.me') < 0) {
+              linkSet[cleanUrl] = true
             }
           })
         }
       }
+      links = Object.keys(linkSet)
+    } else {
+      // Deduplicar links passados pelo Claude
+      var seen = {}
+      links = links.filter(function(l) { if (seen[l]) return false; seen[l] = true; return true })
     }
+
+    // Verificar login antes de tentar
+    var loginCheck = verificarLogin()
+    if (!loginCheck) {
+      adicionarMsg('assistant', '⚠️ Você precisa estar logado para gerar um orçamento de assessoria.\n\nFaça login e depois me manda o link novamente que eu gero o orçamento! 😊')
+      // Oferecer navegar para login
+      setTimeout(function() {
+        adicionarMsg('assistant', '👉 [Fazer login](https://brazilianashop.com.br/login)')
+      }, 500)
+      return
+    }
+
     if (links.length === 0) {
       adicionarMsg('assistant', '⚠️ Não encontrei nenhum link de produto na conversa. Me manda os links dos produtos que você quer orçar!')
       return
@@ -1111,10 +1130,10 @@
           window.location.href = orcUrl
         }, 2000)
       } else {
-        adicionarMsg('assistant', '❌ ' + (d.erro || 'Erro ao gerar orçamento'))
+        adicionarMsg('assistant', '❌ ' + (d.erro || d.error || 'Erro ao gerar orçamento.') + '\n\nVerifique se você está logado e tente novamente. Se o problema persistir, me avisa que eu tento de outra forma!')
       }
     } catch (e) {
-      adicionarMsg('assistant', '❌ Erro ao gerar orçamento. Tenta de novo?')
+      adicionarMsg('assistant', '❌ Não consegui gerar o orçamento agora. Verifique se está logado e tente mandar o link novamente!')
     }
   }
 
@@ -1157,7 +1176,7 @@
     localStorage.setItem(STORAGE.aberto, '1')
     var msgs = document.getElementById('bz-copiloto-messages')
     if (msgs.children.length === 0 && historico.length === 0) {
-      adicionarMsg('assistant', 'Oi! Sou a Bri, sua copiloto de compras na Braziliana. 😊\nComo posso te ajudar?')
+      adicionarMsg('assistant', 'Oi! Sou a Bri, sua copiloto de compras na Braziliana. 😊\n\nPosso te ajudar com:\n🛍️ Buscar e adicionar produtos ao carrinho\n🔗 Orçar produtos de qualquer loja dos EUA (assessoria)\n💰 Calcular valores com taxas e impostos\n📦 Consultar status dos seus pedidos\n🛒 Finalizar compras pelo checkout\n❓ Tirar dúvidas sobre como funciona\n\nMe conta o que você precisa! 💚')
     }
     setTimeout(function () { document.getElementById('bz-copiloto-input').focus() }, 100)
     scrollBottom()

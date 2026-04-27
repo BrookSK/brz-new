@@ -796,7 +796,21 @@ class CopilotoApiController extends Controller {
 
             $userId = (int) ($_SESSION['usuario_id'] ?? 0);
             if ($userId <= 0) {
-                $this->responderJson(['erro' => 'Você precisa estar logado'], 401);
+                // Tentar fallback via remember_token
+                if (!empty($_COOKIE['remember_token'])) {
+                    try {
+                        $pdo = \Config\Database::getConnection();
+                        $stUser = $pdo->prepare("SELECT id FROM usuarios WHERE remember_token = ? LIMIT 1");
+                        $stUser->execute([$_COOKIE['remember_token']]);
+                        $userId = (int) ($stUser->fetchColumn() ?: 0);
+                        if ($userId > 0) {
+                            $_SESSION['usuario_id'] = $userId;
+                        }
+                    } catch (\Exception $e) {}
+                }
+                if ($userId <= 0) {
+                    $this->responderJson(['erro' => 'Você precisa estar logado para gerar um orçamento. Faça login e tente novamente.'], 401);
+                }
             }
 
             // Chamar o AssessoriaController diretamente
