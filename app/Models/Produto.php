@@ -6,6 +6,31 @@ use App\Core\Url;
 class Produto extends Model {
     protected $table = 'produtos';
 
+    /**
+     * Retorna o preço promocional se estiver ativo (não expirado).
+     * Se sale_price_expires está definido e já passou, retorna 0 (sem promoção).
+     */
+    private function getPrecoPromocaoAtivo(array $produto): float {
+        $salePrice = floatval($produto['sale_price'] ?? 0);
+        if ($salePrice <= 0) return 0;
+
+        $expires = $produto['sale_price_expires'] ?? null;
+        if (!empty($expires)) {
+            $expiresTime = strtotime($expires);
+            if ($expiresTime !== false && $expiresTime < time()) {
+                // Promoção expirou — limpar no banco de forma assíncrona
+                try {
+                    $this->getConnection()->prepare(
+                        "UPDATE {$this->table} SET sale_price = 0, sale_price_expires = NULL WHERE id = ? AND sale_price_expires IS NOT NULL AND sale_price_expires < NOW()"
+                    )->execute([(int) ($produto['id'] ?? 0)]);
+                } catch (\Exception $e) {}
+                return 0;
+            }
+        }
+
+        return $salePrice;
+    }
+
     private function debugLog(string $message): void {
         $enabled = false;
         if (isset($_ENV['APP_DEBUG'])) {
@@ -49,7 +74,8 @@ class Produto extends Model {
                 'especificacoes' => $produto['specifications'] ?? $produto['especificacoes'] ?? $produto['specs'] ?? '',                'valor' => floatval($produto['price'] ?? 0),
                 'preco' => floatval($produto['price'] ?? 0),
                 'preco_custo' => floatval($produto['cost_price'] ?? 0),
-                'preco_promocao' => floatval($produto['sale_price'] ?? 0),
+                'preco_promocao' => $this->getPrecoPromocaoAtivo($produto),
+                'preco_promocao_expira' => $produto['sale_price_expires'] ?? null,
                 'estoque' => intval($produto['stock'] ?? 0),
                 'estoque_minimo' => intval($produto['min_stock'] ?? 0),
                 'estoque_maximo' => intval($produto['max_stock'] ?? 999999),
@@ -934,5 +960,33 @@ class Produto extends Model {
         $stmt->execute();
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $result['count'] > 0;
+    }
+
+    /**
+     * Expira promoções vencidas: zera sale_price e sale_price_expires de todos os produtos cuja promoção já passou.
+     * Pode ser chamado via cron ou sob demanda.
+     */
+    public function expirarPromocoes(): int {
+        try {
+            $cols = [];
+            try {
+                $st = $this->getConnection()->query('DESCRIBE ' . $this->table);
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Exception $e) { return 0; }
+
+            if (!in_array('sale_price_expires', $cols, true)) return 0;
+
+            $stmt = $this->getConnection()->prepare("
+                UPDATE {$this->table} 
+                SET sale_price = 0, sale_price_expires = NULL 
+                WHERE sale_price_expires IS NOT NULL 
+                  AND sale_price_expires < NOW()
+                  AND sale_price > 0
+            ");
+            $stmt->execute();
+            return $stmt->rowCount();
+        } catch (\Exception $e) {
+            return 0;
+        }
     }
 }

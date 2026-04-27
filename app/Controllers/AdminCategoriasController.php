@@ -434,6 +434,7 @@ class AdminCategoriasController extends Controller {
                         <td><span class="badge bg-' . $badge . '">' . $status . '</span></td>
                         <td>
                             <div class="btn-group" role="group">
+                                <a class="btn btn-sm btn-outline-secondary" href="/admin/produtos?categoria=' . (int) $c['id'] . '" title="Ver produtos desta categoria"><i class="fas fa-box-open"></i></a>
                                 <a class="btn btn-sm btn-outline-primary" href="/admin/categorias/editar/' . (int) $c['id'] . '"><i class="fas fa-edit"></i></a>
                                 <form method="POST" action="/admin/categorias/excluir/' . (int) $c['id'] . '" onsubmit="return confirm(\'Excluir esta categoria?\');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>

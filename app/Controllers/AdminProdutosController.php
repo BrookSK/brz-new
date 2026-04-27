@@ -1955,6 +1955,15 @@ class AdminProdutosController extends Controller {
             $data['sale_price'] = null;
         }
 
+        // Data limite da promoção (opcional)
+        $salePriceExpiresRaw = trim((string) $request->getParam('sale_price_expires', ''));
+        if ($salePriceExpiresRaw !== '' && in_array('sale_price_expires', $cols, true)) {
+            $dt = \DateTime::createFromFormat('Y-m-d\TH:i', $salePriceExpiresRaw);
+            $data['sale_price_expires'] = $dt ? $dt->format('Y-m-d H:i:59') : null;
+        } elseif (in_array('sale_price_expires', $cols, true)) {
+            $data['sale_price_expires'] = null;
+        }
+
         if (in_array('weight', $cols, true)) $data['weight'] = $weight;
         if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;
 
@@ -2304,6 +2313,11 @@ class AdminProdutosController extends Controller {
                     <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label fw-semibold">Data Limite da Promoção <span class="text-muted fw-normal small">Opcional</span></label>
+                    <input type="datetime-local" class="form-control" name="sale_price_expires" placeholder="Deixe vazio para promoção sem prazo">
+                    <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-semibold">Estoque</label>
                     <input type="number" class="form-control form-control-lg" name="stock" value="999" min="0">
                 </div>
@@ -2420,6 +2434,11 @@ class AdminProdutosController extends Controller {
                     <label class="form-label fw-semibold">Valor Promocional (USD) <span class="text-muted fw-normal small">Opcional</span></label>
                     <div class="input-group"><span class="input-group-text">$</span><input type="text" class="form-control" name="sale_price" inputmode="decimal" placeholder="Deixe vazio se não houver promoção" id="loteSalePriceInput"></div>
                     <small class="text-muted">Se preenchido, o produto aparece com preço riscado e destaque no valor promocional.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Data Limite da Promoção <span class="text-muted fw-normal small">Opcional</span></label>
+                    <input type="datetime-local" class="form-control" name="sale_price_expires" placeholder="Deixe vazio para promoção sem prazo" id="loteSalePriceExpiresInput">
+                    <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -3471,6 +3490,15 @@ HTML;
             $data['sale_price'] = null;
         }
 
+        // Data limite da promoção (opcional)
+        $salePriceExpiresRaw = trim((string) $request->getParam('sale_price_expires', ''));
+        if ($salePriceExpiresRaw !== '' && in_array('sale_price_expires', $cols, true)) {
+            $dt = \DateTime::createFromFormat('Y-m-d\TH:i', $salePriceExpiresRaw);
+            $data['sale_price_expires'] = $dt ? $dt->format('Y-m-d H:i:59') : null;
+        } elseif (in_array('sale_price_expires', $cols, true)) {
+            $data['sale_price_expires'] = null;
+        }
+
         if (in_array('weight', $cols, true)) $data['weight'] = $weight;
         if (in_array('peso', $cols, true) && !isset($data['weight'])) $data['peso'] = $weight;
 
@@ -3898,6 +3926,14 @@ HTML;
                 if ($lojaCol !== '') {
                     $where .= " AND p.{$lojaCol} = :loja_filtro ";
                     $params[':loja_filtro'] = $lojaFiltro;
+                }
+            }
+            $categoriaFiltro = (string) $request->getParam('categoria', '');
+            if ($categoriaFiltro !== '' && is_numeric($categoriaFiltro)) {
+                $catCol = !empty($colNames['category_id']) ? 'category_id' : (!empty($colNames['categoria_id']) ? 'categoria_id' : '');
+                if ($catCol !== '') {
+                    $where .= " AND p.{$catCol} = :categoria_filtro ";
+                    $params[':categoria_filtro'] = (int) $categoriaFiltro;
                 }
             }
 
@@ -4971,6 +5007,11 @@ HTML;
                                         </div>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Data Limite da Promoção <span class="text-muted small">Opcional</span></label>
+                                        <input type="datetime-local" class="form-control" name="sale_price_expires">
+                                        <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Peso (kg)</label>
                                         <input type="text" class="form-control" name="weight">
                                     </div>
@@ -5813,6 +5854,11 @@ HTML;
                                         </div>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Data Limite da Promoção <span class="text-muted small">Opcional</span></label>
+                                        <input type="datetime-local" class="form-control" name="sale_price_expires" value="' . (!empty($produto['sale_price_expires']) ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($produto['sale_price_expires']))) : '') . '">
+                                        <small class="text-muted">Após essa data, o preço volta ao valor normal automaticamente.</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Estoque</label>
                                         <input type="number" class="form-control" name="stock" value="' . htmlspecialchars($produto['stock'] ?? 0) . '">
                                     </div>
@@ -6229,6 +6275,17 @@ HTMLSCRIPT;
             if (in_array('elegivel_oferta_gratis', $cols, true)) {
                 $stmtOferta = $pdo->prepare('UPDATE produtos SET elegivel_oferta_gratis = ? WHERE id = ?');
                 $stmtOferta->execute([(int) ($request->getParam('elegivel_oferta_gratis') ?: 0), (int) $id]);
+            }
+
+            if (in_array('sale_price_expires', $cols, true)) {
+                $salePriceExpiresRaw = trim((string) $request->getParam('sale_price_expires', ''));
+                $salePriceExpiresVal = null;
+                if ($salePriceExpiresRaw !== '') {
+                    $dt = \DateTime::createFromFormat('Y-m-d\TH:i', $salePriceExpiresRaw);
+                    if ($dt) $salePriceExpiresVal = $dt->format('Y-m-d H:i:59');
+                }
+                $stmtExpires = $pdo->prepare('UPDATE produtos SET sale_price_expires = ? WHERE id = ?');
+                $stmtExpires->execute([$salePriceExpiresVal, (int) $id]);
             }
 
             if (in_array('oculto', $cols, true)) {
