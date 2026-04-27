@@ -1070,12 +1070,15 @@
         // Só extrair links de mensagens do USUÁRIO (não do assistant que repete)
         if (historico[i].role !== 'user') continue
         var txt = historico[i].content || ''
-        var urlMatches = txt.match(/https?:\/\/[^\s<>"']+/gi)
+        // Detectar URLs com e sem protocolo
+        var urlMatches = txt.match(/(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s<>"']*)?/gi)
         if (urlMatches) {
           urlMatches.forEach(function (u) {
             var cleanUrl = u.replace(/[.,;:!?)]+$/, '')
             // Ignorar URLs do próprio site e WhatsApp
             if (cleanUrl.indexOf('brazilianashop') < 0 && cleanUrl.indexOf('wa.me') < 0) {
+              // Adicionar https:// se não tem protocolo
+              if (cleanUrl.indexOf('http') !== 0) cleanUrl = 'https://' + cleanUrl
               linkSet[cleanUrl] = true
             }
           })
@@ -1083,9 +1086,13 @@
       }
       links = Object.keys(linkSet)
     } else {
-      // Deduplicar links passados pelo Claude
+      // Deduplicar e normalizar links passados pelo Claude
       var seen = {}
-      links = links.filter(function(l) { if (seen[l]) return false; seen[l] = true; return true })
+      links = links.map(function(l) {
+        l = (l || '').trim()
+        if (l && l.indexOf('http') !== 0) l = 'https://' + l
+        return l
+      }).filter(function(l) { if (!l || seen[l]) return false; seen[l] = true; return true })
     }
 
     // Verificar login antes de tentar

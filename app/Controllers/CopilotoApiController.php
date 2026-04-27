@@ -786,7 +786,12 @@ class CopilotoApiController extends Controller {
             $cleanLinks = [];
             foreach ($links as $l) {
                 $l = trim((string) $l);
-                if ($l !== '' && filter_var($l, FILTER_VALIDATE_URL)) {
+                if ($l === '') continue;
+                // Adicionar https:// se não tem protocolo
+                if ($l !== '' && !preg_match('/^https?:\/\//i', $l)) {
+                    $l = 'https://' . $l;
+                }
+                if (filter_var($l, FILTER_VALIDATE_URL)) {
                     $cleanLinks[] = $l;
                 }
             }
