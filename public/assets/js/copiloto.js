@@ -674,7 +674,30 @@
                     }
                     adicionarMsg('assistant', '🛒 Aceitando termos e adicionando ao carrinho...')
                     btnAddCart.click()
-                    setTimeout(function() { resolve() }, 3000)
+                    // Aguardar e verificar se deu erro (SweetAlert popup ou redirect)
+                    setTimeout(function() {
+                      // Verificar se apareceu popup de erro (SweetAlert)
+                      var swalPopup = qs('.swal2-popup, .swal2-container')
+                      var swalTitle = swalPopup ? qs('.swal2-title, .swal2-html-container', swalPopup) : null
+                      if (swalPopup && swalTitle) {
+                        var erroTexto = swalTitle.textContent || ''
+                        if (erroTexto.match(/expirad|reprocess|refaça/i)) {
+                          var msgs = document.getElementById('bz-copiloto-messages')
+                          if (msgs.lastChild) msgs.removeChild(msgs.lastChild); historico.pop()
+                          adicionarMsg('assistant', '⏰ O orçamento expirou (limite de 15 minutos). Vou reprocessar pra você...')
+                          // Clicar no OK do SweetAlert
+                          var swalOk = qs('.swal2-confirm', swalPopup)
+                          if (swalOk) swalOk.click()
+                          // Redirecionar para reprocessar
+                          var orcId = (window.location.search.match(/orcamento_id=(\d+)/) || [])[1]
+                          if (orcId) {
+                            salvarEstadoChat()
+                            setTimeout(function() { window.location.href = '/assessoria/reprocessar?orcamento_id=' + orcId }, 1000)
+                          }
+                        }
+                      }
+                      resolve()
+                    }, 3000)
                   }, 500)
                 }, 500)
               } else {
@@ -956,10 +979,11 @@
         acaoTipo = 'limpar_carrinho'
       }
       
-      if (acaoTipo === 'adicionar_carrinho' || acaoTipo === 'limpar_carrinho') {
-        // Executar ação primeiro — a função addToCart/limpar já mostra mensagem de sucesso/erro
+      if (acaoTipo === 'adicionar_carrinho' || acaoTipo === 'limpar_carrinho' || acaoTipo === 'aceitar_termos_assessoria') {
+        // Executar ação primeiro — a função já mostra mensagem de sucesso/erro
         await executarAcao(acaoTipo, acaoParams)
-        if (!textoResp.match(/adicion|✅|carrinho.*limpo|zerado/i)) {
+        // Só mostrar texto do Claude se não é redundante com a mensagem da ação
+        if (!textoResp.match(/adicion|✅|carrinho.*limpo|zerado|termos.*aceito|aceit.*termos/i)) {
           adicionarMsg('assistant', textoResp)
         }
       } else {
