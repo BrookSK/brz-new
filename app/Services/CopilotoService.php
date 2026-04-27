@@ -372,6 +372,9 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                     $resumoOrcamento .= "\nSe uma variação tem MÚLTIPLAS opções, pergunte ao cliente qual prefere.";
                     $resumoOrcamento .= "\nUse acao: selecionar_variacao_orcamento com parametros: {\"indice\": 0, \"variacao\": {\"Size\": \"Extra-Small\", \"Color\": \"Green\"}}";
                     $resumoOrcamento .= "\nUse os nomes EXATOS das opções mostradas acima. Depois de selecionar, prossiga com aceitar_termos_assessoria.";
+                } else {
+                    $resumoOrcamento .= "\n\n✅ Nenhuma variação pendente — todos os produtos estão prontos para adicionar ao carrinho.";
+                    $resumoOrcamento .= "\nNÃO pergunte sobre variações, cores ou tamanhos — o produto já está definido.";
                 }
             }
             $resumoOrcamento .= "\n\nVocê pode informar estes valores ao cliente.";
