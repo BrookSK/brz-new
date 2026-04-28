@@ -195,7 +195,7 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
                 if (!empty($p['acesso_restrito'])) {
                     $linha .= " | ❌ USUÁRIO NÃO TEM CLUBE ATIVO";
                 }
-                if (!empty($p['sem_estoque'])) {
+                if (!empty($p['sem_estoque']) && empty($p['grupo'])) {
                     $linha .= " | ❌ SEM ESTOQUE — NÃO PODE ADICIONAR AO CARRINHO";
                 }
                 $linhas[] = $linha;
@@ -218,6 +218,7 @@ Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
                 "\nO produto_id é o número após 'ID:' na lista acima. NUNCA omita o produto_id." .
                 "\nREGRAS DE PRODUTOS:" .
                 "\n- Produtos marcados ❌ SEM ESTOQUE: informe que está indisponível. NÃO tente adicionar ao carrinho." .
+                "\n- Produtos de Grupo de Compras (campo 'Grupo:' na lista): NUNCA mencione estoque, quantidade disponível ou disponibilidade — esses produtos são comprados por demanda e não têm estoque fixo." .
                 "\n- Produtos marcados ⚠️ EXCLUSIVO CLUBE: informe que é exclusivo para membros do Clube e ofereça explicar como ativar." .
                 "\n- Produtos marcados ❌ USUÁRIO NÃO TEM CLUBE: o usuário não pode comprar. Ofereça acao: ir_para_clube." .
                 "\n- NUNCA mencione informações sobre oferta gratuita ou elegibilidade para brinde — isso é surpresa para o cliente." .
@@ -429,6 +430,11 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
         $grupo = $contexto['produto_grupo'] ?? 'nenhum';
         $dataAtual = date('d/m/Y H:i');
 
+        // Instrução para não falar de estoque quando produto é de grupo de compras
+        $instrucaoGrupoEstoque = ($grupo !== 'nenhum' && $grupo !== '')
+            ? "IMPORTANTE: O produto em tela pertence a um Grupo de Compras. NUNCA mencione estoque, quantidade disponível ou disponibilidade — produtos de grupo são comprados por demanda. Se o cliente perguntar sobre estoque, diga que os produtos são adquiridos sob demanda e que pode adicionar ao carrinho normalmente."
+            : '';
+
         return <<<PROMPT
 IDENTIDADE:
 Você é a Bri, copiloto de compras da Braziliana.
@@ -546,6 +552,7 @@ Página atual: {$pagina}
 URL: {$url}
 Produto em tela: {$produtoNome} {$produtoId}
 Grupo em tela: {$grupo}
+{$instrucaoGrupoEstoque}
 
 CARRINHO ATUAL:
 {$carrinhoTexto}
@@ -909,8 +916,10 @@ PROMPT;
                     $p['acesso_restrito'] = false;
                 }
                 
-                // Sem estoque
-                $p['sem_estoque'] = ($p['stock'] !== null && $p['stock'] <= 0);
+                // Sem estoque — produtos de grupo de compras nunca são marcados como sem estoque
+                // (são comprados por demanda, não têm estoque fixo)
+                $ehDeGrupo = !empty($p['grupo_slug']) || (!empty($p['grupo_compras_id']) && (int)$p['grupo_compras_id'] > 0);
+                $p['sem_estoque'] = (!$ehDeGrupo && $p['stock'] !== null && $p['stock'] <= 0);
             }
             unset($p);
 
