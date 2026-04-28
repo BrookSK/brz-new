@@ -1180,7 +1180,8 @@ class AdminRemessaInternacionalController extends Controller {
                 rjp.wexpress_tracking_number,
                 rjp.courier_tracking_number,
                 rjp.wexpress_status,
-                p.created_at,
+                rjp.created_at AS entrou_janela_em,
+                p.created_at AS pedido_criado_em,
                 p.total,
                 " . ($hasMoeda ? 'p.moeda,' : "'' AS moeda,") . "
                 " . ($hasCurrency ? 'p.currency,' : "'' AS currency,") . "
@@ -1191,7 +1192,7 @@ class AdminRemessaInternacionalController extends Controller {
             LEFT JOIN pedidos p ON p.id = rjp.pedido_id
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             WHERE rjp.janela_id = ?
-            ORDER BY (p.created_at IS NULL) ASC, p.created_at DESC, rjp.pedido_id DESC
+            ORDER BY (rjp.created_at IS NULL) ASC, rjp.created_at DESC, rjp.pedido_id DESC
         ";
         $st = $this->connection->prepare($sql);
         $st->execute([$janelaId]);
@@ -1277,7 +1278,7 @@ class AdminRemessaInternacionalController extends Controller {
                                 <tr>
                                     <th>Pedido</th>
                                     <th>Cliente</th>
-                                    <th>Data</th>
+                                    <th>Entrou na janela</th>
                                     <th>Total</th>
                                     <th>Etiqueta</th>
                                     <th>Ações</th>
@@ -1298,7 +1299,8 @@ class AdminRemessaInternacionalController extends Controller {
                 $wxStatus = (string) ($p['wexpress_status'] ?? '');
                 $wxShipId = (string) ($p['wexpress_shipping_id'] ?? '');
                 $wxCourier = (string) ($p['courier_tracking_number'] ?? '');
-                $dt = !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '-';
+                $dt = !empty($p['entrou_janela_em']) ? date('d/m/Y H:i', strtotime((string) $p['entrou_janela_em'])) : '-';
+                $dtPedido = !empty($p['pedido_criado_em']) ? date('d/m/Y H:i', strtotime((string) $p['pedido_criado_em'])) : '';
                 $moeda = strtoupper(trim((string) ($p['moeda'] ?? ($p['currency'] ?? 'USD'))));
                 if ($moeda === '') $moeda = 'USD';
                 $totalValue = is_numeric($p['total'] ?? null) ? (float) $p['total'] : null;
@@ -1310,7 +1312,7 @@ class AdminRemessaInternacionalController extends Controller {
                 echo '<tr>
                     <td><strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong></td>
                     <td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? 'N/A')) . '<br><small class="text-muted">' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</small></td>
-                    <td>' . $dt . '</td>
+                    <td>' . $dt . ($dtPedido && $dtPedido !== $dt ? '<br><small class="text-muted" title="Data do pedido">Pedido: ' . $dtPedido . '</small>' : '') . '</td>
                     <td>US$ ' . $totalV . '</td>
                     <td>
                         <span class="badge bg-' . $etBadge . '">' . $etLabel . '</span>';
