@@ -55,7 +55,7 @@ class AdminComissoesGlobalController
         $colOrigem = $this->pick($cols, ['origem_pedido', 'origem', 'tipo']);
         $colStatus = $this->pick($cols, ['status', 'status_pedido']);
         $colPayStatus = $this->pick($cols, ['payment_status', 'status_pagamento']);
-        $colCriadoPor = $this->pick($cols, ['criado_por', 'vendedor_id', 'created_by']);
+        $colCriadoPor = $this->pick($cols, ['admin_criador_id', 'criado_por', 'vendedor_id', 'created_by']);
         $colSemComissao = $this->pick($cols, ['sem_comissao']);
 
         // Buscar pedidos manuais pagos
