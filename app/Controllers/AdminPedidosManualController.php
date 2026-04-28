@@ -1955,7 +1955,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     PEDIDO_ID = Number(resp.pedidoId || resp.pedido_id || resp.id || 0);
 
                     const fp = String(fd.get('forma_pagamento') || (fpSel ? String(fpSel.value || '') : ''));
-                    if (fp === 'nomad_transferencia' || fp === 'appmax_pix' || fp === 'carteira') {
+                    if (fp === 'nomad_transferencia' || fp === 'appmax_pix' || fp === 'carteira' || fp === 'pagdev') {
                         if (PEDIDO_ID && Number(PEDIDO_ID) > 0) {
                             window.location.href = '/admin/pedidos/detalhes/' + String(PEDIDO_ID) + '#comprovante';
                             return;

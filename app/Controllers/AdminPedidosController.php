@@ -1893,8 +1893,26 @@ JS;
                 }
             }
             if (!empty($status)) {
-                $sql .= " AND p.status = :status";
-                $params[':status'] = $status;
+                if ($status === 'aguardando_comprovante') {
+                    // Filtro especial: pedidos offline sem comprovante
+                    $hasFP = in_array('forma_pagamento', $colsPedidos, true);
+                    if ($hasFP) {
+                        $sql .= " AND p.forma_pagamento IN ('nomad_transferencia','appmax_pix','pagdev')";
+                        // Excluir pedidos que já têm comprovante OK
+                        $hasDocsTableFilter = false;
+                        try {
+                            $stChk = $pdo->prepare('SHOW TABLES LIKE ?');
+                            $stChk->execute(['pedidos_pagamento_documentos']);
+                            $hasDocsTableFilter = (bool) $stChk->fetchColumn();
+                        } catch (\Exception $e) {}
+                        if ($hasDocsTableFilter) {
+                            $sql .= " AND p.id NOT IN (SELECT pedido_id FROM pedidos_pagamento_documentos WHERE status = 'ok' AND arquivo_path IS NOT NULL AND arquivo_path != '')";
+                        }
+                    }
+                } else {
+                    $sql .= " AND p.status = :status";
+                    $params[':status'] = $status;
+                }
             }
             
             $sql .= " ORDER BY p.created_at DESC LIMIT :limite OFFSET :offset";
@@ -1941,6 +1959,50 @@ JS;
                 $warningsMap = $this->getPedidosMissingDataWarnings($pdo, $pedidoIds);
             } catch (\Exception $e) {
                 $warningsMap = [];
+            }
+
+            // Detectar pedidos offline aguardando comprovante
+            $aguardandoComprovanteMap = [];
+            try {
+                $offlineMethods = ['nomad_transferencia', 'appmax_pix', 'pagdev'];
+                $hasFP = in_array('forma_pagamento', $colsPedidos, true);
+                if ($hasFP && !empty($pedidoIds)) {
+                    // Verificar se tabela de documentos existe
+                    $hasDocsTable = false;
+                    try {
+                        $stCheck = $pdo->prepare('SHOW TABLES LIKE ?');
+                        $stCheck->execute(['pedidos_pagamento_documentos']);
+                        $hasDocsTable = (bool) $stCheck->fetchColumn();
+                    } catch (\Exception $e) {}
+
+                    $placeholders = implode(',', array_fill(0, count($pedidoIds), '?'));
+                    $fpPlaceholders = implode(',', array_fill(0, count($offlineMethods), '?'));
+
+                    // Buscar pedidos offline da página atual
+                    $stOff = $pdo->prepare("SELECT id, forma_pagamento FROM pedidos WHERE id IN ({$placeholders}) AND forma_pagamento IN ({$fpPlaceholders})");
+                    $stOff->execute(array_merge($pedidoIds, $offlineMethods));
+                    $offlinePedidos = $stOff->fetchAll(\PDO::FETCH_ASSOC);
+
+                    if (!empty($offlinePedidos)) {
+                        $offlineIds = array_column($offlinePedidos, 'id');
+                        // Verificar quais já têm comprovante OK
+                        $docsOk = [];
+                        if ($hasDocsTable && !empty($offlineIds)) {
+                            $phOff = implode(',', array_fill(0, count($offlineIds), '?'));
+                            $stDocs = $pdo->prepare("SELECT pedido_id FROM pedidos_pagamento_documentos WHERE pedido_id IN ({$phOff}) AND status = 'ok' AND arquivo_path IS NOT NULL AND arquivo_path != ''");
+                            $stDocs->execute($offlineIds);
+                            $docsOk = $stDocs->fetchAll(\PDO::FETCH_COLUMN);
+                        }
+                        foreach ($offlinePedidos as $op) {
+                            $opId = (int) $op['id'];
+                            if (!in_array($opId, $docsOk)) {
+                                $aguardandoComprovanteMap[$opId] = true;
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                $aguardandoComprovanteMap = [];
             }
 
             // Normalizar moeda/total para exibição (sem alterar o banco)
@@ -2058,8 +2120,24 @@ JS;
                 }
             }
             if (!empty($status)) {
-                $sqlTotal .= " AND p.status = :status";
-                $paramsTotal[':status'] = $status;
+                if ($status === 'aguardando_comprovante') {
+                    $hasFP = in_array('forma_pagamento', $colsPedidos, true);
+                    if ($hasFP) {
+                        $sqlTotal .= " AND p.forma_pagamento IN ('nomad_transferencia','appmax_pix','pagdev')";
+                        $hasDocsTableTotal = false;
+                        try {
+                            $stChk2 = $pdo->prepare('SHOW TABLES LIKE ?');
+                            $stChk2->execute(['pedidos_pagamento_documentos']);
+                            $hasDocsTableTotal = (bool) $stChk2->fetchColumn();
+                        } catch (\Exception $e) {}
+                        if ($hasDocsTableTotal) {
+                            $sqlTotal .= " AND p.id NOT IN (SELECT pedido_id FROM pedidos_pagamento_documentos WHERE status = 'ok' AND arquivo_path IS NOT NULL AND arquivo_path != '')";
+                        }
+                    }
+                } else {
+                    $sqlTotal .= " AND p.status = :status";
+                    $paramsTotal[':status'] = $status;
+                }
             }
             
             $stmtTotal = $pdo->prepare($sqlTotal);
@@ -2163,6 +2241,7 @@ JS;
                             <option value="enviado" ' . ($status === 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
                             <option value="entregue" ' . ($status === 'entregue' ? 'selected' : '') . '>Entregue</option>
                             <option value="cancelado" ' . ($status === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                            <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -2219,6 +2298,10 @@ JS;
                             $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
                         }
                     }
+                    $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
+                    if ($aguardandoComprovante) {
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                    }
                     
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
@@ -2266,7 +2349,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -2353,6 +2436,10 @@ JS;
                             $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
                         }
                     }
+                    $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
+                    if ($aguardandoComprovante) {
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                    }
 
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
@@ -2400,7 +2487,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -2486,6 +2573,10 @@ JS;
                             $reviewBadges .= '<span class="badge bg-danger ms-2"><i class="fas fa-exclamation-circle me-1"></i>Valor cliente</span>';
                         }
                     }
+                    $aguardandoComprovante = !empty($aguardandoComprovanteMap[$pid]);
+                    if ($aguardandoComprovante) {
+                        $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
+                    }
 
                     $paisTxt = '';
                     if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
@@ -2533,7 +2624,7 @@ JS;
                                         <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
                                         <p class="text-muted small mb-1">' . htmlspecialchars($pedido['cliente_email'] ?? 'N/A') . '</p>
                                         <p class="text-muted small mb-0">' . htmlspecialchars((string) ($pedido['numero_pedido'] ?? '')) . '</p>
-                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div><div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>') : '') . '
+                                        ' . ($reviewBadges !== '' ? ('<div class="mt-2">' . $reviewBadges . '</div>' . ($needsReview ? '<div class="text-muted small" style="margin-top:6px;">Precisa revisar itens do pedido (editar produto)</div>' : '')) : '') . '
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
@@ -4190,7 +4281,7 @@ LINKSCRIPT;
 
                                     $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
                                     $statusBloqueadoPorComprovante = false;
-                                    if (in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
+                                    if (in_array($fp, ['nomad_transferencia', 'appmax_pix', 'pagdev'], true)) {
                                         $hasDocs = false;
                                         if ($pdoLocal instanceof \PDO) {
                                             try {
@@ -4455,7 +4546,7 @@ LINKSCRIPT;
             }
 
             $fp = strtolower(trim($formaPagamento));
-            if (!in_array($fp, ['nomad_transferencia', 'appmax_pix'], true)) {
+            if (!in_array($fp, ['nomad_transferencia', 'appmax_pix', 'pagdev'], true)) {
                 $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
             }
 
