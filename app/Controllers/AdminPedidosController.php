@@ -1985,17 +1985,42 @@ JS;
 
                     if (!empty($offlinePedidos)) {
                         $offlineIds = array_column($offlinePedidos, 'id');
-                        // Verificar quais já têm comprovante OK
-                        $docsOk = [];
+                        // Verificar quais já têm AMBOS os comprovantes OK (produtos + taxas)
+                        // Se a coluna tipo não existir, basta ter 1 comprovante OK
+                        $hasColTipo = false;
+                        if ($hasDocsTable) {
+                            try {
+                                $stColCheck = $pdo->prepare('SHOW COLUMNS FROM pedidos_pagamento_documentos LIKE ?');
+                                $stColCheck->execute(['tipo']);
+                                $hasColTipo = (bool) $stColCheck->fetchColumn();
+                            } catch (\Exception $e) {}
+                        }
+
+                        $docsOkMap = []; // pedido_id => ['produtos' => bool, 'taxas' => bool]
                         if ($hasDocsTable && !empty($offlineIds)) {
                             $phOff = implode(',', array_fill(0, count($offlineIds), '?'));
-                            $stDocs = $pdo->prepare("SELECT pedido_id FROM pedidos_pagamento_documentos WHERE pedido_id IN ({$phOff}) AND status = 'ok' AND arquivo_path IS NOT NULL AND arquivo_path != ''");
-                            $stDocs->execute($offlineIds);
-                            $docsOk = $stDocs->fetchAll(\PDO::FETCH_COLUMN);
+                            if ($hasColTipo) {
+                                $stDocs = $pdo->prepare("SELECT pedido_id, tipo FROM pedidos_pagamento_documentos WHERE pedido_id IN ({$phOff}) AND status = 'ok' AND arquivo_path IS NOT NULL AND arquivo_path != ''");
+                                $stDocs->execute($offlineIds);
+                                foreach ($stDocs->fetchAll(\PDO::FETCH_ASSOC) as $dRow) {
+                                    $dPid = (int) $dRow['pedido_id'];
+                                    $dTipo = (string) ($dRow['tipo'] ?? 'produtos');
+                                    if (!isset($docsOkMap[$dPid])) $docsOkMap[$dPid] = [];
+                                    $docsOkMap[$dPid][$dTipo] = true;
+                                }
+                            } else {
+                                $stDocs = $pdo->prepare("SELECT pedido_id FROM pedidos_pagamento_documentos WHERE pedido_id IN ({$phOff}) AND status = 'ok' AND arquivo_path IS NOT NULL AND arquivo_path != ''");
+                                $stDocs->execute($offlineIds);
+                                foreach ($stDocs->fetchAll(\PDO::FETCH_COLUMN) as $dPid) {
+                                    $docsOkMap[(int)$dPid] = ['produtos' => true];
+                                }
+                            }
                         }
                         foreach ($offlinePedidos as $op) {
                             $opId = (int) $op['id'];
-                            if (!in_array($opId, $docsOk)) {
+                            $okP = !empty($docsOkMap[$opId]['produtos']);
+                            $okT = !$hasColTipo || !empty($docsOkMap[$opId]['taxas']);
+                            if (!($okP && $okT)) {
                                 $aguardandoComprovanteMap[$opId] = true;
                             }
                         }
@@ -4298,53 +4323,94 @@ LINKSCRIPT;
 
                                         echo '<hr>';
                                         echo '<div class="mb-3" id="comprovante">'
-                                            . '<h6 class="mb-2">Comprovante de Pagamento</h6>';
+                                            . '<h6 class="mb-2">Comprovantes de Pagamento</h6>';
 
                                         if (!$hasDocs) {
                                             echo '<div class="alert alert-warning">'
-                                                . '<div><strong>Aguardando comprovante.</strong> Para anexar, é necessário criar a tabela <code>pedidos_pagamento_documentos</code>.</div>'
-                                                . '<div class="small mt-2">Rode as migrations: <strong>055_create_pedidos_pagamento_documentos.sql</strong> e <strong>056_add_fk_pedidos_pagamento_documentos.sql</strong>.</div>'
+                                                . '<div><strong>Aguardando comprovantes.</strong> Para anexar, é necessário criar a tabela <code>pedidos_pagamento_documentos</code>.</div>'
+                                                . '<div class="small mt-2">Rode as migrations: <strong>055_create_pedidos_pagamento_documentos.sql</strong>, <strong>056_add_fk_pedidos_pagamento_documentos.sql</strong> e <strong>131_add_tipo_to_pedidos_pagamento_documentos.sql</strong>.</div>'
                                                 . '</div>';
-                                            echo '<button type="button" class="btn btn-sm btn-secondary" disabled>Anexar comprovante</button>';
+                                            echo '<button type="button" class="btn btn-sm btn-secondary" disabled>Anexar comprovantes</button>';
                                         } else {
-                                            $doc = null;
+                                            $temColTipo = false;
                                             try {
                                                 if ($pdoLocal instanceof \PDO) {
-                                                    $st = $pdoLocal->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1');
-                                                    $st->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp]);
-                                                    $row = $st->fetch(\PDO::FETCH_ASSOC);
-                                                    $doc = is_array($row) ? $row : null;
-                                                } else {
-                                                    $doc = null;
+                                                    $stCols = $pdoLocal->query('DESCRIBE pedidos_pagamento_documentos');
+                                                    $colsDoc = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+                                                    $temColTipo = in_array('tipo', $colsDoc, true);
                                                 }
-                                            } catch (\Exception $e) {
-                                                $doc = null;
-                                            }
+                                            } catch (\Exception $e) {}
 
-                                            $docArr = is_array($doc) ? $doc : [];
-                                            $docStatus = strtolower((string) (($docArr['status'] ?? '') ?: 'pendente_upload'));
-                                            $docPath = (string) ($docArr['arquivo_path'] ?? '');
-                                            $docUploadedAt = (string) ($docArr['uploaded_at'] ?? '');
+                                            $docProdutos = null;
+                                            $docTaxas    = null;
+                                            try {
+                                                if ($pdoLocal instanceof \PDO) {
+                                                    if ($temColTipo) {
+                                                        $stDoc = $pdoLocal->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo AND tipo = :tipo ORDER BY id DESC LIMIT 1');
+                                                        $stDoc->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp, ':tipo' => 'produtos']);
+                                                        $rowP = $stDoc->fetch(\PDO::FETCH_ASSOC);
+                                                        $docProdutos = is_array($rowP) ? $rowP : null;
+                                                        $stDoc->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp, ':tipo' => 'taxas']);
+                                                        $rowT = $stDoc->fetch(\PDO::FETCH_ASSOC);
+                                                        $docTaxas = is_array($rowT) ? $rowT : null;
+                                                    } else {
+                                                        $stDoc = $pdoLocal->prepare('SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1');
+                                                        $stDoc->execute([':pid' => (int) $pedido['id'], ':metodo' => $fp]);
+                                                        $rowP = $stDoc->fetch(\PDO::FETCH_ASSOC);
+                                                        $docProdutos = is_array($rowP) ? $rowP : null;
+                                                    }
+                                                }
+                                            } catch (\Exception $e) {}
 
-                                            $statusBloqueadoPorComprovante = !($docStatus === 'ok' && $docPath !== '');
+                                            $okProdutos = !empty($docProdutos['arquivo_path']) && strtolower((string)($docProdutos['status'] ?? '')) === 'ok';
+                                            $okTaxas    = !$temColTipo || (!empty($docTaxas['arquivo_path']) && strtolower((string)($docTaxas['status'] ?? '')) === 'ok');
+                                            $statusBloqueadoPorComprovante = !($okProdutos && $okTaxas);
 
-                                            if ($docStatus === 'ok' && $docPath !== '') {
-                                                echo '<div class="alert alert-success">'
-                                                    . '<div><strong>Comprovante recebido.</strong></div>'
-                                                    . (!empty($docUploadedAt) ? ('<div class="small">Enviado em: <strong>' . htmlspecialchars(date('d/m/Y H:i', strtotime($docUploadedAt))) . '</strong></div>') : '')
-                                                    . '<div class="mt-2"><a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($docPath) . '" target="_blank" rel="noopener">Abrir comprovante</a></div>'
+                                            echo '<div class="row g-3">';
+
+                                            // Bloco Produtos
+                                            echo '<div class="col-md-6">';
+                                            echo '<div class="card border h-100"><div class="card-body">';
+                                            echo '<h6 class="card-title mb-3"><i class="fas fa-box me-2 text-primary"></i>Comprovante de Produtos</h6>';
+                                            if ($okProdutos) {
+                                                $atP = (string)($docProdutos['uploaded_at'] ?? '');
+                                                echo '<div class="alert alert-success py-2 mb-2"><strong>Recebido.</strong>'
+                                                    . (!empty($atP) ? ' <span class="small">Enviado em ' . htmlspecialchars(date('d/m/Y H:i', strtotime($atP))) . '</span>' : '')
                                                     . '</div>';
+                                                echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docProdutos['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">Abrir arquivo</a>';
                                             } else {
-                                                echo '<div class="alert alert-warning">'
-                                                    . '<div><strong>Aguardando comprovante.</strong> Anexe o arquivo para liberar a edição do status.</div>'
-                                                    . '</div>';
+                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante do pagamento dos produtos.</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
-                                                    . '<div class="mb-2">'
-                                                    . '<input class="form-control" type="file" name="comprovante" required>'
-                                                    . '</div>'
-                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar comprovante</button>'
+                                                    . '<input type="hidden" name="tipo_comprovante" value="produtos">'
+                                                    . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante" accept="image/*,application/pdf" required></div>'
+                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar</button>'
                                                     . '</form>';
                                             }
+                                            echo '</div></div></div>';
+
+                                            // Bloco Taxas/Impostos
+                                            echo '<div class="col-md-6">';
+                                            echo '<div class="card border h-100"><div class="card-body">';
+                                            echo '<h6 class="card-title mb-3"><i class="fas fa-receipt me-2 text-warning"></i>Comprovante de Taxas / Impostos</h6>';
+                                            if (!$temColTipo) {
+                                                echo '<div class="alert alert-secondary py-2 small">Rode a migration <strong>131_add_tipo_to_pedidos_pagamento_documentos.sql</strong> para habilitar este campo.</div>';
+                                            } elseif ($okTaxas) {
+                                                $atT = (string)($docTaxas['uploaded_at'] ?? '');
+                                                echo '<div class="alert alert-success py-2 mb-2"><strong>Recebido.</strong>'
+                                                    . (!empty($atT) ? ' <span class="small">Enviado em ' . htmlspecialchars(date('d/m/Y H:i', strtotime($atT))) . '</span>' : '')
+                                                    . '</div>';
+                                                echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docTaxas['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">Abrir arquivo</a>';
+                                            } else {
+                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante de taxas, impostos ou frete.</div>';
+                                                echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
+                                                    . '<input type="hidden" name="tipo_comprovante" value="taxas">'
+                                                    . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante" accept="image/*,application/pdf" required></div>'
+                                                    . '<button type="submit" class="btn btn-sm btn-primary">Anexar</button>'
+                                                    . '</form>';
+                                            }
+                                            echo '</div></div></div>';
+
+                                            echo '</div>'; // row
                                         }
 
                                         echo '</div>';
@@ -4617,10 +4683,23 @@ LINKSCRIPT;
                 $colsDocs = [];
             }
 
+            // Tipo do comprovante: 'produtos' ou 'taxas'
+            $tipoComprovante = 'produtos';
+            $tipoRaw = strtolower(trim((string) ($request->getParam('tipo_comprovante', 'produtos'))));
+            if ($tipoRaw === 'taxas') {
+                $tipoComprovante = 'taxas';
+            }
+            $temColTipo = in_array('tipo', $colsDocs, true);
+
             $docId = 0;
             try {
-                $st = $pdo->prepare('SELECT id FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo LIMIT 1');
-                $st->execute([':pid' => $pedidoId, ':metodo' => $fp]);
+                if ($temColTipo) {
+                    $st = $pdo->prepare('SELECT id FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo AND tipo = :tipo LIMIT 1');
+                    $st->execute([':pid' => $pedidoId, ':metodo' => $fp, ':tipo' => $tipoComprovante]);
+                } else {
+                    $st = $pdo->prepare('SELECT id FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo LIMIT 1');
+                    $st->execute([':pid' => $pedidoId, ':metodo' => $fp]);
+                }
                 $docId = (int) ($st->fetchColumn() ?: 0);
             } catch (\Exception $e) {
                 $docId = 0;
@@ -4640,6 +4719,10 @@ LINKSCRIPT;
             if ($docId > 0) {
                 $set = ['status = :status', 'arquivo_path = :path', 'mime = :mime', 'uploaded_at = NOW()'];
                 $params = [':id' => $docId, ':status' => 'ok', ':path' => $relPath, ':mime' => $mime];
+                if ($temColTipo) {
+                    $set[] = 'tipo = :tipo';
+                    $params[':tipo'] = $tipoComprovante;
+                }
                 if ($adminId !== null && $adminId > 0 && in_array('usuario_id', $colsDocs, true)) {
                     $set[] = 'usuario_id = :usuario_id';
                     $params[':usuario_id'] = (int) $adminId;
@@ -4651,6 +4734,11 @@ LINKSCRIPT;
                 $insertCols = ['pedido_id', 'metodo', 'status', 'arquivo_path', 'mime', 'uploaded_at'];
                 $insertVals = [':pedido_id', ':metodo', ':status', ':path', ':mime', 'NOW()'];
                 $params = [':pedido_id' => $pedidoId, ':metodo' => $fp, ':status' => 'ok', ':path' => $relPath, ':mime' => $mime];
+                if ($temColTipo) {
+                    $insertCols[] = 'tipo';
+                    $insertVals[] = ':tipo';
+                    $params[':tipo'] = $tipoComprovante;
+                }
                 if ($adminId !== null && $adminId > 0 && in_array('usuario_id', $colsDocs, true)) {
                     $insertCols[] = 'usuario_id';
                     $insertVals[] = ':usuario_id';
