@@ -673,6 +673,7 @@ class PedidoManualService {
         $colTaxa        = $this->pickFirstExistingColumn($colsPedidos, ['taxa_servico', 'servicos']);
         $colSubtotal    = $this->pickFirstExistingColumn($colsPedidos, ['subtotal_produtos', 'subtotal']);
         $colImpostos    = $this->pickFirstExistingColumn($colsPedidos, ['valor_impostos', 'impostos']);
+        $colImpostoLocal = $this->pickFirstExistingColumn($colsPedidos, ['imposto_local']);
 
         $select = ['id'];
         if ($colMoeda !== '')        $select[] = $colMoeda . ' AS moeda';
@@ -682,6 +683,7 @@ class PedidoManualService {
         if ($colTaxa !== '')         $select[] = $colTaxa . ' AS taxa_servico';
         if ($colSubtotal !== '')     $select[] = $colSubtotal . ' AS subtotal_produtos';
         if ($colImpostos !== '')     $select[] = $colImpostos . ' AS valor_impostos';
+        if ($colImpostoLocal !== '') $select[] = $colImpostoLocal . ' AS imposto_local';
 
         $stmt = $this->db->prepare('SELECT ' . implode(', ', $select) . ' FROM pedidos WHERE id = ? LIMIT 1');
         $stmt->execute([$pedidoId]);
@@ -701,17 +703,18 @@ class PedidoManualService {
             return ['success' => false, 'error' => 'Total inválido para cobrança'];
         }
 
-        // Calcular split: produtos vs taxas+impostos
+        // Calcular split: produtos vs taxas+impostos (incluindo imposto local)
         $taxaServico    = (float) ($pedido['taxa_servico'] ?? 0);
         $subtotalProd   = (float) ($pedido['subtotal_produtos'] ?? 0);
         $valorImpostos  = (float) ($pedido['valor_impostos'] ?? 0);
+        $impostoLocal   = (float) ($pedido['imposto_local'] ?? 0);
 
         if ($subtotalProd > 0) {
             $valorProdutos = round(max(0.0, $subtotalProd), 2);
         } else {
-            $valorProdutos = round(max(0.0, $totalUsd - $taxaServico - $valorImpostos), 2);
+            $valorProdutos = round(max(0.0, $totalUsd - $taxaServico - $valorImpostos - $impostoLocal), 2);
         }
-        $valorTaxas = round(max(0.0, $taxaServico + $valorImpostos), 2);
+        $valorTaxas = round(max(0.0, $taxaServico + $valorImpostos + $impostoLocal), 2);
 
         // Se não há separação clara, usar total inteiro no link de produtos
         if ($valorProdutos <= 0 && $valorTaxas <= 0) {

@@ -1592,7 +1592,7 @@ function gerarLinkPagamento(){
                         ? 'Pagamento 1: Produtos (Stripe — Cartão de Crédito)'
                         : 'Pagamento 1: Produtos (Câmbio Real — Link de Checkout)';
                     const label2 = isStripe
-                        ? 'Pagamento 2: Taxas e Impostos (Stripe — Cartão de Crédito)'
+                        ? 'Pagamento 2: Taxas, Impostos e Imposto Local (Stripe — Cartão de Crédito)'
                         : 'Pagamento 2: Taxas e Impostos (AppMax — Link de Pagamento)';
                     const alertMsg = isStripe
                         ? '<strong>Links Stripe gerados.</strong> Copie e envie para o cliente (link de produtos + link de taxas/impostos).'
