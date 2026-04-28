@@ -725,8 +725,14 @@
                     salvarEstadoChat()
                     setTimeout(function() { window.location.href = d.redirect || '/carrinho' }, 1500)
                   } else {
-                    adicionarMsg('assistant', '❌ ' + (d.message || 'Erro ao adicionar.'))
-                    if (d.redirect) { salvarEstadoChat(); setTimeout(function() { window.location.href = d.redirect }, 2000) }
+                    var errMsg = d.message || 'Erro ao adicionar.'
+                    // Detectar orçamento expirado
+                    if (errMsg.match(/expirad|reprocess/i) || (d.redirect && d.redirect.match(/reprocessar/))) {
+                      adicionarMsg('assistant', '⏰ O orçamento expirou (15 min). Vou reprocessar automaticamente...')
+                    } else {
+                      adicionarMsg('assistant', '❌ ' + errMsg)
+                    }
+                    if (d.redirect) { salvarEstadoChat(); setTimeout(function() { window.location.href = d.redirect }, 1500) }
                     else adicionarMsg('assistant', 'Tenta pelo botão na página ou me avisa que eu abro um ticket.')
                   }
                   resolve()

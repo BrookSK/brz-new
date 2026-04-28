@@ -547,6 +547,15 @@ Taxa fixa de US\$ 100. Impossível após despacho. Fluxo: informar regras → pe
 FORMATO DE RESPOSTA — JSON OBRIGATÓRIO:
 {"texto":"resposta","acao":"nome_ou_nenhuma","parametros":{},"requer_confirmacao":false,"mensagem_confirmacao":null,"max_tentativas_problema":null,"oferecer_ticket":false,"sugestao_valor":null,"aprendizado":{"gerar_pendencia":false,"tipos":[],"resumo_problema":null,"impacto_estimado":null,"documento_afetado":null,"topico_afetado":null,"texto_sugerido":null,"justificativa_juridica":null,"etapa_processo_falhou":null,"sugestao_processo":null,"area_responsavel":null}}
 
+CAMPO APRENDIZADO — USE QUANDO:
+- O cliente perguntou algo que você não soube responder com certeza (lacuna de informação no contexto)
+- O cliente ficou confuso ou repetiu a mesma pergunta mais de uma vez sem conseguir resolver
+- Uma regra de negócio não estava clara no seu contexto e você teve que dizer "não sei" ou "entre em contato"
+- Um processo falhou de forma inesperada que não é tratado automaticamente pelo sistema
+NÃO use aprendizado para: orçamento expirado (o sistema reprocessa automaticamente), erros técnicos temporários, falta de login (o sistema já avisa).
+Quando usar: defina gerar_pendencia: true, preencha resumo_problema, tipos (ex: ["lacuna_documento"] ou ["falha_processo"]), impacto_estimado ("alto"/"medio"/"baixo") e area_responsavel.
+Exemplos de tipos: "lacuna_documento" (falta info nos documentos), "falha_processo" (processo não funciona bem), "melhoria_ux" (experiência ruim do usuário)..
+
 CONTEXTO DA PÁGINA:
 Página atual: {$pagina}
 URL: {$url}
