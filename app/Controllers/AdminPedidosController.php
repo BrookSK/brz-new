@@ -4386,16 +4386,7 @@ LINKSCRIPT;
                                     <label class="form-label">Atualizar Status:</label>
                                     <select class="form-select" id="novo_status">
                                         <option value="">Selecione...</option>
-                                        <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
-                                        <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
-                                        <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                        <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
-                                        <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
-                                        <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
-                                        <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                        <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
-                                        <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
-                                        <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                                        ' . $this->buildStatusOptions((string)($pedido['status'] ?? ''), false) . '
                                     </select>
                                 </div>
                                 ' . (($statusBloqueadoPorComprovante ?? false) ? '<div class="alert alert-warning">Envie o comprovante para liberar a edição do status.</div>' : '') . '
@@ -4770,28 +4761,14 @@ LINKSCRIPT;
     }
 
     private function getStatusLabel(string $status): string {
-        $map = [
-            'pendente' => 'Pendente',
-            'pago' => 'Pago',
-            'processando' => 'Processando',
-            'produto_consolidado' => 'Caixa Fechada',
-            'etiqueta_gerada' => 'Etiqueta Gerada',
-            'em_transporte' => 'Em Transporte',
-            'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
-            'enviado_ao_destinatario' => 'Enviado ao Destinatário',
-            'enviado' => 'Enviado',
-            'entregue' => 'Entregue',
-            'cancelado' => 'Cancelado',
-
-            // legado
-            'pagamento' => 'Pagamento',
-            'aprovado' => 'Aprovado',
-            'separacao' => 'Separação',
-
-            // carnê
-            'carne_pagando' => 'Carnê em Pagamento',
+        $map = array_merge(self::getStatusList(), [
+            'enviado'          => 'Etiqueta Gerada', // alias legado
+            'pagamento'        => 'Pagamento',
+            'aprovado'         => 'Aprovado',
+            'separacao'        => 'Separação',
+            'carne_pagando'    => 'Carnê em Pagamento',
             'carne_aguardando' => 'Carnê Aguardando',
-        ];
+        ]);
         $status = trim($status);
         return $map[$status] ?? ($status !== '' ? ucfirst($status) : '');
     }
@@ -5527,18 +5504,9 @@ HTML;
             $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
             $isPaid = in_array(strtolower(trim((string) $novoStatus)), $paidValues, true);
 
-            $statusLabelMap = [
-                'pendente' => 'Pendente',
-                'pago' => 'Pago',
-                'processando' => 'Processando',
-                'produto_consolidado' => 'Caixa Fechada',
-                'em_transporte' => 'Em Transporte',
-                'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
-                'enviado_ao_destinatario' => 'Enviado ao Destinatário',
-                'enviado' => 'Etiqueta gerada',
-                'entregue' => 'Entregue',
-                'cancelado' => 'Cancelado',
-            ];
+            $statusLabelMap = array_merge(self::getStatusList(), [
+                'enviado' => 'Etiqueta Gerada', // alias legado
+            ]);
             $pagamentoStatusTexto = $statusLabelMap[$novoStatusKey] ?? ucfirst(str_replace('_', ' ', $novoStatusKey));
 
             if ($isPaid && is_array($cols)) {

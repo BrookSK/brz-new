@@ -2,15 +2,10 @@
 
 <?php
 function getOrderStatusLabel($status) {
-    $labels = [
-        'pendente' => __('admin.orders.status.pending', 'Pendente'),
-        'pago' => __('admin.orders.status.paid', 'Pago'),
-        'processando' => __('admin.orders.status.processing', 'Processando'),
-        'enviado' => __('admin.orders.status.shipped', 'Etiqueta gerada'),
-        'entregue' => __('admin.orders.status.delivered', 'Entregue'),
-        'cancelado' => __('admin.orders.status.cancelled', 'Cancelado')
-    ];
-    return $labels[(string) $status] ?? (string) $status;
+    $labels = array_merge(\App\Controllers\AdminPedidosController::getStatusList(), [
+        'enviado' => 'Etiqueta Gerada',
+    ]);
+    return $labels[(string)$status] ?? (string)$status;
 }
 ?>
 
@@ -44,12 +39,9 @@ function getOrderStatusLabel($status) {
                     <label class="form-label"><?= __('common.status', 'Status') ?></label>
                     <select name="status" class="form-select">
                         <option value=""><?= __('common.all', 'Todos') ?></option>
-                        <option value="pendente" <?= $status == 'pendente' ? 'selected' : '' ?>><?= __('admin.orders.status.pending', 'Pendente') ?></option>
-                        <option value="pago" <?= $status == 'pago' ? 'selected' : '' ?>><?= __('admin.orders.status.paid', 'Pago') ?></option>
-                        <option value="processando" <?= $status == 'processando' ? 'selected' : '' ?>><?= __('admin.orders.status.processing', 'Processando') ?></option>
-                        <option value="enviado" <?= $status == 'enviado' ? 'selected' : '' ?>><?= __('admin.orders.status.shipped', 'Etiqueta gerada') ?></option>
-                        <option value="entregue" <?= $status == 'entregue' ? 'selected' : '' ?>><?= __('admin.orders.status.delivered', 'Entregue') ?></option>
-                        <option value="cancelado" <?= $status == 'cancelado' ? 'selected' : '' ?>><?= __('admin.orders.status.cancelled', 'Cancelado') ?></option>
+                        <?php foreach (\App\Controllers\AdminPedidosController::getStatusList() as $val => $label): ?>
+                        <option value="<?= htmlspecialchars($val) ?>"<?= ($status == $val) ? ' selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-3">

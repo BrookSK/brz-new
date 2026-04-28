@@ -19,24 +19,28 @@ function getStatusColor($status) {
 function getStatusText($status) {
     $statusKey = is_string($status) ? strtolower($status) : '';
     $map = [
-        'pendente' => 'order_status.pending',
-        'processando' => 'order_status.processing',
-        'enviado' => 'order_status.label_generated',
-        'entregue' => 'order_status.delivered',
-        'cancelado' => 'order_status.cancelled',
-        'pago' => 'order_status.paid',
+        'pendente'                       => 'order_status.pending',
+        'processando'                    => 'order_status.processing',
+        'pago'                           => 'order_status.paid',
+        'produto_consolidado'            => 'order_status.product_consolidated',
+        'itens_comprados'                => 'order_status.items_purchased',
+        'etiqueta_gerada'                => 'order_status.label_generated',
+        'enviado'                        => 'order_status.label_generated',
+        'em_transporte'                  => 'order_status.in_transit',
+        'aguardando_liberacao_aduaneira' => 'order_status.awaiting_customs_release',
+        'enviado_ao_destinatario'        => 'order_status.sent_to_recipient',
+        'entregue'                       => 'order_status.delivered',
+        'cancelado'                      => 'order_status.cancelled',
 
-        'pedido_criado' => 'order_status.created',
-        'em_transporte' => 'order_status.in_transit',
-
-        'aguardando_processamento' => 'order_status.awaiting_processing',
-        'consolidado' => 'order_status.consolidated',
-        'produto_consolidado' => 'order_status.product_consolidated',
-        'rascunho_etiqueta' => 'order_status.label_draft',
-        'etiqueta_efetivada' => 'order_status.label_effective',
-        'aguardando_lib_alfandegaria' => 'order_status.awaiting_customs_release',
-        'finalizacao_embalagem' => 'order_status.packaging_finalization',
-        'entrega_finalizada' => 'order_status.delivery_completed',
+        // legado/aliases
+        'pedido_criado'                  => 'order_status.created',
+        'aguardando_processamento'       => 'order_status.awaiting_processing',
+        'consolidado'                    => 'order_status.consolidated',
+        'rascunho_etiqueta'              => 'order_status.label_draft',
+        'etiqueta_efetivada'             => 'order_status.label_effective',
+        'aguardando_lib_alfandegaria'    => 'order_status.awaiting_customs_release',
+        'finalizacao_embalagem'          => 'order_status.packaging_finalization',
+        'entrega_finalizada'             => 'order_status.delivery_completed',
     ];
 
     if (isset($map[$statusKey])) {

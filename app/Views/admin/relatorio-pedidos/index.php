@@ -1,13 +1,35 @@
 <?php
 $statusLabels = [
-    'pendente'=>'Pendente','pago'=>'Pago','processando'=>'Processando','enviado'=>'Enviado',
-    'entregue'=>'Entregue','cancelado'=>'Cancelado','carne_pagando'=>'Carnê em Pagamento',
-    'produto_consolidado'=>'Caixa Fechada','etiqueta_gerada'=>'Etiqueta Gerada',
-    'em_transporte'=>'Em Transporte','carne_aguardando'=>'Carnê Aguardando',
+    'pendente'                       => 'Pendente',
+    'processando'                    => 'Processando',
+    'pago'                           => 'Pago',
+    'produto_consolidado'            => 'Caixa Fechada',
+    'itens_comprados'                => 'Itens Comprados',
+    'etiqueta_gerada'                => 'Etiqueta Gerada',
+    'enviado'                        => 'Etiqueta Gerada',
+    'em_transporte'                  => 'Em Transporte',
+    'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
+    'enviado_ao_destinatario'        => 'Enviado ao Destinatário',
+    'entregue'                       => 'Entregue',
+    'cancelado'                      => 'Cancelado',
+    'carne_pagando'                  => 'Carnê em Pagamento',
+    'carne_aguardando'               => 'Carnê Aguardando',
 ];
 $statusColors = [
-    'pendente'=>'warning','pago'=>'success','processando'=>'primary','enviado'=>'info',
-    'entregue'=>'dark','cancelado'=>'danger','carne_pagando'=>'purple',
+    'pendente'                       => 'warning',
+    'processando'                    => 'primary',
+    'pago'                           => 'success',
+    'produto_consolidado'            => 'dark',
+    'itens_comprados'                => 'info',
+    'etiqueta_gerada'                => 'primary',
+    'enviado'                        => 'primary',
+    'em_transporte'                  => 'info',
+    'aguardando_liberacao_aduaneira' => 'secondary',
+    'enviado_ao_destinatario'        => 'info',
+    'entregue'                       => 'success',
+    'cancelado'                      => 'danger',
+    'carne_pagando'                  => 'purple',
+    'carne_aguardando'               => 'secondary',
 ];
 ?>
 
