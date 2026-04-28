@@ -254,11 +254,11 @@ class AdminRemessaInternacionalController extends Controller {
         $dateCol = 'id'; // fallback sem filtro
         if (is_array($cols)) {
             if (in_array('updated_at', $cols, true)) {
-                $dateCol = 'updated_at';
+                $dateCol = 'p.updated_at';
             } elseif (in_array('consolidado_em', $cols, true)) {
-                $dateCol = 'consolidado_em';
+                $dateCol = 'p.consolidado_em';
             } elseif (in_array('created_at', $cols, true)) {
-                $dateCol = 'created_at';
+                $dateCol = 'p.created_at';
             }
         }
         $dateWhere = ($dateCol === 'id') ? '1=1' : ("{$dateCol} >= ? AND {$dateCol} <= ?");
