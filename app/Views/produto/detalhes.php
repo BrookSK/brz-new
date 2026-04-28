@@ -194,6 +194,10 @@
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <div class="text-muted small"><?= __('product_details.availability', 'Disponibilidade') ?></div>
                             <div>
+                                <?php
+                                $pertenceAGrupo = !empty($produto['grupo_compras_id']) && (int)($produto['grupo_compras_id']) > 0;
+                                if (!$pertenceAGrupo):
+                                ?>
                                 <?php if ($variacoesEnabled): ?>
                                     <span id="stock-badge" class="badge" style="background: rgba(59, 130, 246, 0.10); border: 1px solid rgba(59, 130, 246, 0.18); color: rgba(30, 64, 175, 1);">
                                         <?= __('product_details.variations_select_to_check', 'Selecione as opções para ver disponibilidade.') ?>
@@ -209,6 +213,7 @@
                                         </span>
                                     <?php endif; ?>
                                 <?php endif; ?>
+                                <?php endif; /* !pertenceAGrupo */ ?>
                             </div>
                         </div>
 

@@ -139,11 +139,6 @@ $busca = $busca ?? '';
                         <img src="<?= htmlspecialchars($produto['foto_principal'], ENT_QUOTES, 'UTF-8') ?>"
                              alt="<?= htmlspecialchars($produto['name'], ENT_QUOTES, 'UTF-8') ?>"
                              class="card-img-top product-image-modern">
-                        <?php if ((int)($produto['stock'] ?? 0) <= 5 && (int)($produto['stock'] ?? 0) > 0): ?>
-                        <span class="position-absolute top-0 end-0 m-2 badge bg-warning">
-                            <i class="fas fa-exclamation-triangle me-1"></i><?= (int)$produto['stock'] ?> unidades
-                        </span>
-                        <?php endif; ?>
                         <?php if (!empty($produto['featured'])): ?>
                         <span class="position-absolute top-0 start-0 m-2 badge bg-danger">
                             <i class="fas fa-star me-1"></i>Destaque
@@ -179,13 +174,6 @@ $busca = $busca ?? '';
                             <?php endif; ?>
                             <?php if ($impostoLocalGrupo > 0): ?>
                             <div class="small text-warning mt-1">+ imposto local <?= number_format($impostoLocalGrupo, 0) ?>%</div>
-                            <?php endif; ?>
-                        </div>
-                        <div>
-                            <?php if ((int)($produto['stock'] ?? 0) > 0): ?>
-                            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Disponível</span>
-                            <?php else: ?>
-                            <span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i>Esgotado</span>
                             <?php endif; ?>
                         </div>
                     </div>
