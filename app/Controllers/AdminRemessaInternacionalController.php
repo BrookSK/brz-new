@@ -318,7 +318,7 @@ class AdminRemessaInternacionalController extends Controller {
     }
 
     private function removeInvalidPedidosFromJanela(int $janelaId, array $cols): void {
-        // Buscar todos os pedido_ids desta janela
+        // Buscar todos os pedido_ids desta janela sem etiqueta gerada
         $stIds = $this->connection->prepare('SELECT pedido_id FROM remessa_janela_pedidos WHERE janela_id = ? AND etiqueta_gerada = 0');
         $stIds->execute([$janelaId]);
         $ids = $stIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -326,32 +326,35 @@ class AdminRemessaInternacionalController extends Controller {
 
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-        // Pedidos que não existem mais ou foram cancelados/deletados
-        $deletadoWhere = '';
-        if (in_array('deleted_at', $cols, true)) {
-            $deletadoWhere = ' OR p.deleted_at IS NOT NULL';
-        }
+        $toRemove = [];
 
-        $sql = "SELECT p.id FROM pedidos p
-                WHERE p.id IN ({$placeholders})
-                  AND (LOWER(COALESCE(p.status,'')) IN ('cancelado','cancelled','lixeira','deleted'){$deletadoWhere})";
-        $stCan = $this->connection->prepare($sql);
-        $stCan->execute($ids);
-        $cancelados = $stCan->fetchAll(\PDO::FETCH_COLUMN) ?: [];
-
-        // Pedidos que não existem mais na tabela pedidos (foram hard-deleted)
+        // 1. Pedidos hard-deleted (não existem mais na tabela pedidos)
         $sqlMissing = "SELECT rjp.pedido_id FROM remessa_janela_pedidos rjp
                        LEFT JOIN pedidos p ON p.id = rjp.pedido_id
                        WHERE rjp.janela_id = ? AND rjp.etiqueta_gerada = 0 AND p.id IS NULL";
         $stMissing = $this->connection->prepare($sqlMissing);
         $stMissing->execute([$janelaId]);
         $missing = $stMissing->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        $toRemove = array_merge($toRemove, array_map('intval', $missing));
 
-        $toRemove = array_unique(array_merge(
-            array_map('intval', $cancelados),
-            array_map('intval', $missing)
-        ));
+        // 2. Pedidos soft-deleted (deleted_at IS NOT NULL)
+        if (in_array('deleted_at', $cols, true)) {
+            $sqlDel = "SELECT p.id FROM pedidos p WHERE p.id IN ({$placeholders}) AND p.deleted_at IS NOT NULL";
+            $stDel = $this->connection->prepare($sqlDel);
+            $stDel->execute($ids);
+            $deleted = $stDel->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $toRemove = array_merge($toRemove, array_map('intval', $deleted));
+        }
 
+        // 3. Pedidos cancelados por status
+        $sqlCan = "SELECT p.id FROM pedidos p WHERE p.id IN ({$placeholders})
+                   AND LOWER(COALESCE(p.status,'')) IN ('cancelado','cancelled','lixeira','deleted')";
+        $stCan = $this->connection->prepare($sqlCan);
+        $stCan->execute($ids);
+        $cancelados = $stCan->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        $toRemove = array_merge($toRemove, array_map('intval', $cancelados));
+
+        $toRemove = array_unique($toRemove);
         if (!$toRemove) return;
 
         $phRem = implode(',', array_fill(0, count($toRemove), '?'));
