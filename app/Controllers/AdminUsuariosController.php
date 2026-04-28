@@ -712,16 +712,24 @@ class AdminUsuariosController extends Controller {
             }
 
             $totalPedidos = is_array($pedidos) ? count($pedidos) : 0;
-            $totalGasto = 0;
+            $totalGastoBrl = 0.0;
+            $totalGastoUsd = 0.0;
             if (!empty($pedidos) && is_array($pedidos)) {
                 foreach ($pedidos as $p) {
-                    $totalGasto += (float)($p['total'] ?? 0);
+                    $moedaPedido = strtoupper(trim((string)($p['moeda'] ?? $p['currency'] ?? 'BRL')));
+                    $valor = (float)($p['total'] ?? $p['valor_total'] ?? 0);
+                    if ($moedaPedido === 'USD') {
+                        $totalGastoUsd += $valor;
+                    } else {
+                        $totalGastoBrl += $valor;
+                    }
                 }
             }
 
             $stats = [
                 'total_pedidos' => $totalPedidos,
-                'total_gasto' => $totalGasto,
+                'total_gasto_brl' => $totalGastoBrl,
+                'total_gasto_usd' => $totalGastoUsd,
                 'ultimo_pedido' => (!empty($pedidos[0]['created_at']) ? $pedidos[0]['created_at'] : null)
             ];
             
@@ -784,7 +792,18 @@ class AdminUsuariosController extends Controller {
                                     <p class="text-muted">Total de Pedidos</p>
                                 </div>
                                 <div class="text-center mb-3">
-                                    <h3 class="text-success">R$ ' . number_format($stats['total_gasto'], 2, ',', '.') . '</h3>
+                                    ' . (function() use ($stats) {
+                                        $brl = (float)($stats['total_gasto_brl'] ?? 0);
+                                        $usd = (float)($stats['total_gasto_usd'] ?? 0);
+                                        if ($usd > 0 && $brl > 0) {
+                                            $val = 'R$ ' . number_format($brl, 2, ',', '.') . '<br><span style="font-size:.85rem;" class="text-muted">US$ ' . number_format($usd, 2, ',', '.') . '</span>';
+                                        } elseif ($usd > 0) {
+                                            $val = 'US$ ' . number_format($usd, 2, ',', '.');
+                                        } else {
+                                            $val = 'R$ ' . number_format($brl, 2, ',', '.');
+                                        }
+                                        return '<h3 class="text-success">' . $val . '</h3>';
+                                    })() . '
                                     <p class="text-muted">Total Gasto</p>
                                 </div>
                                 <hr>
@@ -924,11 +943,16 @@ class AdminUsuariosController extends Controller {
                                         <tbody>';
                                         
                                         foreach ($pedidos as $pedido) {
+                                            $moedaPed = strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL')));
+                                            $valorPed = (float)($pedido['valor_total'] ?? $pedido['total'] ?? 0);
+                                            $valorFmt = ($moedaPed === 'USD')
+                                                ? 'US$ ' . number_format($valorPed, 2, ',', '.')
+                                                : 'R$ ' . number_format($valorPed, 2, ',', '.');
                                             echo '<tr>
                                                 <td>#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</td>
                                                 <td><span class="badge bg-' . ($pedido['status'] == 'pago' ? 'success' : 'warning') . '">' . ucfirst($pedido['status']) . '</span></td>
-                                                <td>R$ ' . number_format((float) ($pedido['valor_total'] ?? $pedido['total'] ?? 0), 2, ',', '.') . '</td>
+                                                <td>' . $valorFmt . '</td>
                                                 <td>
                                                     <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
                                                         <i class="fas fa-eye"></i>
