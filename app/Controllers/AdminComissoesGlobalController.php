@@ -38,14 +38,67 @@ class AdminComissoesGlobalController
         return 'R$ ' . number_format($v, 2, ',', '.');
     }
 
+    /** Busca taxa USD→BRL da tabela de configurações de moeda */
+    private function getUsdToBrl(): float
+    {
+        try {
+            $st = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+            $st->execute();
+            $v = (float)($st->fetchColumn() ?: 0);
+            if ($v > 1.0) return $v;
+        } catch (\Exception $e) {}
+        try {
+            foreach (['configuracoes_sistema', 'configuracoes', 'settings'] as $t) {
+                $st = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $st->execute([$t]);
+                if ((int)($st->fetchColumn() ?: 0) === 0) continue;
+                $cols = $this->getCols($t);
+                $kc = $this->pick($cols, ['chave', 'key', 'config_key']);
+                $vc = $this->pick($cols, ['valor', 'value']);
+                if ($kc && $vc) {
+                    $st2 = $this->connection->prepare("SELECT {$vc} FROM {$t} WHERE {$kc} IN ('taxa_usd_brl','usd_brl','cambio_usd') LIMIT 1");
+                    $st2->execute();
+                    $v = (float)($st2->fetchColumn() ?: 0);
+                    if ($v > 1.0) return $v;
+                }
+            }
+        } catch (\Exception $e) {}
+        return 5.5;
+    }
+
+    /**
+     * Dado "YYYY-MM", retorna [data_inicio, data_fim] no ciclo dia 10 → dia 9 do mês seguinte.
+     */
+    private function periodoDoMes(string $mesAno): array
+    {
+        [$ano, $mes] = explode('-', $mesAno);
+        $ano = (int)$ano; $mes = (int)$mes;
+        $inicio = sprintf('%04d-%02d-10', $ano, $mes);
+        $proxMes = $mes === 12 ? 1 : $mes + 1;
+        $proxAno = $mes === 12 ? $ano + 1 : $ano;
+        $fim = sprintf('%04d-%02d-09', $proxAno, $proxMes);
+        return [$inicio, $fim];
+    }
+
     // ─── Tela 1: Comissões de todos os vendedores ───
     public function comissoesTodas(Request $request)
     {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
 
-        $dataInicio = (string) $request->getParam('data_inicio', '');
-        $dataFim = (string) $request->getParam('data_fim', '');
+        // Período: seletor de mês/ano (ciclo dia 10 → dia 9)
+        $periodoParam = (string)$request->getParam('periodo', '');
+        $dataInicio   = (string)$request->getParam('data_inicio', '');
+        $dataFim      = (string)$request->getParam('data_fim', '');
+
+        if ($periodoParam !== '' && preg_match('/^\d{4}-\d{2}$/', $periodoParam)) {
+            [$dataInicio, $dataFim] = $this->periodoDoMes($periodoParam);
+        } elseif ($dataInicio === '' && $dataFim === '') {
+            $periodoParam = date('Y-m');
+            [$dataInicio, $dataFim] = $this->periodoDoMes($periodoParam);
+        }
+
+        $usdToBrl = $this->getUsdToBrl();
 
         $cols = $this->getCols('pedidos');
         $colTotal = $this->pick($cols, ['valor_total', 'total', 'amount']);
@@ -108,28 +161,26 @@ class AdminComissoesGlobalController
             $custoByPedido = $this->calcCustoProdutosByPedido($itensTable, array_column($rows, 'id'));
         }
 
-        // Comissões de processamento
-        $comProc = [];
+        // Comissões de processamento — converter tudo para BRL
+        $comProc = []; // [uid => float em BRL]
         try {
             $stT = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'comissoes_processamento'");
             $stT->execute();
-            if ((int) ($stT->fetchColumn() ?: 0) > 0) {
-                $sqlP = 'SELECT usuario_id, moeda, SUM(valor_comissao) AS total_comissao, SUM(base_liquida) AS total_base FROM comissoes_processamento';
-                $wpP = [];
-                $ppP = [];
+            if ((int)($stT->fetchColumn() ?: 0) > 0) {
+                $sqlP = 'SELECT usuario_id, moeda, SUM(valor_comissao) AS total_comissao FROM comissoes_processamento';
+                $wpP = []; $ppP = [];
                 if ($dataInicio !== '') { $wpP[] = 'DATE(created_at) >= ?'; $ppP[] = $dataInicio; }
-                if ($dataFim !== '') { $wpP[] = 'DATE(created_at) <= ?'; $ppP[] = $dataFim; }
+                if ($dataFim !== '')    { $wpP[] = 'DATE(created_at) <= ?'; $ppP[] = $dataFim; }
                 if (!empty($wpP)) $sqlP .= ' WHERE ' . implode(' AND ', $wpP);
                 $sqlP .= ' GROUP BY usuario_id, moeda';
                 $stP = $this->connection->prepare($sqlP);
                 $stP->execute($ppP);
                 foreach ($stP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
-                    $uid = (int) ($r['usuario_id'] ?? 0);
-                    $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
-                    $comProc[$uid][$m] = [
-                        'total_comissao' => (float) ($r['total_comissao'] ?? 0),
-                        'total_base' => (float) ($r['total_base'] ?? 0),
-                    ];
+                    $uid = (int)($r['usuario_id'] ?? 0);
+                    $m   = strtoupper(trim((string)($r['moeda'] ?? 'BRL')));
+                    $com = (float)($r['total_comissao'] ?? 0);
+                    if ($m === 'USD') $com *= $usdToBrl;
+                    $comProc[$uid] = ($comProc[$uid] ?? 0.0) + $com;
                 }
             }
         } catch (\Exception $e) {}
@@ -137,25 +188,27 @@ class AdminComissoesGlobalController
         // Faixas de comissão manual
         $faixas = $this->getComissaoManualFaixas();
 
-        // Agrupar por vendedor
-        $porVendedor = [];
+        // Agrupar por vendedor — tudo convertido para BRL
+        $porVendedor = []; // [uid => ['faturado','impostos','custo','liquido','qtd']]
         foreach ($rows as $r) {
-            $uid = (int) ($r['criado_por'] ?? 0);
-            $m = strtoupper(trim((string) ($r['moeda'] ?? 'BRL')));
+            $uid  = (int)($r['criado_por'] ?? 0);
+            $m    = strtoupper(trim((string)($r['moeda'] ?? 'BRL')));
             if ($m === '') $m = 'BRL';
-            $pid = (int) ($r['id'] ?? 0);
-            $fat = (float) ($r['valor_total'] ?? 0);
-            $imp = (float) ($r['impostos'] ?? 0);
-            $custo = (float) ($custoByPedido[$pid] ?? 0);
-            $liq = $fat - $custo - $imp;
+            $pid  = (int)($r['id'] ?? 0);
+            $fat  = (float)($r['valor_total'] ?? 0);
+            $imp  = (float)($r['impostos'] ?? 0);
+            $custo = (float)($custoByPedido[$pid] ?? 0);
+            $liq  = $fat - $custo - $imp;
+            if ($m === 'USD') { $fat *= $usdToBrl; $imp *= $usdToBrl; $custo *= $usdToBrl; $liq *= $usdToBrl; }
 
-            if (!isset($porVendedor[$uid])) $porVendedor[$uid] = [];
-            if (!isset($porVendedor[$uid][$m])) $porVendedor[$uid][$m] = ['faturado' => 0, 'impostos' => 0, 'custo' => 0, 'liquido' => 0, 'qtd' => 0];
-            $porVendedor[$uid][$m]['faturado'] += $fat;
-            $porVendedor[$uid][$m]['impostos'] += $imp;
-            $porVendedor[$uid][$m]['custo'] += $custo;
-            $porVendedor[$uid][$m]['liquido'] += $liq;
-            $porVendedor[$uid][$m]['qtd']++;
+            if (!isset($porVendedor[$uid])) {
+                $porVendedor[$uid] = ['faturado' => 0.0, 'impostos' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'qtd' => 0];
+            }
+            $porVendedor[$uid]['faturado'] += $fat;
+            $porVendedor[$uid]['impostos'] += $imp;
+            $porVendedor[$uid]['custo']    += $custo;
+            $porVendedor[$uid]['liquido']  += $liq;
+            $porVendedor[$uid]['qtd']++;
         }
 
         // Nomes dos vendedores
@@ -167,16 +220,16 @@ class AdminComissoesGlobalController
                 $st = $this->connection->prepare("SELECT id, nome, email FROM usuarios WHERE id IN ({$in})");
                 $st->execute(array_values($uids));
                 foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $u) {
-                    $nomes[(int) $u['id']] = trim(($u['nome'] ?? '') . ' (' . ($u['email'] ?? '') . ')');
+                    $nomes[(int)$u['id']] = trim(($u['nome'] ?? '') . ' (' . ($u['email'] ?? '') . ')');
                 }
             } catch (\Exception $e) {}
         }
 
-        // Vendas orgânicas (sem criado_por ou criado_por = 0)
-        $organico = $porVendedor[0] ?? [];
+        // Vendas orgânicas (uid = 0)
+        $organico = $porVendedor[0] ?? null;
         unset($porVendedor[0]);
 
-        // Render
+        // ── Render ───────────────────────────────────────────────────────────
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
 
@@ -186,76 +239,106 @@ class AdminComissoesGlobalController
         echo '</div>';
 
         echo '<div class="alert alert-light border mb-4 small">';
-        echo '<strong>Fórmula:</strong> Bruto = total vendido pelo vendedor | Líquido = Bruto - Custo do Produto - Impostos | Comissão = Líquido × % da faixa';
+        echo '<strong>Fórmula:</strong> Bruto = total vendido (convertido para R$) | Líquido = Bruto − Custo − Impostos | Comissão = Líquido × % da faixa';
+        echo ' &nbsp;|&nbsp; <strong>Câmbio:</strong> 1 USD = R$ ' . number_format($usdToBrl, 4, ',', '.');
         echo '</div>';
 
-        // Filtros
+        // Filtro por período (seletor de mês)
+        $periodoSel = $periodoParam;
+        if ($periodoSel === '' && $dataInicio !== '') {
+            $dt = \DateTime::createFromFormat('Y-m-d', $dataInicio);
+            if ($dt && (int)$dt->format('d') === 10) $periodoSel = $dt->format('Y-m');
+        }
+
+        // Gerar lista de períodos: últimos 13 meses
+        $periodos = [];
+        $hoje = new \DateTime();
+        $diaHoje = (int)$hoje->format('d');
+        $mesBase = (int)$hoje->format('m');
+        $anoBase = (int)$hoje->format('Y');
+        if ($diaHoje < 10) {
+            $mesBase = $mesBase === 1 ? 12 : $mesBase - 1;
+            if ($mesBase === 12 && (int)$hoje->format('m') === 1) $anoBase--;
+        }
+        for ($i = 12; $i >= 0; $i--) {
+            $mm = $mesBase - $i; $aa = $anoBase;
+            while ($mm <= 0) { $mm += 12; $aa--; }
+            $key = sprintf('%04d-%02d', $aa, $mm);
+            [$di, $df] = $this->periodoDoMes($key);
+            $label = date('M/Y', mktime(0, 0, 0, $mm, 1, $aa)) . ' (' . date('d/m', strtotime($di)) . '–' . date('d/m', strtotime($df)) . ')';
+            $periodos[$key] = $label;
+        }
+
         echo '<div class="card mb-4"><div class="card-body">';
         echo '<form method="GET" class="row g-2 align-items-end">';
-        echo '<div class="col-md-3"><label class="form-label">Data início</label><input type="date" class="form-control" name="data_inicio" value="' . htmlspecialchars($dataInicio) . '"></div>';
-        echo '<div class="col-md-3"><label class="form-label">Data fim</label><input type="date" class="form-control" name="data_fim" value="' . htmlspecialchars($dataFim) . '"></div>';
-        echo '<div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Filtrar</button></div>';
+        echo '<div class="col-md-5"><label class="form-label fw-semibold">Período de comissão</label>';
+        echo '<select class="form-select" name="periodo" onchange="this.form.submit()">';
+        foreach ($periodos as $k => $label) {
+            echo '<option value="' . htmlspecialchars($k) . '"' . ($k === $periodoSel ? ' selected' : '') . '>' . htmlspecialchars($label) . '</option>';
+        }
+        echo '</select></div>';
+        echo '<div class="col-md-auto d-grid"><button class="btn btn-primary" type="submit"><i class="fas fa-filter me-1"></i>Filtrar</button></div>';
+        echo '<div class="col-md-auto align-self-end"><small class="text-muted">De <strong>' . date('d/m/Y', strtotime($dataInicio)) . '</strong> até <strong>' . date('d/m/Y', strtotime($dataFim)) . '</strong></small></div>';
         echo '</form></div></div>';
 
         // Vendas orgânicas
         if (!empty($organico)) {
             echo '<div class="card mb-4"><div class="card-header bg-success bg-opacity-10"><strong><i class="fas fa-leaf me-1"></i>Vendas Orgânicas (sem vendedor atribuído)</strong></div><div class="card-body">';
-            foreach ($organico as $m => $t) {
-                echo '<div class="mb-2"><span class="badge bg-secondary">' . htmlspecialchars($m) . '</span> ';
-                echo $t['qtd'] . ' pedidos | Bruto: <strong>' . $this->fmt($t['faturado'], $m) . '</strong>';
-                echo ' | Custo: ' . $this->fmt($t['custo'], $m);
-                echo ' | Impostos: ' . $this->fmt($t['impostos'], $m);
-                echo ' | Líquido: <strong>' . $this->fmt($t['liquido'], $m) . '</strong></div>';
-            }
+            echo $organico['qtd'] . ' pedidos | Bruto: <strong>' . $this->fmt($organico['faturado'], 'BRL') . '</strong>';
+            echo ' | Custo: ' . $this->fmt($organico['custo'], 'BRL');
+            echo ' | Impostos: ' . $this->fmt($organico['impostos'], 'BRL');
+            echo ' | Líquido: <strong>' . $this->fmt($organico['liquido'], 'BRL') . '</strong>';
             echo '</div></div>';
         }
 
-        // Tabela por vendedor
-        echo '<div class="card mb-4"><div class="card-header"><strong>Comissões por Vendedor (Pedidos Manuais + Processamento)</strong></div><div class="card-body">';
+        // Tabela por vendedor — tudo em BRL
+        echo '<div class="card mb-4"><div class="card-header"><strong>Comissões por Vendedor (Pedidos Manuais + Processamento) — valores em R$</strong></div><div class="card-body">';
         echo '<div class="table-responsive"><table class="table table-hover table-sm">';
-        echo '<thead><tr><th>Vendedor</th><th>Moeda</th><th class="text-end">Pedidos</th><th class="text-end">Bruto (Total Vendido)</th><th class="text-end">Custo Produto</th><th class="text-end">Impostos</th><th class="text-end">Líquido</th><th class="text-end">% Comissão</th><th class="text-end">Comissão Manual</th><th class="text-end">Comissão Proc.</th><th class="text-end">Total Comissão</th></tr></thead><tbody>';
+        echo '<thead><tr>'
+            . '<th>Vendedor</th>'
+            . '<th class="text-end">Pedidos</th>'
+            . '<th class="text-end">Bruto (R$)</th>'
+            . '<th class="text-end">Custo Produto</th>'
+            . '<th class="text-end">Impostos</th>'
+            . '<th class="text-end">Líquido</th>'
+            . '<th class="text-end">% Comissão</th>'
+            . '<th class="text-end">Comissão Manual</th>'
+            . '<th class="text-end">Comissão Proc.</th>'
+            . '<th class="text-end">Total Comissão</th>'
+            . '</tr></thead><tbody>';
 
         $allUids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
         sort($allUids);
-
-        $grandTotal = ['USD' => 0, 'BRL' => 0];
+        $grandTotal = 0.0;
 
         foreach ($allUids as $uid) {
             if ($uid <= 0) continue;
             $nome = $nomes[$uid] ?? ('Vendedor #' . $uid);
-            $moedas = array_unique(array_merge(array_keys($porVendedor[$uid] ?? []), array_keys($comProc[$uid] ?? [])));
-            foreach ($moedas as $m) {
-                $t = $porVendedor[$uid][$m] ?? ['faturado' => 0, 'impostos' => 0, 'custo' => 0, 'liquido' => 0, 'qtd' => 0];
-                $pct = $this->resolvePercentualPorFaixas($t['faturado'], $faixas);
-                $comManual = max(0, $t['liquido']) * ($pct / 100);
-                $cp = $comProc[$uid][$m] ?? ['total_comissao' => 0, 'total_base' => 0];
-                $comProcVal = (float) ($cp['total_comissao'] ?? 0);
-                $totalCom = $comManual + $comProcVal;
-                $grandTotal[$m] = ($grandTotal[$m] ?? 0) + $totalCom;
+            $t = $porVendedor[$uid] ?? ['faturado' => 0.0, 'impostos' => 0.0, 'custo' => 0.0, 'liquido' => 0.0, 'qtd' => 0];
+            $pct        = $this->resolvePercentualPorFaixas($t['faturado'], $faixas);
+            $comManual  = max(0.0, $t['liquido']) * ($pct / 100);
+            $comProcVal = (float)($comProc[$uid] ?? 0);
+            $totalCom   = $comManual + $comProcVal;
+            $grandTotal += $totalCom;
 
-                echo '<tr>';
-                echo '<td>' . htmlspecialchars($nome) . '</td>';
-                echo '<td>' . htmlspecialchars($m) . '</td>';
-                echo '<td class="text-end">' . $t['qtd'] . '</td>';
-                echo '<td class="text-end">' . $this->fmt($t['faturado'], $m) . '</td>';
-                echo '<td class="text-end">' . $this->fmt($t['custo'], $m) . '</td>';
-                echo '<td class="text-end">' . $this->fmt($t['impostos'], $m) . '</td>';
-                echo '<td class="text-end">' . $this->fmt($t['liquido'], $m) . '</td>';
-                echo '<td class="text-end">' . number_format($pct, 2, ',', '.') . '%</td>';
-                echo '<td class="text-end">' . $this->fmt($comManual, $m) . '</td>';
-                echo '<td class="text-end">' . $this->fmt($comProcVal, $m) . '</td>';
-                echo '<td class="text-end fw-bold">' . $this->fmt($totalCom, $m) . '</td>';
-                echo '</tr>';
-            }
+            echo '<tr>';
+            echo '<td>' . htmlspecialchars($nome) . '</td>';
+            echo '<td class="text-end">' . $t['qtd'] . '</td>';
+            echo '<td class="text-end">' . $this->fmt($t['faturado'], 'BRL') . '</td>';
+            echo '<td class="text-end">' . $this->fmt($t['custo'], 'BRL') . '</td>';
+            echo '<td class="text-end">' . $this->fmt($t['impostos'], 'BRL') . '</td>';
+            echo '<td class="text-end">' . $this->fmt($t['liquido'], 'BRL') . '</td>';
+            echo '<td class="text-end">' . number_format($pct, 2, ',', '.') . '%</td>';
+            echo '<td class="text-end">' . $this->fmt($comManual, 'BRL') . '</td>';
+            echo '<td class="text-end">' . $this->fmt($comProcVal, 'BRL') . '</td>';
+            echo '<td class="text-end fw-bold">' . $this->fmt($totalCom, 'BRL') . '</td>';
+            echo '</tr>';
         }
 
         echo '</tbody><tfoot><tr class="table-dark">';
-        echo '<td colspan="10" class="text-end fw-bold">Total Geral</td>';
-        echo '<td class="text-end fw-bold">';
-        foreach ($grandTotal as $m => $v) {
-            if ($v > 0) echo $this->fmt($v, $m) . '<br>';
-        }
-        echo '</td></tr></tfoot></table></div></div></div>';
+        echo '<td colspan="9" class="text-end fw-bold">Total Geral</td>';
+        echo '<td class="text-end fw-bold">' . $this->fmt($grandTotal, 'BRL') . '</td>';
+        echo '</tr></tfoot></table></div></div></div>';
 
         echo '</div>';
         $content = ob_get_clean();
