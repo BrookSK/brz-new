@@ -176,7 +176,19 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
 
             echo '<tr>';
             echo '<td>#' . (int) ($r['id'] ?? 0) . '</td>';
-            echo '<td>' . (int) ($r['usuario_id'] ?? 0) . '</td>';
+            echo '<td>';
+            $uNome  = htmlspecialchars((string)($r['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $uEmail = htmlspecialchars((string)($r['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $uSuite = (int)($r['usuario_suite'] ?? 0);
+            $uId    = (int)($r['usuario_id'] ?? 0);
+            if ($uNome !== '') {
+                echo '<a href="/admin/usuarios/detalhes/' . $uId . '" class="fw-semibold text-decoration-none">' . $uNome . '</a>';
+                if ($uSuite > 0) echo '<div class="text-muted small">Suite ' . $uSuite . '</div>';
+                if ($uEmail !== '') echo '<div class="text-muted small">' . $uEmail . '</div>';
+            } else {
+                echo '<a href="/admin/usuarios/detalhes/' . $uId . '" class="text-muted">#' . $uId . '</a>';
+            }
+            echo '</td>';
             echo '<td><div class="fw-semibold">' . htmlspecialchars((string) ($r['pagador_nome'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>';
             echo '<div class="text-muted small">' . htmlspecialchars((string) ($r['pagador_email'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div></td>';
             echo '<td class="text-muted small">' . htmlspecialchars((string) ($r['pagador_documento'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';

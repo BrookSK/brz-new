@@ -85,10 +85,12 @@ class AdminClubeRecargasController extends Controller {
             if ($limit <= 0) $limit = 200;
             if ($limit > 1000) $limit = 1000;
 
-            $stmt = $db->prepare("SELECT id, usuario_id, pagador_nome, pagador_email, pagador_documento, metodo, moeda, valor, usd_brl_rate, valor_brl, gateway, payment_id, status, tipo_recarga, locked_until, created_at, paid_at
-                FROM carteira_recargas
-                WHERE origem = 'clube_quick_checkout'
-                ORDER BY created_at DESC, id DESC
+            $stmt = $db->prepare("SELECT cr.id, cr.usuario_id, cr.pagador_nome, cr.pagador_email, cr.pagador_documento, cr.metodo, cr.moeda, cr.valor, cr.usd_brl_rate, cr.valor_brl, cr.gateway, cr.payment_id, cr.status, cr.tipo_recarga, cr.locked_until, cr.created_at, cr.paid_at,
+                COALESCE(u.nome, u.name, '') AS usuario_nome, COALESCE(u.email, '') AS usuario_email, COALESCE(u.suite, 0) AS usuario_suite
+                FROM carteira_recargas cr
+                LEFT JOIN usuarios u ON u.id = cr.usuario_id
+                WHERE cr.origem = 'clube_quick_checkout'
+                ORDER BY cr.created_at DESC, cr.id DESC
                 LIMIT {$limit}");
             $stmt->execute();
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
