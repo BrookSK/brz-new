@@ -666,16 +666,22 @@ class PedidoManualService {
             return ['success' => false, 'error' => 'Tabela pedidos não encontrada'];
         }
 
-        $colMoeda = in_array('moeda', $colsPedidos, true) ? 'moeda' : (in_array('currency', $colsPedidos, true) ? 'currency' : '');
-        $colTotal = $this->pickFirstExistingColumn($colsPedidos, ['total', 'valor_total', 'amount', 'valor']);
-        $colUsuarioId = $this->pickFirstExistingColumn($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
-        $colNumeroPedido = $this->pickFirstExistingColumn($colsPedidos, ['numero_pedido', 'codigo', 'order_number']);
+        $colMoeda       = in_array('moeda', $colsPedidos, true) ? 'moeda' : (in_array('currency', $colsPedidos, true) ? 'currency' : '');
+        $colTotal       = $this->pickFirstExistingColumn($colsPedidos, ['total', 'valor_total', 'amount', 'valor']);
+        $colUsuarioId   = $this->pickFirstExistingColumn($colsPedidos, ['usuario_id', 'user_id', 'cliente_id']);
+        $colNumeroPedido = $this->pickFirstExistingColumn($colsPedidos, ['numero_pedido', 'codigo_pedido', 'codigo', 'order_number']);
+        $colTaxa        = $this->pickFirstExistingColumn($colsPedidos, ['taxa_servico', 'servicos']);
+        $colSubtotal    = $this->pickFirstExistingColumn($colsPedidos, ['subtotal_produtos', 'subtotal']);
+        $colImpostos    = $this->pickFirstExistingColumn($colsPedidos, ['valor_impostos', 'impostos']);
 
         $select = ['id'];
-        if ($colMoeda !== '') $select[] = $colMoeda . ' AS moeda';
-        if ($colTotal !== '') $select[] = $colTotal . ' AS total';
-        if ($colUsuarioId !== '') $select[] = $colUsuarioId . ' AS usuario_id';
+        if ($colMoeda !== '')        $select[] = $colMoeda . ' AS moeda';
+        if ($colTotal !== '')        $select[] = $colTotal . ' AS total';
+        if ($colUsuarioId !== '')    $select[] = $colUsuarioId . ' AS usuario_id';
         if ($colNumeroPedido !== '') $select[] = $colNumeroPedido . ' AS numero_pedido';
+        if ($colTaxa !== '')         $select[] = $colTaxa . ' AS taxa_servico';
+        if ($colSubtotal !== '')     $select[] = $colSubtotal . ' AS subtotal_produtos';
+        if ($colImpostos !== '')     $select[] = $colImpostos . ' AS valor_impostos';
 
         $stmt = $this->db->prepare('SELECT ' . implode(', ', $select) . ' FROM pedidos WHERE id = ? LIMIT 1');
         $stmt->execute([$pedidoId]);
@@ -695,6 +701,25 @@ class PedidoManualService {
             return ['success' => false, 'error' => 'Total inválido para cobrança'];
         }
 
+        // Calcular split: produtos vs taxas+impostos
+        $taxaServico    = (float) ($pedido['taxa_servico'] ?? 0);
+        $subtotalProd   = (float) ($pedido['subtotal_produtos'] ?? 0);
+        $valorImpostos  = (float) ($pedido['valor_impostos'] ?? 0);
+
+        if ($subtotalProd > 0) {
+            $valorProdutos = round(max(0.0, $subtotalProd), 2);
+        } else {
+            $valorProdutos = round(max(0.0, $totalUsd - $taxaServico - $valorImpostos), 2);
+        }
+        $valorTaxas = round(max(0.0, $taxaServico + $valorImpostos), 2);
+
+        // Se não há separação clara, usar total inteiro no link de produtos
+        if ($valorProdutos <= 0 && $valorTaxas <= 0) {
+            $valorProdutos = $totalUsd;
+            $valorTaxas    = 0.0;
+        }
+
+        // Buscar email do cliente
         $email = '';
         try {
             $uid = (int) ($pedido['usuario_id'] ?? 0);
@@ -703,38 +728,55 @@ class PedidoManualService {
                 $stmtU->execute([$uid]);
                 $email = (string) ($stmtU->fetchColumn() ?: '');
             }
-        } catch (\Exception $e) {
-            $email = '';
-        }
+        } catch (\Exception $e) {}
 
-        $descricao = 'Pedido #' . (string) (($pedido['numero_pedido'] ?? '') !== '' ? $pedido['numero_pedido'] : $pedidoId);
-
+        $numeroPedido = (string) (($pedido['numero_pedido'] ?? '') !== '' ? $pedido['numero_pedido'] : $pedidoId);
         $paySvc = new PaymentService();
-        $session = $paySvc->createStripeCheckoutSession($pedidoId, $totalUsd, $descricao, ['email' => $email]);
-        if (empty($session['success'])) {
-            return ['success' => false, 'error' => (string) ($session['error'] ?? 'Falha ao criar link Stripe')];
+
+        // ── Link 1: Produtos ────────────────────────────────────────────────
+        $sessionProdutos = null;
+        if ($valorProdutos > 0) {
+            $descProdutos = 'Pedido #' . $numeroPedido . ' — Produtos';
+            $sessionProdutos = $paySvc->createStripeCheckoutSession($pedidoId, $valorProdutos, $descProdutos, ['email' => $email]);
+            if (empty($sessionProdutos['success'])) {
+                return ['success' => false, 'error' => (string) ($sessionProdutos['error'] ?? 'Falha ao criar link Stripe (produtos)')];
+            }
+            // Persistir o pagamento de produtos
+            $this->persistirPagamentoNoPedido($pedidoId, [
+                'billingType'  => 'CREDIT_CARD',
+                'payment_id'   => (string) ($sessionProdutos['payment_intent_id'] ?? $sessionProdutos['session_id'] ?? ''),
+                'invoiceUrl'   => (string) ($sessionProdutos['url'] ?? ''),
+                'status'       => 'pending',
+            ], 'stripe');
         }
 
-        $payResult = [
-            'billingType' => 'CREDIT_CARD',
-            'payment_id' => (string) ($session['payment_intent_id'] ?? ''),
-            'invoiceUrl' => (string) ($session['url'] ?? ''),
-        ];
-
-        // Se não veio payment_intent, usar session_id como fallback (ao menos para exibição do link)
-        if ($payResult['payment_id'] === '') {
-            $payResult['payment_id'] = (string) ($session['session_id'] ?? '');
+        // ── Link 2: Taxas + Impostos ─────────────────────────────────────────
+        $sessionTaxas = null;
+        if ($valorTaxas > 0) {
+            $descTaxas = 'Pedido #' . $numeroPedido . ' — Taxas e Impostos';
+            $sessionTaxas = $paySvc->createStripeCheckoutSession($pedidoId, $valorTaxas, $descTaxas, ['email' => $email]);
+            if (empty($sessionTaxas['success'])) {
+                return ['success' => false, 'error' => (string) ($sessionTaxas['error'] ?? 'Falha ao criar link Stripe (taxas)')];
+            }
         }
-
-        $this->persistirPagamentoNoPedido($pedidoId, $payResult, 'stripe');
 
         return [
-            'success' => true,
-            'pedido_id' => $pedidoId,
-            'payment_id' => $payResult['payment_id'],
-            'invoiceUrl' => (string) ($session['url'] ?? ''),
-            'billingType' => 'CREDIT_CARD',
-            'status' => 'pending',
+            'success'    => true,
+            'split'      => true,
+            'pedido_id'  => $pedidoId,
+            'moeda'      => $moeda,
+            'produto'    => $sessionProdutos ? [
+                'success'    => true,
+                'invoiceUrl' => (string) ($sessionProdutos['url'] ?? ''),
+                'payment_id' => (string) ($sessionProdutos['payment_intent_id'] ?? $sessionProdutos['session_id'] ?? ''),
+                'valor'      => $valorProdutos,
+            ] : null,
+            'taxa'       => $sessionTaxas ? [
+                'success'    => true,
+                'invoiceUrl' => (string) ($sessionTaxas['url'] ?? ''),
+                'payment_id' => (string) ($sessionTaxas['payment_intent_id'] ?? $sessionTaxas['session_id'] ?? ''),
+                'valor'      => $valorTaxas,
+            ] : null,
         ];
     }
 

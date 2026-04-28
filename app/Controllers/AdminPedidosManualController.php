@@ -1586,12 +1586,21 @@ function gerarLinkPagamento(){
                 if (isSplit) {
                     const produto = data.produto || null;
                     const taxa = data.taxa || null;
+                    const isStripe = (data.moeda && data.moeda !== 'BRL');
 
-                    el.innerHTML = `<div class="alert alert-success">
-                        <strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + link de pagamento AppMax para taxas).
-                    </div>
-                    ${buildSection('Pagamento 1: Produtos (Câmbio Real — Link de Checkout)', produto)}
-                    ${buildSection('Pagamento 2: Taxas e Impostos (AppMax — Link de Pagamento)', taxa)}
+                    const label1 = isStripe
+                        ? 'Pagamento 1: Produtos (Stripe — Cartão de Crédito)'
+                        : 'Pagamento 1: Produtos (Câmbio Real — Link de Checkout)';
+                    const label2 = isStripe
+                        ? 'Pagamento 2: Taxas e Impostos (Stripe — Cartão de Crédito)'
+                        : 'Pagamento 2: Taxas e Impostos (AppMax — Link de Pagamento)';
+                    const alertMsg = isStripe
+                        ? '<strong>Links Stripe gerados.</strong> Copie e envie para o cliente (link de produtos + link de taxas/impostos).'
+                        : '<strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + link de pagamento AppMax para taxas).';
+
+                    el.innerHTML = `<div class="alert alert-success">${alertMsg}</div>
+                    ${produto ? buildSection(label1, produto) : ''}
+                    ${taxa ? buildSection(label2, taxa) : ''}
                     <div class="small text-muted mt-2">Se precisar, você pode ajustar o pedido e gerar novamente.</div>`;
                 } else {
                     const url = String(data.invoiceUrl || '').trim();
