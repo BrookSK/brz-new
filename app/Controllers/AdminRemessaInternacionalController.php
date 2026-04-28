@@ -235,9 +235,8 @@ class AdminRemessaInternacionalController extends Controller {
         }
 
         $inicio = (string) $j['data_inicio'];
-        $fim = (string) $j['data_fim'];
+        $fim    = (string) $j['data_fim'];
 
-        // Apenas pedidos em Caixa Fechada dentro do período entram na janela
         $cols = [];
         try {
             $stCols = $this->connection->query('DESCRIBE pedidos');
@@ -246,27 +245,25 @@ class AdminRemessaInternacionalController extends Controller {
             $cols = [];
         }
 
-        // Apenas pedidos com status Caixa Fechada e NÃO cancelados/deletados
-        $canceladoWhere = '';
-        // Tentar filtrar deleted_at — ignora se coluna não existir (tratado no catch da query)
-        $canceladoWhere .= " AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','lixeira','deleted')";
+        // Critério de status: qualquer pedido pago (não cancelado, não deletado)
+        // A janela é determinada pela data de CRIAÇÃO do pedido (created_at)
+        $paidStatusWhere = "(LOWER(COALESCE(p.status,'')) IN ("
+            . "'pago','paid','approved','aprovado',"
+            . "'produto_consolidado','consolidado',"
+            . "'processando','processing',"
+            . "'em_transporte','enviado','entregue'"
+            . "))";
+
+        $canceladoWhere = " AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','lixeira','deleted')";
         $hasDeletedAt = is_array($cols) && in_array('deleted_at', $cols, true);
         if ($hasDeletedAt) {
             $canceladoWhere .= ' AND p.deleted_at IS NULL';
         }
-        $paidStatusWhere = "(LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado'))";
 
-        // Usar pago_em se existir (mais preciso), senão created_at.
-        // NÃO usar updated_at — ele muda em qualquer alteração (cancelamento, etc.)
-        $dateCol = 'id'; // fallback sem filtro de data
-        if (is_array($cols)) {
-            if (in_array('pago_em', $cols, true)) {
-                $dateCol = 'p.pago_em';
-            } elseif (in_array('consolidado_em', $cols, true)) {
-                $dateCol = 'p.consolidado_em';
-            } elseif (in_array('created_at', $cols, true)) {
-                $dateCol = 'p.created_at';
-            }
+        // Sempre usar created_at para determinar a janela
+        $dateCol = 'id'; // fallback sem filtro
+        if (is_array($cols) && in_array('created_at', $cols, true)) {
+            $dateCol = 'p.created_at';
         }
         $dateWhere = ($dateCol === 'id') ? '1=1' : ("{$dateCol} >= ? AND {$dateCol} <= ?");
 
@@ -289,8 +286,7 @@ class AdminRemessaInternacionalController extends Controller {
             }
         }
 
-        // Excluir pedidos que já estão em outra janela (evitar duplicatas entre janelas)
-        // Sempre tenta filtrar deleted_at; se a coluna não existir, o catch remove o filtro
+        // Excluir pedidos já em outra janela e pedidos cancelados/deletados
         $sqlBase = "SELECT p.id FROM pedidos p {$joinEndereco}
                 WHERE {$paidStatusWhere}
                   AND {$dateWhere}
