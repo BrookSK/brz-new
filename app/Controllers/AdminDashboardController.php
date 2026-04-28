@@ -83,12 +83,31 @@ class AdminDashboardController extends Controller {
                 $stats['pedidos_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM pedidos");
                 $stats['usuarios_total'] = $this->safeScalar($pdo, "SELECT COUNT(*) as total FROM usuarios");
 
+                $fatBrlAdmin = 0.0;
+                $fatUsdAdmin = 0.0;
                 if ($pedidoTotalCol) {
-                    $stats['faturamento_total'] = $this->safeScalar($pdo, "SELECT COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago'");
-                } else {
-                    $stats['faturamento_total'] = 0;
+                    $colMoedaAdmin = $this->columnExists($pdo, 'pedidos', 'moeda') ? 'moeda' : ($this->columnExists($pdo, 'pedidos', 'currency') ? 'currency' : null);
+                    if ($colMoedaAdmin) {
+                        try {
+                            $stAdmin = $pdo->query("SELECT UPPER(COALESCE({$colMoedaAdmin},'BRL')) as moeda, COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago' GROUP BY UPPER(COALESCE({$colMoedaAdmin},'BRL'))");
+                            $rowsAdmin = $stAdmin ? ($stAdmin->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+                            foreach ($rowsAdmin as $r) {
+                                $m = strtoupper(trim((string)($r['moeda'] ?? '')));
+                                $v = (float)($r['total'] ?? 0);
+                                if ($m === 'USD') { $fatUsdAdmin += $v; } else { $fatBrlAdmin += $v; }
+                            }
+                        } catch (\Exception $e) {
+                            $fatBrlAdmin = (float)$this->safeScalar($pdo, "SELECT COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago'");
+                        }
+                    } else {
+                        $fatBrlAdmin = (float)$this->safeScalar($pdo, "SELECT COALESCE(SUM({$pedidoTotalCol}),0) as total FROM pedidos WHERE status = 'pago'");
+                    }
                 }
-                $stats['faturamento_display'] = 'R$ ' . number_format((float) ($stats['faturamento_total'] ?? 0), 2, ',', '.');
+                $stats['faturamento_total'] = $fatBrlAdmin + $fatUsdAdmin;
+                $partsAdmin = [];
+                if ($fatBrlAdmin > 0) $partsAdmin[] = 'R$ ' . number_format($fatBrlAdmin, 2, ',', '.');
+                if ($fatUsdAdmin > 0) $partsAdmin[] = 'US$ ' . number_format($fatUsdAdmin, 2, ',', '.');
+                $stats['faturamento_display'] = !empty($partsAdmin) ? implode(' / ', $partsAdmin) : 'R$ 0,00';
             } else {
                 $colAdminCriador = null;
                 foreach (['admin_criador_id', 'admin_creator_id', 'created_by_admin_id', 'criador_admin_id', 'admin_id'] as $c) {
@@ -553,6 +572,8 @@ class AdminDashboardController extends Controller {
 
                     $pid = (int) ($pedido['id'] ?? 0);
                     $hrefPedido = $pid > 0 ? ('/admin/correios-mundial/pedido/' . $pid) : '#';
+                    $moedaPed = strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL')));
+                    $simboloPed = ($moedaPed === 'USD') ? 'US$ ' : 'R$ ';
 
                     echo '<div class="d-flex justify-content-between align-items-center mb-2">'
                         . '<div>'
@@ -561,7 +582,7 @@ class AdminDashboardController extends Controller {
                         . '</div>'
                         . '<div class="text-end">'
                         . '<span class="badge bg-' . ((string) ($pedido['status'] ?? '') === 'pago' ? 'success' : 'warning') . '">' . htmlspecialchars(ucfirst((string) ($pedido['status'] ?? '-'))) . '</span>'
-                        . '<br><strong>R$ ' . number_format($valorTotalPedido, 2, ',', '.') . '</strong>'
+                        . '<br><strong>' . $simboloPed . number_format($valorTotalPedido, 2, ',', '.') . '</strong>'
                         . '</div>'
                         . '</div>';
                 }
@@ -695,7 +716,7 @@ class AdminDashboardController extends Controller {
                                 <div class="row no-gutters align-items-center">
                                     <div class="col mr-2">
                                         <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Faturamento</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">R$ ' . number_format($stats['faturamento_total'], 2, ',', '.') . '</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . htmlspecialchars((string)($stats['faturamento_display'] ?: ('R$ ' . number_format((float)($stats['faturamento_total'] ?? 0), 2, ',', '.')))) . '</div>
                                         <div class="text-xs text-muted">Total</div>
                                     </div>
                                     <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
@@ -923,7 +944,7 @@ class AdminDashboardController extends Controller {
                                         </div>
                                         <div class="text-end">
                                             <span class="badge bg-' . ($pedido['status'] == 'pago' ? 'success' : 'warning') . '">' . ucfirst($pedido['status']) . '</span>
-                                            <br><strong>R$ ' . number_format($valorTotalPedido, 2, ',', '.') . '</strong>
+                                            <br><strong>' . (strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL'))) === 'USD' ? 'US$ ' : 'R$ ') . number_format($valorTotalPedido, 2, ',', '.') . '</strong>
                                         </div>
                                     </div>';
                                 }
