@@ -246,15 +246,19 @@ class AdminRemessaInternacionalController extends Controller {
             $cols = [];
         }
 
-        $paidStatusWhere = "(LOWER(COALESCE(status,'')) IN ('produto_consolidado','consolidado'))";
+        // Apenas pedidos com status Caixa Fechada e NÃO cancelados/deletados
+        $canceladoWhere = '';
+        if (is_array($cols) && in_array('deleted_at', $cols, true)) {
+            $canceladoWhere .= ' AND p.deleted_at IS NULL';
+        }
+        $paidStatusWhere = "(LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado'))";
 
-        // Usar updated_at como referência de quando o pedido virou "Caixa Fechada",
-        // pois created_at/pago_em podem ser de antes da janela atual.
-        // Fallback: created_at, depois id (sem filtro de data).
-        $dateCol = 'id'; // fallback sem filtro
+        // Usar pago_em se existir (mais preciso), senão created_at.
+        // NÃO usar updated_at — ele muda em qualquer alteração (cancelamento, etc.)
+        $dateCol = 'id'; // fallback sem filtro de data
         if (is_array($cols)) {
-            if (in_array('updated_at', $cols, true)) {
-                $dateCol = 'p.updated_at';
+            if (in_array('pago_em', $cols, true)) {
+                $dateCol = 'p.pago_em';
             } elseif (in_array('consolidado_em', $cols, true)) {
                 $dateCol = 'p.consolidado_em';
             } elseif (in_array('created_at', $cols, true)) {
@@ -284,9 +288,10 @@ class AdminRemessaInternacionalController extends Controller {
 
         // Excluir pedidos que já estão em outra janela (evitar duplicatas entre janelas)
         $sql = "SELECT p.id FROM pedidos p {$joinEndereco}
-                WHERE ({$paidStatusWhere})
+                WHERE {$paidStatusWhere}
                   AND {$dateWhere}
                   AND {$wherePais}
+                  {$canceladoWhere}
                   AND p.id NOT IN (
                       SELECT pedido_id FROM remessa_janela_pedidos
                       WHERE janela_id != ?
@@ -307,6 +312,51 @@ class AdminRemessaInternacionalController extends Controller {
         foreach ($pedidoIds as $pid) {
             $stIns->execute([$janelaId, (int) $pid]);
         }
+
+        // Remover da janela pedidos que foram cancelados/deletados depois de entrar
+        $this->removeInvalidPedidosFromJanela($janelaId, $cols);
+    }
+
+    private function removeInvalidPedidosFromJanela(int $janelaId, array $cols): void {
+        // Buscar todos os pedido_ids desta janela
+        $stIds = $this->connection->prepare('SELECT pedido_id FROM remessa_janela_pedidos WHERE janela_id = ? AND etiqueta_gerada = 0');
+        $stIds->execute([$janelaId]);
+        $ids = $stIds->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+        if (!$ids) return;
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        // Pedidos que não existem mais ou foram cancelados/deletados
+        $deletadoWhere = '';
+        if (in_array('deleted_at', $cols, true)) {
+            $deletadoWhere = ' OR p.deleted_at IS NOT NULL';
+        }
+
+        $sql = "SELECT p.id FROM pedidos p
+                WHERE p.id IN ({$placeholders})
+                  AND (LOWER(COALESCE(p.status,'')) IN ('cancelado','cancelled','lixeira','deleted'){$deletadoWhere})";
+        $stCan = $this->connection->prepare($sql);
+        $stCan->execute($ids);
+        $cancelados = $stCan->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+        // Pedidos que não existem mais na tabela pedidos (foram hard-deleted)
+        $sqlMissing = "SELECT rjp.pedido_id FROM remessa_janela_pedidos rjp
+                       LEFT JOIN pedidos p ON p.id = rjp.pedido_id
+                       WHERE rjp.janela_id = ? AND rjp.etiqueta_gerada = 0 AND p.id IS NULL";
+        $stMissing = $this->connection->prepare($sqlMissing);
+        $stMissing->execute([$janelaId]);
+        $missing = $stMissing->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+        $toRemove = array_unique(array_merge(
+            array_map('intval', $cancelados),
+            array_map('intval', $missing)
+        ));
+
+        if (!$toRemove) return;
+
+        $phRem = implode(',', array_fill(0, count($toRemove), '?'));
+        $stDel = $this->connection->prepare("DELETE FROM remessa_janela_pedidos WHERE janela_id = ? AND pedido_id IN ({$phRem}) AND etiqueta_gerada = 0");
+        $stDel->execute(array_merge([$janelaId], $toRemove));
     }
 
     private function tryAutoCloseJanela(int $janelaId): void {
