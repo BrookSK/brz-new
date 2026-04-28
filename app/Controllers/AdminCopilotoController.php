@@ -477,6 +477,136 @@ class AdminCopilotoController extends Controller {
         return $configs;
     }
 
+    /**
+     * GET /admin/copiloto/analytics — Relatório de analytics do Co-Piloto
+     */
+    public function analytics(Request $request) {
+        $auth = new \App\Services\AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $periodo = max(1, min(365, (int) $request->getParam('periodo', 30)));
+        $pdo = Database::getConnection();
+
+        // KPIs gerais
+        $kpis = [];
+        try {
+            $st = $pdo->prepare("SELECT COUNT(DISTINCT sessao_id) as total_sessoes, COUNT(*) as total_mensagens, COUNT(DISTINCT usuario_id) as total_usuarios_unicos FROM copiloto_sessoes WHERE criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY)");
+            $st->execute([$periodo]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $kpis['total_sessoes'] = (int) ($row['total_sessoes'] ?? 0);
+            $kpis['total_mensagens'] = (int) ($row['total_mensagens'] ?? 0);
+            $kpis['total_usuarios_unicos'] = (int) ($row['total_usuarios_unicos'] ?? 0);
+        } catch (\Exception $e) {}
+
+        // Pedidos com influência do bot
+        $pedidos_bot = [];
+        $kpis['pedidos_com_bot'] = 0;
+        $kpis['total_pedidos_periodo'] = 0;
+        $kpis['valor_total_bot'] = 0;
+        try {
+            // Detectar colunas da tabela pedidos
+            $colsPed = $pdo->query('DESCRIBE pedidos')->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $colUsuario = in_array('usuario_id', $colsPed) ? 'usuario_id' : (in_array('cliente_id', $colsPed) ? 'cliente_id' : '');
+            $colStatus = in_array('status', $colsPed) ? 'status' : '';
+            $colTotal = in_array('valor_total', $colsPed) ? 'valor_total' : (in_array('total', $colsPed) ? 'total' : '');
+            $colMoeda = in_array('moeda', $colsPed) ? 'moeda' : '';
+            $colCreated = in_array('created_at', $colsPed) ? 'created_at' : (in_array('criado_em', $colsPed) ? 'criado_em' : '');
+            $colNome = in_array('nome', $colsPed) ? 'nome' : '';
+
+            // Buscar nome do usuário
+            $colsUsu = $pdo->query('DESCRIBE usuarios')->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $colNomeUsu = in_array('nome', $colsUsu) ? 'nome' : (in_array('name', $colsUsu) ? 'name' : '');
+
+            if ($colUsuario && $colCreated) {
+                // Total de pedidos no período
+                $stTotal = $pdo->prepare("SELECT COUNT(*) FROM pedidos WHERE {$colCreated} >= DATE_SUB(NOW(), INTERVAL ? DAY)");
+                $stTotal->execute([$periodo]);
+                $kpis['total_pedidos_periodo'] = (int) $stTotal->fetchColumn();
+
+                // Pedidos de usuários que usaram o bot no mesmo dia
+                $selectCols = "p.id as pedido_id";
+                if ($colCreated) $selectCols .= ", p.{$colCreated} as data_pedido";
+                if ($colStatus) $selectCols .= ", p.{$colStatus} as status";
+                if ($colTotal) $selectCols .= ", p.{$colTotal} as total";
+                if ($colMoeda) $selectCols .= ", p.{$colMoeda} as moeda";
+                $selectCols .= ", COALESCE(u.{$colNomeUsu}, 'Visitante') as cliente_nome";
+                $selectCols .= ", COUNT(cm.id) as msgs_chat";
+
+                $sql = "SELECT {$selectCols}
+                    FROM pedidos p
+                    LEFT JOIN usuarios u ON u.id = p.{$colUsuario}
+                    INNER JOIN copiloto_sessoes cs ON cs.usuario_id = p.{$colUsuario}
+                        AND DATE(cs.criado_em) = DATE(p.{$colCreated})
+                    LEFT JOIN copiloto_mensagens cm ON cm.sessao_id = cs.sessao_id
+                    WHERE p.{$colCreated} >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                    GROUP BY p.id
+                    ORDER BY p.{$colCreated} DESC
+                    LIMIT 50";
+                $st = $pdo->prepare($sql);
+                $st->execute([$periodo]);
+                $pedidos_bot = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $kpis['pedidos_com_bot'] = count($pedidos_bot);
+
+                // Valor total
+                if ($colTotal && $colMoeda) {
+                    foreach ($pedidos_bot as $pb) {
+                        if (($pb['moeda'] ?? 'BRL') === 'BRL') {
+                            $kpis['valor_total_bot'] += (float) ($pb['total'] ?? 0);
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {}
+
+        // Gráfico: mensagens por dia
+        $grafico_dias = [];
+        try {
+            $st = $pdo->prepare("SELECT DATE(cm.criado_em) as dia, COUNT(*) as total, COUNT(DISTINCT cm.sessao_id) as sessoes FROM copiloto_mensagens cm WHERE cm.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY) GROUP BY DATE(cm.criado_em) ORDER BY dia ASC");
+            $st->execute([$periodo]);
+            $grafico_dias = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Gráfico: horários de pico
+        $grafico_horarios = [];
+        try {
+            $st = $pdo->prepare("SELECT HOUR(criado_em) as hora, COUNT(*) as total FROM copiloto_mensagens WHERE criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY) AND role = 'user' GROUP BY HOUR(criado_em) ORDER BY hora ASC");
+            $st->execute([$periodo]);
+            $grafico_horarios = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Gráfico: ações mais usadas
+        $grafico_acoes = [];
+        try {
+            $st = $pdo->prepare("SELECT acao, COUNT(*) as total FROM copiloto_mensagens WHERE criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY) AND role = 'assistant' AND acao IS NOT NULL AND acao != 'nenhuma' GROUP BY acao ORDER BY total DESC LIMIT 10");
+            $st->execute([$periodo]);
+            $grafico_acoes = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Páginas com mais interação
+        $paginas = [];
+        try {
+            $st = $pdo->prepare("SELECT cs.pagina_origem as pagina, COUNT(DISTINCT cs.sessao_id) as sessoes, COUNT(cm.id) as mensagens FROM copiloto_sessoes cs LEFT JOIN copiloto_mensagens cm ON cm.sessao_id = cs.sessao_id WHERE cs.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY) AND cs.pagina_origem IS NOT NULL GROUP BY cs.pagina_origem ORDER BY mensagens DESC LIMIT 15");
+            $st->execute([$periodo]);
+            $paginas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Perguntas mais frequentes (mensagens do usuário mais repetidas)
+        $perguntas_frequentes = [];
+        try {
+            $st = $pdo->prepare("SELECT cm.conteudo, JSON_UNQUOTE(JSON_EXTRACT(cm.contexto_pagina, '$.pagina')) as pagina, COUNT(*) as total FROM copiloto_mensagens cm WHERE cm.criado_em >= DATE_SUB(NOW(), INTERVAL ? DAY) AND cm.role = 'user' AND LENGTH(cm.conteudo) > 5 AND LENGTH(cm.conteudo) < 300 GROUP BY cm.conteudo ORDER BY total DESC LIMIT 30");
+            $st->execute([$periodo]);
+            $perguntas_frequentes = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        $title = 'Co-Piloto — Analytics';
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/copiloto/analytics.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
     private function salvarConfig(\PDO $pdo, string $chave, string $valor): void {
         $chaveCompleta = 'copiloto_' . $chave;
         $st = $pdo->prepare("SELECT COUNT(*) FROM configuracoes_sistema WHERE chave = ?");

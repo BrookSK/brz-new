@@ -6,6 +6,9 @@
             <p class="text-muted mb-0">Configurações do assistente inteligente do site</p>
         </div>
                 <div class="d-flex gap-2">
+                    <a href="/admin/copiloto/analytics" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-chart-bar me-1"></i>Analytics
+                    </a>
                     <a href="/admin/copiloto/aprendizado" class="btn btn-outline-primary btn-sm">
                         <i class="fas fa-brain me-1"></i>Aprendizado
                         <?php if (($stats['total_pendencias'] ?? 0) > 0): ?>

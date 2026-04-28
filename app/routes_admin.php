@@ -218,6 +218,7 @@ $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
 // Co-Piloto Braziliana
 $router->get('/admin/copiloto', 'AdminCopilotoController', 'index');
 $router->post('/admin/copiloto/salvar', 'AdminCopilotoController', 'salvar');
+$router->get('/admin/copiloto/analytics', 'AdminCopilotoController', 'analytics');
 $router->get('/admin/copiloto/aprendizado', 'AdminCopilotoController', 'aprendizado');
 $router->post('/admin/copiloto/aprendizado/aceitar/{id}', 'AdminCopilotoController', 'aceitarPendencia');
 $router->post('/admin/copiloto/aprendizado/recusar/{id}', 'AdminCopilotoController', 'recusarPendencia');
