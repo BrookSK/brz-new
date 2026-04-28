@@ -248,7 +248,19 @@ class AdminRemessaInternacionalController extends Controller {
 
         $paidStatusWhere = "(LOWER(COALESCE(status,'')) IN ('produto_consolidado','consolidado'))";
 
-        $dateCol = (is_array($cols) && in_array('pago_em', $cols, true)) ? 'pago_em' : ((is_array($cols) && in_array('created_at', $cols, true)) ? 'created_at' : 'id');
+        // Usar updated_at como referência de quando o pedido virou "Caixa Fechada",
+        // pois created_at/pago_em podem ser de antes da janela atual.
+        // Fallback: created_at, depois id (sem filtro de data).
+        $dateCol = 'id'; // fallback sem filtro
+        if (is_array($cols)) {
+            if (in_array('updated_at', $cols, true)) {
+                $dateCol = 'updated_at';
+            } elseif (in_array('consolidado_em', $cols, true)) {
+                $dateCol = 'consolidado_em';
+            } elseif (in_array('created_at', $cols, true)) {
+                $dateCol = 'created_at';
+            }
+        }
         $dateWhere = ($dateCol === 'id') ? '1=1' : ("{$dateCol} >= ? AND {$dateCol} <= ?");
 
         $joinEndereco = '';
@@ -270,12 +282,20 @@ class AdminRemessaInternacionalController extends Controller {
             }
         }
 
-        $sql = "SELECT p.id FROM pedidos p {$joinEndereco} WHERE ({$paidStatusWhere}) AND {$dateWhere} AND {$wherePais}";
+        // Excluir pedidos que já estão em outra janela (evitar duplicatas entre janelas)
+        $sql = "SELECT p.id FROM pedidos p {$joinEndereco}
+                WHERE ({$paidStatusWhere})
+                  AND {$dateWhere}
+                  AND {$wherePais}
+                  AND p.id NOT IN (
+                      SELECT pedido_id FROM remessa_janela_pedidos
+                      WHERE janela_id != ?
+                  )";
         $stP = $this->connection->prepare($sql);
         if ($dateCol === 'id') {
-            $stP->execute();
+            $stP->execute([$janelaId]);
         } else {
-            $stP->execute([$inicio, $fim]);
+            $stP->execute([$inicio, $fim, $janelaId]);
         }
         $pedidoIds = $stP->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
@@ -302,10 +322,26 @@ class AdminRemessaInternacionalController extends Controller {
         $stPend = $this->connection->prepare('SELECT COUNT(*) FROM remessa_janela_pedidos WHERE janela_id = ? AND etiqueta_gerada = 0');
         $stPend->execute([$janelaId]);
         $pend = (int) $stPend->fetchColumn();
+
+        // Só fecha automaticamente se TODOS os pedidos têm etiqueta gerada
+        // e a janela já passou do período (não fechar janelas ainda ativas)
         if ($pend === 0) {
-            $stUp = $this->connection->prepare("UPDATE remessa_janelas SET status = 'remessa_gerada', closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = ?");
-            $stUp->execute([$janelaId]);
+            $stJ = $this->connection->prepare('SELECT data_fim, status FROM remessa_janelas WHERE id = ? LIMIT 1');
+            $stJ->execute([$janelaId]);
+            $jRow = $stJ->fetch(\PDO::FETCH_ASSOC);
+            if (!$jRow) return;
+
+            $dataFim = new \DateTime((string) $jRow['data_fim']);
+            $now = $this->now();
+
+            // Só auto-fecha se a janela já expirou (data_fim < agora)
+            if ($dataFim < $now) {
+                $stUp = $this->connection->prepare("UPDATE remessa_janelas SET status = 'remessa_gerada', closed_at = COALESCE(closed_at, NOW()), updated_at = NOW() WHERE id = ?");
+                $stUp->execute([$janelaId]);
+            }
         }
+        // Se ainda tem etiquetas pendentes, NÃO fecha — mantém o status atual
+        // O dashboard mostrará o aviso de etiquetas pendentes
     }
 
     public function index($request) {
@@ -461,6 +497,8 @@ class AdminRemessaInternacionalController extends Controller {
                                 
                                 foreach ($janelasAbertas as $janela) {
                                     $statusClass = $janela['status'] == 'aberta' ? 'success' : 'secondary';
+                                    $pendentes = (int) ($janela['etiquetas_pendentes'] ?? 0);
+                                    $totalPed  = (int) ($janela['total_pedidos'] ?? 0);
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
@@ -470,8 +508,10 @@ class AdminRemessaInternacionalController extends Controller {
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
                                                     <span class="badge bg-' . $statusClass . '">' . ucfirst($janela['status']) . '</span>
-                                                </p>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
+                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' pedido(s)</span>
+                                                </p>'
+                                                . ($pendentes > 0 ? '<div class="alert alert-warning py-1 px-2 mb-2 small"><i class="fas fa-tag me-1"></i><strong>' . $pendentes . ' etiqueta(s) pendente(s)</strong></div>' : '')
+                                                . '<button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
                                                     <i class="fas fa-eye"></i> Ver Pedidos
                                                 </button>
                                             </div>
@@ -503,6 +543,8 @@ class AdminRemessaInternacionalController extends Controller {
                                 <div class="row">';
 
                                 foreach ($janelasFinalizadas as $janela) {
+                                    $pendentes = (int) ($janela['etiquetas_pendentes'] ?? 0);
+                                    $totalPed  = (int) ($janela['total_pedidos'] ?? 0);
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
@@ -512,8 +554,10 @@ class AdminRemessaInternacionalController extends Controller {
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
                                                     <span class="badge bg-secondary">Finalizada</span>
-                                                </p>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
+                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' pedido(s)</span>
+                                                </p>'
+                                                . ($pendentes > 0 ? '<div class="alert alert-warning py-1 px-2 mb-2 small"><i class="fas fa-tag me-1"></i><strong>' . $pendentes . ' etiqueta(s) pendente(s)</strong> — não pode ser fechada</div>' : '')
+                                                . '<button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
                                                     <i class="fas fa-eye"></i> Ver Pedidos
                                                 </button>
                                             </div>
@@ -544,6 +588,8 @@ class AdminRemessaInternacionalController extends Controller {
                                 <div class="row">';
 
                                 foreach ($janelasAtraso as $janela) {
+                                    $pendentes = (int) ($janela['etiquetas_pendentes'] ?? 0);
+                                    $totalPed  = (int) ($janela['total_pedidos'] ?? 0);
                                     echo '<div class="col-md-4 mb-3">
                                         <div class="card janela-card">
                                             <div class="card-body">
@@ -553,8 +599,10 @@ class AdminRemessaInternacionalController extends Controller {
                                                         <i class="fas fa-calendar"></i> ' . date('d/m/Y', strtotime($janela['data_inicio'])) . ' a ' . date('d/m/Y', strtotime($janela['data_fim'])) . '
                                                     </small><br>
                                                     <span class="badge bg-danger">Atraso</span>
-                                                </p>
-                                                <button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
+                                                    <span class="badge bg-light text-dark ms-1">' . $totalPed . ' pedido(s)</span>
+                                                </p>'
+                                                . ($pendentes > 0 ? '<div class="alert alert-danger py-1 px-2 mb-2 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>' . $pendentes . ' etiqueta(s) pendente(s)</strong> — gere as etiquetas para fechar</div>' : '')
+                                                . '<button class="btn btn-sm btn-outline-primary" onclick="verJanela(' . $janela['id'] . ')">
                                                     <i class="fas fa-eye"></i> Ver Pedidos
                                                 </button>
                                             </div>
@@ -1071,7 +1119,25 @@ class AdminRemessaInternacionalController extends Controller {
         $sql = "SELECT id, data_inicio, data_fim, status, closed_at, created_at, updated_at FROM remessa_janelas WHERE status IN ({$placeholders}) ORDER BY data_inicio DESC LIMIT 50";
         $st = $this->connection->prepare($sql);
         $st->execute($statuses);
-        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $janelas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Enriquecer com contagem de pedidos e etiquetas pendentes
+        foreach ($janelas as &$janela) {
+            $jid = (int) $janela['id'];
+            try {
+                $stCount = $this->connection->prepare('SELECT COUNT(*) as total, SUM(CASE WHEN etiqueta_gerada = 0 THEN 1 ELSE 0 END) as pendentes FROM remessa_janela_pedidos WHERE janela_id = ?');
+                $stCount->execute([$jid]);
+                $row = $stCount->fetch(\PDO::FETCH_ASSOC);
+                $janela['total_pedidos']      = (int) ($row['total'] ?? 0);
+                $janela['etiquetas_pendentes'] = (int) ($row['pendentes'] ?? 0);
+            } catch (\Exception $e) {
+                $janela['total_pedidos']      = 0;
+                $janela['etiquetas_pendentes'] = 0;
+            }
+        }
+        unset($janela);
+
+        return $janelas;
     }
 
     public function verJanela($request, $id) {
@@ -1945,7 +2011,7 @@ function regerarEtiqueta() {
             $stPend->execute([$janelaId]);
             $pend = (int) $stPend->fetchColumn();
             if ($pend > 0) {
-                echo json_encode(['success' => false, 'error' => 'Ainda existem pedidos sem etiqueta nesta janela']);
+                echo json_encode(['success' => false, 'error' => "Ainda existem {$pend} pedido(s) sem etiqueta nesta janela. Gere todas as etiquetas antes de fechar."]);
                 exit;
             }
 

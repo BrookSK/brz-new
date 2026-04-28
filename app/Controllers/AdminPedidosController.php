@@ -4401,7 +4401,7 @@ LINKSCRIPT;
                                                     . '</div>';
                                                 echo '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars((string)($docTaxas['arquivo_path'] ?? '')) . '" target="_blank" rel="noopener">Abrir arquivo</a>';
                                             } else {
-                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante de taxas, impostos ou frete.</div>';
+                                                echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante de taxas, impostos.</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
                                                     . '<input type="hidden" name="tipo_comprovante" value="taxas">'
                                                     . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante" accept="image/*,application/pdf" required></div>'
