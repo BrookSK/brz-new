@@ -1387,40 +1387,42 @@ class AdminEstoqueController extends Controller {
                     p.id as produto_id,
                     {$nameExpr} as produto_nome,
                     {$skuExpr} as sku,
-                    e.total as quantidade_estoque,
+                    COALESCE(e.total, p.stock, 0) as quantidade_estoque,
                     CASE
-                        WHEN e.total <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
-                        WHEN e.total <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                        WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                        WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
                         ELSE 'normal'
                     END as status_estoque,
-                    loc.localizacao,
+                    COALESCE(loc.localizacao, '') as localizacao,
                     loc.data_compra_mais_recente,
                     loc.validade_mais_proxima,
                     {$reservadoSelectExpr} as reservado,
                     {$imgSelect}
-                FROM (
+                FROM produtos p
+                LEFT JOIN (
                     SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
                     FROM estoque_interno
                     WHERE quantidade > 0
                     GROUP BY produto_id
-                ) e
-                JOIN produtos p ON p.id = e.produto_id
+                ) e ON e.produto_id = p.id
                 LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
                 {$reservaJoin}
-                JOIN (
+                LEFT JOIN (
                     SELECT
-                        e.produto_id,
+                        ei.produto_id,
                         GROUP_CONCAT(DISTINCT CONCAT(
-                            COALESCE(e.galpao, ''),
-                            CASE WHEN COALESCE(e.galpao, '') <> '' AND COALESCE(e.prateleira, '') <> '' THEN ' - ' ELSE '' END,
-                            COALESCE(e.prateleira, '')
+                            COALESCE(ei.galpao, ''),
+                            CASE WHEN COALESCE(ei.galpao, '') <> '' AND COALESCE(ei.prateleira, '') <> '' THEN ' - ' ELSE '' END,
+                            COALESCE(ei.prateleira, '')
                         ) SEPARATOR ', ') AS localizacao,
-                        MAX(e.data_compra) AS data_compra_mais_recente,
-                        MIN(CASE WHEN e.is_alimenticio = 1 AND e.data_validade IS NOT NULL THEN e.data_validade ELSE NULL END) AS validade_mais_proxima
-                    FROM estoque_interno e
-                    WHERE e.quantidade > 0
-                    GROUP BY e.produto_id
+                        MAX(ei.data_compra) AS data_compra_mais_recente,
+                        MIN(CASE WHEN ei.is_alimenticio = 1 AND ei.data_validade IS NOT NULL THEN ei.data_validade ELSE NULL END) AS validade_mais_proxima
+                    FROM estoque_interno ei
+                    WHERE ei.quantidade > 0
+                    GROUP BY ei.produto_id
                 ) loc ON loc.produto_id = p.id
+                WHERE COALESCE(e.total, p.stock, 0) > 0
+                  AND COALESCE(p.active, 1) = 1
                 ORDER BY produto_nome
             ");
             $stmt->execute();
@@ -1436,18 +1438,20 @@ class AdminEstoqueController extends Controller {
                     SELECT
                         p.id as produto_id,
                         CASE
-                            WHEN e.total <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
-                            WHEN e.total <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                            WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                            WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
                             ELSE 'normal'
                         END as status_estoque
-                    FROM (
+                    FROM produtos p
+                    LEFT JOIN (
                         SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
                         FROM estoque_interno
                         WHERE quantidade > 0
                         GROUP BY produto_id
-                    ) e
-                    JOIN produtos p ON p.id = e.produto_id
+                    ) e ON e.produto_id = p.id
                     LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
+                    WHERE COALESCE(e.total, p.stock, 0) > 0
+                      AND COALESCE(p.active, 1) = 1
                 ) t
             ");
             $stmt->execute();
