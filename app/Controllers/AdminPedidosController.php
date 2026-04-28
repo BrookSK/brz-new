@@ -2256,16 +2256,7 @@ JS;
                     <div class="col-md-3">
                         <select class="form-select" name="status">
                             <option value="">Todos status</option>
-                            <option value="pendente" ' . ($status === 'pendente' ? 'selected' : '') . '>Pendente</option>
-                            <option value="pago" ' . ($status === 'pago' ? 'selected' : '') . '>Pago</option>
-                            <option value="processando" ' . ($status === 'processando' ? 'selected' : '') . '>Processando</option>
-                            <option value="produto_consolidado" ' . ($status === 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
-                            <option value="em_transporte" ' . ($status === 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
-                            <option value="aguardando_liberacao_aduaneira" ' . ($status === 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
-                            <option value="enviado_ao_destinatario" ' . ($status === 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                            <option value="enviado" ' . ($status === 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
-                            <option value="entregue" ' . ($status === 'entregue' ? 'selected' : '') . '>Entregue</option>
-                            <option value="cancelado" ' . ($status === 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                            ' . $this->buildStatusOptions($status) . '
                             <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
                         </select>
                     </div>
@@ -2398,16 +2389,7 @@ JS;
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
-                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
-                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
-                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
-                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
-                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                                                ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
                                     </div>
@@ -2536,16 +2518,7 @@ JS;
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
-                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
-                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
-                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
-                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
-                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                                                ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
                                     </div>
@@ -2673,16 +2646,7 @@ JS;
                                             </button>
                                             <select class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="location.href=\'/admin/pedidos/atualizar-status/' . $pedido['id'] . '/\'+this.value">
                                                 <option value="">Status</option>
-                                                <option value="pendente" ' . ($pedido['status'] == 'pendente' ? 'selected' : '') . '>Pendente</option>
-                                                <option value="pago" ' . ($pedido['status'] == 'pago' ? 'selected' : '') . '>Pago</option>
-                                                <option value="processando" ' . ($pedido['status'] == 'processando' ? 'selected' : '') . '>Processando</option>
-                                                <option value="produto_consolidado" ' . ($pedido['status'] == 'produto_consolidado' ? 'selected' : '') . '>Caixa Fechada</option>
-                                                <option value="em_transporte" ' . ($pedido['status'] == 'em_transporte' ? 'selected' : '') . '>Em Transporte</option>
-                                                <option value="aguardando_liberacao_aduaneira" ' . ($pedido['status'] == 'aguardando_liberacao_aduaneira' ? 'selected' : '') . '>Aguardando Liberação Aduaneira</option>
-                                                <option value="enviado_ao_destinatario" ' . ($pedido['status'] == 'enviado_ao_destinatario' ? 'selected' : '') . '>Enviado ao Destinatário</option>
-                                                <option value="enviado" ' . ($pedido['status'] == 'enviado' ? 'selected' : '') . '>Etiqueta gerada</option>
-                                                <option value="entregue" ' . ($pedido['status'] == 'entregue' ? 'selected' : '') . '>Entregue</option>
-                                                <option value="cancelado" ' . ($pedido['status'] == 'cancelado' ? 'selected' : '') . '>Cancelado</option>
+                                                ' . $this->buildStatusOptions((string)($pedido['status'] ?? '')) . '
                                             </select>
                                         </div>
                                     </div>
@@ -4834,48 +4798,78 @@ LINKSCRIPT;
     
     private function getStatusIcon($status) {
         $icons = [
-            'pendente' => 'fas fa-clock',
-            'pago' => 'fas fa-check-circle',
-            'processando' => 'fas fa-cogs',
-            'produto_consolidado' => 'fas fa-boxes-stacked',
-            'etiqueta_gerada' => 'fas fa-tag',
-            'em_transporte' => 'fas fa-truck-moving',
+            'pendente'                       => 'fas fa-clock',
+            'processando'                    => 'fas fa-cogs',
+            'pago'                           => 'fas fa-check-circle',
+            'produto_consolidado'            => 'fas fa-boxes-stacked',
+            'itens_comprados'                => 'fas fa-shopping-cart',
+            'etiqueta_gerada'                => 'fas fa-tag',
+            'em_transporte'                  => 'fas fa-truck-moving',
             'aguardando_liberacao_aduaneira' => 'fas fa-passport',
-            'enviado_ao_destinatario' => 'fas fa-route',
-            'enviado' => 'fas fa-truck',
-            'entregue' => 'fas fa-check-double',
-            'cancelado' => 'fas fa-times-circle'
+            'enviado_ao_destinatario'        => 'fas fa-route',
+            'enviado'                        => 'fas fa-truck',
+            'entregue'                       => 'fas fa-check-double',
+            'cancelado'                      => 'fas fa-times-circle',
         ];
-        // legado
         if (!isset($icons[$status])) {
             $icons['pagamento'] = 'fas fa-credit-card';
-            $icons['aprovado'] = 'fas fa-check-circle';
+            $icons['aprovado']  = 'fas fa-check-circle';
             $icons['separacao'] = 'fas fa-box';
         }
         return $icons[$status] ?? 'fas fa-question-circle';
     }
-    
+
     private function getStatusColor($status) {
         $colors = [
-            'pendente' => 'warning',
-            'pago' => 'success',
-            'processando' => 'primary',
-            'produto_consolidado' => 'dark',
-            'etiqueta_gerada' => 'primary',
-            'em_transporte' => 'info',
+            'pendente'                       => 'warning',
+            'processando'                    => 'primary',
+            'pago'                           => 'success',
+            'produto_consolidado'            => 'dark',
+            'itens_comprados'                => 'info',
+            'etiqueta_gerada'                => 'primary',
+            'em_transporte'                  => 'info',
             'aguardando_liberacao_aduaneira' => 'secondary',
-            'enviado_ao_destinatario' => 'info',
-            'enviado' => 'info',
-            'entregue' => 'success',
-            'cancelado' => 'danger'
+            'enviado_ao_destinatario'        => 'info',
+            'enviado'                        => 'info',
+            'entregue'                       => 'success',
+            'cancelado'                      => 'danger',
         ];
-        // legado
         if (!isset($colors[$status])) {
             $colors['pagamento'] = 'info';
-            $colors['aprovado'] = 'success';
+            $colors['aprovado']  = 'success';
             $colors['separacao'] = 'primary';
         }
         return $colors[$status] ?? 'secondary';
+    }
+
+    /**
+     * Retorna os status na ordem do fluxo logístico.
+     * Usado para gerar <option> em todos os selects de status.
+     */
+    public static function getStatusList(): array {
+        return [
+            'pendente'                       => 'Pendente',
+            'processando'                    => 'Processando',
+            'pago'                           => 'Pago',
+            'produto_consolidado'            => 'Caixa Fechada',
+            'itens_comprados'                => 'Itens Comprados',
+            'etiqueta_gerada'                => 'Etiqueta Gerada',
+            'em_transporte'                  => 'Em Transporte',
+            'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
+            'enviado_ao_destinatario'        => 'Enviado ao Destinatário',
+            'entregue'                       => 'Entregue',
+            'cancelado'                      => 'Cancelado',
+        ];
+    }
+
+    /** Gera as <option> de status com o valor atual selecionado. */
+    private function buildStatusOptions(string $current, bool $withEmpty = false): string {
+        $html = $withEmpty ? '<option value="">Selecione...</option>' : '';
+        foreach (self::getStatusList() as $val => $label) {
+            $sel = ($current === $val) ? ' selected' : '';
+            $html .= '<option value="' . $val . '"' . $sel . '>' . htmlspecialchars($label) . '</option>';
+        }
+        return $html;
     }
 
     public function comissoes(Request $request) {
