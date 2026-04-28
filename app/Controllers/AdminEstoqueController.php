@@ -1349,47 +1349,62 @@ class AdminEstoqueController extends Controller {
 
     public function index($request) {
         try {
-            // Esta tela é apenas para listagem. A entrada é feita em /admin/estoque/entrada.
-
             $schemaProdutos = $this->getProdutosSchema();
             $nameCol = $schemaProdutos['nameCol'] ?? null;
-            $skuCol = $schemaProdutos['skuCol'] ?? null;
-            $imgCol = $schemaProdutos['imgCol'] ?? null;
+            $skuCol  = $schemaProdutos['skuCol']  ?? null;
+            $imgCol  = $schemaProdutos['imgCol']  ?? null;
             $imgSelect = "'' AS imagem_raw";
             if (is_string($imgCol) && $imgCol !== '') {
                 $imgSelect = 'p.' . $imgCol . ' AS imagem_raw';
             }
-
             $nameExpr = (is_string($nameCol) && $nameCol !== '') ? ('p.' . $nameCol) : "CAST(p.id AS CHAR)";
-            $skuExpr = (is_string($skuCol) && $skuCol !== '') ? ('p.' . $skuCol) : "''";
+            $skuExpr  = (is_string($skuCol)  && $skuCol  !== '') ? ('p.' . $skuCol)  : "''";
 
-            // Buscar status geral do estoque (apenas itens com quantidade no galpão)
-            // Regra (UI): Reservado = apenas reservas reais (estoque_reservas ativa). A pendência de compra fica na tela de compras.
+            // Paginacao e busca server-side
+            $pagina       = max(1, (int)($request->getParam('pagina', 1)));
+            $limite       = 50;
+            $offset       = ($pagina - 1) * $limite;
+            $busca        = trim((string)($request->getParam('busca', '')));
+            $filtroStatus = trim((string)($request->getParam('status_filtro', '')));
+
             $reservaJoin = '';
             $reservadoSelectExpr = '0';
-
             if ($this->tableExists('estoque_reservas')) {
-                $reservaJoin .= "
+                $reservaJoin = "
                     LEFT JOIN (
                         SELECT er.produto_id, SUM(COALESCE(er.quantidade_reservada,0)) as reservado
                         FROM estoque_reservas er
                         LEFT JOIN pedidos p ON p.id = er.pedido_id
                         WHERE er.status = 'ativa'
-                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluído','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
+                          AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','concluido','concluido','finalizado','finalizada','entregue','entregue ao cliente','completed','refunded','estornado','estornada'))
                         GROUP BY er.produto_id
                     ) res_er ON res_er.produto_id = p.id
                 ";
                 $reservadoSelectExpr = 'COALESCE(res_er.reservado, 0)';
             }
 
-            $stmt = $this->connection->prepare("
+            $whereParts  = ["COALESCE(e.total, p.stock, 0) > 0", "COALESCE(p.active, 1) = 1"];
+            $queryParams = [];
+
+            if ($busca !== '') {
+                $whereParts[] = "({$nameExpr} LIKE :busca OR {$skuExpr} LIKE :busca OR COALESCE(loc.localizacao,'') LIKE :busca)";
+                $queryParams[':busca'] = '%' . $busca . '%';
+            }
+            if ($filtroStatus !== '') {
+                $whereParts[] = "CASE WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'critico' WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo' ELSE 'normal' END = :status_filtro";
+                $queryParams[':status_filtro'] = $filtroStatus;
+            }
+
+            $whereClause = implode(' AND ', $whereParts);
+
+            $sqlMain = "
                 SELECT
                     p.id as produto_id,
                     {$nameExpr} as produto_nome,
                     {$skuExpr} as sku,
                     COALESCE(e.total, p.stock, 0) as quantidade_estoque,
                     CASE
-                        WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
+                        WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'critico'
                         WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
                         ELSE 'normal'
                     END as status_estoque,
@@ -1401,9 +1416,7 @@ class AdminEstoqueController extends Controller {
                 FROM produtos p
                 LEFT JOIN (
                     SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
-                    FROM estoque_interno
-                    WHERE quantidade > 0
-                    GROUP BY produto_id
+                    FROM estoque_interno WHERE quantidade > 0 GROUP BY produto_id
                 ) e ON e.produto_id = p.id
                 LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
                 {$reservaJoin}
@@ -1411,59 +1424,79 @@ class AdminEstoqueController extends Controller {
                     SELECT
                         ei.produto_id,
                         GROUP_CONCAT(DISTINCT CONCAT(
-                            COALESCE(ei.galpao, ''),
-                            CASE WHEN COALESCE(ei.galpao, '') <> '' AND COALESCE(ei.prateleira, '') <> '' THEN ' - ' ELSE '' END,
-                            COALESCE(ei.prateleira, '')
+                            COALESCE(ei.galpao,''),
+                            CASE WHEN COALESCE(ei.galpao,'') <> '' AND COALESCE(ei.prateleira,'') <> '' THEN ' - ' ELSE '' END,
+                            COALESCE(ei.prateleira,'')
                         ) SEPARATOR ', ') AS localizacao,
                         MAX(ei.data_compra) AS data_compra_mais_recente,
                         MIN(CASE WHEN ei.is_alimenticio = 1 AND ei.data_validade IS NOT NULL THEN ei.data_validade ELSE NULL END) AS validade_mais_proxima
-                    FROM estoque_interno ei
-                    WHERE ei.quantidade > 0
-                    GROUP BY ei.produto_id
+                    FROM estoque_interno ei WHERE ei.quantidade > 0 GROUP BY ei.produto_id
                 ) loc ON loc.produto_id = p.id
-                WHERE COALESCE(e.total, p.stock, 0) > 0
-                  AND COALESCE(p.active, 1) = 1
+                WHERE {$whereClause}
                 ORDER BY produto_nome
-            ");
-            $stmt->execute();
-            $status_geral = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                LIMIT :limite OFFSET :offset
+            ";
 
-            // Estatísticas
-            $stmt = $this->connection->prepare("SELECT
-                    COUNT(*) as total_produtos,
-                    SUM(CASE WHEN status_estoque IN ('crítico','critico') THEN 1 ELSE 0 END) as criticos,
-                    SUM(CASE WHEN status_estoque = 'baixo' THEN 1 ELSE 0 END) as baixos,
-                    SUM(CASE WHEN status_estoque = 'normal' THEN 1 ELSE 0 END) as normais
-                FROM (
-                    SELECT
-                        p.id as produto_id,
-                        CASE
-                            WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'crítico'
-                            WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
-                            ELSE 'normal'
-                        END as status_estoque
+            $sqlCount = "
+                SELECT COUNT(*) FROM (
+                    SELECT p.id
                     FROM produtos p
                     LEFT JOIN (
                         SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
-                        FROM estoque_interno
-                        WHERE quantidade > 0
-                        GROUP BY produto_id
+                        FROM estoque_interno WHERE quantidade > 0 GROUP BY produto_id
                     ) e ON e.produto_id = p.id
                     LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
-                    WHERE COALESCE(e.total, p.stock, 0) > 0
-                      AND COALESCE(p.active, 1) = 1
-                ) t
+                    LEFT JOIN (
+                        SELECT ei.produto_id,
+                            GROUP_CONCAT(DISTINCT COALESCE(ei.galpao,'') SEPARATOR ', ') AS localizacao
+                        FROM estoque_interno ei WHERE ei.quantidade > 0 GROUP BY ei.produto_id
+                    ) loc ON loc.produto_id = p.id
+                    WHERE {$whereClause}
+                ) _cnt
+            ";
+
+            $stMain = $this->connection->prepare($sqlMain);
+            foreach ($queryParams as $k => $v) $stMain->bindValue($k, $v);
+            $stMain->bindValue(':limite', $limite, \PDO::PARAM_INT);
+            $stMain->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            $stMain->execute();
+            $status_geral = $stMain->fetchAll(\PDO::FETCH_ASSOC);
+
+            $stCount = $this->connection->prepare($sqlCount);
+            foreach ($queryParams as $k => $v) $stCount->bindValue($k, $v);
+            $stCount->execute();
+            $totalItens   = (int)($stCount->fetchColumn() ?: 0);
+            $totalPaginas = max(1, (int)ceil($totalItens / $limite));
+
+            // Estatisticas globais (sem filtro de busca/status)
+            $stmt = $this->connection->prepare("
+                SELECT
+                    COUNT(*) as total_produtos,
+                    SUM(CASE WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 1 ELSE 0 END) as criticos,
+                    SUM(CASE WHEN COALESCE(e.total, p.stock, 0) > COALESCE(ec.estoque_minimo, 5) AND COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 1 ELSE 0 END) as baixos,
+                    SUM(CASE WHEN COALESCE(e.total, p.stock, 0) > COALESCE(ec.estoque_ideal, 20) THEN 1 ELSE 0 END) as normais
+                FROM produtos p
+                LEFT JOIN (
+                    SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
+                    FROM estoque_interno WHERE quantidade > 0 GROUP BY produto_id
+                ) e ON e.produto_id = p.id
+                LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
+                WHERE COALESCE(e.total, p.stock, 0) > 0 AND COALESCE(p.active, 1) = 1
             ");
             $stmt->execute();
             $estatisticas = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         } catch (\Exception $e) {
-            $produtos = [];
-            $status_geral = [];
-            $estatisticas = ['total_produtos' => 0, 'criticos' => 0, 'baixos' => 0, 'normais' => 0];
+            $status_geral  = [];
+            $estatisticas  = ['total_produtos' => 0, 'criticos' => 0, 'baixos' => 0, 'normais' => 0];
+            $totalItens    = 0;
+            $totalPaginas  = 1;
+            $pagina        = 1;
+            $limite        = 50;
+            $busca         = '';
+            $filtroStatus  = '';
         }
 
-        // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
@@ -1474,363 +1507,173 @@ class AdminEstoqueController extends Controller {
     <title>Estoque Interno - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
-        
-        // Renderizar estilos do menu
         renderAdminSidebarStyles();
-        
-        echo '</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">';
-        
-        // Renderizar menu lateral usando o partial
+        echo '</head><body><div class="container-fluid"><div class="row">';
         renderAdminSidebar('estoque');
-        
+
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-warehouse me-2"></i>Estoque Interno</h1>
-                    <div>
-                        <a class="btn btn-success me-2" href="/admin/estoque/entrada">
-                            <i class="fas fa-plus me-1"></i>Entrada de Estoque
-                        </a>
-                        <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
-                            <i class="fas fa-file-pdf me-1"></i>Gerar PDF
-                        </button>
-                        <button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
-                        </button>
-                    </div>
-                </div>';
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><i class="fas fa-warehouse me-2"></i>Estoque Interno</h1>
+                <div>
+                    <a class="btn btn-success me-2" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada de Estoque</a>
+                    <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</button>
+                    <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                </div>
+            </div>';
 
         $this->renderFlashIfAny();
 
-                // Cards de Estatísticas
-                echo '<div class="container py-4"><div class="row g-3">';
-                    echo '<div class="col-md-3">
-                        <div class="card card-stats bg-primary text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Total Produtos</h5>
-                                <h3>' . number_format($estatisticas['total_produtos']) . '</h3>
-                                <small>Ativos no sistema</small>
-                            </div>
-                        </div>
+        // Cards de Estatisticas
+        echo '<div class="row g-3 mb-4">';
+        echo '<div class="col-md-3"><div class="card bg-primary text-white"><div class="card-body"><h5 class="card-title">Total Produtos</h5><h3>' . number_format((int)($estatisticas['total_produtos'] ?? 0)) . '</h3><small>Ativos no sistema</small></div></div></div>';
+        echo '<div class="col-md-3"><div class="card bg-danger text-white" style="cursor:pointer" onclick="filtrarStatus(\'critico\')"><div class="card-body"><h5 class="card-title">Estoque Critico</h5><h3>' . number_format((int)($estatisticas['criticos'] ?? 0)) . '</h3><small>Abaixo do minimo</small></div></div></div>';
+        echo '<div class="col-md-3"><div class="card bg-warning text-dark" style="cursor:pointer" onclick="filtrarStatus(\'baixo\')"><div class="card-body"><h5 class="card-title">Estoque Baixo</h5><h3>' . number_format((int)($estatisticas['baixos'] ?? 0)) . '</h3><small>Abaixo do ideal</small></div></div></div>';
+        echo '<div class="col-md-3"><div class="card bg-success text-white" style="cursor:pointer" onclick="filtrarStatus(\'normal\')"><div class="card-body"><h5 class="card-title">Estoque Normal</h5><h3>' . number_format((int)($estatisticas['normais'] ?? 0)) . '</h3><small>Niveis adequados</small></div></div></div>';
+        echo '</div>';
+
+        // Filtros
+        $buscaEsc        = htmlspecialchars($busca);
+        $filtroStatusEsc = htmlspecialchars($filtroStatus);
+        echo '<div class="card mb-3"><div class="card-body py-2">
+            <form method="GET" class="row g-2 align-items-end" id="formFiltroEstoque">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" name="busca" id="estoque_busca"
+                            placeholder="Buscar por produto, SKU ou localizacao..."
+                            value="' . $buscaEsc . '">
                     </div>
-                    <div class="col-md-3">
-                        <div class="card card-stats bg-danger text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Estoque Crítico</h5>
-                                <h3>' . number_format((float) ($estatisticas['criticos'] ?? 0)) . '</h3>
-                                <small>Abaixo do mínimo</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card card-stats bg-warning text-dark">
-                            <div class="card-body">
-                                <h5 class="card-title">Estoque Baixo</h5>
-                                <h3>' . number_format((float) ($estatisticas['baixos'] ?? 0)) . '</h3>
-                                <small>Abaixo do ideal</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card card-stats bg-success text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Estoque Normal</h5>
-                                <h3>' . number_format((float) ($estatisticas['normais'] ?? 0)) . '</h3>
-                                <small>Níveis adequados</small>
-                            </div>
-                        </div>
-                    </div>
-                </div></div>';
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="status_filtro" id="status_filtro_sel" onchange="this.form.submit()">
+                        <option value="">Todos os status</option>
+                        <option value="critico"' . ($filtroStatus === 'critico' ? ' selected' : '') . '>Critico</option>
+                        <option value="baixo"'   . ($filtroStatus === 'baixo'   ? ' selected' : '') . '>Baixo</option>
+                        <option value="normal"'  . ($filtroStatus === 'normal'  ? ' selected' : '') . '>Normal</option>
+                    </select>
+                </div>
+                <div class="col-md-auto">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                    <a href="/admin/estoque" class="btn btn-outline-secondary ms-1">Limpar</a>
+                </div>
+                <div class="col-md-auto align-self-end">
+                    <small class="text-muted">Exibindo ' . number_format($totalItens) . ' produto(s)</small>
+                </div>
+            </form>
+        </div></div>';
 
-                // Tabela de Estoque
-                echo '<div class="card">
-                    <div class="card-header">
-                        <h5><i class="fas fa-list me-2"></i>Estoque Atual</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-2 align-items-center mb-3">
-                            <div class="col-md-6">
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                    <input type="text" class="form-control" id="estoque_busca" placeholder="Buscar por produto, SKU, loja, localização ou status..." oninput="filtrarTabelaEstoque()">
-                                </div>
-                            </div>
-                            <div class="col-md-6 text-md-end">
-                                <small class="text-muted" id="estoque_busca_info"></small>
-                            </div>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="estoque_tabela">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>Produto</th>
-                                        <th>SKU</th>
-                                        <th>Quantidade</th>
-                                        <th>Reservado</th>
-                                        <th>Disponível</th>
-                                        <th>Status</th>
-                                        <th>Localização</th>
-                                        <th>Validade</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="estoque_tbody">';
-                                
-                                foreach ($status_geral as $item) {
-                                    $produtoId = (int) ($item['produto_id'] ?? 0);
-                                    $produtoNome = (string) ($item['produto_nome'] ?? '');
-                                    $sku = (string) ($item['sku'] ?? '');
-                                    $qtd = (int) ($item['quantidade_estoque'] ?? 0);
-                                    $reservado = (int) ($item['reservado'] ?? 0);
-                                    $disponivel = $qtd - $reservado;
-                                    $status = (string) ($item['status_estoque'] ?? '');
-                                    if ($reservado > $qtd) {
-                                        $status = 'reposicao';
-                                    }
-                                    $loc = (string) ($item['localizacao'] ?? '');
-                                    $validade = $item['validade_mais_proxima'] ?? null;
+        // Tabela
+        echo '<div class="card">
+            <div class="card-header"><h5 class="mb-0"><i class="fas fa-list me-2"></i>Estoque Atual</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Produto</th><th>SKU</th><th>Quantidade</th><th>Reservado</th>
+                                <th>Disponivel</th><th>Status</th><th>Localizacao</th><th>Validade</th><th>Acoes</th>
+                            </tr>
+                        </thead>
+                        <tbody>';
 
-                                    $imgUrl = null;
-                                    if (!empty($item['imagem_raw'])) {
-                                        $imgUrl = $this->resolveProdutoImagem(['imagem_raw' => (string) $item['imagem_raw']], 'imagem_raw');
-                                    }
-                                    $imgTag = $imgUrl
-                                        ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06);">'
-                                        : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
-                                    
-                                    $rowSearch = strtolower(
-                                        (string) ($produtoNome ?? '') . ' ' .
-                                        (string) ($sku ?? '') . ' ' .
-                                        (string) ($loc ?? '') . ' ' .
-                                        (string) ($status ?? '')
-                                    );
+        foreach ($status_geral as $item) {
+            $produtoId   = (int)($item['produto_id'] ?? 0);
+            $produtoNome = (string)($item['produto_nome'] ?? '');
+            $sku         = (string)($item['sku'] ?? '');
+            $qtd         = (int)($item['quantidade_estoque'] ?? 0);
+            $reservado   = (int)($item['reservado'] ?? 0);
+            $disponivel  = $qtd - $reservado;
+            $status      = (string)($item['status_estoque'] ?? '');
+            if ($reservado > $qtd) $status = 'reposicao';
+            $loc      = (string)($item['localizacao'] ?? '');
+            $validade = $item['validade_mais_proxima'] ?? null;
 
-                                    $btnEye = ($reservado > 0)
-                                        ? '<button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . (int) $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '"><i class="fas fa-eye"></i></button>'
-                                        : '';
-                                    $acoes = '<div class="btn-group btn-group-sm">'
-                                        . '<a href="/admin/estoque/editar/' . (int) $produtoId . '" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>'
-                                        . $btnEye
-                                        . '</div>';
+            $imgUrl = null;
+            if (!empty($item['imagem_raw'])) {
+                $imgUrl = $this->resolveProdutoImagem(['imagem_raw' => (string)$item['imagem_raw']], 'imagem_raw');
+            }
+            $imgTag = $imgUrl
+                ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:10px;border:1px solid rgba(148,163,184,.22);">'
+                : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
 
-                                    $reservadoBadge = $reservado > 0 ? '<span class="badge bg-dark">' . (int) $reservado . '</span>' : '-';
-                                    $dispClass = ($disponivel < 0) ? 'danger' : 'secondary';
-                                    $dispBadge = '<span class="badge bg-' . $dispClass . '">' . (int) $disponivel . '</span>';
+            $btnEye = ($reservado > 0)
+                ? '<button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modalReservas" data-produto-id="' . $produtoId . '" data-produto-nome="' . htmlspecialchars($produtoNome) . '"><i class="fas fa-eye"></i></button>'
+                : '';
 
-                                    $status_class = $status == 'crítico' ? 'danger' :
-                                                   ($status == 'baixo' ? 'warning' :
-                                                   ($status == 'reposicao' ? 'danger' : 'success'));
+            $reservadoBadge = $reservado > 0 ? '<span class="badge bg-dark">' . $reservado . '</span>' : '-';
+            $dispClass  = ($disponivel < 0) ? 'danger' : 'secondary';
+            $dispBadge  = '<span class="badge bg-' . $dispClass . '">' . $disponivel . '</span>';
+            $statusClass = ($status === 'critico' || $status === 'reposicao') ? 'danger' : ($status === 'baixo' ? 'warning' : 'success');
+            $statusLabel = $status === 'reposicao' ? 'Reposicao' : ucfirst($status);
 
-                                    echo '<tr data-search="' . htmlspecialchars($rowSearch) . '">
-                                        <td>
-                                            <div class="d-flex gap-2 align-items-center">
-                                                ' . $imgTag . '
-                                                <div>
-                                                    <strong>' . htmlspecialchars($produtoNome) . '</strong>
-                                                    <br><small class="text-muted">ID: ' . $produtoId . '</small>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>' . htmlspecialchars($sku) . '</td>
-                                        <td>
-                                            <span class="badge bg-' . $status_class . '">' . $qtd . '</span>
-                                        </td>
-                                        <td>' . $reservadoBadge . '</td>
-                                        <td>' . $dispBadge . '</td>
-                                        <td>
-                                            <span class="badge bg-' . $status_class . '">' . ($status === 'reposicao' ? 'Reposição' : ucfirst($status)) . '</span>
-                                        </td>
-                                        <td>' . (!empty($loc) ? htmlspecialchars($loc) : '-') . '</td>
-                                        <td>' . (!empty($validade) ? date('d/m/Y', strtotime($validade)) : '-') . '</td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <a class="btn btn-outline-primary" href="/admin/estoque/editar/' . (int) $produtoId . '">
-                                                    <i class="fas fa-pen"></i>
-                                                </a>
-                                                ' . $btnEye . '
-                                            </div>
-                                        </td>
-                                    </tr>';
-                                }
-                                
-                                echo '</tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>';
+            echo '<tr>
+                <td><div class="d-flex gap-2 align-items-center">' . $imgTag . '<div><strong>' . htmlspecialchars($produtoNome) . '</strong><br><small class="text-muted">ID: ' . $produtoId . '</small></div></div></td>
+                <td>' . htmlspecialchars($sku) . '</td>
+                <td><span class="badge bg-' . $statusClass . '">' . $qtd . '</span></td>
+                <td>' . $reservadoBadge . '</td>
+                <td>' . $dispBadge . '</td>
+                <td><span class="badge bg-' . $statusClass . '">' . $statusLabel . '</span></td>
+                <td>' . (!empty($loc) ? htmlspecialchars($loc) : '-') . '</td>
+                <td>' . (!empty($validade) ? date('d/m/Y', strtotime($validade)) : '-') . '</td>
+                <td><div class="btn-group btn-group-sm"><a class="btn btn-outline-primary" href="/admin/estoque/editar/' . $produtoId . '"><i class="fas fa-pen"></i></a>' . $btnEye . '</div></td>
+            </tr>';
+        }
 
-                echo '<script>
-                    function filtrarTabelaEstoque() {
-                        var input = document.getElementById("estoque_busca");
-                        var tbody = document.getElementById("estoque_tbody");
-                        var info = document.getElementById("estoque_busca_info");
-                        if (!input || !tbody) return;
-                        var q = (input.value || "").toLowerCase().trim();
-                        var rows = tbody.querySelectorAll("tr");
-                        var vis = 0;
-                        for (var i = 0; i < rows.length; i++) {
-                            var r = rows[i];
-                            var hay = (r.getAttribute("data-search") || "").toLowerCase();
-                            var show = (q === "") || (hay.indexOf(q) !== -1);
-                            r.style.display = show ? "" : "none";
-                            if (show) vis++;
-                        }
-                        if (info) {
-                            info.textContent = q === "" ? ("Exibindo " + vis + " item(ns).") : ("Encontrado(s) " + vis + " item(ns). ");
-                        }
-                    }
-                    document.addEventListener("DOMContentLoaded", function() { filtrarTabelaEstoque(); });
-                </script>';
+        if (empty($status_geral)) {
+            echo '<tr><td colspan="9" class="text-center text-muted py-4">Nenhum produto encontrado.</td></tr>';
+        }
 
-                echo '<div class="modal fade" id="modalReservas" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Reservas / Pedidos relacionados</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="mb-2 text-muted" id="reservas_produto_nome"></div>
-                                    <div id="reservas_loading" class="text-muted">Carregando...</div>
-                                    <div id="reservas_empty" class="alert alert-warning d-none">Nenhum pedido encontrado.</div>
-                                    <div class="accordion" id="accordionReservas"></div>
-                                </div>
-                                <div class="modal-footer">
-                                    <a class="btn btn-outline-primary" id="reservas_ir_compras" href="/admin/estoque/compras" target="_blank">Abrir lista de compras</a>
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>';
+        echo '</tbody></table></div></div></div>';
 
-                echo '<script>
-                    function escapeHtml2(str){
-                        if (str === null || str === undefined) return "";
-                        return String(str)
-                            .replace(/&/g, "&amp;")
-                            .replace(/</g, "&lt;")
-                            .replace(/>/g, "&gt;")
-                            .replace(/\"/g, "&quot;")
-                            .replace(/\'/g, "&#039;");
-                    }
-                    function formatMoney2(v){
-                        if (v === null || v === undefined || v === "") return "-";
-                        var n = Number(v);
-                        if (isNaN(n)) return String(v);
-                        return "$ " + n.toFixed(2);
-                    }
-                    function renderAccordionReservas(pedidos){
-                        var acc = document.getElementById("accordionReservas");
-                        if (!acc) return;
-                        acc.innerHTML = "";
-                        pedidos.forEach(function(p){
-                            var pid = p.id || 0;
-                            var headId = "resHead_" + pid;
-                            var bodyId = "resBody_" + pid;
-                            var total = (p.valor_total !== null && p.valor_total !== undefined) ? formatMoney2(p.valor_total) : "-";
-                            var status = p.status ? escapeHtml2(p.status) : "";
-                            var codigo = p.codigo_pedido ? escapeHtml2(p.codigo_pedido) : "";
-                            var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
-                            var criado = p.created_at ? escapeHtml2(p.created_at) : "";
-                            var pagoEm = p.pago_em ? escapeHtml2(p.pago_em) : "";
-                            var itensHtml = "";
-                            if (Array.isArray(p.itens) && p.itens.length > 0) {
-                                itensHtml += "<div class=\"table-responsive\"><table class=\"table table-sm\">";
-                                itensHtml += "<thead><tr><th>Produto</th><th style=\"width:90px;\">Qtd</th><th style=\"width:120px;\">Preço</th><th style=\"width:120px;\">Subtotal</th></tr></thead><tbody>";
-                                p.itens.forEach(function(it){
-                                    itensHtml += "<tr>";
-                                    itensHtml += "<td>" + escapeHtml2(it.nome_produto || it.nome_produto_sku || ("Produto ID: " + (it.produto_id||""))) + "</td>";
-                                    itensHtml += "<td>" + escapeHtml2(it.quantidade || 0) + "</td>";
-                                    itensHtml += "<td>" + formatMoney2(it.preco_unitario) + "</td>";
-                                    itensHtml += "<td>" + formatMoney2(it.subtotal) + "</td>";
-                                    itensHtml += "</tr>";
-                                });
-                                itensHtml += "</tbody></table></div>";
-                            } else {
-                                itensHtml = "<div class=\"text-muted\">Itens do pedido não disponíveis.</div>";
-                            }
-                            var html = "";
-                            html += "<div class=\"accordion-item\">";
-                            html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
-                            html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
-                            html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
-                            html += "</button></h2>";
-                            html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionReservas\">";
-                            html += "<div class=\"accordion-body\">";
-                            html += "<div class=\"mb-2\">";
-                            html += "<div><strong>Cliente:</strong> " + escapeHtml2(cliente) + "</div>";
-                            html += "<div><strong>Criado em:</strong> " + criado + "</div>";
-                            if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
-                            html += "<div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/" + pid + "\" target=\"_blank\">Abrir pedido</a></div>";
-                            html += "</div>";
-                            html += itensHtml;
-                            html += "</div></div></div>";
-                            acc.insertAdjacentHTML("beforeend", html);
-                        });
-                    }
-                    var modalReservas = document.getElementById("modalReservas");
-                    if (modalReservas) {
-                        modalReservas.addEventListener("show.bs.modal", function (event) {
-                            var button = event.relatedTarget;
-                            var produtoId = button.getAttribute("data-produto-id") || "";
-                            var produtoNome = button.getAttribute("data-produto-nome") || "";
-                            var label = document.getElementById("reservas_produto_nome");
-                            if (label) label.textContent = produtoNome;
+        // Paginacao
+        if ($totalPaginas > 1) {
+            $baseUrl = '/admin/estoque?busca=' . urlencode($busca) . '&status_filtro=' . urlencode($filtroStatus);
+            echo '<nav class="mt-3"><ul class="pagination justify-content-center flex-wrap">';
+            if ($pagina > 1) echo '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pagina=' . ($pagina - 1) . '">&laquo; Anterior</a></li>';
+            $start = max(1, $pagina - 3); $end = min($totalPaginas, $pagina + 3);
+            if ($start > 1) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            for ($i = $start; $i <= $end; $i++) {
+                echo '<li class="page-item' . ($i === $pagina ? ' active' : '') . '"><a class="page-link" href="' . $baseUrl . '&pagina=' . $i . '">' . $i . '</a></li>';
+            }
+            if ($end < $totalPaginas) echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            if ($pagina < $totalPaginas) echo '<li class="page-item"><a class="page-link" href="' . $baseUrl . '&pagina=' . ($pagina + 1) . '">Proxima &raquo;</a></li>';
+            echo '</ul></nav>';
+            echo '<div class="text-center text-muted small mb-3">Pagina ' . $pagina . ' de ' . $totalPaginas . ' (' . number_format($totalItens) . ' produtos)</div>';
+        }
 
-                            var linkCompras = document.getElementById("reservas_ir_compras");
-                            if (linkCompras) linkCompras.href = "/admin/estoque/compras?status=pendente";
+        // Modal de reservas
+        echo '<div class="modal fade" id="modalReservas" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg"><div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Reservas / Pedidos relacionados</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-2 text-muted" id="reservas_produto_nome"></div>
+                    <div id="reservas_loading" class="text-muted">Carregando...</div>
+                    <div id="reservas_empty" class="alert alert-warning d-none">Nenhum pedido encontrado.</div>
+                    <div class="accordion" id="accordionReservas"></div>
+                </div>
+                <div class="modal-footer">
+                    <a class="btn btn-outline-primary" href="/admin/estoque/compras" target="_blank">Abrir lista de compras</a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div></div>
+        </div>';
 
-                            var loading = document.getElementById("reservas_loading");
-                            var empty = document.getElementById("reservas_empty");
-                            var acc = document.getElementById("accordionReservas");
-                            if (loading) loading.classList.remove("d-none");
-                            if (empty) empty.classList.add("d-none");
-                            if (acc) acc.innerHTML = "";
+        echo '<script>
+        function filtrarStatus(s){document.getElementById("status_filtro_sel").value=s;document.getElementById("formFiltroEstoque").submit();}
+        var _bt;document.getElementById("estoque_busca").addEventListener("input",function(){clearTimeout(_bt);_bt=setTimeout(function(){document.getElementById("formFiltroEstoque").submit();},600);});
+        function escH(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+        function fmtM(v){if(v===null||v===undefined||v==="")return"-";var n=Number(v);return isNaN(n)?String(v):"$ "+n.toFixed(2);}
+        function renderRes(pedidos){var acc=document.getElementById("accordionReservas");if(!acc)return;acc.innerHTML="";pedidos.forEach(function(p){var pid=p.id||0,hId="rH"+pid,bId="rB"+pid,tot=fmtM(p.valor_total),st=escH(p.status||""),cod=escH(p.codigo_pedido||""),cli=(p.cliente_nome||"")+(p.cliente_email?" - "+p.cliente_email:"");var ih="";if(Array.isArray(p.itens)&&p.itens.length){ih="<table class=\"table table-sm\"><thead><tr><th>Produto</th><th>Qtd</th><th>Preco</th></tr></thead><tbody>";p.itens.forEach(function(it){ih+="<tr><td>"+escH(it.nome_produto||"")+"</td><td>"+escH(it.quantidade||0)+"</td><td>"+fmtM(it.preco_unitario)+"</td></tr>";});ih+="</tbody></table>";}else{ih="<div class=\"text-muted\">Sem itens.</div>";}var h="<div class=\"accordion-item\"><h2 class=\"accordion-header\" id=\""+hId+"\"><button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#"+bId+"\">Pedido #"+pid+(cod?" ("+cod+")":"")+" - "+st+" - "+tot+"</button></h2><div id=\""+bId+"\" class=\"accordion-collapse collapse\"><div class=\"accordion-body\"><div><strong>Cliente:</strong> "+escH(cli)+"</div><div class=\"mt-2\"><a class=\"btn btn-sm btn-outline-primary\" href=\"/admin/pedidos/detalhes/"+pid+"\" target=\"_blank\">Abrir pedido</a></div>"+ih+"</div></div></div>";acc.insertAdjacentHTML("beforeend",h);});}
+        var mr=document.getElementById("modalReservas");if(mr){mr.addEventListener("show.bs.modal",function(ev){var btn=ev.relatedTarget,pid=btn.getAttribute("data-produto-id")||"",pnm=btn.getAttribute("data-produto-nome")||"";var lbl=document.getElementById("reservas_produto_nome");if(lbl)lbl.textContent=pnm;var ld=document.getElementById("reservas_loading"),em=document.getElementById("reservas_empty"),ac=document.getElementById("accordionReservas");if(ld)ld.classList.remove("d-none");if(em)em.classList.add("d-none");if(ac)ac.innerHTML="";fetch("/admin/estoque/reservas?produto_id="+encodeURIComponent(pid),{headers:{"Accept":"application/json"}}).then(function(r){return r.json();}).then(function(d){if(ld)ld.classList.add("d-none");if(!d||!d.success){if(em){em.classList.remove("d-none");em.textContent=(d&&d.message)?d.message:"Erro.";}return;}var ps=d.pedidos||[];if(!ps.length){if(em)em.classList.remove("d-none");return;}renderRes(ps);}).catch(function(){if(ld)ld.classList.add("d-none");if(em){em.classList.remove("d-none");em.textContent="Erro.";}});});}
+        </script>';
 
-                            var url = "/admin/estoque/reservas?produto_id=" + encodeURIComponent(produtoId);
-                            fetch(url, { headers: { "Accept": "application/json" } })
-                                .then(function(r){ return r.json(); })
-                                .then(function(data){
-                                    if (loading) loading.classList.add("d-none");
-                                    if (!data || !data.success) {
-                                        if (empty) {
-                                            empty.classList.remove("d-none");
-                                            empty.textContent = (data && data.message) ? data.message : "Erro ao buscar pedidos.";
-                                        }
-                                        return;
-                                    }
-                                    var pedidos = data.pedidos || [];
-                                    if (!pedidos.length) {
-                                        if (empty) empty.classList.remove("d-none");
-                                        return;
-                                    }
-                                    renderAccordionReservas(pedidos);
-                                })
-                                .catch(function(){
-                                    if (loading) loading.classList.add("d-none");
-                                    if (empty) {
-                                        empty.classList.remove("d-none");
-                                        empty.textContent = "Erro ao buscar pedidos.";
-                                    }
-                                });
-                        });
-                    }
-                </script>';
-
-                echo '</main>
-        </div>
-    </div>';
-
-    // Renderizar scripts
-    renderAdminScripts();
-    
-    echo '</body>
-</html>';
+        echo '</main></div></div>';
+        renderAdminScripts();
+        echo '</body></html>';
     }
 
-    public function salvar($request) {
+
+        public function salvar($request) {
         $this->requireWriteAccess(false);
         try {
             $produtoId = (int) $request->getParam('produto_id');
