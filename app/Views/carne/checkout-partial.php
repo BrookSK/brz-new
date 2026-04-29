@@ -127,10 +127,15 @@
 
                 // Checar se há parcelas disponíveis (mínimo R$20 por boleto)
                 if (!data.parcelas || data.parcelas.length === 0) {
-                    const minimoTecnico = data.minimo_parcelamento || 40;
-                    const falta = Math.max(0, minimoTecnico - totalPedido);
-                    if (falta > 0) {
-                        mostrarAviso('Adicione R$ ' + formatMoney(falta) + ' ao carrinho para usar o Carnê Braziliana (mínimo R$ ' + formatMoney(minimoTecnico) + ' para parcelar em 2x ou mais).');
+                    // Calcular quanto falta especificamente no boleto de produtos
+                    // (é o gargalo mais comum — taxa de serviço costuma ser alta)
+                    const minimoBoleto = 20;
+                    const faltaProd = Math.max(0, (minimoBoleto * 2) - totalProdutos);
+                    const faltaTaxa = Math.max(0, (minimoBoleto * 2) - totalTaxas);
+                    // O gargalo é o que ainda falta para atingir o mínimo
+                    const falta = Math.max(faltaProd, faltaTaxa);
+                    if (falta > 0.01) {
+                        mostrarAviso('Adicione R$ ' + formatMoney(falta) + ' ao carrinho para usar o Carnê Braziliana (cada parcela precisa ter no mínimo R$ ' + formatMoney(minimoBoleto) + ' por boleto).');
                     } else {
                         mostrarAviso('O valor do pedido não permite parcelamento. Adicione mais produtos ao carrinho.');
                     }
