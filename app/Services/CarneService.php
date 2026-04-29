@@ -651,6 +651,7 @@ class CarneService {
             $somenteAdmin = (string) ($configs['carne_somente_admin'] ?? '0');
 
             $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+            if ($perfil === '') $perfil = strtolower(trim((string) ($_SESSION['usuario_role'] ?? '')));
             if ($perfil === 'administrator' || $perfil === 'administrador') $perfil = 'admin';
             $isAdmin = ($perfil === 'admin');
 
@@ -659,7 +660,7 @@ class CarneService {
                 return $isAdmin;
             }
 
-            // Modo normal: respeita o toggle principal
+            // Modo normal: carne_ativo=1 significa disponível para TODOS (incluindo admin)
             return ($ativo === '1');
         } catch (\Exception $e) {
             return false;
