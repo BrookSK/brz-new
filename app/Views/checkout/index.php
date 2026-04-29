@@ -22,12 +22,18 @@
         // Carnê Braziliana: verificar disponibilidade server-side e expor para o JS
         // Nota: a checagem de moeda/país é feita pelo JS em tempo real; aqui só verificamos se está ativo nas configs
         $carneDispCheck = false;
+        $carneValorMinimo = 0.0;
         try {
             $carneServiceInit = new \App\Services\CarneService();
             $carneDispCheck = $carneServiceInit->isCarneAtivo();
+            $dbCarne = \Config\Database::getConnection();
+            $stMin = $dbCarne->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_valor_minimo' LIMIT 1");
+            $stMin->execute();
+            $carneValorMinimo = (float) ($stMin->fetchColumn() ?: 0);
         } catch (\Exception $e) {}
         ?>
         window.CARNE_BRAZILIANA_DISPONIVEL = <?= $carneDispCheck ? 'true' : 'false' ?>;
+        window.CARNE_VALOR_MINIMO = <?= json_encode($carneValorMinimo) ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -2800,7 +2806,13 @@ function updatePaymentMethodsForCurrency(currency) {
 
         // Carnê Braziliana: só BRL + Brasil
         if (isBRL && isBR && window.CARNE_BRAZILIANA_DISPONIVEL) {
-            select.appendChild(new Option('Carnê Braziliana (até 12x boleto)', 'carne_braziliana'));
+            // Checar valor mínimo (total em BRL)
+            const carneMin = window.CARNE_VALOR_MINIMO || 0;
+            const rate = Number(window.CAMBIOREAL_RATE_BRL || 5.5);
+            const totalBrl = totalUsd * rate;
+            if (carneMin <= 0 || totalBrl >= carneMin) {
+                select.appendChild(new Option('Carnê Braziliana (até 12x boleto)', 'carne_braziliana'));
+            }
         }
     } else {
         // Fora do Brasil + USD: Stripe (tudo)

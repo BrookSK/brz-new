@@ -21,17 +21,16 @@ class CarneService {
         $total = $totalProdutos + $totalTaxas;
         $opcoes = [];
 
-        // Mínimo por boleto/PIX: R$ 20,00 (~USD 3.40)
-        // Câmbio Real com take_rates=1 precisa de margem acima de USD 1.00 líquido
+        // Mínimo por boleto/PIX: R$ 20,00
         $minimoBoleto = 20.00;
 
-        for ($i = 1; $i <= $maxParcelas; $i++) {
+        // Carnê começa em 2x (1x não é carnê)
+        for ($i = 2; $i <= $maxParcelas; $i++) {
             $vProd = round($totalProdutos / $i, 2);
             $vTaxa = round($totalTaxas / $i, 2);
             $vTotal = round($total / $i, 2);
 
             // Só incluir se ambos os boletos atendem o mínimo
-            // (ou se o valor é 0, ex: sem taxas ou sem produtos)
             $prodOk = ($vProd <= 0 || $vProd >= $minimoBoleto);
             $taxaOk = ($vTaxa <= 0 || $vTaxa >= $minimoBoleto);
 
@@ -46,17 +45,7 @@ class CarneService {
             }
         }
 
-        // Garantir que pelo menos 1x esteja disponível
-        if (empty($opcoes)) {
-            $opcoes[] = [
-                'parcelas' => 1,
-                'valor_parcela_produtos' => $totalProdutos,
-                'valor_parcela_taxas' => $totalTaxas,
-                'valor_parcela_total' => $total,
-                'total' => $total
-            ];
-        }
-
+        // Se nenhuma parcela atende o mínimo por boleto, retorna vazio (total muito baixo)
         return $opcoes;
     }
 

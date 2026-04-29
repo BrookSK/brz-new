@@ -151,7 +151,22 @@ class CarneController extends Controller {
         $totalTaxas = floatval($request->getParam('total_taxas', 0));
 
         $opcoes = $this->carneService->calcularParcelas($totalProdutos, $totalTaxas);
-        $this->json(['success' => true, 'parcelas' => $opcoes]);
+
+        // Buscar valor mínimo configurado
+        $valorMinimo = 0.0;
+        try {
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_valor_minimo' LIMIT 1");
+            $st->execute();
+            $valorMinimo = (float) ($st->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+
+        $this->json([
+            'success' => true,
+            'parcelas' => $opcoes,
+            'valor_minimo' => $valorMinimo,
+            'total' => $totalProdutos + $totalTaxas,
+        ]);
     }
 
     /**

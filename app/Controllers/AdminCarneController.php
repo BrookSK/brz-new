@@ -255,7 +255,7 @@ class AdminCarneController extends Controller {
     public function configuracoes(Request $request) {
         if ($request->getMethod() === 'POST') {
             $campos = [
-                'carne_ativo', 'carne_somente_admin', 'carne_max_parcelas', 'carne_dias_vencimento',
+                'carne_ativo', 'carne_somente_admin', 'carne_max_parcelas', 'carne_valor_minimo', 'carne_dias_vencimento',
                 'carne_meses_atraso_cancelamento', 'carne_dias_aviso_cancelamento',
                 'carne_webhook_url', 'carne_webhook_ativo', 'carne_email_ativo',
                 'carne_eventos_webhook', 'carne_eventos_email', 'cron_secret'

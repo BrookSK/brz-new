@@ -39,7 +39,12 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Máximo de Parcelas</label>
-                            <input type="number" name="carne_max_parcelas" class="form-control" value="<?= htmlspecialchars($config['carne_max_parcelas'] ?? '12') ?>" min="1" max="24">
+                            <input type="number" name="carne_max_parcelas" class="form-control" value="<?= htmlspecialchars($config['carne_max_parcelas'] ?? '12') ?>" min="2" max="24">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Valor Mínimo do Pedido (R$)</label>
+                            <input type="number" name="carne_valor_minimo" class="form-control" value="<?= htmlspecialchars($config['carne_valor_minimo'] ?? '0') ?>" min="0" step="0.01" placeholder="0 = sem mínimo">
+                            <small class="text-muted">Pedidos abaixo deste valor não podem usar o Carnê. Use 0 para não ter mínimo.</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Dias para Vencimento</label>

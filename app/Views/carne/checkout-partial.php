@@ -71,7 +71,40 @@
             .then(r => r.json())
             .then(data => {
                 if (!data.success) return;
+
                 select.innerHTML = '';
+
+                // Verificar valor mínimo
+                const valorMinimo = data.valor_minimo || 0;
+                const totalPedido = data.total || (totalProdutos + totalTaxas);
+
+                if (valorMinimo > 0 && totalPedido < valorMinimo) {
+                    // Total abaixo do mínimo — esconder opção de carnê
+                    section.style.display = 'none';
+                    // Remover a opção do select de forma de pagamento
+                    const formaSel = document.getElementById('forma_pagamento');
+                    if (formaSel) {
+                        Array.from(formaSel.options).forEach(opt => {
+                            if (opt.value === 'carne_braziliana') opt.remove();
+                        });
+                        if (formaSel.value === 'carne_braziliana') formaSel.value = '';
+                    }
+                    return;
+                }
+
+                if (!data.parcelas || data.parcelas.length === 0) {
+                    // Nenhuma parcela disponível (valor muito baixo para parcelar)
+                    section.style.display = 'none';
+                    const formaSel = document.getElementById('forma_pagamento');
+                    if (formaSel) {
+                        Array.from(formaSel.options).forEach(opt => {
+                            if (opt.value === 'carne_braziliana') opt.remove();
+                        });
+                        if (formaSel.value === 'carne_braziliana') formaSel.value = '';
+                    }
+                    return;
+                }
+
                 data.parcelas.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.parcelas;
