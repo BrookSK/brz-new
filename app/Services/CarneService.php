@@ -637,6 +637,33 @@ class CarneService {
     }
 
     /**
+     * Verifica se carnê está ativo nas configurações (sem checar moeda/país — isso é feito pelo JS)
+     */
+    public function isCarneAtivo(): bool {
+        try {
+            $stmt = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('carne_ativo', 'carne_somente_admin')");
+            $stmt->execute();
+            $configs = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+            $ativo = (string) ($configs['carne_ativo'] ?? '0');
+            $somenteAdmin = (string) ($configs['carne_somente_admin'] ?? '0');
+
+            // Modo teste: só admin vê — retorna true para que o JS possa checar o perfil se necessário
+            // mas aqui retornamos true mesmo assim (o JS filtra por isBRL+isBR)
+            if ($somenteAdmin === '1') {
+                $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
+                if ($perfil === '') $perfil = strtolower(trim((string) ($_SESSION['usuario_role'] ?? '')));
+                if ($perfil === 'administrator' || $perfil === 'administrador') $perfil = 'admin';
+                return ($perfil === 'admin');
+            }
+
+            return ($ativo === '1');
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Verifica se carnê está disponível para o contexto do checkout
      */
     public function isCarneDisponivel($moeda = 'BRL', $paisEnvio = 'BR') {

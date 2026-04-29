@@ -20,14 +20,11 @@
         window.CARTEIRA_TURBO_LIBERACAO_DATA = <?= json_encode((string) ($carteira_turbo_liberacao_data ?? ''), JSON_UNESCAPED_UNICODE) ?>;
         <?php
         // Carnê Braziliana: verificar disponibilidade server-side e expor para o JS
+        // Nota: a checagem de moeda/país é feita pelo JS em tempo real; aqui só verificamos se está ativo nas configs
         $carneDispCheck = false;
         try {
             $carneServiceInit = new \App\Services\CarneService();
-            $moedaInit = strtoupper(trim((string) ($moeda ?? 'BRL')));
-            $paisInit = 'BR';
-            if (!empty($endereco_prefill['pais'])) $paisInit = strtoupper(trim((string) $endereco_prefill['pais']));
-            if ($paisInit === '') $paisInit = 'BR';
-            $carneDispCheck = $carneServiceInit->isCarneDisponivel($moedaInit, $paisInit);
+            $carneDispCheck = $carneServiceInit->isCarneAtivo();
         } catch (\Exception $e) {}
         ?>
         window.CARNE_BRAZILIANA_DISPONIVEL = <?= $carneDispCheck ? 'true' : 'false' ?>;
@@ -751,21 +748,11 @@
                                                 <!-- <option value="boleto">Boleto</option> <!-- OCULTO TEMPORARIAMENTE -->
                                                 <?php
                                                 // Carnê Braziliana: só aparece para BRL + Brasil
+                                                // A checagem de moeda/país é feita pelo JS; aqui só verificamos se está ativo
                                                 $carneService = new \App\Services\CarneService();
-                                                $moedaCheckout = strtoupper(trim((string) ($moeda ?? 'BRL')));
-                                                // Detectar país de entrega: variável da view, endereço prefill, ou fallback BR
-                                                $paisCheckout = 'BR';
-                                                if (!empty($pais_entrega)) {
-                                                    $paisCheckout = strtoupper(trim((string) $pais_entrega));
-                                                } elseif (!empty($endereco_prefill['pais'])) {
-                                                    $paisCheckout = strtoupper(trim((string) $endereco_prefill['pais']));
-                                                } elseif (!empty($cobra_impostos_br)) {
-                                                    $paisCheckout = 'BR';
-                                                }
-                                                if ($paisCheckout === '') $paisCheckout = 'BR';
-                                                if ($carneService->isCarneDisponivel($moedaCheckout, $paisCheckout)):
+                                                if ($carneService->isCarneAtivo()):
                                                 ?>
-                                                <option value="carne_braziliana">Carnê Braziliana (até 12x boleto)</option>
+                                                <option value="carne_braziliana" style="display:none;">Carnê Braziliana (até 12x boleto)</option>
                                                 <?php endif; ?>
                                             </select>
 
