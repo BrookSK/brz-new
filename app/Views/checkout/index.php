@@ -112,12 +112,12 @@
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
                                     <input type="text" class="form-control" name="nome" required 
-                                           value="<?= htmlspecialchars($usuario['nome'] ?? '') ?>">
+                                           value="<?= htmlspecialchars((string) ($usuario['nome'] ?? '')) ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label"><?= __('auth.email', 'E-mail') ?> *</label>
                                     <input type="email" class="form-control" name="email" required 
-                                           value="<?= htmlspecialchars($usuario['email'] ?? '') ?>">
+                                           value="<?= htmlspecialchars((string) ($usuario['email'] ?? '')) ?>">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label" id="label-documento">CPF</label>
@@ -143,7 +143,7 @@
                                             <option value="0"><?= __('auth.other', 'Outro') ?></option>
                                         </select>
                                         <input type="text" class="form-control" id="telefone_numero" name="telefone_numero" style="flex: 1 1 0; min-width: 0;" placeholder="<?= htmlspecialchars(__('auth.number', 'Número'), ENT_QUOTES, 'UTF-8') ?>" required>
-                                        <input type="hidden" class="form-control" name="telefone" id="telefone" value="<?= htmlspecialchars($usuario['telefone'] ?? '') ?>">
+                                        <input type="hidden" class="form-control" name="telefone" id="telefone" value="<?= htmlspecialchars((string) ($usuario['telefone'] ?? '')) ?>">
                                     </div>
                                     <div class="input-group mt-2" id="telefone_ddi_outro_box" style="display:none;">
                                         <span class="input-group-text">DDI</span>
@@ -199,15 +199,15 @@
                                         <?php foreach ($enderecos as $endereco): ?>
                                             <option value="<?= $endereco['id'] ?>" 
                                                     data-pais="<?= htmlspecialchars((string) ($endereco['pais'] ?? 'BR')) ?>"
-                                                    data-cep="<?= htmlspecialchars($endereco['cep']) ?>"
-                                                    data-endereco="<?= htmlspecialchars($endereco['endereco']) ?>"
-                                                    data-numero="<?= htmlspecialchars($endereco['numero']) ?>"
-                                                    data-complemento="<?= htmlspecialchars($endereco['complemento']) ?>"
-                                                    data-bairro="<?= htmlspecialchars($endereco['bairro']) ?>"
-                                                    data-cidade="<?= htmlspecialchars($endereco['cidade']) ?>"
-                                                    data-estado="<?= htmlspecialchars($endereco['estado']) ?>"
+                                                    data-cep="<?= htmlspecialchars((string) ($endereco['cep'] ?? '')) ?>"
+                                                    data-endereco="<?= htmlspecialchars((string) ($endereco['endereco'] ?? '')) ?>"
+                                                    data-numero="<?= htmlspecialchars((string) ($endereco['numero'] ?? '')) ?>"
+                                                    data-complemento="<?= htmlspecialchars((string) ($endereco['complemento'] ?? '')) ?>"
+                                                    data-bairro="<?= htmlspecialchars((string) ($endereco['bairro'] ?? '')) ?>"
+                                                    data-cidade="<?= htmlspecialchars((string) ($endereco['cidade'] ?? '')) ?>"
+                                                    data-estado="<?= htmlspecialchars((string) ($endereco['estado'] ?? '')) ?>"
                                                     <?= $endereco['principal'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($endereco['endereco']) ?>, <?= htmlspecialchars($endereco['numero']) ?> - <?= htmlspecialchars($endereco['bairro']) ?>, <?= htmlspecialchars($endereco['cidade']) ?>/<?= htmlspecialchars($endereco['estado']) ?><?= $endereco['principal'] ? ' (Principal)' : '' ?>
+                                                <?= htmlspecialchars((string) ($endereco['endereco'] ?? '')) ?>, <?= htmlspecialchars((string) ($endereco['numero'] ?? '')) ?> - <?= htmlspecialchars((string) ($endereco['bairro'] ?? '')) ?>, <?= htmlspecialchars((string) ($endereco['cidade'] ?? '')) ?>/<?= htmlspecialchars((string) ($endereco['estado'] ?? '')) ?><?= $endereco['principal'] ? ' (Principal)' : '' ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -230,7 +230,7 @@
                                         <?php $pp = strtoupper((string) (($endereco_prefill['pais'] ?? 'BR'))); ?>
                                         <select class="form-select" name="pais" id="pais" required>
                                             <?php foreach ($countries as $code => $name): ?>
-                                                <option value="<?= htmlspecialchars($code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                                                <option value="<?= htmlspecialchars((string) $code) ?>" <?= $pp === $code ? 'selected' : '' ?>><?= htmlspecialchars((string) $name) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                         <input type="text" class="form-control mt-2" id="pais_search" placeholder="<?= htmlspecialchars(__('auth.filter_countries', 'Digite para filtrar países...'), ENT_QUOTES, 'UTF-8') ?>">
@@ -619,7 +619,7 @@
                                     <div class="d-flex justify-content-between">
                                         <div>
                                             <small>
-                                                <?= htmlspecialchars($item['nome']) ?> (<?= $item['quantidade'] ?>x)
+                                                <?= htmlspecialchars((string) ($item['nome'] ?? '')) ?> (<?= $item['quantidade'] ?>x)
                                                 <?php if (!empty($item['is_free_offer'])): ?>
                                                     <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Gratuito</span>
                                                 <?php endif; ?>
