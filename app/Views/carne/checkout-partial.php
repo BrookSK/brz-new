@@ -5,14 +5,15 @@
             <h6 class="mb-0"><i class="fas fa-file-invoice-dollar"></i> Carnê Braziliana</h6>
         </div>
         <div class="card-body">
-            <!-- Aviso de valor mínimo (mostrado quando total está abaixo) -->
-            <div id="carne-aviso-minimo" class="alert alert-warning mb-3" style="display:none;">
-                <i class="fas fa-exclamation-triangle me-1"></i>
+
+            <!-- Aviso de valor mínimo / loading (mostrado quando total está abaixo ou carregando) -->
+            <div id="carne-aviso-minimo" class="alert alert-warning mb-0" style="display:none;">
+                <span id="carne-aviso-icone"><i class="fas fa-exclamation-triangle me-1"></i></span>
                 <span id="carne-aviso-minimo-texto"></span>
             </div>
 
-            <!-- Conteúdo normal do carnê (escondido quando abaixo do mínimo) -->
-            <div id="carne-conteudo-normal">
+            <!-- Conteúdo normal do carnê -->
+            <div id="carne-conteudo-normal" style="display:none;">
                 <p class="small text-muted mb-3">
                     Parcele sua compra em até 12x via boleto bancário. Cada parcela gera dois boletos: um para produtos (Câmbio Real) e outro para taxas (Appmax).
                     <strong>O envio ocorre somente após a quitação total.</strong>
@@ -44,7 +45,7 @@
 
                 <!-- Aceite dos Termos -->
                 <div class="form-check mb-2">
-                    <input type="checkbox" name="carne_termos_aceitos" id="carne-termos-check" class="form-check-input" value="1" required>
+                    <input type="checkbox" name="carne_termos_aceitos" id="carne-termos-check" class="form-check-input" value="1">
                     <label class="form-check-label" for="carne-termos-check">
                         Li e aceito os <a href="/carne/termos" target="_blank">termos e condições do Carnê Braziliana</a>
                     </label>
@@ -54,6 +55,7 @@
                     <i class="fas fa-info-circle"></i> Disponível apenas para pagamentos em Reais (BRL) e envios para o Brasil.
                 </div>
             </div>
+
         </div>
     </div>
 </div>
@@ -69,70 +71,67 @@
     const valProds   = document.getElementById('carne-valor-produtos');
     const valTaxas   = document.getElementById('carne-valor-taxas');
     const valTotal   = document.getElementById('carne-valor-total');
-    const termos     = document.getElementById('carne-termos-check');
 
-    // Função chamada pelo checkout ao selecionar/desselecionar carnê
+    // Chamada pelo checkout ao selecionar/desselecionar carnê
     window.toggleCarneBraziliana = function(show, totalProdutos, totalTaxas) {
-        section.style.display = show ? 'block' : 'none';
-        if (show) {
-            carregarParcelas(totalProdutos, totalTaxas);
-        } else {
-            // Limpar estado ao esconder
+        if (!show) {
+            section.style.display = 'none';
             avisoBox.style.display = 'none';
-            conteudo.style.display = 'block';
-            if (termos) termos.required = false;
+            conteudo.style.display = 'none';
+            return;
         }
+        section.style.display = 'block';
+        carregarParcelas(totalProdutos, totalTaxas);
     };
 
-    function mostrarAvisoMinimo(faltaReais) {
-        // Mostrar aviso, esconder formulário de parcelas
+    function mostrarAviso(texto) {
+        avisoBox.className = 'alert alert-warning mb-0';
+        document.getElementById('carne-aviso-icone').innerHTML = '<i class="fas fa-cart-plus me-1"></i>';
+        avisoTexto.textContent = texto;
         avisoBox.style.display = 'block';
-        avisoTexto.textContent = 'Adicione pelo menos R$ ' + formatMoney(faltaReais) + ' ao carrinho para usar o Carnê Braziliana.';
         conteudo.style.display = 'none';
-        // Desabilitar o checkbox de termos para não bloquear o submit
-        if (termos) { termos.required = false; termos.checked = false; }
-        // Trocar forma de pagamento de volta para "Selecione..."
-        const formaSel = document.getElementById('forma_pagamento');
-        if (formaSel && formaSel.value === 'carne_braziliana') {
-            formaSel.value = '';
-            // Disparar evento para o checkout atualizar o estado do botão
-            formaSel.dispatchEvent(new Event('change'));
-        }
     }
 
-    function mostrarConteudoNormal() {
+    function mostrarParcelas() {
         avisoBox.style.display = 'none';
         conteudo.style.display = 'block';
-        if (termos) termos.required = true;
     }
 
     function carregarParcelas(totalProdutos, totalTaxas) {
+        // Mostrar loading enquanto carrega
+        avisoBox.style.display = 'none';
+        conteudo.style.display = 'none';
+        // Mostrar spinner temporário
+        avisoTexto.textContent = 'Calculando parcelas...';
+        avisoBox.style.display = 'block';
+        avisoBox.className = 'alert alert-secondary mb-0';
+        document.getElementById('carne-aviso-icone').innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>';
+
         fetch('/carne/calcular-parcelas?total_produtos=' + totalProdutos + '&total_taxas=' + totalTaxas)
             .then(r => r.json())
             .then(data => {
-                if (!data.success) return;
+                if (!data.success) {
+                    mostrarAviso('Não foi possível carregar as opções de parcelamento. Tente novamente.');
+                    return;
+                }
 
-                const valorMinimo  = data.valor_minimo || 0;
-                const totalPedido  = data.total || (totalProdutos + totalTaxas);
+                const valorMinimo = data.valor_minimo || 0;
+                const totalPedido = data.total || (totalProdutos + totalTaxas);
 
-                // Checar valor mínimo configurado
+                // Checar valor mínimo configurado pelo admin
                 if (valorMinimo > 0 && totalPedido < valorMinimo) {
-                    mostrarAvisoMinimo(valorMinimo - totalPedido);
+                    const falta = valorMinimo - totalPedido;
+                    mostrarAviso('Adicione R$ ' + formatMoney(falta) + ' ao carrinho para usar o Carnê Braziliana (mínimo R$ ' + formatMoney(valorMinimo) + ').');
                     return;
                 }
 
-                // Checar se há parcelas disponíveis (mínimo por boleto R$20)
+                // Checar se há parcelas disponíveis (mínimo R$20 por boleto)
                 if (!data.parcelas || data.parcelas.length === 0) {
-                    // Calcular quanto falta para ter pelo menos 2x com R$20 cada boleto
-                    // Mínimo total = 2 * R$20 = R$40 por boleto de produto + R$40 por boleto de taxa
-                    const minimoParaParcela = 40; // R$40 mínimo para 2x
-                    const falta = Math.max(0, minimoParaParcela - totalPedido);
-                    mostrarAvisoMinimo(falta > 0 ? falta : 0.01);
+                    mostrarAviso('O valor do pedido é muito baixo para parcelar. Adicione mais produtos ao carrinho para usar o Carnê Braziliana.');
                     return;
                 }
 
-                // Tudo ok — mostrar parcelas normalmente
-                mostrarConteudoNormal();
+                // Tudo ok — mostrar parcelas
                 select.innerHTML = '';
                 data.parcelas.forEach(p => {
                     const opt = document.createElement('option');
@@ -143,12 +142,11 @@
                     opt.dataset.total    = p.valor_parcela_total;
                     select.appendChild(opt);
                 });
+                mostrarParcelas();
                 atualizarResumo();
             })
             .catch(() => {
-                // Erro de rede — não sumir, só não mostrar parcelas
-                mostrarAvisoMinimo(0);
-                avisoTexto.textContent = 'Não foi possível carregar as opções de parcelamento. Tente novamente.';
+                mostrarAviso('Não foi possível carregar as opções de parcelamento. Verifique sua conexão e tente novamente.');
             });
     }
 
