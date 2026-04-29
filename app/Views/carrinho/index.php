@@ -357,8 +357,8 @@
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('cart.taxes_brazil', 'Impostos do Brasil') ?>
                             <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
-                                  title="Imposto de importação cobrado pela Receita Federal brasileira sobre produtos adquiridos no exterior. Calculado sobre o valor total dos produtos."
-                                  style="cursor:help; color:#6c757d; font-size:.8em; vertical-align:middle;">
+                                  title="É o imposto de importação cobrado pelo governo brasileiro quando você traz produtos de fora do país. Já está incluído no seu pedido para você não ter surpresas na entrega."
+                                  style="cursor:help; color:#6c757d; font-size:.85em; vertical-align:middle;">
                                 <i class="fas fa-question-circle"></i>
                             </span>
                         </span>
@@ -379,8 +379,8 @@
                     <div class="d-flex justify-content-between mb-2">
                         <span>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%)
                             <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
-                                  title="Sales tax cobrado pelo estado americano onde está localizado nosso armazém. Este imposto é exigido por lei nos EUA e varia conforme o estado."
-                                  style="cursor:help; color:#6c757d; font-size:.8em; vertical-align:middle;">
+                                  title="É um imposto cobrado nos EUA sobre compras feitas em lojas americanas — parecido com o ICMS aqui no Brasil. Nem todas as lojas cobram, mas quando cobram, é obrigatório por lei."
+                                  style="cursor:help; color:#6c757d; font-size:.85em; vertical-align:middle;">
                                 <i class="fas fa-question-circle"></i>
                             </span>
                         </span>
