@@ -962,7 +962,13 @@
                                 <?php endif; ?>
                                 <?php if (!empty($cobra_impostos_br)): ?>
                                     <div class="d-flex justify-content-between" id="impostos-row" <?= $isPaymentLinkTaxaOnly ? 'style="display:none;"' : '' ?>>
-                                        <span><?= __('cart.taxes', 'Impostos') ?>:</span>
+                                        <span><?= __('cart.taxes', 'Impostos') ?>:
+                                            <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                  title="Imposto de importação cobrado pela Receita Federal brasileira sobre produtos adquiridos no exterior. Calculado sobre o valor total dos produtos."
+                                                  style="cursor:help; color:#6c757d; font-size:.8em; vertical-align:middle;">
+                                                <i class="fas fa-question-circle"></i>
+                                            </span>
+                                        </span>
                                         <span id="impostos" class="cart-currency" data-original-value="<?= $impostos ?? 0 ?>"><?= number_format(($impostos ?? 0), 2, '.', ',') ?></span>
                                     </div>
                                     <?php if (!empty($free_offer_info)): ?>
@@ -990,7 +996,13 @@
                                 <?php endif; ?>
                                 <?php if (($imposto_local ?? 0) > 0): ?>
                                     <div class="d-flex justify-content-between" id="imposto-local-row">
-                                        <span>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%):</span>
+                                        <span>Imposto local (<?= number_format($imposto_local_percent ?? 0, 0) ?>%):
+                                            <span tabindex="0" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                  title="Sales tax cobrado pelo estado americano onde está localizado nosso armazém. Este imposto é exigido por lei nos EUA e varia conforme o estado."
+                                                  style="cursor:help; color:#6c757d; font-size:.8em; vertical-align:middle;">
+                                                <i class="fas fa-question-circle"></i>
+                                            </span>
+                                        </span>
                                         <span id="imposto-local" class="cart-currency" data-original-value="<?= $imposto_local ?>"><?= number_format($imposto_local, 2, '.', ',') ?></span>
                                     </div>
                                 <?php endif; ?>
@@ -3148,6 +3160,12 @@ document.addEventListener('DOMContentLoaded', function() {
             clearEnderecoForm();
         });
     }
+});
+
+// Inicializar tooltips Bootstrap
+document.addEventListener('DOMContentLoaded', function () {
+    var tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipEls.forEach(function (el) { new bootstrap.Tooltip(el); });
 });
 </script>
 
