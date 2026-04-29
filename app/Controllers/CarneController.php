@@ -152,7 +152,7 @@ class CarneController extends Controller {
 
         $opcoes = $this->carneService->calcularParcelas($totalProdutos, $totalTaxas);
 
-        // Buscar valor mínimo configurado
+        // Buscar valor mínimo configurado pelo admin
         $valorMinimo = 0.0;
         try {
             $db = \Config\Database::getConnection();
@@ -161,11 +161,15 @@ class CarneController extends Controller {
             $valorMinimo = (float) ($st->fetchColumn() ?: 0);
         } catch (\Exception $e) {}
 
+        // Mínimo técnico para parcelar (R$20 por boleto × 2 parcelas)
+        $minimoParcelamento = $this->carneService->calcularMinimoParcelamento($totalProdutos, $totalTaxas);
+
         $this->json([
-            'success' => true,
-            'parcelas' => $opcoes,
-            'valor_minimo' => $valorMinimo,
-            'total' => $totalProdutos + $totalTaxas,
+            'success'            => true,
+            'parcelas'           => $opcoes,
+            'valor_minimo'       => $valorMinimo,
+            'minimo_parcelamento'=> $minimoParcelamento,
+            'total'              => $totalProdutos + $totalTaxas,
         ]);
     }
 

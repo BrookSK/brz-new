@@ -21,7 +21,7 @@ class CarneService {
         $total = $totalProdutos + $totalTaxas;
         $opcoes = [];
 
-        // Mínimo por boleto/PIX: R$ 20,00
+        // Mínimo por boleto: R$ 20,00
         $minimoBoleto = 20.00;
 
         // Carnê começa em 2x (1x não é carnê)
@@ -30,7 +30,6 @@ class CarneService {
             $vTaxa = round($totalTaxas / $i, 2);
             $vTotal = round($total / $i, 2);
 
-            // Só incluir se ambos os boletos atendem o mínimo
             $prodOk = ($vProd <= 0 || $vProd >= $minimoBoleto);
             $taxaOk = ($vTaxa <= 0 || $vTaxa >= $minimoBoleto);
 
@@ -45,8 +44,21 @@ class CarneService {
             }
         }
 
-        // Se nenhuma parcela atende o mínimo por boleto, retorna vazio (total muito baixo)
         return $opcoes;
+    }
+
+    /**
+     * Calcula o valor mínimo necessário para ter pelo menos 2x no carnê
+     * Leva em conta o mínimo por boleto (R$20) para produtos e taxas separadamente
+     */
+    public function calcularMinimoParcelamento($totalProdutos, $totalTaxas): float {
+        $minimoBoleto = 20.00;
+        // Para 2x: cada boleto precisa de >= R$20
+        // mínimo_produtos = 2 * 20 = 40 (se produtos > 0)
+        // mínimo_taxas    = 2 * 20 = 40 (se taxas > 0)
+        $minProd = ($totalProdutos > 0) ? ($minimoBoleto * 2) : 0.0;
+        $minTaxa = ($totalTaxas > 0)   ? ($minimoBoleto * 2) : 0.0;
+        return $minProd + $minTaxa;
     }
 
     /**

@@ -127,7 +127,13 @@
 
                 // Checar se há parcelas disponíveis (mínimo R$20 por boleto)
                 if (!data.parcelas || data.parcelas.length === 0) {
-                    mostrarAviso('O valor do pedido é muito baixo para parcelar. Adicione mais produtos ao carrinho para usar o Carnê Braziliana.');
+                    const minimoTecnico = data.minimo_parcelamento || 40;
+                    const falta = Math.max(0, minimoTecnico - totalPedido);
+                    if (falta > 0) {
+                        mostrarAviso('Adicione R$ ' + formatMoney(falta) + ' ao carrinho para usar o Carnê Braziliana (mínimo R$ ' + formatMoney(minimoTecnico) + ' para parcelar em 2x ou mais).');
+                    } else {
+                        mostrarAviso('O valor do pedido não permite parcelamento. Adicione mais produtos ao carrinho.');
+                    }
                     return;
                 }
 
