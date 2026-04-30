@@ -1,0 +1,1 @@
+﻿<?php header('Content-Type: application/json'); $f='/tmp/split_debug.txt'; echo file_exists($f)?file_get_contents($f):json_encode(['msg'=>'no debug yet']);

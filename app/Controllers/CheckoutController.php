@@ -3515,6 +3515,17 @@ class CheckoutController extends Controller {
                                 }
 
                                 $taxa = $this->gerarCobrancaCambioRealTaxasSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico', (float) $valorTaxa);
+                                // DEBUG TEMPORÁRIO — remover após teste
+                                file_put_contents('/tmp/split_debug.txt', json_encode([
+                                    'moeda' => $moedaPedidoPay,
+                                    'valorAppmax' => $valorAppmax,
+                                    'valorTaxa' => $valorTaxa,
+                                    'valorImposto' => $valorImposto,
+                                    'taxaServico_raw' => $taxaServico,
+                                    'totalBrl' => $totalBrl,
+                                    'splitTaxaConversao' => $splitTaxaConversao ?? 'N/A',
+                                    'billingType' => $billingType,
+                                ], JSON_PRETTY_PRINT));
                                 if (empty($taxa['success'])) {
                                     throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento Câmbio Real Taxas (taxa de serviço)'));
                                 }
