@@ -223,11 +223,55 @@ class QuickBooksService
             }
         }
 
-        // Memo com detalhes de pagamento
+        // Memo com detalhes completos
         $memo = 'Pedido Braziliana #' . $ped['id'];
         if ($pedidoEmBrl) {
             $memo .= sprintf(' | R$ %s (taxa %.2f)', number_format($totalPedido, 2, ',', '.'), $taxaCambio);
         }
+
+        // Detalhamento por componente (campos diretos do pedido)
+        $detalhes = [];
+        $camposProduto  = ['valor_produtos', 'subtotal_produtos', 'subtotal'];
+        $camposTaxa     = ['taxa_servico', 'valor_taxa_servico', 'servico'];
+        $camposImposto  = ['imposto', 'valor_impostos', 'impostos', 'imposto_importacao'];
+        $camposImpostoL = ['imposto_local', 'sales_tax', 'imposto_eua'];
+
+        foreach ($camposProduto as $c) {
+            if (!empty($ped[$c]) && (float)$ped[$c] > 0) {
+                $detalhes[] = 'Produtos: R$ ' . number_format((float)$ped[$c], 2, ',', '.');
+                break;
+            }
+        }
+        foreach ($camposTaxa as $c) {
+            if (!empty($ped[$c]) && (float)$ped[$c] > 0) {
+                $detalhes[] = 'Taxa servico: R$ ' . number_format((float)$ped[$c], 2, ',', '.');
+                break;
+            }
+        }
+        foreach ($camposImposto as $c) {
+            if (!empty($ped[$c]) && (float)$ped[$c] > 0) {
+                $detalhes[] = 'Imposto importacao: R$ ' . number_format((float)$ped[$c], 2, ',', '.');
+                break;
+            }
+        }
+        foreach ($camposImpostoL as $c) {
+            if (!empty($ped[$c]) && (float)$ped[$c] > 0) {
+                $detalhes[] = 'Imposto local: R$ ' . number_format((float)$ped[$c], 2, ',', '.');
+                break;
+            }
+        }
+
+        // Forma de pagamento direta do pedido
+        $fp = (string)($ped['forma_pagamento'] ?? $ped['payment_method'] ?? '');
+        if ($fp !== '') {
+            $detalhes[] = 'Pagamento: ' . $fp;
+        }
+
+        if (!empty($detalhes)) {
+            $memo .= ' | ' . implode(' | ', $detalhes);
+        }
+
+        // Split de pagamentos da tabela pedido_pagamentos (quando disponível)
         $pagamentos = $ped['_pagamentos'] ?? [];
         if (!empty($pagamentos)) {
             $labels = [
@@ -237,13 +281,13 @@ class QuickBooksService
                 'stripe'           => 'Stripe',
                 'asaas'            => 'Asaas',
             ];
-            $memo .= ' | Pagamentos:';
+            $memo .= ' | Split:';
             foreach ($pagamentos as $pg) {
                 $gw   = $labels[$pg['gateway']] ?? ucfirst($pg['gateway'] ?? '');
                 $met  = strtoupper($pg['metodo'] ?? '');
-                $val  = number_format((float) ($pg['valor'] ?? 0), 2, ',', '.');
+                $val  = number_format((float)($pg['valor'] ?? 0), 2, ',', '.');
                 $comp = ucfirst($pg['componente'] ?? '');
-                $memo .= " [{$comp} R$ {$val} {$gw}/{$met}]";
+                $memo .= " [{$comp} R$ {$val} via {$gw}/{$met}]";
             }
         }
 
