@@ -161,7 +161,18 @@ class QuickBooksService
     private function registrarLog(string $ent,?int $eid,?string $qid,string $ac,string $st,array $pl=[],string $err=""): void {
         try{$uid=isset($_SESSION["usuario_id"])?(int)$_SESSION["usuario_id"]:null;$this->pdo->prepare("INSERT INTO quickbooks_sync_log(entidade,entidade_id,qb_id,acao,status,payload,erro,usuario_id) VALUES(?,?,?,?,?,?,?,?)")->execute([$ent,$eid,$qid,$ac,$st,json_encode($pl,JSON_UNESCAPED_UNICODE),$err?:null,$uid]);}catch(\Throwable $e){}
     }
-    public function getLogsRecentes(int $lim=50): array { $s=$this->pdo->prepare("SELECT l.*,u.nome AS usuario_nome FROM quickbooks_sync_log l LEFT JOIN usuarios u ON u.id=l.usuario_id ORDER BY l.criado_em DESC LIMIT ?"); $s->execute([$lim]); return $s->fetchAll(\PDO::FETCH_ASSOC)?:[]; }
+    public function getLogsRecentes(int $lim = 50): array {
+        $lim = max(1, (int) $lim);
+        $s = $this->pdo->prepare(
+            "SELECT l.*, u.nome AS usuario_nome
+             FROM quickbooks_sync_log l
+             LEFT JOIN usuarios u ON u.id = l.usuario_id
+             ORDER BY l.criado_em DESC
+             LIMIT " . $lim
+        );
+        $s->execute();
+        return $s->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
     private function apiGet(string $ep): array { $url=$this->getBaseUrl()."/".$this->getRealmId().$ep."?minorversion=65"; return $this->httpGet($url,["Authorization: Bearer ".$this->getAccessToken(),"Accept: application/json"]); }
     private function apiPost(string $ep,array $pl): array { $url=$this->getBaseUrl()."/".$this->getRealmId().$ep."?minorversion=65"; return $this->httpPost($url,$pl,null,["Authorization: Bearer ".$this->getAccessToken(),"Content-Type: application/json","Accept: application/json"],true); }
     private function apiQuery(string $q): array { $url=$this->getBaseUrl()."/".$this->getRealmId()."/query?query=".urlencode($q)."&minorversion=65"; return $this->httpGet($url,["Authorization: Bearer ".$this->getAccessToken(),"Accept: application/json"]); }
