@@ -3472,11 +3472,8 @@ class CheckoutController extends Controller {
                                     // Se taxas falhar, produtos não é cobrado.
                                     $taxa = null;
                                     if ($valorAppmax > 0) {
-                                        // Converter valorAppmax para BRL se estiver em USD
-                                        $valorAppmaxBrl = $valorAppmax;
-                                        if ($moedaPedidoPay === 'BRL' && $tx > 1.01 && $valorAppmax < ($totalBrl * 0.8)) {
-                                            $valorAppmaxBrl = round($valorAppmax * $tx, 2);
-                                        }
+                                        // Passar valorAppmax direto em BRL (igual ao PIX que já funciona)
+                                        $valorAppmaxBrl = (float) $valorAppmax;
 
                                         $clienteSplitCard = [
                                             'nome'       => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
@@ -3510,7 +3507,7 @@ class CheckoutController extends Controller {
                                             $clienteSplitCard,
                                             $descricaoTaxaCard,
                                             'taxa_servico',
-                                            (float) (isset($splitTaxaConversao) && $splitTaxaConversao > 1.01 ? round($valorTaxa * $splitTaxaConversao, 2) : ($moedaPedidoPay === 'BRL' && $tx > 1.01 ? round($valorTaxa * $tx, 2) : $valorTaxa))
+                                            (float) $valorTaxa
                                         );
                                         if (empty($taxa['success'])) {
                                             throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento Câmbio Real Taxas (taxa de serviço)'));
