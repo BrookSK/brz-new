@@ -1,4 +1,4 @@
-﻿<?php require_once __DIR__.'/../partials/admin_sidebar.php'; renderAdminSidebarStyles(); ?>
+﻿<?php require_once __DIR__.'/../../partials/admin_sidebar.php'; renderAdminSidebarStyles(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
