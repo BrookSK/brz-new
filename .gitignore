@@ -1,2 +1,10 @@
 ﻿/docs/prompt
 .kiro/
+
+# Server-specific files (uploads, vendor, backups, etc.)
+.well-known/
+composer.lock
+public/public/
+public/uploads/
+storage/backups/
+vendor/
