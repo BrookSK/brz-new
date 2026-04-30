@@ -111,7 +111,22 @@ class AdminQuickBooksController extends Controller {
             }
             unset($item);
 
-            // Normalizar total BRL do pedido para o service usar como fallback
+            // Debug: retornar campos do pedido para diagnóstico
+            $camposTotal = [];
+            foreach (['total', 'valor_total', 'total_brl', 'valor_total_brl', 'amount', 'valor', 'subtotal', 'preco_total', 'grand_total'] as $c) {
+                if (array_key_exists($c, $pedido)) {
+                    $camposTotal[$c] = $pedido[$c];
+                }
+            }
+            $camposItens = array_map(fn($it) => [
+                'produto_nome'   => $it['produto_nome'] ?? '',
+                'quantidade'     => $it['quantidade']   ?? $it['qty'] ?? '',
+                'preco_unitario' => $it['preco_unitario'] ?? $it['preco'] ?? '',
+                'subtotal'       => $it['subtotal']      ?? '',
+            ], $itens);
+
+            echo json_encode(['debug' => true, 'campos_total' => $camposTotal, 'itens' => $camposItens]);
+            return;
             foreach (['total_brl', 'valor_total_brl', 'total', 'valor_total', 'amount', 'valor'] as $col) {
                 if (!empty($pedido[$col]) && (float) $pedido[$col] > 0) {
                     $pedido['total_brl'] = (float) $pedido[$col];
