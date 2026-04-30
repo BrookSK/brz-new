@@ -140,16 +140,31 @@ class QuickBooksService
     public function criarInvoiceDePedido(array $ped, array $itens, array $cli): array {
         $cid = $this->sincronizarCliente($cli);
 
-        // Determinar moeda do pedido
-        $moeda = (string) ($ped['moeda'] ?? 'BRL');
+        // Moeda do pedido
+        $moedaPedido = strtoupper(trim((string) ($ped['moeda'] ?? 'BRL')));
+        $pedidoEmBrl = ($moedaPedido === 'BRL' || $moedaPedido === '');
+
+        // Taxa de câmbio BRL→USD (QuickBooks sandbox/produção opera em USD)
+        // Buscar do sistema; fallback 5.85 conforme configuração da empresa
+        $taxaCambio = 5.85;
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT valor FROM configuracoes_sistema WHERE chave = 'sistema_usd_brl_rate' LIMIT 1"
+            );
+            $stmt->execute();
+            $taxa = (float) ($stmt->fetchColumn() ?: 0);
+            if ($taxa > 0) $taxaCambio = $taxa;
+        } catch (\Throwable $e) {}
+
+        // Converter valor BRL para USD se necessário
+        $converter = fn(float $v): float => $pedidoEmBrl ? round($v / $taxaCambio, 2) : round($v, 2);
 
         // Montar line items
         $li = [];
         foreach ($itens as $it) {
-            // Usar subtotal em BRL se disponível, senão preco_unitario
-            $subtotal = (float) ($it['subtotal_brl'] ?? $it['subtotal'] ?? 0);
-            $unitario = (float) ($it['preco_unitario_brl'] ?? $it['preco_unitario'] ?? $it['preco'] ?? 0);
-            $qty      = (float) ($it['quantidade'] ?? $it['qty'] ?? 1);
+            $subtotal  = (float) ($it['subtotal_brl'] ?? $it['subtotal'] ?? 0);
+            $unitario  = (float) ($it['preco_unitario_brl'] ?? $it['preco_unitario'] ?? $it['preco'] ?? 0);
+            $qty       = (float) ($it['quantidade'] ?? $it['qty'] ?? 1);
             $descricao = (string) ($it['produto_nome'] ?? $it['nome'] ?? 'Produto');
 
             if ($subtotal <= 0 && $unitario > 0) {
@@ -157,12 +172,12 @@ class QuickBooksService
             }
 
             $li[] = [
-                'Amount'             => round($subtotal, 2),
-                'DetailType'         => 'SalesItemLineDetail',
-                'Description'        => $descricao,
+                'Amount'              => $converter($subtotal),
+                'DetailType'          => 'SalesItemLineDetail',
+                'Description'         => $descricao,
                 'SalesItemLineDetail' => [
                     'Qty'       => $qty,
-                    'UnitPrice' => round($unitario, 2),
+                    'UnitPrice' => $converter($unitario),
                 ],
             ];
         }
@@ -171,10 +186,10 @@ class QuickBooksService
         $taxa = (float) ($ped['taxa_servico_brl'] ?? $ped['taxa_servico'] ?? 0);
         if ($taxa > 0) {
             $li[] = [
-                'Amount'             => round($taxa, 2),
-                'DetailType'         => 'SalesItemLineDetail',
-                'Description'        => 'Taxa de Serviço',
-                'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($taxa, 2)],
+                'Amount'              => $converter($taxa),
+                'DetailType'          => 'SalesItemLineDetail',
+                'Description'         => 'Taxa de Servico',
+                'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => $converter($taxa)],
             ];
         }
 
@@ -182,48 +197,53 @@ class QuickBooksService
         $imposto = (float) ($ped['imposto_brl'] ?? $ped['imposto'] ?? $ped['valor_impostos'] ?? 0);
         if ($imposto > 0) {
             $li[] = [
-                'Amount'             => round($imposto, 2),
-                'DetailType'         => 'SalesItemLineDetail',
-                'Description'        => 'Imposto de Importação',
-                'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($imposto, 2)],
+                'Amount'              => $converter($imposto),
+                'DetailType'          => 'SalesItemLineDetail',
+                'Description'         => 'Imposto de Importacao',
+                'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => $converter($imposto)],
             ];
         }
 
-        // Se não há itens com valor em BRL, usar o total do pedido como linha única
-        // (itens podem estar em USD — o total do pedido é sempre em BRL)
+        // Se itens estão em USD mas pedido é BRL, ou total diverge — usar total do pedido
         $totalLinhas = array_sum(array_column($li, 'Amount'));
         $totalPedido = (float) ($ped['total_brl'] ?? $ped['valor_total_brl'] ?? $ped['total'] ?? $ped['valor_total'] ?? $ped['amount'] ?? $ped['valor'] ?? 0);
+        $totalUsd    = $converter($totalPedido);
 
-        if ($totalLinhas <= 0 || ($totalPedido > 0 && abs($totalLinhas - $totalPedido) > 1)) {
-            // Itens em USD ou valor divergente — usar total BRL como linha única
+        if ($totalLinhas <= 0 || ($totalPedido > 0 && abs($totalLinhas - $totalUsd) > 0.5)) {
             if ($totalPedido > 0) {
+                $descLinha = $pedidoEmBrl
+                    ? sprintf('Total do Pedido #%s (R$ %s ÷ %.2f)', $ped['id'], number_format($totalPedido, 2, ',', '.'), $taxaCambio)
+                    : sprintf('Total do Pedido #%s (USD)', $ped['id']);
                 $li = [[
-                    'Amount'              => round($totalPedido, 2),
+                    'Amount'              => $totalUsd,
                     'DetailType'          => 'SalesItemLineDetail',
-                    'Description'         => 'Total do Pedido Braziliana #' . $ped['id'] . ' (BRL)',
-                    'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($totalPedido, 2)],
+                    'Description'         => $descLinha,
+                    'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => $totalUsd],
                 ]];
             }
         }
 
-        // Montar memo com detalhes de pagamento
+        // Memo com detalhes de pagamento
         $memo = 'Pedido Braziliana #' . $ped['id'];
+        if ($pedidoEmBrl) {
+            $memo .= sprintf(' | R$ %s (taxa %.2f)', number_format($totalPedido, 2, ',', '.'), $taxaCambio);
+        }
         $pagamentos = $ped['_pagamentos'] ?? [];
         if (!empty($pagamentos)) {
             $labels = [
-                'cambioreal'       => 'Câmbio Real (Produtos)',
-                'cambioreal_taxas' => 'Câmbio Real (Taxas)',
+                'cambioreal'       => 'Cambio Real (Produtos)',
+                'cambioreal_taxas' => 'Cambio Real (Taxas)',
                 'appmax'           => 'Appmax',
                 'stripe'           => 'Stripe',
                 'asaas'            => 'Asaas',
             ];
-            $memo .= "\nPagamentos:";
+            $memo .= ' | Pagamentos:';
             foreach ($pagamentos as $pg) {
-                $gw  = $labels[$pg['gateway']] ?? ucfirst($pg['gateway'] ?? '');
-                $met = strtoupper($pg['metodo'] ?? '');
-                $val = number_format((float) ($pg['valor'] ?? 0), 2, ',', '.');
+                $gw   = $labels[$pg['gateway']] ?? ucfirst($pg['gateway'] ?? '');
+                $met  = strtoupper($pg['metodo'] ?? '');
+                $val  = number_format((float) ($pg['valor'] ?? 0), 2, ',', '.');
                 $comp = ucfirst($pg['componente'] ?? '');
-                $memo .= "\n  - {$comp}: R$ {$val} via {$gw} ({$met})";
+                $memo .= " [{$comp} R${$val} {$gw}/{$met}]";
             }
         }
 
@@ -233,7 +253,7 @@ class QuickBooksService
             'TxnDate'     => date('Y-m-d', strtotime($ped['created_at'] ?? 'now')),
             'DocNumber'   => 'BRZ-' . $ped['id'],
             'PrivateNote' => $memo,
-            'CurrencyRef' => ['value' => 'BRL'],
+            'CurrencyRef' => ['value' => 'USD'],
         ];
 
         $res = $this->apiPost('/invoice', $pl);
