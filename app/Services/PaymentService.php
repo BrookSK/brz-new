@@ -1190,6 +1190,10 @@ class PaymentService {
     }
 
 
+    public function getCambioRealTaxasAppId(): string {
+        return (string) ($this->cambioRealTaxasAppId ?? '');
+    }
+
     public function getCambioRealTaxasAppPublic(): string {
         return (string) ($this->cambioRealTaxasAppPublic ?? '');
     }

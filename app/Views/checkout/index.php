@@ -37,6 +37,8 @@
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+            appIdTaxas: <?= json_encode((string) ($cambioreal_taxas_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+            appPublicTaxas: <?= json_encode((string) ($cambioreal_taxas_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             baseUrl: <?= json_encode((string) ($cambioreal_base_url ?? ''), JSON_UNESCAPED_UNICODE) ?>
         };
     </script>
@@ -1893,6 +1895,30 @@ async function processarPedidoDireto() {
             formData.set('cambioreal_card_bin', bin);
             formData.set('cambioreal_card_dfp_id', dfpId);
             formData.set('cambioreal_card_type', (formaPagamento === 'cartao_debito') ? 'debit' : 'credit');
+
+            // Tokenizar também para a conta Taxas (app_public diferente)
+            const appIdTaxas = String(window.CAMBIOREAL_DIRECT.appIdTaxas || '');
+            const appPublicTaxas = String(window.CAMBIOREAL_DIRECT.appPublicTaxas || '');
+            if (appIdTaxas && appPublicTaxas) {
+                try {
+                    const dfpIdTaxas = 'TAXAS_' + String(Date.now());
+                    const cardHashLibTaxas = new CardHash(appIdTaxas, appPublicTaxas, dfpIdTaxas, sandbox);
+                    const tokenTaxas = await cardHashLibTaxas.generateCardHash(cardData);
+                    if (tokenTaxas) {
+                        formData.set('cambioreal_taxas_card_token', tokenTaxas);
+                        formData.set('cambioreal_taxas_card_dfp_id', dfpIdTaxas);
+                    }
+                } catch (eTaxas) {
+                    console.warn('Falha ao tokenizar para conta Taxas:', eTaxas);
+                    // Fallback: usar o mesmo token (pode falhar no backend)
+                    formData.set('cambioreal_taxas_card_token', token);
+                    formData.set('cambioreal_taxas_card_dfp_id', dfpId);
+                }
+            } else {
+                // Sem credenciais de Taxas — usar o mesmo token
+                formData.set('cambioreal_taxas_card_token', token);
+                formData.set('cambioreal_taxas_card_dfp_id', dfpId);
+            }
         } catch (e) {
             throw e;
         }
