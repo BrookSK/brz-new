@@ -5797,12 +5797,12 @@ class CheckoutController extends Controller {
 
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
 
-            // Admin: modo teste — taxa de serviço fixa em $1.00
+            // Admin: modo teste — taxa de serviço fixa em $2.50
             if (!empty($dados['admin_taxa_teste'])) {
                 $perfilSessao = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
                 if ($perfilSessao === 'admin') {
-                    $taxaServicoUsd = 1.00;
-                    $this->debugLog('[CRIAR_PEDIDO] Admin modo teste: taxa de serviço forçada para $1.00');
+                    $taxaServicoUsd = 2.50;
+                    $this->debugLog('[CRIAR_PEDIDO] Admin modo teste: taxa de serviço forçada para $2.50');
                 }
             }
 
@@ -5814,12 +5814,12 @@ class CheckoutController extends Controller {
                 $impostosUsd = 0.0;
             }
 
-            // Admin: modo teste — impostos fixos em $1.00
+            // Admin: modo teste — impostos fixos em $2.50
             if (!empty($dados['admin_impostos_teste']) && $paisEntrega === 'BR') {
                 $perfilSessao = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? '')));
                 if ($perfilSessao === 'admin') {
-                    $impostosUsd = 1.00;
-                    $this->debugLog('[CRIAR_PEDIDO] Admin modo teste: impostos forçados para $1.00');
+                    $impostosUsd = 2.50;
+                    $this->debugLog('[CRIAR_PEDIDO] Admin modo teste: impostos forçados para $2.50');
                 }
             }
 
