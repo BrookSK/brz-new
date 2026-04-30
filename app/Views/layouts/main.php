@@ -107,6 +107,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
         }
 
         $siteFavicon = is_string($rawFav) ? trim($rawFav) : '';
+        // Corrigir URLs legadas que não incluem /public/ no path
+        if ($siteFavicon !== '' && preg_match('#^/uploads/#', $siteFavicon)) {
+            $siteFavicon = '/public' . $siteFavicon;
+        }
     } catch (\Exception $e) {
         $siteFavicon = '';
     }
@@ -966,6 +970,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 }
 
                 $siteLogo = is_string($raw) ? trim($raw) : '';
+                // Corrigir URLs legadas que não incluem /public/ no path
+                if ($siteLogo !== '' && preg_match('#^/uploads/#', $siteLogo)) {
+                    $siteLogo = '/public' . $siteLogo;
+                }
             } catch (\Exception $e) {
                 $siteLogo = '';
             }
@@ -1251,6 +1259,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         }
 
                         $footerLogo = is_string($rawFooter) ? trim($rawFooter) : '';
+                        // Corrigir URLs legadas que não incluem /public/ no path
+                        if ($footerLogo !== '' && preg_match('#^/uploads/#', $footerLogo)) {
+                            $footerLogo = '/public' . $footerLogo;
+                        }
                     } catch (\Exception $e) {
                         $footerLogo = '';
                     }
