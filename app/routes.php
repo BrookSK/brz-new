@@ -485,6 +485,7 @@ $router->post('/webhook/stripe', 'WebhookController', 'stripe');
 $router->post('/webhook/appmax', 'WebhookController', 'appmax');
 $router->post('/webhook/mercadopago', 'WebhookController', 'mercadopago');
 $router->post('/webhook/cambioreal', 'WebhookController', 'cambioreal');
+$router->post('/webhook/quickbooks', 'WebhookController', 'quickbooks');
 
 // Webhooks Carnê Braziliana
 $router->post('/webhook/carne/cambioreal', 'WebhookCarneController', 'cambioReal');

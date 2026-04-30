@@ -259,3 +259,12 @@ $router->get('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutoriz
 $router->post('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
 $router->get('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoController', 'painel');
 $router->post('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoController', 'painel');
+
+// QuickBooks
+$router->get('/admin/quickbooks', 'AdminQuickBooksController', 'index');
+$router->get('/admin/quickbooks/invoices', 'AdminQuickBooksController', 'invoices');
+$router->get('/admin/quickbooks/conectar', 'AdminQuickBooksController', 'conectar');
+$router->get('/admin/quickbooks/callback', 'AdminQuickBooksController', 'oauthCallback');
+$router->post('/admin/quickbooks/desconectar', 'AdminQuickBooksController', 'desconectar');
+$router->post('/admin/quickbooks/config', 'AdminQuickBooksController', 'salvarConfig');
+$router->post('/admin/quickbooks/sincronizar-pedido', 'AdminQuickBooksController', 'sincronizarPedido');
