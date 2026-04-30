@@ -3472,10 +3472,17 @@ class CheckoutController extends Controller {
 
                                 if ($billingType === 'CREDIT_CARD') {
                                     $clienteSplit['card_holder_name'] = (string) ($dados['card_holder_name'] ?? '');
-                                    $clienteSplit['card_number'] = (string) ($dados['card_number'] ?? '');
+                                    $clienteSplit['card_number']       = (string) ($dados['card_number'] ?? '');
                                     $clienteSplit['card_expiry_month'] = (string) ($dados['card_expiry_month'] ?? '');
-                                    $clienteSplit['card_expiry_year'] = (string) ($dados['card_expiry_year'] ?? '');
-                                    $clienteSplit['card_cvv'] = (string) ($dados['card_cvv'] ?? '');
+                                    $clienteSplit['card_expiry_year']  = (string) ($dados['card_expiry_year'] ?? '');
+                                    $clienteSplit['card_cvv']          = (string) ($dados['card_cvv'] ?? '');
+                                    // Dados tokenizados do Câmbio Real (necessários para createCambioRealTaxasCartaoPayment)
+                                    $clienteSplit['card_token']        = (string) ($dados['cambioreal_card_token'] ?? '');
+                                    $clienteSplit['card_brand']        = (string) ($dados['cambioreal_card_brand'] ?? '');
+                                    $clienteSplit['card_bin']          = (string) ($dados['cambioreal_card_bin'] ?? '');
+                                    $clienteSplit['card_dfp_id']       = (string) ($dados['cambioreal_card_dfp_id'] ?? '');
+                                    $clienteSplit['card_type']         = (string) ($dados['cambioreal_card_type'] ?? 'credit');
+                                    $clienteSplit['card_installments'] = (int) ($dados['card_installments'] ?? ($dados['installments'] ?? 1));
                                 }
 
                                 $taxa = $this->gerarCobrancaCambioRealTaxasSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico', (float) $valorTaxa);
