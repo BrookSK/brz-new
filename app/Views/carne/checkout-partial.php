@@ -15,7 +15,7 @@
             <!-- Conteúdo normal do carnê -->
             <div id="carne-conteudo-normal" style="display:none;">
                 <p class="small text-muted mb-3">
-                    Parcele sua compra em até 12x via boleto bancário. Cada parcela gera dois boletos: um para produtos (Câmbio Real) e outro para taxas (Appmax).
+                    Parcele sua compra em até 12x via boleto bancário. Cada parcela gera dois boletos: um para produtos (Câmbio Real) e outro para taxas (Câmbio Real).
                     <strong>O envio ocorre somente após a quitação total.</strong>
                 </p>
 
@@ -35,7 +35,7 @@
                             <p class="fw-bold text-primary mb-0" id="carne-valor-produtos">R$ 0,00</p>
                         </div>
                         <div class="col-6">
-                            <small class="text-muted">Boleto Taxas (Appmax)</small>
+                            <small class="text-muted">Boleto Taxas (Câmbio Real)</small>
                             <p class="fw-bold text-primary mb-0" id="carne-valor-taxas">R$ 0,00</p>
                         </div>
                     </div>

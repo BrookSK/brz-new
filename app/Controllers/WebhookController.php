@@ -46,6 +46,26 @@ class WebhookController extends Controller {
         }
     }
 
+    public function cambiorealTaxas(Request $request) {
+        // Câmbio Real Taxas envia x-www-form-urlencoded por padrão (igual à conta Produtos)
+        $payload = [];
+        try {
+            $payload = $request->getParams();
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+        } catch (\Exception $e) {
+            $payload = [];
+        }
+
+        try {
+            $result = $this->paymentService->processarWebhookCambioRealTaxas($payload);
+            $this->json(['success' => true, 'result' => $result]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function asaas(Request $request) {
         $raw = file_get_contents('php://input');
         $payload = json_decode((string) $raw, true);

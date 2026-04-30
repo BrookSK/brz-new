@@ -32,6 +32,11 @@ class PaymentService {
     private $cambioRealAppSecret;
     private $cambioRealAppPublic;
     private $cambioRealBaseUrl;
+
+    // Segunda conta Câmbio Real — exclusiva para taxa de serviço e impostos
+    private $cambioRealTaxasAppId;
+    private $cambioRealTaxasAppSecret;
+    private $cambioRealTaxasAppPublic;
     
     private function garantirTabelaPedidoPagamentos(): void {
         try {
@@ -1176,6 +1181,818 @@ class PaymentService {
         return is_array($decoded) ? $decoded : [];
     }
 
+    // -------------------------------------------------------------------------
+    // Câmbio Real TAXAS — segunda conta (taxa de serviço + impostos)
+    // -------------------------------------------------------------------------
+
+    private function isCambioRealTaxasEnabled(): bool {
+        return !empty($this->cambioRealTaxasAppId) && !empty($this->cambioRealTaxasAppSecret);
+    }
+
+
+    public function getCambioRealTaxasAppPublic(): string {
+        return (string) ($this->cambioRealTaxasAppPublic ?? '');
+    }
+
+    /**
+     * HTTP client para a conta Câmbio Real Taxas.
+     * Usa as mesmas credenciais de base URL da conta Produtos (mesmo ambiente),
+     * mas autenticação com as credenciais de Taxas.
+     */
+    private function cambioRealTaxasRequest(string $method, string $path, ?array $body = null): array {
+        if (!$this->isCambioRealTaxasEnabled()) {
+            throw new \Exception('Câmbio Real Taxas não configurado (APP ID/SECRET ausentes)');
+        }
+
+        $url = $this->getCambioRealBaseUrl() . '/' . ltrim($path, '/');
+        $auth = base64_encode((string) $this->cambioRealTaxasAppId . ':' . (string) $this->cambioRealTaxasAppSecret);
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json; charset=utf-8',
+            'Authorization: Basic ' . $auth,
+            'X-APP-ID: ' . (string) $this->cambioRealTaxasAppId,
+            'X-APP-SECRET: ' . (string) $this->cambioRealTaxasAppSecret,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        $payload = null;
+        if ($body !== null) {
+            $payload = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($payload === false) {
+                throw new \Exception('Câmbio Real Taxas: falha ao codificar payload (JSON inválido)');
+            }
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if ($payload !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            }
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (!empty($err)) {
+                throw new \Exception('Erro de conexão com Câmbio Real Taxas: ' . $err);
+            }
+
+            $decoded = json_decode((string) $respBody, true);
+            if ($httpCode < 200 || $httpCode >= 300) {
+                if (in_array($httpCode, [401, 403], true)) {
+                    throw new \Exception('Câmbio Real Taxas: credenciais inválidas (APP ID/SECRET) ou Base URL incorreta.');
+                }
+                $msgSafe = (string) $httpCode;
+                try {
+                    $msgSafe = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : (string) $httpCode;
+                    if (is_array($decoded) && isset($decoded['errors']) && is_array($decoded['errors'])) {
+                        $flat = [];
+                        foreach ($decoded['errors'] as $k => $v) {
+                            if (is_array($v)) {
+                                foreach ($v as $vv) {
+                                    if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                                }
+                            } elseif (is_scalar($v) && (string) $v !== '') {
+                                $flat[] = (string) $v;
+                            }
+                        }
+                        $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                        if (!empty($flat)) {
+                            $msgSafe .= ' | ' . implode(' | ', array_slice($flat, 0, 8));
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+                throw new \Exception('Erro Câmbio Real Taxas HTTP ' . $httpCode . ': ' . $msgSafe);
+            }
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+            $raw = (string) $respBody;
+            return ['__raw_len' => strlen($raw), '__raw_head' => substr($raw, 0, 300)];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => strtoupper($method),
+                'header' => implode("\r\n", $headers),
+                'content' => $payload ?? '',
+                'ignore_errors' => true,
+            ]
+        ]);
+        $respBody = @file_get_contents($url, false, $context);
+        $decoded = json_decode((string) $respBody, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    // =========================================================================
+    // Câmbio Real TAXAS — métodos públicos de pagamento
+    // =========================================================================
+
+    /**
+     * Cria cobrança PIX de taxas via Câmbio Real Taxas.
+     */
+    public function createCambioRealTaxasPixPayment(int $pedidoId, float $valorBrl, string $descricao, array $client): array {
+        $pedidoId = (int) $pedidoId;
+        $valorBrl = (float) $valorBrl;
+
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealTaxasEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas não configurado'];
+        }
+
+        $orderId = (string) ($pedidoId . '-taxas-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 8));
+
+        $emailUsed = '';
+        try {
+            if (isset($client['email']) && is_string($client['email'])) {
+                $emailUsed = trim((string) $client['email']);
+            }
+        } catch (\Exception $e) {
+            $emailUsed = '';
+        }
+
+        $payload = [
+            'order_id' => $orderId,
+            'amount' => round($valorBrl, 2),
+            'currency' => 'BRL',
+            'payment_method' => 'pix',
+            'client' => (array) $client,
+            'duplicate' => 1,
+            'take_rates' => 1,
+            'products' => [
+                [
+                    'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (taxas)'),
+                    'base_value' => round($valorBrl, 2),
+                    'valor' => round($valorBrl, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
+
+        $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
+            $msg = (string) ($resp['message'] ?? $defaultMsg);
+            $details = '';
+            try {
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $flat = [];
+                    foreach ($errs as $k => $v) {
+                        if (is_array($v)) {
+                            foreach ($v as $vv) {
+                                if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                            }
+                        } elseif (is_scalar($v) && (string) $v !== '') {
+                            $flat[] = (string) $v;
+                        }
+                    }
+                    $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                    if (!empty($flat)) {
+                        $details = ' | ' . implode(' | ', $flat);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+            return 'Câmbio Real Taxas: ' . $msg . $details;
+        };
+
+        $isEmailInUseError = static function(array $resp): bool {
+            $hay = '';
+            try {
+                $hay .= ' ' . (string) ($resp['message'] ?? '');
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $hay .= ' ' . json_encode($errs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            } catch (\Exception $e) {
+            }
+            $hay = strtolower($hay);
+            return (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false));
+        };
+
+        $makePlusEmail = static function(string $email, int $pedidoId): string {
+            $email = trim($email);
+            if ($email === '' || strpos($email, '@') === false) return '';
+            [$local, $domain] = explode('@', $email, 2);
+            $local = trim($local);
+            $domain = trim($domain);
+            if ($local === '' || $domain === '') return '';
+            if (strpos($local, '+') !== false) {
+                $local = explode('+', $local, 2)[0];
+            }
+            $tag = 'pix' . $pedidoId . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
+            return $local . '+' . $tag . '@' . $domain;
+        };
+
+        try {
+            $resp = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                if ($isEmailInUseError($resp)) {
+                    $originalEmail = '';
+                    try {
+                        $originalEmail = (string) (($payload['client']['email'] ?? '') ?: '');
+                    } catch (\Exception $e) {
+                        $originalEmail = '';
+                    }
+                    $altEmail = $makePlusEmail($originalEmail, $pedidoId);
+                    if ($altEmail !== '') {
+                        $payloadRetry = $payload;
+                        $payloadRetry['client']['email'] = $altEmail;
+                        $resp2 = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payloadRetry);
+                        $data2 = is_array($resp2['data'] ?? null) ? (array) $resp2['data'] : [];
+                        $tx2 = is_array($data2['transaction'] ?? null) ? (array) $data2['transaction'] : [];
+                        $status2 = strtolower(trim((string) ($resp2['status'] ?? '')));
+                        if ($status2 === '' || $status2 === 'success') {
+                            $resp = $resp2;
+                            $data = $data2;
+                            $tx = $tx2;
+                            $emailUsed = $altEmail;
+                        } else {
+                            return [
+                                'success' => false,
+                                'error' => $buildErrorMessage($resp2, 'Falha ao criar PIX no Câmbio Real Taxas'),
+                                'raw' => $resp2,
+                                'order_id' => $orderId,
+                                'email_used' => $altEmail,
+                                'bank_slip_url' => '',
+                                'digitable_line' => '',
+                            ];
+                        }
+                    } else {
+                        return [
+                            'success' => false,
+                            'error' => $buildErrorMessage($resp, 'Falha ao criar PIX no Câmbio Real Taxas'),
+                            'raw' => $resp,
+                            'order_id' => $orderId,
+                            'email_used' => $emailUsed,
+                            'bank_slip_url' => '',
+                            'digitable_line' => '',
+                        ];
+                    }
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => $buildErrorMessage($resp, 'Falha ao criar PIX no Câmbio Real Taxas'),
+                        'raw' => $resp,
+                        'order_id' => $orderId,
+                        'email_used' => $emailUsed,
+                        'bank_slip_url' => '',
+                        'digitable_line' => '',
+                    ];
+                }
+            }
+
+            $paymentId = (string) ($data['id'] ?? '');
+            if ($paymentId === '') {
+                $paymentId = (string) ($data['code'] ?? '');
+            }
+
+            $pixPayload = trim((string) ($tx['number'] ?? ''));
+            $pixImg = trim((string) ($tx['barcode'] ?? ''));
+            $invoiceUrl = trim((string) ($tx['ticket_url'] ?? ''));
+            $gatewayStatus = trim((string) ($tx['code'] ?? ($data['code'] ?? 'AGUARDANDO_CLIENTE')));
+
+            if ($pixImg !== '') {
+                $pixImg = preg_replace('#^data:image/[^;]+;base64,#', '', $pixImg);
+                $pixImg = trim((string) $pixImg);
+            }
+
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Câmbio Real Taxas: resposta inválida ao criar PIX (id ausente).'];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => 'taxa_servico',
+                'gateway' => 'cambioreal_taxas',
+                'metodo' => 'pix',
+                'moeda' => 'BRL',
+                'valor' => round($valorBrl, 2),
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'invoice_url' => $invoiceUrl,
+                'pix_encoded_image' => $pixImg,
+                'pix_payload' => $pixPayload,
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'AGUARDANDO_CLIENTE',
+                'metadata' => json_encode([
+                    'raw' => $resp,
+                    'email_used' => $emailUsed,
+                    'amount_brl_sent' => round($valorBrl, 2),
+                    'take_rates_sent' => 1,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'invoice_url' => $invoiceUrl,
+                'order_id' => $orderId,
+                'email_used' => $emailUsed,
+                'pix' => [
+                    'encodedImage' => $pixImg !== '' ? $pixImg : null,
+                    'payload' => $pixPayload !== '' ? $pixPayload : null,
+                ],
+                'error' => '',
+                'bank_slip_url' => '',
+                'digitable_line' => '',
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'bank_slip_url' => '', 'digitable_line' => ''];
+        }
+    }
+
+
+    /**
+     * Cria cobrança boleto de taxas via Câmbio Real Taxas.
+     */
+    public function createCambioRealTaxasBoletoPayment(int $pedidoId, float $valorBrl, string $descricao, array $client): array {
+        $pedidoId = (int) $pedidoId;
+        $valorBrl = (float) $valorBrl;
+
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealTaxasEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas não configurado'];
+        }
+
+        $clientName = (string) ($client['name'] ?? ($client['nome'] ?? ''));
+        $clientEmail = (string) ($client['email'] ?? '');
+        $clientDoc = (string) ($client['document'] ?? ($client['documento'] ?? ''));
+        $clientBirth = (string) ($client['birth_date'] ?? ($client['data_nascimento'] ?? ''));
+        $clientPhone = (string) ($client['phone'] ?? ($client['telefone'] ?? ''));
+        $clientIp = (string) ($client['ip'] ?? '127.0.0.1');
+        $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
+
+        $payload = [
+            'order_id' => (string) $pedidoId,
+            'amount' => round($valorBrl, 2),
+            'currency' => 'BRL',
+            'payment_method' => 'boleto',
+            'client' => [
+                'name' => $clientName,
+                'email' => $clientEmail,
+                'document' => $clientDoc,
+                'birth_date' => $clientBirth,
+                'phone' => $clientPhone,
+                'ip' => $clientIp,
+                'address' => [
+                    'state' => (string) ($addr['state'] ?? ($addr['estado'] ?? '')),
+                    'city' => (string) ($addr['city'] ?? ($addr['cidade'] ?? '')),
+                    'zip_code' => (string) ($addr['zip_code'] ?? ($addr['cep'] ?? '')),
+                    'district' => (string) ($addr['district'] ?? ($addr['bairro'] ?? '')),
+                    'street' => (string) ($addr['street'] ?? ($addr['endereco'] ?? '')),
+                    'number' => (string) ($addr['number'] ?? ($addr['numero'] ?? '')),
+                ],
+            ],
+            'duplicate' => 0,
+            'take_rates' => 1,
+            'products' => [
+                [
+                    'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (taxas)'),
+                    'base_value' => round($valorBrl, 2),
+                    'valor' => round($valorBrl, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
+
+        $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
+            $msg = (string) ($resp['message'] ?? $defaultMsg);
+            $details = '';
+            try {
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $flat = [];
+                    foreach ($errs as $k => $v) {
+                        if (is_array($v)) {
+                            foreach ($v as $vv) {
+                                if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                            }
+                        } elseif (is_scalar($v) && (string) $v !== '') {
+                            $flat[] = (string) $v;
+                        }
+                    }
+                    $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                    if (!empty($flat)) {
+                        $details = ' | ' . implode(' | ', $flat);
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+            return 'Câmbio Real Taxas: ' . $msg . $details;
+        };
+
+        $isEmailInUseError = static function(array $resp): bool {
+            $hay = '';
+            try {
+                $hay .= ' ' . (string) ($resp['message'] ?? '');
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $hay .= ' ' . json_encode($errs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            } catch (\Exception $e) {
+            }
+            $hay = strtolower($hay);
+            return (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false));
+        };
+
+        $makePlusEmail = static function(string $email, int $pedidoId): string {
+            $email = trim($email);
+            if ($email === '' || strpos($email, '@') === false) return '';
+            [$local, $domain] = explode('@', $email, 2);
+            $local = trim($local);
+            $domain = trim($domain);
+            if ($local === '' || $domain === '') return '';
+            if (strpos($local, '+') !== false) {
+                $local = explode('+', $local, 2)[0];
+            }
+            $tag = 'pix' . $pedidoId . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
+            return $local . '+' . $tag . '@' . $domain;
+        };
+
+        try {
+            $resp = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                if ($isEmailInUseError($resp)) {
+                    $payloadRetry = $payload;
+                    $payloadRetry['duplicate'] = 1;
+                    $resp2 = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payloadRetry);
+                    $status2 = strtolower(trim((string) ($resp2['status'] ?? '')));
+                    if ($status2 === '' || $status2 === 'success') {
+                        $resp = $resp2;
+                        $data = is_array($resp2['data'] ?? null) ? (array) $resp2['data'] : [];
+                    } else {
+                        $originalEmail = '';
+                        try {
+                            $originalEmail = (string) (($payload['client']['email'] ?? '') ?: '');
+                        } catch (\Throwable $e) {
+                            $originalEmail = '';
+                        }
+                        $altEmail = $makePlusEmail($originalEmail, $pedidoId);
+                        if ($altEmail !== '') {
+                            $payloadRetry2 = $payloadRetry;
+                            $payloadRetry2['client']['email'] = $altEmail;
+                            $resp3 = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payloadRetry2);
+                            $status3 = strtolower(trim((string) ($resp3['status'] ?? '')));
+                            if ($status3 === '' || $status3 === 'success') {
+                                $resp = $resp3;
+                                $data = is_array($resp3['data'] ?? null) ? (array) $resp3['data'] : [];
+                            } else {
+                                return [
+                                    'success' => false,
+                                    'error' => $buildErrorMessage($resp3, 'Falha ao criar boleto no Câmbio Real Taxas'),
+                                    'raw' => $resp3,
+                                    'bank_slip_url' => '',
+                                    'digitable_line' => '',
+                                    'invoice_url' => '',
+                                    'payment_id' => '',
+                                ];
+                            }
+                        } else {
+                            return [
+                                'success' => false,
+                                'error' => $buildErrorMessage($resp2, 'Falha ao criar boleto no Câmbio Real Taxas'),
+                                'raw' => $resp2,
+                                'bank_slip_url' => '',
+                                'digitable_line' => '',
+                                'invoice_url' => '',
+                                'payment_id' => '',
+                            ];
+                        }
+                    }
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => $buildErrorMessage($resp, 'Falha ao criar boleto no Câmbio Real Taxas'),
+                        'raw' => $resp,
+                        'bank_slip_url' => '',
+                        'digitable_line' => '',
+                        'invoice_url' => '',
+                        'payment_id' => '',
+                    ];
+                }
+            }
+
+            $paymentId = (string) ($data['id'] ?? '');
+            $code = (string) ($data['code'] ?? '');
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+
+            $gatewayStatus = strtoupper(trim((string) ($tx['status'] ?? ($tx['payment_status'] ?? 'PENDING'))));
+            $ticketUrl = (string) ($tx['ticket_url'] ?? '');
+            $digitableLine = (string) ($tx['digitable_line'] ?? ($tx['linha_digitavel'] ?? ($tx['barcode_number'] ?? '')));
+
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Câmbio Real Taxas: resposta inválida (id ausente)', 'bank_slip_url' => '', 'digitable_line' => '', 'invoice_url' => '', 'payment_id' => ''];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => 'taxa_servico',
+                'gateway' => 'cambioreal_taxas',
+                'metodo' => 'boleto',
+                'moeda' => 'BRL',
+                'valor' => round($valorBrl, 2),
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'invoice_url' => $ticketUrl,
+                'bank_slip_url' => $ticketUrl,
+                'digitable_line' => $digitableLine,
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'PENDING',
+                'metadata' => json_encode([
+                    'raw' => $resp,
+                    'code' => $code,
+                    'amount_brl_sent' => round($valorBrl, 2),
+                    'take_rates_sent' => 1,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'invoice_url' => $ticketUrl,
+                'bank_slip_url' => $ticketUrl,
+                'digitable_line' => $digitableLine,
+                'error' => '',
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'bank_slip_url' => '', 'digitable_line' => '', 'invoice_url' => '', 'payment_id' => ''];
+        }
+    }
+
+
+    /**
+     * Cria cobrança de cartão de taxas via Câmbio Real Taxas.
+     */
+    public function createCambioRealTaxasCartaoPayment(int $pedidoId, float $valorBrl, string $descricao, array $client, array $card): array {
+        $pedidoId = (int) $pedidoId;
+        $valorBrl = (float) $valorBrl;
+
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealTaxasEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas não configurado'];
+        }
+
+        $token = trim((string) ($card['token'] ?? ''));
+        $brand = trim((string) ($card['brand'] ?? ''));
+        $bin = preg_replace('/\D+/', '', (string) ($card['bin'] ?? ''));
+        $dfpId = trim((string) ($card['dfp_id'] ?? ''));
+        $holder = trim((string) ($card['holder'] ?? ''));
+        $installments = (int) ($card['installments'] ?? 1);
+        if ($installments <= 0) $installments = 1;
+        $type = strtolower(trim((string) ($card['type'] ?? 'credit')));
+        if (!in_array($type, ['credit', 'debit'], true)) {
+            $type = 'credit';
+        }
+        $paymentMethod = ($type === 'debit') ? 'debit_card' : 'credit_card';
+
+        if ($token === '' || $brand === '' || $bin === '' || $dfpId === '' || $holder === '') {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas: token/brand/bin/dfp_id/holder são obrigatórios'];
+        }
+
+        $clientName = (string) ($client['name'] ?? ($client['nome'] ?? ''));
+        $clientEmail = (string) ($client['email'] ?? '');
+        $clientDoc = (string) ($client['document'] ?? ($client['documento'] ?? ''));
+        $clientBirth = (string) ($client['birth_date'] ?? ($client['data_nascimento'] ?? ''));
+        $clientPhone = (string) ($client['phone'] ?? ($client['telefone'] ?? ''));
+        $clientIp = (string) ($client['ip'] ?? '127.0.0.1');
+        $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
+
+        $payload = [
+            'order_id' => (string) $pedidoId,
+            'amount' => round($valorBrl, 2),
+            'currency' => 'BRL',
+            'payment_method' => $paymentMethod,
+            'client' => [
+                'name' => $clientName,
+                'email' => $clientEmail,
+                'document' => $clientDoc,
+                'birth_date' => $clientBirth,
+                'phone' => $clientPhone,
+                'ip' => $clientIp,
+                'address' => [
+                    'state' => (string) ($addr['state'] ?? ($addr['estado'] ?? '')),
+                    'city' => (string) ($addr['city'] ?? ($addr['cidade'] ?? '')),
+                    'zip_code' => (string) ($addr['zip_code'] ?? ($addr['cep'] ?? '')),
+                    'district' => (string) ($addr['district'] ?? ($addr['bairro'] ?? '')),
+                    'street' => (string) ($addr['street'] ?? ($addr['endereco'] ?? '')),
+                    'number' => (string) ($addr['number'] ?? ($addr['numero'] ?? '')),
+                ],
+            ],
+            'card' => [
+                'bin' => $bin,
+                'brand' => $brand,
+                'country' => 'BR',
+                'dfp_id' => $dfpId,
+                'holder' => $holder,
+                'installments' => $installments,
+                'token' => $token,
+                'type' => $type,
+            ],
+            'duplicate' => 0,
+            'take_rates' => 1,
+            'products' => [
+                [
+                    'descricao' => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (taxas)'),
+                    'base_value' => round($valorBrl, 2),
+                    'valor' => round($valorBrl, 2),
+                    'qty' => 1,
+                    'ref' => (string) $pedidoId,
+                ]
+            ],
+        ];
+
+        $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
+            $msg = (string) ($resp['message'] ?? $defaultMsg);
+            $details = '';
+            try {
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $flat = [];
+                    foreach ($errs as $k => $v) {
+                        if (is_array($v)) {
+                            foreach ($v as $vv) {
+                                if (is_scalar($vv) && (string) $vv !== '') $flat[] = (string) $vv;
+                            }
+                        } elseif (is_scalar($v) && (string) $v !== '') {
+                            $flat[] = (string) $v;
+                        }
+                    }
+                    $flat = array_values(array_unique(array_filter($flat, static fn($x) => trim((string) $x) !== '')));
+                    if (!empty($flat)) {
+                        $details = ' | ' . implode(' | ', $flat);
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+            return 'Câmbio Real Taxas: ' . $msg . $details;
+        };
+
+        $isEmailInUseError = static function(array $resp): bool {
+            $hay = '';
+            try {
+                $hay .= ' ' . (string) ($resp['message'] ?? '');
+                $errs = $resp['errors'] ?? null;
+                if (is_array($errs)) {
+                    $hay .= ' ' . json_encode($errs, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            } catch (\Exception $e) {
+            }
+            $hay = strtolower($hay);
+            return (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false));
+        };
+
+        $makePlusEmail = static function(string $email, int $pedidoId): string {
+            $email = trim($email);
+            if ($email === '' || strpos($email, '@') === false) return '';
+            [$local, $domain] = explode('@', $email, 2);
+            $local = trim($local);
+            $domain = trim($domain);
+            if ($local === '' || $domain === '') return '';
+            if (strpos($local, '+') !== false) {
+                $local = explode('+', $local, 2)[0];
+            }
+            $tag = 'pix' . $pedidoId . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
+            return $local . '+' . $tag . '@' . $domain;
+        };
+
+        try {
+            $resp = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                if ($isEmailInUseError($resp)) {
+                    $payloadRetry = $payload;
+                    $payloadRetry['duplicate'] = 1;
+                    $resp2 = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payloadRetry);
+                    $status2 = strtolower(trim((string) ($resp2['status'] ?? '')));
+                    if ($status2 === '' || $status2 === 'success') {
+                        $resp = $resp2;
+                        $data = is_array($resp2['data'] ?? null) ? (array) $resp2['data'] : [];
+                    } else {
+                        $originalEmail = '';
+                        try {
+                            $originalEmail = (string) (($payload['client']['email'] ?? '') ?: '');
+                        } catch (\Throwable $e) {
+                            $originalEmail = '';
+                        }
+                        $altEmail = $makePlusEmail($originalEmail, $pedidoId);
+                        if ($altEmail !== '') {
+                            $payloadRetry2 = $payloadRetry;
+                            $payloadRetry2['client']['email'] = $altEmail;
+                            $resp3 = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payloadRetry2);
+                            $status3 = strtolower(trim((string) ($resp3['status'] ?? '')));
+                            if ($status3 === '' || $status3 === 'success') {
+                                $resp = $resp3;
+                                $data = is_array($resp3['data'] ?? null) ? (array) $resp3['data'] : [];
+                            } else {
+                                return [
+                                    'success' => false,
+                                    'error' => $buildErrorMessage($resp3, 'Falha ao criar transação no Câmbio Real Taxas'),
+                                    'raw' => $resp3,
+                                    'bank_slip_url' => '',
+                                    'digitable_line' => '',
+                                    'invoice_url' => '',
+                                    'payment_id' => '',
+                                ];
+                            }
+                        } else {
+                            return [
+                                'success' => false,
+                                'error' => $buildErrorMessage($resp2, 'Falha ao criar transação no Câmbio Real Taxas'),
+                                'raw' => $resp2,
+                                'bank_slip_url' => '',
+                                'digitable_line' => '',
+                                'invoice_url' => '',
+                                'payment_id' => '',
+                            ];
+                        }
+                    }
+                } else {
+                    return [
+                        'success' => false,
+                        'error' => $buildErrorMessage($resp, 'Falha ao criar transação no Câmbio Real Taxas'),
+                        'raw' => $resp,
+                        'bank_slip_url' => '',
+                        'digitable_line' => '',
+                        'invoice_url' => '',
+                        'payment_id' => '',
+                    ];
+                }
+            }
+
+            $paymentId = (string) ($data['id'] ?? '');
+            $code = (string) ($data['code'] ?? '');
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+            $gatewayStatus = strtoupper(trim((string) ($tx['status'] ?? ($tx['payment_status'] ?? 'PENDING'))));
+            $ticketUrl = (string) ($tx['ticket_url'] ?? '');
+
+            if ($paymentId === '') {
+                return ['success' => false, 'error' => 'Câmbio Real Taxas: resposta inválida (id ausente)', 'bank_slip_url' => '', 'digitable_line' => '', 'invoice_url' => '', 'payment_id' => ''];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id' => $pedidoId,
+                'componente' => 'taxa_servico',
+                'gateway' => 'cambioreal_taxas',
+                'metodo' => ($type === 'debit' ? 'cartao_debito' : 'cartao_credito'),
+                'moeda' => 'BRL',
+                'valor' => round($valorBrl, 2),
+                'payment_id' => $paymentId,
+                'status' => 'pending',
+                'invoice_url' => $ticketUrl,
+                'gateway_status' => $gatewayStatus !== '' ? $gatewayStatus : 'PENDING',
+                'metadata' => json_encode([
+                    'raw' => $resp,
+                    'code' => $code,
+                    'amount_brl_sent' => round($valorBrl, 2),
+                    'take_rates_sent' => 1,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success' => true,
+                'payment_id' => $paymentId,
+                'invoice_url' => $ticketUrl,
+                'bank_slip_url' => '',
+                'digitable_line' => '',
+                'error' => '',
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'bank_slip_url' => '', 'digitable_line' => '', 'invoice_url' => '', 'payment_id' => ''];
+        }
+    }
+
+
+    // -------------------------------------------------------------------------
+
     public function createCambioRealCheckoutRequestProduto(int $pedidoId, float $valorBrl, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null): array {
         $pedidoId = (int) $pedidoId;
         $valorBrl = (float) $valorBrl;
@@ -1634,6 +2451,125 @@ class PaymentService {
             'payment_status' => $internal,
             'gateway_status' => $statusNorm,
             'payment_method' => $metodoNorm,
+        ];
+    }
+
+    /**
+     * Processa webhook recebido no endpoint /webhook/cambioreal-taxas.
+     * Análogo a processarWebhookCambioReal(), mas busca payment_id com gateway='cambioreal_taxas'.
+     */
+    public function processarWebhookCambioRealTaxas(array $payload): array {
+        $token = '';
+        if (!empty($payload['token']) && is_string($payload['token'])) {
+            $token = (string) $payload['token'];
+        }
+        if ($token === '' && !empty($payload['data']['token']) && is_string($payload['data']['token'])) {
+            $token = (string) $payload['data']['token'];
+        }
+        if ($token === '' && !empty($payload['code']) && is_string($payload['code'])) {
+            $token = (string) $payload['code'];
+        }
+        if ($token === '' && !empty($payload['data']['code']) && is_string($payload['data']['code'])) {
+            $token = (string) $payload['data']['code'];
+        }
+        if ($token === '' && !empty($payload['id']) && (is_string($payload['id']) || is_numeric($payload['id']))) {
+            $token = (string) $payload['id'];
+        }
+        if ($token === '' && !empty($payload['data']['id']) && (is_string($payload['data']['id']) || is_numeric($payload['data']['id']))) {
+            $token = (string) $payload['data']['id'];
+        }
+        $token = trim($token);
+        if ($token === '') {
+            error_log('[WEBHOOK_CR_TAXAS] token ausente no payload');
+            return ['success' => false, 'error' => 'Câmbio Real Taxas: token ausente no webhook'];
+        }
+
+        // Verificar se o payment_id existe com gateway='cambioreal_taxas'
+        try {
+            $this->garantirTabelaPedidoPagamentos();
+            $db = \Config\Database::getConnection();
+            $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = ? AND payment_id = ? LIMIT 1');
+            $st->execute(['cambioreal_taxas', $token]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) {
+                error_log('[WEBHOOK_CR_TAXAS] payment_id não encontrado: ' . $token);
+                return ['success' => false, 'error' => 'payment_id não encontrado'];
+            }
+        } catch (\Exception $e) {
+            error_log('[WEBHOOK_CR_TAXAS] Erro ao consultar pedido_pagamentos: ' . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+
+        $statusNorm = '';
+        $internal = 'pending';
+        try {
+            $tx = $this->obterTransacaoCambioReal($token);
+            $data = is_array($tx['data'] ?? null) ? $tx['data'] : [];
+            $status = strtoupper(trim((string) ($data['status'] ?? '')));
+            $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? '')));
+            $statusNorm = $status;
+
+            if (
+                in_array($status, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'SOLICITACAO_FINALIZADA '], true) ||
+                str_contains($status, 'PAGO') ||
+                str_contains($status, 'PAG') ||
+                str_contains($status, 'COMPENS') ||
+                str_contains($status, 'CONFIRM') ||
+                in_array($status, ['PAID', 'CONFIRMED', 'APPROVED', 'COMPLETED', 'COMPENSADA', 'COMPENSADO'], true)
+            ) {
+                $internal = 'approved';
+            } elseif (in_array($status, ['REFUNDED'], true) || str_contains($status, 'REFUND')) {
+                $internal = 'refunded';
+            } elseif (
+                str_contains($status, 'CANCEL') ||
+                str_contains($status, 'RECUS') ||
+                str_contains($status, 'INVALID') ||
+                str_contains($status, 'EXPIR')
+            ) {
+                $internal = 'rejected';
+            }
+
+            $metodoNorm = $paymentMethod;
+            if ($metodoNorm === 'credit_card') {
+                $metodoNorm = 'cartao_credito';
+            } elseif ($metodoNorm === 'debit_card') {
+                $metodoNorm = 'cartao_debito';
+            }
+        } catch (\Exception $e) {
+            // Se não conseguir consultar o gateway, usar status do payload
+            $statusNorm = strtoupper(trim((string) ($payload['status'] ?? '')));
+            $metodoNorm = '';
+            if (
+                str_contains($statusNorm, 'PAGO') ||
+                str_contains($statusNorm, 'CONFIRM') ||
+                in_array($statusNorm, ['PAID', 'CONFIRMED', 'APPROVED'], true)
+            ) {
+                $internal = 'approved';
+            }
+        }
+
+        $this->atualizarSplitPorGatewayPaymentId($token, 'cambioreal_taxas', $internal, $statusNorm);
+
+        if (!empty($metodoNorm)) {
+            try {
+                $db = \Config\Database::getConnection();
+                $st = $db->prepare('UPDATE pedido_pagamentos SET metodo = :m, gateway_status = :gs, updated_at = NOW() WHERE gateway = :g AND payment_id = :pid');
+                $st->execute([
+                    ':m' => (string) $metodoNorm,
+                    ':gs' => (string) $statusNorm,
+                    ':g' => 'cambioreal_taxas',
+                    ':pid' => (string) $token,
+                ]);
+            } catch (\Exception $e) {
+            }
+        }
+
+        return [
+            'success' => true,
+            'gateway' => 'cambioreal_taxas',
+            'payment_id' => $token,
+            'payment_status' => $internal,
+            'gateway_status' => $statusNorm,
         ];
     }
 
@@ -4780,6 +5716,11 @@ class PaymentService {
         $this->cambioRealAppSecret = (string) $this->getConfig('pagamentos', 'cambioreal_app_secret', '');
         $this->cambioRealAppPublic = (string) $this->getConfig('pagamentos', 'cambioreal_app_public', '');
         $this->cambioRealBaseUrl = (string) $this->getConfig('pagamentos', 'cambioreal_base_url', '');
+
+        // Segunda conta Câmbio Real — taxa de serviço e impostos
+        $this->cambioRealTaxasAppId     = (string) $this->getConfig('pagamentos', 'cambioreal_taxas_app_id', '');
+        $this->cambioRealTaxasAppSecret = (string) $this->getConfig('pagamentos', 'cambioreal_taxas_app_secret', '');
+        $this->cambioRealTaxasAppPublic = (string) $this->getConfig('pagamentos', 'cambioreal_taxas_app_public', '');
     }
 
     private function getConfig(string $categoria, string $chave, $default = null) {
@@ -5400,6 +6341,11 @@ class PaymentService {
     }
 
     public function processarWebhookAppmax($payload) {
+        if (!$this->isAppmaxEnabled()) {
+            error_log('[WEBHOOK_APPMAX] AppMax desativado — webhook ignorado');
+            return ['success' => false, 'error' => 'AppMax desativado'];
+        }
+
         $event = '';
         foreach (['event', 'evento', 'type', 'nome', 'name'] as $k) {
             if (!empty($payload[$k]) && is_string($payload[$k])) {
@@ -7367,3 +8313,4 @@ class PaymentService {
         return $mes >= 1 && $mes <= 12;
     }
 }
+
