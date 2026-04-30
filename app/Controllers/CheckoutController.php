@@ -3184,35 +3184,6 @@ class CheckoutController extends Controller {
                             $valorTaxa = round(max(0.0, $taxaServico), 2);
                             $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
 
-                            // Quando moeda é BRL, os valores de taxa/imposto podem estar em USD (preço original).
-                            // Converter para BRL usando a taxa de conversão do pedido.
-                            if ($moedaPedidoPay === 'BRL') {
-                                $splitTaxaConversao = 1.0;
-                                try {
-                                    // Usar taxa do pedido se disponível
-                                    $txPed = (float) ($pedidoRowPay['taxa_conversao'] ?? 0);
-                                    if ($txPed > 1.01) {
-                                        $splitTaxaConversao = $txPed;
-                                    } else {
-                                        $dbTxSplit = \Config\Database::getConnection();
-                                        $stTxSplit = $dbTxSplit->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                                        $stTxSplit->execute();
-                                        $txSplit = (float) str_replace(',', '.', (string) ($stTxSplit->fetchColumn() ?: '0'));
-                                        if ($txSplit > 1.01) {
-                                            $splitTaxaConversao = $txSplit;
-                                        }
-                                    }
-                                } catch (\Exception $e) {}
-
-                                // Se valorAppmax parece estar em USD (muito menor que o total BRL), converter
-                                if ($splitTaxaConversao > 1.01 && $valorAppmax > 0 && $valorAppmax < ($totalBrl * 0.8)) {
-                                    $valorTaxa = round($valorTaxa * $splitTaxaConversao, 2);
-                                    $valorImposto = round($valorImposto * $splitTaxaConversao, 2);
-                                    $valorImpostoLocal = round($valorImpostoLocal * $splitTaxaConversao, 2);
-                                    $valorAppmax = round(max(0.0, $valorTaxa + $valorImposto + $valorImpostoLocal), 2);
-                                }
-                            }
-
                             // Quando moeda é USD, converter valores do AppMax para BRL (AppMax só aceita BRL)
                             $splitTaxaConversao = 1.0;
                             if ($moedaPedidoPay === 'USD') {
