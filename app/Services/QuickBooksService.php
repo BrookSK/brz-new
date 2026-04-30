@@ -243,7 +243,7 @@ class QuickBooksService
                 $met  = strtoupper($pg['metodo'] ?? '');
                 $val  = number_format((float) ($pg['valor'] ?? 0), 2, ',', '.');
                 $comp = ucfirst($pg['componente'] ?? '');
-                $memo .= " [{$comp} R${$val} {$gw}/{$met}]";
+                $memo .= " [{$comp} R$ {$val} {$gw}/{$met}]";
             }
         }
 
