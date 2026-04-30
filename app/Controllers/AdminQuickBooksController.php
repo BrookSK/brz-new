@@ -93,8 +93,14 @@ class AdminQuickBooksController extends Controller {
                 $pedido['telefone'] = $usuario['telefone'] ?? '';
                 $pedido['cpf']      = $usuario['cpf']      ?? $usuario['documento'] ?? '';
             }
-            $itStmt=$pdo->prepare("SELECT pi.*,pr.nome AS produto_nome FROM pedido_itens pi LEFT JOIN produtos pr ON pr.id=pi.produto_id WHERE pi.pedido_id=?");
-            $itStmt->execute([$pedidoId]); $itens=$itStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $itStmt = $pdo->prepare(
+                'SELECT pi.*, COALESCE(pr.name, pr.nome, pi.produto_nome, \'\') AS produto_nome
+                 FROM pedido_itens pi
+                 LEFT JOIN produtos pr ON pr.id = pi.produto_id
+                 WHERE pi.pedido_id = ?'
+            );
+            $itStmt->execute([$pedidoId]);
+            $itens = $itStmt->fetchAll(\PDO::FETCH_ASSOC);
             $qb=$this->qb(); $res=$qb->criarInvoiceDePedido($pedido,$itens,$pedido);
             echo json_encode(['ok'=>true,'qb_invoice_id'=>$res['Invoice']['Id']??null]);
         }catch(\Throwable $ex){echo json_encode(['ok'=>false,'erro'=>$ex->getMessage()]);}
