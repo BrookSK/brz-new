@@ -70,9 +70,21 @@ class AdminQuickBooksController extends Controller {
         $pedidoId=(int)($req->getParam('pedido_id')??0);
         if($pedidoId<=0){echo json_encode(['ok'=>false,'erro'=>'ID invalido']); return;}
         try{
-            $pdo=Database::getConnection();
-            $ped=$pdo->prepare("SELECT p.*,c.nome,c.email,c.telefone,c.cpf FROM pedidos p LEFT JOIN clientes c ON c.id=p.cliente_id WHERE p.id=? LIMIT 1");
-            $ped->execute([$pedidoId]); $pedido=$ped->fetch(\PDO::FETCH_ASSOC);
+            $pdo = Database::getConnection();
+            $ped = $pdo->prepare(
+                'SELECT p.*, u.nome, u.name, u.email, u.telefone, u.phone, u.cpf
+                 FROM pedidos p
+                 LEFT JOIN usuarios u ON u.id = p.usuario_id
+                 WHERE p.id = ? LIMIT 1'
+            );
+            $ped->execute([$pedidoId]);
+            $pedido = $ped->fetch(\PDO::FETCH_ASSOC);
+            if ($pedido) {
+                // Normalizar nome/email independente do nome da coluna
+                $pedido['nome']     = $pedido['nome']     ?? $pedido['name']  ?? '';
+                $pedido['email']    = $pedido['email']    ?? '';
+                $pedido['telefone'] = $pedido['telefone'] ?? $pedido['phone'] ?? '';
+            }
             if(!$pedido){echo json_encode(['ok'=>false,'erro'=>'Pedido nao encontrado']); return;}
             $itStmt=$pdo->prepare("SELECT pi.*,pr.nome AS produto_nome FROM pedido_itens pi LEFT JOIN produtos pr ON pr.id=pi.produto_id WHERE pi.pedido_id=?");
             $itStmt->execute([$pedidoId]); $itens=$itStmt->fetchAll(\PDO::FETCH_ASSOC);
