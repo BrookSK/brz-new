@@ -15,7 +15,7 @@
                     <p>Cada parcela mensal gera dois boletos:</p>
                     <ul>
                         <li>Boleto 1 (Câmbio Real): referente ao valor dos produtos</li>
-                        <li>Boleto 2 (Appmax): referente às taxas de serviço, impostos e demais valores</li>
+                        <li>Boleto 2 (Câmbio Real Taxas): referente às taxas de serviço, impostos e demais valores</li>
                     </ul>
                     <p>A parcela só será considerada quitada quando ambos os boletos forem pagos.</p>
 

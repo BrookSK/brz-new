@@ -457,7 +457,7 @@
                         $gwProduto = is_array($pProduto) ? strtolower(trim((string) ($pProduto['gateway'] ?? ''))) : '';
                         $gwTaxa = is_array($pTaxa) ? strtolower(trim((string) ($pTaxa['gateway'] ?? ''))) : '';
                         $gwLabelProduto = $gwProduto === 'stripe' ? 'Stripe' : ($gwProduto === 'cambioreal' ? 'Câmbio Real' : strtoupper($gwProduto));
-                        $gwLabelTaxa = $gwTaxa === 'stripe' ? 'Stripe' : ($gwTaxa === 'appmax' ? 'AppMax' : strtoupper($gwTaxa));
+                        $gwLabelTaxa = $gwTaxa === 'stripe' ? 'Stripe' : ($gwTaxa === 'cambioreal_taxas' ? 'Câmbio Real Taxas' : ($gwTaxa === 'appmax' ? 'Câmbio Real Taxas' : strtoupper($gwTaxa)));
                         ?>
                         <?php $renderSplitBox('Pagamento 1: Produtos (' . $gwLabelProduto . ')', is_array($pProduto) ? $pProduto : null); ?>
                         <?php $renderSplitBox('Pagamento 2: Taxas e impostos (' . $gwLabelTaxa . ')', is_array($pTaxa) ? $pTaxa : null); ?>

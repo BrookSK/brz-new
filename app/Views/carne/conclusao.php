@@ -19,7 +19,7 @@
                 <div class="card-body">
                     <ul class="list-unstyled">
                         <li class="mb-2"><i class="fas fa-check text-success"></i> Sua compra foi parcelada em <strong><?= $carne['quantidade_parcelas'] ?>x</strong></li>
-                        <li class="mb-2"><i class="fas fa-check text-success"></i> Cada parcela gera <strong>dois pagamentos</strong>: um de produtos (Câmbio Real) e um de taxas (Appmax)</li>
+                        <li class="mb-2"><i class="fas fa-check text-success"></i> Cada parcela gera <strong>dois pagamentos</strong>: um de produtos (Câmbio Real) e um de taxas (Câmbio Real Taxas)</li>
                         <li class="mb-2"><i class="fas fa-qrcode text-primary"></i> A <strong>primeira parcela é via PIX</strong> para pagamento imediato</li>
                         <li class="mb-2"><i class="fas fa-exclamation-triangle text-warning"></i> A parcela só é considerada paga quando <strong>ambos os pagamentos</strong> forem confirmados</li>
                         <li class="mb-2"><i class="fas fa-truck text-info"></i> O envio do pedido ocorrerá <strong>somente após a quitação total</strong></li>
@@ -74,10 +74,10 @@
                             </div>
                         </div>
 
-                        <!-- Taxas (Appmax) -->
+                        <!-- Taxas (Câmbio Real Taxas) -->
                         <div class="col-md-6 mb-3">
                             <div class="border rounded p-3 text-center">
-                                <h6>Taxas (Appmax)</h6>
+                                <h6>Taxas (Câmbio Real Taxas)</h6>
                                 <p class="fs-4 fw-bold text-primary">R$ <?= number_format($primeiraParcela['valor_taxas'], 2, ',', '.') ?></p>
 
                                 <?php if ($isPix && !empty($primeiraParcela['pix_taxas_qrcode'])): ?>

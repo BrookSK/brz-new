@@ -114,10 +114,10 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                                 </div>
                             </div>
 
-                            <!-- Taxas (Appmax) -->
+                            <!-- Taxas (Câmbio Real Taxas) -->
                             <div class="col-md-6 mb-2">
                                 <div class="border rounded p-3 text-center <?= $p['boleto_taxas_pago'] ? 'bg-light' : '' ?>">
-                                    <small class="text-muted d-block mb-1">Taxas (Appmax)</small>
+                                    <small class="text-muted d-block mb-1">Taxas (Câmbio Real Taxas)</small>
                                     <span class="fs-5 fw-bold">R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?></span>
                                     <?php if ($p['boleto_taxas_pago']): ?>
                                         <div class="mt-1"><span class="badge bg-success"><i class="fas fa-check"></i> Pago</span></div>

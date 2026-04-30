@@ -766,7 +766,7 @@
                                                 <div class="fw-bold mb-1">Atenção: taxas do Câmbio Real no cartão</div>
                                                 <div class="small">
                                                     Ao pagar com <strong>cartão</strong>, o <strong>Câmbio Real</strong> pode aplicar taxas no valor final (câmbio/VET, IOF e tarifa de processamento).<br>
-                                                    A cobrança pela <strong>AppMax</strong> (taxas/impostos) <strong>não</strong> adiciona essas tarifas do Câmbio Real.
+                                                    A cobrança pela <strong>Câmbio Real Taxas</strong> (taxas/impostos) <strong>não</strong> adiciona essas tarifas do Câmbio Real.
                                                     <hr class="my-2">
                                                     <div><strong>Câmbio:</strong> <span id="cr-fee-cambio">-</span></div>
                                                     <div><strong>VET:</strong> <span id="cr-fee-vet">-</span></div>
@@ -2737,7 +2737,7 @@ function updatePrices(currency) {
     } catch (e) {
     }
 
-    // Atualizar opções de forma de pagamento conforme moeda (BRL=AppMax, USD=Stripe)
+    // Atualizar opções de forma de pagamento conforme moeda (BRL=Câmbio Real, USD=Stripe)
     updatePaymentMethodsForCurrency(currency);
     
     // Atualizar símbolo da moeda no header se existir
@@ -2762,10 +2762,10 @@ function updatePaymentMethodsForCurrency(currency) {
     const pais = paisSel ? paisSel.value.toUpperCase() : 'BR';
     const isBR = (pais === 'BR');
 
-    // Brasil (qualquer moeda): Split CR + AppMax → PIX, Cartão Crédito, Cartão Débito, Carteira
-    // Fora do Brasil + BRL: Split CR + AppMax → PIX, Cartão Crédito, Cartão Débito, Carteira
+    // Brasil (qualquer moeda): Split CR + CR Taxas → PIX, Cartão Crédito, Cartão Débito, Carteira
+    // Fora do Brasil + BRL: Split CR + CR Taxas → PIX, Cartão Crédito, Cartão Débito, Carteira
     // Fora do Brasil + USD: Stripe (tudo) → Cartão Crédito, PIX (Stripe), Carteira
-    const useSplit = isBRL; // BRL = Câmbio Real + AppMax, USD = Stripe (independente do país)
+    const useSplit = isBRL; // BRL = Câmbio Real + Câmbio Real Taxas, USD = Stripe (independente do país)
     // /* REGRA ANTIGA (por moeda): const useSplit = isBRL; */
 
     const currentValue = select.value;
@@ -2797,7 +2797,7 @@ function updatePaymentMethodsForCurrency(currency) {
     }
 
     if (useSplit) {
-        // Split: CR produtos + AppMax taxas
+        // Split: CR produtos + CR Taxas
         // Opções: PIX, Cartão de Crédito, Cartão de Débito, Carteira, Carnê
         select.appendChild(optCarteira);
         select.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));

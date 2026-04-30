@@ -41,7 +41,7 @@
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
-                                <tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Prod. (Câmbio)</th><th>Taxa (Appmax)</th><th>Status</th><th>Ações</th></tr>
+                                <tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Prod. (Câmbio)</th><th>Taxa (Câmbio Real Taxas)</th><th>Status</th><th>Ações</th></tr>
                             </thead>
                             <tbody>
                             <?php foreach ($carne['parcelas'] as $p): ?>

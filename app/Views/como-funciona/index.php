@@ -47,7 +47,7 @@
                         <p>Processamos seu pagamento através dos gateways mais seguros do mercado. Suas informações estão protegidas com criptografia SSL.</p>
                         <ul>
                             <li>Stripe para pagamentos internacionais</li>
-                            <li>AppMax para pagamentos em reais</li>
+                            <li>Câmbio Real para pagamentos em reais</li>
                             <li>Proteção contra fraudes</li>
                             <li>Cancelamento fácil antes do envio</li>
                         </ul>
