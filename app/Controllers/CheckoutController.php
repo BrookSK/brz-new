@@ -41,12 +41,20 @@ class CheckoutController extends Controller {
 
         // Normalizar dados do cliente para o formato esperado pelo PaymentService
         $client = [
-            'name'     => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
-            'email'    => (string) ($usuario['email'] ?? ''),
-            'document' => (string) ($usuario['documento'] ?? ($usuario['document'] ?? '')),
-            'phone'    => (string) ($usuario['telefone'] ?? ($usuario['phone'] ?? '')),
-            'ip'       => (string) ($usuario['ip'] ?? '127.0.0.1'),
-            'address'  => is_array($usuario['address'] ?? null) ? (array) $usuario['address'] : [],
+            'name'       => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
+            'email'      => (string) ($usuario['email'] ?? ''),
+            'document'   => (string) ($usuario['documento'] ?? ($usuario['document'] ?? '')),
+            'birth_date' => (string) ($usuario['birth_date'] ?? ($usuario['data_nascimento'] ?? '')),
+            'phone'      => (string) ($usuario['telefone'] ?? ($usuario['phone'] ?? '')),
+            'ip'         => (string) ($usuario['ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1')),
+            'address'    => is_array($usuario['address'] ?? null) ? (array) $usuario['address'] : [
+                'street'   => (string) ($usuario['endereco'] ?? ''),
+                'number'   => (string) ($usuario['numero'] ?? ''),
+                'district' => (string) ($usuario['bairro'] ?? ''),
+                'city'     => (string) ($usuario['cidade'] ?? ''),
+                'state'    => (string) ($usuario['estado'] ?? ''),
+                'zip_code' => (string) ($usuario['cep'] ?? ''),
+            ],
         ];
 
         if ($billingType === 'PIX') {
@@ -3451,6 +3459,16 @@ class CheckoutController extends Controller {
                                 $clienteSplit['email'] = (string) $pickNonEmpty($dados['email'] ?? '', $pedidoRowPay['cliente_email'] ?? '', $pedidoRowPay['email'] ?? '', $pedidoRowPay['customer_email'] ?? '', $usuario['email'] ?? '');
                                 $clienteSplit['telefone'] = (string) $pickNonEmpty($dados['telefone'] ?? '', $pedidoRowPay['cliente_telefone'] ?? '', $usuario['telefone'] ?? '', $usuario['celular'] ?? '');
                                 $clienteSplit['documento'] = (string) $pickNonEmpty($dados['documento'] ?? '', $pedidoRowPay['cliente_documento'] ?? '', $pedidoRowPay['documento'] ?? '', $usuario['documento'] ?? '');
+                                $clienteSplit['birth_date'] = (string) $pickNonEmpty($dados['data_nascimento'] ?? '', $usuario['data_nascimento'] ?? '');
+                                $clienteSplit['ip'] = (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+                                $clienteSplit['address'] = [
+                                    'street'   => (string) $pickNonEmpty($dados['endereco'] ?? '', $usuario['endereco'] ?? ''),
+                                    'number'   => (string) $pickNonEmpty($dados['numero'] ?? '', $usuario['numero'] ?? ''),
+                                    'district' => (string) $pickNonEmpty($dados['bairro'] ?? '', $usuario['bairro'] ?? ''),
+                                    'city'     => (string) $pickNonEmpty($dados['cidade'] ?? '', $usuario['cidade'] ?? ''),
+                                    'state'    => (string) $pickNonEmpty($dados['estado'] ?? '', $usuario['estado'] ?? ''),
+                                    'zip_code' => (string) $pickNonEmpty($dados['cep'] ?? '', $usuario['cep'] ?? ''),
+                                ];
 
                                 if ($billingType === 'CREDIT_CARD') {
                                     $clienteSplit['card_holder_name'] = (string) ($dados['card_holder_name'] ?? '');

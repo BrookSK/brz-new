@@ -1320,13 +1320,36 @@ class PaymentService {
             $emailUsed = '';
         }
 
+        $clientName  = (string) ($client['name']       ?? ($client['nome']          ?? ''));
+        $clientEmail = (string) ($client['email']      ?? '');
+        $clientDoc   = (string) ($client['document']   ?? ($client['documento']      ?? ''));
+        $clientBirth = (string) ($client['birth_date'] ?? ($client['data_nascimento'] ?? ''));
+        $clientPhone = (string) ($client['phone']      ?? ($client['telefone']       ?? ''));
+        $clientIp    = (string) ($client['ip']         ?? '127.0.0.1');
+        $addr        = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
+
         $payload = [
-            'order_id' => $orderId,
-            'amount' => round($valorBrl, 2),
-            'currency' => 'BRL',
+            'order_id'       => $orderId,
+            'amount'         => round($valorBrl, 2),
+            'currency'       => 'BRL',
             'payment_method' => 'pix',
-            'client' => (array) $client,
-            'duplicate' => 1,
+            'client'         => [
+                'name'       => $clientName,
+                'email'      => $clientEmail,
+                'document'   => $clientDoc,
+                'birth_date' => $clientBirth,
+                'phone'      => $clientPhone,
+                'ip'         => $clientIp,
+                'address'    => [
+                    'state'    => (string) ($addr['state']    ?? ($addr['estado']   ?? '')),
+                    'city'     => (string) ($addr['city']     ?? ($addr['cidade']   ?? '')),
+                    'zip_code' => (string) ($addr['zip_code'] ?? ($addr['cep']      ?? '')),
+                    'district' => (string) ($addr['district'] ?? ($addr['bairro']   ?? '')),
+                    'street'   => (string) ($addr['street']   ?? ($addr['endereco'] ?? '')),
+                    'number'   => (string) ($addr['number']   ?? ($addr['numero']   ?? '')),
+                ],
+            ],
+            'duplicate'  => 1,
             'take_rates' => 1,
             'products' => [
                 [
