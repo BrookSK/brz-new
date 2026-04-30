@@ -262,6 +262,14 @@ $router->post('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoC
 
 // QuickBooks
 $router->get('/admin/quickbooks', 'AdminQuickBooksController', 'index');
+
+// Debug temporário split
+$router->get('/admin/split-debug', function() {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    header('Content-Type: application/json');
+    echo json_encode($_SESSION['_split_debug'] ?? ['msg' => 'Nenhum debug ainda. Faça um checkout primeiro.'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+});
 $router->get('/admin/quickbooks/invoices', 'AdminQuickBooksController', 'invoices');
 $router->get('/admin/quickbooks/conectar', 'AdminQuickBooksController', 'conectar');
 $router->get('/admin/quickbooks/callback', 'AdminQuickBooksController', 'oauthCallback');
