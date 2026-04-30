@@ -95,7 +95,7 @@ class CarneService {
     }
 
     /**
-     * Gera os dois boletos de uma parcela (Câmbio Real + Câmbio Real Taxas)
+     * Gera os dois boletos de uma parcela (Câmbio Real + Appmax)
      */
     public function gerarBoletosParcela($parcela, $pedidoId, $dadosCliente = []) {
         $parcelaId = $parcela['id'];
@@ -113,7 +113,7 @@ class CarneService {
     }
 
     /**
-     * Gera PIX para uma parcela (Câmbio Real + Câmbio Real Taxas)
+     * Gera PIX para uma parcela (Câmbio Real + Appmax)
      */
     public function gerarPixParcela($parcela, $pedidoId, $clientData, $descBase) {
         $paymentService = new PaymentService();
@@ -201,34 +201,63 @@ class CarneService {
             }
         }
 
-        // 2. PIX Taxas via Câmbio Real Taxas
+        // 2. PIX Taxas via Appmax
         if ($parcela['valor_taxas'] > 0) {
             try {
-                $result = $paymentService->createCambioRealTaxasPixPayment(
-                    (int) $pedidoId,
+                $appmaxDados = [
+                    'billingType' => 'PIX',
+                    'forma_pagamento' => 'pix',
+                    'customer_name' => $clientData['name'] ?? '',
+                    'customer_email' => $clientData['email'] ?? '',
+                    'customer_document' => $clientData['document'] ?? '',
+                    'customer_phone' => $clientData['phone'] ?? '',
+                    'customer_zipcode' => $clientData['address']['zip_code'] ?? '',
+                    'customer_address' => $clientData['address']['street'] ?? '',
+                    'customer_address_number' => $clientData['address']['number'] ?? '',
+                    'customer_province' => $clientData['address']['district'] ?? '',
+                    'customer_city' => $clientData['address']['city'] ?? '',
+                    'customer_state' => $clientData['address']['state'] ?? '',
+                    'products' => [[
+                        'sku' => 'CARNE_TAXA_PIX_' . $pedidoId . '_' . $parcela['numero_parcela'],
+                        'name' => $descBase . ' - Taxas',
+                        'quantity' => 1,
+                        'unit_value' => (int) round($parcela['valor_taxas'] * 100),
+                        'type' => 'service',
+                    ]],
+                    'products_value_cents' => (int) round($parcela['valor_taxas'] * 100),
+                    'shipping_value_cents' => 0,
+                    'discount_value_cents' => 0,
+                ];
+
+                $appmaxResult = $paymentService->processarPagamento(
+                    $appmaxDados,
                     (float) $parcela['valor_taxas'],
-                    $descBase . ' - Taxas',
-                    $clientData
+                    'BRL',
+                    $descBase . ' - Taxas'
                 );
 
-                if (!empty($result['success'])) {
-                    $pix = $result['pix'] ?? [];
+                if (!empty($appmaxResult['success'])) {
+                    $pix = $appmaxResult['pix'] ?? [];
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_taxas_url'      => $result['invoice_url'] ?? '',
-                        'boleto_taxas_id_externo' => $result['payment_id'] ?? '',
-                        'pix_taxas_qrcode'      => $pix['encodedImage'] ?? '',
-                        'pix_taxas_payload'     => $pix['payload'] ?? '',
-                        'pix_taxas_expiracao'   => date('Y-m-d H:i:s', strtotime('+30 minutes')),
+                        'boleto_taxas_url' => $appmaxResult['invoiceUrl'] ?? '',
+                        'boleto_taxas_id_externo' => $appmaxResult['payment_id'] ?? '',
+                        'pix_taxas_qrcode' => $pix['encodedImage'] ?? '',
+                        'pix_taxas_payload' => $pix['payload'] ?? '',
+                        'pix_taxas_expiracao' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
-                    error_log('[CARNE] PIX Câmbio Real Taxas gerado: id=' . ($result['payment_id'] ?? ''));
+                    error_log('[CARNE] PIX Appmax gerado: id=' . ($appmaxResult['payment_id'] ?? ''));
                 } else {
-                    error_log('[CARNE] Erro PIX Câmbio Real Taxas: ' . ($result['error'] ?? 'desconhecido'));
+                    error_log('[CARNE] Erro PIX Appmax: ' . ($appmaxResult['error'] ?? 'desconhecido'));
                 }
             } catch (\Exception $e) {
-                error_log('[CARNE] Exception PIX Câmbio Real Taxas: ' . $e->getMessage());
+                error_log('[CARNE] Exception PIX Appmax: ' . $e->getMessage());
             }
         }
     }
+
+    /**
+     * Gera boletos para uma parcela (Câmbio Real + Appmax)
+     */
     private function gerarBoletoParcela($parcela, $pedidoId, $clientData, $descBase) {
         $paymentService = new PaymentService();
         $parcelaId = $parcela['id'];
@@ -270,27 +299,39 @@ class CarneService {
             }
         }
 
-        // 2. Boleto Taxas via Câmbio Real Taxas
+        // 2. Boleto Taxas via Appmax
         if ($parcela['valor_taxas'] > 0) {
             try {
-                $result = $paymentService->createCambioRealTaxasBoletoPayment(
-                    (int) $pedidoId,
-                    (float) $parcela['valor_taxas'],
-                    $descBase . ' - Taxas',
-                    $clientData
-                );
-                if (!empty($result['success'])) {
+                $appmaxDados = [
+                    'billingType' => 'BOLETO',
+                    'customer_name' => $clientData['name'] ?? '',
+                    'customer_email' => $clientData['email'] ?? '',
+                    'customer_document' => $clientData['document'] ?? '',
+                    'customer_phone' => $clientData['phone'] ?? '',
+                    'customer_zipcode' => $clientData['address']['zip_code'] ?? '',
+                    'customer_address' => $clientData['address']['street'] ?? '',
+                    'customer_address_number' => $clientData['address']['number'] ?? '',
+                    'customer_province' => $clientData['address']['district'] ?? '',
+                    'customer_city' => $clientData['address']['city'] ?? '',
+                    'customer_state' => $clientData['address']['state'] ?? '',
+                    'products' => [[
+                        'sku' => 'CARNE_TAXA_' . $pedidoId . '_' . $parcela['numero_parcela'],
+                        'name' => $descBase . ' - Taxas', 'quantity' => 1,
+                        'unit_value' => (int) round($parcela['valor_taxas'] * 100), 'type' => 'service',
+                    ]],
+                    'products_value_cents' => (int) round($parcela['valor_taxas'] * 100),
+                    'shipping_value_cents' => 0, 'discount_value_cents' => 0,
+                ];
+                $appmaxResult = $paymentService->processarPagamento($appmaxDados, (float) $parcela['valor_taxas'], 'BRL', $descBase . ' - Taxas');
+                if (!empty($appmaxResult['success'])) {
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_taxas_url'        => $result['bank_slip_url'] ?? ($result['invoice_url'] ?? ''),
-                        'boleto_taxas_codigo'     => $result['digitable_line'] ?? '',
-                        'boleto_taxas_id_externo' => $result['payment_id'] ?? '',
+                        'boleto_taxas_url' => $appmaxResult['bankSlipUrl'] ?? ($appmaxResult['invoiceUrl'] ?? ''),
+                        'boleto_taxas_codigo' => $appmaxResult['digitableLine'] ?? '',
+                        'boleto_taxas_id_externo' => $appmaxResult['payment_id'] ?? '',
                     ]);
-                    error_log('[CARNE] Boleto Câmbio Real Taxas gerado: id=' . ($result['payment_id'] ?? ''));
-                } else {
-                    error_log('[CARNE] Erro boleto Câmbio Real Taxas: ' . ($result['error'] ?? 'desconhecido'));
                 }
             } catch (\Exception $e) {
-                error_log('[CARNE] Exception Câmbio Real Taxas boleto: ' . $e->getMessage());
+                error_log('[CARNE] Exception Appmax boleto: ' . $e->getMessage());
             }
         }
     }
@@ -337,7 +378,7 @@ class CarneService {
      * Processa pagamento de boleto via webhook
      */
     public function processarPagamentoBoleto($idExterno, $tipo) {
-        // tipo: 'produtos' (Câmbio Real) ou 'taxas' (Câmbio Real Taxas)
+        // tipo: 'produtos' (Câmbio Real) ou 'taxas' (Appmax)
         $campo = "boleto_{$tipo}_id_externo";
         $stmt = $this->db->prepare("SELECT * FROM carne_parcelas WHERE {$campo} = :ext");
         $stmt->execute([':ext' => $idExterno]);

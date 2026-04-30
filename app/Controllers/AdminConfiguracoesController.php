@@ -1980,43 +1980,6 @@ class AdminConfiguracoesController extends Controller {
                                             <hr>
 
                                             <div class="row">
-                                                <div class="col-md-6">
-                                                    <div class="card border-info">
-                                                        <div class="card-header bg-info bg-opacity-10">
-                                                            <h6 class="mb-0">💱 Câmbio Real Taxas <small class="text-muted">(taxa de serviço e impostos)</small></h6>
-                                                        </div>
-                                                        <div class="card-body">
-                                                            <div class="mb-3">
-                                                                <label class="form-label">APP ID</label>
-                                                                <input type="text" class="form-control" name="pagamentos_cambioreal_taxas_app_id" value="' . htmlspecialchars($this->getConfigValue($config, 'pagamentos', 'cambioreal_taxas_app_id', ''), ENT_QUOTES, 'UTF-8') . '">
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label">APP Public</label>
-                                                                <input type="text" class="form-control" name="pagamentos_cambioreal_taxas_app_public" value="' . htmlspecialchars($this->getConfigValue($config, 'pagamentos', 'cambioreal_taxas_app_public', ''), ENT_QUOTES, 'UTF-8') . '">
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label">APP Secret</label>
-                                                                <div class="input-group">
-                                                                    <input type="password" class="form-control" name="pagamentos_cambioreal_taxas_app_secret" value="' . htmlspecialchars($this->getConfigValue($config, 'pagamentos', 'cambioreal_taxas_app_secret', ''), ENT_QUOTES, 'UTF-8') . '">
-                                                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility(this)">
-                                                                        <i class="fas fa-eye"></i>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            <div class="mb-0">
-                                                                <label class="form-label">Webhook URL</label>
-                                                                <input type="text" class="form-control" value="' . htmlspecialchars((isset($_SERVER['HTTP_HOST']) ? ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] : '') . '/webhook/cambioreal-taxas', ENT_QUOTES, 'UTF-8') . '" readonly>
-                                                                <div class="form-text">Configure esta URL no painel da Câmbio Real Taxas antes de criar a APIKey.</div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6"></div>
-                                            </div>
-
-                                            <hr>
-
-                                            <div class="row">
                                                 <div class="col-12">
                                                     <div class="card">
                                                         <div class="card-header d-flex justify-content-between align-items-center">
@@ -4469,7 +4432,7 @@ HTML;
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo', 'conversao_moeda_ativa'],
                 'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
-                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'cambioreal_enabled', 'cambioreal_base_url', 'cambioreal_app_id', 'cambioreal_app_public', 'cambioreal_app_secret', 'cambioreal_taxas_app_id', 'cambioreal_taxas_app_public', 'cambioreal_taxas_app_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
+                'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'cambioreal_enabled', 'cambioreal_base_url', 'cambioreal_app_id', 'cambioreal_app_public', 'cambioreal_app_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_turbo_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
                 'comissao' => ['manual_faixas', 'processamento_percent', 'janela_primeiro_inicio', 'janela_primeiro_fim', 'janela_duracao_dias'],
                 'entrega' => ['moeda_padrao', 'taxa_servico_kg', 'frete_gratis_acima', 'frete_padrao', 'custo_envio_por_item_usd', 'prazo_padrao', 'cep_origem', 'calcular_automatico', 'wexpress_enabled', 'wexpress_ambiente', 'wexpress_api_key', 'wexpress_service_code', 'wexpress_sender_json', 'correios_provider', 'correios_prepostagem_token', 'correios_prepostagem_id_correios', 'correios_prepostagem_codigo_servico', 'correios_prepostagem_sender_json', 'sigep_enabled', 'sigep_ambiente', 'sigep_usuario', 'sigep_senha', 'sigep_cnpj', 'sigep_servico_codigo', 'sigep_numero_contrato', 'sigep_cartao_postagem', 'correios_tracking_enabled', 'correios_tracking_base_url', 'correios_tracking_token', 'correios_tracking_header', 'correios_token_usuario', 'correios_token_senha', 'correios_token_ambiente', 'correios_token', 'correios_token_expira_em', 'correios_cep_ambiente', 'correios_cep_base_url', 'correios_cep_token', 'correios_packet_ambiente', 'correios_packet_login', 'correios_packet_password', 'correios_packet_cartao_postagem', 'shipstation_enabled', 'shipstation_api_key', 'shipstation_from_address_json', 'shipstation_carrier_id', 'shipstation_carrier_code', 'shipstation_service_code', 'shipstation_package_code', 'shipstation_label_layout', 'shipstation_label_format', 'shipstation_label_download_type', 'shipstation_display_scheme'],

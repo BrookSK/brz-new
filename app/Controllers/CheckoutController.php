@@ -29,7 +29,7 @@ class CheckoutController extends Controller {
     private $enderecoModel;
     private $pedidoModel;
 
-    private function gerarCobrancaCambioRealTaxasSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao, string $componente = 'taxa_servico', ?float $valorRegistro = null): array {
+    private function gerarCobrancaAppmaxTaxaServicoSplit(int $pedidoId, string $billingType, float $valor, array $usuario, string $descricao, string $componente = 'taxa_servico', ?float $valorRegistro = null): array {
         $billingType = strtoupper(trim($billingType));
         if (!in_array($billingType, ['PIX', 'BOLETO', 'CREDIT_CARD'], true)) {
             $billingType = 'BOLETO';
@@ -38,50 +38,81 @@ class CheckoutController extends Controller {
         if ($valor <= 0) {
             return ['success' => true, 'skipped' => true];
         }
+        // valorRegistro: valor a salvar no split (pode ser diferente do valor cobrado)
+        $valorParaSplit = ($valorRegistro !== null && $valorRegistro > 0) ? $valorRegistro : $valor;
 
-        // Normalizar dados do cliente para o formato esperado pelo PaymentService
-        $client = [
-            'name'     => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
-            'email'    => (string) ($usuario['email'] ?? ''),
-            'document' => (string) ($usuario['documento'] ?? ($usuario['document'] ?? '')),
-            'phone'    => (string) ($usuario['telefone'] ?? ($usuario['phone'] ?? '')),
-            'ip'       => (string) ($usuario['ip'] ?? '127.0.0.1'),
-            'address'  => is_array($usuario['address'] ?? null) ? (array) $usuario['address'] : [],
+        $nome = (string) ($usuario['nome'] ?? 'Cliente');
+        $email = (string) ($usuario['email'] ?? '');
+        $telefone = (string) ($usuario['telefone'] ?? '');
+        $documento = (string) ($usuario['documento'] ?? '');
+
+        $productsValueCents = (int) round($valor * 100);
+        $products = [
+            [
+                'sku' => 'TAXA_SERVICO_' . (string) $pedidoId,
+                'name' => $descricao,
+                'quantity' => 1,
+                'unit_value' => $productsValueCents,
+                'type' => 'service',
+                'freight_type' => 'normal',
+            ]
         ];
 
-        if ($billingType === 'PIX') {
-            $result = $this->paymentService->createCambioRealTaxasPixPayment(
-                (int) $pedidoId,
-                (float) $valor,
-                (string) $descricao,
-                $client
-            );
-        } elseif ($billingType === 'CREDIT_CARD') {
-            $card = [
-                'token'        => (string) ($usuario['card_token'] ?? ($usuario['token'] ?? '')),
-                'brand'        => (string) ($usuario['card_brand'] ?? ($usuario['brand'] ?? '')),
-                'bin'          => (string) ($usuario['card_bin'] ?? ($usuario['bin'] ?? '')),
-                'dfp_id'       => (string) ($usuario['card_dfp_id'] ?? ($usuario['dfp_id'] ?? '')),
-                'holder'       => (string) ($usuario['card_holder_name'] ?? ($usuario['holder'] ?? '')),
-                'installments' => (int) ($usuario['card_installments'] ?? ($usuario['installments'] ?? 1)),
-                'type'         => (string) ($usuario['card_type'] ?? ($usuario['type'] ?? 'credit')),
-            ];
-            $result = $this->paymentService->createCambioRealTaxasCartaoPayment(
-                (int) $pedidoId,
-                (float) $valor,
-                (string) $descricao,
-                $client,
-                $card
-            );
-        } else {
-            // BOLETO (padrão)
-            $result = $this->paymentService->createCambioRealTaxasBoletoPayment(
-                (int) $pedidoId,
-                (float) $valor,
-                (string) $descricao,
-                $client
-            );
+        $payloadAppmax = [
+            'billingType' => $billingType,
+            'force_gateway' => 'appmax',
+            'customer_name' => $nome,
+            'customer_email' => $email,
+            'customer_phone' => $telefone,
+            'customer_document' => $documento,
+            'externalReference' => (string) $pedidoId,
+            'products' => $products,
+            'products_value_cents' => $productsValueCents,
+            'shipping_value_cents' => 0,
+            'discount_value_cents' => 0,
+        ];
+
+        // Passar dados do cartão quando billingType é CREDIT_CARD
+        if ($billingType === 'CREDIT_CARD') {
+            $cardFields = ['card_holder_name', 'card_number', 'card_expiry_month', 'card_expiry_year', 'card_cvv'];
+            foreach ($cardFields as $cf) {
+                if (!empty($usuario[$cf])) {
+                    $payloadAppmax[$cf] = (string) $usuario[$cf];
+                }
+            }
         }
+
+        $result = $this->paymentService->processarPagamento($payloadAppmax, $valor, 'BRL', $descricao);
+
+        if (empty($result['success'])) {
+            return $result;
+        }
+
+        $paymentId = (string) ($result['payment_id'] ?? '');
+        if ($paymentId === '') {
+            return ['success' => false, 'error' => 'AppMax: payment_id não retornado'];
+        }
+
+        $pix = (isset($result['pix']) && is_array($result['pix'])) ? $result['pix'] : null;
+        $invoiceUrl = (string) ($result['invoiceUrl'] ?? '');
+        $bankSlipUrl = (string) ($result['bankSlipUrl'] ?? '');
+        $digitableLine = (string) ($result['digitableLine'] ?? '');
+
+        $this->paymentService->registrarPedidoPagamentoSplit([
+            'pedido_id' => $pedidoId,
+            'componente' => strtolower(trim((string) $componente)) !== '' ? strtolower(trim((string) $componente)) : 'taxa_servico',
+            'gateway' => 'appmax',
+            'metodo' => strtolower($billingType),
+            'moeda' => 'BRL',
+            'valor' => $valorParaSplit,
+            'payment_id' => $paymentId,
+            'status' => 'pending',
+            'invoice_url' => $invoiceUrl,
+            'bank_slip_url' => $bankSlipUrl,
+            'digitable_line' => $digitableLine,
+            'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
+            'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
+        ]);
 
         return $result;
     }
@@ -3460,12 +3491,12 @@ class CheckoutController extends Controller {
                                     $clienteSplit['card_cvv'] = (string) ($dados['card_cvv'] ?? '');
                                 }
 
-                                $taxa = $this->gerarCobrancaCambioRealTaxasSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico', (float) $valorTaxa);
+                                $taxa = $this->gerarCobrancaAppmaxTaxaServicoSplit((int) $pedidoId, $billingType, (float) $valorAppmax, $clienteSplit, (string) $descricaoTaxa, 'taxa_servico', (float) $valorTaxa);
                                 if (empty($taxa['success'])) {
-                                    throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento Câmbio Real Taxas (taxa de serviço)'));
+                                    throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento AppMax (taxa de serviço)'));
                                 }
 
-                                // Corrigir o valor registrado no split: o pagamento é do total (taxa+impostos),
+                                // Corrigir o valor registrado no split: o pagamento AppMax é do total (taxa+impostos),
                                 // mas o componente taxa_servico deve registrar apenas o valor da taxa.
                                 if (!empty($taxa['payment_id']) && $valorTaxa < $valorAppmax) {
                                     try {
@@ -3480,7 +3511,7 @@ class CheckoutController extends Controller {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
                                         'pedido_id' => (int) $pedidoId,
                                         'componente' => 'imposto',
-                                        'gateway' => 'cambioreal_taxas',
+                                        'gateway' => 'appmax',
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
                                         'valor' => (float) $valorImposto,
@@ -3493,7 +3524,7 @@ class CheckoutController extends Controller {
                                     $this->paymentService->registrarPedidoPagamentoSplit([
                                         'pedido_id' => (int) $pedidoId,
                                         'componente' => 'imposto_local',
-                                        'gateway' => 'cambioreal_taxas',
+                                        'gateway' => 'appmax',
                                         'metodo' => strtolower((string) $billingType),
                                         'moeda' => 'BRL',
                                         'valor' => (float) $valorImpostoLocal,
@@ -3512,7 +3543,7 @@ class CheckoutController extends Controller {
                                 'taxa' => $taxa,
                                 'imposto' => [
                                     'success' => true,
-                                    'gateway' => 'cambioreal_taxas',
+                                    'gateway' => 'appmax',
                                     'metodo' => $formaSelecionada,
                                     'moeda' => 'BRL',
                                     'valor' => (float) $valorImposto,
