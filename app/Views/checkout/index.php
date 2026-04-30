@@ -946,7 +946,7 @@
                                 <div class="form-check mt-1 mb-1">
                                     <input class="form-check-input" type="checkbox" id="admin-taxa-teste" name="admin_taxa_teste" value="1">
                                     <label class="form-check-label small text-warning" for="admin-taxa-teste">
-                                        <i class="fas fa-flask me-1"></i>Modo teste: taxa $1.00
+                                        <i class="fas fa-flask me-1"></i>Modo teste: taxa $2.50
                                     </label>
                                 </div>
                                 <?php endif; ?>
@@ -983,7 +983,7 @@
                                 <div class="form-check mt-1 mb-1" id="admin-impostos-teste-wrap" <?= empty($cobra_impostos_br) ? 'style="display:none"' : '' ?>>
                                     <input class="form-check-input" type="checkbox" id="admin-impostos-teste" name="admin_impostos_teste" value="1">
                                     <label class="form-check-label small text-warning" for="admin-impostos-teste">
-                                        <i class="fas fa-flask me-1"></i>Modo teste: impostos $1.00
+                                        <i class="fas fa-flask me-1"></i>Modo teste: impostos $2.50
                                     </label>
                                 </div>
                                 <?php endif; ?>
@@ -3253,8 +3253,8 @@ main {
 <?php if (!empty($is_admin)): ?>
 <script>
 (function() {
-    var TAXA_TESTE = 1.00;
-    var IMPOSTOS_TESTE = 1.00;
+    var TAXA_TESTE = 2.50;
+    var IMPOSTOS_TESTE = 2.50;
     var taxaOriginal = <?= json_encode((float) ($taxa_servico ?? 0)) ?>;
     var impostosOriginal = <?= json_encode((float) ($impostos_calculado ?? $impostos ?? 0)) ?>;
 
