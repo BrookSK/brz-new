@@ -71,21 +71,28 @@ class AdminQuickBooksController extends Controller {
         if($pedidoId<=0){echo json_encode(['ok'=>false,'erro'=>'ID invalido']); return;}
         try{
             $pdo = Database::getConnection();
-            $ped = $pdo->prepare(
-                'SELECT p.*, u.nome, u.name, u.email, u.telefone, u.phone, u.cpf
-                 FROM pedidos p
-                 LEFT JOIN usuarios u ON u.id = p.usuario_id
-                 WHERE p.id = ? LIMIT 1'
-            );
+
+            // Buscar pedido
+            $ped = $pdo->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
             $ped->execute([$pedidoId]);
             $pedido = $ped->fetch(\PDO::FETCH_ASSOC);
-            if ($pedido) {
-                // Normalizar nome/email independente do nome da coluna
-                $pedido['nome']     = $pedido['nome']     ?? $pedido['name']  ?? '';
-                $pedido['email']    = $pedido['email']    ?? '';
-                $pedido['telefone'] = $pedido['telefone'] ?? $pedido['phone'] ?? '';
+            if (!$pedido) {
+                echo json_encode(['ok' => false, 'erro' => 'Pedido não encontrado']);
+                return;
             }
-            if(!$pedido){echo json_encode(['ok'=>false,'erro'=>'Pedido nao encontrado']); return;}
+
+            // Buscar usuário separadamente (evita assumir nomes de colunas)
+            $usuarioId = (int) ($pedido['usuario_id'] ?? 0);
+            if ($usuarioId > 0) {
+                $uStmt = $pdo->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                $uStmt->execute([$usuarioId]);
+                $usuario = $uStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                // Normalizar campos que podem ter nomes diferentes
+                $pedido['nome']     = $usuario['nome']     ?? $usuario['name']  ?? '';
+                $pedido['email']    = $usuario['email']    ?? '';
+                $pedido['telefone'] = $usuario['telefone'] ?? '';
+                $pedido['cpf']      = $usuario['cpf']      ?? $usuario['documento'] ?? '';
+            }
             $itStmt=$pdo->prepare("SELECT pi.*,pr.nome AS produto_nome FROM pedido_itens pi LEFT JOIN produtos pr ON pr.id=pi.produto_id WHERE pi.pedido_id=?");
             $itStmt->execute([$pedidoId]); $itens=$itStmt->fetchAll(\PDO::FETCH_ASSOC);
             $qb=$this->qb(); $res=$qb->criarInvoiceDePedido($pedido,$itens,$pedido);
