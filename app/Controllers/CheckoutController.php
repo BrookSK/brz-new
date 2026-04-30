@@ -3502,6 +3502,20 @@ class CheckoutController extends Controller {
                                         ];
 
                                         $descricaoTaxaCard = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (taxas e impostos)';
+                                        // DEBUG TEMPORÁRIO
+                                        $_SESSION['_split_debug'] = [
+                                            'ts' => date('Y-m-d H:i:s'),
+                                            'moeda' => $moedaPedidoPay ?? 'N/A',
+                                            'valorAppmax' => $valorAppmax,
+                                            'valorAppmaxBrl' => $valorAppmaxBrl,
+                                            'valorTaxa' => $valorTaxa,
+                                            'valorImposto' => $valorImposto,
+                                            'taxaServico_raw' => $taxaServico,
+                                            'totalBrl' => $totalBrl,
+                                            'tx' => $tx,
+                                            'billingType' => 'CREDIT_CARD',
+                                            'pedidoId' => $pedidoId,
+                                        ];
                                         $taxa = $this->gerarCobrancaCambioRealTaxasSplit(
                                             (int) $pedidoId,
                                             'CREDIT_CARD',
