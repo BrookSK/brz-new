@@ -110,6 +110,15 @@ class AdminQuickBooksController extends Controller {
                 }
             }
             unset($item);
+
+            // Normalizar total BRL do pedido para o service usar como fallback
+            foreach (['total_brl', 'valor_total_brl', 'total', 'valor_total', 'amount', 'valor'] as $col) {
+                if (!empty($pedido[$col]) && (float) $pedido[$col] > 0) {
+                    $pedido['total_brl'] = (float) $pedido[$col];
+                    break;
+                }
+            }
+
             $qb=$this->qb(); $res=$qb->criarInvoiceDePedido($pedido,$itens,$pedido);
             echo json_encode(['ok'=>true,'qb_invoice_id'=>$res['Invoice']['Id']??null]);
         }catch(\Throwable $ex){echo json_encode(['ok'=>false,'erro'=>$ex->getMessage()]);}

@@ -137,19 +137,122 @@ class QuickBooksService
         ];
     }
 
-    public function criarInvoiceDePedido(array $ped,array $itens,array $cli): array {
-        $cid=$this->sincronizarCliente($cli); $li=[];
-        foreach($itens as $it){$li[]=["Amount"=>round((float)($it["subtotal"]??0),2),"DetailType"=>"SalesItemLineDetail","Description"=>(string)($it["nome"]??$it["produto_nome"]??"Produto"),"SalesItemLineDetail"=>["Qty"=>(float)($it["quantidade"]??1),"UnitPrice"=>round((float)($it["preco_unitario"]??0),2)]];}
-        if(!empty($ped["taxa_servico"])&&(float)$ped["taxa_servico"]>0)$li[]=["Amount"=>round((float)$ped["taxa_servico"],2),"DetailType"=>"SalesItemLineDetail","Description"=>"Taxa de Servico","SalesItemLineDetail"=>["Qty"=>1,"UnitPrice"=>round((float)$ped["taxa_servico"],2)]];
-        if(!empty($ped["imposto"])&&(float)$ped["imposto"]>0)$li[]=["Amount"=>round((float)$ped["imposto"],2),"DetailType"=>"SalesItemLineDetail","Description"=>"Imposto de Importacao","SalesItemLineDetail"=>["Qty"=>1,"UnitPrice"=>round((float)$ped["imposto"],2)]];
-        $pl=["Line"=>$li,"CustomerRef"=>["value"=>$cid],"TxnDate"=>date("Y-m-d",strtotime($ped["created_at"]??"now")),"DocNumber"=>"BRZ-".$ped["id"],"PrivateNote"=>"Pedido Braziliana #".$ped["id"],"CurrencyRef"=>["value"=>$ped["moeda"]??"BRL"]];
-        $res=$this->apiPost("/invoice",$pl); $this->salvarMapeamentoPedido((int)$ped["id"],["qb_invoice_id"=>$res["Invoice"]["Id"]??null,"qb_invoice_doc_number"=>$res["Invoice"]["DocNumber"]??null,"qb_customer_id"=>$cid]); $this->registrarLog("invoice",(int)$ped["id"],$res["Invoice"]["Id"]??null,"create","success",$pl); return $res;
+    public function criarInvoiceDePedido(array $ped, array $itens, array $cli): array {
+        $cid = $this->sincronizarCliente($cli);
+
+        // Determinar moeda do pedido
+        $moeda = (string) ($ped['moeda'] ?? 'BRL');
+
+        // Montar line items
+        $li = [];
+        foreach ($itens as $it) {
+            // Usar subtotal em BRL se disponível, senão preco_unitario
+            $subtotal = (float) ($it['subtotal_brl'] ?? $it['subtotal'] ?? 0);
+            $unitario = (float) ($it['preco_unitario_brl'] ?? $it['preco_unitario'] ?? $it['preco'] ?? 0);
+            $qty      = (float) ($it['quantidade'] ?? $it['qty'] ?? 1);
+            $descricao = (string) ($it['produto_nome'] ?? $it['nome'] ?? 'Produto');
+
+            if ($subtotal <= 0 && $unitario > 0) {
+                $subtotal = round($unitario * $qty, 2);
+            }
+
+            $li[] = [
+                'Amount'             => round($subtotal, 2),
+                'DetailType'         => 'SalesItemLineDetail',
+                'Description'        => $descricao,
+                'SalesItemLineDetail' => [
+                    'Qty'       => $qty,
+                    'UnitPrice' => round($unitario, 2),
+                ],
+            ];
+        }
+
+        // Taxa de serviço
+        $taxa = (float) ($ped['taxa_servico_brl'] ?? $ped['taxa_servico'] ?? 0);
+        if ($taxa > 0) {
+            $li[] = [
+                'Amount'             => round($taxa, 2),
+                'DetailType'         => 'SalesItemLineDetail',
+                'Description'        => 'Taxa de Serviço',
+                'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($taxa, 2)],
+            ];
+        }
+
+        // Imposto
+        $imposto = (float) ($ped['imposto_brl'] ?? $ped['imposto'] ?? $ped['valor_impostos'] ?? 0);
+        if ($imposto > 0) {
+            $li[] = [
+                'Amount'             => round($imposto, 2),
+                'DetailType'         => 'SalesItemLineDetail',
+                'Description'        => 'Imposto de Importação',
+                'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($imposto, 2)],
+            ];
+        }
+
+        // Se não há itens com valor, usar o total do pedido como linha única
+        $totalLinhas = array_sum(array_column($li, 'Amount'));
+        if ($totalLinhas <= 0) {
+            $totalPedido = (float) ($ped['total_brl'] ?? $ped['valor_total_brl'] ?? $ped['total'] ?? $ped['valor_total'] ?? $ped['amount'] ?? $ped['valor'] ?? 0);
+            if ($totalPedido > 0) {
+                $li = [[
+                    'Amount'             => round($totalPedido, 2),
+                    'DetailType'         => 'SalesItemLineDetail',
+                    'Description'        => 'Pedido Braziliana #' . $ped['id'],
+                    'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($totalPedido, 2)],
+                ]];
+            }
+        }
+
+        $pl = [
+            'Line'        => $li,
+            'CustomerRef' => ['value' => $cid],
+            'TxnDate'     => date('Y-m-d', strtotime($ped['created_at'] ?? 'now')),
+            'DocNumber'   => 'BRZ-' . $ped['id'],
+            'PrivateNote' => 'Pedido Braziliana #' . $ped['id'],
+            'CurrencyRef' => ['value' => 'BRL'],
+        ];
+
+        $res = $this->apiPost('/invoice', $pl);
+        $this->salvarMapeamentoPedido((int) $ped['id'], [
+            'qb_invoice_id'         => $res['Invoice']['Id'] ?? null,
+            'qb_invoice_doc_number' => $res['Invoice']['DocNumber'] ?? null,
+            'qb_customer_id'        => $cid,
+        ]);
+        $this->registrarLog('invoice', (int) $ped['id'], $res['Invoice']['Id'] ?? null, 'create', 'success', $pl);
+        return $res;
     }
     public function sincronizarCliente(array $cli): string {
-        $em=(string)($cli["email"]??"");
-        if($em!==""){$res=$this->apiQuery("SELECT * FROM Customer WHERE PrimaryEmailAddr = '".$em."' MAXRESULTS 1"); $rows=$res["QueryResponse"]["Customer"]??[]; if(!empty($rows[0]["Id"]))return (string)$rows[0]["Id"];}
-        $pl=["DisplayName"=>(string)($cli["nome"]??$em),"PrimaryEmailAddr"=>["Address"=>$em],"PrimaryPhone"=>["FreeFormNumber"=>(string)($cli["telefone"]??"")],"BillAddr"=>["Line1"=>(string)($cli["endereco"]??""),"City"=>(string)($cli["cidade"]??""),"CountrySubDivisionCode"=>(string)($cli["estado"]??""),"PostalCode"=>(string)($cli["cep"]??""),"Country"=>"BR"]];
-        $res=$this->apiPost("/customer",$pl); $id=(string)($res["Customer"]["Id"]??""); $this->registrarLog("customer",null,$id,"create","success",$pl); return $id;
+        $em = (string) ($cli['email'] ?? '');
+
+        // Montar DisplayName com nome real — nunca usar só 'BR'
+        $nome = trim((string) ($cli['nome'] ?? $cli['name'] ?? ''));
+        if ($nome === '') {
+            $nome = $em !== '' ? $em : 'Cliente';
+        }
+
+        if ($em !== '') {
+            $res  = $this->apiQuery("SELECT * FROM Customer WHERE PrimaryEmailAddr = '" . addslashes($em) . "' MAXRESULTS 1");
+            $rows = $res['QueryResponse']['Customer'] ?? [];
+            if (!empty($rows[0]['Id'])) return (string) $rows[0]['Id'];
+        }
+
+        $pl = [
+            'DisplayName'      => $nome,
+            'PrimaryEmailAddr' => ['Address' => $em],
+            'PrimaryPhone'     => ['FreeFormNumber' => (string) ($cli['telefone'] ?? '')],
+            'BillAddr'         => [
+                'Line1'                  => (string) ($cli['endereco'] ?? ''),
+                'City'                   => (string) ($cli['cidade']   ?? ''),
+                'CountrySubDivisionCode' => (string) ($cli['estado']   ?? ''),
+                'PostalCode'             => (string) ($cli['cep']      ?? ''),
+                'Country'                => 'BR',
+            ],
+        ];
+
+        $res = $this->apiPost('/customer', $pl);
+        $id  = (string) ($res['Customer']['Id'] ?? '');
+        $this->registrarLog('customer', null, $id, 'create', 'success', $pl);
+        return $id;
     }
     public function listarPayments(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Payment ORDERBY TxnDate DESC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
     public function listarCustomers(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Customer ORDERBY DisplayName ASC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
