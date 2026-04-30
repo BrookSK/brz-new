@@ -608,7 +608,7 @@ class PaymentService {
             return ['success' => false, 'error' => 'Câmbio Real está desabilitado.'];
         }
 
-        $orderId = (string) $pedidoId;
+        $orderId = (string) $pedidoId . '-prod-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 6);
         $paymentMethod = 'credit_card';
 
         $token = trim((string) ($card['token'] ?? ''));
