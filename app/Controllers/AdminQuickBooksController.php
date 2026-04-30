@@ -93,14 +93,23 @@ class AdminQuickBooksController extends Controller {
                 $pedido['telefone'] = $usuario['telefone'] ?? '';
                 $pedido['cpf']      = $usuario['cpf']      ?? $usuario['documento'] ?? '';
             }
-            $itStmt = $pdo->prepare(
-                'SELECT pi.*, COALESCE(pr.name, pr.nome, pi.produto_nome, \'\') AS produto_nome
-                 FROM pedido_itens pi
-                 LEFT JOIN produtos pr ON pr.id = pi.produto_id
-                 WHERE pi.pedido_id = ?'
-            );
+            $itStmt = $pdo->prepare('SELECT * FROM pedido_itens WHERE pedido_id = ?');
             $itStmt->execute([$pedidoId]);
-            $itens = $itStmt->fetchAll(\PDO::FETCH_ASSOC);
+            $itens = $itStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Enriquecer cada item com o nome do produto (coluna pode ser 'name' ou 'nome')
+            foreach ($itens as &$item) {
+                $prodId = (int) ($item['produto_id'] ?? 0);
+                if ($prodId > 0) {
+                    $pStmt = $pdo->prepare('SELECT * FROM produtos WHERE id = ? LIMIT 1');
+                    $pStmt->execute([$prodId]);
+                    $prod = $pStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    $item['produto_nome'] = $prod['name'] ?? $prod['nome'] ?? $prod['title'] ?? 'Produto #' . $prodId;
+                } else {
+                    $item['produto_nome'] = $item['produto_nome'] ?? 'Produto';
+                }
+            }
+            unset($item);
             $qb=$this->qb(); $res=$qb->criarInvoiceDePedido($pedido,$itens,$pedido);
             echo json_encode(['ok'=>true,'qb_invoice_id'=>$res['Invoice']['Id']??null]);
         }catch(\Throwable $ex){echo json_encode(['ok'=>false,'erro'=>$ex->getMessage()]);}
