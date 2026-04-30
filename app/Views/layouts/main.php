@@ -64,22 +64,51 @@ if ($__layoutCfg === null) {
         }
         $__layoutCfg['conversao_moeda'] = ((string) ($__v ?? '0') === '1');
 
-        // Favicon
+        // Favicon — compatível com schema categoria+chave e schema chave única (legado)
         try {
             $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'favicon' LIMIT 1");
             $st->execute();
-            $__layoutCfg['favicon'] = (string) ($st->fetchColumn() ?: '');
+            $v = $st->fetchColumn();
+            if ($v === false || $v === null || $v === '') {
+                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'layout_favicon' LIMIT 1");
+                $st2->execute();
+                $v = $st2->fetchColumn();
+            }
+            $__layoutCfg['favicon'] = (string) ($v ?: '');
         } catch (\Exception $e) {}
 
-        // Logo
+        // Logo — compatível com schema categoria+chave e schema chave única (legado)
         try {
+            // Tentar schema categoria+chave primeiro
             $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'logo' LIMIT 1");
             $st->execute();
-            $__layoutCfg['logo'] = (string) ($st->fetchColumn() ?: '');
+            $v = $st->fetchColumn();
+            if ($v === false || $v === null || $v === '') {
+                // Fallback: schema chave única (ex: 'layout_logo')
+                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'layout_logo' LIMIT 1");
+                $st2->execute();
+                $v = $st2->fetchColumn();
+            }
+            $__layoutCfg['logo'] = (string) ($v ?: '');
         } catch (\Exception $e) {}
 
-        // Footer logo (mesmo que logo por padrão)
-        $__layoutCfg['footer_logo'] = $__layoutCfg['logo'];
+        // Footer logo — buscar logo_footer dedicado, fallback para logo principal
+        try {
+            $v = false;
+            // Tentar schema categoria+chave
+            $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'logo_footer' LIMIT 1");
+            $st->execute();
+            $v = $st->fetchColumn();
+            if ($v === false || $v === null || $v === '') {
+                // Fallback: schema chave única
+                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'layout_logo_footer' LIMIT 1");
+                $st2->execute();
+                $v = $st2->fetchColumn();
+            }
+            $__layoutCfg['footer_logo'] = (string) ($v ?: $__layoutCfg['logo']);
+        } catch (\Exception $e) {
+            $__layoutCfg['footer_logo'] = $__layoutCfg['logo'];
+        }
 
         // Copiloto
         try {
