@@ -189,17 +189,41 @@ class QuickBooksService
             ];
         }
 
-        // Se não há itens com valor, usar o total do pedido como linha única
+        // Se não há itens com valor em BRL, usar o total do pedido como linha única
+        // (itens podem estar em USD — o total do pedido é sempre em BRL)
         $totalLinhas = array_sum(array_column($li, 'Amount'));
-        if ($totalLinhas <= 0) {
-            $totalPedido = (float) ($ped['total_brl'] ?? $ped['valor_total_brl'] ?? $ped['total'] ?? $ped['valor_total'] ?? $ped['amount'] ?? $ped['valor'] ?? 0);
+        $totalPedido = (float) ($ped['total_brl'] ?? $ped['valor_total_brl'] ?? $ped['total'] ?? $ped['valor_total'] ?? $ped['amount'] ?? $ped['valor'] ?? 0);
+
+        if ($totalLinhas <= 0 || ($totalPedido > 0 && abs($totalLinhas - $totalPedido) > 1)) {
+            // Itens em USD ou valor divergente — usar total BRL como linha única
             if ($totalPedido > 0) {
                 $li = [[
-                    'Amount'             => round($totalPedido, 2),
-                    'DetailType'         => 'SalesItemLineDetail',
-                    'Description'        => 'Pedido Braziliana #' . $ped['id'],
+                    'Amount'              => round($totalPedido, 2),
+                    'DetailType'          => 'SalesItemLineDetail',
+                    'Description'         => 'Total do Pedido Braziliana #' . $ped['id'] . ' (BRL)',
                     'SalesItemLineDetail' => ['Qty' => 1, 'UnitPrice' => round($totalPedido, 2)],
                 ]];
+            }
+        }
+
+        // Montar memo com detalhes de pagamento
+        $memo = 'Pedido Braziliana #' . $ped['id'];
+        $pagamentos = $ped['_pagamentos'] ?? [];
+        if (!empty($pagamentos)) {
+            $labels = [
+                'cambioreal'       => 'Câmbio Real (Produtos)',
+                'cambioreal_taxas' => 'Câmbio Real (Taxas)',
+                'appmax'           => 'Appmax',
+                'stripe'           => 'Stripe',
+                'asaas'            => 'Asaas',
+            ];
+            $memo .= "\nPagamentos:";
+            foreach ($pagamentos as $pg) {
+                $gw  = $labels[$pg['gateway']] ?? ucfirst($pg['gateway'] ?? '');
+                $met = strtoupper($pg['metodo'] ?? '');
+                $val = number_format((float) ($pg['valor'] ?? 0), 2, ',', '.');
+                $comp = ucfirst($pg['componente'] ?? '');
+                $memo .= "\n  - {$comp}: R$ {$val} via {$gw} ({$met})";
             }
         }
 
@@ -208,7 +232,7 @@ class QuickBooksService
             'CustomerRef' => ['value' => $cid],
             'TxnDate'     => date('Y-m-d', strtotime($ped['created_at'] ?? 'now')),
             'DocNumber'   => 'BRZ-' . $ped['id'],
-            'PrivateNote' => 'Pedido Braziliana #' . $ped['id'],
+            'PrivateNote' => $memo,
             'CurrencyRef' => ['value' => 'BRL'],
         ];
 

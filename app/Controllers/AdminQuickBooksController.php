@@ -111,30 +111,34 @@ class AdminQuickBooksController extends Controller {
             }
             unset($item);
 
-            // Debug: retornar campos do pedido para diagnóstico
-            $camposTotal = [];
-            foreach (['total', 'valor_total', 'total_brl', 'valor_total_brl', 'amount', 'valor', 'subtotal', 'preco_total', 'grand_total'] as $c) {
-                if (array_key_exists($c, $pedido)) {
-                    $camposTotal[$c] = $pedido[$c];
-                }
-            }
-            $camposItens = array_map(fn($it) => [
-                'produto_nome'   => $it['produto_nome'] ?? '',
-                'quantidade'     => $it['quantidade']   ?? $it['qty'] ?? '',
-                'preco_unitario' => $it['preco_unitario'] ?? $it['preco'] ?? '',
-                'subtotal'       => $it['subtotal']      ?? '',
-            ], $itens);
-
-            echo json_encode(['debug' => true, 'campos_total' => $camposTotal, 'itens' => $camposItens]);
-            return;
-            foreach (['total_brl', 'valor_total_brl', 'total', 'valor_total', 'amount', 'valor'] as $col) {
+            // Normalizar total BRL do pedido
+            $totalBrl = 0.0;
+            foreach (['total', 'valor_total', 'total_brl', 'valor_total_brl', 'amount', 'valor'] as $col) {
                 if (!empty($pedido[$col]) && (float) $pedido[$col] > 0) {
-                    $pedido['total_brl'] = (float) $pedido[$col];
+                    $totalBrl = (float) $pedido[$col];
                     break;
                 }
             }
+            $pedido['total_brl'] = $totalBrl;
 
-            $qb=$this->qb(); $res=$qb->criarInvoiceDePedido($pedido,$itens,$pedido);
+            // Buscar split de pagamentos da tabela pedido_pagamentos (se existir)
+            $pagamentos = [];
+            try {
+                $pgStmt = $pdo->prepare(
+                    "SELECT componente, gateway, metodo, valor, moeda
+                     FROM pedido_pagamentos
+                     WHERE pedido_id = ? AND status IN ('paid','approved','confirmed')
+                     ORDER BY id ASC"
+                );
+                $pgStmt->execute([$pedidoId]);
+                $pagamentos = $pgStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Throwable $e) {
+                // tabela pode não existir em instalações antigas
+            }
+            $pedido['_pagamentos'] = $pagamentos;
+
+            $qb  = $this->qb();
+            $res = $qb->criarInvoiceDePedido($pedido, $itens, $pedido);
             echo json_encode(['ok'=>true,'qb_invoice_id'=>$res['Invoice']['Id']??null]);
         }catch(\Throwable $ex){echo json_encode(['ok'=>false,'erro'=>$ex->getMessage()]);}
     }
