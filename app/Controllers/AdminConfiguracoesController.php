@@ -4698,10 +4698,6 @@ HTML;
             }
 
             $pdo->commit();
-
-            // Invalidar cache de layout em sessão para que o novo logo apareça imediatamente
-            if (session_status() === PHP_SESSION_NONE) @session_start();
-            unset($_SESSION['__brz_layout_cfg__']);
             
             header('Location: /admin/configuracoes?success=1');
             exit;

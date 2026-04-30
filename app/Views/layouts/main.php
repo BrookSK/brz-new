@@ -1,142 +1,44 @@
 <!DOCTYPE html>
 <?php
-// ── Cache de configurações do layout em sessão (TTL: 5 min) ──────────────────
-// Evita múltiplas queries ao banco a cada request, prevenindo timeout no Cloudflare
-if (session_status() === PHP_SESSION_NONE) @session_start();
-
-$__layoutCacheKey = '__brz_layout_cfg__';
-$__layoutCacheTTL = 300; // 5 minutos
-$__layoutCfg = null;
-
-if (
-    isset($_SESSION[$__layoutCacheKey]) &&
-    is_array($_SESSION[$__layoutCacheKey]) &&
-    isset($_SESSION[$__layoutCacheKey]['ts']) &&
-    (time() - $_SESSION[$__layoutCacheKey]['ts']) < $__layoutCacheTTL
-) {
-    $__layoutCfg = $_SESSION[$__layoutCacheKey];
-}
-
-if ($__layoutCfg === null) {
-    // Buscar todas as configs necessárias em uma única passagem
-    $__layoutCfg = [
-        'ts'                  => time(),
-        'conversao_moeda'     => false,
-        'favicon'             => '',
-        'logo'                => '',
-        'footer_logo'         => '',
-        'copiloto_ativo'      => false,
-        'copiloto_modo'       => 'desativado',
-        'welcome_popup'       => '1',
+// Ler configuração de conversão de moeda
+$__conversaoMoedaAtiva = false;
+try {
+    $__pdo = \Config\Database::getConnection();
+    $__queries = [
+        // Schema categoria_chave (configuracoes_sistema)
+        "SELECT valor FROM configuracoes_sistema WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        "SELECT value FROM configuracoes_sistema WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        // Schema categoria_chave (configuracoes)
+        "SELECT valor FROM configuracoes WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        "SELECT value FROM configuracoes WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1",
+        // Schema chave_valor
+        "SELECT valor FROM configuracoes_sistema WHERE chave = 'loja_conversao_moeda_ativa' LIMIT 1",
+        "SELECT valor FROM configuracoes WHERE chave = 'loja_conversao_moeda_ativa' LIMIT 1",
+        "SELECT value FROM settings WHERE `key` = 'loja_conversao_moeda_ativa' LIMIT 1",
+        // Schema single_row
+        "SELECT loja_conversao_moeda_ativa FROM configuracoes_sistema ORDER BY id ASC LIMIT 1",
+        "SELECT conversao_moeda_ativa FROM configuracoes_sistema ORDER BY id ASC LIMIT 1",
+        "SELECT loja_conversao_moeda_ativa FROM configuracoes ORDER BY id ASC LIMIT 1",
+        "SELECT conversao_moeda_ativa FROM configuracoes ORDER BY id ASC LIMIT 1",
     ];
-
-    try {
-        $__pdo = \Config\Database::getConnection();
-
-        // Helper: busca valor em configuracoes_sistema por chave
-        $__cfgGet = function(string $chave, $default = null) use ($__pdo) {
-            try {
-                $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
-                $st->execute([$chave]);
-                $v = $st->fetchColumn();
-                if ($v !== false && $v !== null) return (string) $v;
-                // Fallback: schema categoria+chave
-                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = ? AND chave = ? LIMIT 1");
-                // Tentar extrair categoria do prefixo (ex: 'loja_conversao_moeda_ativa' → categoria='loja', chave='conversao_moeda_ativa')
-                $parts = explode('_', $chave, 2);
-                if (count($parts) === 2) {
-                    $st2->execute([$parts[0], $parts[1]]);
-                    $v2 = $st2->fetchColumn();
-                    if ($v2 !== false && $v2 !== null) return (string) $v2;
+    foreach ($__queries as $__sql) {
+        try {
+            $__st = $__pdo->query($__sql);
+            if ($__st) {
+                $__v = $__st->fetchColumn();
+                if ($__v !== false) {
+                    $__conversaoMoedaAtiva = ((string) $__v === '1');
+                    break;
                 }
-            } catch (\Exception $e) {}
-            return $default;
-        };
-
-        // Conversão de moeda
-        $__v = $__cfgGet('loja_conversao_moeda_ativa');
-        if ($__v === null) {
-            try {
-                $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'loja' AND chave = 'conversao_moeda_ativa' LIMIT 1");
-                $st->execute();
-                $__v = $st->fetchColumn();
-            } catch (\Exception $e) {}
+            }
+        } catch (\Exception $__e) {
+            continue;
         }
-        $__layoutCfg['conversao_moeda'] = ((string) ($__v ?? '0') === '1');
-
-        // Favicon — compatível com schema categoria+chave e schema chave única (legado)
-        try {
-            $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'favicon' LIMIT 1");
-            $st->execute();
-            $v = $st->fetchColumn();
-            if ($v === false || $v === null || $v === '') {
-                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'layout_favicon' LIMIT 1");
-                $st2->execute();
-                $v = $st2->fetchColumn();
-            }
-            $__layoutCfg['favicon'] = (string) ($v ?: '');
-        } catch (\Exception $e) {}
-
-        // Logo — compatível com schema categoria+chave e schema chave única (legado)
-        try {
-            // Tentar schema categoria+chave primeiro
-            $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'logo' LIMIT 1");
-            $st->execute();
-            $v = $st->fetchColumn();
-            if ($v === false || $v === null || $v === '') {
-                // Fallback: schema chave única (ex: 'layout_logo')
-                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'layout_logo' LIMIT 1");
-                $st2->execute();
-                $v = $st2->fetchColumn();
-            }
-            $__layoutCfg['logo'] = (string) ($v ?: '');
-        } catch (\Exception $e) {}
-
-        // Footer logo — buscar logo_footer dedicado, fallback para logo principal
-        try {
-            $v = false;
-            // Tentar schema categoria+chave
-            $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'logo_footer' LIMIT 1");
-            $st->execute();
-            $v = $st->fetchColumn();
-            if ($v === false || $v === null || $v === '') {
-                // Fallback: schema chave única
-                $st2 = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'layout_logo_footer' LIMIT 1");
-                $st2->execute();
-                $v = $st2->fetchColumn();
-            }
-            $__layoutCfg['footer_logo'] = (string) ($v ?: $__layoutCfg['logo']);
-        } catch (\Exception $e) {
-            $__layoutCfg['footer_logo'] = $__layoutCfg['logo'];
-        }
-
-        // Copiloto
-        try {
-            $st = $__pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('copiloto_ativo', 'copiloto_modo')");
-            $st->execute();
-            while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
-                if ($row['chave'] === 'copiloto_ativo') $__layoutCfg['copiloto_ativo'] = ($row['valor'] === '1');
-                if ($row['chave'] === 'copiloto_modo') $__layoutCfg['copiloto_modo'] = $row['valor'];
-            }
-        } catch (\Exception $e) {}
-
-        // Welcome popup
-        try {
-            $st = $__pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'sistema' AND chave = 'welcome_popup_enabled' LIMIT 1");
-            $st->execute();
-            $__v = $st->fetchColumn();
-            if ($__v !== false) $__layoutCfg['welcome_popup'] = (string) $__v;
-        } catch (\Exception $e) {}
-
-    } catch (\Exception $e) {
-        // Banco indisponível — usar defaults
     }
-
-    $_SESSION[$__layoutCacheKey] = $__layoutCfg;
+} catch (\Exception $e) {
+    $__conversaoMoedaAtiva = false;
 }
-
-// Variáveis de uso no layout
-$__conversaoMoedaAtiva = (bool) $__layoutCfg['conversao_moeda'];
+// No checkout, a conversão é sempre disponível
 $__isCheckoutPage = (strpos($_SERVER['REQUEST_URI'] ?? '', '/checkout') !== false);
 $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
 ?>
@@ -148,8 +50,67 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <meta name="appmax-app-id" content="f3d696e4-4f04-4176-84e6-1319433b5dda">
     <title><?= $title ?? 'Braziliana - E-commerce Internacional' ?></title>
     <?php
-    // Favicon — usar cache do layout
-    $siteFavicon = $__layoutCfg['favicon'] ?? '';
+    $siteFavicon = '';
+    try {
+        $rawFav = '';
+        $tablesToTryFav = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+        foreach ($tablesToTryFav as $t) {
+            if ($rawFav !== '') break;
+            try {
+                $pdoFav = \Config\Database::getConnection();
+                $stmtT = $pdoFav->prepare('SHOW TABLES LIKE ?');
+                $stmtT->execute([$t]);
+                if (!$stmtT->fetchColumn()) {
+                    continue;
+                }
+
+                $stmtCols = $pdoFav->query('DESCRIBE ' . $t);
+                $cols = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!is_array($cols)) {
+                    $cols = [];
+                }
+
+                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                    if ($valCol !== '') {
+                        $stmt = $pdoFav->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                        $stmt->execute(['layout', 'favicon']);
+                        $rawFav = (string) ($stmt->fetchColumn() ?: '');
+                        if ($rawFav !== '') break;
+                    }
+                }
+
+                $keyCol = '';
+                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                $valCol = '';
+                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                if ($keyCol !== '' && $valCol !== '') {
+                    $stmt = $pdoFav->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                    $stmt->execute(['layout_favicon']);
+                    $rawFav = (string) ($stmt->fetchColumn() ?: '');
+                    if ($rawFav !== '') break;
+                }
+
+                if (in_array('layout_favicon', $cols, true)) {
+                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                    $stmt2 = $pdoFav->query('SELECT layout_favicon AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                    $rawFav = (string) ($stmt2->fetchColumn() ?: '');
+                    if ($rawFav !== '') break;
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        $siteFavicon = is_string($rawFav) ? trim($rawFav) : '';
+    } catch (\Exception $e) {
+        $siteFavicon = '';
+    }
+
     $faviconVer = $siteFavicon !== '' ? substr(sha1($siteFavicon), 0, 10) : '';
     $siteFaviconHref = $siteFavicon !== '' ? ($siteFavicon . (strpos($siteFavicon, '?') === false ? '?' : '&') . 'v=' . rawurlencode($faviconVer)) : '';
     $siteFaviconEsc = htmlspecialchars($siteFaviconHref, ENT_QUOTES, 'UTF-8');
@@ -944,8 +905,70 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid px-3">
             <?php
-            // Logo — usar cache do layout
-            $siteLogo = $__layoutCfg['logo'] ?? '';
+            $siteLogo = '';
+            try {
+                $raw = isset($settings) ? ($settings['site_logo'] ?? '') : '';
+                $raw = '';
+                $tablesToTry = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+                foreach ($tablesToTry as $t) {
+                    if ($raw !== '') break;
+                    try {
+                        $pdo = \Config\Database::getConnection();
+                        $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                        $stmtT->execute([$t]);
+                        if (!$stmtT->fetchColumn()) {
+                            continue;
+                        }
+
+                        $stmtCols = $pdo->query('DESCRIBE ' . $t);
+                        $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                        if (!is_array($cols)) {
+                            $cols = [];
+                        }
+
+                        // schema categoria+chave+valor
+                        if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                            $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                            if ($valCol !== '') {
+                                $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                                $stmt->execute(['layout', 'logo']);
+                                $raw = (string) ($stmt->fetchColumn() ?: '');
+                                if ($raw !== '') break;
+                            }
+                        }
+
+                        // schema key/value
+                        $keyCol = '';
+                        if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                        elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                        elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                        elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                        $valCol = '';
+                        if (in_array('valor', $cols, true)) $valCol = 'valor';
+                        elseif (in_array('value', $cols, true)) $valCol = 'value';
+                        elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                        if ($keyCol !== '' && $valCol !== '') {
+                            $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                            $stmt->execute(['layout_logo']);
+                            $raw = (string) ($stmt->fetchColumn() ?: '');
+                            if ($raw !== '') break;
+                        }
+
+                        // schema single_row (coluna direta)
+                        if (in_array('layout_logo', $cols, true)) {
+                            $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                            $stmt2 = $pdo->query('SELECT layout_logo AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                            $raw = (string) ($stmt2->fetchColumn() ?: '');
+                            if ($raw !== '') break;
+                        }
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                $siteLogo = is_string($raw) ? trim($raw) : '';
+            } catch (\Exception $e) {
+                $siteLogo = '';
+            }
             ?>
             <a class="navbar-brand fw-bold" href="/">
                 <?php if (!empty($siteLogo)): ?>
@@ -1171,8 +1194,67 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             <div class="row">
                 <div class="col-lg-4 mb-4">
                     <?php
-                    // Footer logo — usar cache do layout
-                    $effectiveFooterLogo = ($__layoutCfg['footer_logo'] ?? '') ?: $siteLogo;
+                    $footerLogo = '';
+                    try {
+                        $pdo = $pdo ?? \Config\Database::getConnection();
+                        $rawFooter = '';
+                        $tablesToTryFooter = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+                        foreach ($tablesToTryFooter as $t) {
+                            if ($rawFooter !== '') break;
+                            try {
+                                $stmtT = $pdo->prepare('SHOW TABLES LIKE ?');
+                                $stmtT->execute([$t]);
+                                if (!$stmtT->fetchColumn()) {
+                                    continue;
+                                }
+
+                                $stmtCols = $pdo->query('DESCRIBE ' . $t);
+                                $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+                                if (!is_array($cols)) {
+                                    $cols = [];
+                                }
+
+                                if (in_array('categoria', $cols, true) && in_array('chave', $cols, true)) {
+                                    $valCol = in_array('valor', $cols, true) ? 'valor' : (in_array('value', $cols, true) ? 'value' : '');
+                                    if ($valCol !== '') {
+                                        $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                                        $stmt->execute(['layout', 'logo_footer']);
+                                        $rawFooter = (string) ($stmt->fetchColumn() ?: '');
+                                        if ($rawFooter !== '') break;
+                                    }
+                                }
+
+                                $keyCol = '';
+                                if (in_array('chave', $cols, true)) $keyCol = 'chave';
+                                elseif (in_array('key', $cols, true)) $keyCol = 'key';
+                                elseif (in_array('nome', $cols, true)) $keyCol = 'nome';
+                                elseif (in_array('config_key', $cols, true)) $keyCol = 'config_key';
+                                $valCol = '';
+                                if (in_array('valor', $cols, true)) $valCol = 'valor';
+                                elseif (in_array('value', $cols, true)) $valCol = 'value';
+                                elseif (in_array('conteudo', $cols, true)) $valCol = 'conteudo';
+                                if ($keyCol !== '' && $valCol !== '') {
+                                    $stmt = $pdo->prepare('SELECT ' . $valCol . ' FROM ' . $t . ' WHERE ' . $keyCol . ' = ? LIMIT 1');
+                                    $stmt->execute(['layout_logo_footer']);
+                                    $rawFooter = (string) ($stmt->fetchColumn() ?: '');
+                                    if ($rawFooter !== '') break;
+                                }
+
+                                if (in_array('layout_logo_footer', $cols, true)) {
+                                    $idCol = in_array('id', $cols, true) ? 'id' : (in_array('ID', $cols, true) ? 'ID' : 'id');
+                                    $stmt2 = $pdo->query('SELECT layout_logo_footer AS valor FROM ' . $t . ' ORDER BY ' . $idCol . ' ASC LIMIT 1');
+                                    $rawFooter = (string) ($stmt2->fetchColumn() ?: '');
+                                    if ($rawFooter !== '') break;
+                                }
+                            } catch (\Exception $e) {
+                            }
+                        }
+
+                        $footerLogo = is_string($rawFooter) ? trim($rawFooter) : '';
+                    } catch (\Exception $e) {
+                        $footerLogo = '';
+                    }
+                    $effectiveFooterLogo = $footerLogo !== '' ? $footerLogo : $siteLogo;
                     ?>
                     <h5 class="mb-3">
                         <?php if (!empty($effectiveFooterLogo)): ?>
@@ -1314,6 +1396,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <?php endif; ?>
     <?php if ($__mostrarConversao): ?>
     <script>
+        // Incluir o código diretamente para evitar problemas de caminho
+        console.log('Carregando sistema de conversão inline...');
+
         const __USD_BRL_RATE__ = <?php
         try {
             $svc = new \App\Services\PedidoManualService();
@@ -1323,6 +1408,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
         }
         ?>;
         
+        // Variáveis globais
         window.CurrencyConverter = {
             currentCurrency: 'USD',
             exchangeRates: {
@@ -1331,16 +1417,38 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             },
             
             init: function() {
+                console.log('=== INICIANDO SISTEMA DE CONVERSÃO INLINE ===');
+                
+                // Recuperar moeda salva
                 this.currentCurrency = localStorage.getItem('selected_currency') || 'BRL';
+                console.log('Moeda inicial:', this.currentCurrency);
+
+                // Garantir que o header reflita a moeda inicial antes de atualizar preços
                 this.updateCurrencyDisplay();
+                
+                // Inicializar seletor
                 this.initSelector();
-                setTimeout(() => { this.updateAllPrices(); }, 100);
+                
+                // Forçar atualização inicial
+                setTimeout(() => {
+                    this.updateAllPrices();
+                }, 100);
             },
             
             initSelector: function() {
+                console.log('Inicializando seletor de moeda...');
+                
+                // Remover eventos antigos
                 const selectors = document.querySelectorAll('.currency-selector');
-                selectors.forEach((selector) => {
+                console.log('Seletores encontrados:', selectors.length);
+                
+                selectors.forEach((selector, index) => {
+                    console.log(`Seletor [${index}]:`, selector.getAttribute('data-currency'));
+                    
+                    // Adicionar novo evento
                     selector.addEventListener('click', (e) => this.handleCurrencyClick(e));
+                    
+                    // Fallback
                     selector.onclick = (e) => this.handleCurrencyClick(e);
                 });
             },
@@ -1348,92 +1456,179 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             handleCurrencyClick: function(e) {
                 e.preventDefault();
                 e.stopPropagation();
+                
                 const el = e.target && e.target.closest ? e.target.closest('.currency-selector') : null;
                 const newCurrency = el ? el.getAttribute('data-currency') : e.target.getAttribute('data-currency');
-                if (!newCurrency) return;
+                console.log('=== CLIQUE NO SELETOR ===');
+                console.log('Moeda selecionada:', newCurrency);
+                console.log('Moeda atual:', this.currentCurrency);
+
+                if (!newCurrency) {
+                    console.log('Moeda não encontrada no clique');
+                    return;
+                }
+                
                 if (newCurrency !== this.currentCurrency) {
                     this.currentCurrency = newCurrency;
                     localStorage.setItem('selected_currency', newCurrency);
+                    console.log('Moeda atualizada para:', this.currentCurrency);
+                    
                     this.updateCurrencyDisplay();
                     this.updateAllPrices();
                     this.showNotification(newCurrency);
+                } else {
+                    console.log('Moeda já é a mesma');
                 }
             },
             
             updateCurrencyDisplay: function() {
                 const span = document.getElementById('current-currency');
-                if (span) span.textContent = this.currentCurrency;
+                if (span) {
+                    span.textContent = this.currentCurrency;
+                    console.log('Display atualizado para:', this.currentCurrency);
+                }
             },
             
             updateAllPrices: function() {
+                console.log('=== ATUALIZANDO TODOS OS PREÇOS ===');
+                console.log('Moeda:', this.currentCurrency);
+                console.log('Taxa:', this.exchangeRates[this.currentCurrency]);
+                
                 const symbol = this.currentCurrency === 'BRL' ? 'R$' : '$';
                 const rate = this.exchangeRates[this.currentCurrency];
                 
-                document.querySelectorAll('[data-original-price]').forEach((element) => {
+                // Atualizar elementos com data-original-price
+                const elements = document.querySelectorAll('[data-original-price]');
+                console.log('Elementos com data-original-price:', elements.length);
+                
+                elements.forEach((element, index) => {
                     const originalPrice = parseFloat(element.getAttribute('data-original-price'));
                     if (!isNaN(originalPrice)) {
-                        element.textContent = `${symbol} ${(originalPrice * rate).toFixed(2).replace('.', ',')}`;
+                        const convertedPrice = originalPrice * rate;
+                        const newPrice = `${symbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
+                        element.textContent = newPrice;
+                        console.log(`[${index}] ${originalPrice} → ${newPrice}`);
                     }
                 });
                 
-                document.querySelectorAll('.currency').forEach(element => {
+                // Atualizar elementos .currency
+                const currencyElements = document.querySelectorAll('.currency');
+                currencyElements.forEach(element => {
                     element.textContent = this.currentCurrency;
                 });
                 
+                // Atualizar carrinho
                 this.updateCart();
+                
+                console.log('=== ATUALIZAÇÃO CONCLUÍDA ===');
             },
             
             updateCart: function() {
+                console.log('Atualizando carrinho...');
+                
                 const symbol = this.currentCurrency === 'BRL' ? 'R$' : '$';
                 const rate = this.exchangeRates[this.currentCurrency];
                 
-                document.querySelectorAll('.cart-currency').forEach(element => {
+                // Atualizar valores do carrinho
+                const cartValues = document.querySelectorAll('.cart-currency');
+                cartValues.forEach(element => {
                     const rawAttr = element.getAttribute('data-original-value');
                     const isFrete = (element.classList.contains('frete-value') || element.id === 'frete');
+
+                    // Se já está grátis, não sobrescreve.
                     const currentText = String(element.textContent || '').trim().toLowerCase();
                     if (isFrete && (currentText === 'frete grátis' || currentText === 'frete gratis')) {
                         element.textContent = 'Frete grátis';
                         return;
                     }
+
                     const originalValue = parseFloat(rawAttr);
-                    if (isFrete && (rawAttr === null || rawAttr === '' || isNaN(originalValue))) return;
+                    if (isFrete && (rawAttr === null || rawAttr === '' || isNaN(originalValue))) {
+                        return;
+                    }
+
                     if (!isNaN(originalValue)) {
-                        if (isFrete && originalValue <= 0) { element.textContent = 'Frete grátis'; return; }
-                        element.textContent = `${symbol} ${(originalValue * rate).toFixed(2).replace('.', ',')}`;
+                        if (isFrete && originalValue <= 0) {
+                            element.textContent = 'Frete grátis';
+                            return;
+                        }
+                        const convertedValue = originalValue * rate;
+                        element.textContent = `${symbol} ${convertedValue.toFixed(2).replace('.', ',')}`;
                     }
                 });
                 
-                document.querySelectorAll('.cart-item-price, .cart-item-subtotal, .cart-item-unit').forEach(element => {
+                // Atualizar itens do carrinho
+                const itemPrices = document.querySelectorAll('.cart-item-price, .cart-item-subtotal, .cart-item-unit');
+                itemPrices.forEach(element => {
                     const originalPrice = parseFloat(element.getAttribute('data-original-price'));
                     if (!isNaN(originalPrice)) {
-                        element.textContent = `${symbol} ${(originalPrice * rate).toFixed(2).replace('.', ',')}`;
+                        const convertedPrice = originalPrice * rate;
+                        element.textContent = `${symbol} ${convertedPrice.toFixed(2).replace('.', ',')}`;
                     }
                 });
             },
             
             showNotification: function(currency) {
                 const name = currency === 'BRL' ? 'Real Brasileiro' : 'Dólar Americano';
+                console.log('Moeda alterada para:', name);
+                
+                // Criar notificação
                 const notification = document.createElement('div');
                 notification.className = 'alert alert-info alert-dismissible fade show position-fixed';
                 notification.style.cssText = 'top: 70px; right: 20px; z-index: 9999; min-width: 250px;';
-                notification.innerHTML = `<i class="fas fa-coins me-2"></i> Moeda alterada para ${name} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+                notification.innerHTML = `
+                    <i class="fas fa-coins me-2"></i>
+                    Moeda alterada para ${name}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
                 document.body.appendChild(notification);
-                setTimeout(() => { if (notification.parentNode) notification.remove(); }, 3000);
+                
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 3000);
             },
             
-            forceUpdate: function() { this.updateAllPrices(); }
+            // Forçar atualização manual
+            forceUpdate: function() {
+                console.log('=== FORÇANDO ATUALIZAÇÃO MANUAL ===');
+                this.updateAllPrices();
+            }
         };
         
+        // Inicializar quando o DOM estiver pronto
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => { window.CurrencyConverter.init(); });
+            document.addEventListener('DOMContentLoaded', () => {
+                window.CurrencyConverter.init();
+            });
         } else {
             window.CurrencyConverter.init();
         }
         
-        window.addEventListener('load', () => { setTimeout(() => { window.CurrencyConverter.forceUpdate(); }, 500); });
-        window.forceCurrencyUpdate = () => { window.CurrencyConverter.forceUpdate(); };
+        // Forçar atualização quando a página carregar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                window.CurrencyConverter.forceUpdate();
+            }, 500);
+        });
+        
+        // Disponibilizar globalmente
+        window.forceCurrencyUpdate = () => {
+            window.CurrencyConverter.forceUpdate();
+        };
+        
+        console.log('Sistema de conversão inline carregado com sucesso!');
     </script>
     <?php endif; ?>
+    
+    <script>
+    // Verificar se jQuery foi carregado
+        console.log('jQuery carregado:', typeof $ !== 'undefined');
+        console.log('Swal carregado:', typeof Swal !== 'undefined');
+        console.log('CurrencyConverter carregado:', typeof window.CurrencyConverter !== 'undefined');
+    </script>
 
     <script>
         window.updateCartBadge = function(totalItens) {
@@ -1513,8 +1708,41 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
 
 <!-- Pop-up de boas-vindas (exibido apenas na primeira visita) -->
 <?php
-// Welcome popup — usar cache do layout
-$welcomePopupEnabled = $__layoutCfg['welcome_popup'] ?? '1';
+$welcomePopupEnabled = '1';
+try {
+    $pdoWp = \Config\Database::getConnection();
+    $tablesToTryWp = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+    foreach ($tablesToTryWp as $tWp) {
+        try {
+            $stTWp = $pdoWp->prepare('SHOW TABLES LIKE ?');
+            $stTWp->execute([$tWp]);
+            if (!$stTWp->fetchColumn()) continue;
+            $stColsWp = $pdoWp->query('DESCRIBE ' . $tWp);
+            $colsWp = $stColsWp ? $stColsWp->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (!is_array($colsWp)) $colsWp = [];
+
+            // schema categoria+chave
+            if (in_array('categoria', $colsWp, true) && in_array('chave', $colsWp, true)) {
+                $vcWp = in_array('valor', $colsWp, true) ? 'valor' : (in_array('value', $colsWp, true) ? 'value' : '');
+                if ($vcWp !== '') {
+                    $stWp = $pdoWp->prepare('SELECT ' . $vcWp . ' FROM ' . $tWp . ' WHERE categoria = ? AND chave = ? LIMIT 1');
+                    $stWp->execute(['sistema', 'welcome_popup_enabled']);
+                    $rWp = $stWp->fetchColumn();
+                    if ($rWp !== false) { $welcomePopupEnabled = (string) $rWp; break; }
+                }
+            }
+
+            // schema single_row
+            foreach (['sistema_welcome_popup_enabled', 'welcome_popup_enabled'] as $cWp) {
+                if (in_array($cWp, $colsWp, true)) {
+                    $stWp2 = $pdoWp->query('SELECT ' . $cWp . ' FROM ' . $tWp . ' LIMIT 1');
+                    $rWp2 = $stWp2 ? $stWp2->fetchColumn() : false;
+                    if ($rWp2 !== false) { $welcomePopupEnabled = (string) $rWp2; break 2; }
+                }
+            }
+        } catch (\Exception $e) {}
+    }
+} catch (\Exception $e) {}
 $popupLogo = !empty($siteLogo) ? $siteLogo : '';
 ?>
 <?php if ($welcomePopupEnabled === '1'): ?>
@@ -1567,19 +1795,29 @@ $popupLogo = !empty($siteLogo) ? $siteLogo : '';
 
 <!-- Co-Piloto Braziliana -->
 <?php
-// Copiloto — usar cache do layout
 $__copilotoMostrar = false;
-$__copilotoAtivo = (bool) ($__layoutCfg['copiloto_ativo'] ?? false);
-$__copilotoModo = (string) ($__layoutCfg['copiloto_modo'] ?? 'desativado');
-if ($__copilotoAtivo) {
-    if ($__copilotoModo === 'publico') {
-        $__copilotoMostrar = true;
-    } elseif ($__copilotoModo === 'somente_admins') {
-        $__copPerfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
-        if ($__copPerfil === 'administrator' || $__copPerfil === 'administrador') $__copPerfil = 'admin';
-        $__copilotoMostrar = ($__copPerfil === 'admin');
+try {
+    $__pdoCop = \Config\Database::getConnection();
+    $__stCop = $__pdoCop->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('copiloto_ativo', 'copiloto_modo')");
+    $__stCop->execute();
+    $__copilotoAtivo = false;
+    $__copilotoModo = 'desativado';
+    while ($__rowCop = $__stCop->fetch(\PDO::FETCH_ASSOC)) {
+        if ($__rowCop['chave'] === 'copiloto_ativo') $__copilotoAtivo = ($__rowCop['valor'] === '1');
+        if ($__rowCop['chave'] === 'copiloto_modo') $__copilotoModo = $__rowCop['valor'];
     }
-}
+
+    if ($__copilotoAtivo) {
+        if ($__copilotoModo === 'publico') {
+            $__copilotoMostrar = true;
+        } elseif ($__copilotoModo === 'somente_admins') {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $__copPerfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+            if ($__copPerfil === 'administrator' || $__copPerfil === 'administrador') $__copPerfil = 'admin';
+            $__copilotoMostrar = ($__copPerfil === 'admin');
+        }
+    }
+} catch (\Exception $e) {}
 if ($__copilotoMostrar):
 ?>
 <script src="/assets/js/copiloto.js?v=<?= time() ?>" async></script>
