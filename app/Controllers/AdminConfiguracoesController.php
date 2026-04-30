@@ -4077,9 +4077,9 @@ HTML;
                             }
 
                             if ($uploadDir !== '') {
-                                $webDir = '/uploads/logo/';
+                                $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/logo/' : '/uploads/logo/';
                                 if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
-                                    $webDir = '/uploads/logos/';
+                                    $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/logos/' : '/uploads/logos/';
                                 }
                                 $fileName = 'logo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
                                 $filePath = $uploadDir . $fileName;
@@ -4127,9 +4127,9 @@ HTML;
                             }
 
                             if ($uploadDir !== '') {
-                                $webDir = '/uploads/logo/';
+                                $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/logo/' : '/uploads/logo/';
                                 if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
-                                    $webDir = '/uploads/logos/';
+                                    $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/logos/' : '/uploads/logos/';
                                 }
                                 $fileName = 'logo_footer_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
                                 $filePath = $uploadDir . $fileName;
@@ -4177,9 +4177,9 @@ HTML;
                             }
 
                             if ($uploadDir !== '') {
-                                $webDir = '/uploads/logo/';
+                                $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/logo/' : '/uploads/logo/';
                                 if (strpos(str_replace('\\', '/', $uploadDir), '/logos/') !== false) {
-                                    $webDir = '/uploads/logos/';
+                                    $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/logos/' : '/uploads/logos/';
                                 }
                                 $fileName = 'logo_admin_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
                                 $filePath = $uploadDir . $fileName;
@@ -4227,9 +4227,9 @@ HTML;
                             }
 
                             if ($uploadDir !== '') {
-                                $webDir = '/uploads/favicon/';
+                                $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/favicon/' : '/uploads/favicon/';
                                 if (strpos(str_replace('\\', '/', $uploadDir), '/favicons/') !== false) {
-                                    $webDir = '/uploads/favicons/';
+                                    $webDir = strpos(str_replace('\\', '/', $uploadDir), '/public/') !== false ? '/public/uploads/favicons/' : '/uploads/favicons/';
                                 }
                                 $fileName = 'favicon_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
                                 $filePath = $uploadDir . $fileName;
