@@ -3468,6 +3468,56 @@ class CheckoutController extends Controller {
                                         'type' => $cardType,
                                     ];
 
+                                    // ── CARTÃO: COBRAR TAXAS PRIMEIRO (atomicidade) ──────────────────
+                                    // Se taxas falhar, produtos não é cobrado.
+                                    $taxa = null;
+                                    if ($valorAppmax > 0) {
+                                        // Converter valorAppmax para BRL se estiver em USD
+                                        $valorAppmaxBrl = $valorAppmax;
+                                        if ($moedaPedidoPay === 'BRL' && $tx > 1.01 && $valorAppmax < ($totalBrl * 0.8)) {
+                                            $valorAppmaxBrl = round($valorAppmax * $tx, 2);
+                                        }
+
+                                        $clienteSplitCard = [
+                                            'nome'       => (string) ($dados['nome'] ?? ($usuario['nome'] ?? 'Cliente')),
+                                            'email'      => (string) ($dados['email'] ?? ($usuario['email'] ?? '')),
+                                            'documento'  => (string) ($dados['documento'] ?? ($usuario['documento'] ?? '')),
+                                            'birth_date' => (string) ($dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? '')),
+                                            'telefone'   => (string) ($dados['telefone'] ?? ($usuario['telefone'] ?? '')),
+                                            'ip'         => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                                            'address'    => [
+                                                'street'   => (string) ($dados['endereco'] ?? ''),
+                                                'number'   => (string) ($dados['numero'] ?? ''),
+                                                'district' => (string) ($dados['bairro'] ?? ''),
+                                                'city'     => (string) ($dados['cidade'] ?? ''),
+                                                'state'    => (string) ($dados['estado'] ?? ''),
+                                                'zip_code' => (string) ($dados['cep'] ?? ''),
+                                            ],
+                                            'card_token'        => trim($token),
+                                            'card_brand'        => trim($brand),
+                                            'card_bin'          => trim($bin),
+                                            'card_dfp_id'       => trim($dfpId),
+                                            'card_type'         => $cardType,
+                                            'card_holder_name'  => (string) ($dados['card_holder_name'] ?? ''),
+                                            'card_installments' => (int) ($dados['installments'] ?? 1),
+                                        ];
+
+                                        $descricaoTaxaCard = 'Pedido #' . (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId) . ' (taxas e impostos)';
+                                        $taxa = $this->gerarCobrancaCambioRealTaxasSplit(
+                                            (int) $pedidoId,
+                                            'CREDIT_CARD',
+                                            (float) $valorAppmaxBrl,
+                                            $clienteSplitCard,
+                                            $descricaoTaxaCard,
+                                            'taxa_servico',
+                                            (float) (isset($splitTaxaConversao) && $splitTaxaConversao > 1.01 ? round($valorTaxa * $splitTaxaConversao, 2) : ($moedaPedidoPay === 'BRL' && $tx > 1.01 ? round($valorTaxa * $tx, 2) : $valorTaxa))
+                                        );
+                                        if (empty($taxa['success'])) {
+                                            throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar pagamento Câmbio Real Taxas (taxa de serviço)'));
+                                        }
+                                    }
+                                    // ── FIM TAXAS PRIMEIRO ───────────────────────────────────────────
+
                                     $cr = $this->paymentService->createCambioRealDirectPaymentProdutoCartao((int) $pedidoId, (float) $valorProduto, (float) $amountUsd, (string) $descricaoProduto, $client, $card);
                                     if (empty($cr['success'])) {
                                         throw new \Exception((string) ($cr['error'] ?? 'Falha ao gerar pagamento Câmbio Real (produto)'));
@@ -3475,8 +3525,9 @@ class CheckoutController extends Controller {
                                 }
                             }
 
-                            $taxa = null;
-                            if ($valorAppmax > 0) {
+                            // Para PIX/boleto: cobrar taxas depois (já funciona corretamente)
+                            if (!isset($taxa)) $taxa = null;
+                            if ($valorAppmax > 0 && $taxa === null) {
                                 $billingType = 'BOLETO';
                                 if ($formaSelecionada === 'pix') {
                                     $billingType = 'PIX';
