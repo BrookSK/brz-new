@@ -85,6 +85,20 @@
                                     <div class="mb-2">
                                         <img src="<?= $qrSrcTaxas . htmlspecialchars($primeiraParcela['pix_taxas_qrcode']) ?>" alt="QR Code PIX" style="max-width: 250px; width: 250px; height: 250px; image-rendering: pixelated;" class="img-fluid">
                                     </div>
+                                <?php elseif ($isPix && !empty($primeiraParcela['pix_taxas_payload'])): ?>
+                                    <div class="mb-2" id="qr-taxas-container" style="max-width:250px;margin:0 auto;"></div>
+                                    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+                                    <script>
+                                    (function(){
+                                        var payload = <?= json_encode($primeiraParcela['pix_taxas_payload']) ?>;
+                                        var container = document.getElementById('qr-taxas-container');
+                                        if (container && payload && typeof QRCode !== 'undefined') {
+                                            QRCode.toCanvas(payload, {width:250,margin:1}, function(err, canvas){
+                                                if (!err && canvas) container.appendChild(canvas);
+                                            });
+                                        }
+                                    })();
+                                    </script>
                                 <?php endif; ?>
 
                                 <?php if ($isPix && !empty($primeiraParcela['pix_taxas_payload'])): ?>

@@ -123,7 +123,21 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                                         <div class="mt-1"><span class="badge bg-success"><i class="fas fa-check"></i> Pago</span></div>
                                     <?php elseif ($isPix && !empty($p['pix_taxas_payload'])): ?>
                                         <?php if (!empty($p['pix_taxas_qrcode'])): ?>
-                                            <div class="my-2"><img src="data:image/png;base64,<?= htmlspecialchars($p['pix_taxas_qrcode']) ?>" alt="QR" style="width:180px;height:180px;image-rendering:pixelated;" class="img-fluid"></div>
+                                            <?php $qrSrcT = (strpos(base64_decode(substr($p['pix_taxas_qrcode'],0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,'; ?>
+                                            <div class="my-2"><img src="<?= $qrSrcT . htmlspecialchars($p['pix_taxas_qrcode']) ?>" alt="QR" style="width:180px;height:180px;image-rendering:pixelated;" class="img-fluid"></div>
+                                        <?php else: ?>
+                                            <div class="my-2" id="qr-taxas-<?= $p['numero'] ?? 0 ?>"></div>
+                                            <script>
+                                            (function(){
+                                                var el = document.getElementById('qr-taxas-<?= $p['numero'] ?? 0 ?>');
+                                                var payload = <?= json_encode($p['pix_taxas_payload'] ?? '') ?>;
+                                                if (el && payload) {
+                                                    var img = new Image(); img.alt='QR'; img.style.cssText='width:180px;height:180px';
+                                                    img.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(payload);
+                                                    el.appendChild(img);
+                                                }
+                                            })();
+                                            </script>
                                         <?php endif; ?>
                                         <div class="input-group input-group-sm mt-1">
                                             <input type="text" class="form-control bg-light small" readonly value="<?= htmlspecialchars($p['pix_taxas_payload']) ?>" id="pix-t-<?= $p['id'] ?>">
