@@ -232,9 +232,10 @@ class QuickBooksService
         // Detalhamento por componente (campos diretos do pedido)
         $detalhes = [];
         $camposProduto  = ['valor_produtos', 'subtotal_produtos', 'subtotal'];
-        $camposTaxa     = ['taxa_servico', 'valor_taxa_servico', 'servico'];
-        $camposImposto  = ['imposto', 'valor_impostos', 'impostos', 'imposto_importacao'];
+        $camposTaxa     = ['servicos', 'taxa_servico', 'valor_taxa_servico', 'servico', 'valor_servicos'];
+        $camposImposto  = ['impostos', 'imposto', 'valor_impostos', 'imposto_importacao'];
         $camposImpostoL = ['imposto_local', 'sales_tax', 'imposto_eua'];
+        $camposFrete    = ['frete', 'valor_frete', 'shipping'];
 
         foreach ($camposProduto as $c) {
             if (!empty($ped[$c]) && (float)$ped[$c] > 0) {
@@ -244,7 +245,7 @@ class QuickBooksService
         }
         foreach ($camposTaxa as $c) {
             if (!empty($ped[$c]) && (float)$ped[$c] > 0) {
-                $detalhes[] = 'Taxa servico: R$ ' . number_format((float)$ped[$c], 2, ',', '.');
+                $detalhes[] = 'Servicos: R$ ' . number_format((float)$ped[$c], 2, ',', '.');
                 break;
             }
         }
@@ -261,7 +262,22 @@ class QuickBooksService
             }
         }
 
-        // Forma de pagamento direta do pedido
+        // Frete
+        $frete = null;
+        foreach ($camposFrete as $c) {
+            if (array_key_exists($c, $ped)) {
+                $frete = $ped[$c];
+                break;
+            }
+        }
+        if ($frete !== null) {
+            $freteVal = (float) $frete;
+            $detalhes[] = $freteVal > 0
+                ? 'Frete: R$ ' . number_format($freteVal, 2, ',', '.')
+                : 'Frete gratis';
+        }
+
+        // Forma de pagamento
         $fp = (string)($ped['forma_pagamento'] ?? $ped['payment_method'] ?? '');
         if ($fp !== '') {
             $detalhes[] = 'Pagamento: ' . $fp;
