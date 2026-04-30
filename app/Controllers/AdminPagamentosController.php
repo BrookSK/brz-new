@@ -1434,6 +1434,9 @@ class AdminPagamentosController extends Controller {
                 'cambioreal_app_public',
                 'cambioreal_app_secret',
                 'cambioreal_base_url',
+                'cambioreal_taxas_app_id',
+                'cambioreal_taxas_app_public',
+                'cambioreal_taxas_app_secret',
                 'mercadopago_access_token',
                 'mercadopago_public_key',
                 'mercadopago_client_id',
@@ -1589,6 +1592,30 @@ class AdminPagamentosController extends Controller {
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="card mb-4 border-info">
+                                <div class="card-header bg-info bg-opacity-10">
+                                    <h5 class="mb-0">Câmbio Real Taxas <small class="text-muted fs-6">(taxa de serviço e impostos)</small></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">APP ID</label>
+                                        <input type="text" class="form-control" name="cambioreal_taxas_app_id" value="' . htmlspecialchars($config['cambioreal_taxas_app_id'] ?? '') . '">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">APP Public</label>
+                                        <input type="text" class="form-control" name="cambioreal_taxas_app_public" value="' . htmlspecialchars($config['cambioreal_taxas_app_public'] ?? '') . '">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">APP Secret</label>
+                                        <input type="password" class="form-control" name="cambioreal_taxas_app_secret" value="' . htmlspecialchars($config['cambioreal_taxas_app_secret'] ?? '') . '">
+                                    </div>
+                                    <div class="mb-0">
+                                        <label class="form-label text-muted small">Webhook URL</label>
+                                        <input type="text" class="form-control form-control-sm" value="/webhook/cambioreal-taxas" readonly>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="col-md-6">
@@ -1720,6 +1747,9 @@ class AdminPagamentosController extends Controller {
             'cambioreal_app_public',
             'cambioreal_app_secret',
             'cambioreal_base_url',
+            'cambioreal_taxas_app_id',
+            'cambioreal_taxas_app_public',
+            'cambioreal_taxas_app_secret',
             'mercadopago_access_token',
             'mercadopago_public_key',
             'mercadopago_client_id',
