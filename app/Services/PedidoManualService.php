@@ -661,7 +661,12 @@ class PedidoManualService {
             'produto' => is_array($cr) ? array_merge($cr, [
                 'invoiceUrl' => (string) ($cr['invoice_url'] ?? ($cr['invoiceUrl'] ?? '')),
             ]) : $cr,
-            'taxa' => $taxa,
+            'taxa' => is_array($taxa) ? array_merge($taxa, [
+                // Normalizar para camelCase que o JS espera
+                'invoiceUrl'    => (string) ($taxa['invoice_url']    ?? ($taxa['invoiceUrl']    ?? '')),
+                'bankSlipUrl'   => (string) ($taxa['bank_slip_url']  ?? ($taxa['bankSlipUrl']   ?? '')),
+                'digitableLine' => (string) ($taxa['digitable_line'] ?? ($taxa['digitableLine'] ?? '')),
+            ]) : $taxa,
             'imposto' => [
                 'success' => true,
                 'gateway' => 'cambioreal_taxas',

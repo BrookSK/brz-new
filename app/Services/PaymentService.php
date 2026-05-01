@@ -1601,7 +1601,7 @@ class PaymentService {
         $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
 
         $payload = [
-            'order_id' => (string) $pedidoId,
+            'order_id' => (string) $pedidoId . '-taxas-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 8),
             'amount' => round($valorBrl, 2),
             'currency' => 'BRL',
             'payment_method' => 'boleto',
@@ -1844,7 +1844,7 @@ class PaymentService {
         $addr = is_array($client['address'] ?? null) ? (array) $client['address'] : [];
 
         $payload = [
-            'order_id' => (string) $pedidoId,
+            'order_id' => (string) $pedidoId . '-taxas-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 8),
             'amount' => round($valorBrl, 2),
             'currency' => 'BRL',
             'payment_method' => $paymentMethod,
