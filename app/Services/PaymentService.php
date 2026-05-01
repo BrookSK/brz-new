@@ -2739,14 +2739,15 @@ class PaymentService {
                 error_log('[WEBHOOK_CR_TAXAS] Erro carnê: ' . $e->getMessage());
             }
 
-            // 3) Último recurso: consultar a API do Câmbio Real com o token para obter o data.id real
+            // 3) Último recurso: consultar a API do Câmbio Real Taxas com o token para obter o data.id real
             foreach ($candidates as $c) {
                 try {
-                    $tx = $this->obterTransacaoCambioReal($c);
+                    $tx = $this->cambioRealTaxasRequest('GET', '/service/v1/checkout/get/' . rawurlencode($c), null);
                     $txData = is_array($tx['data'] ?? null) ? (array) $tx['data'] : [];
                     $realId = (string) ($txData['id'] ?? '');
+                    error_log('[WEBHOOK_CR_TAXAS] API lookup: candidate=' . $c . ' realId=' . $realId);
                     if ($realId !== '' && $realId !== $c) {
-                        // Tentar com o ID real
+                        // Tentar pedido_pagamentos com o ID real
                         $db = \Config\Database::getConnection();
                         $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = ? AND payment_id = ? LIMIT 1');
                         $st->execute(['cambioreal_taxas', $realId]);
@@ -2755,14 +2756,14 @@ class PaymentService {
                             break;
                         }
                         // Tentar carnê com ID real
-                        $carneResult = $carneService->processarPagamentoBoleto($realId, 'taxas');
-                        if ($carneResult) {
+                        $carneResult2 = $carneService->processarPagamentoBoleto($realId, 'taxas');
+                        if ($carneResult2) {
                             error_log('[WEBHOOK_CR_TAXAS] Processado como carnê taxas (via API lookup): ' . $realId);
                             return ['success' => true, 'gateway' => 'cambioreal_taxas', 'payment_id' => $realId, 'payment_status' => 'approved', 'source' => 'carne'];
                         }
                     }
                 } catch (\Exception $e) {
-                    // API lookup falhou, continuar
+                    error_log('[WEBHOOK_CR_TAXAS] API lookup falhou para ' . $c . ': ' . $e->getMessage());
                 }
             }
 
@@ -2775,7 +2776,8 @@ class PaymentService {
         $statusNorm = '';
         $internal = 'pending';
         try {
-            $tx = $this->obterTransacaoCambioReal($token);
+            // Usar credenciais da conta Taxas para consultar o status
+            $tx = $this->cambioRealTaxasRequest('GET', '/service/v1/checkout/get/' . rawurlencode($token), null);
             $data = is_array($tx['data'] ?? null) ? $tx['data'] : [];
             $status = strtoupper(trim((string) ($data['status'] ?? '')));
             $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? '')));
