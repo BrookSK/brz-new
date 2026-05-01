@@ -1501,6 +1501,11 @@ class PaymentService {
                 return ['success' => false, 'error' => 'Câmbio Real Taxas: resposta inválida ao criar PIX (id ausente).'];
             }
 
+            // Construir link de pagamento se ticket_url não veio
+            if ($invoiceUrl === '' && $paymentId !== '') {
+                $invoiceUrl = 'https://payment.cambioreal.com/request/' . $paymentId;
+            }
+
             $this->registrarPedidoPagamentoSplit([
                 'pedido_id' => $pedidoId,
                 'componente' => 'taxa_servico',
