@@ -381,6 +381,12 @@ class CopilotoApiController extends Controller {
             if (in_array('oculto', $cols, true)) {
                 $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
             }
+            if (in_array('active', $cols, true)) {
+                $filtros[] = "(p.active IS NULL OR p.active = 1)";
+            }
+            if (in_array('ativo', $cols, true)) {
+                $filtros[] = "(p.ativo IS NULL OR p.ativo = 1)";
+            }
             if (in_array('status', $cols, true)) {
                 $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('archived','deleted','trash','lixeira','draft','rascunho'))";
             }

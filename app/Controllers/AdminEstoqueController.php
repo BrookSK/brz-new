@@ -1383,7 +1383,8 @@ class AdminEstoqueController extends Controller {
                 $reservadoSelectExpr = 'COALESCE(res_er.reservado, 0)';
             }
 
-            $whereParts  = ["COALESCE(e.total, p.stock, 0) > 0", "COALESCE(p.active, 1) = 1"];
+            // Mostrar apenas produtos com entradas reais no estoque_interno (cadastradas manualmente)
+            $whereParts  = ["e.total IS NOT NULL AND e.total > 0", "COALESCE(p.active, 1) = 1"];
             $queryParams = [];
 
             if ($busca !== '') {
@@ -1391,7 +1392,7 @@ class AdminEstoqueController extends Controller {
                 $queryParams[':busca'] = '%' . $busca . '%';
             }
             if ($filtroStatus !== '') {
-                $whereParts[] = "CASE WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'critico' WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo' ELSE 'normal' END = :status_filtro";
+                $whereParts[] = "CASE WHEN COALESCE(e.total, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'critico' WHEN COALESCE(e.total, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo' ELSE 'normal' END = :status_filtro";
                 $queryParams[':status_filtro'] = $filtroStatus;
             }
 
@@ -1402,10 +1403,10 @@ class AdminEstoqueController extends Controller {
                     p.id as produto_id,
                     {$nameExpr} as produto_nome,
                     {$skuExpr} as sku,
-                    COALESCE(e.total, p.stock, 0) as quantidade_estoque,
+                    COALESCE(e.total, 0) as quantidade_estoque,
                     CASE
-                        WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'critico'
-                        WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
+                        WHEN COALESCE(e.total, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 'critico'
+                        WHEN COALESCE(e.total, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 'baixo'
                         ELSE 'normal'
                     END as status_estoque,
                     COALESCE(loc.localizacao, '') as localizacao,
@@ -1414,7 +1415,7 @@ class AdminEstoqueController extends Controller {
                     {$reservadoSelectExpr} as reservado,
                     {$imgSelect}
                 FROM produtos p
-                LEFT JOIN (
+                INNER JOIN (
                     SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
                     FROM estoque_interno WHERE quantidade > 0 GROUP BY produto_id
                 ) e ON e.produto_id = p.id
@@ -1441,7 +1442,7 @@ class AdminEstoqueController extends Controller {
                 SELECT COUNT(*) FROM (
                     SELECT p.id
                     FROM produtos p
-                    LEFT JOIN (
+                    INNER JOIN (
                         SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
                         FROM estoque_interno WHERE quantidade > 0 GROUP BY produto_id
                     ) e ON e.produto_id = p.id
@@ -1468,20 +1469,20 @@ class AdminEstoqueController extends Controller {
             $totalItens   = (int)($stCount->fetchColumn() ?: 0);
             $totalPaginas = max(1, (int)ceil($totalItens / $limite));
 
-            // Estatisticas globais (sem filtro de busca/status)
+            // Estatisticas globais (sem filtro de busca/status) — apenas produtos com entradas reais no estoque_interno
             $stmt = $this->connection->prepare("
                 SELECT
                     COUNT(*) as total_produtos,
-                    SUM(CASE WHEN COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 1 ELSE 0 END) as criticos,
-                    SUM(CASE WHEN COALESCE(e.total, p.stock, 0) > COALESCE(ec.estoque_minimo, 5) AND COALESCE(e.total, p.stock, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 1 ELSE 0 END) as baixos,
-                    SUM(CASE WHEN COALESCE(e.total, p.stock, 0) > COALESCE(ec.estoque_ideal, 20) THEN 1 ELSE 0 END) as normais
+                    SUM(CASE WHEN COALESCE(e.total, 0) <= COALESCE(ec.estoque_minimo, 5) THEN 1 ELSE 0 END) as criticos,
+                    SUM(CASE WHEN COALESCE(e.total, 0) > COALESCE(ec.estoque_minimo, 5) AND COALESCE(e.total, 0) <= COALESCE(ec.estoque_ideal, 20) THEN 1 ELSE 0 END) as baixos,
+                    SUM(CASE WHEN COALESCE(e.total, 0) > COALESCE(ec.estoque_ideal, 20) THEN 1 ELSE 0 END) as normais
                 FROM produtos p
-                LEFT JOIN (
+                INNER JOIN (
                     SELECT produto_id, SUM(COALESCE(quantidade,0)) as total
                     FROM estoque_interno WHERE quantidade > 0 GROUP BY produto_id
                 ) e ON e.produto_id = p.id
                 LEFT JOIN estoque_configuracoes ec ON ec.produto_id = p.id
-                WHERE COALESCE(e.total, p.stock, 0) > 0 AND COALESCE(p.active, 1) = 1
+                WHERE e.total > 0 AND COALESCE(p.active, 1) = 1
             ");
             $stmt->execute();
             $estatisticas = $stmt->fetch(\PDO::FETCH_ASSOC);

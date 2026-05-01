@@ -857,10 +857,16 @@ PROMPT;
             }
             $likeSQL = '(' . implode(' OR ', $likeClauses) . ')';
 
-            // Filtros de visibilidade — excluir apenas ocultos e arquivados
+            // Filtros de visibilidade — excluir produtos ocultos, inativos e arquivados
             $filtros = [];
             if ($temOculto) {
                 $filtros[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            }
+            if ($temActive) {
+                $filtros[] = "(p.active IS NULL OR p.active = 1)";
+            }
+            if ($temAtivo) {
+                $filtros[] = "(p.ativo IS NULL OR p.ativo = 1)";
             }
             if ($temStatus) {
                 $filtros[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('archived','deleted','trash','lixeira'))";
