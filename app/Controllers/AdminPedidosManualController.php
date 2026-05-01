@@ -455,8 +455,8 @@ class AdminPedidosManualController extends Controller {
                             <div class="col-md-6">
                                 <label class="form-label">Método de Pagamento</label>
                                 <select class="form-select" name="forma_pagamento" id="forma_pagamento">
-                                    <option value="pix" selected>PIX (Câmbio Real + AppMax)</option>
-                                    <!-- <option value="boleto">Boleto (Câmbio Real + AppMax)</option> <!-- OCULTO TEMPORARIAMENTE -->
+                                    <option value="pix" selected>PIX (Câmbio Real + Câmbio Real Taxas)</option>
+                                    <!-- <option value="boleto">Boleto (Câmbio Real + Câmbio Real Taxas)</option> <!-- OCULTO TEMPORARIAMENTE -->
                                     <option value="cartao_credito">Cartão de Crédito</option>
                                     <option value="cartao_debito">Cartão de Débito</option>
                                     <option value="carteira">Carteira</option>
@@ -588,9 +588,9 @@ class AdminPedidosManualController extends Controller {
             </form>
 
             <div class="card mb-4" id="linkPagamentoCard">
-                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Câmbio Real + AppMax</span>)</strong></div>
+                <div class="card-header"><strong>Pagamento (<span id="gatewayLabel">Câmbio Real + Câmbio Real Taxas</span>)</strong></div>
                 <div class="card-body">
-                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento AppMax (taxas/impostos). Copie e envie para o cliente.</small></div>
+                    <div class="alert alert-info mb-3" id="linkPagamentoInfo">Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento Câmbio Real Taxas (taxas/impostos). Copie e envie para o cliente.</small></div>
                     <div class="row g-3 align-items-end">
                         <div class="col-md-4" id="billingTypeWrap" style="display:none;">
                             <input type="hidden" id="billingType" value="PIX">
@@ -1084,7 +1084,7 @@ function updateLinkVisibility(){
             linkInfo.style.display = 'none';
         } else {
             linkInfo.style.display = '';
-            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento AppMax (taxas/impostos). Copie e envie para o cliente.</small>';
+            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento Câmbio Real Taxas (taxas/impostos). Copie e envie para o cliente.</small>';
         }
     }
     if (linkResult && !canShowLinkCard) {
@@ -1524,8 +1524,16 @@ function gerarLinkPagamento(){
     const moeda = getSelectedMoeda();
     let bt = 'CREDIT_CARD';
     if (moeda === 'BRL') {
-        const sel = document.getElementById('billingType');
-        bt = sel ? String(sel.value || 'PIX') : 'PIX';
+        // Mapear forma de pagamento selecionada para billingType da API
+        const fpSel = document.getElementById('forma_pagamento');
+        const fp = fpSel ? String(fpSel.value || '').toLowerCase() : '';
+        if (fp === 'cartao_credito' || fp === 'cartao_debito') {
+            bt = 'CREDIT_CARD';
+        } else if (fp === 'boleto') {
+            bt = 'BOLETO';
+        } else {
+            bt = 'PIX'; // pix ou qualquer outro método BRL usa PIX nas taxas
+        }
     }
 
     // Garantir que os hidden inputs estejam atualizados
@@ -1799,8 +1807,8 @@ document.addEventListener('DOMContentLoaded', function(){
             const moeda = getSelectedMoeda();
             fpSel.innerHTML = '';
             if (moeda === 'BRL') {
-                fpSel.appendChild(new Option('PIX (Câmbio Real + AppMax)', 'pix'));
-                // fpSel.appendChild(new Option('Boleto (Câmbio Real + AppMax)', 'boleto')); // OCULTO TEMPORARIAMENTE
+                fpSel.appendChild(new Option('PIX (Câmbio Real + Câmbio Real Taxas)', 'pix'));
+                // fpSel.appendChild(new Option('Boleto (Câmbio Real + Câmbio Real Taxas)', 'boleto')); // OCULTO TEMPORARIAMENTE
                 fpSel.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
                 fpSel.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
             } else {

@@ -557,7 +557,7 @@ class PedidoManualService {
             }
         }
 
-        // 2) Taxas + impostos via Câmbio Real Taxas (PIX) — gera PIX com payload copiável para o vendedor enviar
+        // 2) Taxas + impostos via Câmbio Real Taxas — método baseado no billingType
         $taxa = null;
         if ($valorAppmax > 0) {
             $pg = new \App\Services\PaymentService();
@@ -605,12 +605,33 @@ class PedidoManualService {
                 $clientData['birth_date'] = '1990-01-01';
             }
 
-            $taxa = $pg->createCambioRealTaxasPixPayment(
-                (int) $pedidoId,
-                (float) $valorAppmax,
-                'Pedido #' . ($codigoPedido ?: $pedidoId) . ' (taxas e impostos)',
-                $clientData
-            );
+            $descricaoTaxa = 'Pedido #' . ($codigoPedido ?: $pedidoId) . ' (taxas e impostos)';
+
+            // Para cartão de crédito no pedido manual: usar boleto nas taxas
+            // (o cliente paga o cartão nos produtos via link Câmbio Real e o boleto nas taxas)
+            // Para PIX e boleto: usar o mesmo método nas taxas
+            if ($billingType === 'CREDIT_CARD') {
+                $taxa = $pg->createCambioRealTaxasBoletoPayment(
+                    (int) $pedidoId,
+                    (float) $valorAppmax,
+                    $descricaoTaxa,
+                    $clientData
+                );
+            } elseif ($billingType === 'BOLETO') {
+                $taxa = $pg->createCambioRealTaxasBoletoPayment(
+                    (int) $pedidoId,
+                    (float) $valorAppmax,
+                    $descricaoTaxa,
+                    $clientData
+                );
+            } else {
+                $taxa = $pg->createCambioRealTaxasPixPayment(
+                    (int) $pedidoId,
+                    (float) $valorAppmax,
+                    $descricaoTaxa,
+                    $clientData
+                );
+            }
             if (empty($taxa['success'])) {
                 throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança Câmbio Real Taxas (taxa)'));
             }
