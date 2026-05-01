@@ -270,6 +270,13 @@ class ApiController extends Controller {
             }
 
             $select = "p.id, {$nameCol} AS nome, {$priceCol} AS valor, {$stockCol} AS estoque, {$currencyCol} AS moeda, p.foto_principal, p.grupo_compras_id";
+            // Incluir sale_price para exibir desconto na busca
+            if (in_array('sale_price', $cols, true)) {
+                $select .= ', p.sale_price';
+            }
+            if (in_array('sale_price_expires', $cols, true)) {
+                $select .= ', p.sale_price_expires';
+            }
             if (in_array('slug', $cols, true)) {
                 $select .= ', p.slug';
             }

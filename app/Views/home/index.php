@@ -631,7 +631,21 @@ $(document).ready(function() {
 
         const priceHtml = isClubeBlocked
             ? '<span class="badge" style="background:#0b1f3a;font-size:.75rem"><i class="fas fa-lock me-1"></i>Clube</span>'
-            : '<span class="h6 mb-0 text-primary">'+fmtMoney(p.valor, p.moeda)+'</span>';
+            : (function(){
+                var base = Number(p.valor||0);
+                var sale = Number(p.sale_price||0);
+                var saleExpires = p.sale_price_expires||'';
+                var expired = false;
+                if (saleExpires) { try { expired = new Date(saleExpires) < new Date(); } catch(e){} }
+                var temPromo = (sale > 0 && sale < base && !expired);
+                if (temPromo) {
+                    var pct = Math.round((1 - sale/base) * 100);
+                    return '<span class="text-decoration-line-through text-muted small me-1">'+fmtMoney(base, p.moeda)+'</span>'
+                         + '<span class="h6 mb-0 text-danger fw-bold">'+fmtMoney(sale, p.moeda)+'</span>'
+                         + (pct > 0 ? ' <span class="badge bg-danger ms-1" style="font-size:.65rem">-'+pct+'%</span>' : '');
+                }
+                return '<span class="h6 mb-0 text-primary">'+fmtMoney(base, p.moeda)+'</span>';
+            })();
 
         let btns = '';
         if (isClubeBlocked) {
