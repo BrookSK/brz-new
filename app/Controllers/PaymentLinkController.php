@@ -534,6 +534,32 @@ class PaymentLinkController extends Controller {
                 'digitable_line' => (string) ($row['digitable_line'] ?? ''),
                 'invoice_url' => (string) ($row['invoice_url'] ?? ''),
             ];
+
+            // Se pix_encoded_image está vazio, tentar extrair do raw_response
+            if ($persist['pix_encoded_image'] === '' && !empty($row['raw_response'])) {
+                $raw = @json_decode((string) $row['raw_response'], true);
+                if (is_array($raw)) {
+                    $data = is_array($raw['data'] ?? null) ? (array) $raw['data'] : $raw;
+                    $tx   = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+                    $candidates = [
+                        $tx['barcode'] ?? '', $tx['qr_code_base64'] ?? '', $tx['qrCodeBase64'] ?? '',
+                        $tx['qrcode_base64'] ?? '', $tx['qr_code'] ?? '', $tx['qrcode'] ?? '',
+                        $tx['pix_qrcode_base64'] ?? '', $tx['pix_qrcode'] ?? '',
+                        $tx['encodedImage'] ?? '', $tx['encoded_image'] ?? '',
+                        $data['barcode'] ?? '', $data['qr_code_base64'] ?? '', $data['qrCodeBase64'] ?? '',
+                        $data['qrcode'] ?? '', $data['encodedImage'] ?? '',
+                    ];
+                    foreach ($candidates as $c) {
+                        $c = trim((string) $c);
+                        if ($c !== '') {
+                            // Remover prefixo data:image se presente
+                            $c = preg_replace('#^data:image/[^;]+;base64,#', '', $c);
+                            $persist['pix_encoded_image'] = trim($c);
+                            break;
+                        }
+                    }
+                }
+            }
             $blocks[] = [
                 'gateway' => (string) ($row['gateway'] ?? ''),
                 'gateway_payment_id' => (string) ($row['gateway_payment_id'] ?? ''),
@@ -751,7 +777,7 @@ class PaymentLinkController extends Controller {
         $impostosValor = (float) ($link['impostos_valor'] ?? 0);
         $totalValor = (float) ($link['total_valor'] ?? 0);
 
-        // Consolidar blocos duplicados (ex.: AppMax taxa + imposto com mesmo payment_id)
+        // Consolidar blocos duplicados (ex.: cambioreal_taxas taxa + imposto com mesmo payment_id)
         $normalizedBlocks = [];
         foreach ($blocks as $b) {
             $gwKey = strtolower(trim((string) ($b['gateway'] ?? '')));
@@ -772,6 +798,36 @@ class PaymentLinkController extends Controller {
             }
         }
         $blocks = array_values($normalizedBlocks);
+
+        // Fallback: se pix_encoded_image ainda vazio, tentar extrair do raw do bloco
+        foreach ($blocks as &$b) {
+            $persist = is_array($b['persist'] ?? null) ? (array) $b['persist'] : [];
+            if ((string) ($persist['pix_encoded_image'] ?? '') === '' && !empty($b['raw'])) {
+                $raw = is_array($b['raw']) ? $b['raw'] : @json_decode((string) $b['raw'], true);
+                if (is_array($raw)) {
+                    $data = is_array($raw['data'] ?? null) ? (array) $raw['data'] : $raw;
+                    $tx   = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+                    $candidates = [
+                        $tx['barcode'] ?? '', $tx['qr_code_base64'] ?? '', $tx['qrCodeBase64'] ?? '',
+                        $tx['qrcode_base64'] ?? '', $tx['qr_code'] ?? '', $tx['qrcode'] ?? '',
+                        $tx['pix_qrcode_base64'] ?? '', $tx['pix_qrcode'] ?? '',
+                        $tx['encodedImage'] ?? '', $tx['encoded_image'] ?? '',
+                        $data['barcode'] ?? '', $data['qr_code_base64'] ?? '', $data['qrCodeBase64'] ?? '',
+                        $data['qrcode'] ?? '', $data['encodedImage'] ?? '',
+                    ];
+                    foreach ($candidates as $c) {
+                        $c = trim((string) $c);
+                        if ($c !== '') {
+                            $c = preg_replace('#^data:image/[^;]+;base64,#', '', $c);
+                            $persist['pix_encoded_image'] = trim($c);
+                            break;
+                        }
+                    }
+                }
+                $b['persist'] = $persist;
+            }
+        }
+        unset($b);
 
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Pagamento</title>'
             . '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">'
