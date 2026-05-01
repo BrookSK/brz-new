@@ -1551,7 +1551,7 @@ function gerarLinkPagamento(){
 
                 const buildSection = function(title, obj){
                     obj = obj || {};
-                    const url = String(obj.init_point || obj.invoiceUrl || '').trim();
+                    const url = String(obj.init_point || obj.invoiceUrl || obj.invoice_url || '').trim();
                     const pixPayload = String((obj.pix && obj.pix.payload) ? obj.pix.payload : '').trim();
                     const pixImg = String((obj.pix && obj.pix.encodedImage) ? obj.pix.encodedImage : '').trim();
                     const bankSlipUrl = String(obj.bankSlipUrl || '').trim();
@@ -1593,10 +1593,10 @@ function gerarLinkPagamento(){
                         : 'Pagamento 1: Produtos (Câmbio Real — Link de Checkout)';
                     const label2 = isStripe
                         ? 'Pagamento 2: Taxas, Impostos e Imposto Local (Stripe — Cartão de Crédito)'
-                        : 'Pagamento 2: Taxas e Impostos (AppMax — Link de Pagamento)';
+                        : 'Pagamento 2: Taxas e Impostos (Câmbio Real Taxas — Link de Pagamento)';
                     const alertMsg = isStripe
                         ? '<strong>Links Stripe gerados.</strong> Copie e envie para o cliente (link de produtos + link de taxas/impostos).'
-                        : '<strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + link de pagamento AppMax para taxas).';
+                        : '<strong>Links gerados.</strong> Copie e envie para o cliente (link de checkout Câmbio Real para produtos + link de pagamento Câmbio Real Taxas para taxas).';
 
                     el.innerHTML = `<div class="alert alert-success">${alertMsg}</div>
                     ${produto ? buildSection(label1, produto) : ''}
