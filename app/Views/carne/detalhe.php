@@ -123,8 +123,16 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                                         <div class="mt-1"><span class="badge bg-success"><i class="fas fa-check"></i> Pago</span></div>
                                     <?php elseif ($isPix && !empty($p['pix_taxas_payload'])): ?>
                                         <?php if (!empty($p['pix_taxas_qrcode'])): ?>
-                                            <?php $qrSrcT = (strpos(base64_decode(substr($p['pix_taxas_qrcode'],0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,'; ?>
-                                            <div class="my-2"><img src="<?= $qrSrcT . htmlspecialchars($p['pix_taxas_qrcode']) ?>" alt="QR" style="width:180px;height:180px;image-rendering:pixelated;" class="img-fluid"></div>
+                                            <?php
+                                            $qrRawT = $p['pix_taxas_qrcode'];
+                                            if (stripos($qrRawT, 'data:image') === 0) {
+                                                $qrImgSrcT = $qrRawT;
+                                            } else {
+                                                $qrSrcT = (strpos(base64_decode(substr($qrRawT,0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,';
+                                                $qrImgSrcT = $qrSrcT . $qrRawT;
+                                            }
+                                            ?>
+                                            <div class="my-2"><img src="<?= htmlspecialchars($qrImgSrcT) ?>" alt="QR" style="width:180px;height:180px;image-rendering:pixelated;" class="img-fluid"></div>
                                         <?php else: ?>
                                             <div class="my-2" id="qr-taxas-<?= $p['numero'] ?? 0 ?>"></div>
                                             <script>

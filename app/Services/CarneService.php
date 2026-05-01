@@ -213,12 +213,21 @@ class CarneService {
 
                 if (!empty($result['success'])) {
                     $pix = $result['pix'] ?? [];
+                    $pixTaxasQrcode  = (string) ($pix['encodedImage'] ?? '');
+                    $pixTaxasPayload = (string) ($pix['payload'] ?? '');
+
+                    // Normalizar QR code: remover prefixo data:image se presente
+                    // A view detecta SVG vs PNG via base64_decode dos primeiros bytes
+                    if ($pixTaxasQrcode !== '') {
+                        $pixTaxasQrcode = preg_replace('#^data:image/[^;]+;base64,#', '', trim($pixTaxasQrcode));
+                    }
+
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_taxas_url'      => $result['invoice_url'] ?? '',
+                        'boleto_taxas_url'        => $result['invoice_url'] ?? '',
                         'boleto_taxas_id_externo' => $result['payment_id'] ?? '',
-                        'pix_taxas_qrcode'      => $pix['encodedImage'] ?? '',
-                        'pix_taxas_payload'     => $pix['payload'] ?? '',
-                        'pix_taxas_expiracao'   => date('Y-m-d H:i:s', strtotime('+30 minutes')),
+                        'pix_taxas_qrcode'        => $pixTaxasQrcode,
+                        'pix_taxas_payload'       => $pixTaxasPayload,
+                        'pix_taxas_expiracao'     => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
                     error_log('[CARNE] PIX Câmbio Real Taxas gerado: id=' . ($result['payment_id'] ?? ''));
                 } else {

@@ -81,9 +81,19 @@
                                 <p class="fs-4 fw-bold text-primary">R$ <?= number_format($primeiraParcela['valor_taxas'], 2, ',', '.') ?></p>
 
                                 <?php if ($isPix && !empty($primeiraParcela['pix_taxas_qrcode'])): ?>
-                                    <?php $qrSrcTaxas = (strpos(base64_decode(substr($primeiraParcela['pix_taxas_qrcode'],0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,'; ?>
+                                    <?php
+                                    $qrRawTaxas = $primeiraParcela['pix_taxas_qrcode'];
+                                    if (stripos($qrRawTaxas, 'data:image') === 0) {
+                                        // Já é data URI completo — usar direto
+                                        $qrImgSrcTaxas = $qrRawTaxas;
+                                    } else {
+                                        // Base64 puro — detectar SVG vs PNG
+                                        $qrSrcTaxas = (strpos(base64_decode(substr($qrRawTaxas,0,100)),'<svg')!==false) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,';
+                                        $qrImgSrcTaxas = $qrSrcTaxas . $qrRawTaxas;
+                                    }
+                                    ?>
                                     <div class="mb-2">
-                                        <img src="<?= $qrSrcTaxas . htmlspecialchars($primeiraParcela['pix_taxas_qrcode']) ?>" alt="QR Code PIX" style="max-width: 250px; width: 250px; height: 250px; image-rendering: pixelated;" class="img-fluid">
+                                        <img src="<?= htmlspecialchars($qrImgSrcTaxas) ?>" alt="QR Code PIX" style="max-width: 250px; width: 250px; height: 250px; image-rendering: pixelated;" class="img-fluid">
                                     </div>
                                 <?php elseif ($isPix && !empty($primeiraParcela['pix_taxas_payload'])): ?>
                                     <div class="mb-2" id="qr-taxas-container" style="max-width:250px;margin:0 auto;"></div>
