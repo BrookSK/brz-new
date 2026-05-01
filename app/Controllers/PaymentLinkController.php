@@ -128,6 +128,8 @@ class PaymentLinkController extends Controller {
             'cambioreal_app_id' => $paySvc->getCambioRealAppId(),
             'cambioreal_app_public' => $paySvc->getCambioRealAppPublic(),
             'cambioreal_base_url' => $paySvc->getCambioRealBaseUrlPublic(),
+            'cambioreal_taxas_app_id' => $paySvc->getCambioRealTaxasAppId(),
+            'cambioreal_taxas_app_public' => $paySvc->getCambioRealTaxasAppPublic(),
         ]);
         exit;
     }
@@ -415,10 +417,10 @@ class PaymentLinkController extends Controller {
                 if ($installments < 1) $installments = 1;
                 if ($installments > 12) $installments = 12;
                 $cardTaxas = [
-                    'token' => (string) $request->getParam('cambioreal_card_token', ''),
+                    'token' => (string) $request->getParam('cambioreal_taxas_card_token', $request->getParam('cambioreal_card_token', '')),
                     'brand' => (string) $request->getParam('cambioreal_card_brand', ''),
                     'bin' => (string) $request->getParam('cambioreal_card_bin', ''),
-                    'dfp_id' => (string) $request->getParam('cambioreal_card_dfp_id', ''),
+                    'dfp_id' => (string) $request->getParam('cambioreal_taxas_card_dfp_id', $request->getParam('cambioreal_card_dfp_id', '')),
                     'holder' => (string) $request->getParam('card_holder_name', ''),
                     'installments' => $installments,
                     'type' => 'credit',
