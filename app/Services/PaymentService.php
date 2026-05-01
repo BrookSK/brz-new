@@ -2599,30 +2599,35 @@ class PaymentService {
     }
 
     public function processarWebhookCambioReal(array $payload): array {
-        $token = '';
-        if (!empty($payload['token']) && is_string($payload['token'])) {
-            $token = (string) $payload['token'];
+        // Extrair todos os identificadores possíveis
+        $candidates = [];
+        foreach (['token', 'code', 'id'] as $k) {
+            $v = trim((string) ($payload[$k] ?? ''));
+            if ($v !== '') $candidates[] = $v;
+            $v2 = trim((string) ($payload['data'][$k] ?? ''));
+            if ($v2 !== '') $candidates[] = $v2;
         }
-        if ($token === '' && !empty($payload['data']['token']) && is_string($payload['data']['token'])) {
-            $token = (string) $payload['data']['token'];
-        }
-        if ($token === '' && !empty($payload['code']) && is_string($payload['code'])) {
-            $token = (string) $payload['code'];
-        }
-        if ($token === '' && !empty($payload['data']['code']) && is_string($payload['data']['code'])) {
-            $token = (string) $payload['data']['code'];
-        }
-        if ($token === '' && !empty($payload['id']) && (is_string($payload['id']) || is_numeric($payload['id']))) {
-            $token = (string) $payload['id'];
-        }
-        if ($token === '' && !empty($payload['data']['id']) && (is_string($payload['data']['id']) || is_numeric($payload['data']['id']))) {
-            $token = (string) $payload['data']['id'];
-        }
-        $token = trim($token);
+        $candidates = array_values(array_unique(array_filter($candidates)));
+        $token = $candidates[0] ?? '';
+
         if ($token === '') {
             return ['success' => false, 'error' => 'Câmbio Real: token ausente no webhook'];
         }
 
+        // 1) Tentar carnê PRIMEIRO (busca direta no banco, sem API call)
+        try {
+            $carneService = new \App\Services\CarneService();
+            foreach ($candidates as $c) {
+                if ($carneService->processarPagamentoBoleto($c, 'produtos')) {
+                    error_log('[WEBHOOK_CR] Processado como carnê produtos: ' . $c);
+                    return ['success' => true, 'gateway' => 'cambioreal', 'payment_id' => $c, 'payment_status' => 'approved', 'source' => 'carne'];
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[WEBHOOK_CR] Erro carnê: ' . $e->getMessage());
+        }
+
+        // 2) Processar como pedido normal
         $tx = $this->obterTransacaoCambioReal($token);
         $data = is_array($tx['data'] ?? null) ? $tx['data'] : [];
         $status = strtoupper(trim((string) ($data['status'] ?? '')));
