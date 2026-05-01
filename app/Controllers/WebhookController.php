@@ -54,9 +54,21 @@ class WebhookController extends Controller {
             if (!is_array($payload)) {
                 $payload = [];
             }
+            // Também tentar JSON body
+            if (empty($payload) || (count($payload) <= 1 && empty($payload['token'] ?? ''))) {
+                $raw = file_get_contents('php://input');
+                if ($raw !== false && $raw !== '') {
+                    $json = json_decode($raw, true);
+                    if (is_array($json) && !empty($json)) {
+                        $payload = array_merge($payload, $json);
+                    }
+                }
+            }
         } catch (\Exception $e) {
             $payload = [];
         }
+
+        error_log('[WEBHOOK_CR_TAXAS_RECV] keys=' . implode(',', array_keys($payload)) . ' token=' . ($payload['token'] ?? '') . ' id=' . ($payload['id'] ?? ''));
 
         try {
             $result = $this->paymentService->processarWebhookCambioRealTaxas($payload);
