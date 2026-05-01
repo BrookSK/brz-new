@@ -348,12 +348,17 @@ class CarneService {
     public function processarPagamentoBoleto($idExterno, $tipo) {
         // tipo: 'produtos' (Câmbio Real) ou 'taxas' (Câmbio Real Taxas)
         $campo = "boleto_{$tipo}_id_externo";
+        error_log('[CARNE processarPagamentoBoleto] campo=' . $campo . ' idExterno=' . $idExterno);
         $stmt = $this->db->prepare("SELECT * FROM carne_parcelas WHERE {$campo} = :ext");
         $stmt->execute([':ext' => $idExterno]);
         $parcela = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-        if (!$parcela) return false;
+        if (!$parcela) {
+            error_log('[CARNE processarPagamentoBoleto] Parcela NÃO encontrada para ' . $campo . '=' . $idExterno);
+            return false;
+        }
 
+        error_log('[CARNE processarPagamentoBoleto] Parcela encontrada: id=' . $parcela['id'] . ' carne_id=' . $parcela['carne_id']);
         $this->carneModel->registrarPagamentoBoleto($parcela['id'], $tipo);
         $this->dispararNotificacao($parcela['carne_id'], $parcela['id'], 'pagamento_confirmado');
         return true;
