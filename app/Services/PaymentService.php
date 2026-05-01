@@ -1492,6 +1492,31 @@ class PaymentService {
             $invoiceUrl = trim((string) ($tx['ticket_url'] ?? ''));
             $gatewayStatus = trim((string) ($tx['code'] ?? ($data['code'] ?? 'AGUARDANDO_CLIENTE')));
 
+            // Fallback: buscar QR code em campos alternativos que a API pode retornar
+            if ($pixImg === '') {
+                $qrCandidates = [
+                    $tx['qr_code_base64'] ?? '', $tx['qrCodeBase64'] ?? '', $tx['qrcode_base64'] ?? '',
+                    $tx['qr_code'] ?? '', $tx['qrcode'] ?? '', $tx['pix_qrcode_base64'] ?? '',
+                    $tx['pix_qrcode'] ?? '', $tx['encodedImage'] ?? '', $tx['encoded_image'] ?? '',
+                    $data['barcode'] ?? '', $data['qr_code_base64'] ?? '', $data['qrCodeBase64'] ?? '',
+                ];
+                foreach ($qrCandidates as $candidate) {
+                    $candidate = trim((string) $candidate);
+                    if ($candidate !== '') { $pixImg = $candidate; break; }
+                }
+            }
+            // Fallback: payload em campos alternativos
+            if ($pixPayload === '') {
+                $payloadCandidates = [
+                    $tx['pix_copy_paste'] ?? '', $tx['copy_paste'] ?? '', $tx['emv'] ?? '',
+                    $tx['payload'] ?? '', $data['number'] ?? '', $data['pix_copy_paste'] ?? '',
+                ];
+                foreach ($payloadCandidates as $candidate) {
+                    $candidate = trim((string) $candidate);
+                    if ($candidate !== '') { $pixPayload = $candidate; break; }
+                }
+            }
+
             if ($pixImg !== '') {
                 $pixImg = preg_replace('#^data:image/[^;]+;base64,#', '', $pixImg);
                 $pixImg = trim((string) $pixImg);
@@ -1504,6 +1529,11 @@ class PaymentService {
             // Construir link de pagamento se ticket_url não veio
             if ($invoiceUrl === '' && $paymentId !== '') {
                 $invoiceUrl = 'https://payment.cambioreal.com/request/' . $paymentId;
+            }
+
+            // Log para diagnóstico do QR code (remover após confirmar campo correto)
+            if ($pixImg === '') {
+                error_log('[CambioRealTaxas PIX] QR code vazio. tx keys: ' . implode(',', array_keys($tx)) . ' | data keys: ' . implode(',', array_keys($data)));
             }
 
             $this->registrarPedidoPagamentoSplit([
