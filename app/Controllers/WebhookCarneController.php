@@ -33,7 +33,7 @@ class WebhookCarneController extends Controller {
     }
 
     /**
-     * Webhook da Appmax (boleto de taxas)
+     * Webhook da Appmax (boleto de taxas) — legado, mantido para webhooks antigos
      */
     public function appmax(Request $request) {
         $input = $request->getBody();
@@ -45,6 +45,30 @@ class WebhookCarneController extends Controller {
         $status = $input['status'] ?? '';
 
         if (!$idExterno || !in_array($status, ['paid', 'confirmed', 'approved', 'pago'])) {
+            $this->json(['message' => 'Evento ignorado']);
+            return;
+        }
+
+        $result = $this->carneService->processarPagamentoBoleto($idExterno, 'taxas');
+        $this->json(['success' => $result]);
+    }
+
+    /**
+     * Webhook da Câmbio Real Taxas (PIX/boleto de taxas)
+     */
+    public function cambiorealTaxas(Request $request) {
+        $input = $request->getBody();
+        if (empty($input)) {
+            $this->json(['error' => 'Payload vazio'], 400);
+            return;
+        }
+
+        $idExterno = $input['id'] ?? $input['payment_id'] ?? $input['boleto_id'] ?? null;
+        $status = strtolower(trim((string) ($input['status'] ?? '')));
+
+        error_log('[WebhookCarne CambioRealTaxas] id=' . ($idExterno ?? 'null') . ' status=' . $status);
+
+        if (!$idExterno || !in_array($status, ['paid', 'confirmed', 'approved', 'pago', 'completed'])) {
             $this->json(['message' => 'Evento ignorado']);
             return;
         }

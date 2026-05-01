@@ -490,6 +490,7 @@ $router->post('/webhook/cambioreal-taxas', 'WebhookController', 'cambiorealTaxas
 
 // Webhooks Carnê Braziliana
 $router->post('/webhook/carne/cambioreal', 'WebhookCarneController', 'cambioReal');
+$router->post('/webhook/carne/cambioreal-taxas', 'WebhookCarneController', 'cambiorealTaxas');
 $router->post('/webhook/carne/appmax', 'WebhookCarneController', 'appmax');
 
 // API

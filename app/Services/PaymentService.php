@@ -2722,6 +2722,17 @@ class PaymentService {
             $st->execute(['cambioreal_taxas', $token]);
             $row = $st->fetch(\PDO::FETCH_ASSOC);
             if (!$row) {
+                // Não encontrado em pedido_pagamentos — tentar processar como carnê
+                try {
+                    $carneService = new \App\Services\CarneService();
+                    $carneResult = $carneService->processarPagamentoBoleto($token, 'taxas');
+                    if ($carneResult) {
+                        error_log('[WEBHOOK_CR_TAXAS] Processado como carnê taxas: ' . $token);
+                        return ['success' => true, 'gateway' => 'cambioreal_taxas', 'payment_id' => $token, 'payment_status' => 'approved', 'source' => 'carne'];
+                    }
+                } catch (\Exception $e) {
+                    error_log('[WEBHOOK_CR_TAXAS] Erro ao tentar carnê: ' . $e->getMessage());
+                }
                 error_log('[WEBHOOK_CR_TAXAS] payment_id não encontrado: ' . $token);
                 return ['success' => false, 'error' => 'payment_id não encontrado'];
             }
