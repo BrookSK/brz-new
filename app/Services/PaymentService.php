@@ -2689,56 +2689,87 @@ class PaymentService {
      * Análogo a processarWebhookCambioReal(), mas busca payment_id com gateway='cambioreal_taxas'.
      */
     public function processarWebhookCambioRealTaxas(array $payload): array {
-        $token = '';
-        if (!empty($payload['token']) && is_string($payload['token'])) {
-            $token = (string) $payload['token'];
+        // Extrair todos os identificadores possíveis do webhook
+        $candidates = [];
+        foreach (['token', 'code', 'id'] as $k) {
+            $v = trim((string) ($payload[$k] ?? ''));
+            if ($v !== '') $candidates[] = $v;
+            $v2 = trim((string) ($payload['data'][$k] ?? ''));
+            if ($v2 !== '') $candidates[] = $v2;
         }
-        if ($token === '' && !empty($payload['data']['token']) && is_string($payload['data']['token'])) {
-            $token = (string) $payload['data']['token'];
-        }
-        if ($token === '' && !empty($payload['code']) && is_string($payload['code'])) {
-            $token = (string) $payload['code'];
-        }
-        if ($token === '' && !empty($payload['data']['code']) && is_string($payload['data']['code'])) {
-            $token = (string) $payload['data']['code'];
-        }
-        if ($token === '' && !empty($payload['id']) && (is_string($payload['id']) || is_numeric($payload['id']))) {
-            $token = (string) $payload['id'];
-        }
-        if ($token === '' && !empty($payload['data']['id']) && (is_string($payload['data']['id']) || is_numeric($payload['data']['id']))) {
-            $token = (string) $payload['data']['id'];
-        }
-        $token = trim($token);
-        if ($token === '') {
-            error_log('[WEBHOOK_CR_TAXAS] token ausente no payload');
-            return ['success' => false, 'error' => 'Câmbio Real Taxas: token ausente no webhook'];
+        $candidates = array_values(array_unique(array_filter($candidates)));
+
+        if (empty($candidates)) {
+            error_log('[WEBHOOK_CR_TAXAS] Nenhum identificador no payload');
+            return ['success' => false, 'error' => 'Câmbio Real Taxas: identificador ausente no webhook'];
         }
 
-        // Verificar se o payment_id existe com gateway='cambioreal_taxas'
+        error_log('[WEBHOOK_CR_TAXAS] Candidatos: ' . implode(', ', $candidates));
+
+        // 1) Tentar encontrar em pedido_pagamentos (pedidos normais)
+        $token = '';
         try {
             $this->garantirTabelaPedidoPagamentos();
             $db = \Config\Database::getConnection();
-            $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = ? AND payment_id = ? LIMIT 1');
-            $st->execute(['cambioreal_taxas', $token]);
-            $row = $st->fetch(\PDO::FETCH_ASSOC);
-            if (!$row) {
-                // Não encontrado em pedido_pagamentos — tentar processar como carnê
-                try {
-                    $carneService = new \App\Services\CarneService();
-                    $carneResult = $carneService->processarPagamentoBoleto($token, 'taxas');
-                    if ($carneResult) {
-                        error_log('[WEBHOOK_CR_TAXAS] Processado como carnê taxas: ' . $token);
-                        return ['success' => true, 'gateway' => 'cambioreal_taxas', 'payment_id' => $token, 'payment_status' => 'approved', 'source' => 'carne'];
-                    }
-                } catch (\Exception $e) {
-                    error_log('[WEBHOOK_CR_TAXAS] Erro ao tentar carnê: ' . $e->getMessage());
+            foreach ($candidates as $c) {
+                $st = $db->prepare('SELECT id, payment_id FROM pedido_pagamentos WHERE gateway = ? AND payment_id = ? LIMIT 1');
+                $st->execute(['cambioreal_taxas', $c]);
+                $row = $st->fetch(\PDO::FETCH_ASSOC);
+                if ($row) {
+                    $token = (string) $row['payment_id'];
+                    break;
                 }
-                error_log('[WEBHOOK_CR_TAXAS] payment_id não encontrado: ' . $token);
-                return ['success' => false, 'error' => 'payment_id não encontrado'];
             }
         } catch (\Exception $e) {
-            error_log('[WEBHOOK_CR_TAXAS] Erro ao consultar pedido_pagamentos: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
+            error_log('[WEBHOOK_CR_TAXAS] Erro pedido_pagamentos: ' . $e->getMessage());
+        }
+
+        // 2) Se não encontrou em pedido_pagamentos, tentar carnê
+        if ($token === '') {
+            try {
+                $carneService = new \App\Services\CarneService();
+                foreach ($candidates as $c) {
+                    $carneResult = $carneService->processarPagamentoBoleto($c, 'taxas');
+                    if ($carneResult) {
+                        error_log('[WEBHOOK_CR_TAXAS] Processado como carnê taxas: ' . $c);
+                        return ['success' => true, 'gateway' => 'cambioreal_taxas', 'payment_id' => $c, 'payment_status' => 'approved', 'source' => 'carne'];
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('[WEBHOOK_CR_TAXAS] Erro carnê: ' . $e->getMessage());
+            }
+
+            // 3) Último recurso: consultar a API do Câmbio Real com o token para obter o data.id real
+            foreach ($candidates as $c) {
+                try {
+                    $tx = $this->obterTransacaoCambioReal($c);
+                    $txData = is_array($tx['data'] ?? null) ? (array) $tx['data'] : [];
+                    $realId = (string) ($txData['id'] ?? '');
+                    if ($realId !== '' && $realId !== $c) {
+                        // Tentar com o ID real
+                        $db = \Config\Database::getConnection();
+                        $st = $db->prepare('SELECT id FROM pedido_pagamentos WHERE gateway = ? AND payment_id = ? LIMIT 1');
+                        $st->execute(['cambioreal_taxas', $realId]);
+                        if ($st->fetch(\PDO::FETCH_ASSOC)) {
+                            $token = $realId;
+                            break;
+                        }
+                        // Tentar carnê com ID real
+                        $carneResult = $carneService->processarPagamentoBoleto($realId, 'taxas');
+                        if ($carneResult) {
+                            error_log('[WEBHOOK_CR_TAXAS] Processado como carnê taxas (via API lookup): ' . $realId);
+                            return ['success' => true, 'gateway' => 'cambioreal_taxas', 'payment_id' => $realId, 'payment_status' => 'approved', 'source' => 'carne'];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // API lookup falhou, continuar
+                }
+            }
+
+            if ($token === '') {
+                error_log('[WEBHOOK_CR_TAXAS] Nenhum match para: ' . implode(', ', $candidates));
+                return ['success' => false, 'error' => 'payment_id não encontrado'];
+            }
         }
 
         $statusNorm = '';
