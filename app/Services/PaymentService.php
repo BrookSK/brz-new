@@ -1297,6 +1297,145 @@ class PaymentService {
     // =========================================================================
 
     /**
+     * Cria checkout hospedado de taxas via Câmbio Real Taxas (conta separada).
+     * Idêntico ao createCambioRealCheckoutRequestProduto, mas usa cambioRealTaxasRequest
+     * e as credenciais da conta Taxas. O cliente escolhe o método (Pix/Boleto/Card) na página hospedada.
+     */
+    public function createCambioRealTaxasCheckoutRequest(int $pedidoId, float $valorBrl, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null): array {
+        $pedidoId = (int) $pedidoId;
+        $valorBrl = (float) $valorBrl;
+
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido'];
+        }
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido'];
+        }
+        if (!$this->isCambioRealTaxasEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas não configurado'];
+        }
+
+        $base = Url::base();
+        if ($successUrl === null || trim((string) $successUrl) === '') {
+            $successUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal_taxas=success';
+        }
+        if ($errorUrl === null || trim((string) $errorUrl) === '') {
+            $errorUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal_taxas=error';
+        }
+
+        $nome  = trim((string) ($customer['name']  ?? ($customer['nome']  ?? 'Cliente')));
+        $email = trim((string) ($customer['email'] ?? ''));
+        $phone = trim((string) ($customer['phone'] ?? ($customer['phone_number'] ?? ($customer['telefone'] ?? ''))));
+        $cpf   = preg_replace('/\D+/', '', (string) ($customer['cpf'] ?? ($customer['document'] ?? ($customer['documento'] ?? ''))));
+
+        if ($nome === '') $nome = 'Cliente';
+
+        // Normalizar email (mesma lógica do método de produtos)
+        $email = preg_replace('/\s+/', '', $email);
+        $email = preg_replace('/[\x00-\x1F\x7F]/', '', $email);
+        $email = strtolower($email);
+        $email = preg_replace('/[^a-z0-9_\-\.\+@]/', '', $email);
+        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas: e-mail do cliente inválido.'];
+        }
+
+        // Normalizar telefone
+        $phoneDigits = preg_replace('/\D+/', '', $phone);
+        $phoneE164 = '';
+        if ($phoneDigits !== '') {
+            $phoneE164 = (strpos($phoneDigits, '55') === 0) ? ('+' . $phoneDigits) : ('+55' . $phoneDigits);
+        }
+        if ($phoneDigits === '' || strlen($phoneDigits) < 10) {
+            return ['success' => false, 'error' => 'Câmbio Real Taxas: telefone do cliente inválido.'];
+        }
+
+        $client = [
+            'name'         => $nome,
+            'email'        => $email,
+            'email_address'=> $email,
+            'phone_number' => $phoneE164 !== '' ? $phoneE164 : $phoneDigits,
+            'phone1'       => $phoneE164 !== '' ? $phoneE164 : $phoneDigits,
+        ];
+        if ($cpf !== '') {
+            $client['cpf'] = $cpf;
+        }
+
+        $orderId = (string) $pedidoId . '-taxas-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . '|' . (string) rand()), 0, 8);
+
+        $payload = [
+            'order_id'     => $orderId,
+            'amount'       => round($valorBrl, 2),
+            'currency'     => 'BRL',
+            'client'       => $client,
+            'duplicate'    => 0,
+            'take_rates'   => 1,
+            'url_callback' => (string) $successUrl,
+            'url_error'    => (string) $errorUrl,
+            'products'     => [[
+                'descricao'  => $descricao !== '' ? $descricao : ('Pedido #' . $pedidoId . ' (taxas)'),
+                'base_value' => round($valorBrl, 2),
+                'valor'      => round($valorBrl, 2),
+                'qty'        => 1,
+                'ref'        => (string) $pedidoId,
+            ]],
+        ];
+
+        try {
+            $resp = $this->cambioRealTaxasRequest('POST', '/service/v1/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+
+            // Extrair token e URL do checkout (mesma lógica do método de produtos)
+            $token = '';
+            foreach (['token', 'checkout_token', 'checkoutToken', 'id'] as $k) {
+                if ($token === '' && !empty($data[$k]) && is_string($data[$k])) $token = (string) $data[$k];
+                if ($token === '' && !empty($resp[$k]) && is_string($resp[$k])) $token = (string) $resp[$k];
+            }
+
+            $checkoutUrl = '';
+            foreach (['checkout', 'checkout_url', 'checkoutUrl', 'ticket', 'url', 'link', 'redirect_url', 'redirectUrl'] as $k) {
+                if ($checkoutUrl === '' && !empty($data[$k]) && is_string($data[$k])) $checkoutUrl = (string) $data[$k];
+                if ($checkoutUrl === '' && !empty($resp[$k]) && is_string($resp[$k])) $checkoutUrl = (string) $resp[$k];
+            }
+
+            // Fallback: construir URL a partir do token
+            if ($checkoutUrl === '' && $token !== '') {
+                $checkoutUrl = 'https://payment.cambioreal.com/checkout/' . $token;
+            }
+
+            if ($token === '' || $checkoutUrl === '') {
+                $msg = (string) ($resp['message'] ?? '');
+                error_log('[CambioRealTaxas Checkout] Resposta inválida: ' . json_encode(['resp_keys' => array_keys($resp), 'data_keys' => array_keys($data)], JSON_UNESCAPED_UNICODE));
+                return ['success' => false, 'error' => 'Câmbio Real Taxas: resposta inválida ao criar checkout.' . ($msg !== '' ? ' ' . $msg : '')];
+            }
+
+            $this->registrarPedidoPagamentoSplit([
+                'pedido_id'      => $pedidoId,
+                'componente'     => 'taxa_servico',
+                'gateway'        => 'cambioreal_taxas',
+                'metodo'         => 'checkout',
+                'moeda'          => 'BRL',
+                'valor'          => round($valorBrl, 2),
+                'payment_id'     => $token,
+                'status'         => 'pending',
+                'invoice_url'    => $checkoutUrl,
+                'gateway_status' => 'AGUARDANDO_CLIENTE',
+                'metadata'       => json_encode(['raw' => $resp, 'order_id' => $orderId], JSON_UNESCAPED_UNICODE),
+            ]);
+
+            return [
+                'success'     => true,
+                'payment_id'  => $token,
+                'invoice_url' => $checkoutUrl,
+                'invoiceUrl'  => $checkoutUrl,
+                'raw'         => $resp,
+                'error'       => '',
+            ];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Cria cobrança PIX de taxas via Câmbio Real Taxas.
      */
     public function createCambioRealTaxasPixPayment(int $pedidoId, float $valorBrl, string $descricao, array $client): array {

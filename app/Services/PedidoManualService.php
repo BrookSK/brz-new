@@ -607,31 +607,20 @@ class PedidoManualService {
 
             $descricaoTaxa = 'Pedido #' . ($codigoPedido ?: $pedidoId) . ' (taxas e impostos)';
 
-            // Para cartão de crédito no pedido manual: usar boleto nas taxas
-            // (o cliente paga o cartão nos produtos via link Câmbio Real e o boleto nas taxas)
-            // Para PIX e boleto: usar o mesmo método nas taxas
-            if ($billingType === 'CREDIT_CARD') {
-                $taxa = $pg->createCambioRealTaxasBoletoPayment(
-                    (int) $pedidoId,
-                    (float) $valorAppmax,
-                    $descricaoTaxa,
-                    $clientData
-                );
-            } elseif ($billingType === 'BOLETO') {
-                $taxa = $pg->createCambioRealTaxasBoletoPayment(
-                    (int) $pedidoId,
-                    (float) $valorAppmax,
-                    $descricaoTaxa,
-                    $clientData
-                );
-            } else {
-                $taxa = $pg->createCambioRealTaxasPixPayment(
-                    (int) $pedidoId,
-                    (float) $valorAppmax,
-                    $descricaoTaxa,
-                    $clientData
-                );
-            }
+            // Usar Checkout API da conta Taxas — igual ao de produtos, só muda a API Key e os valores
+            // O cliente escolhe o método (Pix/Boleto/Card) na página hospedada do Câmbio Real
+            $base = \App\Core\Url::base();
+            $successUrl = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal_taxas=success';
+            $errorUrl   = rtrim($base, '/') . '/checkout/conclusao/' . $pedidoId . '?cambioreal_taxas=error';
+
+            $taxa = $pg->createCambioRealTaxasCheckoutRequest(
+                (int) $pedidoId,
+                (float) $valorAppmax,
+                $descricaoTaxa,
+                $clientData,
+                $successUrl,
+                $errorUrl
+            );
             if (empty($taxa['success'])) {
                 throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança Câmbio Real Taxas (taxa)'));
             }
