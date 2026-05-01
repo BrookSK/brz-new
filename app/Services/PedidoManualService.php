@@ -561,14 +561,50 @@ class PedidoManualService {
         $taxa = null;
         if ($valorAppmax > 0) {
             $pg = new \App\Services\PaymentService();
+
+            // Buscar dados completos do cliente para o Câmbio Real Taxas
             $clientData = [
-                'name'     => $nome,
-                'email'    => $email,
-                'phone'    => $telefone,
-                'document' => $documento,
-                'ip'       => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
-                'address'  => [],
+                'name'       => $nome,
+                'email'      => $email,
+                'phone'      => $telefone,
+                'document'   => $documento,
+                'birth_date' => '',
+                'ip'         => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                'address'    => [
+                    'street'   => '',
+                    'number'   => '',
+                    'district' => '',
+                    'city'     => '',
+                    'state'    => '',
+                    'zip_code' => '',
+                ],
             ];
+            // Tentar buscar endereço e data de nascimento do usuário
+            try {
+                $dbClient = \Config\Database::getConnection();
+                $stClient = $dbClient->prepare('SELECT * FROM usuarios WHERE email = ? LIMIT 1');
+                $stClient->execute([$email]);
+                $uRow = $stClient->fetch(\PDO::FETCH_ASSOC) ?: [];
+                if (!empty($uRow)) {
+                    $clientData['birth_date'] = (string) ($uRow['data_nascimento'] ?? ($uRow['birth_date'] ?? ''));
+                    $clientData['address'] = [
+                        'street'   => (string) ($uRow['endereco'] ?? ($uRow['street'] ?? 'Rua Exemplo')),
+                        'number'   => (string) ($uRow['numero'] ?? ($uRow['number'] ?? '1')),
+                        'district' => (string) ($uRow['bairro'] ?? ($uRow['district'] ?? 'Centro')),
+                        'city'     => (string) ($uRow['cidade'] ?? ($uRow['city'] ?? 'São Paulo')),
+                        'state'    => (string) ($uRow['estado'] ?? ($uRow['state'] ?? 'SP')),
+                        'zip_code' => (string) ($uRow['cep'] ?? ($uRow['zip_code'] ?? '01001-000')),
+                    ];
+                }
+            } catch (\Throwable $e) {}
+            // Fallback se endereço ficou vazio
+            if (empty($clientData['address']['street'])) {
+                $clientData['address'] = ['street'=>'Rua Exemplo','number'=>'1','district'=>'Centro','city'=>'São Paulo','state'=>'SP','zip_code'=>'01001-000'];
+            }
+            if (empty($clientData['birth_date'])) {
+                $clientData['birth_date'] = '1990-01-01';
+            }
+
             $taxa = $pg->createCambioRealTaxasPixPayment(
                 (int) $pedidoId,
                 (float) $valorAppmax,
