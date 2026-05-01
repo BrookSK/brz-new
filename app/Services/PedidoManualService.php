@@ -633,10 +633,8 @@ class PedidoManualService {
                 );
             }
             if (empty($taxa['success'])) {
-                error_log('[PedidoManual] Falha taxa: ' . json_encode($taxa, JSON_UNESCAPED_UNICODE));
                 throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança Câmbio Real Taxas (taxa)'));
             }
-            error_log('[PedidoManual] Taxa OK: invoice_url=' . ($taxa['invoice_url'] ?? '') . ' bank_slip_url=' . ($taxa['bank_slip_url'] ?? '') . ' payment_id=' . ($taxa['payment_id'] ?? ''));
 
             // Replicar registro do componente imposto apontando para o mesmo payment_id (SPLIT_ITEM)
             $taxasPaymentId = (string) ($taxa['payment_id'] ?? '');

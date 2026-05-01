@@ -1761,6 +1761,38 @@ class PaymentService {
             $ticketUrl = (string) ($tx['ticket_url'] ?? '');
             $digitableLine = (string) ($tx['digitable_line'] ?? ($tx['linha_digitavel'] ?? ($tx['barcode_number'] ?? '')));
 
+            // Fallback: buscar URL do boleto em campos alternativos
+            if ($ticketUrl === '') {
+                $urlCandidates = [
+                    $tx['bank_slip_url'] ?? '', $tx['boleto_url'] ?? '', $tx['url'] ?? '',
+                    $tx['invoice_url'] ?? '', $tx['link'] ?? '',
+                    $data['ticket_url'] ?? '', $data['bank_slip_url'] ?? '', $data['boleto_url'] ?? '',
+                    $data['url'] ?? '', $data['invoice_url'] ?? '',
+                ];
+                foreach ($urlCandidates as $c) {
+                    $c = trim((string) $c);
+                    if ($c !== '' && stripos($c, 'http') === 0) { $ticketUrl = $c; break; }
+                }
+            }
+            // Fallback: construir link a partir do payment_id (mesmo padrão do PIX)
+            if ($ticketUrl === '' && $paymentId !== '') {
+                $ticketUrl = 'https://payment.cambioreal.com/request/' . $paymentId;
+            }
+            // Fallback: linha digitável em campos alternativos
+            if ($digitableLine === '') {
+                $lineCandidates = [
+                    $tx['barcode'] ?? '', $tx['number'] ?? '', $tx['codigo_barras'] ?? '',
+                    $data['digitable_line'] ?? '', $data['barcode'] ?? '',
+                ];
+                foreach ($lineCandidates as $c) {
+                    $c = trim((string) $c);
+                    // barcode do boleto é numérico longo, não SVG
+                    if ($c !== '' && strlen($c) > 10 && !str_contains($c, '<') && !str_contains($c, 'data:')) {
+                        $digitableLine = $c; break;
+                    }
+                }
+            }
+
             if ($paymentId === '') {
                 return ['success' => false, 'error' => 'Câmbio Real Taxas: resposta inválida (id ausente)', 'bank_slip_url' => '', 'digitable_line' => '', 'invoice_url' => '', 'payment_id' => ''];
             }
