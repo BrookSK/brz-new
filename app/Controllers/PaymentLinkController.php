@@ -271,7 +271,7 @@ class PaymentLinkController extends Controller {
             exit;
         }
 
-        // BRL -> Câmbio Real + AppMax
+        // BRL -> Câmbio Real Produtos + Câmbio Real Taxas
         $estado = trim((string) $request->getParam('estado', ''));
         $cidade = trim((string) $request->getParam('cidade', ''));
         $cep = trim((string) $request->getParam('cep', ''));
@@ -300,7 +300,7 @@ class PaymentLinkController extends Controller {
         $produtoValor = (float) ($link['produto_valor'] ?? 0);
         $taxaValor = (float) ($link['taxa_servico_valor'] ?? 0);
         $impostosValor = (float) ($link['impostos_valor'] ?? 0);
-        $valorAppmax = round(max(0.0, $taxaValor + $impostosValor), 2);
+        $valorTaxas = round(max(0.0, $taxaValor + $impostosValor), 2);
 
         $products = [];
         try {
@@ -383,8 +383,8 @@ class PaymentLinkController extends Controller {
             $resultBlocks[] = $cr;
         }
 
-        // 2) Taxa+Impostos via AppMax
-        if ($valorAppmax > 0) {
+        // 2) Taxa+Impostos via Câmbio Real Taxas (substituiu AppMax)
+        if ($valorTaxas > 0) {
             $billingType = 'BOLETO';
             if ($forma === 'pix') $billingType = 'PIX';
             if ($forma === 'cartao_credito' || $forma === 'cartao_debito') $billingType = 'CREDIT_CARD';
@@ -393,7 +393,7 @@ class PaymentLinkController extends Controller {
                 'produto_valor' => 0.0,
                 'taxa_servico_valor' => (float) $taxaValor,
                 'impostos_valor' => (float) $impostosValor,
-                'total_valor' => (float) $valorAppmax,
+                'total_valor' => (float) $valorTaxas,
             ]);
             if (empty($attemptTaxa['success'])) {
                 $this->renderNotFound((string) ($attemptTaxa['error'] ?? 'Falha ao iniciar pagamento')); return;
@@ -406,62 +406,57 @@ class PaymentLinkController extends Controller {
                 ]);
             }
 
-            $productsValueCents = (int) round($valorAppmax * 100);
             $descricaoTaxa = $descricao . ' (taxas e impostos)';
-            $products = [[
-                'sku' => 'PAYLINK_TAXA_' . (string) $attemptTaxaId,
-                'name' => $descricaoTaxa,
-                'quantity' => 1,
-                'unit_value' => $productsValueCents,
-                'type' => 'service',
-                'freight_type' => 'normal',
-            ]];
 
-            $dadosPagamento = [
-                'billingType' => $billingType,
-                'customer_name' => $nome,
-                'customer_email' => $email,
-                'customer_phone' => $telefone,
-                'customer_document' => $documento,
-                'externalReference' => 'PAYLINK_' . (string) $attemptTaxaId,
-                'products' => $products,
-                'products_value_cents' => $productsValueCents,
-                'shipping_value_cents' => 0,
-                'discount_value_cents' => 0,
-            ];
-
+            // Montar dados de cartão se necessário
+            $cardTaxas = [];
             if ($billingType === 'CREDIT_CARD') {
-                $dadosPagamento['card_holder_name'] = (string) $request->getParam('card_holder_name', '');
-                $dadosPagamento['card_number'] = (string) $request->getParam('card_number', '');
-                $dadosPagamento['card_expiry_month'] = (string) $request->getParam('card_expiry_month', '');
-                $dadosPagamento['card_expiry_year'] = (string) $request->getParam('card_expiry_year', '');
-                $dadosPagamento['card_cvv'] = (string) $request->getParam('card_cvv', '');
+                $installments = (int) $request->getParam('installments', 1);
+                if ($installments < 1) $installments = 1;
+                if ($installments > 12) $installments = 12;
+                $cardTaxas = [
+                    'token' => (string) $request->getParam('cambioreal_card_token', ''),
+                    'brand' => (string) $request->getParam('cambioreal_card_brand', ''),
+                    'bin' => (string) $request->getParam('cambioreal_card_bin', ''),
+                    'dfp_id' => (string) $request->getParam('cambioreal_card_dfp_id', ''),
+                    'holder' => (string) $request->getParam('card_holder_name', ''),
+                    'installments' => $installments,
+                    'type' => 'credit',
+                ];
             }
 
-            $appmax = $paySvc->processarPagamento($dadosPagamento, $valorAppmax, 'BRL', $descricaoTaxa);
-            if (empty($appmax['payment_id'])) {
+            // Chamar o método correto da Câmbio Real Taxas conforme forma de pagamento
+            if ($billingType === 'PIX') {
+                $crTaxas = $paySvc->createCambioRealTaxasPixPayment($attemptTaxaId, $valorTaxas, $descricaoTaxa, $client);
+            } elseif ($billingType === 'CREDIT_CARD') {
+                $crTaxas = $paySvc->createCambioRealTaxasCartaoPayment($attemptTaxaId, $valorTaxas, $descricaoTaxa, $client, $cardTaxas);
+            } else {
+                $crTaxas = $paySvc->createCambioRealTaxasBoletoPayment($attemptTaxaId, $valorTaxas, $descricaoTaxa, $client);
+            }
+
+            if (empty($crTaxas['success'])) {
                 $svc->updatePaymentAttempt($attemptTaxaId, [
                     'status' => 'failed',
-                    'gateway' => 'appmax',
-                    'raw_response' => json_encode($appmax, JSON_UNESCAPED_UNICODE),
+                    'gateway' => 'cambioreal_taxas',
+                    'raw_response' => json_encode($crTaxas['raw'] ?? $crTaxas, JSON_UNESCAPED_UNICODE),
                 ]);
-                $this->renderNotFound('Falha ao criar pagamento AppMax'); return;
+                $this->renderNotFound((string) ($crTaxas['error'] ?? 'Falha ao criar pagamento de taxas')); return;
             }
 
-            $pix = (isset($appmax['pix']) && is_array($appmax['pix'])) ? $appmax['pix'] : null;
+            $pix = (isset($crTaxas['pix']) && is_array($crTaxas['pix'])) ? $crTaxas['pix'] : null;
             $persist = [
-                'invoice_url' => (string) ($appmax['invoiceUrl'] ?? ''),
-                'bank_slip_url' => (string) ($appmax['bankSlipUrl'] ?? ''),
-                'digitable_line' => (string) ($appmax['digitableLine'] ?? ''),
+                'invoice_url' => (string) ($crTaxas['invoice_url'] ?? ''),
+                'bank_slip_url' => (string) ($crTaxas['bank_slip_url'] ?? ''),
+                'digitable_line' => (string) ($crTaxas['digitable_line'] ?? ''),
                 'pix_payload' => is_array($pix) ? (string) ($pix['payload'] ?? '') : '',
                 'pix_encoded_image' => is_array($pix) ? (string) ($pix['encodedImage'] ?? '') : '',
             ];
 
             $svc->updatePaymentAttempt($attemptTaxaId, array_merge([
-                'status' => (string) ($appmax['status'] ?? 'pending'),
-                'gateway' => 'appmax',
-                'gateway_payment_id' => (string) ($appmax['payment_id'] ?? ''),
-                'raw_response' => json_encode($appmax, JSON_UNESCAPED_UNICODE),
+                'status' => 'pending',
+                'gateway' => 'cambioreal_taxas',
+                'gateway_payment_id' => (string) ($crTaxas['payment_id'] ?? ''),
+                'raw_response' => json_encode($crTaxas['raw'] ?? [], JSON_UNESCAPED_UNICODE),
             ], $persist));
 
             // imposto como item lógico (mesmo payment_id)
@@ -476,9 +471,9 @@ class PaymentLinkController extends Controller {
                     $attemptImpId = (int) ($attemptImp['id'] ?? 0);
                     if ($attemptImpId > 0) $resultAttemptIds[] = $attemptImpId;
                     $svc->updatePaymentAttempt($attemptImpId, [
-                        'status' => (string) ($appmax['status'] ?? 'pending'),
-                        'gateway' => 'appmax',
-                        'gateway_payment_id' => (string) ($appmax['payment_id'] ?? ''),
+                        'status' => 'pending',
+                        'gateway' => 'cambioreal_taxas',
+                        'gateway_payment_id' => (string) ($crTaxas['payment_id'] ?? ''),
                         'metadata' => json_encode(['gateway_status' => 'SPLIT_ITEM'], JSON_UNESCAPED_UNICODE),
                     ]);
                     if ($attemptImpId > 0 && $formSnapshotJson) {
@@ -489,7 +484,7 @@ class PaymentLinkController extends Controller {
                 }
             }
 
-            $resultBlocks[] = ['success' => true, 'gateway' => 'appmax', 'billingType' => $billingType, 'payment_id' => (string) ($appmax['payment_id'] ?? ''), 'persist' => $persist, 'raw' => $appmax];
+            $resultBlocks[] = ['success' => true, 'gateway' => 'cambioreal_taxas', 'billingType' => $billingType, 'payment_id' => (string) ($crTaxas['payment_id'] ?? ''), 'persist' => $persist, 'raw' => $crTaxas['raw'] ?? []];
         }
 
         if ($isAjax) {
