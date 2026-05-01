@@ -2009,6 +2009,8 @@ class AdminComprasController extends Controller {
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="concluir_produto_id" value="">
                                         <input type="hidden" name="loja_id" id="concluir_loja_id" value="0">
+                                        <input type="hidden" name="redirect_loja_id" id="concluir_redirect_loja_id" value="0">
+                                        <input type="hidden" name="redirect_sem_loja" id="concluir_redirect_sem_loja" value="0">
                                         <div class="alert alert-success mb-0">
                                             Concluir compra de: <strong id="concluir_produto_nome"></strong>
                                         </div>
@@ -2038,6 +2040,12 @@ class AdminComprasController extends Controller {
                             document.getElementById("concluir_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
                             var maxQ = parseInt(button.getAttribute("data-quantidade") || "0", 10);
                             var inp = document.getElementById("concluir_quantidade_comprada");
+                            // Preservar o filtro atual da URL para o redirect após confirmar
+                            var urlParams = new URLSearchParams(window.location.search);
+                            var currentLojaId = urlParams.get("loja_id") || "0";
+                            var currentSemLoja = urlParams.get("sem_loja") || "0";
+                            document.getElementById("concluir_redirect_loja_id").value = currentLojaId;
+                            document.getElementById("concluir_redirect_sem_loja").value = currentSemLoja;
                             if (inp) {
                                 inp.max = String(Math.max(0, maxQ));
                                 inp.value = "0";
@@ -2428,11 +2436,29 @@ class AdminComprasController extends Controller {
         $semLoja = (string) $request->getParam('sem_loja', '0') === '1';
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
 
+        // Usar o filtro que o usuário estava visualizando (passado pelo JS via redirect_loja_id/redirect_sem_loja)
+        // Se não vier, cai no loja_id do produto como fallback
+        $redirectLojaIdRaw = $request->getParam('redirect_loja_id', null);
+        $redirectSemLojaRaw = $request->getParam('redirect_sem_loja', null);
+        $hasRedirectFilter = ($redirectLojaIdRaw !== null || $redirectSemLojaRaw !== null);
+
         $redirectParams = ['status' => 'pendente'];
-        if ($semLoja) {
-            $redirectParams['sem_loja'] = '1';
-        } elseif ($lojaId > 0) {
-            $redirectParams['loja_id'] = (string) $lojaId;
+        if ($hasRedirectFilter) {
+            $redirectSemLoja = (string) ($redirectSemLojaRaw ?? '0') === '1';
+            $redirectLojaId = (int) ($redirectLojaIdRaw ?? 0);
+            if ($redirectSemLoja) {
+                $redirectParams['sem_loja'] = '1';
+            } elseif ($redirectLojaId > 0) {
+                $redirectParams['loja_id'] = (string) $redirectLojaId;
+            }
+            // Se redirect_loja_id = 0 e redirect_sem_loja = 0 → filtro "Todas as lojas", não adiciona nada
+        } else {
+            // Fallback: comportamento anterior (usa loja do produto)
+            if ($semLoja) {
+                $redirectParams['sem_loja'] = '1';
+            } elseif ($lojaId > 0) {
+                $redirectParams['loja_id'] = (string) $lojaId;
+            }
         }
         $redirectUrl = '/admin/estoque/compras' . (!empty($redirectParams) ? ('?' . http_build_query($redirectParams)) : '');
 
