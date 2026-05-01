@@ -557,25 +557,39 @@ class PedidoManualService {
             }
         }
 
-        // 2) Taxas + impostos via AppMax (PIX) — gera PIX com payload copiável para o vendedor enviar
+        // 2) Taxas + impostos via Câmbio Real Taxas (PIX) — gera PIX com payload copiável para o vendedor enviar
         $taxa = null;
         if ($valorAppmax > 0) {
-            $taxa = $this->gerarCobrancaAppmaxPedidoManualComValor($pedidoId, 'PIX', $valorAppmax, $nome, $email, $telefone, $documento, $codigoPedido);
+            $pg = new \App\Services\PaymentService();
+            $clientData = [
+                'name'     => $nome,
+                'email'    => $email,
+                'phone'    => $telefone,
+                'document' => $documento,
+                'ip'       => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                'address'  => [],
+            ];
+            $taxa = $pg->createCambioRealTaxasPixPayment(
+                (int) $pedidoId,
+                (float) $valorAppmax,
+                'Pedido #' . ($codigoPedido ?: $pedidoId) . ' (taxas e impostos)',
+                $clientData
+            );
             if (empty($taxa['success'])) {
-                throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança AppMax (taxa)'));
+                throw new \Exception((string) ($taxa['error'] ?? 'Falha ao gerar cobrança Câmbio Real Taxas (taxa)'));
             }
 
-            // Replicar registro do componente imposto apontando para o mesmo payment_id da AppMax (SPLIT_ITEM)
-            $appmaxPaymentId = (string) ($taxa['payment_id'] ?? '');
-            if ($appmaxPaymentId !== '' && $valorImpostos > 0) {
+            // Replicar registro do componente imposto apontando para o mesmo payment_id (SPLIT_ITEM)
+            $taxasPaymentId = (string) ($taxa['payment_id'] ?? '');
+            if ($taxasPaymentId !== '' && $valorImpostos > 0) {
                 $pg->registrarPedidoPagamentoSplit([
                     'pedido_id' => (int) $pedidoId,
                     'componente' => 'imposto',
-                    'gateway' => 'appmax',
+                    'gateway' => 'cambioreal_taxas',
                     'metodo' => strtolower((string) $billingType),
                     'moeda' => 'BRL',
                     'valor' => (float) $valorImpostos,
-                    'payment_id' => $appmaxPaymentId,
+                    'payment_id' => $taxasPaymentId,
                     'status' => 'pending',
                     'gateway_status' => 'SPLIT_ITEM',
                 ]);
@@ -593,7 +607,7 @@ class PedidoManualService {
             'taxa' => $taxa,
             'imposto' => [
                 'success' => true,
-                'gateway' => 'appmax',
+                'gateway' => 'cambioreal_taxas',
                 'metodo' => strtolower((string) $billingType),
                 'moeda' => 'BRL',
                 'valor' => (float) $valorImpostos,
