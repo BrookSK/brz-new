@@ -1422,6 +1422,8 @@ class PaymentService {
 
         try {
             $resp = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payload);
+            // LOG DIAGNÓSTICO — remover após identificar campo do QR code
+            error_log('[CambioRealTaxas PIX RAW] ' . json_encode($resp, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
             $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
 
