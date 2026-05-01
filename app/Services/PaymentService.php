@@ -1422,8 +1422,6 @@ class PaymentService {
 
         try {
             $resp = $this->cambioRealTaxasRequest('POST', '/service/v2/checkout/request', $payload);
-            // LOG DIAGNÓSTICO — remover após identificar campo do QR code
-            error_log('[CambioRealTaxas PIX RAW] ' . json_encode($resp, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
             $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
 
@@ -1520,8 +1518,10 @@ class PaymentService {
             }
 
             if ($pixImg !== '') {
-                $pixImg = preg_replace('#^data:image/[^;]+;base64,#', '', $pixImg);
+                // Preservar o data: URI completo (pode ser SVG ou PNG)
+                // A view já detecta e renderiza corretamente data: URIs
                 $pixImg = trim((string) $pixImg);
+                // Se não tem prefixo data:, é base64 puro — manter como está (view trata como PNG)
             }
 
             if ($paymentId === '') {
@@ -1531,11 +1531,6 @@ class PaymentService {
             // Construir link de pagamento se ticket_url não veio
             if ($invoiceUrl === '' && $paymentId !== '') {
                 $invoiceUrl = 'https://payment.cambioreal.com/request/' . $paymentId;
-            }
-
-            // Log para diagnóstico do QR code (remover após confirmar campo correto)
-            if ($pixImg === '') {
-                error_log('[CambioRealTaxas PIX] QR code vazio. tx keys: ' . implode(',', array_keys($tx)) . ' | data keys: ' . implode(',', array_keys($data)));
             }
 
             $this->registrarPedidoPagamentoSplit([
