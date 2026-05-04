@@ -79,6 +79,18 @@ $statusLabels = [
         </div>
     </div>
     <script>
+    function formatarBRL(valor) {
+        return valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    function atualizarOptionsParcelas(d) {
+        var sel = document.getElementById('recriar-parcelas');
+        var totalBrl = Number(d.total_brl);
+        for (var i = 0; i < sel.options.length; i++) {
+            var n = parseInt(sel.options[i].value);
+            var vlr = totalBrl / n;
+            sel.options[i].text = n + 'x R$ ' + formatarBRL(vlr);
+        }
+    }
     function buscarDadosPedidoCarne() {
         var pid = document.getElementById('recriar-pedido-id').value;
         if (!pid || pid <= 0) { alert('Informe o ID do pedido'); return; }
@@ -105,6 +117,7 @@ $statusLabels = [
                 }
                 // Guardar dados do pedido para recalcular ao mudar parcelas
                 window._dadosPedidoCarne = d;
+                atualizarOptionsParcelas(d);
 
                 var qtdParcelas = d.parcelas_sugeridas || parseInt(document.getElementById('recriar-parcelas').value) || 4;
                 var parcelaProdutos = Number(d.subtotal_brl) / qtdParcelas;
