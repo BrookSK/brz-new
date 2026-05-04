@@ -84,7 +84,16 @@ if (typeof window.toggleAdminCop === 'undefined') {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({mensagem: msg, historico: historico.slice(-10)})
         })
-        .then(function(r){ return r.json(); })
+        .then(function(r){
+            if (!r.ok) {
+                return r.text().then(function(t){
+                    var p; try { p = JSON.parse(t); } catch(e){ p = null; }
+                    if (p && p.resposta) return p;
+                    throw new Error('HTTP ' + r.status + ': ' + (t || '').substring(0, 200));
+                });
+            }
+            return r.json();
+        })
         .then(function(data){
             typing.remove();
             var resp = data.resposta || 'Sem resposta.';
@@ -93,9 +102,9 @@ if (typeof window.toggleAdminCop === 'undefined') {
             renderMsgs();
             scrollBottom();
         })
-        .catch(function(){
+        .catch(function(err){
             typing.remove();
-            historico.push({role:'assistant', content:'Erro de conexão. Tente novamente.'});
+            historico.push({role:'assistant', content: err && err.message ? err.message : 'Erro de conexão. Tente novamente.'});
             renderMsgs();
             scrollBottom();
         })
