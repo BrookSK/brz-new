@@ -875,8 +875,10 @@ class AdminPedidosEditController extends Controller {
                 .then(function(r){ return r.json(); })
                 .then(function(data){
                     if (data.success) {
-                        alert("Pedido salvo com sucesso!");
-                        window.location.href = "/admin/pedidos/detalhes/" + pedidoId;
+                        var st = document.getElementById("pedido_status")?.value || "";
+                        var label = st.replace(/_/g, " ");
+                        sessionStorage.setItem("brz_pedidos_flash", "Pedido #" + pedidoId + " salvo com sucesso" + (label ? " — Status: " + label : ""));
+                        window.location.href = "/admin/pedidos";
                         return;
                     }
                     alert("Erro: " + (data.message || "Falha ao salvar"));
