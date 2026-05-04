@@ -742,6 +742,8 @@ class AdminComprasController extends Controller {
             $pedidos = [];
             foreach ($pedidosRows as $p) {
                 $pid = (int) ($p['id'] ?? 0);
+                $formaPag = strtolower(trim((string) ($p['forma_pagamento'] ?? '')));
+                $isCarne = ($formaPag === 'carne_braziliana');
                 $pedidos[$pid] = [
                     'id' => $pid,
                     'codigo_pedido' => (string) ($p['codigo_pedido'] ?? ($p['numero_pedido'] ?? '')),
@@ -754,8 +756,45 @@ class AdminComprasController extends Controller {
                     'cliente_email' => (string) ($p['cliente_email'] ?? ''),
                     'payment_gateway' => (string) ($p['payment_gateway'] ?? ($p['gateway'] ?? '')),
                     'payment_id' => (string) ($p['payment_id'] ?? ($p['asaas_payment_id'] ?? '')),
+                    'is_carne' => $isCarne,
+                    'carne_info' => null,
                     'itens' => [],
                 ];
+            }
+
+            // Buscar info de carnê para pedidos que são carnê
+            $pedidoIdsCarne = array_keys(array_filter($pedidos, fn($p) => $p['is_carne']));
+            if (!empty($pedidoIdsCarne)) {
+                try {
+                    $inCarne = implode(',', array_fill(0, count($pedidoIdsCarne), '?'));
+                    $stCarne = $this->connection->prepare("
+                        SELECT c.pedido_id, c.id as carne_id, c.quantidade_parcelas, c.status as carne_status,
+                               c.compra_interna_liberada,
+                               (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas
+                        FROM carnes c WHERE c.pedido_id IN ({$inCarne})
+                        ORDER BY c.id DESC
+                    ");
+                    $stCarne->execute(array_map('intval', $pedidoIdsCarne));
+                    $carneRows = $stCarne->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    $carneMap = [];
+                    foreach ($carneRows as $cr) {
+                        $cpid = (int) ($cr['pedido_id'] ?? 0);
+                        if (!isset($carneMap[$cpid])) $carneMap[$cpid] = $cr;
+                    }
+                    foreach ($pedidos as &$ped) {
+                        if ($ped['is_carne'] && isset($carneMap[$ped['id']])) {
+                            $ci = $carneMap[$ped['id']];
+                            $ped['carne_info'] = [
+                                'carne_id' => (int) $ci['carne_id'],
+                                'parcelas' => (int) $ci['quantidade_parcelas'],
+                                'pagas' => (int) $ci['parcelas_pagas'],
+                                'status' => (string) $ci['carne_status'],
+                                'compra_liberada' => (bool) $ci['compra_interna_liberada'],
+                            ];
+                        }
+                    }
+                    unset($ped);
+                } catch (\Exception $e) {}
             }
 
             // Buscar itens desse produto nos pedidos
@@ -1779,10 +1818,22 @@ class AdminComprasController extends Controller {
                             html += "<h2 class=\"accordion-header\" id=\"" + headId + "\">";
                             html += "<button class=\"accordion-button collapsed\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#" + bodyId + "\">";
                             html += "Pedido #" + pid + (codigo ? (" (" + codigo + ")") : "") + " - " + status + " - " + total;
+                            if (p.is_carne) html += " <span class=\"badge bg-warning text-dark\" style=\"font-size:10px\">🎫 Carnê</span>";
                             html += "</button></h2>";
                             html += "<div id=\"" + bodyId + "\" class=\"accordion-collapse collapse\" data-bs-parent=\"#accordionPedidos\">";
                             html += "<div class=\"accordion-body\">";
                             html += "<div class=\"mb-2\">";
+                            if (p.is_carne && p.carne_info) {
+                                var ci = p.carne_info;
+                                html += "<div class=\"alert alert-warning py-1 px-2 small mb-2\">";
+                                html += "<strong>🎫 Carnê #" + ci.carne_id + "</strong> — ";
+                                html += "Parcelas: " + ci.pagas + "/" + ci.parcelas + " pagas";
+                                html += " — Status: " + escapeHtml(ci.status);
+                                if (ci.compra_liberada) html += " — <span class=\"text-success\">✅ Compra liberada</span>";
+                                else html += " — <span class=\"text-danger\">⏳ Aguardando 1ª parcela</span>";
+                                html += " — <a href=\"/admin/carnes/detalhes/" + ci.carne_id + "\" target=\"_blank\" class=\"text-primary\">Abrir carnê</a>";
+                                html += "</div>";
+                            }
                             html += "<div><strong>Cliente:</strong> " + escapeHtml(cliente) + "</div>";
                             html += "<div><strong>Criado em:</strong> " + criado + "</div>";
                             if (pagoEm) html += "<div><strong>Pago em:</strong> " + pagoEm + "</div>";
