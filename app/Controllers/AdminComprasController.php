@@ -1165,7 +1165,7 @@ class AdminComprasController extends Controller {
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
             $tipoCompraView = strtolower(trim((string) $request->getParam('tipo_compra', 'todos')));
-            if (!in_array($tipoCompraView, ['offline', 'online', 'todos'], true)) {
+            if (!in_array($tipoCompraView, ['offline', 'online', 'carne', 'todos'], true)) {
                 $tipoCompraView = 'todos';
             }
 
@@ -1198,8 +1198,11 @@ class AdminComprasController extends Controller {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'offline' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
                 } elseif ($tipoCompraView === 'online') {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'online' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
+                } elseif ($tipoCompraView === 'carne') {
+                    $whereTipoCompra = " AND lc.tipo_compra = 'carne'";
                 } else {
                     $whereTipoCompra = '';
+                }
                 }
             }
 
@@ -1235,6 +1238,7 @@ class AdminComprasController extends Controller {
                 . ', agg.loja_id as loja_id'
                 . ', agg.status as status'
                 . ', agg.nome_produto_custom as nome_produto_custom'
+                . ($temTipoCompraEmLista ? ', agg.tipo_compra as tipo_compra' : ", '' as tipo_compra")
                 . ' FROM ('
                 . '   SELECT lc.produto_id, '
                 . ($temLojaIdEmLista && $temLojaIdEmProdutos
@@ -1242,6 +1246,7 @@ class AdminComprasController extends Controller {
                     : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id'))
                 . '     , lc.status as status'
                 . ($this->columnExists('lista_compras', 'nome_produto') ? ', COALESCE(lc.nome_produto, \'\') as nome_produto_custom' : ", '' as nome_produto_custom")
+                . ($temTipoCompraEmLista ? ", COALESCE(lc.tipo_compra, '') as tipo_compra" : ", '' as tipo_compra")
                 . '     , SUM(CASE WHEN COALESCE(lc.quantidade_faltante,0) > 0 THEN lc.quantidade_faltante ELSE COALESCE(lc.quantidade_necessaria,0) END) as quantidade_faltante'
                 . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
                 . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
@@ -1251,7 +1256,7 @@ class AdminComprasController extends Controller {
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
-                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','carne_pagando','carne_aguardando','pagamento'))" : '')
                 . $whereTipoCompra
                 . ($reabertos && !empty($reabertos['items'])
                     ? ($temLojaIdEmLista
@@ -1267,6 +1272,7 @@ class AdminComprasController extends Controller {
                     : '')
                 . '   GROUP BY lc.produto_id, '
                 . ($this->columnExists('lista_compras', 'nome_produto') ? 'COALESCE(lc.nome_produto, \'\'), ' : '')
+                . ($temTipoCompraEmLista ? "COALESCE(lc.tipo_compra, ''), " : '')
                 . ($temLojaIdEmLista && $temLojaIdEmProdutos
                     ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0), lc.status'
                     : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0), lc.status' : '0, lc.status'))
@@ -1486,6 +1492,12 @@ class AdminComprasController extends Controller {
 
                 echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1">Sem loja</a>'
                     . '</div>'
+                    . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">Tipo:</small>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Online</a>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Offline</a>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'carne' ? 'btn-warning' : 'btn-outline-warning') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=carne"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</a>'
+                    . '</div>'
                     . '</div>'
                     . '</div>';
 
@@ -1635,6 +1647,7 @@ class AdminComprasController extends Controller {
                                         . '<div class="d-flex gap-2 align-items-center">' . $imgTag . '<div>'
                                         . '<strong>' . htmlspecialchars($item['produto_nome']) . '</strong>'
                                         . '<br><small class="text-muted">ID: ' . (int) $item['produto_id'] . '</small>'
+                                        . ((!empty($item['tipo_compra']) && $item['tipo_compra'] === 'carne') ? ' <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>' : '')
                                         . '</div></div>'
                                         . '</td>'
                                         . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">Sem loja</span>') . '</td>'

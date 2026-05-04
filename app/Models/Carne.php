@@ -205,6 +205,63 @@ class Carne extends Model {
         ");
         $stmt->execute([':cid' => $carneId, ':cid2' => $carneId]);
 
+        // Inserir itens do pedido na lista_compras com tipo_compra = 'carne'
+        try {
+            $carne = $this->find($carneId);
+            $pedidoId = (int) ($carne['pedido_id'] ?? 0);
+            if ($pedidoId > 0) {
+                // Buscar itens do pedido
+                $stItens = $this->connection->prepare("SELECT produto_id, quantidade FROM pedido_itens WHERE pedido_id = ? AND produto_id IS NOT NULL AND produto_id > 0");
+                $stItens->execute([$pedidoId]);
+                $itens = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                // Verificar colunas disponíveis em lista_compras
+                $colsLC = [];
+                try { $st = $this->connection->query('DESCRIBE lista_compras'); $colsLC = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $temTipoCompra = in_array('tipo_compra', $colsLC, true);
+                $temPedidoId = in_array('pedido_id', $colsLC, true);
+                $temLojaId = in_array('loja_id', $colsLC, true);
+                $temQtdFaltante = in_array('quantidade_faltante', $colsLC, true);
+
+                foreach ($itens as $item) {
+                    $prodId = (int) ($item['produto_id'] ?? 0);
+                    $qtd = (int) ($item['quantidade'] ?? 1);
+                    if ($prodId <= 0 || $qtd <= 0) continue;
+
+                    // Verificar se já existe pendência para este produto/pedido
+                    $sqlCheck = "SELECT id FROM lista_compras WHERE produto_id = ? AND status = 'pendente'";
+                    $paramsCheck = [$prodId];
+                    if ($temPedidoId) { $sqlCheck .= " AND pedido_id = ?"; $paramsCheck[] = $pedidoId; }
+                    $stCheck = $this->connection->prepare($sqlCheck . " LIMIT 1");
+                    $stCheck->execute($paramsCheck);
+                    if ($stCheck->fetchColumn()) continue; // Já existe
+
+                    // Buscar loja_id do produto
+                    $lojaId = 0;
+                    if ($temLojaId) {
+                        try {
+                            $stLoja = $this->connection->prepare("SELECT loja_id FROM produtos WHERE id = ? LIMIT 1");
+                            $stLoja->execute([$prodId]);
+                            $lojaId = (int) ($stLoja->fetchColumn() ?: 0);
+                        } catch (\Exception $e) {}
+                    }
+
+                    $cols = ['produto_id', 'quantidade_necessaria', 'prioridade', 'status', 'data_solicitacao'];
+                    $vals = ['?', '?', "'media'", "'pendente'", 'CURDATE()'];
+                    $params = [$prodId, $qtd];
+                    if ($temQtdFaltante) { $cols[] = 'quantidade_faltante'; $vals[] = '?'; $params[] = $qtd; }
+                    if ($temPedidoId) { $cols[] = 'pedido_id'; $vals[] = '?'; $params[] = $pedidoId; }
+                    if ($temLojaId) { $cols[] = 'loja_id'; $vals[] = '?'; $params[] = $lojaId; }
+                    if ($temTipoCompra) { $cols[] = 'tipo_compra'; $vals[] = "'carne'"; }
+
+                    $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')')->execute($params);
+                }
+                $this->registrarLog($carneId, $pedidoId, null, 'compra_liberada', "Itens do pedido #{$pedidoId} adicionados à lista de compras", json_encode(['itens' => count($itens)]));
+            }
+        } catch (\Exception $e) {
+            error_log('[CARNE] Erro ao inserir itens na lista_compras: ' . $e->getMessage());
+        }
+
         $this->registrarHistorico($carneId, null, 'compra_liberada', 'Primeira parcela paga. Compra interna liberada.');
     }
 
