@@ -320,7 +320,11 @@ class Carne extends Model {
             FROM carne_compras_internas ci
             JOIN carnes c ON ci.carne_id = c.id
             JOIN usuarios u ON c.cliente_id = u.id
+            LEFT JOIN pedidos p ON p.id = c.pedido_id
             WHERE " . implode(' AND ', $where) . "
+            AND p.id IS NOT NULL AND (p.deleted_at IS NULL)
+            AND p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+            GROUP BY c.pedido_id
             ORDER BY ci.created_at ASC
         ";
         $stmt = $this->connection->prepare($sql);
