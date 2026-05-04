@@ -795,4 +795,23 @@ function renderAdminSidebarStyles() {
 function renderAdminScripts() {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
 }
+
+// Widget Co-Piloto Admin — injeta automaticamente em todas as páginas admin
+function renderAdminCopilotoWidget() {
+    static $rendered = false;
+    if ($rendered) return;
+    $rendered = true;
+    $widgetFile = __DIR__ . '/admin_copiloto_widget.php';
+    if (file_exists($widgetFile)) {
+        include $widgetFile;
+    }
+}
+
+// Auto-injetar widget via register_shutdown_function (funciona em páginas inline e layout)
+if (!defined('_ADMIN_COP_WIDGET_REGISTERED')) {
+    define('_ADMIN_COP_WIDGET_REGISTERED', true);
+    register_shutdown_function(function() {
+        renderAdminCopilotoWidget();
+    });
+}
 ?>
