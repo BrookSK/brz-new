@@ -160,8 +160,27 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                             </div>
                         </div>
 
-                        <?php if ($p['status'] === 'pendente' && !$paga): ?>
-                        <!-- Parcela futura: botão para antecipar pagamento -->
+                        <?php
+                        // Mostrar botão de antecipar apenas se:
+                        // 1. Parcela está pendente (futura)
+                        // 2. Parcela anterior está paga (não pode pular)
+                        $podeAntecipar = false;
+                        if ($p['status'] === 'pendente' && !$paga) {
+                            $numAtual = (int) $p['numero_parcela'];
+                            if ($numAtual <= 1) {
+                                $podeAntecipar = true; // Primeira parcela sempre pode
+                            } else {
+                                // Verificar se a anterior está paga
+                                foreach ($carne['parcelas'] as $pAnterior) {
+                                    if ((int) $pAnterior['numero_parcela'] === $numAtual - 1 && $pAnterior['status'] === 'paga') {
+                                        $podeAntecipar = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        ?>
+                        <?php if ($podeAntecipar): ?>
                         <div class="text-center mt-2">
                             <button class="btn btn-sm btn-success" onclick="anteciparParcela(<?= $p['id'] ?>, this)">
                                 <i class="fas fa-forward me-1"></i>Antecipar pagamento desta parcela
