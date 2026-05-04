@@ -808,9 +808,22 @@ function renderAdminCopilotoWidget() {
 }
 
 // Auto-injetar widget via register_shutdown_function (funciona em páginas inline e layout)
+// NÃO injetar em rotas de API (JSON)
 if (!defined('_ADMIN_COP_WIDGET_REGISTERED')) {
     define('_ADMIN_COP_WIDGET_REGISTERED', true);
     register_shutdown_function(function() {
+        // Não injetar em respostas de API/JSON
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+        if (strpos($uri, '/api/') === 0) return;
+        $contentType = '';
+        foreach (headers_list() as $h) {
+            if (stripos($h, 'content-type:') === 0) {
+                $contentType = strtolower(trim(substr($h, 13)));
+                break;
+            }
+        }
+        if (strpos($contentType, 'application/json') !== false) return;
+        if (strpos($contentType, 'application/pdf') !== false) return;
         renderAdminCopilotoWidget();
     });
 }

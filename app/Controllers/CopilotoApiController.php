@@ -1011,11 +1011,14 @@ class CopilotoApiController extends Controller {
 
     /** POST /api/copiloto/admin/chat — Chat interno para admin/suporte */
     public function adminChat(Request $request) {
+        // Suprimir erros HTML na resposta JSON
+        $prevDisplay = ini_get('display_errors');
+        @ini_set('display_errors', '0');
         try {
             if (session_status() === PHP_SESSION_NONE) @session_start();
             $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
             if (!in_array($perfil, ['admin', 'administrator', 'administrador', 'suporte', 'support', 'vendedor', 'seller'], true)) {
-                $this->responderJson(['resposta' => 'Acesso negado.'], 403);
+                $this->responderJson(['resposta' => 'Acesso negado. Perfil: ' . ($perfil ?: 'vazio')], 403);
             }
 
             $body = $request->getBody();
@@ -1029,13 +1032,15 @@ class CopilotoApiController extends Controller {
             $service = new CopilotoService();
             $resultado = $service->chamarClaudeAdmin($mensagem, $historico);
 
+            @ini_set('display_errors', $prevDisplay);
             $this->responderJson([
                 'resposta' => $resultado['texto'],
                 'tokens_usados' => $resultado['tokens_usados'] ?? 0,
             ]);
         } catch (\Throwable $e) {
-            error_log('[CoPiloto Admin] Erro: ' . $e->getMessage());
-            $this->responderJson(['resposta' => 'Erro interno. Tente novamente.'], 500);
+            @ini_set('display_errors', $prevDisplay);
+            error_log('[CoPiloto Admin] Erro: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+            $this->responderJson(['resposta' => 'Erro: ' . $e->getMessage()], 500);
         }
     }
 }
