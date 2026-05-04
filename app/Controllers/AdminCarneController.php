@@ -110,6 +110,35 @@ class AdminCarneController extends Controller {
     }
 
     /**
+     * Desfazer status da compra interna (voltar para aguardando_compra)
+     */
+    public function desfazerCompra(Request $request, $id) {
+        $stmt = $this->db->prepare("SELECT carne_id, status FROM carne_compras_internas WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            $_SESSION['message'] = 'Registro não encontrado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes/compras-internas');
+            return;
+        }
+
+        $stmt = $this->db->prepare("
+            UPDATE carne_compras_internas SET status = 'aguardando_compra', comprado_em = NULL, recebido_em = NULL WHERE id = :id
+        ");
+        $stmt->execute([':id' => $id]);
+
+        $carneId = (int) ($row['carne_id'] ?? 0);
+        $this->carneModel->registrarHistorico($carneId, null, 'compra_desfeita',
+            'Status da compra interna revertido para aguardando_compra', null, $_SESSION['usuario_id'] ?? null);
+
+        $_SESSION['message'] = 'Status revertido para aguardando compra.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect($carneId > 0 ? "/admin/carnes/detalhes/{$carneId}" : '/admin/carnes/compras-internas');
+    }
+
+    /**
      * Marcar produto como recebido internamente
      */
     public function marcarRecebido(Request $request, $id) {

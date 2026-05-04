@@ -54,6 +54,11 @@
                                             <button type="submit" class="btn btn-sm btn-outline-success" title="Marcar Comprado"><i class="fas fa-check"></i></button>
                                         </form>
                                     <?php endif; ?>
+                                    <?php if ($ci['status'] !== 'aguardando_compra'): ?>
+                                        <form method="POST" action="/admin/carnes/desfazer-compra/<?= $ci['id'] ?>" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Desfazer" onclick="return confirm('Reverter para aguardando compra?')"><i class="fas fa-undo"></i></button>
+                                        </form>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
