@@ -1008,4 +1008,34 @@ class CopilotoApiController extends Controller {
         $limpeza = $service->limparDadosAntigos();
         $this->responderJson(['success' => true, 'conteudo_processado' => $processados, 'limpeza' => $limpeza, 'timestamp' => date('Y-m-d H:i:s')]);
     }
+
+    /** POST /api/copiloto/admin/chat — Chat interno para admin/suporte */
+    public function adminChat(Request $request) {
+        try {
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['usuario_role'] ?? ''))));
+            if (!in_array($perfil, ['admin', 'administrator', 'administrador', 'suporte', 'support', 'vendedor', 'seller'], true)) {
+                $this->responderJson(['resposta' => 'Acesso negado.'], 403);
+            }
+
+            $body = $request->getBody();
+            $mensagem = $this->sanitizar((string) ($body['mensagem'] ?? ''));
+            if ($mensagem === '' || mb_strlen($mensagem) > 2000) {
+                $this->responderJson(['resposta' => 'Mensagem vazia ou muito longa.'], 400);
+            }
+
+            $historico = is_array($body['historico'] ?? null) ? $body['historico'] : [];
+
+            $service = new CopilotoService();
+            $resultado = $service->chamarClaudeAdmin($mensagem, $historico);
+
+            $this->responderJson([
+                'resposta' => $resultado['texto'],
+                'tokens_usados' => $resultado['tokens_usados'] ?? 0,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[CoPiloto Admin] Erro: ' . $e->getMessage());
+            $this->responderJson(['resposta' => 'Erro interno. Tente novamente.'], 500);
+        }
+    }
 }

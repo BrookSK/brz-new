@@ -1383,4 +1383,161 @@ PROMPT;
         } catch (\Exception $e) {}
         return $resultado;
     }
+
+    // ========== ADMIN CHAT (respostas secas, mesma base de conhecimento) ==========
+
+    public function chamarClaudeAdmin(string $mensagem, array $historico): array {
+        $apiKey = $this->configs['api_key_claude'] ?? '';
+        if (empty($apiKey)) {
+            return ['texto' => 'API Key do Co-Piloto não configurada.', 'tokens_usados' => 0];
+        }
+
+        // Buscar base de conhecimento e conteúdo relevante
+        $docs = $this->obterBaseConhecimento();
+        $conteudoRef = $this->buscarConteudoRelevante($mensagem);
+        $resultadoBusca = $this->buscarProdutoNoBanco($mensagem);
+
+        $secaoRef = '';
+        if (!empty($conteudoRef)) {
+            $trechos = '';
+            foreach ($conteudoRef as $i => $c) {
+                $n = $i + 1;
+                $trechos .= "[{$n}] {$c['titulo']} — {$c['categoria']}\n" . mb_substr($c['texto'], 0, 1200) . "\n\n";
+            }
+            $secaoRef = "\nREFERÊNCIAS:\n{$trechos}";
+        }
+
+        $secaoProdutos = '';
+        if (!empty($resultadoBusca)) {
+            $linhas = [];
+            foreach ($resultadoBusca as $p) {
+                $linha = "- ID:{$p['id']} | {$p['nome']} | US\$ " . number_format((float)($p['preco'] ?? 0), 2);
+                if (!empty($p['peso'])) $linha .= " | {$p['peso']}kg";
+                if (!empty($p['grupo_nome'])) $linha .= " | Grupo: {$p['grupo_nome']}";
+                $linhas[] = $linha;
+            }
+            $secaoProdutos = "\nPRODUTOS ENCONTRADOS:\n" . implode("\n", $linhas);
+        }
+
+        $cambio = (float) ($this->configs['cambio_usd_brl'] ?? 5.80);
+
+        $systemPrompt = <<<PROMPT
+Você é o assistente interno da Braziliana para a equipe admin/suporte.
+Respostas CURTAS e DIRETAS. Sem emojis, sem frufru. Só o necessário.
+Idioma: português brasileiro.
+Você NÃO executa ações (carrinho, checkout, etc). Apenas responde perguntas.
+
+REGRAS DE NEGÓCIO COMPLETAS:
+
+TAXA DE SERVIÇO: US\$ 39/kg, faixas: 1,2,3,4,5,6,7,8,9,10,15,20,25,30 kg.
+Frete: SEMPRE GRÁTIS (Brasil e qualquer outro país).
+Câmbio atual: 1 USD = R\$ {$cambio}
+
+IMPOSTOS BRASIL (Receita Federal — Remessa Postal/Expressa):
+- Valor aduaneiro = valor do produto + frete + seguro
+- Imposto de Importação (II):
+  - Remessa Conforme (certificada): até US\$ 50 = 20%, acima de US\$ 50 = 60% com desconto de US\$ 20
+  - Não certificada: 60% sem desconto
+- ICMS: cálculo "por dentro" sobre (valor aduaneiro + II). Alíquota padrão 17%.
+  Base de cálculo = (valor aduaneiro + II) / (1 - 0.17)
+  ICMS = base × 0.17
+- NÃO existe IPI separado. Os impostos são II + ICMS.
+- Impostos são pré-pagos no checkout — sem surpresa na entrega.
+
+IMPOSTO LOCAL EUA: 8% em BBW, Walmart, Trader Joe's, BJ's, Achados. 0% em Costco, Sam's, Desapegos.
+
+MOEDAS E PAGAMENTO:
+- BRL: PIX ou cartão via Câmbio Real (split: produtos via Câmbio Real + taxas via Câmbio Real Taxas)
+- USD: Stripe (cartão), Zelle, Venmo
+- Carnê Braziliana: parcelamento próprio, parcelas de produtos + taxas separadas (boleto ou PIX)
+- Carteira Braziliana: saldo pré-pago em USD, pode usar no checkout
+
+LIMITES: 30kg e US\$ 2.999,99/caixa. Valor mínimo do pedido: US\$ 5,00.
+
+PRAZO: NÃO informe prazos específicos. Cada pedido varia. Oriente o cliente a abrir ticket para acompanhamento.
+
+ENVIO INTERNACIONAL:
+- Envia para qualquer país (Brasil, Canadá, Portugal, etc.)
+- Fora do Brasil: via transportadora internacional (UPS), frete grátis
+- Impostos fora do Brasil: NÃO inclusos, responsabilidade do cliente no destino
+- O cliente pode usar endereço da Braziliana nos EUA como intermediário
+
+CANCELAMENTO: Taxa fixa de US\$ 100. Impossível após despacho.
+
+ASSESSORIA (compra por link / redirecionamento):
+- Cliente manda link de produto de qualquer loja dos EUA
+- Sistema gera orçamento via ScrapingBee com valores reais
+- "Redirecionamento" = "Assessoria" = compra por link
+
+CLUBE BRAZILIANA: Assinatura que dá acesso a produtos e grupos exclusivos.
+
+FLUXO DE STATUS DOS PEDIDOS:
+1. Pendente → 2. Processando → 3. Pago → 4. Caixa Fechada (precisa peso/medidas) → 5. Etiqueta Gerada → 6. Em Transporte → 7. Aguardando Liberação Aduaneira → 8. Enviado ao Destinatário → 9. Entregue
+Cancelado pode ocorrer em qualquer etapa antes do despacho.
+
+CÁLCULO RÁPIDO (para ajudar admin a responder clientes):
+Para calcular custo total de um produto:
+1. Preço do produto em USD
+2. + Imposto local EUA (se aplicável)
+3. + Taxa de serviço (peso arredondado pra cima na faixa × \$39)
+4. + II (60% com desconto \$20 se > \$50, ou 20% se ≤ \$50)
+5. + ICMS 17% por dentro
+6. = Total em USD → × câmbio = Total em BRL
+
+BASE DE CONHECIMENTO:
+{$docs}
+{$secaoRef}
+{$secaoProdutos}
+
+Responda de forma objetiva. Se não souber, diga que não sabe.
+Se o admin perguntar como calcular algo, faça o cálculo completo.
+PROMPT;
+
+        $messages = [];
+        $maxHist = (int) ($this->configs['max_historico_enviado'] ?? 10);
+        $histSlice = array_slice($historico, -$maxHist);
+        foreach ($histSlice as $m) {
+            $role = ($m['role'] ?? 'user') === 'assistant' ? 'assistant' : 'user';
+            $messages[] = ['role' => $role, 'content' => (string) ($m['content'] ?? '')];
+        }
+        $messages[] = ['role' => 'user', 'content' => $mensagem];
+
+        $payload = [
+            'model' => self::MODELO,
+            'max_tokens' => 600,
+            'system' => $systemPrompt,
+            'messages' => $messages,
+        ];
+
+        $timeout = (int) ($this->configs['timeout_claude_ms'] ?? 15000);
+        $ch = curl_init('https://api.anthropic.com/v1/messages');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'x-api-key: ' . $apiKey,
+                'anthropic-version: 2023-06-01',
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT_MS => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError || $httpCode !== 200) {
+            error_log("[CoPiloto Admin] Claude API erro: HTTP $httpCode — curl: $curlError");
+            return ['texto' => 'Erro ao consultar a IA. Tente novamente.', 'tokens_usados' => 0];
+        }
+
+        $data = json_decode($response, true);
+        $textoResposta = trim($data['content'][0]['text'] ?? '');
+        $tokensUsados = ($data['usage']['input_tokens'] ?? 0) + ($data['usage']['output_tokens'] ?? 0);
+
+        return ['texto' => $textoResposta, 'tokens_usados' => $tokensUsados];
+    }
 }

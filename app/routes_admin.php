@@ -249,6 +249,9 @@ $router->post('/api/copiloto/prepararcheckout', 'CopilotoApiController', 'prepar
 $router->post('/api/copiloto/atualizarperfil', 'CopilotoApiController', 'atualizarPerfil');
 $router->get('/api/copiloto/cron', 'CopilotoApiController', 'cron');
 
+// Co-Piloto Admin (chat interno para equipe)
+$router->post('/api/copiloto/admin/chat', 'CopilotoApiController', 'adminChat');
+
 // Desconto com Autorização
 $router->post('/admin/configuracoes/desconto/solicitar', 'AdminDescontoAutorizacaoController', 'solicitar');
 $router->get('/admin/configuracoes/desconto/verificar', 'AdminDescontoAutorizacaoController', 'verificar');
