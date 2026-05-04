@@ -589,10 +589,10 @@ class AdminPedidosManualController extends Controller {
                                     <span id="resumoFreteWrap"><span id="resumoMoedaSymbol5">$</span> <span id="resumoFrete">0.00</span></span>
                                 </div>
 
-                                <!-- Desconto Global (subtotal + taxa de serviço) -->
+                                <!-- Desconto na Taxa de Serviço -->
                                 <div class="border rounded p-2 mt-2 mb-2" id="descontoGlobalWrap">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
-                                        <span class="text-muted small fw-bold"><i class="fas fa-tag me-1"></i>Desconto Global (subtotal + taxa)</span>
+                                        <span class="text-muted small fw-bold"><i class="fas fa-tag me-1"></i>Desconto na Taxa de Serviço</span>
                                     </div>
                                     <div class="d-flex gap-2 align-items-center">
                                         <input type="number" class="form-control form-control-sm" id="descontoGlobalValor" value="" min="0" step="0.01" placeholder="0" style="max-width:100px;">
@@ -1331,10 +1331,10 @@ function calcTotal(){
             // Aplicar desconto global (se aprovado)
             const dgAplicado = window.__DESCONTO_GLOBAL_APROVADO__ ? window.__DESCONTO_GLOBAL_VALOR_APLICADO__ : 0;
             if (dgAplicado > 0) {
-                // Recalcular desconto sobre base atualizada (subtotal + taxa podem ter mudado)
+                // Recalcular desconto sobre base atualizada (taxa pode ter mudado)
                 const dgTipo = document.getElementById('descontoGlobalTipo')?.value || 'percentual';
                 const dgVal = parseFloat(document.getElementById('descontoGlobalValor')?.value || '0');
-                const dgBase = Number(data.subtotal || subtotal) + taxaServicoShown;
+                const dgBase = taxaServicoShown;
                 let dgReal = dgTipo === 'percentual' ? dgBase * (dgVal / 100) : dgVal;
                 dgReal = Math.min(dgReal, dgBase);
                 dgReal = Math.round(dgReal * 100) / 100;
@@ -2256,13 +2256,12 @@ function solicitarDescontoGlobal() {
         return;
     }
 
-    // Calcular base (subtotal + taxa de serviço)
-    const subtotal = parseFloat(document.getElementById('subtotal_produtos')?.value || '0');
+    // Calcular base (apenas taxa de serviço)
     const taxaServico = parseFloat(document.getElementById('taxa_servico')?.value || '0');
-    const base = subtotal + taxaServico;
+    const base = taxaServico;
 
     if (base <= 0) {
-        alert('Adicione produtos ao pedido antes de solicitar desconto global.');
+        alert('Adicione produtos ao pedido antes de solicitar desconto na taxa de serviço.');
         return;
     }
 
@@ -2272,7 +2271,7 @@ function solicitarDescontoGlobal() {
 
     const fd = new FormData();
     fd.append('produto_id', 0);
-    fd.append('produto_nome', 'DESCONTO GLOBAL (Subtotal + Taxa de Serviço)');
+    fd.append('produto_nome', 'DESCONTO NA TAXA DE SERVIÇO');
     fd.append('desconto_tipo', descontoTipo);
     fd.append('desconto_valor', descontoValor);
     fd.append('preco_original', base);
@@ -2333,10 +2332,9 @@ function iniciarPollingDescontoGlobal(token) {
                         btn.disabled = true;
                     }
 
-                    // Calcular e aplicar desconto
-                    const subtotal = parseFloat(document.getElementById('subtotal_produtos')?.value || '0');
+                    // Calcular e aplicar desconto (apenas sobre taxa de serviço)
                     const taxaServico = parseFloat(document.getElementById('taxa_servico')?.value || '0');
-                    const base = subtotal + taxaServico;
+                    const base = taxaServico;
                     const tipo = tipoInp?.value || 'percentual';
                     const val = parseFloat(valorInp?.value || '0');
 
