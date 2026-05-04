@@ -103,11 +103,22 @@ $statusLabels = [
                 if (d.parcelas_sugeridas) {
                     document.getElementById('recriar-parcelas').value = d.parcelas_sugeridas;
                 }
+                // Guardar dados do pedido para recalcular ao mudar parcelas
+                window._dadosPedidoCarne = d;
+
+                var qtdParcelas = d.parcelas_sugeridas || parseInt(document.getElementById('recriar-parcelas').value) || 4;
+                var parcelaProdutos = Number(d.subtotal_brl) / qtdParcelas;
+                var parcelaTaxas = Number(d.taxas_brl) / qtdParcelas;
+                var parcelaTotal = Number(d.total_brl) / qtdParcelas;
+
                 var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
                 html += 'Forma: ' + d.forma_pagamento + ' | Moeda: ' + d.moeda + '<br>';
-                html += 'Produtos (USD): $ ' + Number(d.subtotal_usd).toFixed(2) + ' → Produtos (BRL): R$ ' + Number(d.subtotal_brl).toFixed(2) + '<br>';
-                html += 'Taxas (USD): $ ' + Number(d.taxas_usd).toFixed(2) + ' → Taxas (BRL): R$ ' + Number(d.taxas_brl).toFixed(2) + '<br>';
+                html += 'Produtos (USD): $ ' + Number(d.subtotal_usd).toFixed(2) + ' → Produtos (BRL): R$ ' + Number(d.subtotal_brl).toFixed(2);
+                html += ' — <strong>Parcela: R$ ' + parcelaProdutos.toFixed(2) + '</strong><br>';
+                html += 'Taxas (USD): $ ' + Number(d.taxas_usd).toFixed(2) + ' → Taxas (BRL): R$ ' + Number(d.taxas_brl).toFixed(2);
+                html += ' — <strong>Parcela: R$ ' + parcelaTaxas.toFixed(2) + '</strong><br>';
                 html += '<strong>Total BRL: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
+                html += ' — <strong>Parcela: R$ ' + parcelaTotal.toFixed(2) + ' (' + qtdParcelas + 'x)</strong>';
                 if (d.parcelas_sugeridas) {
                     html += '<br><span class="text-success"><i class="fas fa-check-circle"></i> Parcelas encontradas no registro: <strong>' + d.parcelas_sugeridas + 'x</strong></span>';
                 } else {
@@ -124,6 +135,34 @@ $statusLabels = [
                 erro.style.display = '';
             });
     }
+    // Recalcular parcelas ao mudar o dropdown
+    document.getElementById('recriar-parcelas').addEventListener('change', function() {
+        var d = window._dadosPedidoCarne;
+        if (!d) return;
+        var qtd = parseInt(this.value) || 1;
+        var parcelaProdutos = Number(d.subtotal_brl) / qtd;
+        var parcelaTaxas = Number(d.taxas_brl) / qtd;
+        var parcelaTotal = Number(d.total_brl) / qtd;
+        var info = document.getElementById('recriar-info');
+
+        var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
+        html += 'Forma: ' + d.forma_pagamento + ' | Moeda: ' + d.moeda + '<br>';
+        html += 'Produtos (USD): $ ' + Number(d.subtotal_usd).toFixed(2) + ' → Produtos (BRL): R$ ' + Number(d.subtotal_brl).toFixed(2);
+        html += ' — <strong>Parcela: R$ ' + parcelaProdutos.toFixed(2) + '</strong><br>';
+        html += 'Taxas (USD): $ ' + Number(d.taxas_usd).toFixed(2) + ' → Taxas (BRL): R$ ' + Number(d.taxas_brl).toFixed(2);
+        html += ' — <strong>Parcela: R$ ' + parcelaTaxas.toFixed(2) + '</strong><br>';
+        html += '<strong>Total BRL: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
+        html += ' — <strong>Parcela: R$ ' + parcelaTotal.toFixed(2) + ' (' + qtd + 'x)</strong>';
+        if (d.parcelas_sugeridas) {
+            html += '<br><span class="text-success"><i class="fas fa-check-circle"></i> Parcelas encontradas no registro: <strong>' + d.parcelas_sugeridas + 'x</strong></span>';
+        } else {
+            html += '<br><span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Quantidade de parcelas não encontrada no registro. Selecione manualmente.</span>';
+        }
+        if (d.ja_tem_carne) {
+            html += '<br><span class="text-danger"><i class="fas fa-ban"></i> Este pedido já tem um carnê (ID: ' + d.carne_id + ')</span>';
+        }
+        info.innerHTML = html;
+    });
     </script>
 
     <!-- Filtros -->
