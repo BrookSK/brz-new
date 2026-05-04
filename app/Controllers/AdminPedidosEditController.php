@@ -527,9 +527,18 @@ class AdminPedidosEditController extends Controller {
                                 <div class="mb-3">
                                     <label class="form-label">Status</label>
                                     <select class="form-select" id="pedido_status">
-                                        <?php foreach (\App\Controllers\AdminPedidosController::getStatusList() as $val => $label): ?>
-                                        <option value="<?= htmlspecialchars($val) ?>"<?= ($statusAtual === $val) ? ' selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-                                        <?php endforeach; ?>
+                                        ' . (function() use ($statusAtual) {
+                                            $html = '';
+                                            $currentLower = strtolower(trim((string) $statusAtual));
+                                            foreach (\App\Controllers\AdminPedidosController::getStatusList() as $val => $label) {
+                                                $sel = ($currentLower === strtolower($val)) ? ' selected' : '';
+                                                $html .= '<option value="' . htmlspecialchars($val) . '"' . $sel . '>' . htmlspecialchars($label) . '</option>';
+                                            }
+                                            if ($currentLower !== '' && !array_key_exists($currentLower, array_change_key_case(\App\Controllers\AdminPedidosController::getStatusList(), CASE_LOWER))) {
+                                                $html .= '<option value="' . htmlspecialchars((string) $statusAtual) . '" selected>' . htmlspecialchars(ucfirst(str_replace('_', ' ', (string) $statusAtual))) . '</option>';
+                                            }
+                                            return $html;
+                                        })() . '
                                     </select>
                                     <button type="button" class="btn btn-outline-primary w-100 mt-2" onclick="atualizarSomenteStatus()">
                                         <i class="fas fa-rotate me-1"></i>Atualizar Status
