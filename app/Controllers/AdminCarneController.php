@@ -287,4 +287,114 @@ class AdminCarneController extends Controller {
 
         require __DIR__ . '/../Views/admin/carne/configuracoes.php';
     }
+
+    /**
+     * POST /admin/carnes/recriar
+     * Recria carnê para pedidos que ficaram sem registro na tabela carnes.
+     */
+    public function recriarCarne(Request $request) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
+        $pedidoId = (int) $request->getParam('pedido_id', 0);
+        $qtdParcelas = (int) $request->getParam('quantidade_parcelas', 4);
+        if ($qtdParcelas < 1 || $qtdParcelas > 12) $qtdParcelas = 4;
+
+        if ($pedidoId <= 0) {
+            $_SESSION['message'] = 'ID do pedido inválido.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+            return;
+        }
+
+        // Verificar se já existe carnê para esse pedido
+        $stCheck = $this->db->prepare('SELECT id FROM carnes WHERE pedido_id = ? LIMIT 1');
+        $stCheck->execute([$pedidoId]);
+        if ($stCheck->fetchColumn()) {
+            $_SESSION['message'] = 'Já existe um carnê para o pedido #' . $pedidoId . '.';
+            $_SESSION['message_type'] = 'warning';
+            $this->redirect('/admin/carnes');
+            return;
+        }
+
+        // Buscar dados do pedido
+        $stPed = $this->db->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+        $stPed->execute([$pedidoId]);
+        $pedido = $stPed->fetch(\PDO::FETCH_ASSOC);
+        if (!$pedido) {
+            $_SESSION['message'] = 'Pedido #' . $pedidoId . ' não encontrado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+            return;
+        }
+
+        $clienteId = (int) ($pedido['usuario_id'] ?? 0);
+        if ($clienteId <= 0) {
+            $_SESSION['message'] = 'Pedido #' . $pedidoId . ' não tem cliente vinculado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+            return;
+        }
+
+        // Calcular valores
+        $taxaConv = 1.0;
+        try {
+            $stTx = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+            $stTx->execute();
+            $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+            if ($txVal > 1.01) $taxaConv = $txVal;
+        } catch (\Exception $e) {}
+        if ($taxaConv <= 1.01) $taxaConv = 5.85;
+
+        $subUsd = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
+        $svcUsd = (float) ($pedido['taxa_servico'] ?? ($pedido['servicos'] ?? 0));
+        $impUsd = (float) ($pedido['valor_impostos'] ?? ($pedido['impostos'] ?? 0));
+        $impLocal = (float) ($pedido['imposto_local'] ?? 0);
+
+        $subtotalProdutos = round($subUsd * $taxaConv, 2);
+        $totalTaxas = round(($svcUsd + $impUsd + $impLocal) * $taxaConv, 2);
+
+        if ($subtotalProdutos <= 0 && $totalTaxas <= 0) {
+            $_SESSION['message'] = 'Pedido #' . $pedidoId . ' tem valores zerados. Não é possível criar carnê.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+            return;
+        }
+
+        // Buscar dados do cliente
+        $stUser = $this->db->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+        $stUser->execute([$clienteId]);
+        $user = $stUser->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        try {
+            $carneId = $this->carneService->criarCarne(
+                $pedidoId,
+                $clienteId,
+                $subtotalProdutos,
+                $totalTaxas,
+                $qtdParcelas,
+                [
+                    'nome' => (string) ($user['nome'] ?? ($user['name'] ?? '')),
+                    'email' => (string) ($user['email'] ?? ''),
+                    'documento' => (string) ($user['documento'] ?? ($user['cpf'] ?? '')),
+                    'data_nascimento' => (string) ($user['data_nascimento'] ?? ($user['birth_date'] ?? '')),
+                    'telefone' => (string) ($user['telefone'] ?? ($user['phone'] ?? '')),
+                    'cep' => (string) ($user['cep'] ?? ($user['zip_code'] ?? '')),
+                    'endereco' => (string) ($user['endereco'] ?? ($user['street'] ?? '')),
+                    'numero' => (string) ($user['numero'] ?? ($user['number'] ?? '')),
+                    'bairro' => (string) ($user['bairro'] ?? ($user['district'] ?? '')),
+                    'cidade' => (string) ($user['cidade'] ?? ($user['city'] ?? '')),
+                    'estado' => (string) ($user['estado'] ?? ($user['state'] ?? '')),
+                ]
+            );
+
+            $_SESSION['message'] = 'Carnê criado com sucesso para o pedido #' . $pedidoId . ' (ID: ' . $carneId . ', ' . $qtdParcelas . ' parcelas, Produtos: R$ ' . number_format($subtotalProdutos, 2, ',', '.') . ', Taxas: R$ ' . number_format($totalTaxas, 2, ',', '.') . ')';
+            $_SESSION['message_type'] = 'success';
+            $this->redirect('/admin/carnes/detalhes/' . $carneId);
+        } catch (\Exception $e) {
+            error_log('[ADMIN CARNE] Erro ao recriar carnê pedido #' . $pedidoId . ': ' . $e->getMessage());
+            $_SESSION['message'] = 'Erro ao criar carnê: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+        }
+    }
 }

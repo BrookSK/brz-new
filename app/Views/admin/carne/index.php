@@ -31,6 +31,37 @@ $statusLabels = [
         <?php unset($_SESSION['message'], $_SESSION['message_type']); ?>
     <?php endif; ?>
 
+    <!-- Recriar Carnê -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-warning bg-opacity-10">
+            <strong><i class="fas fa-plus-circle me-1"></i> Recriar Carnê (pedido sem carnê)</strong>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/admin/carnes/recriar" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small">ID do Pedido</label>
+                    <input type="number" name="pedido_id" class="form-control form-control-sm" placeholder="Ex: 715" required min="1">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Quantidade de Parcelas</label>
+                    <select name="quantidade_parcelas" class="form-select form-select-sm">
+                        <?php for ($i = 1; $i <= 12; $i++): ?>
+                            <option value="<?= $i ?>" <?= $i === 4 ? 'selected' : '' ?>><?= $i ?>x</option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="col-md-auto">
+                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Tem certeza que deseja criar o carnê para este pedido?')">
+                        <i class="fas fa-plus me-1"></i> Criar Carnê
+                    </button>
+                </div>
+                <div class="col-md-12">
+                    <small class="text-muted">Use para pedidos com forma_pagamento = carne_braziliana que não tiveram o carnê criado automaticamente.</small>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Filtros -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
