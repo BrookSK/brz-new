@@ -2731,6 +2731,32 @@ HTML;
                 if(form) form.action = "/admin/pedidos/excluir/" + pid;
             });
         })();
+
+        // Salvar posição do scroll ao sair da página
+        window.addEventListener("beforeunload", function(){
+            try { sessionStorage.setItem("brz_pedidos_scrollY", String(window.scrollY || 0)); } catch(e){}
+        });
+
+        // Restaurar scroll e mostrar flash de sucesso ao voltar
+        (function(){
+            try {
+                var flash = sessionStorage.getItem("brz_pedidos_flash");
+                if (flash) {
+                    sessionStorage.removeItem("brz_pedidos_flash");
+                    var div = document.createElement("div");
+                    div.className = "alert alert-success alert-dismissible fade show position-fixed";
+                    div.style.cssText = "top:16px;right:16px;z-index:9999;min-width:320px;box-shadow:0 4px 16px rgba(0,0,0,.15);";
+                    div.innerHTML = "<i class=\"fas fa-check-circle me-2\"></i>" + flash + "<button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button>";
+                    document.body.appendChild(div);
+                    setTimeout(function(){ try { div.remove(); } catch(e){} }, 4000);
+                }
+                var scrollY = sessionStorage.getItem("brz_pedidos_scrollY");
+                if (scrollY) {
+                    sessionStorage.removeItem("brz_pedidos_scrollY");
+                    window.scrollTo(0, parseInt(scrollY, 10));
+                }
+            } catch(e){}
+        })();
     </script>
 </body>
 </html>';

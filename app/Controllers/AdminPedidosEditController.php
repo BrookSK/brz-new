@@ -889,7 +889,58 @@ class AdminPedidosEditController extends Controller {
             window.atualizarSomenteStatus = function(){
                 const st = document.getElementById("pedido_status")?.value;
                 if (!st) return;
-                window.location.href = "/admin/pedidos/atualizar-status/" + pedidoId + "/" + st;
+
+                // Coletar medidas junto com o status
+                const itens = [];
+                document.querySelectorAll(".item-row").forEach(function(row){
+                    const item = {
+                        quantidade: row.querySelector(".quantidade")?.value,
+                        preco_unitario: row.querySelector(".preco_unitario")?.value,
+                        produto_id: row.dataset.produtoId || "",
+                        nome_produto: row.dataset.nomeProduto || "",
+                        nome_produto_sku: row.dataset.nomeProdutoSku || "",
+                        loja: row.dataset.loja || "outro"
+                    };
+                    if (row.dataset.itemId) item.id = row.dataset.itemId;
+                    itens.push(item);
+                });
+
+                const dados = {
+                    pedido_id: pedidoId,
+                    status: st,
+                    peso_total: document.getElementById("pedido_peso_total")?.value,
+                    altura: document.getElementById("pedido_altura")?.value,
+                    largura: document.getElementById("pedido_largura")?.value,
+                    comprimento: document.getElementById("pedido_comprimento")?.value,
+                    frete: document.getElementById("valor_frete")?.value,
+                    desconto: document.getElementById("percentual_desconto")?.value,
+                    observacao_vendedor: document.getElementById("observacao_vendedor")?.value,
+                    itens: itens
+                };
+
+                fetch("/admin/pedidos/salvar", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(dados)
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (data.success) {
+                        // Guardar scroll da lista de pedidos e redirecionar com aviso
+                        var returnUrl = "/admin/pedidos";
+                        try {
+                            var scrollY = sessionStorage.getItem("brz_pedidos_scrollY");
+                            if (scrollY) returnUrl += "#scrollRestore";
+                        } catch(e){}
+                        sessionStorage.setItem("brz_pedidos_flash", "Status do pedido #" + pedidoId + " atualizado para: " + st.replace(/_/g, " "));
+                        window.location.href = returnUrl;
+                        return;
+                    }
+                    alert("Erro: " + (data.message || "Falha ao atualizar status"));
+                })
+                .catch(function(){
+                    alert("Erro ao atualizar status");
+                });
             };
 
             window.gerarLinkDiferenca = function(){
