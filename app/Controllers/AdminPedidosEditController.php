@@ -736,6 +736,14 @@ class AdminPedidosEditController extends Controller {
             const temPagamentoAsaas = ' . ($temPagamentoAsaas ? 'true' : 'false') . ';
             const totalOriginalPedido = ' . json_encode((float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0))) . ';
 
+            // Guardar URL de origem (listagem de pedidos com paginação/filtros)
+            try {
+                var ref = document.referrer || "";
+                if (ref && ref.indexOf("/admin/pedidos") !== -1 && ref.indexOf("/editar/") === -1 && ref.indexOf("/detalhes/") === -1) {
+                    sessionStorage.setItem("brz_pedidos_returnUrl", ref);
+                }
+            } catch(e){}
+
             window.abrirModalAdicionarProduto = function(){
                 if (!canEditItens) return;
                 const el = document.getElementById("modalAdicionarProduto");
@@ -878,7 +886,8 @@ class AdminPedidosEditController extends Controller {
                         var st = document.getElementById("pedido_status")?.value || "";
                         var label = st.replace(/_/g, " ");
                         sessionStorage.setItem("brz_pedidos_flash", "Pedido #" + pedidoId + " salvo com sucesso" + (label ? " — Status: " + label : ""));
-                        window.location.href = "/admin/pedidos";
+                        var returnUrl = sessionStorage.getItem("brz_pedidos_returnUrl") || "/admin/pedidos";
+                        window.location.href = returnUrl;
                         return;
                     }
                     alert("Erro: " + (data.message || "Falha ao salvar"));
@@ -928,13 +937,8 @@ class AdminPedidosEditController extends Controller {
                 .then(function(r){ return r.json(); })
                 .then(function(data){
                     if (data.success) {
-                        // Guardar scroll da lista de pedidos e redirecionar com aviso
-                        var returnUrl = "/admin/pedidos";
-                        try {
-                            var scrollY = sessionStorage.getItem("brz_pedidos_scrollY");
-                            if (scrollY) returnUrl += "#scrollRestore";
-                        } catch(e){}
                         sessionStorage.setItem("brz_pedidos_flash", "Status do pedido #" + pedidoId + " atualizado para: " + st.replace(/_/g, " "));
+                        var returnUrl = sessionStorage.getItem("brz_pedidos_returnUrl") || "/admin/pedidos";
                         window.location.href = returnUrl;
                         return;
                     }
