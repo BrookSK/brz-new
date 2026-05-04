@@ -638,7 +638,11 @@ class AdminPedidosController extends Controller {
                 exit;
             }
 
-            $stmt = $pdo->query("SELECT p.*, u.name as cliente_nome, u.email as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC LIMIT 200");
+            $hasDeletedBy = in_array('deleted_by', $colsPedidos, true);
+            $deletedByJoin = $hasDeletedBy ? 'LEFT JOIN usuarios d ON p.deleted_by = d.id' : '';
+            $deletedBySelect = $hasDeletedBy ? ', d.name as deletado_por_nome, d.email as deletado_por_email' : '';
+
+            $stmt = $pdo->query("SELECT p.*, u.name as cliente_nome, u.email as cliente_email {$deletedBySelect} FROM pedidos p LEFT JOIN usuarios u ON p.usuario_id = u.id {$deletedByJoin} WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC LIMIT 200");
             $pedidos = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
         } catch (\Exception $e) {
             $pedidos = [];
@@ -673,15 +677,19 @@ class AdminPedidosController extends Controller {
         } else {
             echo '<div class="table-responsive">'
                 . '<table class="table table-sm align-middle">'
-                . '<thead><tr><th>Pedido</th><th>Cliente</th><th>Email</th><th>Excluído em</th><th>Ações</th></tr></thead><tbody>';
+                . '<thead><tr><th>Pedido</th><th>Cliente</th><th>Email</th><th>Excluído por</th><th>Excluído em</th><th>Ações</th></tr></thead><tbody>';
             foreach ($pedidos as $p) {
                 $pid = (int) ($p['id'] ?? 0);
                 $dt = (string) ($p['deleted_at'] ?? '');
                 $dtFmt = $dt !== '' ? date('d/m/Y H:i', strtotime($dt)) : '-';
+                $deletadoPor = trim((string) ($p['deletado_por_nome'] ?? ''));
+                $deletadoPorEmail = trim((string) ($p['deletado_por_email'] ?? ''));
+                $deletadoPorDisplay = $deletadoPor !== '' ? $deletadoPor : ($deletadoPorEmail !== '' ? $deletadoPorEmail : '<span class="text-muted">—</span>');
                 echo '<tr>'
                     . '<td><strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong></td>'
                     . '<td>' . htmlspecialchars((string) ($p['cliente_nome'] ?? '')) . '</td>'
                     . '<td>' . htmlspecialchars((string) ($p['cliente_email'] ?? '')) . '</td>'
+                    . '<td>' . ($deletadoPor !== '' || $deletadoPorEmail !== '' ? htmlspecialchars($deletadoPorDisplay) : '<span class="text-muted">—</span>') . '</td>'
                     . '<td>' . htmlspecialchars($dtFmt) . '</td>'
                     . '<td>'
                     . '<div class="d-flex gap-2">'
