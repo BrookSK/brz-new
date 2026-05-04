@@ -117,13 +117,14 @@ class Carne extends Model {
 
         $stmt = $this->connection->prepare("
             SELECT c.*, 
+                LOWER(COALESCE(p.status,'')) AS pedido_status,
                 (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas,
                 (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento
             FROM carnes c
             INNER JOIN pedidos p ON p.id = c.pedido_id
             WHERE c.cliente_id = :cid
               {$deletedFilter}
-              AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+              AND LOWER(COALESCE(p.status,'')) NOT IN ('excluido','excluída','deleted','lixeira','trash')
             ORDER BY c.created_at DESC
         ");
         $stmt->execute([':cid' => $clienteId]);

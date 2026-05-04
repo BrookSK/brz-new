@@ -98,6 +98,16 @@ class CarneController extends Controller {
             return;
         }
 
+        // Bloquear se pedido cancelado
+        $carneCompleto = $this->carneModel->getCompleto($carne['id']);
+        $pedidoStatus = strtolower(trim((string) ($carneCompleto['pedido_status'] ?? '')));
+        if (in_array($pedidoStatus, ['cancelado','cancelada','cancelled','canceled'], true)) {
+            $_SESSION['message'] = 'Este carnê pertence a um pedido cancelado. Não é possível gerar boletos.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meu-carne/' . $carne['id']);
+            return;
+        }
+
         try {
             // Gerar novos boletos para a parcela
             $clientData = $this->carneService->buildClientData([], $carne['id']);
@@ -141,6 +151,14 @@ class CarneController extends Controller {
         $carne = $this->carneModel->find($parcela['carne_id']);
         if (!$carne || (int) $carne['cliente_id'] !== (int) $_SESSION['usuario_id']) {
             $this->json(['success' => false, 'message' => 'Acesso negado'], 403);
+            return;
+        }
+
+        // Bloquear se pedido cancelado
+        $carneCompleto = $this->carneModel->getCompleto($carne['id']);
+        $pedidoStatus = strtolower(trim((string) ($carneCompleto['pedido_status'] ?? '')));
+        if (in_array($pedidoStatus, ['cancelado','cancelada','cancelled','canceled'], true)) {
+            $this->json(['success' => false, 'message' => 'Este carnê pertence a um pedido cancelado. Não é possível gerar pagamentos.'], 400);
             return;
         }
 
@@ -204,6 +222,14 @@ class CarneController extends Controller {
         $carne = $this->carneModel->find($parcela['carne_id']);
         if (!$carne || $carne['cliente_id'] != $_SESSION['usuario_id']) {
             $this->json(['success' => false, 'message' => 'Acesso negado'], 403);
+        }
+
+        // Bloquear se pedido cancelado
+        $carneCompleto = $this->carneModel->getCompleto($carne['id']);
+        $pedidoStatus = strtolower(trim((string) ($carneCompleto['pedido_status'] ?? '')));
+        if (in_array($pedidoStatus, ['cancelado','cancelada','cancelled','canceled'], true)) {
+            $this->json(['success' => false, 'message' => 'Este carnê pertence a um pedido cancelado. Não é possível gerar pagamentos.'], 400);
+            return;
         }
 
         if ($parcela['status'] === 'paga') {

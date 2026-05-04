@@ -44,26 +44,46 @@
                     $pagas = (int) ($c['parcelas_pagas'] ?? 0);
                     $total = (int) $c['quantidade_parcelas'];
                     $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
+                    $pedidoCancelado = in_array(($c['pedido_status'] ?? ''), ['cancelado','cancelada','cancelled','canceled'], true);
                 ?>
-                <div class="card border-0 shadow-sm mb-3">
+                <div class="card border-0 shadow-sm mb-3<?= $pedidoCancelado ? ' opacity-75' : '' ?>">
                     <div class="card-body">
+                        <?php if ($pedidoCancelado): ?>
+                            <div class="alert alert-danger py-2 px-3 mb-3 d-flex align-items-center gap-2" style="border-radius: 10px;">
+                                <i class="fas fa-ban"></i>
+                                <strong>Pedido cancelado</strong>
+                                <span class="text-muted small">— Este carnê não aceita mais pagamentos.</span>
+                            </div>
+                        <?php endif; ?>
                         <div class="row align-items-center">
                             <div class="col-md-7">
                                 <div class="d-flex align-items-center mb-2">
-                                    <span class="badge bg-<?= $st['cor'] ?> me-2">
-                                        <i class="fas fa-<?= $st['icon'] ?> me-1"></i><?= ucfirst(str_replace('_', ' ', $c['status'])) ?>
-                                    </span>
+                                    <?php if ($pedidoCancelado): ?>
+                                        <span class="badge bg-danger me-2">
+                                            <i class="fas fa-ban me-1"></i>Cancelado
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="badge bg-<?= $st['cor'] ?> me-2">
+                                            <i class="fas fa-<?= $st['icon'] ?> me-1"></i><?= ucfirst(str_replace('_', ' ', $c['status'])) ?>
+                                        </span>
+                                    <?php endif; ?>
                                     <span class="text-muted small">Pedido #<?= $c['pedido_id'] ?> — <?= date('d/m/Y', strtotime($c['created_at'])) ?></span>
                                 </div>
-                                <h5 class="mb-1">R$ <?= number_format($c['total_geral'], 2, ',', '.') ?></h5>
+                                <h5 class="mb-1<?= $pedidoCancelado ? ' text-decoration-line-through text-muted' : '' ?>">R$ <?= number_format($c['total_geral'], 2, ',', '.') ?></h5>
                                 <p class="text-muted small mb-2"><?= $total ?>x de R$ <?= number_format($c['total_geral'] / max($total, 1), 2, ',', '.') ?></p>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar bg-<?= $progresso >= 100 ? 'success' : 'primary' ?>" style="width: <?= $progresso ?>%"></div>
-                                </div>
-                                <small class="text-muted"><?= $pagas ?> de <?= $total ?> parcelas pagas</small>
+                                <?php if (!$pedidoCancelado): ?>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-<?= $progresso >= 100 ? 'success' : 'primary' ?>" style="width: <?= $progresso ?>%"></div>
+                                    </div>
+                                    <small class="text-muted"><?= $pagas ?> de <?= $total ?> parcelas pagas</small>
+                                <?php else: ?>
+                                    <small class="text-danger"><i class="fas fa-times-circle me-1"></i><?= $pagas ?> de <?= $total ?> parcelas foram pagas antes do cancelamento</small>
+                                <?php endif; ?>
                             </div>
                             <div class="col-md-3 text-center">
-                                <?php if (!empty($c['proximo_vencimento'])): ?>
+                                <?php if ($pedidoCancelado): ?>
+                                    <span class="text-danger fw-bold"><i class="fas fa-ban"></i> Cancelado</span>
+                                <?php elseif (!empty($c['proximo_vencimento'])): ?>
                                     <small class="text-muted d-block">Próximo vencimento</small>
                                     <span class="fw-bold"><?= date('d/m/Y', strtotime($c['proximo_vencimento'])) ?></span>
                                 <?php elseif ($c['status'] === 'quitado' || $c['status'] === 'liberado_envio'): ?>
@@ -71,7 +91,7 @@
                                 <?php endif; ?>
                             </div>
                             <div class="col-md-2 text-end">
-                                <a href="/meu-carne/<?= $c['id'] ?>" class="btn btn-outline-primary btn-sm">
+                                <a href="/meu-carne/<?= $c['id'] ?>" class="btn btn-outline-<?= $pedidoCancelado ? 'secondary' : 'primary' ?> btn-sm">
                                     <i class="fas fa-eye me-1"></i>Detalhes
                                 </a>
                             </div>

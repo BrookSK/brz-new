@@ -5,6 +5,7 @@ $pagas = 0;
 foreach ($carne['parcelas'] as $pp) { if ($pp['status'] === 'paga') $pagas++; }
 $total = (int) $carne['quantidade_parcelas'];
 $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
+$pedidoCancelado = in_array(strtolower(trim((string) ($carne['pedido_status'] ?? ''))), ['cancelado','cancelada','cancelled','canceled'], true);
 ?>
 <div class="container py-5">
     <div class="row g-4">
@@ -21,6 +22,16 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                     <?= ucfirst(str_replace('_', ' ', $carne['status'])) ?>
                 </span>
             </div>
+
+            <?php if ($pedidoCancelado): ?>
+            <div class="alert alert-danger d-flex align-items-center gap-2 mb-4" style="border-radius: 12px;">
+                <i class="fas fa-ban fs-4"></i>
+                <div>
+                    <strong>Pedido cancelado</strong><br>
+                    <span class="small">Este carnê não aceita mais pagamentos. As parcelas já pagas ficam registradas para consulta.</span>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Resumo -->
             <div class="card border-0 shadow-sm mb-4">
@@ -88,6 +99,13 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                             </div>
                         </div>
                     <?php else: ?>
+                        <?php if ($pedidoCancelado): ?>
+                        <!-- Parcela pendente mas pedido cancelado: bloquear pagamento -->
+                        <div class="text-center py-2">
+                            <span class="badge bg-danger"><i class="fas fa-ban me-1"></i>Cancelado</span>
+                            <div class="small text-muted mt-1">Pagamento bloqueado — pedido cancelado</div>
+                        </div>
+                        <?php else: ?>
                         <!-- Parcela pendente: mostrar pagamento -->
                         <div class="row">
                             <!-- Produtos (Câmbio Real) -->
@@ -200,6 +218,7 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                             </form>
                         </div>
                         <?php endif; ?>
+                        <?php endif; /* fim pedidoCancelado */ ?>
                     <?php endif; ?>
                 </div>
             </div>
