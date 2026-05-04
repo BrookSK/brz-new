@@ -2486,12 +2486,22 @@ function updateCambioRealFeesPreview() {
     // Obter valor de taxas/impostos (taxa de serviço + impostos BR + imposto local)
     let taxasBrl = 0;
     try {
-        const taxaEl = document.getElementById('taxa_servico');
-        const impostosEl = document.getElementById('impostos_br');
-        const impLocalEl = document.getElementById('imposto_local');
-        if (taxaEl) { const v = parseFloat((taxaEl.textContent||'').replace(/[^0-9,\.\-]/g,'').replace(',','.')); if (isFinite(v)) taxasBrl += v; }
-        if (impostosEl) { const v = parseFloat((impostosEl.textContent||'').replace(/[^0-9,\.\-]/g,'').replace(',','.')); if (isFinite(v)) taxasBrl += v; }
-        if (impLocalEl) { const v = parseFloat((impLocalEl.textContent||'').replace(/[^0-9,\.\-]/g,'').replace(',','.')); if (isFinite(v)) taxasBrl += v; }
+        const taxaEl = document.getElementById('taxa-servico');
+        const impostosEl = document.getElementById('impostos');
+        const impLocalEl = document.getElementById('imposto-local');
+        // Usar data-original-value (USD) e converter para BRL, ou ler o textContent se já em BRL
+        if (taxaEl) {
+            const orig = Number(taxaEl.getAttribute('data-original-value') || 0);
+            taxasBrl += (orig > 0) ? (orig * rate) : 0;
+        }
+        if (impostosEl) {
+            const orig = Number(impostosEl.getAttribute('data-original-value') || 0);
+            taxasBrl += (orig > 0) ? (orig * rate) : 0;
+        }
+        if (impLocalEl) {
+            const orig = Number(impLocalEl.getAttribute('data-original-value') || 0);
+            taxasBrl += (orig > 0) ? (orig * rate) : 0;
+        }
     } catch(e) {}
 
     const shippingUsd = 1.99;
