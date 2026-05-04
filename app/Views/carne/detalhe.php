@@ -160,7 +160,15 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
                             </div>
                         </div>
 
-                        <?php if ($isPix && $aberta): ?>
+                        <?php if ($p['status'] === 'pendente' && !$paga): ?>
+                        <!-- Parcela futura: botão para antecipar pagamento -->
+                        <div class="text-center mt-2">
+                            <button class="btn btn-sm btn-success" onclick="anteciparParcela(<?= $p['id'] ?>, this)">
+                                <i class="fas fa-forward me-1"></i>Antecipar pagamento desta parcela
+                            </button>
+                            <div class="small text-muted mt-1">Gera os boletos/PIX para pagar antes do vencimento</div>
+                        </div>
+                        <?php elseif ($isPix && $aberta): ?>
                         <div class="text-center mt-2">
                             <button class="btn btn-sm btn-outline-success" onclick="regerarPix(<?= $p['id'] ?>, this)">
                                 <i class="fas fa-redo me-1"></i>Regerar QR Code PIX
@@ -182,6 +190,19 @@ $progresso = $total > 0 ? round(($pagas / $total) * 100) : 0;
 </div>
 
 <script>
+function anteciparParcela(parcelaId, btn) {
+    if (!confirm('Deseja antecipar o pagamento desta parcela? Os boletos/PIX serão gerados agora.')) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
+    fetch('/carne/antecipar/' + parcelaId, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { location.reload(); }
+            else { alert(data.message || 'Erro ao antecipar parcela'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-forward me-1"></i>Antecipar pagamento desta parcela'; }
+        })
+        .catch(() => { alert('Erro de conexão'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-forward me-1"></i>Antecipar pagamento desta parcela'; });
+}
+
 function regerarPix(parcelaId, btn) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';

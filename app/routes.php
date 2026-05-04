@@ -620,6 +620,7 @@ $router->get('/meus-carnes', 'CarneController', 'meusCarnes');
 $router->get('/meu-carne/{id}', 'CarneController', 'detalhe');
 $router->post('/carne/segunda-via/{parcelaId}', 'CarneController', 'segundaVia');
 $router->post('/carne/regerar-pix/{parcelaId}', 'CarneController', 'regerarPix');
+$router->post('/carne/antecipar/{parcelaId}', 'CarneController', 'antecipar');
 $router->get('/carne/calcular-parcelas', 'CarneController', 'calcularParcelas');
 
 // Cron

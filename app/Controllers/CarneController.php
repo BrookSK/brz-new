@@ -101,6 +101,71 @@ class CarneController extends Controller {
     }
 
     /**
+     * Antecipar pagamento de uma parcela futura (gerar boletos/PIX antes do vencimento)
+     */
+    public function antecipar(Request $request, $parcelaId) {
+        if (empty($_SESSION['usuario_id'])) {
+            $this->json(['success' => false, 'message' => 'Não autenticado'], 401);
+            return;
+        }
+
+        $parcela = $this->carneModel->getParcela($parcelaId);
+        if (!$parcela) {
+            $this->json(['success' => false, 'message' => 'Parcela não encontrada'], 404);
+            return;
+        }
+
+        $carne = $this->carneModel->find($parcela['carne_id']);
+        if (!$carne || (int) $carne['cliente_id'] !== (int) $_SESSION['usuario_id']) {
+            $this->json(['success' => false, 'message' => 'Acesso negado'], 403);
+            return;
+        }
+
+        if ($parcela['status'] === 'paga') {
+            $this->json(['success' => false, 'message' => 'Esta parcela já está paga'], 400);
+            return;
+        }
+
+        if (!in_array($parcela['status'], ['pendente'], true)) {
+            $this->json(['success' => false, 'message' => 'Esta parcela já está em andamento. Use "Regerar PIX" ou "2ª Via Boleto".'], 400);
+            return;
+        }
+
+        // Verificar se a parcela anterior está paga (não pode pular parcelas)
+        $numeroParcela = (int) ($parcela['numero_parcela'] ?? 0);
+        if ($numeroParcela > 1) {
+            $parcelas = $this->carneModel->getParcelas($carne['id']);
+            foreach ($parcelas as $p) {
+                if ((int) $p['numero_parcela'] === $numeroParcela - 1) {
+                    if ($p['status'] !== 'paga') {
+                        $this->json(['success' => false, 'message' => 'A parcela anterior (#' . ($numeroParcela - 1) . ') ainda não foi paga. Pague na ordem.'], 400);
+                        return;
+                    }
+                    break;
+                }
+            }
+        }
+
+        try {
+            // Ativar a parcela
+            $this->carneModel->atualizarParcela($parcelaId, ['status' => 'aguardando_pagamento']);
+
+            // Gerar boletos/PIX
+            $clientData = $this->carneService->buildClientData([], $carne['id']);
+            $descBase = "Carnê Braziliana - Pedido #{$carne['pedido_id']} - Parcela {$parcela['numero_parcela']}";
+            $this->carneService->gerarBoletosParcela($parcela, $carne['pedido_id'], $clientData);
+
+            $this->carneModel->registrarHistorico($carne['id'], $parcelaId, 'parcela_antecipada',
+                "Parcela {$parcela['numero_parcela']} antecipada pelo cliente");
+
+            $this->json(['success' => true, 'message' => 'Parcela antecipada! Os boletos foram gerados.']);
+        } catch (\Exception $e) {
+            error_log('[CARNE] Erro ao antecipar parcela: ' . $e->getMessage());
+            $this->json(['success' => false, 'message' => 'Erro ao gerar boletos: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Regerar PIX de uma parcela (quando expirou)
      */
     public function regerarPix(Request $request, $parcelaId) {
