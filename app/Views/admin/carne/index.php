@@ -32,35 +32,98 @@ $statusLabels = [
     <?php endif; ?>
 
     <!-- Recriar Carnê -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-warning bg-opacity-10">
-            <strong><i class="fas fa-plus-circle me-1"></i> Recriar Carnê (pedido sem carnê)</strong>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="/admin/carnes/recriar" class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label small">ID do Pedido</label>
-                    <input type="number" name="pedido_id" class="form-control form-control-sm" placeholder="Ex: 715" required min="1">
+    <div class="mb-4">
+        <button class="btn btn-outline-warning btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#recriarCarneCollapse">
+            <i class="fas fa-plus-circle me-1"></i> Recriar Carnê (pedido sem carnê)
+        </button>
+        <div class="collapse mt-2" id="recriarCarneCollapse">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small">ID do Pedido</label>
+                            <input type="number" id="recriar-pedido-id" class="form-control form-control-sm" placeholder="Ex: 715" min="1">
+                        </div>
+                        <div class="col-md-auto">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="buscarDadosPedidoCarne()">
+                                <i class="fas fa-search me-1"></i> Buscar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="recriar-resultado" class="mt-3" style="display:none;">
+                        <div id="recriar-info" class="alert alert-info small"></div>
+                        <form method="POST" action="/admin/carnes/recriar" id="recriar-form">
+                            <input type="hidden" name="pedido_id" id="recriar-form-pedido-id">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Quantidade de Parcelas</label>
+                                    <select name="quantidade_parcelas" id="recriar-parcelas" class="form-select form-select-sm">
+                                        <?php for ($i = 1; $i <= 12; $i++): ?>
+                                            <option value="<?= $i ?>" <?= $i === 4 ? 'selected' : '' ?>><?= $i ?>x</option>
+                                        <?php endfor; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-auto">
+                                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Criar carnê para este pedido?')">
+                                        <i class="fas fa-plus me-1"></i> Criar Carnê
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div id="recriar-erro" class="mt-2 alert alert-danger small" style="display:none;"></div>
+                    <small class="text-muted d-block mt-2">Para pedidos com forma_pagamento = carne_braziliana que não tiveram o carnê criado automaticamente.</small>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label small">Quantidade de Parcelas</label>
-                    <select name="quantidade_parcelas" class="form-select form-select-sm">
-                        <?php for ($i = 1; $i <= 12; $i++): ?>
-                            <option value="<?= $i ?>" <?= $i === 4 ? 'selected' : '' ?>><?= $i ?>x</option>
-                        <?php endfor; ?>
-                    </select>
-                </div>
-                <div class="col-md-auto">
-                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Tem certeza que deseja criar o carnê para este pedido?')">
-                        <i class="fas fa-plus me-1"></i> Criar Carnê
-                    </button>
-                </div>
-                <div class="col-md-12">
-                    <small class="text-muted">Use para pedidos com forma_pagamento = carne_braziliana que não tiveram o carnê criado automaticamente.</small>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
+    <script>
+    function buscarDadosPedidoCarne() {
+        var pid = document.getElementById('recriar-pedido-id').value;
+        if (!pid || pid <= 0) { alert('Informe o ID do pedido'); return; }
+        var info = document.getElementById('recriar-info');
+        var resultado = document.getElementById('recriar-resultado');
+        var erro = document.getElementById('recriar-erro');
+        erro.style.display = 'none';
+        resultado.style.display = 'none';
+        info.textContent = 'Buscando...';
+        resultado.style.display = '';
+
+        fetch('/admin/carnes/buscar-pedido?pedido_id=' + encodeURIComponent(pid))
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) {
+                    resultado.style.display = 'none';
+                    erro.textContent = d.error;
+                    erro.style.display = '';
+                    return;
+                }
+                document.getElementById('recriar-form-pedido-id').value = d.pedido_id;
+                if (d.parcelas_sugeridas) {
+                    document.getElementById('recriar-parcelas').value = d.parcelas_sugeridas;
+                }
+                var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
+                html += 'Forma: ' + d.forma_pagamento + ' | Moeda: ' + d.moeda + '<br>';
+                html += 'Produtos (USD): $ ' + Number(d.subtotal_usd).toFixed(2) + ' → Produtos (BRL): R$ ' + Number(d.subtotal_brl).toFixed(2) + '<br>';
+                html += 'Taxas (USD): $ ' + Number(d.taxas_usd).toFixed(2) + ' → Taxas (BRL): R$ ' + Number(d.taxas_brl).toFixed(2) + '<br>';
+                html += '<strong>Total BRL: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
+                if (d.parcelas_sugeridas) {
+                    html += '<br><span class="text-success"><i class="fas fa-check-circle"></i> Parcelas encontradas no registro: <strong>' + d.parcelas_sugeridas + 'x</strong></span>';
+                } else {
+                    html += '<br><span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Quantidade de parcelas não encontrada no registro. Selecione manualmente.</span>';
+                }
+                if (d.ja_tem_carne) {
+                    html += '<br><span class="text-danger"><i class="fas fa-ban"></i> Este pedido já tem um carnê (ID: ' + d.carne_id + ')</span>';
+                }
+                info.innerHTML = html;
+            })
+            .catch(function(e) {
+                resultado.style.display = 'none';
+                erro.textContent = 'Erro ao buscar: ' + e.message;
+                erro.style.display = '';
+            });
+    }
+    </script>
 
     <!-- Filtros -->
     <div class="card border-0 shadow-sm mb-4">

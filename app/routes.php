@@ -639,6 +639,7 @@ $router->post('/admin/carnes/reenviar-notificacao/{carneId}', 'AdminCarneControl
 $router->get('/admin/carnes/configuracoes', 'AdminCarneController', 'configuracoes');
 $router->post('/admin/carnes/configuracoes', 'AdminCarneController', 'configuracoes');
 $router->post('/admin/carnes/recriar', 'AdminCarneController', 'recriarCarne');
+$router->get('/admin/carnes/buscar-pedido', 'AdminCarneController', 'buscarPedido');
 
 // Área do Representante
 $router->get('/admin/representante/produtos', 'AdminProdutosController', 'index');

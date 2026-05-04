@@ -289,6 +289,117 @@ class AdminCarneController extends Controller {
     }
 
     /**
+     * GET /admin/carnes/buscar-pedido?pedido_id=X
+     * Retorna dados do pedido para o formulário de recriar carnê.
+     */
+    public function buscarPedido(Request $request) {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $pedidoId = (int) $request->getParam('pedido_id', 0);
+        if ($pedidoId <= 0) {
+            echo json_encode(['error' => 'ID do pedido inválido.']);
+            return;
+        }
+
+        $stPed = $this->db->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+        $stPed->execute([$pedidoId]);
+        $pedido = $stPed->fetch(\PDO::FETCH_ASSOC);
+        if (!$pedido) {
+            echo json_encode(['error' => 'Pedido #' . $pedidoId . ' não encontrado.']);
+            return;
+        }
+
+        // Verificar se já tem carnê
+        $stCheck = $this->db->prepare('SELECT id FROM carnes WHERE pedido_id = ? LIMIT 1');
+        $stCheck->execute([$pedidoId]);
+        $carneExistente = $stCheck->fetchColumn();
+
+        // Buscar cliente
+        $clienteId = (int) ($pedido['usuario_id'] ?? 0);
+        $clienteNome = '';
+        $clienteEmail = '';
+        if ($clienteId > 0) {
+            $stUser = $this->db->prepare('SELECT nome, email FROM usuarios WHERE id = ? LIMIT 1');
+            $stUser->execute([$clienteId]);
+            $user = $stUser->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $clienteNome = (string) ($user['nome'] ?? '');
+            $clienteEmail = (string) ($user['email'] ?? '');
+        }
+
+        // Câmbio
+        $taxaConv = 1.0;
+        try {
+            $stTx = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+            $stTx->execute();
+            $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+            if ($txVal > 1.01) $taxaConv = $txVal;
+        } catch (\Exception $e) {}
+        if ($taxaConv <= 1.01) $taxaConv = 5.85;
+
+        $subUsd = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
+        $svcUsd = (float) ($pedido['taxa_servico'] ?? ($pedido['servicos'] ?? 0));
+        $impUsd = (float) ($pedido['valor_impostos'] ?? ($pedido['impostos'] ?? 0));
+        $impLocal = (float) ($pedido['imposto_local'] ?? 0);
+        $taxasUsd = $svcUsd + $impUsd + $impLocal;
+
+        // Tentar encontrar quantidade de parcelas no pedido_meta
+        $parcelasSugeridas = null;
+        try {
+            // Tentar pedido_meta
+            $stMeta = $this->db->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key IN ('carne_parcelas','quantidade_parcelas','parcelas') LIMIT 1");
+            $stMeta->execute([$pedidoId]);
+            $metaVal = $stMeta->fetchColumn();
+            if ($metaVal && (int) $metaVal > 0 && (int) $metaVal <= 12) {
+                $parcelasSugeridas = (int) $metaVal;
+            }
+        } catch (\Exception $e) {}
+
+        // Tentar campo direto no pedido
+        if (!$parcelasSugeridas) {
+            foreach (['carne_parcelas', 'quantidade_parcelas', 'parcelas'] as $col) {
+                if (isset($pedido[$col]) && (int) $pedido[$col] > 0 && (int) $pedido[$col] <= 12) {
+                    $parcelasSugeridas = (int) $pedido[$col];
+                    break;
+                }
+            }
+        }
+
+        // Tentar no observacao/metadata do pedido (pode ter sido salvo como JSON)
+        if (!$parcelasSugeridas) {
+            foreach (['observacao', 'metadata', 'dados_extras'] as $col) {
+                if (!empty($pedido[$col]) && is_string($pedido[$col])) {
+                    $decoded = @json_decode($pedido[$col], true);
+                    if (is_array($decoded)) {
+                        foreach (['carne_parcelas', 'quantidade_parcelas', 'parcelas'] as $k) {
+                            if (isset($decoded[$k]) && (int) $decoded[$k] > 0 && (int) $decoded[$k] <= 12) {
+                                $parcelasSugeridas = (int) $decoded[$k];
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        echo json_encode([
+            'pedido_id' => $pedidoId,
+            'forma_pagamento' => (string) ($pedido['forma_pagamento'] ?? ''),
+            'moeda' => (string) ($pedido['moeda'] ?? 'BRL'),
+            'cliente_nome' => $clienteNome,
+            'cliente_email' => $clienteEmail,
+            'subtotal_usd' => round($subUsd, 2),
+            'taxas_usd' => round($taxasUsd, 2),
+            'subtotal_brl' => round($subUsd * $taxaConv, 2),
+            'taxas_brl' => round($taxasUsd * $taxaConv, 2),
+            'total_brl' => round(($subUsd + $taxasUsd) * $taxaConv, 2),
+            'cambio' => $taxaConv,
+            'parcelas_sugeridas' => $parcelasSugeridas,
+            'ja_tem_carne' => !empty($carneExistente),
+            'carne_id' => $carneExistente ? (int) $carneExistente : null,
+        ]);
+    }
+
+    /**
      * POST /admin/carnes/recriar
      * Recria carnê para pedidos que ficaram sem registro na tabela carnes.
      */
