@@ -4400,8 +4400,76 @@ LINKSCRIPT;
                                 ' . (($statusBloqueadoPorComprovante ?? false) ? '<div class="alert alert-warning">Envie o comprovante para liberar a edição do status.</div>' : '') . '
                                 <button onclick="atualizarStatus()" class="btn btn-primary w-100" ' . (($statusBloqueadoPorComprovante ?? false) ? 'disabled' : '') . '>Atualizar Status</button>
                             </div>
-                        </div>
-                        
+                        </div>';
+
+                        // Card de Carnê Braziliana (se o pedido tiver carnê vinculado)
+                        try {
+                            $dbCarne = \Config\Database::getConnection();
+                            $stCarne = $dbCarne->prepare("
+                                SELECT c.id, c.status, c.quantidade_parcelas, c.total_geral, c.created_at,
+                                    (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas,
+                                    (SELECT SUM(COALESCE(valor_produtos,0) + COALESCE(valor_taxas,0)) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as valor_pago,
+                                    (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento
+                                FROM carnes c WHERE c.pedido_id = ? LIMIT 1
+                            ");
+                            $stCarne->execute([(int) $pedido['id']]);
+                            $carneInfo = $stCarne->fetch(\PDO::FETCH_ASSOC);
+
+                            if ($carneInfo) {
+                                $cPagas = (int) ($carneInfo['parcelas_pagas'] ?? 0);
+                                $cTotal = (int) ($carneInfo['quantidade_parcelas'] ?? 0);
+                                $cProgresso = $cTotal > 0 ? round(($cPagas / $cTotal) * 100) : 0;
+                                $cStatusMap = [
+                                    'aguardando_primeira_parcela' => ['cor' => 'info', 'label' => 'Aguardando 1ª parcela'],
+                                    'ativo' => ['cor' => 'primary', 'label' => 'Ativo'],
+                                    'em_andamento' => ['cor' => 'primary', 'label' => 'Em andamento'],
+                                    'com_atraso' => ['cor' => 'danger', 'label' => 'Com atraso'],
+                                    'quitado' => ['cor' => 'success', 'label' => 'Quitado'],
+                                    'liberado_envio' => ['cor' => 'success', 'label' => 'Liberado p/ envio'],
+                                    'encerrado' => ['cor' => 'secondary', 'label' => 'Encerrado'],
+                                ];
+                                $cSt = $cStatusMap[$carneInfo['status']] ?? ['cor' => 'secondary', 'label' => ucfirst(str_replace('_', ' ', $carneInfo['status']))];
+                                $cValorPago = (float) ($carneInfo['valor_pago'] ?? 0);
+                                $cTotalGeral = (float) ($carneInfo['total_geral'] ?? 0);
+
+                                echo '
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Carnê Braziliana</h5>
+                                <span class="badge bg-' . $cSt['cor'] . '">' . htmlspecialchars($cSt['label']) . '</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center mb-3">
+                                    <div class="col-4">
+                                        <small class="text-muted d-block">Parcelas</small>
+                                        <span class="fw-bold">' . $cPagas . ' / ' . $cTotal . '</span>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted d-block">Valor Pago</small>
+                                        <span class="fw-bold text-success">R$ ' . number_format($cValorPago, 2, ',', '.') . '</span>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted d-block">Total Carnê</small>
+                                        <span class="fw-bold">R$ ' . number_format($cTotalGeral, 2, ',', '.') . '</span>
+                                    </div>
+                                </div>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-' . ($cProgresso >= 100 ? 'success' : 'primary') . '" style="width: ' . $cProgresso . '%"></div>
+                                </div>';
+                                if (!empty($carneInfo['proximo_vencimento'])) {
+                                    echo '<p class="small text-muted mb-2"><i class="fas fa-calendar me-1"></i>Próximo vencimento: <strong>' . date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) . '</strong></p>';
+                                }
+                                echo '<a href="/admin/carnes/detalhes/' . (int) $carneInfo['id'] . '" class="btn btn-outline-primary btn-sm w-100">
+                                    <i class="fas fa-external-link-alt me-1"></i>Ver detalhes do Carnê
+                                </a>
+                            </div>
+                        </div>';
+                            }
+                        } catch (\Exception $e) {
+                            // Silenciar — tabela carnes pode não existir
+                        }
+
+                        echo '
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <h5 class="mb-0">Dados do Cliente</h5>
