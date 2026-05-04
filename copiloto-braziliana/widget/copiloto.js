@@ -324,6 +324,9 @@
           <button id="bz-copiloto-close" aria-label="Fechar">&times;</button>
         </div>
         <div id="bz-copiloto-messages"></div>
+        <div id="bz-copiloto-disclaimer" style="padding:4px 12px;background:#fff8e1;border-top:1px solid #ffe082;font-size:11px;color:#8d6e00;text-align:center;line-height:1.3;">
+          ⚠️ A Bri é uma assistente de IA e pode cometer erros. Confirme informações importantes.
+        </div>
         <div id="bz-copiloto-input-area">
           <input type="text" id="bz-copiloto-input" placeholder="Fala comigo..." maxlength="2000" autocomplete="off" />
           <button id="bz-copiloto-send" aria-label="Enviar">

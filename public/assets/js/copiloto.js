@@ -1214,6 +1214,7 @@
         '<div class="bz-header-actions"><button id="bz-copiloto-clear" aria-label="Limpar conversa" title="Limpar conversa">🗑</button>' +
         '<button id="bz-copiloto-close" aria-label="Fechar">&times;</button></div></div>' +
         '<div id="bz-copiloto-messages"></div>' +
+        '<div id="bz-copiloto-disclaimer" style="padding:4px 12px;background:#fff8e1;border-top:1px solid #ffe082;font-size:11px;color:#8d6e00;text-align:center;line-height:1.3;">⚠️ A Bri é uma assistente de IA e pode cometer erros. Confirme informações importantes.</div>' +
         '<div id="bz-copiloto-input-area">' +
           '<input type="text" id="bz-copiloto-input" placeholder="Fala comigo..." maxlength="2000" autocomplete="off" />' +
           '<button id="bz-copiloto-send" aria-label="Enviar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" fill="#fff"/></svg></button>' +
