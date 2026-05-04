@@ -382,16 +382,20 @@ class AdminCarneController extends Controller {
         }
 
         echo json_encode([
+            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL'))));
+            $isBrl = ($moedaPedido === 'BRL');
+
+        echo json_encode([
             'pedido_id' => $pedidoId,
             'forma_pagamento' => (string) ($pedido['forma_pagamento'] ?? ''),
-            'moeda' => (string) ($pedido['moeda'] ?? 'BRL'),
+            'moeda' => $moedaPedido,
             'cliente_nome' => $clienteNome,
             'cliente_email' => $clienteEmail,
             'subtotal_usd' => round($subUsd, 2),
             'taxas_usd' => round($taxasUsd, 2),
-            'subtotal_brl' => round($subUsd * $taxaConv, 2),
-            'taxas_brl' => round($taxasUsd * $taxaConv, 2),
-            'total_brl' => round(($subUsd + $taxasUsd) * $taxaConv, 2),
+            'subtotal_brl' => $isBrl ? round($subUsd, 2) : round($subUsd * $taxaConv, 2),
+            'taxas_brl' => $isBrl ? round($taxasUsd, 2) : round($taxasUsd * $taxaConv, 2),
+            'total_brl' => $isBrl ? round($subUsd + $taxasUsd, 2) : round(($subUsd + $taxasUsd) * $taxaConv, 2),
             'cambio' => $taxaConv,
             'parcelas_sugeridas' => $parcelasSugeridas,
             'ja_tem_carne' => !empty($carneExistente),
@@ -420,6 +424,41 @@ class AdminCarneController extends Controller {
         $logs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         require __DIR__ . '/../Views/admin/carne/logs.php';
+    }
+
+    /**
+     * POST /admin/carnes/marcar-parcela-paga/{parcelaId}
+     * Marca uma parcela como paga manualmente (produtos e/ou taxas).
+     */
+    public function marcarParcelaPaga(Request $request, $parcelaId) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
+        $parcela = $this->carneModel->getParcela($parcelaId);
+        if (!$parcela) {
+            $_SESSION['message'] = 'Parcela não encontrada.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/carnes');
+            return;
+        }
+
+        $tipo = (string) $request->getParam('tipo', 'ambos'); // 'produtos', 'taxas', 'ambos'
+        $carneId = (int) ($parcela['carne_id'] ?? 0);
+
+        if ($tipo === 'produtos' || $tipo === 'ambos') {
+            $this->carneModel->registrarPagamentoBoleto($parcelaId, 'produtos');
+            $this->carneModel->registrarLog($carneId, null, (int) $parcelaId, 'pagamento_confirmado', "Pagamento PRODUTOS marcado manualmente pelo admin (parcela #{$parcela['numero_parcela']})", '');
+        }
+        if ($tipo === 'taxas' || $tipo === 'ambos') {
+            $this->carneModel->registrarPagamentoBoleto($parcelaId, 'taxas');
+            $this->carneModel->registrarLog($carneId, null, (int) $parcelaId, 'pagamento_confirmado', "Pagamento TAXAS marcado manualmente pelo admin (parcela #{$parcela['numero_parcela']})", '');
+        }
+
+        $this->carneModel->registrarHistorico($carneId, $parcelaId, 'pagamento_manual',
+            "Parcela {$parcela['numero_parcela']} marcada como paga manualmente ({$tipo})", null, $_SESSION['usuario_id'] ?? null);
+
+        $_SESSION['message'] = "Parcela {$parcela['numero_parcela']} marcada como paga ({$tipo}).";
+        $_SESSION['message_type'] = 'success';
+        $this->redirect("/admin/carnes/detalhes/{$carneId}");
     }
 
     /**
@@ -484,8 +523,15 @@ class AdminCarneController extends Controller {
         $impUsd = (float) ($pedido['valor_impostos'] ?? ($pedido['impostos'] ?? 0));
         $impLocal = (float) ($pedido['imposto_local'] ?? 0);
 
-        $subtotalProdutos = round($subUsd * $taxaConv, 2);
-        $totalTaxas = round(($svcUsd + $impUsd + $impLocal) * $taxaConv, 2);
+        // Se o pedido já está em BRL, os valores já estão em reais — NÃO multiplicar pelo câmbio
+        $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL'))));
+        if ($moedaPedido === 'BRL') {
+            $subtotalProdutos = round($subUsd, 2);
+            $totalTaxas = round($svcUsd + $impUsd + $impLocal, 2);
+        } else {
+            $subtotalProdutos = round($subUsd * $taxaConv, 2);
+            $totalTaxas = round(($svcUsd + $impUsd + $impLocal) * $taxaConv, 2);
+        }
 
         if ($subtotalProdutos <= 0 && $totalTaxas <= 0) {
             $_SESSION['message'] = 'Pedido #' . $pedidoId . ' tem valores zerados. Não é possível criar carnê.';

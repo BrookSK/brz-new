@@ -52,7 +52,23 @@
                                     <td><span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_produtos'], 2, ',', '.') ?> <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?></span></td>
                                     <td><span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?> <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?></span></td>
                                     <td><span class="badge bg-<?= $p['status'] === 'paga' ? 'success' : ($p['status'] === 'em_atraso' ? 'danger' : 'secondary') ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span></td>
-                                    <td><form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-warning" title="Reemitir"><i class="fas fa-redo"></i></button></form></td>
+                                    <td>
+                                        <form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-warning" title="Reemitir"><i class="fas fa-redo"></i></button></form>
+                                        <?php if ($p['status'] !== 'paga'): ?>
+                                        <div class="btn-group btn-group-sm ms-1">
+                                            <button type="button" class="btn btn-outline-success btn-sm dropdown-toggle" data-bs-toggle="dropdown" title="Marcar como pago"><i class="fas fa-check"></i></button>
+                                            <ul class="dropdown-menu">
+                                                <?php if (!$p['boleto_produtos_pago']): ?>
+                                                <li><form method="POST" action="/admin/carnes/marcar-parcela-paga/<?= $p['id'] ?>"><input type="hidden" name="tipo" value="produtos"><button type="submit" class="dropdown-item" onclick="return confirm('Marcar PRODUTOS como pago?')"><i class="fas fa-box me-1"></i> Produtos</button></form></li>
+                                                <?php endif; ?>
+                                                <?php if (!$p['boleto_taxas_pago']): ?>
+                                                <li><form method="POST" action="/admin/carnes/marcar-parcela-paga/<?= $p['id'] ?>"><input type="hidden" name="tipo" value="taxas"><button type="submit" class="dropdown-item" onclick="return confirm('Marcar TAXAS como pago?')"><i class="fas fa-receipt me-1"></i> Taxas</button></form></li>
+                                                <?php endif; ?>
+                                                <li><form method="POST" action="/admin/carnes/marcar-parcela-paga/<?= $p['id'] ?>"><input type="hidden" name="tipo" value="ambos"><button type="submit" class="dropdown-item" onclick="return confirm('Marcar AMBOS como pago?')"><i class="fas fa-check-double me-1"></i> Ambos</button></form></li>
+                                            </ul>
+                                        </div>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
