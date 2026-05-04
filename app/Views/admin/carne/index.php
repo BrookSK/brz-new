@@ -113,11 +113,11 @@ $statusLabels = [
 
                 var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
                 html += 'Forma: ' + d.forma_pagamento + ' | Moeda: ' + d.moeda + '<br>';
-                html += 'Produtos (USD): $ ' + Number(d.subtotal_usd).toFixed(2) + ' → Produtos (BRL): R$ ' + Number(d.subtotal_brl).toFixed(2);
+                html += 'Produtos: R$ ' + Number(d.subtotal_brl).toFixed(2);
                 html += ' — <strong>Parcela: R$ ' + parcelaProdutos.toFixed(2) + '</strong><br>';
-                html += 'Taxas (USD): $ ' + Number(d.taxas_usd).toFixed(2) + ' → Taxas (BRL): R$ ' + Number(d.taxas_brl).toFixed(2);
+                html += 'Taxas + Impostos: R$ ' + Number(d.taxas_brl).toFixed(2);
                 html += ' — <strong>Parcela: R$ ' + parcelaTaxas.toFixed(2) + '</strong><br>';
-                html += '<strong>Total BRL: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
+                html += '<strong>Total: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
                 html += ' — <strong>Parcela: R$ ' + parcelaTotal.toFixed(2) + ' (' + qtdParcelas + 'x)</strong>';
                 if (d.parcelas_sugeridas) {
                     html += '<br><span class="text-success"><i class="fas fa-check-circle"></i> Parcelas encontradas no registro: <strong>' + d.parcelas_sugeridas + 'x</strong></span>';
@@ -164,11 +164,11 @@ $statusLabels = [
 
         var html = '<strong>Pedido #' + d.pedido_id + '</strong> — ' + d.cliente_nome + ' (' + d.cliente_email + ')<br>';
         html += 'Forma: ' + d.forma_pagamento + ' | Moeda: ' + d.moeda + '<br>';
-        html += 'Produtos (USD): $ ' + Number(d.subtotal_usd).toFixed(2) + ' → Produtos (BRL): R$ ' + Number(d.subtotal_brl).toFixed(2);
+        html += 'Produtos: R$ ' + Number(d.subtotal_brl).toFixed(2);
         html += ' — <strong>Parcela: R$ ' + parcelaProdutos.toFixed(2) + '</strong><br>';
-        html += 'Taxas (USD): $ ' + Number(d.taxas_usd).toFixed(2) + ' → Taxas (BRL): R$ ' + Number(d.taxas_brl).toFixed(2);
+        html += 'Taxas + Impostos: R$ ' + Number(d.taxas_brl).toFixed(2);
         html += ' — <strong>Parcela: R$ ' + parcelaTaxas.toFixed(2) + '</strong><br>';
-        html += '<strong>Total BRL: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
+        html += '<strong>Total: R$ ' + Number(d.total_brl).toFixed(2) + '</strong>';
         html += ' — <strong>Parcela: R$ ' + parcelaTotal.toFixed(2) + ' (' + qtd + 'x)</strong>';
         if (d.parcelas_sugeridas) {
             html += '<br><span class="text-success"><i class="fas fa-check-circle"></i> Parcelas encontradas no registro: <strong>' + d.parcelas_sugeridas + 'x</strong></span>';
