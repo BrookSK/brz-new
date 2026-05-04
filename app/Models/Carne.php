@@ -105,12 +105,25 @@ class Carne extends Model {
      * Lista carnês de um cliente
      */
     public function getByCliente($clienteId) {
+        // Verificar se pedidos tem deleted_at (soft delete)
+        $hasDeletedAt = false;
+        try {
+            $stCol = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'pedidos' AND column_name = 'deleted_at'");
+            $stCol->execute();
+            $hasDeletedAt = ((int) $stCol->fetchColumn()) > 0;
+        } catch (\Exception $e) {}
+
+        $deletedFilter = $hasDeletedAt ? 'AND p.deleted_at IS NULL' : '';
+
         $stmt = $this->connection->prepare("
             SELECT c.*, 
                 (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas,
                 (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento
             FROM carnes c
+            INNER JOIN pedidos p ON p.id = c.pedido_id
             WHERE c.cliente_id = :cid
+              {$deletedFilter}
+              AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
             ORDER BY c.created_at DESC
         ");
         $stmt->execute([':cid' => $clienteId]);
