@@ -273,6 +273,10 @@ class CarneService {
                                 if (!empty($c) && strpos($c,'http')===0) { $crUrl=$c; break; }
                             }
                         }
+                        // Fallback: construir URL a partir do payment_id
+                        if (empty($crUrl) && !empty($crResult['payment_id'])) {
+                            $crUrl = 'https://payment.cambioreal.com/request/' . $crResult['payment_id'];
+                        }
                         $this->carneModel->atualizarParcela($parcelaId, [
                             'boleto_produtos_url' => $crUrl,
                             'boleto_produtos_codigo' => $crResult['digitable_line'] ?? '',
@@ -299,8 +303,13 @@ class CarneService {
                     $clientData
                 );
                 if (!empty($result['success'])) {
+                    $taxaUrl = $result['bank_slip_url'] ?? ($result['invoice_url'] ?? '');
+                    // Fallback: construir URL a partir do payment_id
+                    if (empty($taxaUrl) && !empty($result['payment_id'])) {
+                        $taxaUrl = 'https://payment.cambioreal.com/request/' . $result['payment_id'];
+                    }
                     $this->carneModel->atualizarParcela($parcelaId, [
-                        'boleto_taxas_url'        => $result['bank_slip_url'] ?? ($result['invoice_url'] ?? ''),
+                        'boleto_taxas_url'        => $taxaUrl,
                         'boleto_taxas_codigo'     => $result['digitable_line'] ?? '',
                         'boleto_taxas_id_externo' => $result['payment_id'] ?? '',
                     ]);
