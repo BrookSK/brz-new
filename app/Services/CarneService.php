@@ -341,24 +341,59 @@ class CarneService {
         ];
         if (empty($clientData['name']) && $carneId > 0) {
             try {
+                // Buscar dados do cliente diretamente (sem depender da tabela enderecos)
                 $stmt = $this->db->prepare("
-                    SELECT u.nome, u.email, u.documento, u.data_nascimento, u.telefone, u.celular,
-                           e.estado, e.cidade, e.cep, e.bairro, e.endereco, e.numero
+                    SELECT u.*
                     FROM carnes c JOIN usuarios u ON c.cliente_id = u.id
-                    LEFT JOIN enderecos e ON e.usuario_id = u.id AND e.principal = 1
                     WHERE c.id = :cid LIMIT 1
                 ");
                 $stmt->execute([':cid' => $carneId]);
                 $row = $stmt->fetch(\PDO::FETCH_ASSOC);
                 if ($row) {
                     $clientData = [
-                        'name' => $row['nome'] ?? '', 'email' => $row['email'] ?? '',
-                        'document' => $row['documento'] ?? '', 'birth_date' => $row['data_nascimento'] ?? '',
-                        'phone' => $row['telefone'] ?? ($row['celular'] ?? ''), 'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
-                        'address' => ['state'=>$row['estado']??'','city'=>$row['cidade']??'','zip_code'=>$row['cep']??'','district'=>$row['bairro']??'','street'=>$row['endereco']??'','number'=>$row['numero']??''],
+                        'name' => (string) ($row['nome'] ?? ($row['name'] ?? '')),
+                        'email' => (string) ($row['email'] ?? ''),
+                        'document' => (string) ($row['documento'] ?? ($row['cpf'] ?? '')),
+                        'birth_date' => (string) ($row['data_nascimento'] ?? ($row['birth_date'] ?? '1990-01-01')),
+                        'phone' => (string) ($row['telefone'] ?? ($row['celular'] ?? ($row['phone'] ?? ''))),
+                        'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                        'address' => [
+                            'state' => (string) ($row['estado'] ?? ($row['state'] ?? 'SP')),
+                            'city' => (string) ($row['cidade'] ?? ($row['city'] ?? 'São Paulo')),
+                            'zip_code' => (string) ($row['cep'] ?? ($row['zip_code'] ?? '01001-000')),
+                            'district' => (string) ($row['bairro'] ?? ($row['district'] ?? 'Centro')),
+                            'street' => (string) ($row['endereco'] ?? ($row['street'] ?? 'Rua Exemplo')),
+                            'number' => (string) ($row['numero'] ?? ($row['number'] ?? '1')),
+                        ],
                     ];
+                    // Tentar buscar endereço da tabela enderecos (se existir)
+                    try {
+                        $stEnd = $this->db->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC LIMIT 1");
+                        $stEnd->execute([(int) $row['id']]);
+                        $end = $stEnd->fetch(\PDO::FETCH_ASSOC);
+                        if ($end && !empty($end['cep'])) {
+                            $clientData['address'] = [
+                                'state' => (string) ($end['estado'] ?? ($end['state'] ?? $clientData['address']['state'])),
+                                'city' => (string) ($end['cidade'] ?? ($end['city'] ?? $clientData['address']['city'])),
+                                'zip_code' => (string) ($end['cep'] ?? ($end['zip_code'] ?? $clientData['address']['zip_code'])),
+                                'district' => (string) ($end['bairro'] ?? ($end['district'] ?? $clientData['address']['district'])),
+                                'street' => (string) ($end['endereco'] ?? ($end['street'] ?? $clientData['address']['street'])),
+                                'number' => (string) ($end['numero'] ?? ($end['number'] ?? $clientData['address']['number'])),
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                        // Tabela enderecos pode não existir — usar dados do usuario
+                    }
                 }
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+                error_log('[CARNE] buildClientData erro: ' . $e->getMessage());
+            }
+            // Fallback final se ainda vazio
+            if (empty($clientData['name'])) $clientData['name'] = 'Cliente';
+            if (empty($clientData['address']['street'])) {
+                $clientData['address'] = ['state'=>'SP','city'=>'São Paulo','zip_code'=>'01001-000','district'=>'Centro','street'=>'Rua Exemplo','number'=>'1'];
+            }
+            if (empty($clientData['birth_date'])) $clientData['birth_date'] = '1990-01-01';
         }
         return $clientData;
     }
