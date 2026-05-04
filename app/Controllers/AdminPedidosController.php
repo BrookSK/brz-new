@@ -2384,7 +2384,7 @@ JS;
                                         <div class="text-center">
                                             <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
                                             <small class="text-muted">Total do Pedido</small>
-                                            <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'Pago em R$' : 'Pago em US$') . '</span></div>
+                                            <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'Moeda: R$' : 'Moeda: US$') . '</span></div>
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
@@ -4834,15 +4834,24 @@ LINKSCRIPT;
     public static function getStatusList(): array {
         return [
             'pendente'                       => 'Pendente',
+            'selecao'                        => 'Seleção',
+            'cobranca'                       => 'Cobrança',
             'processando'                    => 'Processando',
             'pago'                           => 'Pago',
+            'carne_pagando'                  => 'Carnê em Pagamento',
+            'carne_aguardando'               => 'Carnê Aguardando',
             'itens_comprados'                => 'Itens Comprados',
             'produto_consolidado'            => 'Caixa Fechada',
+            'despacho'                       => 'Despacho',
             'etiqueta_gerada'                => 'Etiqueta Gerada',
             'em_transporte'                  => 'Em Transporte',
+            'transito'                       => 'Em Trânsito',
+            'aduana'                         => 'Aduana',
             'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
             'enviado_ao_destinatario'        => 'Enviado ao Destinatário',
+            'entrega'                        => 'Saiu para Entrega',
             'entregue'                       => 'Entregue',
+            'concluido'                      => 'Concluído',
             'cancelado'                      => 'Cancelado',
         ];
     }
@@ -4850,9 +4859,14 @@ LINKSCRIPT;
     /** Gera as <option> de status com o valor atual selecionado. */
     private function buildStatusOptions(string $current, bool $withEmpty = false): string {
         $html = $withEmpty ? '<option value="">Selecione...</option>' : '';
+        $currentLower = strtolower(trim($current));
         foreach (self::getStatusList() as $val => $label) {
-            $sel = ($current === $val) ? ' selected' : '';
+            $sel = ($currentLower === strtolower($val)) ? ' selected' : '';
             $html .= '<option value="' . $val . '"' . $sel . '>' . htmlspecialchars($label) . '</option>';
+        }
+        // Se o status atual não está na lista, adicionar como opção selecionada
+        if ($currentLower !== '' && !array_key_exists($currentLower, array_change_key_case(self::getStatusList(), CASE_LOWER))) {
+            $html .= '<option value="' . htmlspecialchars($current) . '" selected>' . htmlspecialchars(ucfirst(str_replace('_', ' ', $current))) . '</option>';
         }
         return $html;
     }
