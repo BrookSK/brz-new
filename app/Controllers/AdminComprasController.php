@@ -719,7 +719,7 @@ class AdminComprasController extends Controller {
             // Detectar coluna de cliente
             $colsPed = [];
             try { $stC = $this->connection->query('DESCRIBE pedidos'); $colsPed = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
-            $clienteCol = in_array('cliente_id', $colsPed, true) ? 'cliente_id' : (in_array('usuario_id', $colsPed, true) ? 'usuario_id' : '');
+            $clienteCol = in_array('usuario_id', $colsPed, true) ? 'usuario_id' : (in_array('cliente_id', $colsPed, true) ? 'cliente_id' : '');
             $totalCol = in_array('total', $colsPed, true) ? 'total' : (in_array('valor_total', $colsPed, true) ? 'valor_total' : '');
 
             $selectPed = 'p.*';
