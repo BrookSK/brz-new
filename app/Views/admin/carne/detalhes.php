@@ -3,6 +3,7 @@
 
 <div class="container-fluid">
     <a href="/admin/carnes" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left"></i> Voltar</a>
+    <a href="/admin/pedidos/detalhes/<?= (int) $carne['pedido_id'] ?>" class="btn btn-sm btn-outline-primary mb-3 ms-2" target="_blank"><i class="fas fa-external-link-alt me-1"></i> Abrir Pedido #<?= (int) $carne['pedido_id'] ?></a>
 
     <div class="row">
         <!-- Info Principal -->
