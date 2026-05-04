@@ -767,13 +767,20 @@
                                             <div id="cambioreal-fees-warning" class="alert alert-warning mt-2" style="display:none;">
                                                 <div class="fw-bold mb-1">Atenção: taxas do Câmbio Real no cartão</div>
                                                 <div class="small">
-                                                    Ao pagar com <strong>cartão</strong>, o <strong>Câmbio Real</strong> pode aplicar taxas no valor final (câmbio/VET, IOF e tarifa de processamento).<br>
-                                                    A cobrança pela <strong>Câmbio Real Taxas</strong> (taxas/impostos) <strong>não</strong> adiciona essas tarifas do Câmbio Real.
+                                                    Ao pagar com <strong>cartão</strong>, o <strong>Câmbio Real</strong> aplica taxas no valor final (câmbio/VET, IOF e tarifa de processamento).<br>
+                                                    Essas taxas são cobradas <strong>em ambas as cobranças</strong>: produtos (Câmbio Real) e taxas/impostos (Câmbio Real Taxas).
                                                     <hr class="my-2">
                                                     <div><strong>Câmbio:</strong> <span id="cr-fee-cambio">-</span></div>
                                                     <div><strong>VET:</strong> <span id="cr-fee-vet">-</span></div>
-                                                    <div><strong>Valor estimado a pagar:</strong> <span id="cr-fee-estimated">-</span></div>
-                                                    <div class="mt-2"><strong>Detalhes estimados</strong></div>
+                                                    <div class="mt-2"><strong>Estimativa — Produtos (Câmbio Real):</strong></div>
+                                                    <div>Valor base: <span id="cr-fee-base-produtos">-</span></div>
+                                                    <div>Estimado a pagar: <span id="cr-fee-estimated-produtos">-</span></div>
+                                                    <div class="mt-2"><strong>Estimativa — Taxas/Impostos (Câmbio Real Taxas):</strong></div>
+                                                    <div>Valor base: <span id="cr-fee-base-taxas">-</span></div>
+                                                    <div>Estimado a pagar: <span id="cr-fee-estimated-taxas">-</span></div>
+                                                    <hr class="my-2">
+                                                    <div><strong>Total estimado a pagar:</strong> <span id="cr-fee-estimated">-</span></div>
+                                                    <div class="mt-2"><strong>Detalhes estimados (por cobrança)</strong></div>
                                                     <div>Taxa de envio: <span id="cr-fee-shipping">-</span></div>
                                                     <div>IOF incluso (3.5%): <span id="cr-fee-iof">-</span></div>
                                                     <div>Tarifa de processamento (4.24%): <span id="cr-fee-processing">-</span></div>
@@ -2476,18 +2483,38 @@ function updateCambioRealFeesPreview() {
 
     if (!isFinite(produtoBrl) || produtoBrl <= 0) return;
 
+    // Obter valor de taxas/impostos (taxa de serviço + impostos BR + imposto local)
+    let taxasBrl = 0;
+    try {
+        const taxaEl = document.getElementById('taxa_servico');
+        const impostosEl = document.getElementById('impostos_br');
+        const impLocalEl = document.getElementById('imposto_local');
+        if (taxaEl) { const v = parseFloat((taxaEl.textContent||'').replace(/[^0-9,\.\-]/g,'').replace(',','.')); if (isFinite(v)) taxasBrl += v; }
+        if (impostosEl) { const v = parseFloat((impostosEl.textContent||'').replace(/[^0-9,\.\-]/g,'').replace(',','.')); if (isFinite(v)) taxasBrl += v; }
+        if (impLocalEl) { const v = parseFloat((impLocalEl.textContent||'').replace(/[^0-9,\.\-]/g,'').replace(',','.')); if (isFinite(v)) taxasBrl += v; }
+    } catch(e) {}
+
     const shippingUsd = 1.99;
     const iofPct = 0.035;
     const procPct = 0.0424;
 
+    // Cálculo para Produtos (Câmbio Real)
     const shippingBrl = shippingUsd * rate;
-    const basePlusShipping = produtoBrl + shippingBrl;
-    const iof = basePlusShipping * iofPct;
-    const processing = (basePlusShipping + iof) * procPct;
-    const estimatedTotal = basePlusShipping + iof + processing;
+    const baseProdutos = produtoBrl + shippingBrl;
+    const iofProdutos = baseProdutos * iofPct;
+    const procProdutos = (baseProdutos + iofProdutos) * procPct;
+    const estimatedProdutos = baseProdutos + iofProdutos + procProdutos;
+
+    // Cálculo para Taxas/Impostos (Câmbio Real Taxas) — mesmas taxas
+    const baseTaxas = taxasBrl + shippingBrl;
+    const iofTaxas = baseTaxas * iofPct;
+    const procTaxas = (baseTaxas + iofTaxas) * procPct;
+    const estimatedTaxas = taxasBrl > 0 ? (baseTaxas + iofTaxas + procTaxas) : 0;
+
+    const estimatedTotal = estimatedProdutos + estimatedTaxas;
 
     const usdAmount = produtoBrl / rate;
-    const vet = usdAmount > 0 ? (estimatedTotal / usdAmount) : 0;
+    const vet = usdAmount > 0 ? (estimatedProdutos / usdAmount) : 0;
 
     const fmt = (v) => 'BRL ' + (Number(v || 0).toFixed(2)).replace('.', ',');
     const fmtRate = (v) => 'BRL ' + (Number(v || 0).toFixed(4)).replace('.', ',');
@@ -2498,13 +2525,21 @@ function updateCambioRealFeesPreview() {
     const elShipping = document.getElementById('cr-fee-shipping');
     const elIof = document.getElementById('cr-fee-iof');
     const elProc = document.getElementById('cr-fee-processing');
+    const elBaseProdutos = document.getElementById('cr-fee-base-produtos');
+    const elEstProdutos = document.getElementById('cr-fee-estimated-produtos');
+    const elBaseTaxas = document.getElementById('cr-fee-base-taxas');
+    const elEstTaxas = document.getElementById('cr-fee-estimated-taxas');
 
     if (elCambio) elCambio.textContent = fmtRate(rate);
     if (elVet) elVet.textContent = fmtRate(vet);
     if (elEstimated) elEstimated.textContent = fmt(estimatedTotal);
     if (elShipping) elShipping.textContent = fmt(shippingBrl) + ' (USD ' + shippingUsd.toFixed(2) + ')';
-    if (elIof) elIof.textContent = fmt(iof);
-    if (elProc) elProc.textContent = fmt(processing);
+    if (elIof) elIof.textContent = fmt(iofProdutos + iofTaxas);
+    if (elProc) elProc.textContent = fmt(procProdutos + procTaxas);
+    if (elBaseProdutos) elBaseProdutos.textContent = fmt(produtoBrl);
+    if (elEstProdutos) elEstProdutos.textContent = fmt(estimatedProdutos);
+    if (elBaseTaxas) elBaseTaxas.textContent = taxasBrl > 0 ? fmt(taxasBrl) : '-';
+    if (elEstTaxas) elEstTaxas.textContent = taxasBrl > 0 ? fmt(estimatedTaxas) : '-';
 }
 
 <?php if (!empty($pix_desconto_taxa_servico_percent) && (float) $pix_desconto_taxa_servico_percent > 0): ?>
