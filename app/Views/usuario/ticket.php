@@ -250,5 +250,19 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    var chatBody = document.querySelector('.brz-chat-body');
+    if (chatBody) {
+        chatBody.scrollTop = chatBody.scrollHeight;
+        var observer = new MutationObserver(function() {
+            chatBody.scrollTop = chatBody.scrollHeight;
+        });
+        observer.observe(chatBody, { childList: true, subtree: true });
+    }
+})();
+</script>
+
 <?php $content = ob_get_clean(); ?>
 <?php include __DIR__ . '/../layouts/main.php'; ?>

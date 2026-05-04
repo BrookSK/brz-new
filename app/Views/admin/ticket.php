@@ -561,6 +561,19 @@
     </div>
 <?php endif; ?>
 
+<script>
+(function() {
+    var chatBody = document.querySelector('.brz-chat-body');
+    if (chatBody) {
+        chatBody.scrollTop = chatBody.scrollHeight;
+        var observer = new MutationObserver(function() {
+            chatBody.scrollTop = chatBody.scrollHeight;
+        });
+        observer.observe(chatBody, { childList: true, subtree: true });
+    }
+})();
+</script>
+
 <?php
     $perfil = '';
     try {

@@ -267,13 +267,37 @@ class AdminTicketsController extends Controller {
             $atendentes = [];
         }
 
-        // Ao abrir a aba/lista, some a bolha de notificação (marca como visto para o admin)
+        // Detectar tickets com mensagens não lidas do cliente (para exibir bolinha vermelha)
         $adminUid = $this->getLoggedUserId();
-        if ($adminUid > 0) {
-            foreach ($tickets as $t) {
-                $this->markAdminSeen($pdo, (int) ($t['id'] ?? 0), $adminUid);
+        $unreadTicketIds = [];
+        try {
+            if ($adminUid > 0 && $this->tableExists($pdo, 'support_ticket_views')) {
+                $sqlUn = "
+                    SELECT m.ticket_id
+                    FROM (
+                        SELECT ticket_id, MAX(created_at) AS last_client_msg_at
+                        FROM support_ticket_messages
+                        WHERE autor_tipo = 'cliente'
+                        GROUP BY ticket_id
+                    ) m
+                    LEFT JOIN support_ticket_views v
+                        ON v.ticket_id = m.ticket_id AND v.viewer_type = 'admin' AND v.viewer_user_id = ?
+                    WHERE v.last_seen_at IS NULL OR m.last_client_msg_at > v.last_seen_at
+                ";
+                $stUn = $pdo->prepare($sqlUn);
+                $stUn->execute([$adminUid]);
+                $unreadTicketIds = array_column($stUn->fetchAll(\PDO::FETCH_ASSOC) ?: [], 'ticket_id');
+                $unreadTicketIds = array_map('intval', $unreadTicketIds);
             }
+        } catch (\Exception $e) {
+            $unreadTicketIds = [];
         }
+
+        // Marcar flag has_unread em cada ticket
+        foreach ($tickets as &$_t) {
+            $_t['has_unread'] = in_array((int) ($_t['id'] ?? 0), $unreadTicketIds, true);
+        }
+        unset($_t);
 
         $sidebarActive = 'tickets';
         ob_start();

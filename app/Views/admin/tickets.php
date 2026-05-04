@@ -111,8 +111,13 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
                                 <td><span class="badge <?= $badge ?>"><?= $st === 'open' ? __('ticket.status.open', 'Aberto') : __('ticket.status.closed', 'Fechado') ?></span></td>
                                 <td class="text-muted small"><?= htmlspecialchars((string) ($t['updated_at'] ?? $t['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-primary" href="/admin/tickets/<?= (int) ($t['id'] ?? 0) ?>">
+                                    <a class="btn btn-sm btn-outline-primary position-relative" href="/admin/tickets/<?= (int) ($t['id'] ?? 0) ?>">
                                         <i class="fas fa-comments"></i>
+                                        <?php if (!empty($t['has_unread'])): ?>
+                                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="width: 12px; height: 12px;">
+                                                <span class="visually-hidden">mensagens não lidas</span>
+                                            </span>
+                                        <?php endif; ?>
                                     </a>
                                 </td>
                             </tr>

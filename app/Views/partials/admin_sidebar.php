@@ -420,10 +420,10 @@ function renderAdminSidebar($activePage = '') {
                 $activeClass = ($activePage === $key) ? 'active' : '';
                 $label = $item['label'];
                 if ($key === 'tickets' && $unreadTickets > 0) {
-                    $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $unreadTickets . '</span>';
+                    $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $unreadTickets . '</span>';
                 }
                 if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
-                    $label .= ' <span class="badge bg-danger ms-2" style="background: rgba(239, 68, 68, 0.18) !important; border-color: rgba(239, 68, 68, 0.35) !important; color: #7f1d1d !important;">' . (int) $pendentesConferencia . '</span>';
+                    $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $pendentesConferencia . '</span>';
                 }
                 echo '<li class="nav-item">
                     <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">

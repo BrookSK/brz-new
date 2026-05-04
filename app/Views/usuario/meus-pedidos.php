@@ -319,7 +319,7 @@
                                                         <a class="btn btn-sm btn-outline-dark"
                                                            href="/meu-ticket/abrir/pedido/<?= (int) ($pedido['id'] ?? 0) ?>"
                                                            title="<?= htmlspecialchars(__('user_orders.actions.support', 'Suporte'), ENT_QUOTES, 'UTF-8') ?>">
-                                                            <i class="fas fa-life-ring me-1"></i><span class="d-none d-md-inline">Abrir Ticket</span>
+                                                            <i class="fas fa-life-ring me-1"></i><span class="d-none d-md-inline">Abrir Ticket</span><span class="d-inline d-md-none">Ticket</span>
                                                         </a>
                                                         <?php
                                                         // Buscar código de rastreio real
