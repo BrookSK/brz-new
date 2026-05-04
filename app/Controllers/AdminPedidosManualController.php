@@ -588,6 +588,30 @@ class AdminPedidosManualController extends Controller {
                                     <span class="text-muted">Frete</span>
                                     <span id="resumoFreteWrap"><span id="resumoMoedaSymbol5">$</span> <span id="resumoFrete">0.00</span></span>
                                 </div>
+
+                                <!-- Desconto Global (subtotal + taxa de serviço) -->
+                                <div class="border rounded p-2 mt-2 mb-2" id="descontoGlobalWrap">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="text-muted small fw-bold"><i class="fas fa-tag me-1"></i>Desconto Global (subtotal + taxa)</span>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="number" class="form-control form-control-sm" id="descontoGlobalValor" value="" min="0" step="0.01" placeholder="0" style="max-width:100px;">
+                                        <select class="form-select form-select-sm" id="descontoGlobalTipo" style="max-width:70px;">
+                                            <option value="percentual">%</option>
+                                            <option value="fixo">$</option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-warning btn-sm" id="btnSolicitarDescontoGlobal" onclick="solicitarDescontoGlobal()" style="font-size:11px;white-space:nowrap;">
+                                            <i class="fas fa-tag"></i> Solicitar
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="descontoGlobalToken" value="">
+                                    <div id="descontoGlobalStatus" class="mt-1" style="font-size:11px;"></div>
+                                    <div id="descontoGlobalAplicado" class="d-flex justify-content-between py-1 text-success fw-bold" style="display:none !important;">
+                                        <span>Desconto aplicado</span>
+                                        <span>- <span id="resumoMoedaSymbol8">$</span> <span id="resumoDescontoGlobal">0.00</span></span>
+                                    </div>
+                                </div>
+
                                 <hr>
                                 <div class="d-flex justify-content-between">
                                     <strong>Total</strong>
@@ -598,6 +622,10 @@ class AdminPedidosManualController extends Controller {
 
                         <input type="hidden" name="subtotal_produtos" id="subtotal_produtos" value="0">
                         <input type="hidden" name="peso_total" id="peso_total" value="0">
+                        <input type="hidden" name="desconto_global_tipo" id="desconto_global_tipo" value="">
+                        <input type="hidden" name="desconto_global_valor" id="desconto_global_valor" value="0">
+                        <input type="hidden" name="desconto_global_aplicado" id="desconto_global_aplicado" value="0">
+                        <input type="hidden" name="desconto_global_token" id="desconto_global_token_hidden" value="">
                         <input type="hidden" name="taxa_servico" id="taxa_servico" value="0">
                         <input type="hidden" name="valor_impostos" id="valor_impostos" value="0">
                         <input type="hidden" name="imposto_local" id="imposto_local" value="0">
@@ -1299,6 +1327,30 @@ function calcTotal(){
 
             document.getElementById('resumoTotal').textContent = formatForDisplay(totalShown, moeda);
             document.getElementById('resumoTotal2').textContent = formatForDisplay(totalShown, moeda);
+
+            // Aplicar desconto global (se aprovado)
+            const dgAplicado = window.__DESCONTO_GLOBAL_APROVADO__ ? window.__DESCONTO_GLOBAL_VALOR_APLICADO__ : 0;
+            if (dgAplicado > 0) {
+                // Recalcular desconto sobre base atualizada (subtotal + taxa podem ter mudado)
+                const dgTipo = document.getElementById('descontoGlobalTipo')?.value || 'percentual';
+                const dgVal = parseFloat(document.getElementById('descontoGlobalValor')?.value || '0');
+                const dgBase = Number(data.subtotal || subtotal) + taxaServicoShown;
+                let dgReal = dgTipo === 'percentual' ? dgBase * (dgVal / 100) : dgVal;
+                dgReal = Math.min(dgReal, dgBase);
+                dgReal = Math.round(dgReal * 100) / 100;
+                window.__DESCONTO_GLOBAL_VALOR_APLICADO__ = dgReal;
+                document.getElementById('desconto_global_aplicado').value = dgReal.toFixed(2);
+
+                const totalComDesconto = Math.max(0, totalShown - dgReal);
+                document.getElementById('resumoTotal').textContent = formatForDisplay(totalComDesconto, moeda);
+                document.getElementById('resumoTotal2').textContent = formatForDisplay(totalComDesconto, moeda);
+                totalShown = totalComDesconto;
+
+                const dgEl = document.getElementById('resumoDescontoGlobal');
+                if (dgEl) dgEl.textContent = formatForDisplay(dgReal, moeda);
+                const aplicadoEl = document.getElementById('descontoGlobalAplicado');
+                if (aplicadoEl) aplicadoEl.style.cssText = 'display:flex !important;';
+            }
 
             const setVal = (id, v) => {
                 const el = document.getElementById(id);
@@ -2178,6 +2230,162 @@ function iniciarPollingDesconto(tr, token) {
                     }
                     if (valorInp) valorInp.disabled = false;
                     if (tipoInp) tipoInp.disabled = false;
+                }
+            })
+            .catch(() => {});
+    }, 3000);
+}
+
+// ========== DESCONTO GLOBAL (subtotal + taxa de serviço) ==========
+window.__DESCONTO_GLOBAL_POLL__ = null;
+window.__DESCONTO_GLOBAL_APROVADO__ = false;
+window.__DESCONTO_GLOBAL_VALOR_APLICADO__ = 0;
+
+function solicitarDescontoGlobal() {
+    const valorInp = document.getElementById('descontoGlobalValor');
+    const tipoInp = document.getElementById('descontoGlobalTipo');
+    const btn = document.getElementById('btnSolicitarDescontoGlobal');
+    const statusEl = document.getElementById('descontoGlobalStatus');
+
+    const descontoValor = parseFloat(valorInp?.value || '0');
+    const descontoTipo = tipoInp?.value || 'percentual';
+
+    if (descontoValor <= 0) {
+        alert('Informe o valor do desconto global.');
+        if (valorInp) valorInp.focus();
+        return;
+    }
+
+    // Calcular base (subtotal + taxa de serviço)
+    const subtotal = parseFloat(document.getElementById('subtotal_produtos')?.value || '0');
+    const taxaServico = parseFloat(document.getElementById('taxa_servico')?.value || '0');
+    const base = subtotal + taxaServico;
+
+    if (base <= 0) {
+        alert('Adicione produtos ao pedido antes de solicitar desconto global.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando...';
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Enviando solicitação...</span>';
+
+    const fd = new FormData();
+    fd.append('produto_id', 0);
+    fd.append('produto_nome', 'DESCONTO GLOBAL (Subtotal + Taxa de Serviço)');
+    fd.append('desconto_tipo', descontoTipo);
+    fd.append('desconto_valor', descontoValor);
+    fd.append('preco_original', base);
+    fd.append('moeda', getSelectedMoeda());
+
+    fetch('/admin/configuracoes/desconto/solicitar', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) throw new Error(data.error || 'Erro ao solicitar');
+
+            const token = data.token;
+            document.getElementById('descontoGlobalToken').value = token;
+            document.getElementById('desconto_global_token_hidden').value = token;
+
+            btn.innerHTML = '<i class="fas fa-clock"></i> Aguardando...';
+            btn.classList.remove('btn-outline-warning');
+            btn.classList.add('btn-outline-info');
+            if (statusEl) statusEl.innerHTML = '<span class="text-warning"><i class="fas fa-hourglass-half"></i> Aguardando autorização...</span>';
+
+            if (valorInp) valorInp.disabled = true;
+            if (tipoInp) tipoInp.disabled = true;
+
+            iniciarPollingDescontoGlobal(token);
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar';
+            if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + escapeHtml(err.message) + '</span>';
+        });
+}
+
+function iniciarPollingDescontoGlobal(token) {
+    if (window.__DESCONTO_GLOBAL_POLL__) {
+        clearInterval(window.__DESCONTO_GLOBAL_POLL__);
+    }
+
+    window.__DESCONTO_GLOBAL_POLL__ = setInterval(() => {
+        fetch('/admin/configuracoes/desconto/verificar?token=' + encodeURIComponent(token))
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+
+                const statusEl = document.getElementById('descontoGlobalStatus');
+                const btn = document.getElementById('btnSolicitarDescontoGlobal');
+                const valorInp = document.getElementById('descontoGlobalValor');
+                const tipoInp = document.getElementById('descontoGlobalTipo');
+
+                if (data.status === 'aprovado') {
+                    clearInterval(window.__DESCONTO_GLOBAL_POLL__);
+                    window.__DESCONTO_GLOBAL_POLL__ = null;
+                    window.__DESCONTO_GLOBAL_APROVADO__ = true;
+
+                    if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Aprovado!</span>';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-check"></i> Aprovado';
+                        btn.classList.remove('btn-outline-info', 'btn-outline-warning');
+                        btn.classList.add('btn-success');
+                        btn.disabled = true;
+                    }
+
+                    // Calcular e aplicar desconto
+                    const subtotal = parseFloat(document.getElementById('subtotal_produtos')?.value || '0');
+                    const taxaServico = parseFloat(document.getElementById('taxa_servico')?.value || '0');
+                    const base = subtotal + taxaServico;
+                    const tipo = tipoInp?.value || 'percentual';
+                    const val = parseFloat(valorInp?.value || '0');
+
+                    let descontoAplicado = 0;
+                    if (tipo === 'percentual') {
+                        descontoAplicado = base * (val / 100);
+                    } else {
+                        descontoAplicado = val;
+                    }
+                    descontoAplicado = Math.min(descontoAplicado, base);
+                    descontoAplicado = Math.round(descontoAplicado * 100) / 100;
+
+                    window.__DESCONTO_GLOBAL_VALOR_APLICADO__ = descontoAplicado;
+
+                    // Atualizar hidden fields
+                    document.getElementById('desconto_global_tipo').value = tipo;
+                    document.getElementById('desconto_global_valor').value = val;
+                    document.getElementById('desconto_global_aplicado').value = descontoAplicado;
+
+                    // Mostrar desconto aplicado
+                    const aplicadoEl = document.getElementById('descontoGlobalAplicado');
+                    if (aplicadoEl) aplicadoEl.style.cssText = 'display:flex !important;';
+                    const moeda = getSelectedMoeda();
+                    const dgEl = document.getElementById('resumoDescontoGlobal');
+                    if (dgEl) dgEl.textContent = formatForDisplay(descontoAplicado, moeda);
+
+                    // Recalcular total
+                    calcTotal();
+
+                } else if (data.status === 'negado') {
+                    clearInterval(window.__DESCONTO_GLOBAL_POLL__);
+                    window.__DESCONTO_GLOBAL_POLL__ = null;
+                    window.__DESCONTO_GLOBAL_APROVADO__ = false;
+                    window.__DESCONTO_GLOBAL_VALOR_APLICADO__ = 0;
+
+                    const motivo = data.motivo ? ' — ' + data.motivo : '';
+                    if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Negado' + escapeHtml(motivo) + '</span>';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-tag"></i> Solicitar';
+                        btn.classList.remove('btn-outline-info', 'btn-success');
+                        btn.classList.add('btn-outline-warning');
+                        btn.disabled = false;
+                    }
+                    if (valorInp) valorInp.disabled = false;
+                    if (tipoInp) tipoInp.disabled = false;
+
+                    document.getElementById('desconto_global_tipo').value = '';
+                    document.getElementById('desconto_global_valor').value = '0';
+                    document.getElementById('desconto_global_aplicado').value = '0';
                 }
             })
             .catch(() => {});

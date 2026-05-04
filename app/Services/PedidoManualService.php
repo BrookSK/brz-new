@@ -1352,6 +1352,26 @@ class PedidoManualService {
             'valor_total' => ['valor_total', 'total'],
         ];
 
+        // Desconto global (subtotal + taxa de serviço)
+        $dgFields = ['desconto_global_tipo', 'desconto_global_valor', 'desconto_global_aplicado', 'desconto_global_token'];
+        foreach ($dgFields as $dgf) {
+            if (array_key_exists($dgf, $resumo) && in_array($dgf, $colsPedidos, true)) {
+                $val = $resumo[$dgf];
+                if ($dgf === 'desconto_global_tipo' || $dgf === 'desconto_global_token') {
+                    $val = trim((string) $val);
+                    if ($val === '') continue;
+                } else {
+                    $val = (float) $val;
+                    if ($val <= 0) continue;
+                }
+                if (!in_array($dgf, $cols, true)) {
+                    $cols[] = $dgf;
+                    $vals[] = ':' . $dgf;
+                    $params[':' . $dgf] = $val;
+                }
+            }
+        }
+
         // Garantir que imposto_local esteja no resumo (recalcular se necessário)
         if (!array_key_exists('imposto_local', $resumo) || (float) ($resumo['imposto_local'] ?? 0) <= 0) {
             try {
