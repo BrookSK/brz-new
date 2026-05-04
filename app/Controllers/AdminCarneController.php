@@ -381,9 +381,8 @@ class AdminCarneController extends Controller {
             }
         }
 
-        echo json_encode([
-            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL'))));
-            $isBrl = ($moedaPedido === 'BRL');
+        $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'BRL'))));
+        $isBrl = ($moedaPedido === 'BRL');
 
         echo json_encode([
             'pedido_id' => $pedidoId,
