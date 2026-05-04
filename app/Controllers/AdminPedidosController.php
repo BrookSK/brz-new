@@ -4834,24 +4834,16 @@ LINKSCRIPT;
     public static function getStatusList(): array {
         return [
             'pendente'                       => 'Pendente',
-            'selecao'                        => 'Seleção',
-            'cobranca'                       => 'Cobrança',
             'processando'                    => 'Processando',
             'pago'                           => 'Pago',
             'carne_pagando'                  => 'Carnê em Pagamento',
             'carne_aguardando'               => 'Carnê Aguardando',
-            'itens_comprados'                => 'Itens Comprados',
             'produto_consolidado'            => 'Caixa Fechada',
-            'despacho'                       => 'Despacho',
             'etiqueta_gerada'                => 'Etiqueta Gerada',
             'em_transporte'                  => 'Em Transporte',
-            'transito'                       => 'Em Trânsito',
-            'aduana'                         => 'Aduana',
             'aguardando_liberacao_aduaneira' => 'Aguardando Liberação Aduaneira',
             'enviado_ao_destinatario'        => 'Enviado ao Destinatário',
-            'entrega'                        => 'Saiu para Entrega',
             'entregue'                       => 'Entregue',
-            'concluido'                      => 'Concluído',
             'cancelado'                      => 'Cancelado',
         ];
     }
