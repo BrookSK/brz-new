@@ -1203,7 +1203,6 @@ class AdminComprasController extends Controller {
                 } else {
                     $whereTipoCompra = '';
                 }
-                }
             }
 
             $selectCols = [
