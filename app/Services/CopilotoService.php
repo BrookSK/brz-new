@@ -836,6 +836,9 @@ PROMPT;
             '/(?:o que tem de|o que temos de|quais?|mostra|lista)\s+(.{3,40})\??/iu',
             '/(?:procur|busc|quer|precis)\w*\s+(?:o|a|um|uma|de)?\s*(.{3,40})/iu',
             '/(?:vende|vendem)\s+(.{3,40})\??/iu',
+            '/(?:quanto|qual)\s+(?:é|e|fica|custa|sai)\s+(?:o|a|um|uma|do|da|esse|essa)?\s*(.{3,40}?)(?:\?|$)/iu',
+            '/(?:preço|preco|valor)\s+(?:do|da|de|d[eo]s?)?\s*(.{3,40}?)(?:\?|$)/iu',
+            '/(?:info|informaç|detalh)\w*\s+(?:do|da|de|sobre|d[eo]s?)?\s*(.{3,40}?)(?:\?|$)/iu',
         ];
 
         $termo = null;
@@ -1392,106 +1395,31 @@ PROMPT;
             return ['texto' => 'API Key do Co-Piloto não configurada.', 'tokens_usados' => 0];
         }
 
-        // Buscar base de conhecimento e conteúdo relevante
-        $docs = $this->obterBaseConhecimento();
-        $conteudoRef = $this->buscarConteudoRelevante($mensagem);
+        // Busca automática de produtos (igual ao cliente)
         $resultadoBusca = $this->buscarProdutoNoBanco($mensagem);
-
-        $secaoRef = '';
-        if (!empty($conteudoRef)) {
-            $trechos = '';
-            foreach ($conteudoRef as $i => $c) {
-                $n = $i + 1;
-                $trechos .= "[{$n}] {$c['titulo']} — {$c['categoria']}\n" . mb_substr($c['texto'], 0, 1200) . "\n\n";
-            }
-            $secaoRef = "\nREFERÊNCIAS:\n{$trechos}";
-        }
-
-        $secaoProdutos = '';
+        $contexto = [];
         if (!empty($resultadoBusca)) {
-            $linhas = [];
-            foreach ($resultadoBusca as $p) {
-                $linha = "- ID:{$p['id']} | {$p['nome']} | US\$ " . number_format((float)($p['preco'] ?? 0), 2);
-                if (!empty($p['peso'])) $linha .= " | {$p['peso']}kg";
-                if (!empty($p['grupo_nome'])) $linha .= " | Grupo: {$p['grupo_nome']}";
-                $linhas[] = $linha;
-            }
-            $secaoProdutos = "\nPRODUTOS ENCONTRADOS:\n" . implode("\n", $linhas);
+            $contexto['_produtos_encontrados'] = $resultadoBusca;
         }
+        // Contexto mínimo pra montar o prompt completo
+        $contexto['pagina'] = 'admin_interno';
+        $contexto['url_atual'] = '/admin';
+        $contexto['usuario_logado'] = true;
+        $contexto['moeda_atual'] = 'BRL';
 
-        $cambio = (float) ($this->configs['cambio_usd_brl'] ?? 5.80);
+        // Reutilizar o prompt completo do cliente (todas as regras, cálculos, base de conhecimento)
+        $systemPrompt = $this->montarSystemPrompt($contexto, $mensagem);
 
-        $systemPrompt = <<<PROMPT
-Você é o assistente interno da Braziliana para a equipe admin/suporte.
-Respostas CURTAS e DIRETAS. Sem emojis, sem frufru. Só o necessário.
-Idioma: português brasileiro.
-Você NÃO executa ações (carrinho, checkout, etc). Apenas responde perguntas.
+        // Sobrescrever identidade e tom — manter todas as regras
+        $adminOverride = "\n\nOVERRIDE DE IDENTIDADE (IGNORA A IDENTIDADE ACIMA):\n"
+            . "Você NÃO é a Bri. Você é o assistente interno da equipe Braziliana (admin/suporte).\n"
+            . "Respostas CURTAS e DIRETAS. Sem emojis, sem frufru. Português brasileiro.\n"
+            . "NÃO execute ações de frontend (carrinho, checkout, navegação). Apenas responda com texto.\n"
+            . "NÃO retorne JSON. Responda em texto puro.\n"
+            . "Use todas as regras de negócio, cálculos e base de conhecimento normalmente.\n"
+            . "Quando encontrar produtos no banco, mostre preço, peso e faça o cálculo completo de custos.\n";
 
-REGRAS DE NEGÓCIO COMPLETAS:
-
-TAXA DE SERVIÇO: US\$ 39/kg, faixas: 1,2,3,4,5,6,7,8,9,10,15,20,25,30 kg.
-Frete: SEMPRE GRÁTIS (Brasil e qualquer outro país).
-Câmbio atual: 1 USD = R\$ {$cambio}
-
-IMPOSTOS BRASIL (Receita Federal — Remessa Postal/Expressa):
-- Valor aduaneiro = valor do produto + frete + seguro
-- Imposto de Importação (II):
-  - Remessa Conforme (certificada): até US\$ 50 = 20%, acima de US\$ 50 = 60% com desconto de US\$ 20
-  - Não certificada: 60% sem desconto
-- ICMS: cálculo "por dentro" sobre (valor aduaneiro + II). Alíquota padrão 17%.
-  Base de cálculo = (valor aduaneiro + II) / (1 - 0.17)
-  ICMS = base × 0.17
-- NÃO existe IPI separado. Os impostos são II + ICMS.
-- Impostos são pré-pagos no checkout — sem surpresa na entrega.
-
-IMPOSTO LOCAL EUA: 8% em BBW, Walmart, Trader Joe's, BJ's, Achados. 0% em Costco, Sam's, Desapegos.
-
-MOEDAS E PAGAMENTO:
-- BRL: PIX ou cartão via Câmbio Real (split: produtos via Câmbio Real + taxas via Câmbio Real Taxas)
-- USD: Stripe (cartão), Zelle, Venmo
-- Carnê Braziliana: parcelamento próprio, parcelas de produtos + taxas separadas (boleto ou PIX)
-- Carteira Braziliana: saldo pré-pago em USD, pode usar no checkout
-
-LIMITES: 30kg e US\$ 2.999,99/caixa. Valor mínimo do pedido: US\$ 5,00.
-
-PRAZO: NÃO informe prazos específicos. Cada pedido varia. Oriente o cliente a abrir ticket para acompanhamento.
-
-ENVIO INTERNACIONAL:
-- Envia para qualquer país (Brasil, Canadá, Portugal, etc.)
-- Fora do Brasil: via transportadora internacional (UPS), frete grátis
-- Impostos fora do Brasil: NÃO inclusos, responsabilidade do cliente no destino
-- O cliente pode usar endereço da Braziliana nos EUA como intermediário
-
-CANCELAMENTO: Taxa fixa de US\$ 100. Impossível após despacho.
-
-ASSESSORIA (compra por link / redirecionamento):
-- Cliente manda link de produto de qualquer loja dos EUA
-- Sistema gera orçamento via ScrapingBee com valores reais
-- "Redirecionamento" = "Assessoria" = compra por link
-
-CLUBE BRAZILIANA: Assinatura que dá acesso a produtos e grupos exclusivos.
-
-FLUXO DE STATUS DOS PEDIDOS:
-1. Pendente → 2. Processando → 3. Pago → 4. Caixa Fechada (precisa peso/medidas) → 5. Etiqueta Gerada → 6. Em Transporte → 7. Aguardando Liberação Aduaneira → 8. Enviado ao Destinatário → 9. Entregue
-Cancelado pode ocorrer em qualquer etapa antes do despacho.
-
-CÁLCULO RÁPIDO (para ajudar admin a responder clientes):
-Para calcular custo total de um produto:
-1. Preço do produto em USD
-2. + Imposto local EUA (se aplicável)
-3. + Taxa de serviço (peso arredondado pra cima na faixa × \$39)
-4. + II (60% com desconto \$20 se > \$50, ou 20% se ≤ \$50)
-5. + ICMS 17% por dentro
-6. = Total em USD → × câmbio = Total em BRL
-
-BASE DE CONHECIMENTO:
-{$docs}
-{$secaoRef}
-{$secaoProdutos}
-
-Responda de forma objetiva. Se não souber, diga que não sabe.
-Se o admin perguntar como calcular algo, faça o cálculo completo.
-PROMPT;
+        $systemPrompt .= $adminOverride;
 
         $messages = [];
         $maxHist = (int) ($this->configs['max_historico_enviado'] ?? 10);
@@ -1504,7 +1432,7 @@ PROMPT;
 
         $payload = [
             'model' => self::MODELO,
-            'max_tokens' => 600,
+            'max_tokens' => 800,
             'system' => $systemPrompt,
             'messages' => $messages,
         ];
@@ -1537,6 +1465,16 @@ PROMPT;
         $data = json_decode($response, true);
         $textoResposta = trim($data['content'][0]['text'] ?? '');
         $tokensUsados = ($data['usage']['input_tokens'] ?? 0) + ($data['usage']['output_tokens'] ?? 0);
+
+        // Se veio JSON (formato do cliente), extrair só o texto
+        if (preg_match('/\{[\s\S]*"texto"\s*:\s*"([\s\S]*?)"/u', $textoResposta, $m)) {
+            $textoExtraido = $m[1];
+            // Unescape JSON string
+            $textoExtraido = str_replace(['\\n', '\\"', '\\\\'], ["\n", '"', '\\'], $textoExtraido);
+            if (mb_strlen($textoExtraido) > 10) {
+                $textoResposta = $textoExtraido;
+            }
+        }
 
         return ['texto' => $textoResposta, 'tokens_usados' => $tokensUsados];
     }
