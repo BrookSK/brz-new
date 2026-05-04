@@ -65,6 +65,8 @@ class CarneService {
      * Cria carnê a partir do checkout
      */
     public function criarCarne($pedidoId, $clienteId, $totalProdutos, $totalTaxas, $qtdParcelas, $dadosCliente = []) {
+        $this->carneModel->registrarLog(null, (int) $pedidoId, null, 'carne_criado', "Iniciando criação de carnê para pedido #{$pedidoId}", json_encode(['cliente_id' => $clienteId, 'total_produtos' => $totalProdutos, 'total_taxas' => $totalTaxas, 'parcelas' => $qtdParcelas]));
+
         $dados = [
             'pedido_id' => $pedidoId,
             'cliente_id' => $clienteId,
@@ -88,8 +90,10 @@ class CarneService {
         } catch (\Exception $e) {
             // Log do erro mas não falha a criação do carnê
             error_log('[CARNE] Erro ao gerar boletos da 1ª parcela: ' . $e->getMessage());
+            $this->carneModel->registrarLog($carneId, (int) $pedidoId, null, 'carne_erro', "Erro ao gerar boletos da 1ª parcela", $e->getMessage());
         }
 
+        $this->carneModel->registrarLog($carneId, (int) $pedidoId, null, 'carne_criado', "Carnê #{$carneId} criado com sucesso para pedido #{$pedidoId}", json_encode(['carne_id' => $carneId, 'parcelas' => $qtdParcelas, 'total' => round($totalProdutos + $totalTaxas, 2)]));
         $this->dispararNotificacao($carneId, null, 'carne_criado');
         return $carneId;
     }
@@ -188,8 +192,10 @@ class CarneService {
                         'pix_produtos_expiracao' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
 
+                    $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'pix_gerado', "PIX Produtos gerado para parcela #{$parcelaId}", json_encode(['payment_id' => $crResult['payment_id'] ?? '', 'valor_brl' => $valorBrl]));
                     error_log('[CARNE] PIX CR: id=' . ($crResult['payment_id'] ?? '') . ' payload_len=' . strlen($pixPayload) . ' qr_len=' . strlen($pixQrcode));
                 } else {
+                    $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'pix_erro', "Erro ao gerar PIX Produtos para parcela #{$parcelaId}", $crResult['error'] ?? 'desconhecido');
                     error_log('[CARNE] Erro PIX CR: ' . ($crResult['error'] ?? 'desconhecido'));
                     if (!empty($crResult['raw'])) {
                         error_log('[CARNE] PIX CR raw: ' . substr(json_encode($crResult['raw']), 0, 1000));
@@ -229,8 +235,10 @@ class CarneService {
                         'pix_taxas_payload'       => $pixTaxasPayload,
                         'pix_taxas_expiracao'     => date('Y-m-d H:i:s', strtotime('+30 minutes')),
                     ]);
+                    $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'pix_gerado', "PIX Taxas gerado para parcela #{$parcelaId}", json_encode(['payment_id' => $result['payment_id'] ?? '', 'valor' => $parcela['valor_taxas']]));
                     error_log('[CARNE] PIX Câmbio Real Taxas gerado: id=' . ($result['payment_id'] ?? ''));
                 } else {
+                    $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'pix_erro', "Erro ao gerar PIX Taxas para parcela #{$parcelaId}", $result['error'] ?? 'desconhecido');
                     error_log('[CARNE] Erro PIX Câmbio Real Taxas: ' . ($result['error'] ?? 'desconhecido'));
                 }
             } catch (\Exception $e) {
@@ -270,7 +278,9 @@ class CarneService {
                             'boleto_produtos_codigo' => $crResult['digitable_line'] ?? '',
                             'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
                         ]);
+                        $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'boleto_gerado', "Boleto Produtos gerado para parcela #{$parcelaId}", json_encode(['payment_id' => $crResult['payment_id'] ?? '', 'valor' => $parcela['valor_produtos']]));
                     } else {
+                        $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'boleto_erro', "Erro ao gerar Boleto Produtos para parcela #{$parcelaId}", $crResult['error'] ?? '');
                         error_log('[CARNE] Erro CR boleto: ' . ($crResult['error'] ?? ''));
                     }
                 } catch (\Exception $e) {
@@ -294,8 +304,10 @@ class CarneService {
                         'boleto_taxas_codigo'     => $result['digitable_line'] ?? '',
                         'boleto_taxas_id_externo' => $result['payment_id'] ?? '',
                     ]);
+                    $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'boleto_gerado', "Boleto Taxas gerado para parcela #{$parcelaId}", json_encode(['payment_id' => $result['payment_id'] ?? '', 'valor' => $parcela['valor_taxas']]));
                     error_log('[CARNE] Boleto Câmbio Real Taxas gerado: id=' . ($result['payment_id'] ?? ''));
                 } else {
+                    $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'boleto_erro', "Erro ao gerar Boleto Taxas para parcela #{$parcelaId}", $result['error'] ?? 'desconhecido');
                     error_log('[CARNE] Erro boleto Câmbio Real Taxas: ' . ($result['error'] ?? 'desconhecido'));
                 }
             } catch (\Exception $e) {
@@ -349,16 +361,20 @@ class CarneService {
         // tipo: 'produtos' (Câmbio Real) ou 'taxas' (Câmbio Real Taxas)
         $campo = "boleto_{$tipo}_id_externo";
         error_log('[CARNE processarPagamentoBoleto] campo=' . $campo . ' idExterno=' . $idExterno);
+        $this->carneModel->registrarLog(null, null, null, 'webhook_recebido', "Webhook recebido para {$campo}={$idExterno}", json_encode(['campo' => $campo, 'id_externo' => $idExterno, 'tipo' => $tipo]));
+
         $stmt = $this->db->prepare("SELECT * FROM carne_parcelas WHERE {$campo} = :ext");
         $stmt->execute([':ext' => $idExterno]);
         $parcela = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$parcela) {
             error_log('[CARNE processarPagamentoBoleto] Parcela NÃO encontrada para ' . $campo . '=' . $idExterno);
+            $this->carneModel->registrarLog(null, null, null, 'pagamento_nao_encontrado', "Parcela não encontrada para {$campo}={$idExterno}", json_encode(['campo' => $campo, 'id_externo' => $idExterno]));
             return false;
         }
 
         error_log('[CARNE processarPagamentoBoleto] Parcela encontrada: id=' . $parcela['id'] . ' carne_id=' . $parcela['carne_id']);
+        $this->carneModel->registrarLog($parcela['carne_id'] ?? null, null, $parcela['id'] ?? null, 'pagamento_confirmado', "Pagamento confirmado para parcela #{$parcela['id']} ({$tipo})", json_encode(['parcela_id' => $parcela['id'], 'carne_id' => $parcela['carne_id'], 'tipo' => $tipo, 'id_externo' => $idExterno]));
         $this->carneModel->registrarPagamentoBoleto($parcela['id'], $tipo);
         $this->dispararNotificacao($parcela['carne_id'], $parcela['id'], 'pagamento_confirmado');
         return true;

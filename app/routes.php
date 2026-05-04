@@ -627,6 +627,7 @@ $router->get('/cron/carne/processar', 'CarneController', 'cron');
 
 // Admin
 $router->get('/admin/carnes', 'AdminCarneController', 'index');
+$router->get('/admin/carnes/logs', 'AdminCarneController', 'logs');
 $router->get('/admin/carnes/detalhes/{id}', 'AdminCarneController', 'detalhes');
 $router->get('/admin/carnes/compras-internas', 'AdminCarneController', 'comprasInternas');
 $router->post('/admin/carnes/reemitir-boleto/{parcelaId}', 'AdminCarneController', 'reemitirBoleto');

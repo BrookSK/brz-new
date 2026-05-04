@@ -3001,6 +3001,24 @@ class CheckoutController extends Controller {
                             ]
                         );
 
+                        // Salvar quantidade de parcelas no pedido_meta para referência futura
+                        try {
+                            $dbMeta = \Config\Database::getConnection();
+                            // Garantir tabela pedido_meta existe
+                            $dbMeta->exec("CREATE TABLE IF NOT EXISTS pedido_meta (
+                                id INT AUTO_INCREMENT PRIMARY KEY,
+                                pedido_id INT NOT NULL,
+                                meta_key VARCHAR(100) NOT NULL,
+                                meta_value TEXT,
+                                INDEX idx_pedido_meta_pedido (pedido_id),
+                                INDEX idx_pedido_meta_key (meta_key)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                            $stMeta = $dbMeta->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)');
+                            $stMeta->execute([(int) $pedidoId, 'carne_parcelas', (string) $qtdParcelas]);
+                        } catch (\Exception $e) {
+                            error_log('[CARNE] Erro ao salvar meta parcelas: ' . $e->getMessage());
+                        }
+
                         // Atualizar status do pedido para indicar carnê
                         try {
                             $dbCarne = \Config\Database::getConnection();

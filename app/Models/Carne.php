@@ -287,7 +287,9 @@ class Carne extends Model {
                 (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento
             FROM carnes c
             JOIN usuarios u ON c.cliente_id = u.id
+            LEFT JOIN pedidos p ON p.id = c.pedido_id
             WHERE " . implode(' AND ', $where) . "
+            AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash'))
             ORDER BY c.created_at DESC
         ";
         $stmt = $this->connection->prepare($sql);
@@ -361,6 +363,19 @@ class Carne extends Model {
         ");
         $stmt->execute([':cid' => $carneId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Registra log no sistema de carne_logs
+     */
+    public function registrarLog(int $carneId = null, int $pedidoId = null, int $parcelaId = null, string $tipo = 'info', string $mensagem = '', string $detalhes = ''): void {
+        try {
+            $this->connection->prepare(
+                'INSERT INTO carne_logs (carne_id, pedido_id, parcela_id, tipo, mensagem, detalhes) VALUES (?, ?, ?, ?, ?, ?)'
+            )->execute([$carneId ?: null, $pedidoId ?: null, $parcelaId ?: null, $tipo, $mensagem, $detalhes]);
+        } catch (\Exception $e) {
+            error_log('[CARNE_LOG] Erro ao registrar log: ' . $e->getMessage());
+        }
     }
 
     /**

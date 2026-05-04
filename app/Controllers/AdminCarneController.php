@@ -400,6 +400,29 @@ class AdminCarneController extends Controller {
     }
 
     /**
+     * Logs do sistema de carnê
+     */
+    public function logs(Request $request) {
+        $filtros = [
+            'carne_id' => $request->getParam('carne_id', ''),
+            'pedido_id' => $request->getParam('pedido_id', ''),
+            'tipo' => $request->getParam('tipo', ''),
+        ];
+
+        $where = ['1=1'];
+        $params = [];
+        if (!empty($filtros['carne_id'])) { $where[] = 'cl.carne_id = ?'; $params[] = (int) $filtros['carne_id']; }
+        if (!empty($filtros['pedido_id'])) { $where[] = 'cl.pedido_id = ?'; $params[] = (int) $filtros['pedido_id']; }
+        if (!empty($filtros['tipo'])) { $where[] = 'cl.tipo = ?'; $params[] = $filtros['tipo']; }
+
+        $stmt = $this->db->prepare('SELECT cl.* FROM carne_logs cl WHERE ' . implode(' AND ', $where) . ' ORDER BY cl.created_at DESC LIMIT 500');
+        $stmt->execute($params);
+        $logs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        require __DIR__ . '/../Views/admin/carne/logs.php';
+    }
+
+    /**
      * POST /admin/carnes/recriar
      * Recria carnê para pedidos que ficaram sem registro na tabela carnes.
      */
