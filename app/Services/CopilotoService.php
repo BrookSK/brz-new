@@ -688,35 +688,52 @@ IMPORTANTE BRL: O pagamento em reais é processado em duas cobranças separadas:
   2. Câmbio Real Taxas (taxas/impostos): taxa de serviço + impostos do Brasil + imposto local EUA
   Avise o cliente que verá DUAS cobranças separadas na fatura do cartão ou dois PIX.
 
-TAXAS DO CARTÃO DE CRÉDITO/DÉBITO (Câmbio Real):
-Quando o cliente paga com cartão, o Câmbio Real aplica taxas adicionais em AMBAS as cobranças (produtos E taxas/impostos):
-- Taxa de envio: USD 1,99 (convertido pelo câmbio) — por cobrança
-- IOF: 3,5% sobre o valor + taxa de envio
-- Tarifa de processamento: 4,24% sobre o valor + taxa de envio + IOF
-- Câmbio: cotação do dia (ex: BRL 5,85)
-- VET (Valor Efetivo Total): câmbio + todas as taxas incluídas
+TAXAS DO CARTÃO DE CRÉDITO/DÉBITO:
+Quando o cliente paga com cartão, o gateway Câmbio Real aplica taxas adicionais. São DUAS cobranças separadas na fatura do cartão, cada uma com suas próprias taxas:
 
-COMO CALCULAR A ESTIMATIVA PARA O CLIENTE:
-Para cada cobrança (produtos e taxas/impostos):
-  valorBase = valor em BRL da cobrança
-  taxaEnvio = 1,99 * câmbio
+📦 COBRANÇA 1 — PRODUTOS (Câmbio Real Produtos):
+Essa cobrança é referente ao valor dos produtos do carrinho.
+  valorBase = subtotal dos produtos convertido para BRL (pelo câmbio do dia)
+  taxaEnvio = USD 1,99 × câmbio
   base = valorBase + taxaEnvio
-  iof = base * 0,035
-  processamento = (base + iof) * 0,0424
-  estimado = base + iof + processamento
-Total estimado = estimado_produtos + estimado_taxas
+  IOF = base × 3,5%
+  processamento = (base + IOF) × 4,24%
+  TOTAL ESTIMADO PRODUTOS = base + IOF + processamento
 
-EXEMPLO: Se produtos = R$ 100 e taxas = R$ 200, câmbio = 5,85:
-  Produtos: base=100+11,64=111,64 → IOF=3,91 → proc=4,90 → estimado=R$ 120,45
-  Taxas: base=200+11,64=211,64 → IOF=7,41 → proc=9,29 → estimado=R$ 228,34
-  Total estimado no cartão: R$ 348,79 (vs R$ 300 no PIX)
+💰 COBRANÇA 2 — TAXA DE SERVIÇO E IMPOSTOS (Câmbio Real Taxas):
+Essa cobrança é referente à taxa de serviço + impostos do Brasil + imposto local dos EUA.
+É uma cobrança SEPARADA, processada em outra conta do Câmbio Real, com as MESMAS taxas:
+  valorBase = (taxa de serviço + impostos BR + imposto local EUA) convertido para BRL
+  taxaEnvio = USD 1,99 × câmbio
+  base = valorBase + taxaEnvio
+  IOF = base × 3,5%
+  processamento = (base + IOF) × 4,24%
+  TOTAL ESTIMADO TAXAS = base + IOF + processamento
 
-REGRA: Se o cliente perguntar sobre acréscimo, taxa no cartão, ou se tem juros:
-- Explique que PIX NÃO tem acréscimo (e pode ter desconto na taxa de serviço)
-- Cartão TEM acréscimo do gateway (IOF 3,5% + processamento 4,24% + taxa de envio USD 1,99 por cobrança)
-- Ofereça calcular a estimativa com os valores do carrinho atual
+🧾 TOTAL NO CARTÃO = TOTAL ESTIMADO PRODUTOS + TOTAL ESTIMADO TAXAS
+
+EXEMPLO PRÁTICO:
+Carrinho: produtos = US$ 16,89 | taxa serviço = US$ 39 | impostos = US$ 10 | câmbio = 5,85
+
+Cobrança 1 (Produtos): base = (16,89×5,85) + (1,99×5,85) = 98,81 + 11,64 = 110,45
+  IOF = 110,45 × 3,5% = 3,87 | proc = (110,45+3,87) × 4,24% = 4,85
+  Estimado produtos = R$ 119,17
+
+Cobrança 2 (Taxas/Impostos): base = ((39+10)×5,85) + (1,99×5,85) = 286,65 + 11,64 = 298,29
+  IOF = 298,29 × 3,5% = 10,44 | proc = (298,29+10,44) × 4,24% = 13,09
+  Estimado taxas = R$ 321,82
+
+Total estimado no cartão: R$ 119,17 + R$ 321,82 = R$ 440,99
+(vs R$ 385,46 no PIX — sem essas taxas)
+
+REGRA AO RESPONDER SOBRE ACRÉSCIMO/TAXA NO CARTÃO:
+- Explique que são DUAS cobranças separadas na fatura: uma para produtos e outra para taxas/impostos
+- Cada cobrança tem suas próprias taxas do gateway (IOF, processamento, taxa de envio)
+- PIX NÃO tem essas taxas adicionais (e pode ter desconto na taxa de serviço)
 - Sempre recomende PIX como opção mais econômica
-- NUNCA diga "sem juros" para cartão — o parcelamento é sem juros, mas as taxas do gateway existem
+- Se o cliente quiser, calcule a estimativa usando os valores do carrinho atual
+- NUNCA diga "sem juros" para cartão — o parcelamento pode ser sem juros, mas as taxas do gateway existem
+- Use a palavra "estimativa" — os valores exatos dependem do câmbio no momento da transação
 
 PAGAMENTO EM USD (Dólar):
 - Cartão de Crédito/Débito: via Stripe
