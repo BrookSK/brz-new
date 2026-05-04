@@ -75,29 +75,52 @@ class CarneController extends Controller {
      * Solicitar segunda via de boleto
      */
     public function segundaVia(Request $request, $parcelaId) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
         if (empty($_SESSION['usuario_id'])) {
-            $this->json(['success' => false, 'message' => 'Não autenticado'], 401);
+            $this->redirect('/login');
+            return;
         }
 
         $parcela = $this->carneModel->getParcela($parcelaId);
         if (!$parcela) {
-            $this->json(['success' => false, 'message' => 'Parcela não encontrada'], 404);
+            $_SESSION['message'] = 'Parcela não encontrada.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-carnes');
+            return;
         }
 
         $carne = $this->carneModel->find($parcela['carne_id']);
-        if (!$carne || $carne['cliente_id'] != $_SESSION['usuario_id']) {
-            $this->json(['success' => false, 'message' => 'Acesso negado'], 403);
+        if (!$carne || (int) $carne['cliente_id'] !== (int) $_SESSION['usuario_id']) {
+            $_SESSION['message'] = 'Acesso negado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/meus-carnes');
+            return;
         }
 
-        $this->carneModel->atualizarParcela($parcelaId, [
-            'reemissao_count' => $parcela['reemissao_count'] + 1,
-            'status' => 'reemitida'
-        ]);
+        try {
+            // Gerar novos boletos para a parcela
+            $clientData = $this->carneService->buildClientData([], $carne['id']);
+            $descBase = "Carnê Braziliana - Pedido #{$carne['pedido_id']} - Parcela {$parcela['numero_parcela']}";
+            $this->carneService->gerarBoletosParcela($parcela, $carne['pedido_id'], $clientData);
 
-        $this->carneModel->registrarHistorico($carne['id'], $parcelaId, 'boleto_reemitido',
-            "Segunda via solicitada para parcela {$parcela['numero_parcela']}");
+            $this->carneModel->atualizarParcela($parcelaId, [
+                'reemissao_count' => ((int) ($parcela['reemissao_count'] ?? 0)) + 1,
+                'status' => 'aguardando_pagamento'
+            ]);
 
-        $this->json(['success' => true, 'message' => 'Segunda via gerada com sucesso']);
+            $this->carneModel->registrarHistorico($carne['id'], $parcelaId, 'boleto_reemitido',
+                "Segunda via gerada para parcela {$parcela['numero_parcela']}");
+
+            $_SESSION['message'] = 'Boletos gerados com sucesso para a parcela ' . $parcela['numero_parcela'] . '.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Exception $e) {
+            error_log('[CARNE] Erro ao gerar 2ª via: ' . $e->getMessage());
+            $_SESSION['message'] = 'Erro ao gerar boletos: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        $this->redirect('/meu-carne/' . (int) $carne['id']);
     }
 
     /**
