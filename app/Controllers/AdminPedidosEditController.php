@@ -553,16 +553,16 @@ class AdminPedidosEditController extends Controller {
                                             <input type="number" class="form-control" id="pedido_peso_total" step="0.001" min="0" value="' . htmlspecialchars((string) ($pedido['peso_total'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label">Altura (cm)</label>
-                                            <input type="number" class="form-control" id="pedido_altura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['altura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <label class="form-label">Comprimento (cm)</label>
+                                            <input type="number" class="form-control" id="pedido_comprimento" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['comprimento'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label">Largura (cm)</label>
                                             <input type="number" class="form-control" id="pedido_largura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['largura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label">Comprimento (cm)</label>
-                                            <input type="number" class="form-control" id="pedido_comprimento" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['comprimento'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <label class="form-label">Altura (cm)</label>
+                                            <input type="number" class="form-control" id="pedido_altura" step="0.01" min="0" value="' . htmlspecialchars((string) ($pedido['altura'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
                                         </div>
                                     </div>
                                 </div>
