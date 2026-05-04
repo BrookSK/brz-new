@@ -257,9 +257,10 @@ class Carne extends Model {
         $where = ['1=1'];
         $params = [];
 
-        // Sempre excluir carnês de pedidos cancelados/excluídos/deletados
+        // Sempre excluir carnês de pedidos cancelados/excluídos/deletados/na lixeira
         $where[] = "p.id IS NOT NULL";
         $where[] = "p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')";
+        $where[] = "(p.deleted_at IS NULL)";
 
         if (!empty($filtros['status'])) {
             $where[] = 'c.status = :status';
