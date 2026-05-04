@@ -257,6 +257,9 @@ class Carne extends Model {
         $where = ['1=1'];
         $params = [];
 
+        // Sempre excluir carnês de pedidos cancelados/excluídos
+        $where[] = "(p.id IS NULL OR p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash'))";
+
         if (!empty($filtros['status'])) {
             $where[] = 'c.status = :status';
             $params[':status'] = $filtros['status'];
@@ -289,7 +292,6 @@ class Carne extends Model {
             JOIN usuarios u ON c.cliente_id = u.id
             LEFT JOIN pedidos p ON p.id = c.pedido_id
             WHERE " . implode(' AND ', $where) . "
-            AND (p.id IS NULL OR LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash'))
             ORDER BY c.created_at DESC
         ";
         $stmt = $this->connection->prepare($sql);
