@@ -53,9 +53,9 @@ $statusLabels = [
                     </div>
                     <div id="recriar-resultado" class="mt-3" style="display:none;">
                         <div id="recriar-info" class="alert alert-info small"></div>
-                        <form method="POST" action="/admin/carnes/recriar" id="recriar-form">
+                        <form method="POST" action="/admin/carnes/recriar" id="recriar-form" onsubmit="return validarCriacaoCarne()">
                             <input type="hidden" name="pedido_id" id="recriar-form-pedido-id">
-                            <div class="row g-2 align-items-end">
+                            <div class="row g-2 align-items-end" id="recriar-form-campos">
                                 <div class="col-md-3">
                                     <label class="form-label small">Quantidade de Parcelas</label>
                                     <select name="quantidade_parcelas" id="recriar-parcelas" class="form-select form-select-sm">
@@ -65,7 +65,7 @@ $statusLabels = [
                                     </select>
                                 </div>
                                 <div class="col-md-auto">
-                                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Criar carnê para este pedido?')">
+                                    <button type="submit" id="recriar-btn-submit" class="btn btn-warning btn-sm">
                                         <i class="fas fa-plus me-1"></i> Criar Carnê
                                     </button>
                                 </div>
@@ -128,12 +128,29 @@ $statusLabels = [
                     html += '<br><span class="text-danger"><i class="fas fa-ban"></i> Este pedido já tem um carnê (ID: ' + d.carne_id + ')</span>';
                 }
                 info.innerHTML = html;
+
+                // Bloquear formulário se já tem carnê
+                var formCampos = document.getElementById('recriar-form-campos');
+                var btnSubmit = document.getElementById('recriar-btn-submit');
+                if (d.ja_tem_carne) {
+                    formCampos.style.display = 'none';
+                } else {
+                    formCampos.style.display = '';
+                }
             })
             .catch(function(e) {
                 resultado.style.display = 'none';
                 erro.textContent = 'Erro ao buscar: ' + e.message;
                 erro.style.display = '';
             });
+    }
+    function validarCriacaoCarne() {
+        var d = window._dadosPedidoCarne;
+        if (d && d.ja_tem_carne) {
+            alert('Este pedido já possui um carnê (ID: ' + d.carne_id + '). Não é possível criar outro.');
+            return false;
+        }
+        return confirm('Criar carnê para este pedido?');
     }
     // Recalcular parcelas ao mudar o dropdown
     document.getElementById('recriar-parcelas').addEventListener('change', function() {
