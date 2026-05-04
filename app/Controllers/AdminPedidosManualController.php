@@ -195,9 +195,27 @@ class AdminPedidosManualController extends Controller {
                 }
             }
 
+            // Detectar coluna de preço promocional
+            $salePriceCol = '';
+            foreach (['sale_price', 'preco_promocional', 'preco_promocao'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $salePriceCol = $c;
+                    break;
+                }
+            }
+            $salePriceExpiresCol = '';
+            foreach (['sale_price_expires', 'promocao_expira', 'sale_expires'] as $c) {
+                if (in_array($c, $cols, true)) {
+                    $salePriceExpiresCol = $c;
+                    break;
+                }
+            }
+
             $select = ['id'];
             if ($nameCol !== '') $select[] = $nameCol . ' AS name';
             if ($priceCol !== '') $select[] = $priceCol . ' AS price';
+            if ($salePriceCol !== '') $select[] = $salePriceCol . ' AS sale_price';
+            if ($salePriceExpiresCol !== '') $select[] = $salePriceExpiresCol . ' AS sale_price_expires';
             if (in_array('sku', $cols, true)) $select[] = 'sku';
             if ($pesoCol !== '') $select[] = $pesoCol . ' AS peso';
             if ($custoCol !== '') $select[] = $custoCol . ' AS custo';
@@ -252,6 +270,19 @@ class AdminPedidosManualController extends Controller {
                 }
 
                 $p['imagem'] = $img;
+
+                // Aplicar preço promocional ativo (se existir e não expirado)
+                $salePrice = floatval($p['sale_price'] ?? 0);
+                if ($salePrice > 0) {
+                    $expires = $p['sale_price_expires'] ?? null;
+                    if (!empty($expires)) {
+                        $expiresTime = strtotime($expires);
+                        if ($expiresTime !== false && $expiresTime < time()) {
+                            $salePrice = 0; // Promoção expirada
+                        }
+                    }
+                }
+                $p['sale_price'] = $salePrice;
             }
         } catch (\Exception $e) {
             $produtos = [];
@@ -740,8 +771,10 @@ function buildProdutoOptions(){
         const id = p.id;
         const name = (p.name || '');
         const sku = (p.sku || '');
-        const price = (p.price || 0);
-        html += `<option value="${id}" data-price="${price}">${escapeHtml(name)} (${escapeHtml(sku)}) - ${formatMoney(price)}</option>`;
+        const salePrice = Number(p.sale_price || 0);
+        const regularPrice = Number(p.price || 0);
+        const effectivePrice = (salePrice > 0 && salePrice < regularPrice) ? salePrice : regularPrice;
+        html += `<option value="${id}" data-price="${effectivePrice}">${escapeHtml(name)} (${escapeHtml(sku)}) - ${formatMoney(effectivePrice)}</option>`;
     }
     return html;
 }
@@ -782,7 +815,9 @@ function convertValueBetweenCurrencies(value, fromMoeda, toMoeda){
 function produtoLabel(p){
     const name = (p && p.name) ? String(p.name) : '';
     const sku = (p && p.sku) ? String(p.sku) : '';
-    const price = (p && p.price) ? Number(p.price) : 0;
+    const salePrice = (p && p.sale_price) ? Number(p.sale_price) : 0;
+    const regularPrice = (p && p.price) ? Number(p.price) : 0;
+    const price = (salePrice > 0 && salePrice < regularPrice) ? salePrice : regularPrice;
     const partSku = sku ? ` (${sku})` : '';
     const moeda = getSelectedMoeda();
     const sym = getSymbol(moeda);
@@ -1111,12 +1146,15 @@ function onProdutoSearchInput(inp){
         const img = produtoImagem(p);
         const label = produtoLabel(p);
         const pid = Number(p.id || 0);
+        const sp = Number(p.sale_price || 0);
+        const rp = Number(p.price || 0);
+        const ep = (sp > 0 && sp < rp) ? sp : rp;
         return `
             <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2" onclick="selectProdutoFromSearch(this, ${pid})">
                 <img src="${escapeHtml(img)}" class="rounded border" style="width:40px;height:40px;object-fit:cover" alt="">
                 <div class="text-start">
                     <div class="fw-semibold">${escapeHtml(String(p.name || ''))}</div>
-                    <div class="small text-muted">R$ ${formatMoney(p.price || 0)}</div>
+                    <div class="small text-muted">${sp > 0 && sp < rp ? '<del>R$ ' + formatMoney(rp) + '</del> ' : ''}R$ ${formatMoney(ep)}</div>
                 </div>
             </button>
         `;
@@ -1140,7 +1178,9 @@ function selectProdutoFromSearch(btn, produtoId){
     if (imgEl) imgEl.src = produtoImagem(prod);
     if (valor) {
         const moeda = getSelectedMoeda();
-        const unitUsd = Number(prod.price || 0);
+        const salePrice = Number(prod.sale_price || 0);
+        const regularPrice = Number(prod.price || 0);
+        const unitUsd = (salePrice > 0 && salePrice < regularPrice) ? salePrice : regularPrice;
         const shown = (moeda === 'BRL') ? convertValueBetweenCurrencies(unitUsd, 'USD', 'BRL') : unitUsd;
         valor.value = formatMoney(shown);
     }
