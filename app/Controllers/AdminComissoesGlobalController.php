@@ -266,10 +266,10 @@ class AdminComissoesGlobalController
         $mesBase = (int)$hoje->format('m');
         $anoBase = (int)$hoje->format('Y');
         if ($diaHoje < 10) {
-            $mesBase = $mesBase === 1 ? 12 : $mesBase - 1;
-            if ($mesBase === 12 && (int)$hoje->format('m') === 1) $anoBase--;
+            $mesBase--;
+            if ($mesBase <= 0) { $mesBase = 12; $anoBase--; }
         }
-        for ($i = 12; $i >= 0; $i--) {
+        for ($i = 0; $i <= 12; $i++) {
             $mm = $mesBase - $i; $aa = $anoBase;
             while ($mm <= 0) { $mm += 12; $aa--; }
             $key = sprintf('%04d-%02d', $aa, $mm);
