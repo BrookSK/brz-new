@@ -701,7 +701,8 @@ class AdminComprasController extends Controller {
                     "SELECT DISTINCT i.pedido_id FROM {$itensTable} i
                      INNER JOIN pedidos ped ON ped.id = i.pedido_id
                      WHERE i.produto_id = ? AND i.pedido_id IS NOT NULL AND i.pedido_id > 0
-                     AND LOWER(COALESCE(ped.status,'')) NOT IN {$statusExcluidos}"
+                     AND LOWER(COALESCE(ped.status,'')) NOT IN {$statusExcluidos}
+                     AND ped.deleted_at IS NULL"
                 );
                 $stItens->execute([$produtoId]);
                 $pedidoIdsFromItens = $stItens->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -735,7 +736,7 @@ class AdminComprasController extends Controller {
                 }
             }
 
-            $stmtPedidos = $this->connection->prepare("SELECT {$selectPed} FROM pedidos p{$joinUser} WHERE p.id IN ({$in}) AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','apagado','deleted','lixeira','trash','rejeitado','rejected') ORDER BY p.id DESC");
+            $stmtPedidos = $this->connection->prepare("SELECT {$selectPed} FROM pedidos p{$joinUser} WHERE p.id IN ({$in}) AND LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','apagado','deleted','lixeira','trash','rejeitado','rejected') AND p.deleted_at IS NULL ORDER BY p.id DESC");
             $stmtPedidos->execute(array_map('intval', $pedidoIds));
             $pedidosRows = $stmtPedidos->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
@@ -1221,6 +1222,7 @@ class AdminComprasController extends Controller {
             $temTipoCompraEmLista = $this->columnExists('lista_compras', 'tipo_compra');
             $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
             $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
+            $temDeletedAt = $this->columnExists('pedidos', 'deleted_at');
             $temCost = $this->columnExists('produtos', 'cost_price');
             $temFoto = $this->columnExists('produtos', 'foto_principal');
             $temImages = $this->columnExists('produtos', 'images');
@@ -1294,7 +1296,7 @@ class AdminComprasController extends Controller {
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
-                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','carne_pagando','carne_aguardando','pagamento'))" : '')
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','carne_pagando','carne_aguardando','pagamento')))" : '')
                 . $whereTipoCompra
                 . ($reabertos && !empty($reabertos['items'])
                     ? ($temLojaIdEmLista
@@ -2673,6 +2675,7 @@ class AdminComprasController extends Controller {
         $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
         $temLojaIdEmProdutos = $this->columnExists('produtos', 'loja_id');
         $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+        $temDeletedAtPdf = $this->columnExists('pedidos', 'deleted_at');
         $temFoto = $this->columnExists('produtos', 'foto_principal');
         $temImages = $this->columnExists('produtos', 'images');
         $temObsVendedor = $this->columnExists('pedidos', 'observacao_vendedor');
@@ -2707,7 +2710,7 @@ class AdminComprasController extends Controller {
             . ($temLojaIdEmProdutos ? ' LEFT JOIN produtos p_inner ON p_inner.id = lc.produto_id' : '')
             . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
             . "   WHERE lc.status = 'pendente'"
-            . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada'))" : '')
+            . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAtPdf ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada')))" : '')
             . '   GROUP BY lc.produto_id, '
             . ($this->columnExists('lista_compras', 'nome_produto') ? "COALESCE(lc.nome_produto, ''), " : '')
             . ($temLojaIdEmLista && $temLojaIdEmProdutos ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0)' : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0)' : '0'))
