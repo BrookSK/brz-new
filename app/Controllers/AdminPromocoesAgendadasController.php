@@ -79,16 +79,26 @@ class AdminPromocoesAgendadasController extends Controller {
         // Produtos pra seleção
         $produtos = [];
         try {
-            $colNome = 'name';
-            $colPreco = 'price';
-            try {
-                $cols = $pdo->query('DESCRIBE produtos')->fetchAll(\PDO::FETCH_COLUMN);
-                if (!in_array('name', $cols, true) && in_array('nome', $cols, true)) $colNome = 'nome';
-                if (!in_array('price', $cols, true) && in_array('valor', $cols, true)) $colPreco = 'valor';
-            } catch (\Exception $e) {}
-            $st = $pdo->query("SELECT id, {$colNome} AS nome, {$colPreco} AS preco, sku FROM produtos WHERE COALESCE(active, ativo, 1) = 1 ORDER BY {$colNome} ASC LIMIT 2000");
+            $cols = [];
+            try { $stC = $pdo->query('DESCRIBE produtos'); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) { $cols = []; }
+
+            $colNome = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
+            $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : 'price');
+
+            $where = '1=1';
+            if (in_array('active', $cols, true)) {
+                $where = 'active = 1';
+            } elseif (in_array('ativo', $cols, true)) {
+                $where = 'ativo = 1';
+            }
+
+            $skuCol = in_array('sku', $cols, true) ? ', sku' : ", '' AS sku";
+
+            $st = $pdo->query("SELECT id, {$colNome} AS nome, {$colPreco} AS preco {$skuCol} FROM produtos WHERE {$where} ORDER BY {$colNome} ASC LIMIT 2000");
             $produtos = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
-        } catch (\Exception $e) {}
+        } catch (\Exception $e) {
+            error_log('[PromoAgendadas] Erro ao carregar produtos: ' . $e->getMessage());
+        }
 
         $title = 'Promoções Agendadas';
         $sidebarActive = 'promocoes-agendadas';
