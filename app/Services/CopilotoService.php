@@ -151,6 +151,12 @@ class CopilotoService {
     private function montarSystemPrompt(array $contexto, string $mensagemUsuario): string {
         $docs = $this->obterBaseConhecimento();
 
+        // Incorporar aprendizados aceitos (pendências aprovadas pelo admin)
+        $aprendizadosAceitos = $this->obterAprendizadosAceitos();
+        if (!empty($aprendizadosAceitos)) {
+            $docs['_aprendizados_ia'] = $aprendizadosAceitos;
+        }
+
         // Cálculo do produto atual
         $calculoProduto = '';
         $precoUsd = (float) ($contexto['produto_preco_usd'] ?? 0);
@@ -1191,6 +1197,31 @@ PROMPT;
             }
         } catch (\Exception $e) {
             error_log('[CoPiloto] Erro salvando log: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Busca aprendizados aceitos pelo admin para incorporar no prompt
+     */
+    private function obterAprendizadosAceitos(): string {
+        try {
+            $st = $this->pdo->query("SELECT resumo_problema, texto_sugerido, topico_afetado, tipos, sugestao_melhoria FROM copiloto_aprendizado WHERE status = 'aceita' ORDER BY impacto_estimado ASC, criado_em DESC LIMIT 30");
+            $rows = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
+            if (empty($rows)) return '';
+
+            $linhas = ["APRENDIZADOS DA IA (aprovados pelo admin — use como referência):"];
+            foreach ($rows as $i => $r) {
+                $n = $i + 1;
+                $linha = "[{$n}] ";
+                if (!empty($r['topico_afetado'])) $linha .= "Tópico: {$r['topico_afetado']} | ";
+                $linha .= "Problema: " . ($r['resumo_problema'] ?? 'N/A');
+                if (!empty($r['texto_sugerido'])) $linha .= " | Resposta correta: {$r['texto_sugerido']}";
+                if (!empty($r['sugestao_melhoria'])) $linha .= " | Melhoria: {$r['sugestao_melhoria']}";
+                $linhas[] = $linha;
+            }
+            return implode("\n", $linhas);
+        } catch (\Exception $e) {
+            return '';
         }
     }
 
