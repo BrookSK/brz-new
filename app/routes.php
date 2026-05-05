@@ -631,6 +631,7 @@ $router->get('/admin/carnes', 'AdminCarneController', 'index');
 $router->get('/admin/carnes/logs', 'AdminCarneController', 'logs');
 $router->get('/admin/carnes/detalhes/{id}', 'AdminCarneController', 'detalhes');
 $router->get('/admin/carnes/compras-internas', 'AdminCarneController', 'comprasInternas');
+$router->get('/admin/carnes/compras-mensal', 'AdminCarneController', 'comprasMensal');
 $router->post('/admin/carnes/reemitir-boleto/{parcelaId}', 'AdminCarneController', 'reemitirBoleto');
 $router->post('/admin/carnes/marcar-comprado/{id}', 'AdminCarneController', 'marcarComprado');
 $router->post('/admin/carnes/desfazer-compra/{id}', 'AdminCarneController', 'desfazerCompra');

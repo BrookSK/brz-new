@@ -65,6 +65,35 @@ class AdminCarneController extends Controller {
     }
 
     /**
+     * Lista de compras internas do Carnê — separada por mês
+     */
+    public function comprasMensal(Request $request) {
+        $filtros = ['status' => $request->getParam('status', '')];
+        $compras = $this->carneModel->listarComprasInternas($filtros);
+
+        // Agrupar por mês (baseado na data de criação)
+        $porMes = [];
+        foreach ($compras as $ci) {
+            $data = $ci['created_at'] ?? $ci['criado_em'] ?? date('Y-m-d');
+            $mesKey = date('Y-m', strtotime($data));
+            if (!isset($porMes[$mesKey])) $porMes[$mesKey] = [];
+            $porMes[$mesKey][] = $ci;
+        }
+        // Ordenar meses (mais recente primeiro)
+        krsort($porMes);
+
+        $mesAtual = $request->getParam('mes', '');
+
+        $title = 'Compras Carnê — Mensal';
+        $sidebarActive = 'carnes';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/carne/compras-mensal.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
      * Reemitir boleto (admin)
      */
     public function reemitirBoleto(Request $request, $parcelaId) {
