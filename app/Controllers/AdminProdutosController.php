@@ -7280,6 +7280,30 @@ HTMLSCRIPT;
         return $s;
     }
 
+    /**
+     * Registra histórico de promoção (auditoria)
+     */
+    private function registrarHistoricoPromocao(int $produtoId, string $produtoNome, string $acao, ?float $salePrice, ?float $price, ?string $salePriceExpires, ?float $salePriceAnterior = null): void {
+        try {
+            $pdo = \Config\Database::getConnection();
+            // Verificar se tabela existe
+            $st = $pdo->query("SHOW TABLES LIKE 'promocoes_historico'");
+            if (!$st || !$st->fetchColumn()) return;
+
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $uid = (int) ($_SESSION['usuario_id'] ?? 0);
+            $uNome = (string) ($_SESSION['usuario_nome'] ?? '');
+            if ($uNome === '' && $uid > 0) {
+                try { $stU = $pdo->prepare('SELECT nome FROM usuarios WHERE id = ? LIMIT 1'); $stU->execute([$uid]); $uNome = (string) ($stU->fetchColumn() ?: ''); } catch (\Exception $e) {}
+            }
+
+            $pdo->prepare("INSERT INTO promocoes_historico (produto_id, produto_nome, acao, sale_price, price, sale_price_expires, sale_price_anterior, usuario_id, usuario_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                ->execute([$produtoId, $produtoNome, $acao, $salePrice, $price, $salePriceExpires, $salePriceAnterior, $uid > 0 ? $uid : null, $uNome ?: null]);
+        } catch (\Exception $e) {
+            // Silenciar — auditoria não deve quebrar o fluxo
+        }
+    }
+
     private function detectPedidoItensTable(\PDO $pdo): ?string {
         foreach (['pedido_itens', 'pedido_items', 'itens_pedido'] as $t) {
             if ($this->tableExists($pdo, $t)) {

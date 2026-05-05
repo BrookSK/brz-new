@@ -253,6 +253,7 @@ $router->get('/api/copiloto/cron', 'CopilotoApiController', 'cron');
 $router->post('/api/copiloto/admin/chat', 'CopilotoApiController', 'adminChat');
 
 // Desconto com Autorização
+$router->get('/admin/promocoes-auditoria', 'AdminPromocoesAuditoriaController', 'index');
 $router->post('/admin/configuracoes/desconto/solicitar', 'AdminDescontoAutorizacaoController', 'solicitar');
 $router->get('/admin/configuracoes/desconto/verificar', 'AdminDescontoAutorizacaoController', 'verificar');
 $router->get('/admin/configuracoes/desconto/autorizar', 'AdminDescontoAutorizacaoController', 'autorizarTela');
