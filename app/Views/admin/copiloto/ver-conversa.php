@@ -21,8 +21,8 @@
             ?>
                 <?php if ($isSystem): continue; endif; ?>
                 <div style="align-self:<?= $isUser ? 'flex-end' : 'flex-start' ?>;max-width:75%;">
-                    <div style="padding:10px 14px;border-radius:14px;background:<?= $isUser ? '#0b1f3a' : '#f1f5f9' ?>;color:<?= $isUser ? '#fff' : '#0f172a' ?>;white-space:pre-wrap;word-break:break-word;line-height:1.4;font-size:13px;">
-                        <?= htmlspecialchars((string) ($m['conteudo'] ?? '')) ?>
+                    <div style="padding:10px 14px;border-radius:14px;background:<?= $isUser ? '#0b1f3a' : '#f1f5f9' ?>;color:<?= $isUser ? '#fff' : '#0f172a' ?>;word-break:break-word;line-height:1.5;font-size:13px;">
+                        <?= nl2br(htmlspecialchars((string) ($m['conteudo'] ?? ''))) ?>
                     </div>
                     <div class="d-flex align-items-center gap-2 mt-1" style="font-size:11px;color:#94a3b8;">
                         <span><?= $isUser ? 'Cliente' : 'Bri' ?></span>

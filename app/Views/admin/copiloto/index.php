@@ -5,7 +5,10 @@
             <h2 class="mb-1"><i class="fas fa-robot me-2"></i>Co-Piloto Braziliana</h2>
             <p class="text-muted mb-0">Configurações do assistente inteligente do site</p>
         </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="/admin/copiloto/conversas" class="btn btn-outline-dark btn-sm">
+                        <i class="fas fa-comments me-1"></i>Conversas
+                    </a>
                     <a href="/admin/copiloto/analytics" class="btn btn-outline-info btn-sm">
                         <i class="fas fa-chart-bar me-1"></i>Analytics
                     </a>
