@@ -4903,6 +4903,8 @@ LINKSCRIPT;
             'pendente'                       => 'warning',
             'processando'                    => 'primary',
             'pago'                           => 'success',
+            'carne_pagando'                  => 'info',
+            'carne_aguardando'              => 'info',
             'produto_consolidado'            => 'dark',
             'itens_comprados'                => 'info',
             'etiqueta_gerada'                => 'primary',
