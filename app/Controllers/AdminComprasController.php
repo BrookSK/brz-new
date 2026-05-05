@@ -1328,7 +1328,11 @@ class AdminComprasController extends Controller {
                     $params[':loja_id'] = $lojaIdFilter;
                 }
             }
-            $sql .= ' ORDER BY agg.prioridade DESC, agg.data_solicitacao ASC';
+            if ($tipoCompraView === 'carne') {
+                $sql .= ' ORDER BY agg.data_solicitacao ASC, agg.prioridade DESC';
+            } else {
+                $sql .= ' ORDER BY agg.prioridade DESC, agg.data_solicitacao ASC';
+            }
 
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
@@ -1613,7 +1617,23 @@ class AdminComprasController extends Controller {
                                 </thead>
                                 <tbody>';
                                 
+                                $__mesAtual = '';
+                                $__meses = ['01'=>'Janeiro','02'=>'Fevereiro','03'=>'Março','04'=>'Abril','05'=>'Maio','06'=>'Junho','07'=>'Julho','08'=>'Agosto','09'=>'Setembro','10'=>'Outubro','11'=>'Novembro','12'=>'Dezembro'];
+
                                 foreach ($compras as $item) {
+                                    // Separação por mês quando filtro Carnê está ativo
+                                    if ($tipoCompraView === 'carne') {
+                                        $dataSol = $item['data_solicitacao'] ?? '';
+                                        $mesItem = $dataSol ? date('Y-m', strtotime($dataSol)) : 'sem-data';
+                                        if ($mesItem !== $__mesAtual) {
+                                            $__mesAtual = $mesItem;
+                                            $mesLabel = ($mesItem !== 'sem-data' && strlen($mesItem) >= 7)
+                                                ? ($__meses[substr($mesItem, 5, 2)] ?? substr($mesItem, 5, 2)) . '/' . substr($mesItem, 0, 4)
+                                                : 'Sem data';
+                                            echo '<tr><td colspan="7" class="bg-light fw-bold text-primary py-2 px-3" style="border-left:4px solid #3b82f6;"><i class="fas fa-calendar me-2"></i>' . htmlspecialchars($mesLabel) . '</td></tr>';
+                                        }
+                                    }
+
                                     $status_class = $item['status'] == 'pendente' ? 'warning' : 
                                                    ($item['status'] == 'comprado' ? 'success' : 'danger');
                                     $prioridade_class = $item['prioridade'] == 'urgente' ? 'danger' : 
