@@ -119,8 +119,13 @@ class AdminComissoesGlobalController
             $where[] = "LOWER(COALESCE(p.{$colOrigem}, '')) = 'manual'";
         }
 
+        // Excluir pedidos deletados/na lixeira
+        if (in_array('deleted_at', $cols, true)) {
+            $where[] = "p.deleted_at IS NULL";
+        }
+
         $paidParts = [];
-        if ($colStatus) $paidParts[] = "LOWER(COALESCE(p.{$colStatus}, '')) IN ('pago','paid','approved','aprovado')";
+        if ($colStatus) $paidParts[] = "LOWER(COALESCE(p.{$colStatus}, '')) IN ('pago','paid','approved','aprovado','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
         if ($colPayStatus) $paidParts[] = "LOWER(COALESCE(p.{$colPayStatus}, '')) IN ('approved','paid','pago','aprovado','confirmed','received','succeeded','success')";
         if (!empty($paidParts)) $where[] = '(' . implode(' OR ', $paidParts) . ')';
 
