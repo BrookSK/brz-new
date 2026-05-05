@@ -413,26 +413,81 @@ function renderAdminSidebar($activePage = '') {
                 ) . '
             </a>
             <ul class="nav flex-column">';
-            
-            foreach ($menuItems as $key => $item) {
-                $roles = isset($item['roles']) && is_array($item['roles']) ? $item['roles'] : [];
-                if (!empty($roles) && !in_array($perfil, $roles, true)) {
+
+            // Definir grupos de menu
+            $menuGroups = [
+                '_solo_dashboard' => ['items' => ['dashboard']],
+                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pedidos-conferencia', 'pedidos-wp', 'wp-estatisticas', 'tickets', 'pedidos-comissoes', 'carnes', 'payment-links']],
+                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'variacoes', 'lojas', 'categorias', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
+                'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'relatorios']],
+                'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'remessa-shipstation']],
+                'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-pedidos', 'relatorio-geral', 'resumo-financeiro', 'comissoes-global', 'clube-recargas', 'quickbooks']],
+                'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
+                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup']],
+            ];
+
+            foreach ($menuGroups as $groupName => $group) {
+                $groupItems = [];
+                foreach ($group['items'] as $key) {
+                    if (!isset($menuItems[$key])) continue;
+                    $item = $menuItems[$key];
+                    $roles = isset($item['roles']) && is_array($item['roles']) ? $item['roles'] : [];
+                    if (!empty($roles) && !in_array($perfil, $roles, true)) continue;
+                    $groupItems[$key] = $item;
+                }
+                if (empty($groupItems)) continue;
+
+                // Solo items (sem grupo)
+                if (strpos($groupName, '_solo_') === 0) {
+                    foreach ($groupItems as $key => $item) {
+                        $activeClass = ($activePage === $key) ? 'active' : '';
+                        $label = $item['label'];
+                        echo '<li class="nav-item">
+                            <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
+                                <i class="fas fa-fw ' . $item['icon'] . '"></i>
+                                <span>' . $label . '</span>
+                            </a>
+                        </li>';
+                    }
                     continue;
                 }
-                $activeClass = ($activePage === $key) ? 'active' : '';
-                $label = $item['label'];
-                if ($key === 'tickets' && $unreadTickets > 0) {
-                    $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $unreadTickets . '</span>';
+
+                // Verificar se algum item do grupo está ativo
+                $groupActive = false;
+                foreach ($groupItems as $key => $item) {
+                    if ($activePage === $key) { $groupActive = true; break; }
                 }
-                if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
-                    $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $pendentesConferencia . '</span>';
-                }
+                $groupId = 'grp_' . md5($groupName);
+                $collapseClass = $groupActive ? 'show' : '';
+
                 echo '<li class="nav-item">
-                    <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '">
-                        <i class="fas fa-fw ' . $item['icon'] . '"></i>
-                        <span>' . $label . '</span>
+                    <a class="nav-link sidebar-group-toggle' . ($groupActive ? ' active' : '') . '" href="#' . $groupId . '" data-bs-toggle="collapse" role="button" aria-expanded="' . ($groupActive ? 'true' : 'false') . '" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><i class="fas fa-fw ' . ($group['icon'] ?? 'fas fa-folder') . '"></i> ' . htmlspecialchars($groupName) . '</span>
+                        <i class="fas fa-chevron-down" style="font-size:10px;transition:transform .2s;' . ($groupActive ? 'transform:rotate(180deg);' : '') . '"></i>
                     </a>
-                </li>';
+                    <div class="collapse ' . $collapseClass . '" id="' . $groupId . '">
+                        <ul class="nav flex-column" style="padding-left:12px;">';
+
+                foreach ($groupItems as $key => $item) {
+                    $activeClass = ($activePage === $key) ? 'active' : '';
+                    $label = $item['label'];
+                    // Remover prefixo (RED) dos labels dentro do grupo
+                    $label = preg_replace('/^\(RED\)\s*/i', '', $label);
+                    if ($key === 'tickets' && $unreadTickets > 0) {
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $unreadTickets . '</span>';
+                    }
+                    if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $pendentesConferencia . '</span>';
+                    }
+                    echo '<li class="nav-item">
+                        <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '" style="padding:4px 12px;font-size:13px;">
+                            <i class="fas fa-fw ' . $item['icon'] . '" style="font-size:11px;"></i>
+                            <span>' . $label . '</span>
+                        </a>
+                    </li>';
+                }
+
+                echo '</ul></div></li>';
             }
             
             echo '</ul>
