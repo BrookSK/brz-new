@@ -228,14 +228,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         var html = '';
                         prods.forEach(function(p) {
                             var checked = produtosSelecionados[p.id] ? ' checked' : '';
-                            html += '<div class="form-check">'
-                                + '<input class="form-check-input" type="checkbox" id="prod_ajax_' + p.id + '" value="' + p.id + '"' + checked
+                            var imgSrc = p.imagem || '/uploads/produtos/placeholder.jpg';
+                            html += '<div class="form-check d-flex align-items-center gap-2 py-1 border-bottom">'
+                                + '<input class="form-check-input mt-0" type="checkbox" id="prod_ajax_' + p.id + '" value="' + p.id + '"' + checked
                                 + ' onchange="toggleProdutoPromo(' + p.id + ',\'' + p.nome.replace(/'/g, "\\'") + '\',' + (p.preco||0) + ',this.checked)">'
-                                + '<label class="form-check-label small" for="prod_ajax_' + p.id + '">'
+                                + '<img src="' + imgSrc + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;" onerror="this.src=\'/uploads/produtos/placeholder.jpg\'">'
+                                + '<label class="form-check-label small flex-grow-1" for="prod_ajax_' + p.id + '">'
                                 + p.nome + ' <span class="text-muted">(US$ ' + Number(p.preco||0).toFixed(2) + ')</span>'
                                 + '</label></div>';
                         });
-                        html += '<div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll(\'#listaProdutosPromo input[type=checkbox]\').forEach(function(c){c.checked=true;toggleProdutoPromo(Number(c.value),c.nextElementSibling.textContent.split(\'(\')[0].trim(),0,true)})">Selecionar todos visíveis</button></div>';
+                        html += '<div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll(\'#listaProdutosPromo input[type=checkbox]\').forEach(function(c){c.checked=true;toggleProdutoPromo(Number(c.value),c.nextElementSibling.nextElementSibling.textContent.split(\'(\')[0].trim(),0,true)})">Selecionar todos visíveis</button></div>';
                         listaEl.innerHTML = html;
                     })
                     .catch(function() {

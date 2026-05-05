@@ -208,17 +208,37 @@ class AdminPromocoesAgendadasController extends Controller {
             $colNome = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
             $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : 'price');
             $hasSku = in_array('sku', $cols, true);
+            $hasFoto = in_array('foto_principal', $cols, true);
 
             $where = "({$colNome} LIKE :q1" . ($hasSku ? " OR sku LIKE :q2" : "") . ")";
             if (in_array('active', $cols, true)) $where .= ' AND active = 1';
             elseif (in_array('ativo', $cols, true)) $where .= ' AND ativo = 1';
 
-            $sql = "SELECT id, {$colNome} AS nome, {$colPreco} AS preco" . ($hasSku ? ", sku" : ", '' AS sku") . " FROM produtos WHERE {$where} ORDER BY {$colNome} ASC LIMIT 50";
+            $selectExtra = ($hasSku ? ", sku" : ", '' AS sku") . ($hasFoto ? ", foto_principal" : ", NULL AS foto_principal");
+            $sql = "SELECT id, {$colNome} AS nome, {$colPreco} AS preco {$selectExtra} FROM produtos WHERE {$where} ORDER BY {$colNome} ASC LIMIT 50";
             $st = $pdo->prepare($sql);
             $params = [':q1' => '%' . $termo . '%'];
             if ($hasSku) $params[':q2'] = '%' . $termo . '%';
             $st->execute($params);
             $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Enriquecer com imagem (fallback para produto_fotos)
+            foreach ($produtos as &$p) {
+                $img = trim((string) ($p['foto_principal'] ?? ''));
+                if ($img === '') {
+                    try {
+                        $stF = $pdo->prepare('SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ? ORDER BY principal DESC, ordem ASC LIMIT 1');
+                        $stF->execute([(int) $p['id']]);
+                        $img = trim((string) ($stF->fetchColumn() ?: ''));
+                    } catch (\Exception $e) {}
+                }
+                if ($img !== '' && $img[0] !== '/' && !preg_match('#^https?://#i', $img)) {
+                    $img = '/uploads/produtos/' . $img;
+                }
+                $p['imagem'] = $img;
+                unset($p['foto_principal']);
+            }
+            unset($p);
 
             echo json_encode(['produtos' => $produtos]);
         } catch (\Exception $e) {
