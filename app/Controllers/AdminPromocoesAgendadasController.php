@@ -76,29 +76,8 @@ class AdminPromocoesAgendadasController extends Controller {
             ];
         }
 
-        // Produtos pra seleção
+        // Produtos: não carregar todos no HTML — busca via AJAX
         $produtos = [];
-        try {
-            $cols = [];
-            try { $stC = $pdo->query('DESCRIBE produtos'); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) { $cols = []; }
-
-            $colNome = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
-            $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : 'price');
-
-            $where = '1=1';
-            if (in_array('active', $cols, true)) {
-                $where = 'active = 1';
-            } elseif (in_array('ativo', $cols, true)) {
-                $where = 'ativo = 1';
-            }
-
-            $skuCol = in_array('sku', $cols, true) ? ', sku' : ", '' AS sku";
-
-            $st = $pdo->query("SELECT id, {$colNome} AS nome, {$colPreco} AS preco {$skuCol} FROM produtos WHERE {$where} ORDER BY {$colNome} ASC LIMIT 2000");
-            $produtos = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
-        } catch (\Exception $e) {
-            error_log('[PromoAgendadas] Erro ao carregar produtos: ' . $e->getMessage());
-        }
 
         $title = 'Promoções Agendadas';
         $sidebarActive = 'promocoes-agendadas';
@@ -204,6 +183,47 @@ class AdminPromocoesAgendadasController extends Controller {
         $resultado = $this->atualizarStatusAutomatico($pdo);
         header('Content-Type: application/json');
         echo json_encode(['success' => true, 'ativadas' => $resultado['ativadas'], 'finalizadas' => $resultado['finalizadas']]);
+        exit;
+    }
+
+    /**
+     * AJAX: buscar produtos por termo (máx 50 resultados)
+     */
+    public function buscarProdutos(Request $request) {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $auth = new AuthService();
+            $auth->requerPerfis(['admin', 'vendedor']);
+
+            $termo = trim((string) ($request->getParam('q') ?? ''));
+            if (mb_strlen($termo) < 2) {
+                echo json_encode(['produtos' => []]);
+                exit;
+            }
+
+            $pdo = $this->getPdo();
+            $cols = [];
+            try { $stC = $pdo->query('DESCRIBE produtos'); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) { $cols = []; }
+
+            $colNome = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : 'name');
+            $colPreco = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : 'price');
+            $hasSku = in_array('sku', $cols, true);
+
+            $where = "({$colNome} LIKE :q1" . ($hasSku ? " OR sku LIKE :q2" : "") . ")";
+            if (in_array('active', $cols, true)) $where .= ' AND active = 1';
+            elseif (in_array('ativo', $cols, true)) $where .= ' AND ativo = 1';
+
+            $sql = "SELECT id, {$colNome} AS nome, {$colPreco} AS preco" . ($hasSku ? ", sku" : ", '' AS sku") . " FROM produtos WHERE {$where} ORDER BY {$colNome} ASC LIMIT 50";
+            $st = $pdo->prepare($sql);
+            $params = [':q1' => '%' . $termo . '%'];
+            if ($hasSku) $params[':q2'] = '%' . $termo . '%';
+            $st->execute($params);
+            $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            echo json_encode(['produtos' => $produtos]);
+        } catch (\Exception $e) {
+            echo json_encode(['produtos' => [], 'error' => $e->getMessage()]);
+        }
         exit;
     }
 

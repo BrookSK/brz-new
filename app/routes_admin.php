@@ -258,6 +258,7 @@ $router->get('/admin/promocoes-agendadas', 'AdminPromocoesAgendadasController', 
 $router->post('/admin/promocoes-agendadas/criar', 'AdminPromocoesAgendadasController', 'criar');
 $router->post('/admin/promocoes-agendadas/cancelar/{id}', 'AdminPromocoesAgendadasController', 'cancelar');
 $router->get('/admin/promocoes-agendadas/processar', 'AdminPromocoesAgendadasController', 'processar');
+$router->get('/admin/promocoes-agendadas/buscar-produtos', 'AdminPromocoesAgendadasController', 'buscarProdutos');
 $router->post('/admin/configuracoes/desconto/solicitar', 'AdminDescontoAutorizacaoController', 'solicitar');
 $router->get('/admin/configuracoes/desconto/verificar', 'AdminDescontoAutorizacaoController', 'verificar');
 $router->get('/admin/configuracoes/desconto/autorizar', 'AdminDescontoAutorizacaoController', 'autorizarTela');

@@ -125,23 +125,13 @@
                         <div class="col-12">
                             <label class="form-label fw-semibold">Produtos (selecione os que participam)</label>
                             <div class="mb-2">
-                                <input type="text" class="form-control form-control-sm" id="buscaProdutoPromo" placeholder="Buscar produto por nome ou SKU...">
+                                <input type="text" class="form-control" id="buscaProdutoPromo" placeholder="Digite para buscar produtos..." autocomplete="off">
                             </div>
+                            <div id="produtosSelecionados" class="mb-2"></div>
                             <div class="border rounded p-2" style="max-height:250px;overflow-y:auto;" id="listaProdutosPromo">
-                                <?php foreach ($produtos as $prod): ?>
-                                    <div class="form-check produto-item" data-search="<?= htmlspecialchars(strtolower(($prod['nome'] ?? '') . ' ' . ($prod['sku'] ?? ''))) ?>">
-                                        <input class="form-check-input" type="checkbox" name="produto_ids[]" value="<?= (int) $prod['id'] ?>" id="prod_<?= (int) $prod['id'] ?>">
-                                        <label class="form-check-label small" for="prod_<?= (int) $prod['id'] ?>">
-                                            <?= htmlspecialchars($prod['nome'] ?? '') ?>
-                                            <span class="text-muted">(US$ <?= number_format((float) ($prod['preco'] ?? 0), 2) ?>)</span>
-                                        </label>
-                                    </div>
-                                <?php endforeach; ?>
+                                <div class="text-muted small text-center py-3">Digite pelo menos 2 caracteres para buscar...</div>
                             </div>
-                            <div class="mt-2 d-flex gap-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll('#listaProdutosPromo input[type=checkbox]').forEach(c=>{if(c.closest('.produto-item').style.display!=='none')c.checked=true})">Selecionar todos visíveis</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll('#listaProdutosPromo input[type=checkbox]').forEach(c=>c.checked=false)">Limpar seleção</button>
-                            </div>
+                            <div class="mt-1 small text-muted" id="contadorProdutos">0 produtos selecionados</div>
                         </div>
                     </div>
                 </div>
@@ -173,15 +163,85 @@ document.addEventListener('DOMContentLoaded', function() {
         cal.render();
     }
 
-    // Busca de produtos
+    // Busca de produtos via AJAX
     var buscaInp = document.getElementById('buscaProdutoPromo');
+    var listaEl = document.getElementById('listaProdutosPromo');
+    var selecionadosEl = document.getElementById('produtosSelecionados');
+    var contadorEl = document.getElementById('contadorProdutos');
+    var produtosSelecionados = {};
+    var buscaTimer = null;
+
+    function atualizarContador() {
+        var n = Object.keys(produtosSelecionados).length;
+        if (contadorEl) contadorEl.textContent = n + ' produto' + (n !== 1 ? 's' : '') + ' selecionado' + (n !== 1 ? 's' : '');
+    }
+
+    function renderSelecionados() {
+        if (!selecionadosEl) return;
+        var html = '';
+        for (var id in produtosSelecionados) {
+            var p = produtosSelecionados[id];
+            html += '<span class="badge bg-primary me-1 mb-1" style="font-size:12px;">'
+                + p.nome + ' <button type="button" class="btn-close btn-close-white ms-1" style="font-size:8px;" onclick="removerProdutoPromo(' + id + ')"></button>'
+                + '<input type="hidden" name="produto_ids[]" value="' + id + '">'
+                + '</span>';
+        }
+        selecionadosEl.innerHTML = html;
+        atualizarContador();
+    }
+
+    window.removerProdutoPromo = function(id) {
+        delete produtosSelecionados[id];
+        renderSelecionados();
+        // Desmarcar checkbox se visível
+        var cb = document.getElementById('prod_ajax_' + id);
+        if (cb) cb.checked = false;
+    };
+
+    window.toggleProdutoPromo = function(id, nome, preco, checked) {
+        if (checked) {
+            produtosSelecionados[id] = { nome: nome, preco: preco };
+        } else {
+            delete produtosSelecionados[id];
+        }
+        renderSelecionados();
+    };
+
     if (buscaInp) {
         buscaInp.addEventListener('input', function() {
-            var term = this.value.toLowerCase();
-            document.querySelectorAll('.produto-item').forEach(function(el) {
-                var search = el.getAttribute('data-search') || '';
-                el.style.display = (!term || search.indexOf(term) !== -1) ? '' : 'none';
-            });
+            var term = this.value.trim();
+            if (buscaTimer) clearTimeout(buscaTimer);
+            if (term.length < 2) {
+                listaEl.innerHTML = '<div class="text-muted small text-center py-3">Digite pelo menos 2 caracteres para buscar...</div>';
+                return;
+            }
+            listaEl.innerHTML = '<div class="text-muted small text-center py-2"><i class="fas fa-spinner fa-spin me-1"></i>Buscando...</div>';
+            buscaTimer = setTimeout(function() {
+                fetch('/admin/promocoes-agendadas/buscar-produtos?q=' + encodeURIComponent(term))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var prods = data.produtos || [];
+                        if (prods.length === 0) {
+                            listaEl.innerHTML = '<div class="text-muted small text-center py-3">Nenhum produto encontrado.</div>';
+                            return;
+                        }
+                        var html = '';
+                        prods.forEach(function(p) {
+                            var checked = produtosSelecionados[p.id] ? ' checked' : '';
+                            html += '<div class="form-check">'
+                                + '<input class="form-check-input" type="checkbox" id="prod_ajax_' + p.id + '" value="' + p.id + '"' + checked
+                                + ' onchange="toggleProdutoPromo(' + p.id + ',\'' + p.nome.replace(/'/g, "\\'") + '\',' + (p.preco||0) + ',this.checked)">'
+                                + '<label class="form-check-label small" for="prod_ajax_' + p.id + '">'
+                                + p.nome + ' <span class="text-muted">(US$ ' + Number(p.preco||0).toFixed(2) + ')</span>'
+                                + '</label></div>';
+                        });
+                        html += '<div class="mt-2"><button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.querySelectorAll(\'#listaProdutosPromo input[type=checkbox]\').forEach(function(c){c.checked=true;toggleProdutoPromo(Number(c.value),c.nextElementSibling.textContent.split(\'(\')[0].trim(),0,true)})">Selecionar todos visíveis</button></div>';
+                        listaEl.innerHTML = html;
+                    })
+                    .catch(function() {
+                        listaEl.innerHTML = '<div class="text-danger small text-center py-3">Erro ao buscar.</div>';
+                    });
+            }, 300);
         });
     }
 
