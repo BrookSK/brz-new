@@ -115,8 +115,12 @@ class AdminComissoesGlobalController
         $where = [];
         $params = [];
 
-        if ($colOrigem) {
-            $where[] = "LOWER(COALESCE(p.{$colOrigem}, '')) = 'manual'";
+        if ($colOrigem && $colCriadoPor) {
+            $where[] = "(LOWER(COALESCE(p.{$colOrigem}, '')) IN ('manual','admin') OR p.{$colCriadoPor} IS NOT NULL AND p.{$colCriadoPor} > 0)";
+        } elseif ($colOrigem) {
+            $where[] = "(LOWER(COALESCE(p.{$colOrigem}, '')) IN ('manual','admin'))";
+        } elseif ($colCriadoPor) {
+            $where[] = "(p.{$colCriadoPor} IS NOT NULL AND p.{$colCriadoPor} > 0)";
         }
 
         // Excluir pedidos deletados/na lixeira
