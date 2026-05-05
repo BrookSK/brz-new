@@ -2300,7 +2300,7 @@ JS;
                 foreach ($pedidos as $pedido) {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
-                    $statusColor = $this->getStatusColor($pedido['status']);
+                    $statusColor = $this->getStatusColor($pedido['status'], $pedido);
 
                     $pid = (int) ($pedido['id'] ?? 0);
                     $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
@@ -2429,7 +2429,7 @@ JS;
                 foreach ($pedidosUSD as $pedido) {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
-                    $statusColor = $this->getStatusColor($pedido['status']);
+                    $statusColor = $this->getStatusColor($pedido['status'], $pedido);
 
                     $pid = (int) ($pedido['id'] ?? 0);
                     $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
@@ -2557,7 +2557,7 @@ JS;
                 foreach ($pedidosBRL as $pedido) {
                     $statusClass = 'status-' . $pedido['status'];
                     $statusIcon = $this->getStatusIcon($pedido['status']);
-                    $statusColor = $this->getStatusColor($pedido['status']);
+                    $statusColor = $this->getStatusColor($pedido['status'], $pedido);
 
                     $pid = (int) ($pedido['id'] ?? 0);
                     $warn = ($pid > 0 && isset($warningsMap[$pid]) && is_array($warningsMap[$pid]))
@@ -4898,7 +4898,16 @@ LINKSCRIPT;
         return $icons[$status] ?? 'fas fa-question-circle';
     }
 
-    private function getStatusColor($status) {
+    private function getStatusColor($status, ?array $pedido = null) {
+        // Carnê com pagamento parcial → azul
+        if ($pedido !== null) {
+            $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+            $st = strtolower(trim((string) $status));
+            if ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true)) {
+                return 'info';
+            }
+        }
+
         $colors = [
             'pendente'                       => 'warning',
             'processando'                    => 'primary',
