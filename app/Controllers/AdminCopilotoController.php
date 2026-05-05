@@ -659,4 +659,88 @@ class AdminCopilotoController extends Controller {
             }
         } catch (\Exception $e) {}
     }
+
+    /**
+     * Histórico de conversas do Co-Piloto
+     */
+    public function conversas(Request $request) {
+        $auth = new \App\Services\AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $pdo = Database::getConnection();
+
+        $busca = trim((string) $request->getParam('busca', ''));
+        $pagina = max(1, (int) $request->getParam('page', 1));
+        $porPagina = 30;
+        $offset = ($pagina - 1) * $porPagina;
+
+        // Buscar sessões com info do usuário
+        $where = '';
+        $params = [];
+        if ($busca !== '') {
+            $where = "WHERE (u.nome LIKE :b1 OR u.email LIKE :b2 OR s.sessao_id LIKE :b3)";
+            $params = [':b1' => "%{$busca}%", ':b2' => "%{$busca}%", ':b3' => "%{$busca}%"];
+        }
+
+        $stTotal = $pdo->prepare("SELECT COUNT(*) FROM copiloto_sessoes s LEFT JOIN usuarios u ON s.usuario_id = u.id {$where}");
+        $stTotal->execute($params);
+        $total = (int) $stTotal->fetchColumn();
+
+        $st = $pdo->prepare("SELECT s.*, u.nome AS usuario_nome, u.email AS usuario_email 
+            FROM copiloto_sessoes s 
+            LEFT JOIN usuarios u ON s.usuario_id = u.id 
+            {$where}
+            ORDER BY s.ultima_interacao DESC 
+            LIMIT {$porPagina} OFFSET {$offset}");
+        $st->execute($params);
+        $sessoes = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $totalPaginas = ceil($total / $porPagina);
+
+        $title = 'Co-Piloto — Conversas';
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/copiloto/conversas.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
+     * Ver mensagens de uma sessão específica
+     */
+    public function verConversa(Request $request, $sessaoId = null) {
+        $auth = new \App\Services\AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $pdo = Database::getConnection();
+        $sessaoId = $sessaoId ?? $request->getParam('sessao_id', '');
+
+        // Info da sessão
+        $st = $pdo->prepare("SELECT s.*, u.nome AS usuario_nome, u.email AS usuario_email 
+            FROM copiloto_sessoes s 
+            LEFT JOIN usuarios u ON s.usuario_id = u.id 
+            WHERE s.sessao_id = ? LIMIT 1");
+        $st->execute([$sessaoId]);
+        $sessao = $st->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$sessao) {
+            $_SESSION['flash_error'] = 'Sessão não encontrada.';
+            header('Location: /admin/copiloto/conversas');
+            exit;
+        }
+
+        // Mensagens
+        $stM = $pdo->prepare("SELECT * FROM copiloto_mensagens WHERE sessao_id = ? ORDER BY criado_em ASC, id ASC");
+        $stM->execute([$sessaoId]);
+        $mensagens = $stM->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $title = 'Conversa — ' . ($sessao['usuario_nome'] ?: 'Visitante');
+        $sidebarActive = 'copiloto';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/copiloto/ver-conversa.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
 }

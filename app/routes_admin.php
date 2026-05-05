@@ -227,6 +227,8 @@ $router->post('/admin/copiloto/conteudo/upload', 'AdminCopilotoController', 'con
 $router->post('/admin/copiloto/conteudo/remover/{id}', 'AdminCopilotoController', 'conteudoRemover');
 $router->post('/admin/copiloto/conteudo/toggle/{id}', 'AdminCopilotoController', 'conteudoToggle');
 $router->get('/admin/copiloto/cancelamentos', 'AdminCopilotoController', 'cancelamentos');
+$router->get('/admin/copiloto/conversas', 'AdminCopilotoController', 'conversas');
+$router->get('/admin/copiloto/conversas/{sessaoId}', 'AdminCopilotoController', 'verConversa');
 $router->post('/admin/copiloto/cancelamentos/autorizar/{id}', 'AdminCopilotoController', 'autorizarCancelamento');
 $router->post('/admin/copiloto/cancelamentos/recusar/{id}', 'AdminCopilotoController', 'recusarCancelamento');
 $router->get('/api/copiloto/config', 'AdminCopilotoController', 'apiConfig');
