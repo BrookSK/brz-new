@@ -37,6 +37,26 @@
                             <span><?= (int) $m['tokens_usados'] ?> tokens</span>
                         <?php endif; ?>
                     </div>
+                    <?php if (!$isUser && !empty($m['acao']) && $m['acao'] === 'buscar_produto'): ?>
+                        <div class="mt-1 p-2 rounded" style="background:rgba(59,130,246,.08);border:1px dashed rgba(59,130,246,.3);font-size:11px;color:#3b82f6;">
+                            <i class="fas fa-images me-1"></i>Carrossel de produtos exibido ao cliente neste ponto
+                            <?php
+                                $params = json_decode((string) ($m['parametros_acao'] ?? ''), true);
+                                if (!empty($params['termo'])): ?>
+                                    — busca: "<?= htmlspecialchars($params['termo']) ?>"
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!$isUser && !empty($m['acao']) && $m['acao'] === 'adicionar_carrinho'): ?>
+                        <div class="mt-1 p-2 rounded" style="background:rgba(16,185,129,.08);border:1px dashed rgba(16,185,129,.3);font-size:11px;color:#065f46;">
+                            <i class="fas fa-cart-plus me-1"></i>Produto adicionado ao carrinho
+                            <?php
+                                $params = json_decode((string) ($m['parametros_acao'] ?? ''), true);
+                                if (!empty($params['produto_id'])): ?>
+                                    — ID: <?= (int) $params['produto_id'] ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
