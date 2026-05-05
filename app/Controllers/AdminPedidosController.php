@@ -2357,7 +2357,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->isCarnePedido($pedido) ? 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center gy-3">
                                     <div class="col-6 col-lg-2">
@@ -2486,7 +2486,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->isCarnePedido($pedido) ? 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center gy-3">
                                     <div class="col-6 col-lg-2">
@@ -2614,7 +2614,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->isCarnePedido($pedido) ? 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;' : '') . '">
                             <div class="card-body">
                                 <div class="row align-items-center gy-3">
                                     <div class="col-6 col-lg-2">
@@ -4896,6 +4896,12 @@ LINKSCRIPT;
             $icons['separacao'] = 'fas fa-box';
         }
         return $icons[$status] ?? 'fas fa-question-circle';
+    }
+
+    private function isCarnePedido(array $pedido): bool {
+        $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+        $st = strtolower(trim((string) ($pedido['status'] ?? '')));
+        return ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true));
     }
 
     private function getStatusColor($status, ?array $pedido = null) {
