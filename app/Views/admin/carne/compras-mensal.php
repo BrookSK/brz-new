@@ -117,7 +117,7 @@
                                 <div class="d-flex gap-1">
                                     <a href="/admin/carnes/detalhes/<?= (int) ($ci['carne_id'] ?? 0) ?>" class="btn btn-outline-primary btn-sm" title="Ver carnê"><i class="fas fa-eye"></i></a>
                                     <?php if (($ci['status'] ?? '') === 'aguardando_compra'): ?>
-                                        <form method="POST" action="/admin/carnes/compras-internas/comprado/<?= (int) $ci['id'] ?>" class="d-inline">
+                                        <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $ci['id'] ?>" class="d-inline">
                                             <button type="submit" class="btn btn-success btn-sm" title="Marcar comprado"><i class="fas fa-check"></i></button>
                                         </form>
                                     <?php endif; ?>
