@@ -194,8 +194,8 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
             echo '<td class="text-muted small">' . htmlspecialchars((string) ($r['pagador_documento'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
             echo '<td><span class="badge bg-' . $tipoBadge . '">' . $tipoLabel . '</span></td>';
             echo '<td>' . htmlspecialchars((string) ($r['metodo'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
-            $gw = strtolower(trim((string) ($r['gateway'] ?? ($r['payment_gateway'] ?? 'stripe'))));
-            $gwLabel = $gw === 'cambioreal' ? 'Câmbio Real' : ($gw === 'stripe' ? 'Stripe' : ucfirst($gw));
+            $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
+            $gwLabel = $gw === 'cambioreal' ? 'Câmbio Real' : ($gw === 'stripe' ? 'Stripe' : ($gw !== '' ? ucfirst($gw) : 'N/A'));
             $gwBadge = $gw === 'cambioreal' ? 'primary' : ($gw === 'stripe' ? 'info' : 'secondary');
             echo '<td><span class="badge bg-' . $gwBadge . '" style="font-size:10px;">' . htmlspecialchars($gwLabel) . '</span></td>';
             echo '<td>$ ' . number_format((float) ($r['valor'] ?? 0), 2, ',', '.') . '</td>';
