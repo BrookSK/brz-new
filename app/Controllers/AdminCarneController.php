@@ -975,28 +975,54 @@ class AdminCarneController extends Controller {
             return;
         }
 
+        $destinatarioEmail = $carne['cliente_email'] ?? '';
+        $destinatarioNome = $carne['cliente_nome'] ?? '';
         $status = 'enviado';
         $erroMsg = null;
 
+        // Montar dados para o template
+        $numeroParcela = (int) ($parcela['numero_parcela'] ?? 0);
+        $totalParcelas = (int) ($carne['quantidade_parcelas'] ?? 0);
+        $valorTotal = number_format((float) ($parcela['valor_total'] ?? 0), 2, ',', '.');
+        $valorProdutos = number_format((float) ($parcela['valor_produtos'] ?? 0), 2, ',', '.');
+        $valorTaxas = number_format((float) ($parcela['valor_taxas'] ?? 0), 2, ',', '.');
+        $vencimento = date('d/m/Y', strtotime($parcela['vencimento']));
+        $statusParcela = $parcela['status'] ?? 'pendente';
+        $pedidoId = (int) ($carne['pedido_id'] ?? 0);
+
+        // URL para o cliente acessar o carnê
+        $baseUrl = rtrim(($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br'), '/');
+        $urlMeuCarne = $baseUrl . '/meu-carne/' . $carneId;
+
+        $assunto = "Cobrança - Parcela {$numeroParcela}/{$totalParcelas} do Carnê #{$carneId}";
+        if ($statusParcela === 'em_atraso' || $statusParcela === 'vencida') {
+            $assunto = "⚠️ Parcela em atraso - {$numeroParcela}/{$totalParcelas} do Carnê #{$carneId}";
+        }
+
+        // Renderizar template HTML
+        $clienteNome = $destinatarioNome;
+        ob_start();
+        include __DIR__ . '/../Views/emails/cobranca-carne.php';
+        $htmlEmail = ob_get_clean();
+
+        // Enviar email via EmailService
         try {
-            // Disparar notificação de cobrança usando o sistema existente
-            $this->carneService->dispararNotificacao($carneId, $parcelaId, 'cobranca');
-
-            // Registrar no histórico do carnê
-            $this->carneModel->registrarHistorico($carneId, $parcelaId, 'cobranca_enviada',
-                "Email de cobrança enviado para parcela #{$parcela['numero_parcela']}",
-                null, $_SESSION['usuario_id'] ?? null);
-
+            $emailService = new \App\Services\EmailService();
+            $emailService->send($destinatarioEmail, $assunto, $htmlEmail);
         } catch (\Exception $e) {
             $status = 'erro';
             $erroMsg = $e->getMessage();
-            error_log('[CARNE] Erro ao enviar cobrança parcela #' . $parcelaId . ': ' . $e->getMessage());
+            error_log('[CARNE] Erro ao enviar email cobrança parcela #' . $parcelaId . ': ' . $e->getMessage());
         }
+
+        // Registrar no histórico do carnê
+        $this->carneModel->registrarHistorico($carneId, $parcelaId, 'cobranca_enviada',
+            "Email de cobrança " . ($status === 'enviado' ? 'enviado' : 'falhou') . " para parcela #{$numeroParcela}",
+            null, $_SESSION['usuario_id'] ?? null);
 
         // Registrar na tabela email_logs
         try {
-            $assunto = "Cobrança - Carnê #{$carneId} - Parcela {$parcela['numero_parcela']}/{$carne['quantidade_parcelas']}";
-            $corpoResumo = "Cobrança da parcela {$parcela['numero_parcela']} no valor de R$ " . number_format($parcela['valor_total'], 2, ',', '.') . " com vencimento em " . date('d/m/Y', strtotime($parcela['vencimento']));
+            $corpoResumo = "Cobrança da parcela {$numeroParcela}/{$totalParcelas} no valor de R$ {$valorTotal} com vencimento em {$vencimento}";
 
             $stmt = $this->db->prepare("
                 INSERT INTO email_logs (tipo, destinatario_email, destinatario_nome, assunto, corpo_resumo, status, erro_mensagem, carne_id, parcela_id, pedido_id, created_at)
@@ -1004,22 +1030,22 @@ class AdminCarneController extends Controller {
             ");
             $stmt->execute([
                 ':tipo' => 'cobranca',
-                ':email' => $carne['cliente_email'] ?? '',
-                ':nome' => $carne['cliente_nome'] ?? '',
+                ':email' => $destinatarioEmail,
+                ':nome' => $destinatarioNome,
                 ':assunto' => $assunto,
                 ':corpo' => $corpoResumo,
                 ':status' => $status,
                 ':erro' => $erroMsg,
                 ':carne_id' => $carneId,
                 ':parcela_id' => $parcelaId,
-                ':pedido_id' => $carne['pedido_id'] ?? null,
+                ':pedido_id' => $pedidoId ?: null,
             ]);
         } catch (\Exception $e) {
             error_log('[EMAIL_LOG] Erro ao registrar log: ' . $e->getMessage());
         }
 
         if ($status === 'enviado') {
-            $_SESSION['message'] = 'Email de cobrança enviado com sucesso para ' . htmlspecialchars($carne['cliente_email'] ?? 'cliente') . '.';
+            $_SESSION['message'] = 'Email de cobrança enviado com sucesso para ' . htmlspecialchars($destinatarioEmail) . '.';
             $_SESSION['message_type'] = 'success';
         } else {
             $_SESSION['message'] = 'Erro ao enviar email de cobrança: ' . ($erroMsg ?: 'erro desconhecido');
