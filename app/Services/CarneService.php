@@ -653,6 +653,7 @@ class CarneService {
         $stmt->execute();
         if (!$stmt->fetchColumn()) return;
 
+        // Registrar na carne_notificacoes (manter compatibilidade)
         $stmt = $this->db->prepare("
             INSERT INTO carne_notificacoes (carne_id, parcela_id, evento, canal, destinatario, payload, status)
             VALUES (:cid, :pid, :ev, 'email', :dest, :pay, 'pendente')
@@ -661,6 +662,207 @@ class CarneService {
             ':cid' => $carneId, ':pid' => $parcelaId, ':ev' => $evento,
             ':dest' => $email, ':pay' => json_encode($payload)
         ]);
+
+        // Enviar email de verdade via EmailService
+        $this->enviarEmailNotificacaoCarne($carneId, $parcelaId, $evento, $email, $payload);
+    }
+
+    /**
+     * Envia email real de notificação do carnê e registra no email_logs
+     */
+    private function enviarEmailNotificacaoCarne($carneId, $parcelaId, $evento, $email, $payload) {
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) return;
+
+        $carne = is_array($payload) ? $payload : [];
+        $clienteNome = $carne['cliente'] ?? 'Cliente';
+        $pedidoId = (int) ($carne['pedido_id'] ?? 0);
+        $parcela = $carne['parcela'] ?? null;
+
+        // Montar dados do template conforme o evento
+        $baseUrl = rtrim(($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br'), '/');
+        $urlMeuCarne = $baseUrl . '/meu-carne/' . $carneId;
+
+        $templateData = $this->montarDadosTemplateEvento($evento, $carneId, $pedidoId, $clienteNome, $parcela, $urlMeuCarne);
+        if (empty($templateData)) return;
+
+        $assunto = $templateData['assunto'];
+        $titulo = $templateData['titulo'];
+        $mensagem = $templateData['mensagem'];
+        $detalhes = $templateData['detalhes'] ?? [];
+        $alerta = $templateData['alerta'] ?? null;
+        $alertaMensagem = $templateData['alertaMensagem'] ?? '';
+        $ctaTexto = $templateData['ctaTexto'] ?? 'Ver meu carnê';
+
+        // Renderizar template
+        ob_start();
+        include __DIR__ . '/../Views/emails/carne-notificacao.php';
+        $htmlEmail = ob_get_clean();
+
+        $status = 'enviado';
+        $erroMsg = null;
+
+        try {
+            $emailService = new \App\Services\EmailService();
+            $emailService->send($email, $assunto, $htmlEmail);
+        } catch (\Exception $e) {
+            $status = 'erro';
+            $erroMsg = $e->getMessage();
+            error_log('[CARNE EMAIL] Erro ao enviar email ' . $evento . ' para ' . $email . ': ' . $e->getMessage());
+        }
+
+        // Atualizar status na carne_notificacoes
+        try {
+            $this->db->prepare("
+                UPDATE carne_notificacoes SET status = :st, erro_mensagem = :err
+                WHERE carne_id = :cid AND canal = 'email' AND evento = :ev
+                ORDER BY id DESC LIMIT 1
+            ")->execute([':st' => $status, ':err' => $erroMsg, ':cid' => $carneId, ':ev' => $evento]);
+        } catch (\Exception $e) {}
+
+        // Registrar no email_logs
+        try {
+            $corpoResumo = mb_substr(strip_tags($mensagem), 0, 200);
+            $this->db->prepare("
+                INSERT INTO email_logs (tipo, destinatario_email, destinatario_nome, assunto, corpo_resumo, status, erro_mensagem, carne_id, parcela_id, pedido_id, created_at)
+                VALUES (:tipo, :email, :nome, :assunto, :corpo, :status, :erro, :carne_id, :parcela_id, :pedido_id, NOW())
+            ")->execute([
+                ':tipo' => 'carne_' . $evento,
+                ':email' => $email,
+                ':nome' => $clienteNome,
+                ':assunto' => $assunto,
+                ':corpo' => $corpoResumo,
+                ':status' => $status,
+                ':erro' => $erroMsg,
+                ':carne_id' => $carneId,
+                ':parcela_id' => $parcelaId,
+                ':pedido_id' => $pedidoId ?: null,
+            ]);
+        } catch (\Exception $e) {
+            error_log('[EMAIL_LOG] Erro ao registrar: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Monta os dados do template de email conforme o tipo de evento
+     */
+    private function montarDadosTemplateEvento($evento, $carneId, $pedidoId, $clienteNome, $parcela, $urlMeuCarne) {
+        $detalhes = ['Carnê' => "#$carneId", 'Pedido' => "#$pedidoId"];
+
+        if ($parcela && is_array($parcela)) {
+            $numParcela = $parcela['numero_parcela'] ?? '';
+            $vencimento = !empty($parcela['vencimento']) ? date('d/m/Y', strtotime($parcela['vencimento'])) : '';
+            $valorTotal = isset($parcela['valor_total']) ? 'R$ ' . number_format((float) $parcela['valor_total'], 2, ',', '.') : '';
+            if ($numParcela) $detalhes['Parcela'] = $numParcela;
+            if ($vencimento) $detalhes['Vencimento'] = $vencimento;
+            if ($valorTotal) $detalhes['Valor'] = $valorTotal;
+        }
+
+        switch ($evento) {
+            case 'carne_criado':
+                return [
+                    'assunto' => "Seu carnê #{$carneId} foi criado - Braziliana",
+                    'titulo' => 'Carnê Criado',
+                    'mensagem' => 'Seu carnê foi criado com sucesso! Acesse o link abaixo para visualizar suas parcelas e realizar os pagamentos.',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'success',
+                    'alertaMensagem' => '<strong>✓ Tudo certo!</strong> Seu carnê está ativo e pronto para pagamento.',
+                    'ctaTexto' => 'Ver meu carnê e pagar',
+                ];
+
+            case 'pagamento_confirmado':
+                return [
+                    'assunto' => "Pagamento confirmado - Carnê #{$carneId}",
+                    'titulo' => 'Pagamento Confirmado',
+                    'mensagem' => 'Recebemos a confirmação do pagamento da sua parcela. Obrigado!',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'success',
+                    'alertaMensagem' => '<strong>✓ Pagamento recebido!</strong> Sua parcela foi registrada como paga.',
+                    'ctaTexto' => 'Ver meu carnê',
+                ];
+
+            case 'parcela_proxima_vencimento':
+                return [
+                    'assunto' => "Lembrete: parcela próxima do vencimento - Carnê #{$carneId}",
+                    'titulo' => 'Lembrete de Vencimento',
+                    'mensagem' => 'Sua parcela está próxima do vencimento. Realize o pagamento para manter seu carnê em dia.',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'warning',
+                    'alertaMensagem' => '<strong>⏰ Atenção:</strong> Sua parcela vence em breve. Evite atrasos!',
+                    'ctaTexto' => 'Pagar agora',
+                ];
+
+            case 'cobranca':
+                $statusParcela = $parcela['status'] ?? 'pendente';
+                $alertaMsg = ($statusParcela === 'em_atraso' || $statusParcela === 'vencida')
+                    ? '<strong>⚠️ Atenção:</strong> Esta parcela está <strong>' . ($statusParcela === 'em_atraso' ? 'em atraso' : 'vencida') . '</strong>. Regularize o pagamento para evitar o cancelamento do seu carnê.'
+                    : '<strong>⏰ Lembrete:</strong> Realize o pagamento da sua parcela.';
+                return [
+                    'assunto' => ($statusParcela === 'em_atraso' || $statusParcela === 'vencida')
+                        ? "⚠️ Parcela em atraso - Carnê #{$carneId}"
+                        : "Cobrança - Carnê #{$carneId}",
+                    'titulo' => 'Cobrança de Parcela',
+                    'mensagem' => 'Estamos entrando em contato para lembrar sobre o pagamento da parcela do seu carnê.',
+                    'detalhes' => $detalhes,
+                    'alerta' => ($statusParcela === 'em_atraso' || $statusParcela === 'vencida') ? 'danger' : 'warning',
+                    'alertaMensagem' => $alertaMsg,
+                    'ctaTexto' => 'Ver meu carnê e pagar',
+                ];
+
+            case 'carne_quitado':
+                return [
+                    'assunto' => "Parabéns! Carnê #{$carneId} quitado",
+                    'titulo' => 'Carnê Quitado',
+                    'mensagem' => 'Parabéns! Todas as parcelas do seu carnê foram pagas. Seu produto será preparado para envio.',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'success',
+                    'alertaMensagem' => '<strong>🎉 Parabéns!</strong> Seu carnê está totalmente quitado!',
+                    'ctaTexto' => 'Ver meu carnê',
+                ];
+
+            case 'envio_liberado':
+                return [
+                    'assunto' => "Envio liberado - Carnê #{$carneId}",
+                    'titulo' => 'Envio Liberado',
+                    'mensagem' => 'O envio do seu produto foi liberado! Em breve você receberá as informações de rastreamento.',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'success',
+                    'alertaMensagem' => '<strong>🚚 Boa notícia!</strong> Seu produto está sendo preparado para envio.',
+                    'ctaTexto' => 'Ver meu carnê',
+                ];
+
+            case 'aviso_cancelamento':
+                return [
+                    'assunto' => "⚠️ URGENTE: Aviso de cancelamento - Carnê #{$carneId}",
+                    'titulo' => 'Aviso de Cancelamento',
+                    'mensagem' => 'Seu carnê possui parcelas em atraso há muito tempo. Se o pagamento não for regularizado nos próximos dias, o carnê será cancelado automaticamente.',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'danger',
+                    'alertaMensagem' => '<strong>🚨 URGENTE:</strong> Seu carnê será cancelado se o pagamento não for regularizado. Entre em contato conosco se precisar de ajuda.',
+                    'ctaTexto' => 'Regularizar agora',
+                ];
+
+            case 'carne_cancelado':
+                return [
+                    'assunto' => "Carnê #{$carneId} cancelado por inadimplência",
+                    'titulo' => 'Carnê Cancelado',
+                    'mensagem' => 'Infelizmente seu carnê foi cancelado devido à inadimplência. Entre em contato com nosso suporte se desejar mais informações.',
+                    'detalhes' => $detalhes,
+                    'alerta' => 'danger',
+                    'alertaMensagem' => '<strong>❌ Cancelado:</strong> Seu carnê foi cancelado por falta de pagamento.',
+                    'ctaTexto' => 'Entrar em contato',
+                ];
+
+            default:
+                return [
+                    'assunto' => "Atualização do Carnê #{$carneId} - Braziliana",
+                    'titulo' => 'Atualização do Carnê',
+                    'mensagem' => 'Houve uma atualização no seu carnê. Acesse o link abaixo para mais detalhes.',
+                    'detalhes' => $detalhes,
+                    'alerta' => null,
+                    'alertaMensagem' => '',
+                    'ctaTexto' => 'Ver meu carnê',
+                ];
+        }
     }
 
     /**

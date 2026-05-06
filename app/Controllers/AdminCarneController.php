@@ -993,6 +993,7 @@ class AdminCarneController extends Controller {
         // URL para o cliente acessar o carnê
         $baseUrl = rtrim(($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? 'brazilianashop.com.br'), '/');
         $urlMeuCarne = $baseUrl . '/meu-carne/' . $carneId;
+        $clienteNome = $destinatarioNome;
 
         $assunto = "Cobrança - Parcela {$numeroParcela}/{$totalParcelas} do Carnê #{$carneId}";
         if ($statusParcela === 'em_atraso' || $statusParcela === 'vencida') {
@@ -1000,9 +1001,24 @@ class AdminCarneController extends Controller {
         }
 
         // Renderizar template HTML
-        $clienteNome = $destinatarioNome;
+        $titulo = $assunto;
+        $mensagem = 'Estamos entrando em contato para lembrar sobre o pagamento da parcela do seu carnê.';
+        $detalhes = [
+            'Carnê' => "#{$carneId} (Pedido #{$pedidoId})",
+            'Parcela' => "{$numeroParcela} de {$totalParcelas}",
+            'Vencimento' => $vencimento,
+            'Produtos' => "R$ {$valorProdutos}",
+            'Taxas' => "R$ {$valorTaxas}",
+            'Total da parcela' => "R$ {$valorTotal}",
+        ];
+        $alerta = ($statusParcela === 'em_atraso' || $statusParcela === 'vencida') ? 'danger' : 'warning';
+        $alertaMensagem = ($statusParcela === 'em_atraso' || $statusParcela === 'vencida')
+            ? '<strong>⚠️ Atenção:</strong> Esta parcela está <strong>' . ($statusParcela === 'em_atraso' ? 'em atraso' : 'vencida') . '</strong>. Regularize o pagamento para evitar o cancelamento do seu carnê.'
+            : '<strong>⏰ Lembrete:</strong> Realize o pagamento da sua parcela.';
+        $ctaTexto = 'Ver meu carnê e pagar';
+
         ob_start();
-        include __DIR__ . '/../Views/emails/cobranca-carne.php';
+        include __DIR__ . '/../Views/emails/carne-notificacao.php';
         $htmlEmail = ob_get_clean();
 
         // Enviar email via EmailService
