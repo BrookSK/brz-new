@@ -2301,9 +2301,13 @@ JS;
                     </ul>';
                     $fpFiltro = strtolower(trim((string) ($request->getParam('forma_pagamento', '') ?? '')));
                     $carneActive = ($fpFiltro === 'carne_braziliana') ? 'btn-dark' : 'btn-outline-dark';
-                    echo '<a href="/admin/pedidos?forma_pagamento=carne_braziliana" class="btn btn-sm ' . $carneActive . ' ms-3"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</a>
-                    </ul>
-                    
+                    if ($fpFiltro === 'carne_braziliana') {
+                        echo '<a href="/admin/pedidos" class="btn btn-sm btn-outline-secondary ms-2"><i class="fas fa-times me-1"></i>Limpar filtro</a>';
+                        echo '<span class="btn btn-sm btn-dark ms-1"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>';
+                    } else {
+                        echo '<a href="/admin/pedidos?forma_pagamento=carne_braziliana" class="btn btn-sm btn-outline-dark ms-2"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</a>';
+                    }
+                    echo '
                     <div class="tab-content" id="pedidosTabContent">
                         <div class="tab-pane fade show active" id="pedidos-todos" role="tabpanel">
                             <div class="row">';
