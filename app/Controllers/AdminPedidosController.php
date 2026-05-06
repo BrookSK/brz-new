@@ -4595,12 +4595,23 @@ LINKSCRIPT;
                             }
                             echo '
                                 <form method="POST" action="/admin/carnes/recriar" class="mt-2">
-                                    <input type="hidden" name="pedido_id" value="' . (int) $pedido['id'] . '">';
-                            if ($metaParcelas) {
-                                echo '<input type="hidden" name="parcelas" value="' . $metaParcelas . '">';
+                                    <input type="hidden" name="pedido_id" value="' . (int) $pedido['id'] . '">
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-bold mb-1">Quantidade de parcelas:</label>
+                                        <select name="parcelas" class="form-select form-select-sm" required>';
+                            $defaultParcelas = $metaParcelas ?: 0;
+                            for ($np = 1; $np <= 12; $np++) {
+                                $sel = ($np === $defaultParcelas) ? ' selected' : '';
+                                echo '<option value="' . $np . '"' . $sel . '>' . $np . 'x</option>';
                             }
                             echo '
-                                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm(\'Deseja recriar o carnê para este pedido?\')">
+                                        </select>';
+                            if ($metaParcelas) {
+                                echo '<div class="form-text text-info"><i class="fas fa-info-circle me-1"></i>Cliente selecionou ' . $metaParcelas . 'x no checkout</div>';
+                            }
+                            echo '
+                                    </div>
+                                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm(\'Deseja recriar o carnê para este pedido com \' + this.form.parcelas.value + \' parcelas?\')">
                                         <i class="fas fa-redo me-1"></i>Recriar Carnê
                                     </button>
                                 </form>
