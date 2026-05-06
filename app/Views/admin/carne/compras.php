@@ -1,5 +1,4 @@
 <?php $title = 'Compras do Carnê'; ?>
-<?php ob_start(); ?>
 <?php $allModals = []; ?>
 
 <div class="container-fluid py-4">
@@ -213,6 +212,3 @@
 </div>
 <?php endif; ?>
 <?php endforeach; ?>
-
-<?php $content = ob_get_clean(); ?>
-<?php include __DIR__ . '/../../layouts/admin.php'; ?>
