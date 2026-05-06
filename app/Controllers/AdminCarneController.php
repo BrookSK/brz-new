@@ -555,7 +555,7 @@ class AdminCarneController extends Controller {
                 WHERE 1=1 {$statusFilter}
                 {$deletedFilter}
                 AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
-                ORDER BY ci.created_at DESC
+                ORDER BY c.quantidade_parcelas ASC, ci.created_at DESC
             ";
         } else {
             // Fallback: buscar direto dos pedidos de carnê (sem carne_compras_internas)
@@ -582,7 +582,7 @@ class AdminCarneController extends Controller {
                 WHERE 1=1
                 {$deletedFilter}
                 AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
-                ORDER BY c.created_at DESC
+                ORDER BY c.quantidade_parcelas ASC, c.created_at DESC
             ";
         }
 
