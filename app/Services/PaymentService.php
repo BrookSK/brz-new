@@ -3352,13 +3352,13 @@ class PaymentService {
             }
 
             $paymentId = (string) ($data['id'] ?? ($data['code'] ?? ($data['transaction_id'] ?? '')));
-            $pixPayload = (string) ($tx['pix_payload'] ?? ($tx['pix_code'] ?? ($tx['pix_copy_paste'] ?? ($tx['pix'] ?? ''))));
-            $pixQrcode = (string) ($tx['pix_qrcode'] ?? ($tx['pix_qr_code_base64'] ?? ($tx['qr_code'] ?? ($tx['qr_code_base64'] ?? ''))));
+            $pixPayload = (string) ($tx['pix_payload'] ?? ($tx['pix_code'] ?? ($tx['pix_copy_paste'] ?? ($tx['pix'] ?? ($tx['code'] ?? '')))));
+            $pixQrcode = (string) ($tx['pix_qrcode'] ?? ($tx['pix_qr_code_base64'] ?? ($tx['qr_code'] ?? ($tx['qr_code_base64'] ?? ($tx['barcode'] ?? '')))));
             $invoiceUrl = (string) ($data['invoice_url'] ?? ($data['url'] ?? ($data['checkout_url'] ?? ($data['payment_url'] ?? ''))));
 
             // Fallback: dados PIX podem estar na raiz de $data
             if ($pixPayload === '') $pixPayload = (string) ($data['pix_payload'] ?? ($data['pix_code'] ?? ($data['pix_copy_paste'] ?? '')));
-            if ($pixQrcode === '') $pixQrcode = (string) ($data['pix_qrcode'] ?? ($data['qr_code_base64'] ?? ($data['qr_code'] ?? '')));
+            if ($pixQrcode === '') $pixQrcode = (string) ($data['pix_qrcode'] ?? ($data['qr_code_base64'] ?? ($data['qr_code'] ?? ($data['barcode'] ?? ''))));
 
             if ($pixPayload === '' && $pixQrcode === '' && $invoiceUrl === '') {
                 error_log('[CR_PIX_RECARGA] Sem dados PIX na resposta. data=' . json_encode($data) . ' tx=' . json_encode($tx) . ' resp_keys=' . json_encode(array_keys($resp)));
