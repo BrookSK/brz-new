@@ -55,6 +55,9 @@
                                     <td><span class="badge bg-<?= $p['status'] === 'paga' ? 'success' : ($p['status'] === 'em_atraso' ? 'danger' : 'secondary') ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span></td>
                                     <td>
                                         <form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-warning" title="Reemitir"><i class="fas fa-redo"></i></button></form>
+                                        <?php if (in_array($p['status'], ['pendente', 'aguardando_pagamento', 'vencida', 'em_atraso'])): ?>
+                                        <form method="POST" action="/admin/carnes/enviar-cobranca/<?= $p['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Enviar email de cobrança para esta parcela?')"><button type="submit" class="btn btn-sm btn-outline-info" title="Enviar cobrança por email"><i class="fas fa-paper-plane"></i></button></form>
+                                        <?php endif; ?>
                                         <?php if ($p['status'] !== 'paga'): ?>
                                         <div class="btn-group btn-group-sm ms-1">
                                             <button type="button" class="btn btn-outline-success btn-sm dropdown-toggle" data-bs-toggle="dropdown" title="Marcar como pago"><i class="fas fa-check"></i></button>

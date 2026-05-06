@@ -455,6 +455,9 @@ $router->get('/admin/backup/download/{id}/{tipo}', 'AdminBackupController', 'dow
 $router->post('/admin/backup/restaurar/{id}', 'AdminBackupController', 'restaurar');
 $router->post('/admin/backup/excluir/{id}', 'AdminBackupController', 'excluir');
 
+// Log de Emails do sistema
+$router->get('/admin/emails', 'AdminEmailLogsController', 'index');
+
 // Mercado Pago OAuth (conectar conta do produto)
 $router->get('/mercadopago/oauth/start', 'MercadoPagoOAuthController', 'start');
 $router->get('/mercadopago/oauth/callback', 'MercadoPagoOAuthController', 'callback');
@@ -646,6 +649,7 @@ $router->get('/admin/carnes/configuracoes', 'AdminCarneController', 'configuraco
 $router->post('/admin/carnes/configuracoes', 'AdminCarneController', 'configuracoes');
 $router->post('/admin/carnes/recriar', 'AdminCarneController', 'recriarCarne');
 $router->post('/admin/carnes/marcar-parcela-paga/{parcelaId}', 'AdminCarneController', 'marcarParcelaPaga');
+$router->post('/admin/carnes/enviar-cobranca/{parcelaId}', 'AdminCarneController', 'enviarCobranca');
 $router->get('/admin/carnes/buscar-pedido', 'AdminCarneController', 'buscarPedido');
 
 // Área do Representante
