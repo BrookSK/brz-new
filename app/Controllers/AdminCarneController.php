@@ -557,10 +557,10 @@ class AdminCarneController extends Controller {
                     ci.id, ci.carne_id, ci.status as status_compra, ci.comprado_em, ci.recebido_em, ci.created_at,
                     c.pedido_id, c.total_geral, c.quantidade_parcelas, c.status as carne_status,
                     u.nome as cliente_nome, u.email as cliente_email,
-                    it.{$colProdutoId} as produto_id, it.{$colQtd} as quantidade,
-                    " . ($colNomeProd ? "it.{$colNomeProd} as item_nome," : '') . "
-                    p.{$colProdNome} as produto_nome,
-                    " . ($colProdFoto ? "p.{$colProdFoto} as produto_imagem," : "'' as produto_imagem,") . "
+                    GROUP_CONCAT(DISTINCT COALESCE(p.{$colProdNome}, " . ($colNomeProd ? "it.{$colNomeProd}" : "''") . ") SEPARATOR '|||') as produtos_nomes,
+                    GROUP_CONCAT(DISTINCT it.{$colProdutoId} SEPARATOR ',') as produtos_ids,
+                    SUM(it.{$colQtd}) as quantidade_total,
+                    " . ($colProdFoto ? "(SELECT pf.{$colProdFoto} FROM {$itensTable} itf LEFT JOIN produtos pf ON pf.id = itf.{$colProdutoId} WHERE itf.pedido_id = c.pedido_id AND pf.{$colProdFoto} IS NOT NULL AND pf.{$colProdFoto} != '' LIMIT 1) as produto_imagem," : "'' as produto_imagem,") . "
                     (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
                     (SELECT MIN(cp2.{$colVenc}) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
                     (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada,
@@ -586,10 +586,10 @@ class AdminCarneController extends Controller {
                     c.id as id, c.id as carne_id, 'aguardando_compra' as status_compra, NULL as comprado_em, NULL as recebido_em, c.created_at,
                     c.pedido_id, c.total_geral, c.quantidade_parcelas, c.status as carne_status,
                     u.nome as cliente_nome, u.email as cliente_email,
-                    it.{$colProdutoId} as produto_id, it.{$colQtd} as quantidade,
-                    " . ($colNomeProd ? "it.{$colNomeProd} as item_nome," : '') . "
-                    p.{$colProdNome} as produto_nome,
-                    " . ($colProdFoto ? "p.{$colProdFoto} as produto_imagem," : "'' as produto_imagem,") . "
+                    GROUP_CONCAT(DISTINCT COALESCE(p.{$colProdNome}, " . ($colNomeProd ? "it.{$colNomeProd}" : "''") . ") SEPARATOR '|||') as produtos_nomes,
+                    GROUP_CONCAT(DISTINCT it.{$colProdutoId} SEPARATOR ',') as produtos_ids,
+                    SUM(it.{$colQtd}) as quantidade_total,
+                    " . ($colProdFoto ? "(SELECT pf.{$colProdFoto} FROM {$itensTable} itf LEFT JOIN produtos pf ON pf.id = itf.{$colProdutoId} WHERE itf.pedido_id = c.pedido_id AND pf.{$colProdFoto} IS NOT NULL AND pf.{$colProdFoto} != '' LIMIT 1) as produto_imagem," : "'' as produto_imagem,") . "
                     (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
                     (SELECT MIN(cp2.{$colVenc}) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
                     (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada,
@@ -618,7 +618,7 @@ class AdminCarneController extends Controller {
             $compras = [];
         }
 
-        // Calcular stats e enriquecer imagens
+        // Calcular stats e enriquecer dados
         foreach ($compras as &$c) {
             $stats['total']++;
             $st = $c['status_compra'] ?? '';
@@ -626,12 +626,23 @@ class AdminCarneController extends Controller {
             elseif ($st === 'comprado') $stats['comprado']++;
             elseif ($st === 'recebido') $stats['recebido']++;
 
+            // Compatibilidade: montar produto_nome a partir de produtos_nomes (GROUP_CONCAT)
+            $nomes = trim((string) ($c['produtos_nomes'] ?? ''));
+            $listaNomes = $nomes !== '' ? array_filter(explode('|||', $nomes)) : [];
+            $c['produto_nome'] = !empty($listaNomes) ? implode(', ', $listaNomes) : '';
+            $c['quantidade'] = (int) ($c['quantidade_total'] ?? 0);
+
+            // Primeiro produto_id para fallback de imagem
+            $ids = trim((string) ($c['produtos_ids'] ?? ''));
+            $listaIds = $ids !== '' ? explode(',', $ids) : [];
+            $c['produto_id'] = !empty($listaIds) ? (int) $listaIds[0] : 0;
+
             // Fallback imagem: buscar de produto_fotos se não tem
             $img = trim((string) ($c['produto_imagem'] ?? ''));
-            if ($img === '' && !empty($c['produto_id'])) {
+            if ($img === '' && $c['produto_id'] > 0) {
                 try {
                     $stF = $this->db->prepare('SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ? ORDER BY principal DESC, ordem ASC LIMIT 1');
-                    $stF->execute([(int) $c['produto_id']]);
+                    $stF->execute([$c['produto_id']]);
                     $img = trim((string) ($stF->fetchColumn() ?: ''));
                 } catch (\Exception $e) {}
             }
