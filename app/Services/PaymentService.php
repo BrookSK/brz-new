@@ -3408,19 +3408,26 @@ class PaymentService {
         }
 
         try {
-            $resp = $this->cambioRealRequest('GET', '/service/v2/checkout/' . $paymentId);
+            // Usar endpoint V1: GET /service/v1/checkout/get/{token}
+            $resp = $this->cambioRealRequest('GET', '/service/v1/checkout/get/' . $paymentId);
             $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : (is_array($resp) ? $resp : []);
 
-            $status = strtolower(trim((string) ($data['status'] ?? ($resp['status'] ?? ''))));
+            $status = strtoupper(trim((string) ($data['status'] ?? ($resp['status'] ?? ''))));
 
-            // Status pagos no Câmbio Real: paid, approved, confirmed, completed, finalizada
-            $paidStatuses = ['paid', 'approved', 'confirmed', 'completed', 'success', 'finalizada', 'finalized'];
+            // Status pagos no Câmbio Real (conforme documentação)
+            $paidStatuses = ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'ON_HOLD'];
             $isPaid = in_array($status, $paidStatuses, true);
 
-            // Fallback: verificar transaction.status
-            if (!$isPaid && isset($data['transaction']) && is_array($data['transaction'])) {
-                $txStatus = strtolower(trim((string) ($data['transaction']['status'] ?? '')));
-                $isPaid = in_array($txStatus, $paidStatuses, true);
+            // Fallback: verificar em lowercase também
+            if (!$isPaid) {
+                $statusLower = strtolower($status);
+                $paidLower = ['paid', 'approved', 'confirmed', 'completed', 'success', 'finalizada', 'finalized', 'solicitacao_pago', 'solicitacao_finalizada'];
+                $isPaid = in_array($statusLower, $paidLower, true);
+            }
+
+            // Verificar campo expired
+            if (!$isPaid && !empty($data['expired'])) {
+                return ['paid' => false, 'status' => 'expired', 'raw' => $data];
             }
 
             return ['paid' => $isPaid, 'status' => $status, 'raw' => $data];
