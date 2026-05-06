@@ -407,6 +407,21 @@ class CarneService {
         error_log('[CARNE processarPagamentoBoleto] campo=' . $campo . ' idExterno=' . $idExterno);
         $this->carneModel->registrarLog(null, null, null, 'webhook_recebido', "Webhook recebido para {$campo}={$idExterno}", json_encode(['campo' => $campo, 'id_externo' => $idExterno, 'tipo' => $tipo]));
 
+        // Verificar status real no Câmbio Real antes de marcar como pago
+        try {
+            $paymentService = new \App\Services\PaymentService();
+            $crStatus = $paymentService->checkCambioRealPaymentStatus($idExterno);
+            if (empty($crStatus['paid'])) {
+                $realStatus = $crStatus['status'] ?? 'unknown';
+                error_log('[CARNE processarPagamentoBoleto] Pagamento NÃO confirmado no CR. Status real: ' . $realStatus . ' idExterno=' . $idExterno);
+                $this->carneModel->registrarLog(null, null, null, 'pagamento_nao_confirmado', "Webhook recebido mas pagamento não confirmado no Câmbio Real. Status: {$realStatus}", json_encode(['campo' => $campo, 'id_externo' => $idExterno, 'status_real' => $realStatus]));
+                return false;
+            }
+        } catch (\Exception $e) {
+            // Se não conseguir verificar, continuar com o fluxo normal (fallback)
+            error_log('[CARNE processarPagamentoBoleto] Erro ao verificar CR: ' . $e->getMessage() . ' - continuando...');
+        }
+
         $stmt = $this->db->prepare("SELECT * FROM carne_parcelas WHERE {$campo} = :ext");
         $stmt->execute([':ext' => $idExterno]);
         $parcela = $stmt->fetch(\PDO::FETCH_ASSOC);

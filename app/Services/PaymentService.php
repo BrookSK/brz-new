@@ -3413,8 +3413,8 @@ class PaymentService {
 
             $status = strtolower(trim((string) ($data['status'] ?? ($resp['status'] ?? ''))));
 
-            // Status pagos no Câmbio Real: paid, approved, confirmed, completed
-            $paidStatuses = ['paid', 'approved', 'confirmed', 'completed', 'success'];
+            // Status pagos no Câmbio Real: paid, approved, confirmed, completed, finalizada
+            $paidStatuses = ['paid', 'approved', 'confirmed', 'completed', 'success', 'finalizada', 'finalized'];
             $isPaid = in_array($status, $paidStatuses, true);
 
             // Fallback: verificar transaction.status

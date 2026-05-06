@@ -649,13 +649,12 @@ class AdminCarneController extends Controller {
         $erros = 0;
 
         try {
-            // Buscar parcelas marcadas como pagas que têm ID externo do Câmbio Real
+            // Buscar TODAS as parcelas que têm ID externo do Câmbio Real (pra verificar e corrigir em ambas direções)
             $sql = "SELECT cp.id, cp.carne_id, cp.numero_parcela, cp.status,
                         cp.boleto_produtos_id_externo, cp.boleto_produtos_pago,
                         cp.boleto_taxas_id_externo, cp.boleto_taxas_pago
                     FROM carne_parcelas cp
-                    WHERE (cp.boleto_produtos_pago = 1 OR cp.boleto_taxas_pago = 1 OR cp.status = 'paga')
-                    AND (cp.boleto_produtos_id_externo IS NOT NULL AND cp.boleto_produtos_id_externo != '')
+                    WHERE (cp.boleto_produtos_id_externo IS NOT NULL AND cp.boleto_produtos_id_externo != '')
                     ORDER BY cp.id DESC
                     LIMIT 500";
 
@@ -673,7 +672,7 @@ class AdminCarneController extends Controller {
                 $taxaRealPago = false;
 
                 // Verificar produto no Câmbio Real
-                if ($prodId !== '' && $prodPago) {
+                if ($prodId !== '') {
                     $verificados++;
                     try {
                         $cr = $paymentService->checkCambioRealPaymentStatus($prodId);
@@ -685,7 +684,7 @@ class AdminCarneController extends Controller {
                 }
 
                 // Verificar taxa no Câmbio Real
-                if ($taxaId !== '' && $taxaPago) {
+                if ($taxaId !== '') {
                     $verificados++;
                     try {
                         $cr = $paymentService->checkCambioRealPaymentStatus($taxaId);
@@ -696,10 +695,11 @@ class AdminCarneController extends Controller {
                     }
                 }
 
-                // Corrigir se marcado como pago mas na verdade expirou
+                // Corrigir discrepâncias (em ambas direções)
                 $precisaCorrigir = false;
                 $updates = [];
 
+                // Se marcado como pago mas na verdade expirou
                 if ($prodPago && !$prodRealPago && $prodId !== '') {
                     $updates[] = 'boleto_produtos_pago = 0';
                     $updates[] = 'boleto_produtos_pago_em = NULL';
@@ -711,10 +711,22 @@ class AdminCarneController extends Controller {
                     $precisaCorrigir = true;
                 }
 
+                // Se NÃO marcado como pago mas na verdade FOI pago (re-confirmar)
+                if (!$prodPago && $prodRealPago && $prodId !== '') {
+                    $updates[] = 'boleto_produtos_pago = 1';
+                    $updates[] = 'boleto_produtos_pago_em = NOW()';
+                    $precisaCorrigir = true;
+                }
+                if (!$taxaPago && $taxaRealPago && $taxaId !== '') {
+                    $updates[] = 'boleto_taxas_pago = 1';
+                    $updates[] = 'boleto_taxas_pago_em = NOW()';
+                    $precisaCorrigir = true;
+                }
+
                 if ($precisaCorrigir) {
-                    // Determinar novo status
-                    $novoProdPago = ($prodPago && $prodRealPago) ? 1 : 0;
-                    $novoTaxaPago = ($taxaPago && $taxaRealPago) ? 1 : 0;
+                    // Determinar novo status baseado no estado REAL
+                    $novoProdPago = $prodRealPago ? 1 : 0;
+                    $novoTaxaPago = $taxaRealPago ? 1 : 0;
 
                     if ($novoProdPago && $novoTaxaPago) {
                         $novoStatus = 'paga';
