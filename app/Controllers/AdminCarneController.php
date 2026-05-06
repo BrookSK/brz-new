@@ -461,6 +461,104 @@ class AdminCarneController extends Controller {
     }
 
     /**
+     * Compras do Carnê — Produtos agrupados por mês
+     */
+    public function compras(Request $request) {
+        $filtroStatus = $request->getParam('status', '');
+
+        // Detectar tabela de itens
+        $itensTable = 'pedido_itens';
+        try {
+            $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stT->execute(['pedido_itens']);
+            if ((int) $stT->fetchColumn() === 0) {
+                $stT->execute(['pedido_items']);
+                if ((int) $stT->fetchColumn() > 0) {
+                    $itensTable = 'pedido_items';
+                }
+            }
+        } catch (\Exception $e) {}
+
+        // Verificar se tabelas existem
+        $tabelasOk = true;
+        try {
+            $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stT->execute(['carne_compras_internas']);
+            if ((int) $stT->fetchColumn() === 0) $tabelasOk = false;
+        } catch (\Exception $e) { $tabelasOk = false; }
+
+        $compras = [];
+        $stats = ['total' => 0, 'aguardando' => 0, 'comprado' => 0, 'recebido' => 0];
+
+        if ($tabelasOk) {
+            $where = ['1=1'];
+            $params = [];
+
+            if (!empty($filtroStatus)) {
+                $where[] = 'ci.status = :status';
+                $params[':status'] = $filtroStatus;
+            }
+
+            $sql = "
+                SELECT 
+                    ci.id, ci.carne_id, ci.status as status_compra, ci.comprado_em, ci.recebido_em, ci.created_at,
+                    c.pedido_id, c.total_geral, c.quantidade_parcelas, c.status as carne_status, c.created_at as carne_created_at,
+                    u.nome as cliente_nome, u.email as cliente_email,
+                    pi.produto_id, pi.quantidade,
+                    p.nome as produto_nome, p.imagem as produto_imagem, p.foto as produto_foto,
+                    (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
+                    (SELECT MIN(cp2.data_vencimento) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
+                    (SELECT MAX(cp3.data_vencimento) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada
+                FROM carne_compras_internas ci
+                JOIN carnes c ON ci.carne_id = c.id
+                JOIN usuarios u ON c.cliente_id = u.id
+                LEFT JOIN pedidos ped ON ped.id = c.pedido_id
+                LEFT JOIN {$itensTable} pi ON pi.pedido_id = c.pedido_id
+                LEFT JOIN produtos p ON p.id = pi.produto_id
+                WHERE " . implode(' AND ', $where) . "
+                AND ped.id IS NOT NULL AND (ped.deleted_at IS NULL)
+                AND ped.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+                ORDER BY ci.created_at DESC
+            ";
+
+            try {
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute($params);
+                $compras = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $compras = [];
+            }
+
+            // Calcular stats
+            foreach ($compras as $c) {
+                $stats['total']++;
+                $st = $c['status_compra'] ?? '';
+                if ($st === 'aguardando_compra') $stats['aguardando']++;
+                elseif ($st === 'comprado') $stats['comprado']++;
+                elseif ($st === 'recebido') $stats['recebido']++;
+            }
+        }
+
+        // Agrupar por mês (baseado na data de criação da compra interna)
+        $porMes = [];
+        foreach ($compras as $c) {
+            $data = $c['created_at'] ?? date('Y-m-d');
+            $mesKey = date('Y-m', strtotime($data));
+            if (!isset($porMes[$mesKey])) $porMes[$mesKey] = [];
+            $porMes[$mesKey][] = $c;
+        }
+        krsort($porMes);
+
+        $title = 'Compras do Carnê';
+        $sidebarActive = 'carnes-compras';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/carne/compras.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
      * Logs do sistema de carnê
      */
     public function logs(Request $request) {
