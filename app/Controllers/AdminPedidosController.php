@@ -2692,10 +2692,8 @@ JS;
                     }
                     echo '</ul></nav>';
                 }
-                
-                echo '</main></div></div>';
 
-                // Tab Carnê
+                // Tab Carnê (dentro do tab-content)
                 $pedidosCarne = array_filter($pedidos, function($p) {
                     $fp = strtolower(trim((string) ($p['forma_pagamento'] ?? '')));
                     $st = strtolower(trim((string) ($p['status'] ?? '')));
@@ -2707,7 +2705,6 @@ JS;
                     echo '<div class="col-12"><div class="text-muted text-center py-5"><i class="fas fa-file-invoice-dollar fs-2 mb-2 d-block"></i>Nenhum pedido de carnê encontrado.</div></div>';
                 } else {
                     foreach ($pedidosCarne as $pedido) {
-                        $statusClass = 'status-' . $pedido['status'];
                         $statusIcon = $this->getStatusIcon($pedido['status']);
                         $statusColor = $this->getStatusColor($pedido['status'], $pedido);
                         $pid = (int) ($pedido['id'] ?? 0);
@@ -2716,12 +2713,10 @@ JS;
                             <div class="card order-card" style="background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;">
                                 <div class="card-body">
                                     <div class="row align-items-center gy-3">
-                                        <div class="col-6 col-lg-2">
-                                            <div class="text-center">
-                                                <div class="badge bg-' . $statusColor . ' fs-6 mb-2"><i class="' . $statusIcon . '"></i></div>
-                                                <h6 class="mb-0">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</h6>
-                                                <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
-                                            </div>
+                                        <div class="col-6 col-lg-2 text-center">
+                                            <div class="badge bg-' . $statusColor . ' fs-6 mb-2"><i class="' . $statusIcon . '"></i></div>
+                                            <h6 class="mb-0">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</h6>
+                                            <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
                                         </div>
                                         <div class="col-12 col-lg-4">
                                             <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
@@ -2731,10 +2726,8 @@ JS;
                                             <h5 class="mb-0 text-primary">' . $this->formatarMoeda((float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0)), (string) ($pedido['moeda'] ?? 'BRL')) . '</h5>
                                             <small class="text-muted">Total do Pedido</small>
                                         </div>
-                                        <div class="col-12 col-lg-3">
-                                            <div class="d-flex flex-wrap justify-content-end gap-2">
-                                                <a href="/admin/pedidos/detalhes/' . $pid . '" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> Ver</a>
-                                            </div>
+                                        <div class="col-12 col-lg-3 text-end">
+                                            <a href="/admin/pedidos/detalhes/' . $pid . '" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye me-1"></i>Ver</a>
                                         </div>
                                     </div>
                                 </div>
@@ -2743,6 +2736,8 @@ JS;
                     }
                 }
                 echo '</div></div>';
+                
+                echo '</main></div></div>';
 
         echo <<<'HTML'
 
