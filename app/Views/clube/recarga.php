@@ -475,7 +475,20 @@ ob_start();
                 if(imgUrl){ imgEl.src = imgUrl; imgWrap.style.display = ''; }
                 else { imgEl.removeAttribute('src'); imgWrap.style.display = 'none'; }
             }
-            document.getElementById('qc_pix_copypaste').value = (pix.copy_paste || '').toString();
+            var copyPaste = (pix.copy_paste || '').toString();
+            var cpEl = document.getElementById('qc_pix_copypaste');
+            var cpLabel = cpEl ? cpEl.previousElementSibling : null;
+            if (cpEl) {
+                // Só mostrar se for um payload PIX real (começa com 00020126 ou tem mais de 50 chars)
+                if (copyPaste.length > 50 || copyPaste.startsWith('0002')) {
+                    cpEl.value = copyPaste;
+                    cpEl.style.display = '';
+                    if (cpLabel) cpLabel.style.display = '';
+                } else {
+                    cpEl.style.display = 'none';
+                    if (cpLabel) cpLabel.style.display = 'none';
+                }
+            }
             startRecargaPolling(data.recarga_id, data.public_token);
             return;
         }
