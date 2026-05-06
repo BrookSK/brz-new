@@ -304,6 +304,8 @@ HTML;
                     if ($colValorInf !== '') $selItens[] = 'i.' . $colValorInf . ' AS valor_informado_cliente';
                     $colObs = $this->pickColumn($colsItens, ['observacao_cliente']);
                     if ($colObs !== '') $selItens[] = 'i.' . $colObs . ' AS observacao_cliente';
+                    $colPesoManual = $this->pickColumn($colsItens, ['peso_manual']);
+                    if ($colPesoManual !== '') $selItens[] = 'i.' . $colPesoManual . ' AS peso_manual';
                     $colVarLabel = $this->pickColumn($colsItens, ['variacao_label']);
                     if ($colVarLabel !== '') $selItens[] = 'i.' . $colVarLabel . ' AS variacao_label';
 
@@ -363,7 +365,7 @@ HTML;
                 $itens = $itensPorPedido[$pid] ?? [];
                 $temValorCliente = false;
                 foreach ($itens as $it) {
-                    if (!empty($it['valor_informado_cliente'])) { $temValorCliente = true; break; }
+                    if (!empty($it['valor_informado_cliente']) || (!empty($it['peso_manual']) && (float) $it['peso_manual'] > 0)) { $temValorCliente = true; break; }
                 }
 
                 $simbolo = strtoupper($moeda) === 'BRL' ? 'R$' : '$';
@@ -402,6 +404,7 @@ HTML;
                         $url = trim((string) ($it['url_original'] ?? ''));
                         $valorInf = !empty($it['valor_informado_cliente']);
                         $obs = trim((string) ($it['observacao_cliente'] ?? ''));
+                        $pesoManualItem = isset($it['peso_manual']) && $it['peso_manual'] !== null ? (float) $it['peso_manual'] : null;
                         $varLabel = trim((string) ($it['variacao_label'] ?? ''));
                         $imagem = trim((string) ($it['produto_imagem'] ?? ''));
                         $produtoId = (int) ($it['produto_id'] ?? 0);
@@ -416,7 +419,7 @@ HTML;
                             }
                         }
 
-                        echo '<tr' . ($valorInf ? ' class="table-warning"' : '') . '>';
+                        echo '<tr' . (($valorInf || ($pesoManualItem !== null && $pesoManualItem > 0)) ? ' class="table-warning"' : '') . '>';
                         // Imagem
                         echo '<td class="text-center">';
                         if ($imgUrl !== '') {
@@ -431,6 +434,7 @@ HTML;
                         if ($varLabel !== '') echo '<div class="text-muted small">' . htmlspecialchars($varLabel) . '</div>';
                         if ($obs !== '') echo '<div class="text-danger small mt-1"><i class="fas fa-comment me-1"></i>' . htmlspecialchars($obs) . '</div>';
                         if ($valorInf) echo '<span class="badge bg-danger small">Preço informado pelo cliente</span>';
+                        if ($pesoManualItem !== null && $pesoManualItem > 0) echo ' <span class="badge bg-warning text-dark small"><i class="fas fa-weight me-1"></i>Peso alterado: ' . number_format($pesoManualItem, 2) . ' kg</span>';
                         echo '</td>';
                         // Qtd
                         echo '<td>' . $qtd . '</td>';
@@ -448,7 +452,7 @@ HTML;
                         echo '</td>';
                         // Status
                         echo '<td>';
-                        if ($valorInf) {
+                        if ($valorInf || ($pesoManualItem !== null && $pesoManualItem > 0)) {
                             echo '<span class="badge bg-warning text-dark">Conferir</span>';
                         } else {
                             echo '<span class="badge bg-success">OK</span>';

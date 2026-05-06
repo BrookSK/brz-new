@@ -4827,6 +4827,12 @@ class CheckoutController extends Controller {
                 $vals[] = (string) $item['observacao_cliente'];
                 $placeholders[] = '?';
             }
+            // Peso manual informado pelo cliente (assessoria - revisão pendente)
+            if (!empty($item['peso_manual']) && is_array($colsItens) && in_array('peso_manual', $colsItens, true)) {
+                $cols[] = 'peso_manual';
+                $vals[] = (float) $item['peso_manual'];
+                $placeholders[] = '?';
+            }
 
                 $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
                 $stmt = $db->prepare($sql);

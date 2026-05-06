@@ -2469,10 +2469,12 @@ class AssessoriaController extends Controller {
                     $quantidade = (int) ($produtoIndex['quantidade'] ?? 1);
                     $valorInformadoCliente = isset($produtoIndex['valor_informado_cliente']) ? floatval($produtoIndex['valor_informado_cliente']) : null;
                     $observacaoCliente = isset($produtoIndex['observacao_cliente']) ? trim((string) $produtoIndex['observacao_cliente']) : '';
+                    $pesoManual = isset($produtoIndex['peso_manual']) && $produtoIndex['peso_manual'] !== null ? floatval($produtoIndex['peso_manual']) : null;
                 } else {
                     $index = $produtoIndex;
                     $valorInformadoCliente = null;
                     $observacaoCliente = '';
+                    $pesoManual = null;
                 }
 
                 if ($quantidade <= 0) {
@@ -2505,6 +2507,13 @@ class AssessoriaController extends Controller {
                                 break;
                             }
                         }
+                    }
+
+                    // Aplicar peso manual do cliente (override)
+                    if ($pesoManual !== null && $pesoManual > 0) {
+                        $produto['peso_original'] = (float) ($produto['peso'] ?? 0);
+                        $produto['peso'] = $pesoManual;
+                        $produto['peso_manual'] = true;
                     }
 
                     $produtoId = $this->criarOuReutilizarProdutoNoSistema($produto);
@@ -2550,6 +2559,11 @@ class AssessoriaController extends Controller {
                         }
                         if ($observacaoCliente !== '') {
                             $_SESSION['carrinho'][$itemKey]['observacao_cliente'] = $observacaoCliente;
+                        }
+                        // Marcar peso manual informado pelo cliente para revisão no admin
+                        if ($pesoManual !== null && $pesoManual > 0) {
+                            $_SESSION['carrinho'][$itemKey]['peso_manual'] = $pesoManual;
+                            $_SESSION['carrinho'][$itemKey]['peso_original'] = (float) ($produto['peso_original'] ?? $produto['peso'] ?? 0);
                         }
                     }
                     

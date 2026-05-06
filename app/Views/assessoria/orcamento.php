@@ -196,13 +196,16 @@ ob_start();
                                     <?php if (!empty($produto['variacoes']) && is_array($produto['variacoes'])): ?>
                                         <div class="mt-2 variation-combo" data-index="<?= $index ?>"></div>
                                     <?php endif; ?>
-                                    <div class="d-flex align-items-center gap-3">
+                                    <div class="d-flex align-items-center gap-3 flex-wrap">
                                         <span class="badge bg-light text-dark">
                                             <i class="fas fa-tag me-1"></i><?= htmlspecialchars($produto['sku']) ?>
                                         </span>
-                                        <span class="badge bg-light text-dark">
+                                        <span class="badge bg-light text-dark peso-badge" data-index="<?= $index ?>">
                                             <i class="fas fa-weight me-1"></i><span class="peso-text" data-base-peso="<?= htmlspecialchars((string) $produto['peso']) ?>"><?= number_format($produto['peso'], 2) ?></span> kg
                                         </span>
+                                        <a href="#" class="text-decoration-none small text-warning peso-override-toggle" data-index="<?= $index ?>">
+                                            <i class="fas fa-edit me-1"></i>Peso errado?
+                                        </a>
                                         <small class="text-muted">
                                             <i class="fas fa-link me-1"></i>
                                             <a href="<?= htmlspecialchars($produto['url_original']) ?>" 
@@ -210,6 +213,19 @@ ob_start();
                                                 Ver original
                                             </a>
                                         </small>
+                                    </div>
+                                    <div class="peso-override-box mt-2" data-index="<?= $index ?>" style="display:none;">
+                                        <div class="input-group input-group-sm" style="max-width: 220px;">
+                                            <span class="input-group-text"><i class="fas fa-weight"></i></span>
+                                            <input type="number" class="form-control peso-override-input" data-index="<?= $index ?>" 
+                                                   step="0.01" min="0.01" placeholder="Peso em kg"
+                                                   value="">
+                                            <span class="input-group-text">kg</span>
+                                            <button type="button" class="btn btn-outline-danger btn-sm peso-override-clear" data-index="<?= $index ?>" title="Limpar">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        <small class="text-muted">Informe o peso correto do produto (em kg)</small>
                                     </div>
                                     <div class="mt-2">
                                         <label class="form-label small text-muted mb-1" for="quantidade_<?= $index ?>">Quantidade</label>
@@ -413,12 +429,14 @@ $(document).ready(function() {
     function resolveVariant(index) {
         const p = produtos[index];
         if (!p || !Array.isArray(p.variacoes) || p.variacoes.length === 0) {
-            return { variacao_id: null, valor: p ? p.valor : 0, peso: p ? p.peso : 0, complete: true, valor_pendente: !!(p && p.valor_pendente && (!p.valor || p.valor <= 0)) };
+            const pesoFinal = (p && p.peso_manual > 0) ? p.peso_manual : (p ? p.peso : 0);
+            return { variacao_id: null, valor: p ? p.valor : 0, peso: pesoFinal, complete: true, valor_pendente: !!(p && p.valor_pendente && (!p.valor || p.valor <= 0)) };
         }
 
         const keys = getVariationKeys(index);
         if (keys.length === 0) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: true };
+            const pesoFinal = (p.peso_manual > 0) ? p.peso_manual : p.peso;
+            return { variacao_id: null, valor: p.valor, peso: pesoFinal, complete: true };
         }
 
         const sel = selections[index] || {};
@@ -436,7 +454,8 @@ $(document).ready(function() {
         });
 
         if (!complete) {
-            return { variacao_id: null, valor: p.valor, peso: p.peso, complete: false };
+            const pesoFinal = (p.peso_manual > 0) ? p.peso_manual : p.peso;
+            return { variacao_id: null, valor: p.valor, peso: pesoFinal, complete: false };
         }
 
         if (matches.length >= 1) {
@@ -454,7 +473,8 @@ $(document).ready(function() {
             }, null);
 
             const valor = best && best.valor !== null && best.valor !== undefined && !isNaN(parseFloat(best.valor)) && parseFloat(best.valor) > 0 ? parseFloat(best.valor) : p.valor;
-            const peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
+            let peso = best && best.peso !== null && best.peso !== undefined && !isNaN(parseFloat(best.peso)) && parseFloat(best.peso) > 0 ? parseFloat(best.peso) : p.peso;
+            if (p.peso_manual > 0) peso = p.peso_manual;
             return { variacao_id: String((best && best.id) ?? ''), valor, peso, complete: true };
         }
 
@@ -559,7 +579,8 @@ $(document).ready(function() {
                 variacao_id: d.variacao_id,
                 quantidade: quantidade,
                 valor_informado_cliente: (p.valor_pendente || d.valor_pendente) ? (p.valor || 0) : null,
-                observacao_cliente: p.observacao_cliente || null
+                observacao_cliente: p.observacao_cliente || null,
+                peso_manual: (p.peso_manual > 0) ? p.peso_manual : null
             });
 
             if (Array.isArray(p.variacoes) && p.variacoes.length > 0) {
@@ -650,6 +671,42 @@ $(document).ready(function() {
     $('.product-checkbox').change(calcularTotaisSelecionados);
     $('#termosAceitos').change(calcularTotaisSelecionados);
     $(document).on('input change', '.quantidade-input', calcularTotaisSelecionados);
+
+    // Handler para peso manual (override)
+    $(document).on('click', '.peso-override-toggle', function(e) {
+        e.preventDefault();
+        const index = $(this).data('index');
+        const box = $('.peso-override-box[data-index="' + index + '"]');
+        box.slideToggle(200);
+    });
+
+    $(document).on('input change', '.peso-override-input', function() {
+        const index = parseInt($(this).data('index'));
+        const val = parseFloat($(this).val());
+        if (!isNaN(index) && produtos[index]) {
+            if (!isNaN(val) && val > 0) {
+                produtos[index].peso_manual = val;
+                // Atualizar badge visual
+                const badge = $('.peso-badge[data-index="' + index + '"] .peso-text');
+                badge.text(val.toFixed(2));
+                badge.closest('.peso-badge').removeClass('bg-light text-dark').addClass('bg-warning text-dark');
+            } else {
+                delete produtos[index].peso_manual;
+                const badge = $('.peso-badge[data-index="' + index + '"] .peso-text');
+                badge.text(parseFloat(badge.data('base-peso')).toFixed(2));
+                badge.closest('.peso-badge').removeClass('bg-warning').addClass('bg-light text-dark');
+            }
+        }
+        calcularTotaisSelecionados();
+    });
+
+    $(document).on('click', '.peso-override-clear', function() {
+        const index = $(this).data('index');
+        const input = $('.peso-override-input[data-index="' + index + '"]');
+        input.val('');
+        input.trigger('change');
+        $('.peso-override-box[data-index="' + index + '"]').slideUp(200);
+    });
 
     // Handler para valor manual (produtos com valor_pendente)
     $(document).on('input change', '.valor-manual-input', function() {
