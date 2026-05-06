@@ -2705,6 +2705,10 @@ JS;
     }
 
     public function calcularResumo(Request $request) {
+        // Suprimir notices/warnings que podem quebrar o JSON
+        @ini_set('display_errors', '0');
+        error_reporting(E_ERROR | E_PARSE);
+
         try {
             $moeda = strtoupper(trim((string) $request->getParam('moeda', 'USD')));
             if (!in_array($moeda, ['BRL', 'USD'], true)) {

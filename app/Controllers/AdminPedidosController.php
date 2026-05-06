@@ -2158,6 +2158,21 @@ JS;
                     if (!array_key_exists('numero_pedido', $p) && $colNumero) {
                         $p['numero_pedido'] = (string) ($p[$colNumero] ?? '');
                     }
+
+                    // Corrigir total quando DB tem apenas subtotal (bug em pedidos manuais antigos)
+                    $dbTotal = (float) ($p['total'] ?? 0);
+                    $sub = (float) ($p['subtotal'] ?? ($p['subtotal_produtos'] ?? 0));
+                    $svc = (float) ($p['servicos'] ?? ($p['taxa_servico'] ?? 0));
+                    $imp = (float) ($p['impostos'] ?? ($p['valor_impostos'] ?? 0));
+                    $impL = (float) ($p['imposto_local'] ?? 0);
+                    $frt = (float) ($p['frete'] ?? 0);
+                    $desc = (float) ($p['desconto'] ?? 0);
+                    if ($svc + $imp > 0) {
+                        $calcTotal = $sub + $svc + $imp + $impL + $frt - $desc;
+                        if ($calcTotal > $dbTotal) {
+                            $p['total'] = $calcTotal;
+                        }
+                    }
                 }
                 unset($p);
             }
@@ -3969,7 +3984,21 @@ HTML;
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<tr><td><strong>Imposto local</strong></td><td><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);">' . $fmtPedido((float) $pedido['imposto_local']) . '</span></td></tr>' : '') . '
                                             <tr><td><strong>Frete</strong></td><td>' . (((float) ($pedido['frete'] ?? 0)) <= 0 ? 'Frete grátis' : $fmtPedido((float) ($pedido['frete'] ?? 0))) . '</td></tr>
                                             <tr><td><strong>Desconto</strong></td><td>' . $fmtPedido((float) ($pedido['desconto'] ?? 0)) . '</td></tr>
-                                            <tr><td><strong>Total</strong></td><td><strong>' . $fmtPedido((float) ($pedido['total'] ?? 0)) . '</strong></td></tr>
+                                            <tr><td><strong>Total</strong></td><td><strong>' . $fmtPedido(
+                                                // Recalcular total a partir dos componentes (corrige pedidos com total incorreto no DB)
+                                                (function() use ($pedido) {
+                                                    $sub = (float) ($pedido['subtotal'] ?? ($pedido['subtotal_produtos'] ?? 0));
+                                                    $svc = (float) ($pedido['servicos'] ?? ($pedido['taxa_servico'] ?? 0));
+                                                    $imp = (float) ($pedido['impostos'] ?? ($pedido['valor_impostos'] ?? 0));
+                                                    $impL = (float) ($pedido['imposto_local'] ?? 0);
+                                                    $frt = (float) ($pedido['frete'] ?? 0);
+                                                    $desc = (float) ($pedido['desconto'] ?? 0);
+                                                    $dbTotal = (float) ($pedido['total'] ?? 0);
+                                                    $calcTotal = $sub + $svc + $imp + $impL + $frt - $desc;
+                                                    // Usar o calculado se for maior que o do DB (indica que DB está errado)
+                                                    return ($calcTotal > $dbTotal && $svc + $imp > 0) ? $calcTotal : $dbTotal;
+                                                })()
+                                            ) . '</strong></td></tr>
                                             <tr><td><strong>Moeda</strong></td><td>' . htmlspecialchars((string) ($pedido['moeda'] ?? 'BRL')) . '</td></tr>
                                             <tr><td><strong>Taxa Conversão</strong></td><td>' . (
                                                 (strtoupper((string) ($pedido['moeda'] ?? '')) === 'BRL' && (float) ($pedido['taxa_conversao'] ?? 1) > 1.01)
