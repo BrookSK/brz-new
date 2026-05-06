@@ -196,11 +196,16 @@
                 <p class="mb-2 fw-semibold">Como deseja marcar?</p>
                 <div class="d-flex flex-column gap-2">
                     <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $m['ci']['id'] ?>">
-                        <button type="submit" class="btn btn-success w-100"><i class="fas fa-check-double me-1"></i>Compra Total (produto completo)</button>
+                        <button type="submit" class="btn btn-success w-100"><i class="fas fa-check-double me-1"></i>Compra Total (<?= (int) ($m['ci']['quantidade'] ?? 1) ?> un.)</button>
                     </form>
-                    <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $m['ci']['id'] ?>">
+                    <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $m['ci']['id'] ?>" class="border rounded p-2 bg-light">
                         <input type="hidden" name="parcial" value="1">
-                        <button type="submit" class="btn btn-warning w-100"><i class="fas fa-check me-1"></i>Compra Parcial (parte do produto)</button>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="small fw-semibold text-nowrap mb-0">Qtd comprada:</label>
+                            <input type="number" name="quantidade_comprada" class="form-control form-control-sm" style="max-width:80px;" min="1" max="<?= (int) ($m['ci']['quantidade'] ?? 1) ?>" value="1" required>
+                            <span class="small text-muted text-nowrap">de <?= (int) ($m['ci']['quantidade'] ?? 1) ?></span>
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100 mt-2"><i class="fas fa-check me-1"></i>Compra Parcial</button>
                     </form>
                 </div>
             </div>
