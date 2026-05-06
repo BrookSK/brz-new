@@ -636,6 +636,137 @@ class AdminCarneController extends Controller {
     }
 
     /**
+     * Reconciliação: verifica status real dos pagamentos no Câmbio Real
+     * e corrige parcelas marcadas como pagas que na verdade expiraram
+     */
+    public function reconciliar(Request $request) {
+        $auth = new \App\Services\AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $paymentService = new \App\Services\PaymentService();
+        $corrigidos = 0;
+        $verificados = 0;
+        $erros = 0;
+
+        try {
+            // Buscar parcelas marcadas como pagas que têm ID externo do Câmbio Real
+            $sql = "SELECT cp.id, cp.carne_id, cp.numero_parcela, cp.status,
+                        cp.boleto_produtos_id_externo, cp.boleto_produtos_pago,
+                        cp.boleto_taxas_id_externo, cp.boleto_taxas_pago
+                    FROM carne_parcelas cp
+                    WHERE (cp.boleto_produtos_pago = 1 OR cp.boleto_taxas_pago = 1 OR cp.status = 'paga')
+                    AND (cp.boleto_produtos_id_externo IS NOT NULL AND cp.boleto_produtos_id_externo != '')
+                    ORDER BY cp.id DESC
+                    LIMIT 500";
+
+            $stmt = $this->db->query($sql);
+            $parcelas = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+
+            foreach ($parcelas as $p) {
+                $prodId = trim((string) ($p['boleto_produtos_id_externo'] ?? ''));
+                $taxaId = trim((string) ($p['boleto_taxas_id_externo'] ?? ''));
+                $prodPago = (int) ($p['boleto_produtos_pago'] ?? 0);
+                $taxaPago = (int) ($p['boleto_taxas_pago'] ?? 0);
+                $parcelaId = (int) $p['id'];
+
+                $prodRealPago = false;
+                $taxaRealPago = false;
+
+                // Verificar produto no Câmbio Real
+                if ($prodId !== '' && $prodPago) {
+                    $verificados++;
+                    try {
+                        $cr = $paymentService->checkCambioRealPaymentStatus($prodId);
+                        $prodRealPago = !empty($cr['paid']);
+                    } catch (\Exception $e) {
+                        $erros++;
+                        continue;
+                    }
+                }
+
+                // Verificar taxa no Câmbio Real
+                if ($taxaId !== '' && $taxaPago) {
+                    $verificados++;
+                    try {
+                        $cr = $paymentService->checkCambioRealPaymentStatus($taxaId);
+                        $taxaRealPago = !empty($cr['paid']);
+                    } catch (\Exception $e) {
+                        $erros++;
+                        continue;
+                    }
+                }
+
+                // Corrigir se marcado como pago mas na verdade expirou
+                $precisaCorrigir = false;
+                $updates = [];
+
+                if ($prodPago && !$prodRealPago && $prodId !== '') {
+                    $updates[] = 'boleto_produtos_pago = 0';
+                    $updates[] = 'boleto_produtos_pago_em = NULL';
+                    $precisaCorrigir = true;
+                }
+                if ($taxaPago && !$taxaRealPago && $taxaId !== '') {
+                    $updates[] = 'boleto_taxas_pago = 0';
+                    $updates[] = 'boleto_taxas_pago_em = NULL';
+                    $precisaCorrigir = true;
+                }
+
+                if ($precisaCorrigir) {
+                    // Determinar novo status
+                    $novoProdPago = ($prodPago && $prodRealPago) ? 1 : 0;
+                    $novoTaxaPago = ($taxaPago && $taxaRealPago) ? 1 : 0;
+
+                    if ($novoProdPago && $novoTaxaPago) {
+                        $novoStatus = 'paga';
+                    } elseif ($novoProdPago || $novoTaxaPago) {
+                        $novoStatus = 'parcialmente_paga';
+                    } else {
+                        $novoStatus = 'aguardando_pagamento';
+                    }
+
+                    $updates[] = "status = '{$novoStatus}'";
+                    $updates[] = "updated_at = NOW()";
+
+                    $this->db->prepare("UPDATE carne_parcelas SET " . implode(', ', $updates) . " WHERE id = ?")
+                        ->execute([$parcelaId]);
+
+                    // Registrar no histórico
+                    try {
+                        $this->carneModel->registrarHistorico(
+                            (int) $p['carne_id'], $parcelaId, 'reconciliacao',
+                            "Parcela {$p['numero_parcela']} corrigida: pagamento expirado no Câmbio Real. Status: {$p['status']} → {$novoStatus}"
+                        );
+                    } catch (\Exception $e) {}
+
+                    $corrigidos++;
+                }
+
+                // Rate limit: não sobrecarregar a API
+                usleep(200000); // 200ms entre requests
+            }
+        } catch (\Exception $e) {
+            if ($request->getParam('json')) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                exit;
+            }
+            $_SESSION['flash_error'] = 'Erro na reconciliação: ' . $e->getMessage();
+            header('Location: /admin/carnes');
+            exit;
+        }
+
+        if ($request->getParam('json')) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'verificados' => $verificados, 'corrigidos' => $corrigidos, 'erros' => $erros]);
+            exit;
+        }
+
+        $_SESSION['flash_success'] = "Reconciliação concluída: {$verificados} verificados, {$corrigidos} corrigidos, {$erros} erros.";
+        header('Location: /admin/carnes');
+        exit;
+    }
+
+    /**
      * Logs do sistema de carnê
      */
     public function logs(Request $request) {
