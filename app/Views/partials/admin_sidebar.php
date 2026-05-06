@@ -235,7 +235,6 @@ function renderAdminSidebar($activePage = '') {
         'usuarios' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.users', 'Usuários'), 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
         'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.payments', 'Pagamentos'), 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         'carnes' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Carnê Braziliana', 'url' => '/admin/carnes', 'roles' => ['admin','vendedor']],
-        'carnes-compras-mensal' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Compras Carnê (Mensal)', 'url' => '/admin/carnes/compras-mensal', 'roles' => ['admin','vendedor']],
         'carnes-compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras do Carnê', 'url' => '/admin/carnes/compras', 'roles' => ['admin','vendedor']],
         'relatorio-pedidos' => ['icon' => 'fas fa-file-alt', 'label' => 'Relatório Pedidos', 'url' => '/admin/relatorio-pedidos', 'roles' => ['admin','vendedor']],
         'relatorio-geral' => ['icon' => 'fas fa-chart-bar', 'label' => 'Resumo Financeiro', 'url' => '/admin/relatorio-geral', 'roles' => ['admin']],

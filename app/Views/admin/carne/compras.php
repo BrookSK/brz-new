@@ -105,7 +105,21 @@
                                     </div>
                                 </td>
                                 <td class="small"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></td>
-                                <td><span class="badge bg-light text-dark"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span></td>
+                                <td>
+                                    <span class="badge bg-light text-dark"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span>
+                                    <?php
+                                        $stP1 = strtolower(trim((string) ($ci['status_primeira_parcela'] ?? '')));
+                                        $p1ProdPago = (int) ($ci['primeira_parcela_produtos_pago'] ?? 0);
+                                        $p1TaxaPago = (int) ($ci['primeira_parcela_taxas_pago'] ?? 0);
+                                    ?>
+                                    <?php if ($stP1 === 'paga'): ?>
+                                        <div style="font-size:10px;" class="text-success"><i class="fas fa-check-circle"></i> 1ª paga</div>
+                                    <?php elseif ($p1ProdPago || $p1TaxaPago): ?>
+                                        <div style="font-size:10px;" class="text-warning"><i class="fas fa-exclamation-circle"></i> 1ª parcial (<?= $p1ProdPago ? 'prod' : '' ?><?= ($p1ProdPago && $p1TaxaPago) ? '+' : '' ?><?= $p1TaxaPago ? 'taxa' : '' ?>)</div>
+                                    <?php else: ?>
+                                        <div style="font-size:10px;" class="text-danger"><i class="fas fa-times-circle"></i> 1ª pendente</div>
+                                    <?php endif; ?>
+                                </td>
                                 <td><span class="badge bg-<?= $carneStatus === 'quitado' ? 'success' : ($carneStatus === 'com_atraso' ? 'danger' : 'primary') ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $carneStatus)) ?></span></td>
                                 <td class="small text-muted"><?= !empty($ci['data_inicio']) ? date('d/m/Y', strtotime($ci['data_inicio'])) : '-' ?></td>
                                 <td class="small text-muted"><?= !empty($ci['data_fim_estimada']) ? date('d/m/Y', strtotime($ci['data_fim_estimada'])) : '-' ?></td>

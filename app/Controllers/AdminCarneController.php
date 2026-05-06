@@ -542,7 +542,10 @@ class AdminCarneController extends Controller {
                     " . ($colProdFoto ? "p.{$colProdFoto} as produto_imagem," : "'' as produto_imagem,") . "
                     (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
                     (SELECT MIN(cp2.{$colVenc}) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
-                    (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada
+                    (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada,
+                    (SELECT cp1.status FROM carne_parcelas cp1 WHERE cp1.carne_id = c.id AND cp1.numero_parcela = 1 LIMIT 1) as status_primeira_parcela,
+                    (SELECT COALESCE(cp1b.boleto_produtos_pago,0) FROM carne_parcelas cp1b WHERE cp1b.carne_id = c.id AND cp1b.numero_parcela = 1 LIMIT 1) as primeira_parcela_produtos_pago,
+                    (SELECT COALESCE(cp1c.boleto_taxas_pago,0) FROM carne_parcelas cp1c WHERE cp1c.carne_id = c.id AND cp1c.numero_parcela = 1 LIMIT 1) as primeira_parcela_taxas_pago
                 FROM carne_compras_internas ci
                 JOIN carnes c ON ci.carne_id = c.id
                 JOIN usuarios u ON c.cliente_id = u.id
@@ -567,7 +570,10 @@ class AdminCarneController extends Controller {
                     " . ($colProdFoto ? "p.{$colProdFoto} as produto_imagem," : "'' as produto_imagem,") . "
                     (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
                     (SELECT MIN(cp2.{$colVenc}) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
-                    (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada
+                    (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada,
+                    (SELECT cp1.status FROM carne_parcelas cp1 WHERE cp1.carne_id = c.id AND cp1.numero_parcela = 1 LIMIT 1) as status_primeira_parcela,
+                    (SELECT COALESCE(cp1b.boleto_produtos_pago,0) FROM carne_parcelas cp1b WHERE cp1b.carne_id = c.id AND cp1b.numero_parcela = 1 LIMIT 1) as primeira_parcela_produtos_pago,
+                    (SELECT COALESCE(cp1c.boleto_taxas_pago,0) FROM carne_parcelas cp1c WHERE cp1c.carne_id = c.id AND cp1c.numero_parcela = 1 LIMIT 1) as primeira_parcela_taxas_pago
                 FROM carnes c
                 JOIN usuarios u ON c.cliente_id = u.id
                 JOIN pedidos ped ON ped.id = c.pedido_id
