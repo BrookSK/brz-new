@@ -2980,28 +2980,88 @@ class CheckoutController extends Controller {
                             throw new \Exception('Usuário não identificado para criar o carnê.');
                         }
 
+                        // SALVAR quantidade de parcelas ANTES de criar o carnê (pra não perder se der erro)
+                        try {
+                            $dbMetaPre = \Config\Database::getConnection();
+                            $dbMetaPre->exec("CREATE TABLE IF NOT EXISTS pedido_meta (
+                                id INT AUTO_INCREMENT PRIMARY KEY,
+                                pedido_id INT NOT NULL,
+                                meta_key VARCHAR(100) NOT NULL,
+                                meta_value TEXT,
+                                INDEX idx_pedido_meta_pedido (pedido_id),
+                                INDEX idx_pedido_meta_key (meta_key)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                            $stMetaPre = $dbMetaPre->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)');
+                            $stMetaPre->execute([(int) $pedidoId, 'carne_parcelas', (string) $qtdParcelas]);
+                            $stMetaPre->execute([(int) $pedidoId, 'carne_subtotal_produtos', (string) $subtotalProdutos]);
+                            $stMetaPre->execute([(int) $pedidoId, 'carne_total_taxas', (string) $totalTaxas]);
+                        } catch (\Exception $e) {
+                            error_log('[CARNE] Erro ao salvar meta parcelas (pre): ' . $e->getMessage());
+                        }
+
                         error_log("[CARNE] Chamando criarCarne: pedido={$pedidoId} cliente={$clienteId} prodBrl={$subtotalProdutos} taxasBrl={$totalTaxas} parcelas={$qtdParcelas}");
 
-                        $carneId = $carneService->criarCarne(
-                            (int) $pedidoId,
-                            $clienteId,
-                            $subtotalProdutos,
-                            $totalTaxas,
-                            $qtdParcelas,
-                            [
-                                'nome' => $dados['nome'] ?? ($usuario['nome'] ?? ''),
-                                'email' => $dados['email'] ?? ($usuario['email'] ?? ''),
-                                'documento' => $dados['documento'] ?? ($usuario['documento'] ?? ''),
-                                'data_nascimento' => $dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? ''),
-                                'telefone' => $dados['telefone'] ?? ($usuario['telefone'] ?? ''),
-                                'cep' => $dados['cep'] ?? '',
-                                'endereco' => $dados['endereco'] ?? '',
-                                'numero' => $dados['numero'] ?? '',
-                                'bairro' => $dados['bairro'] ?? '',
-                                'cidade' => $dados['cidade'] ?? '',
-                                'estado' => $dados['estado'] ?? '',
-                            ]
-                        );
+                        // Tentativa 1
+                        $carneId = null;
+                        $carneCriado = false;
+                        try {
+                            $carneId = $carneService->criarCarne(
+                                (int) $pedidoId,
+                                $clienteId,
+                                $subtotalProdutos,
+                                $totalTaxas,
+                                $qtdParcelas,
+                                [
+                                    'nome' => $dados['nome'] ?? ($usuario['nome'] ?? ''),
+                                    'email' => $dados['email'] ?? ($usuario['email'] ?? ''),
+                                    'documento' => $dados['documento'] ?? ($usuario['documento'] ?? ''),
+                                    'data_nascimento' => $dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? ''),
+                                    'telefone' => $dados['telefone'] ?? ($usuario['telefone'] ?? ''),
+                                    'cep' => $dados['cep'] ?? '',
+                                    'endereco' => $dados['endereco'] ?? '',
+                                    'numero' => $dados['numero'] ?? '',
+                                    'bairro' => $dados['bairro'] ?? '',
+                                    'cidade' => $dados['cidade'] ?? '',
+                                    'estado' => $dados['estado'] ?? '',
+                                ]
+                            );
+                            $carneCriado = ($carneId > 0);
+                        } catch (\Exception $e1) {
+                            error_log('[CARNE] Tentativa 1 falhou para pedido #' . $pedidoId . ': ' . $e1->getMessage());
+                            // Tentativa 2 (retry)
+                            usleep(500000); // 500ms
+                            try {
+                                $carneId = $carneService->criarCarne(
+                                    (int) $pedidoId,
+                                    $clienteId,
+                                    $subtotalProdutos,
+                                    $totalTaxas,
+                                    $qtdParcelas,
+                                    [
+                                        'nome' => $dados['nome'] ?? ($usuario['nome'] ?? ''),
+                                        'email' => $dados['email'] ?? ($usuario['email'] ?? ''),
+                                        'documento' => $dados['documento'] ?? ($usuario['documento'] ?? ''),
+                                        'data_nascimento' => $dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? ''),
+                                        'telefone' => $dados['telefone'] ?? ($usuario['telefone'] ?? ''),
+                                        'cep' => $dados['cep'] ?? '',
+                                        'endereco' => $dados['endereco'] ?? '',
+                                        'numero' => $dados['numero'] ?? '',
+                                        'bairro' => $dados['bairro'] ?? '',
+                                        'cidade' => $dados['cidade'] ?? '',
+                                        'estado' => $dados['estado'] ?? '',
+                                    ]
+                                );
+                                $carneCriado = ($carneId > 0);
+                                error_log('[CARNE] Tentativa 2 SUCESSO para pedido #' . $pedidoId . ' carneId=' . $carneId);
+                            } catch (\Exception $e2) {
+                                error_log('[CARNE] Tentativa 2 também falhou para pedido #' . $pedidoId . ': ' . $e2->getMessage());
+                                throw new \Exception('Erro ao criar Carnê (2 tentativas): ' . $e2->getMessage());
+                            }
+                        }
+
+                        if (!$carneCriado || !$carneId) {
+                            throw new \Exception('Carnê não foi criado (ID inválido).');
+                        }
 
                         // Salvar quantidade de parcelas no pedido_meta para referência futura
                         try {
