@@ -1869,13 +1869,6 @@ JS;
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
             }
-
-            // Filtro por forma de pagamento (ex: carne_braziliana)
-            $formaPagamentoFiltro = trim((string) ($request->getParam('forma_pagamento', '') ?? ''));
-            if ($formaPagamentoFiltro !== '' && in_array('forma_pagamento', $colsPedidos, true)) {
-                $sql .= " AND LOWER(p.forma_pagamento) = :forma_pagamento";
-                $params[':forma_pagamento'] = strtolower($formaPagamentoFiltro);
-            }
             
             if (!empty($busca)) {
                 $buscaRaw = trim((string) $busca);
@@ -2298,15 +2291,12 @@ JS;
                                 <i class="fas fa-currency-brl"></i> Pagamentos em Reais
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pedidos-carne-tab" data-bs-toggle="pill" data-bs-target="#pedidos-carne" type="button">
+                                <i class="fas fa-file-invoice-dollar"></i> Carnê
+                            </button>
+                        </li>
                     </ul>';
-                    $fpFiltro = strtolower(trim((string) ($request->getParam('forma_pagamento', '') ?? '')));
-                    $carneActive = ($fpFiltro === 'carne_braziliana') ? 'btn-dark' : 'btn-outline-dark';
-                    if ($fpFiltro === 'carne_braziliana') {
-                        echo '<a href="/admin/pedidos" class="btn btn-sm btn-outline-secondary ms-2"><i class="fas fa-times me-1"></i>Limpar filtro</a>';
-                        echo '<span class="btn btn-sm btn-dark ms-1"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>';
-                    } else {
-                        echo '<a href="/admin/pedidos?forma_pagamento=carne_braziliana" class="btn btn-sm btn-outline-dark ms-2"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</a>';
-                    }
                     echo '
                     <div class="tab-content" id="pedidosTabContent">
                         <div class="tab-pane fade show active" id="pedidos-todos" role="tabpanel">
@@ -2704,6 +2694,55 @@ JS;
                 }
                 
                 echo '</main></div></div>';
+
+                // Tab Carnê
+                $pedidosCarne = array_filter($pedidos, function($p) {
+                    $fp = strtolower(trim((string) ($p['forma_pagamento'] ?? '')));
+                    $st = strtolower(trim((string) ($p['status'] ?? '')));
+                    return ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true));
+                });
+
+                echo '<div class="tab-pane fade" id="pedidos-carne" role="tabpanel"><div class="row">';
+                if (empty($pedidosCarne)) {
+                    echo '<div class="col-12"><div class="text-muted text-center py-5"><i class="fas fa-file-invoice-dollar fs-2 mb-2 d-block"></i>Nenhum pedido de carnê encontrado.</div></div>';
+                } else {
+                    foreach ($pedidosCarne as $pedido) {
+                        $statusClass = 'status-' . $pedido['status'];
+                        $statusIcon = $this->getStatusIcon($pedido['status']);
+                        $statusColor = $this->getStatusColor($pedido['status'], $pedido);
+                        $pid = (int) ($pedido['id'] ?? 0);
+
+                        echo '<div class="col-12 mb-3">
+                            <div class="card order-card" style="background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;">
+                                <div class="card-body">
+                                    <div class="row align-items-center gy-3">
+                                        <div class="col-6 col-lg-2">
+                                            <div class="text-center">
+                                                <div class="badge bg-' . $statusColor . ' fs-6 mb-2"><i class="' . $statusIcon . '"></i></div>
+                                                <h6 class="mb-0">#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</h6>
+                                                <small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-lg-4">
+                                            <h6 class="mb-1">' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</h6>
+                                            <p class="text-muted small mb-0">' . htmlspecialchars($pedido['cliente_email'] ?? '') . '</p>
+                                        </div>
+                                        <div class="col-6 col-lg-3 text-center">
+                                            <h5 class="mb-0 text-primary">' . $this->formatarMoeda((float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0)), (string) ($pedido['moeda'] ?? 'BRL')) . '</h5>
+                                            <small class="text-muted">Total do Pedido</small>
+                                        </div>
+                                        <div class="col-12 col-lg-3">
+                                            <div class="d-flex flex-wrap justify-content-end gap-2">
+                                                <a href="/admin/pedidos/detalhes/' . $pid . '" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> Ver</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>';
+                    }
+                }
+                echo '</div></div>';
 
         echo <<<'HTML'
 
