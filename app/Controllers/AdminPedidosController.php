@@ -5002,9 +5002,28 @@ LINKSCRIPT;
         $valorPago = $total > 0 ? round(($totalGeral / $total) * $pagas, 2) : 0;
         $pct = $total > 0 ? round(($pagas / $total) * 100) : 0;
 
-        $html = '<div class="mt-1" style="font-size:.7rem;">';
-        $html .= '<div class="progress" style="height:5px;"><div class="progress-bar bg-success" style="width:' . $pct . '%"></div></div>';
-        $html .= '<span class="text-muted">' . $pagas . '/' . $total . ' parcelas &middot; R$ ' . number_format($valorPago, 2, ',', '.') . '</span>';
+        // Cores baseadas no progresso
+        if ($pct >= 100) {
+            $barColor = 'bg-success';
+            $textColor = 'color:#198754;font-weight:700;';
+            $icon = '<i class="fas fa-check-circle me-1"></i>';
+        } elseif ($pct >= 50) {
+            $barColor = 'bg-primary';
+            $textColor = 'color:#0d6efd;font-weight:600;';
+            $icon = '';
+        } elseif ($pagas > 0) {
+            $barColor = 'bg-warning';
+            $textColor = 'color:#dc3545;font-weight:600;';
+            $icon = '';
+        } else {
+            $barColor = 'bg-danger';
+            $textColor = 'color:#dc3545;font-weight:700;';
+            $icon = '<i class="fas fa-exclamation-circle me-1"></i>';
+        }
+
+        $html = '<div class="mt-1" style="font-size:.72rem;">';
+        $html .= '<div class="progress" style="height:6px;border-radius:3px;"><div class="progress-bar ' . $barColor . '" style="width:' . $pct . '%"></div></div>';
+        $html .= '<span style="' . $textColor . '">' . $icon . $pagas . '/' . $total . ' parcelas &middot; R$ ' . number_format($valorPago, 2, ',', '.') . '</span>';
         $html .= '</div>';
         return $html;
     }
