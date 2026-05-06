@@ -589,14 +589,26 @@ class AdminCarneController extends Controller {
             $compras = [];
         }
 
-        // Calcular stats
-        foreach ($compras as $c) {
+        // Calcular stats e enriquecer imagens
+        foreach ($compras as &$c) {
             $stats['total']++;
             $st = $c['status_compra'] ?? '';
             if ($st === 'aguardando_compra') $stats['aguardando']++;
             elseif ($st === 'comprado') $stats['comprado']++;
             elseif ($st === 'recebido') $stats['recebido']++;
+
+            // Fallback imagem: buscar de produto_fotos se não tem
+            $img = trim((string) ($c['produto_imagem'] ?? ''));
+            if ($img === '' && !empty($c['produto_id'])) {
+                try {
+                    $stF = $this->db->prepare('SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ? ORDER BY principal DESC, ordem ASC LIMIT 1');
+                    $stF->execute([(int) $c['produto_id']]);
+                    $img = trim((string) ($stF->fetchColumn() ?: ''));
+                } catch (\Exception $e) {}
+            }
+            $c['produto_imagem'] = $img;
         }
+        unset($c);
 
         // Agrupar por mês (baseado na data de criação da compra interna)
         $porMes = [];
