@@ -24,7 +24,7 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small">Status da Compra</label>
                     <select name="status" class="form-select form-select-sm">
                         <option value="">Todos</option>
@@ -33,8 +33,28 @@
                         <option value="recebido" <?= ($filtroStatus ?? '') === 'recebido' ? 'selected' : '' ?>>Recebido</option>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Tipo / 1a Parcela</label>
+                    <select name="tipo" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="primeira_paga" <?= ($filtroTipo ?? '') === 'primeira_paga' ? 'selected' : '' ?>>1a parcela paga</option>
+                        <option value="primeira_pendente" <?= ($filtroTipo ?? '') === 'primeira_pendente' ? 'selected' : '' ?>>1a parcela pendente</option>
+                        <option value="quitado" <?= ($filtroTipo ?? '') === 'quitado' ? 'selected' : '' ?>>Quitados</option>
+                        <option value="com_atraso" <?= ($filtroTipo ?? '') === 'com_atraso' ? 'selected' : '' ?>>Com atraso</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Parcelas</label>
+                    <select name="parcelas" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        <?php for ($i = 2; $i <= 12; $i++): ?>
+                        <option value="<?= $i ?>" <?= ($filtroParcelas ?? '') == $i ? 'selected' : '' ?>><?= $i ?>x</option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                    <a href="/admin/carnes/compras" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-times"></i></a>
                 </div>
             </form>
         </div>

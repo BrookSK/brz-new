@@ -465,6 +465,8 @@ class AdminCarneController extends Controller {
      */
     public function compras(Request $request) {
         $filtroStatus = $request->getParam('status', '');
+        $filtroTipo = $request->getParam('tipo', '');
+        $filtroParcelas = $request->getParam('parcelas', '');
 
         // Detectar tabela de itens
         $itensTable = 'pedido_itens';
@@ -528,6 +530,25 @@ class AdminCarneController extends Controller {
             $params[':status'] = $filtroStatus;
         }
 
+        // Filtro por tipo (primeira parcela paga/pendente)
+        $tipoFilter = '';
+        if ($filtroTipo === 'primeira_paga') {
+            $tipoFilter = " AND (SELECT COALESCE(cp_f.boleto_produtos_pago,0) FROM carne_parcelas cp_f WHERE cp_f.carne_id = c.id AND cp_f.numero_parcela = 1 LIMIT 1) = 1";
+        } elseif ($filtroTipo === 'primeira_pendente') {
+            $tipoFilter = " AND (SELECT COALESCE(cp_f.boleto_produtos_pago,0) FROM carne_parcelas cp_f WHERE cp_f.carne_id = c.id AND cp_f.numero_parcela = 1 LIMIT 1) = 0";
+        } elseif ($filtroTipo === 'quitado') {
+            $tipoFilter = " AND c.status = 'quitado'";
+        } elseif ($filtroTipo === 'com_atraso') {
+            $tipoFilter = " AND c.status IN ('com_atraso','inadimplente')";
+        }
+
+        // Filtro por quantidade de parcelas
+        $parcelasFilter = '';
+        if ($filtroParcelas !== '' && (int) $filtroParcelas > 0) {
+            $parcelasFilter = " AND c.quantidade_parcelas = :parcelas";
+            $params[':parcelas'] = (int) $filtroParcelas;
+        }
+
         $deletedFilter = $temDeletedAt ? 'AND ped.deleted_at IS NULL' : '';
 
         if ($temComprasInternas) {
@@ -552,7 +573,7 @@ class AdminCarneController extends Controller {
                 JOIN pedidos ped ON ped.id = c.pedido_id
                 LEFT JOIN {$itensTable} it ON it.pedido_id = c.pedido_id
                 LEFT JOIN produtos p ON p.id = it.{$colProdutoId}
-                WHERE 1=1 {$statusFilter}
+                WHERE 1=1 {$statusFilter} {$tipoFilter} {$parcelasFilter}
                 {$deletedFilter}
                 AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
                 ORDER BY c.quantidade_parcelas ASC, ci.created_at DESC
@@ -579,7 +600,7 @@ class AdminCarneController extends Controller {
                 JOIN pedidos ped ON ped.id = c.pedido_id
                 LEFT JOIN {$itensTable} it ON it.pedido_id = c.pedido_id
                 LEFT JOIN produtos p ON p.id = it.{$colProdutoId}
-                WHERE 1=1
+                WHERE 1=1 {$tipoFilter} {$parcelasFilter}
                 {$deletedFilter}
                 AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
                 ORDER BY c.quantidade_parcelas ASC, c.created_at DESC
