@@ -4510,6 +4510,62 @@ LINKSCRIPT;
                             // Silenciar — tabela carnes pode não existir
                         }
 
+                        // Alerta: Carnê não criado (forma_pagamento = carne_braziliana mas sem registro na tabela carnes)
+                        $formaPgto = strtolower(trim($pedido['forma_pagamento'] ?? ''));
+                        if ($formaPgto === 'carne_braziliana' && empty($carneInfo)) {
+                            $metaParcelas = null;
+                            $metaSubtotal = null;
+                            $metaTaxas = null;
+                            try {
+                                $dbMetaCheck = \Config\Database::getConnection();
+                                $stMetaCheck = $dbMetaCheck->prepare("SELECT meta_key, meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key IN ('carne_parcelas','carne_subtotal_produtos','carne_total_taxas')");
+                                $stMetaCheck->execute([(int) $pedido['id']]);
+                                $metaRows = $stMetaCheck->fetchAll(\PDO::FETCH_ASSOC);
+                                foreach ($metaRows as $mr) {
+                                    if ($mr['meta_key'] === 'carne_parcelas') $metaParcelas = (int) $mr['meta_value'];
+                                    if ($mr['meta_key'] === 'carne_subtotal_produtos') $metaSubtotal = $mr['meta_value'];
+                                    if ($mr['meta_key'] === 'carne_total_taxas') $metaTaxas = $mr['meta_value'];
+                                }
+                            } catch (\Exception $e) {
+                                // tabela pedido_meta pode não existir
+                            }
+
+                            echo '
+                        <div class="card mt-3 border-danger">
+                            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Carnê Não Criado</h5>
+                                <span class="badge bg-light text-danger">Erro</span>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-danger mb-2">O pedido foi registrado como <strong>Carnê Braziliana</strong>, porém o carnê não foi criado no sistema (possível timeout ou erro na geração).</p>';
+                            if ($metaParcelas) {
+                                echo '<div class="alert alert-info py-2 mb-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>Parcelas selecionadas pelo cliente:</strong> ' . $metaParcelas . 'x';
+                                if ($metaSubtotal) echo ' | Produtos: R$ ' . number_format((float) $metaSubtotal, 2, ',', '.');
+                                if ($metaTaxas) echo ' | Taxas: R$ ' . number_format((float) $metaTaxas, 2, ',', '.');
+                                echo '</div>';
+                            } else {
+                                echo '<div class="alert alert-warning py-2 mb-2">
+                                    <i class="fas fa-exclamation-circle me-1"></i>
+                                    Informação de parcelas não encontrada no registro (pedido_meta).
+                                </div>';
+                            }
+                            echo '
+                                <form method="POST" action="/admin/carnes/recriar" class="mt-2">
+                                    <input type="hidden" name="pedido_id" value="' . (int) $pedido['id'] . '">';
+                            if ($metaParcelas) {
+                                echo '<input type="hidden" name="parcelas" value="' . $metaParcelas . '">';
+                            }
+                            echo '
+                                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm(\'Deseja recriar o carnê para este pedido?\')">
+                                        <i class="fas fa-redo me-1"></i>Recriar Carnê
+                                    </button>
+                                </form>
+                            </div>
+                        </div>';
+                        }
+
                         echo '
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">

@@ -867,7 +867,19 @@ class AdminCarneController extends Controller {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
 
         $pedidoId = (int) $request->getParam('pedido_id', 0);
-        $qtdParcelas = (int) $request->getParam('quantidade_parcelas', 4);
+        $qtdParcelas = (int) ($request->getParam('quantidade_parcelas', 0) ?: $request->getParam('parcelas', 0));
+
+        // Se não veio no POST, tentar buscar do pedido_meta
+        if ($qtdParcelas < 1 && $pedidoId > 0) {
+            try {
+                $dbM = \Config\Database::getConnection();
+                $stM = $dbM->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_parcelas' LIMIT 1");
+                $stM->execute([$pedidoId]);
+                $metaVal = $stM->fetchColumn();
+                if ($metaVal) $qtdParcelas = (int) $metaVal;
+            } catch (\Exception $e) {}
+        }
+
         if ($qtdParcelas < 1 || $qtdParcelas > 12) $qtdParcelas = 4;
 
         if ($pedidoId <= 0) {
@@ -967,12 +979,23 @@ class AdminCarneController extends Controller {
 
             $_SESSION['message'] = 'Carnê criado com sucesso para o pedido #' . $pedidoId . ' (ID: ' . $carneId . ', ' . $qtdParcelas . ' parcelas, Produtos: R$ ' . number_format($subtotalProdutos, 2, ',', '.') . ', Taxas: R$ ' . number_format($totalTaxas, 2, ',', '.') . ')';
             $_SESSION['message_type'] = 'success';
-            $this->redirect('/admin/carnes/detalhes/' . $carneId);
+            // Redirecionar de volta ao pedido se veio de lá
+            $referer = $_SERVER['HTTP_REFERER'] ?? '';
+            if (strpos($referer, '/admin/pedidos/detalhes/') !== false) {
+                $this->redirect('/admin/pedidos/detalhes/' . $pedidoId);
+            } else {
+                $this->redirect('/admin/carnes/detalhes/' . $carneId);
+            }
         } catch (\Exception $e) {
             error_log('[ADMIN CARNE] Erro ao recriar carnê pedido #' . $pedidoId . ': ' . $e->getMessage());
             $_SESSION['message'] = 'Erro ao criar carnê: ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
-            $this->redirect('/admin/carnes');
+            $referer = $_SERVER['HTTP_REFERER'] ?? '';
+            if (strpos($referer, '/admin/pedidos/detalhes/') !== false) {
+                $this->redirect('/admin/pedidos/detalhes/' . $pedidoId);
+            } else {
+                $this->redirect('/admin/carnes');
+            }
         }
     }
 
