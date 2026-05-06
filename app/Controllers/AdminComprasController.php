@@ -1242,7 +1242,8 @@ class AdminComprasController extends Controller {
                 } elseif ($tipoCompraView === 'carne') {
                     $whereTipoCompra = " AND lc.tipo_compra = 'carne'";
                 } else {
-                    $whereTipoCompra = '';
+                    // Todos exceto carnê (carnê tem tela separada)
+                    $whereTipoCompra = " AND (lc.tipo_compra IS NULL OR lc.tipo_compra = '' OR lc.tipo_compra != 'carne')";
                 }
             }
 
@@ -1540,7 +1541,7 @@ class AdminComprasController extends Controller {
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Online</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Offline</a>'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'carne' ? 'btn-warning' : 'btn-outline-warning') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=carne"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</a>'
+                    . '<!-- Carnê oculto - tela separada em /admin/carnes/compras-mensal -->'
                     . '</div>'
                     . '</div>'
                     . '</div>';
