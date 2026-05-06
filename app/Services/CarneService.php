@@ -686,17 +686,54 @@ class CarneService {
         if (empty($templateData)) return;
 
         $assunto = $templateData['assunto'];
-        $titulo = $templateData['titulo'];
-        $mensagem = $templateData['mensagem'];
-        $detalhes = $templateData['detalhes'] ?? [];
-        $alerta = $templateData['alerta'] ?? null;
-        $alertaMensagem = $templateData['alertaMensagem'] ?? '';
-        $ctaTexto = $templateData['ctaTexto'] ?? 'Ver meu carnê';
+        $htmlEmail = null;
 
-        // Renderizar template
-        ob_start();
-        include __DIR__ . '/../Views/emails/carne-notificacao.php';
-        $htmlEmail = ob_get_clean();
+        // Tentar usar template customizado da tabela email_templates (salvo via Configurações > Criar E-mail)
+        try {
+            $emailService = new \App\Services\EmailService();
+            $tplDb = $emailService->getTemplate('carne_' . $evento);
+            if (!empty($tplDb['corpo_html'])) {
+                // Renderizar variáveis no template do banco
+                $vars = [
+                    'cliente_nome' => $clienteNome,
+                    'cliente_email' => $email,
+                    'carne_id' => $carneId,
+                    'pedido_id' => $pedidoId,
+                    'url_meu_carne' => $urlMeuCarne,
+                    'total_geral' => $carne['total_geral'] ?? '',
+                    'quantidade_parcelas' => $carne['quantidade_parcelas'] ?? '',
+                ];
+                if ($parcela && is_array($parcela)) {
+                    $vars['numero_parcela'] = $parcela['numero_parcela'] ?? '';
+                    $vars['total_parcelas'] = $carne['quantidade_parcelas'] ?? '';
+                    $vars['valor_parcela'] = isset($parcela['valor_total']) ? 'R$ ' . number_format((float) $parcela['valor_total'], 2, ',', '.') : '';
+                    $vars['valor_produtos'] = isset($parcela['valor_produtos']) ? 'R$ ' . number_format((float) $parcela['valor_produtos'], 2, ',', '.') : '';
+                    $vars['valor_taxas'] = isset($parcela['valor_taxas']) ? 'R$ ' . number_format((float) $parcela['valor_taxas'], 2, ',', '.') : '';
+                    $vars['vencimento'] = !empty($parcela['vencimento']) ? date('d/m/Y', strtotime($parcela['vencimento'])) : '';
+                    $vars['status_parcela'] = $parcela['status'] ?? '';
+                }
+                $htmlEmail = $emailService->renderTemplate($tplDb['corpo_html'], $vars);
+                if (!empty($tplDb['assunto'])) {
+                    $assunto = $emailService->renderTemplate($tplDb['assunto'], $vars);
+                }
+            }
+        } catch (\Exception $e) {
+            // Fallback para template PHP padrão
+        }
+
+        // Se não tem template customizado, usar o template PHP padrão
+        if (empty($htmlEmail)) {
+            $titulo = $templateData['titulo'];
+            $mensagem = $templateData['mensagem'];
+            $detalhes = $templateData['detalhes'] ?? [];
+            $alerta = $templateData['alerta'] ?? null;
+            $alertaMensagem = $templateData['alertaMensagem'] ?? '';
+            $ctaTexto = $templateData['ctaTexto'] ?? 'Ver meu carnê';
+
+            ob_start();
+            include __DIR__ . '/../Views/emails/carne-notificacao.php';
+            $htmlEmail = ob_get_clean();
+        }
 
         $status = 'enviado';
         $erroMsg = null;
@@ -721,7 +758,7 @@ class CarneService {
 
         // Registrar no email_logs
         try {
-            $corpoResumo = mb_substr(strip_tags($mensagem), 0, 200);
+            $corpoResumo = mb_substr(strip_tags($templateData['mensagem'] ?? ''), 0, 200);
             $this->db->prepare("
                 INSERT INTO email_logs (tipo, destinatario_email, destinatario_nome, assunto, corpo_resumo, status, erro_mensagem, carne_id, parcela_id, pedido_id, created_at)
                 VALUES (:tipo, :email, :nome, :assunto, :corpo, :status, :erro, :carne_id, :parcela_id, :pedido_id, NOW())

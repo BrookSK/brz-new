@@ -1161,6 +1161,14 @@ class AdminConfiguracoesController extends Controller {
                                                             <option value="novo_usuario">👤 Novo Usuário</option>
                                                             <option value="recuperar_senha">🔑 Recuperar Senha</option>
                                                             <option value="contato_contato">📧 Contato</option>
+                                                            <option value="carne_criado">📄 Carnê Criado</option>
+                                                            <option value="carne_cobranca">💰 Carnê - Cobrança</option>
+                                                            <option value="carne_parcela_proxima_vencimento">⏰ Carnê - Parcela Próxima Vencimento</option>
+                                                            <option value="carne_pagamento_confirmado">✅ Carnê - Pagamento Confirmado</option>
+                                                            <option value="carne_quitado">🎉 Carnê Quitado</option>
+                                                            <option value="carne_envio_liberado">🚚 Carnê - Envio Liberado</option>
+                                                            <option value="carne_aviso_cancelamento">🚨 Carnê - Aviso Cancelamento</option>
+                                                            <option value="carne_cancelado">❌ Carnê Cancelado</option>
                                                         </select>
                                                     </div>
                                                     <div class="mb-3">
@@ -6500,6 +6508,71 @@ HTML;
                 "{{email_contato}}": "Email do Contato",
                 "{{mensagem}}": "Mensagem",
                 "{{data_contato}}": "Data do Contato"
+            },
+            "carne_criado": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{cliente_email}}": "Email do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{pedido_id}}": "ID do Pedido",
+                "{{total_geral}}": "Valor Total do Carnê",
+                "{{quantidade_parcelas}}": "Quantidade de Parcelas",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_cobranca": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{cliente_email}}": "Email do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{pedido_id}}": "ID do Pedido",
+                "{{numero_parcela}}": "Número da Parcela",
+                "{{total_parcelas}}": "Total de Parcelas",
+                "{{valor_parcela}}": "Valor da Parcela",
+                "{{valor_produtos}}": "Valor Produtos",
+                "{{valor_taxas}}": "Valor Taxas",
+                "{{vencimento}}": "Data de Vencimento",
+                "{{status_parcela}}": "Status da Parcela",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_parcela_proxima_vencimento": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{numero_parcela}}": "Número da Parcela",
+                "{{valor_parcela}}": "Valor da Parcela",
+                "{{vencimento}}": "Data de Vencimento",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_pagamento_confirmado": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{numero_parcela}}": "Número da Parcela",
+                "{{valor_parcela}}": "Valor da Parcela",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_quitado": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{pedido_id}}": "ID do Pedido",
+                "{{total_geral}}": "Valor Total do Carnê",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_envio_liberado": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{pedido_id}}": "ID do Pedido",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_aviso_cancelamento": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{pedido_id}}": "ID do Pedido",
+                "{{dias_para_cancelamento}}": "Dias para Cancelamento",
+                "{{url_meu_carne}}": "Link para o Carnê"
+            },
+            "carne_cancelado": {
+                "{{cliente_nome}}": "Nome do Cliente",
+                "{{carne_id}}": "ID do Carnê",
+                "{{pedido_id}}": "ID do Pedido",
+                "{{motivo_cancelamento}}": "Motivo do Cancelamento",
+                "{{url_meu_carne}}": "Link para o Carnê"
             }
         };
         
