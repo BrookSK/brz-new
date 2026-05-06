@@ -1299,6 +1299,8 @@ class AdminComprasController extends Controller {
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
                 . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','carne_pagando','carne_aguardando','pagamento')))" : '')
                 . $whereTipoCompra
+                // Excluir itens de pedidos de carnê (tela separada)
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL))" : '')
                 . ($reabertos && !empty($reabertos['items'])
                     ? ($temLojaIdEmLista
                         ? (' AND (' . implode(' OR ', array_values(array_filter(array_map(function ($x) {

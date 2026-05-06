@@ -479,64 +479,123 @@ class AdminCarneController extends Controller {
             }
         } catch (\Exception $e) {}
 
-        // Verificar se tabelas existem
-        $tabelasOk = true;
+        // Detectar colunas da tabela de itens
+        $colsItens = [];
+        try { $st = $this->db->query("DESCRIBE {$itensTable}"); $colsItens = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+        $colProdutoId = in_array('produto_id', $colsItens, true) ? 'produto_id' : (in_array('product_id', $colsItens, true) ? 'product_id' : 'produto_id');
+        $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : 'quantidade');
+        $colNomeProd = in_array('nome_produto', $colsItens, true) ? 'nome_produto' : (in_array('product_name', $colsItens, true) ? 'product_name' : '');
+
+        // Detectar colunas de produtos
+        $colsProd = [];
+        try { $st = $this->db->query("DESCRIBE produtos"); $colsProd = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+        $colProdNome = in_array('name', $colsProd, true) ? 'name' : (in_array('nome', $colsProd, true) ? 'nome' : 'name');
+        $colProdFoto = in_array('foto_principal', $colsProd, true) ? 'foto_principal' : (in_array('imagem', $colsProd, true) ? 'imagem' : '');
+
+        // Detectar coluna vencimento em carne_parcelas
+        $colVenc = 'vencimento';
         try {
-            $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
-            $stT->execute(['carne_compras_internas']);
-            if ((int) $stT->fetchColumn() === 0) $tabelasOk = false;
-        } catch (\Exception $e) { $tabelasOk = false; }
+            $colsParc = [];
+            $st = $this->db->query("DESCRIBE carne_parcelas");
+            $colsParc = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+            if (!in_array('vencimento', $colsParc, true) && in_array('data_vencimento', $colsParc, true)) $colVenc = 'data_vencimento';
+        } catch (\Exception $e) {}
+
+        // Verificar se carne_compras_internas existe
+        $temComprasInternas = false;
+        try {
+            $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'carne_compras_internas'");
+            $stT->execute();
+            $temComprasInternas = ((int) $stT->fetchColumn()) > 0;
+        } catch (\Exception $e) {}
+
+        // Verificar deleted_at em pedidos
+        $temDeletedAt = false;
+        try {
+            $stD = $this->db->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'pedidos' AND column_name = 'deleted_at'");
+            $stD->execute();
+            $temDeletedAt = ((int) $stD->fetchColumn()) > 0;
+        } catch (\Exception $e) {}
 
         $compras = [];
         $stats = ['total' => 0, 'aguardando' => 0, 'comprado' => 0, 'recebido' => 0];
 
-        if ($tabelasOk) {
-            $where = ['1=1'];
-            $params = [];
+        // Buscar itens de pedidos de carnê (via tabela carnes → pedido_itens)
+        $statusFilter = '';
+        $params = [];
+        if ($temComprasInternas && !empty($filtroStatus)) {
+            $statusFilter = " AND ci.status = :status";
+            $params[':status'] = $filtroStatus;
+        }
 
-            if (!empty($filtroStatus)) {
-                $where[] = 'ci.status = :status';
-                $params[':status'] = $filtroStatus;
-            }
+        $deletedFilter = $temDeletedAt ? 'AND ped.deleted_at IS NULL' : '';
 
+        if ($temComprasInternas) {
             $sql = "
                 SELECT 
                     ci.id, ci.carne_id, ci.status as status_compra, ci.comprado_em, ci.recebido_em, ci.created_at,
-                    c.pedido_id, c.total_geral, c.quantidade_parcelas, c.status as carne_status, c.created_at as carne_created_at,
+                    c.pedido_id, c.total_geral, c.quantidade_parcelas, c.status as carne_status,
                     u.nome as cliente_nome, u.email as cliente_email,
-                    pi.produto_id, pi.quantidade,
-                    p.nome as produto_nome, p.imagem as produto_imagem, p.foto as produto_foto,
+                    it.{$colProdutoId} as produto_id, it.{$colQtd} as quantidade,
+                    " . ($colNomeProd ? "it.{$colNomeProd} as item_nome," : '') . "
+                    p.{$colProdNome} as produto_nome,
+                    " . ($colProdFoto ? "p.{$colProdFoto} as produto_imagem," : "'' as produto_imagem,") . "
                     (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
-                    (SELECT MIN(cp2.data_vencimento) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
-                    (SELECT MAX(cp3.data_vencimento) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada
+                    (SELECT MIN(cp2.{$colVenc}) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
+                    (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada
                 FROM carne_compras_internas ci
                 JOIN carnes c ON ci.carne_id = c.id
                 JOIN usuarios u ON c.cliente_id = u.id
-                LEFT JOIN pedidos ped ON ped.id = c.pedido_id
-                LEFT JOIN {$itensTable} pi ON pi.pedido_id = c.pedido_id
-                LEFT JOIN produtos p ON p.id = pi.produto_id
-                WHERE " . implode(' AND ', $where) . "
-                AND ped.id IS NOT NULL AND (ped.deleted_at IS NULL)
-                AND ped.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+                JOIN pedidos ped ON ped.id = c.pedido_id
+                LEFT JOIN {$itensTable} it ON it.pedido_id = c.pedido_id
+                LEFT JOIN produtos p ON p.id = it.{$colProdutoId}
+                WHERE 1=1 {$statusFilter}
+                {$deletedFilter}
+                AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
                 ORDER BY ci.created_at DESC
             ";
+        } else {
+            // Fallback: buscar direto dos pedidos de carnê (sem carne_compras_internas)
+            $sql = "
+                SELECT 
+                    c.id as id, c.id as carne_id, 'aguardando_compra' as status_compra, NULL as comprado_em, NULL as recebido_em, c.created_at,
+                    c.pedido_id, c.total_geral, c.quantidade_parcelas, c.status as carne_status,
+                    u.nome as cliente_nome, u.email as cliente_email,
+                    it.{$colProdutoId} as produto_id, it.{$colQtd} as quantidade,
+                    " . ($colNomeProd ? "it.{$colNomeProd} as item_nome," : '') . "
+                    p.{$colProdNome} as produto_nome,
+                    " . ($colProdFoto ? "p.{$colProdFoto} as produto_imagem," : "'' as produto_imagem,") . "
+                    (SELECT COUNT(*) FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status = 'paga') as parcelas_pagas,
+                    (SELECT MIN(cp2.{$colVenc}) FROM carne_parcelas cp2 WHERE cp2.carne_id = c.id) as data_inicio,
+                    (SELECT MAX(cp3.{$colVenc}) FROM carne_parcelas cp3 WHERE cp3.carne_id = c.id) as data_fim_estimada
+                FROM carnes c
+                JOIN usuarios u ON c.cliente_id = u.id
+                JOIN pedidos ped ON ped.id = c.pedido_id
+                LEFT JOIN {$itensTable} it ON it.pedido_id = c.pedido_id
+                LEFT JOIN produtos p ON p.id = it.{$colProdutoId}
+                WHERE 1=1
+                {$deletedFilter}
+                AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+                ORDER BY c.created_at DESC
+            ";
+        }
 
-            try {
-                $stmt = $this->db->prepare($sql);
-                $stmt->execute($params);
-                $compras = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            } catch (\Exception $e) {
-                $compras = [];
-            }
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $compras = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            error_log('[CarneCompras] Erro: ' . $e->getMessage());
+            $compras = [];
+        }
 
-            // Calcular stats
-            foreach ($compras as $c) {
-                $stats['total']++;
-                $st = $c['status_compra'] ?? '';
-                if ($st === 'aguardando_compra') $stats['aguardando']++;
-                elseif ($st === 'comprado') $stats['comprado']++;
-                elseif ($st === 'recebido') $stats['recebido']++;
-            }
+        // Calcular stats
+        foreach ($compras as $c) {
+            $stats['total']++;
+            $st = $c['status_compra'] ?? '';
+            if ($st === 'aguardando_compra') $stats['aguardando']++;
+            elseif ($st === 'comprado') $stats['comprado']++;
+            elseif ($st === 'recebido') $stats['recebido']++;
         }
 
         // Agrupar por mês (baseado na data de criação da compra interna)
