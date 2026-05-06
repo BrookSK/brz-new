@@ -694,79 +694,89 @@ class ClubeRecargaController extends Controller {
                 return;
             }
 
-            $descricao = 'Recarga Clube #' . $recargaId;
+            $descricao = 'Recarga Clube Braziliana #' . $recargaId . ' - ' . $nomeCompleto;
 
-            $stripeCustomer = [
+            $customerData = [
                 'email' => $email,
                 'name' => $nomeCompleto,
+                'first_name' => $nome,
+                'last_name' => $sobrenome,
                 'tax_id' => $doc,
-                'metadata' => [
-                    'usd_amount' => (string) $valorUsd,
-                    'usd_brl_rate' => (string) $rate,
-                    'brl_amount' => (string) $valorBrl,
-                    'flow' => 'clube_quick_checkout',
-                    'metodo' => $metodo,
-                ],
+                'document' => $doc,
+                'phone' => $telefone,
             ];
 
             if ($metodo === 'card') {
+                // Cartão continua via Stripe
+                $stripeCustomer = [
+                    'email' => $email,
+                    'name' => $nomeCompleto,
+                    'tax_id' => $doc,
+                    'metadata' => [
+                        'usd_amount' => (string) $valorUsd,
+                        'usd_brl_rate' => (string) $rate,
+                        'brl_amount' => (string) $valorBrl,
+                        'flow' => 'clube_quick_checkout',
+                        'metodo' => $metodo,
+                    ],
+                ];
                 $pi = $this->paymentService->createStripePaymentIntentCarteiraRecargaCardBrl($recargaId, $valorBrl, $descricao, $stripeCustomer);
-            } else {
-                $pi = $this->paymentService->createStripePaymentIntentCarteiraRecargaPixBrl($recargaId, $valorBrl, $descricao, $stripeCustomer);
-            }
 
-            if (empty($pi['success'])) {
-                $err = (string) ($pi['error'] ?? 'Falha ao iniciar pagamento Stripe');
-                $lower = strtolower($err);
-                $pixNotEnabled = false;
-                if ($metodo !== 'card') {
-                    // Erro típico quando PIX não está ativado no Stripe.
-                    // Pode vir como JSON dentro do texto: "Erro Stripe HTTP 400: {\"error\":{...}}"
-                    if (
-                        strpos($lower, 'payment_intent_invalid_parameter') !== false
-                        && strpos($lower, 'payment_method_types') !== false
-                        && strpos($lower, 'pix') !== false
-                        && strpos($lower, 'invalid') !== false
-                    ) {
-                        $pixNotEnabled = true;
-                    }
-
-                    // Fallback: mensagem direta do Stripe
-                    if (!$pixNotEnabled && (strpos($lower, 'payment method type') !== false) && (strpos($lower, 'pix') !== false) && (strpos($lower, 'invalid') !== false)) {
-                        $pixNotEnabled = true;
-                    }
-                }
-
-                if ($pixNotEnabled) {
-                    $this->json([
-                        'success' => false,
-                        'error' => 'PIX não está habilitado na sua conta Stripe. Ative em Painel Stripe > Configurações de Pagamentos, ou selecione Cartão.',
-                    ], 400);
+                if (empty($pi['success'])) {
+                    $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao iniciar pagamento')], 500);
                     return;
                 }
-                $this->json(['success' => false, 'error' => $err], 500);
-                return;
-            }
 
-            $paymentIntentId = (string) ($pi['payment_intent_id'] ?? '');
-            if ($paymentIntentId !== '') {
-                $stmtUp = $db->prepare("UPDATE carteira_recargas SET gateway = 'stripe', payment_id = :pid, status = 'pending', updated_at = NOW() WHERE id = :id");
-                $stmtUp->execute([':pid' => $paymentIntentId, ':id' => $recargaId]);
-            }
+                $paymentIntentId = (string) ($pi['payment_intent_id'] ?? '');
+                if ($paymentIntentId !== '') {
+                    $stmtUp = $db->prepare("UPDATE carteira_recargas SET gateway = 'stripe', payment_id = :pid, status = 'pending', updated_at = NOW() WHERE id = :id");
+                    $stmtUp->execute([':pid' => $paymentIntentId, ':id' => $recargaId]);
+                }
 
-            $this->json([
-                'success' => true,
-                'recarga_id' => $recargaId,
-                'public_token' => $publicToken,
-                'usuario_id' => $usuarioId,
-                'valor_usd' => $valorUsd,
-                'usd_brl_rate' => $rate,
-                'valor_brl' => $valorBrl,
-                'metodo' => $metodo,
-                'payment_intent_id' => $paymentIntentId,
-                'client_secret' => (string) ($pi['client_secret'] ?? ''),
-                'pix' => (isset($pi['pix']) && is_array($pi['pix'])) ? $pi['pix'] : null,
-            ]);
+                $this->json([
+                    'success' => true,
+                    'recarga_id' => $recargaId,
+                    'public_token' => $publicToken,
+                    'usuario_id' => $usuarioId,
+                    'valor_usd' => $valorUsd,
+                    'usd_brl_rate' => $rate,
+                    'valor_brl' => $valorBrl,
+                    'metodo' => $metodo,
+                    'gateway' => 'stripe',
+                    'payment_intent_id' => $paymentIntentId,
+                    'client_secret' => (string) ($pi['client_secret'] ?? ''),
+                    'pix' => null,
+                ]);
+            } else {
+                // PIX via Câmbio Real (conta de produtos) — sem taxa adicional
+                $pi = $this->paymentService->createCambioRealPixCarteiraRecarga($recargaId, $valorBrl, $descricao, $customerData);
+
+                if (empty($pi['success'])) {
+                    $this->json(['success' => false, 'error' => (string) ($pi['error'] ?? 'Falha ao gerar PIX')], 500);
+                    return;
+                }
+
+                $paymentId = (string) ($pi['payment_id'] ?? '');
+                if ($paymentId !== '') {
+                    $stmtUp = $db->prepare("UPDATE carteira_recargas SET gateway = 'cambioreal', payment_id = :pid, invoice_url = :url, status = 'pending', updated_at = NOW() WHERE id = :id");
+                    $stmtUp->execute([':pid' => $paymentId, ':url' => (string) ($pi['invoice_url'] ?? ''), ':id' => $recargaId]);
+                }
+
+                $this->json([
+                    'success' => true,
+                    'recarga_id' => $recargaId,
+                    'public_token' => $publicToken,
+                    'usuario_id' => $usuarioId,
+                    'valor_usd' => $valorUsd,
+                    'usd_brl_rate' => $rate,
+                    'valor_brl' => $valorBrl,
+                    'metodo' => $metodo,
+                    'gateway' => 'cambioreal',
+                    'payment_intent_id' => $paymentId,
+                    'client_secret' => '',
+                    'pix' => (isset($pi['pix']) && is_array($pi['pix'])) ? $pi['pix'] : null,
+                ]);
+            }
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
@@ -793,6 +803,26 @@ class ClubeRecargaController extends Controller {
             }
 
             $status = strtolower(trim((string) ($row['status'] ?? 'pending')));
+
+            // Se gateway é Câmbio Real e status ainda pendente, verificar na API
+            if ($status === 'pending' && strtolower(trim((string) ($row['gateway'] ?? ''))) === 'cambioreal') {
+                $paymentId = (string) ($row['payment_id'] ?? '');
+                if ($paymentId !== '') {
+                    try {
+                        $crStatus = $this->paymentService->checkCambioRealPaymentStatus($paymentId);
+                        if (!empty($crStatus['paid'])) {
+                            $status = 'paid';
+                            $db->prepare("UPDATE carteira_recargas SET status = 'paid', paid_at = NOW(), updated_at = NOW() WHERE id = ? AND status = 'pending'")->execute([$recargaId]);
+                            $row['paid_at'] = date('Y-m-d H:i:s');
+                            // Creditar carteira
+                            $this->creditarCarteira($db, $row);
+                        }
+                    } catch (\Exception $e) {
+                        // Silenciar — polling vai tentar de novo
+                    }
+                }
+            }
+
             $paid = in_array($status, ['paid', 'approved', 'credited'], true);
             $this->json([
                 'success' => true,
@@ -815,6 +845,26 @@ class ClubeRecargaController extends Controller {
             ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Credita a carteira do usuário (o saldo é calculado dinamicamente pela soma de recargas pagas,
+     * mas aqui podemos adicionar lógica extra como locked_until pra turbo)
+     */
+    private function creditarCarteira(\PDO $db, array $row): void {
+        try {
+            $tipoRecarga = strtolower(trim((string) ($row['tipo_recarga'] ?? 'normal')));
+            $recargaId = (int) ($row['id'] ?? 0);
+
+            // Se é turbo, definir locked_until (90 dias)
+            if ($tipoRecarga === 'turbo' && $recargaId > 0) {
+                $lockedUntil = date('Y-m-d H:i:s', strtotime('+90 days'));
+                $db->prepare("UPDATE carteira_recargas SET locked_until = ? WHERE id = ? AND locked_until IS NULL")
+                    ->execute([$lockedUntil, $recargaId]);
+            }
+        } catch (\Exception $e) {
+            error_log('[ClubeRecarga] Erro ao creditar carteira: ' . $e->getMessage());
         }
     }
 

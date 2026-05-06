@@ -3274,6 +3274,134 @@ class PaymentService {
     }
 
     /**
+     * Cria PIX via Câmbio Real (conta de produtos) para recarga do Clube Braziliana.
+     * Sem taxa adicional (diferente do Stripe que cobrava 3,5%).
+     */
+    public function createCambioRealPixCarteiraRecarga(int $recargaId, float $valorBrl, string $descricao, array $customer = []): array {
+        if (!$this->isCambioRealEnabled()) {
+            return ['success' => false, 'error' => 'Câmbio Real está desabilitado.'];
+        }
+
+        if ($valorBrl <= 0) {
+            return ['success' => false, 'error' => 'Valor inválido para recarga.'];
+        }
+
+        $orderId = 'recarga-' . $recargaId . '-' . date('YmdHis') . '-' . substr(sha1((string) microtime(true) . rand()), 0, 6);
+
+        $payload = [
+            'order_id' => $orderId,
+            'amount' => round($valorBrl, 2),
+            'currency' => 'BRL',
+            'payment_method' => 'pix',
+            'client' => $customer,
+            'duplicate' => 1,
+            'take_rates' => 1,
+            'products' => [
+                [
+                    'descricao' => $descricao !== '' ? $descricao : ('Recarga Clube #' . $recargaId),
+                    'base_value' => round($valorBrl, 2),
+                    'valor' => round($valorBrl, 2),
+                    'qty' => 1,
+                    'ref' => 'recarga-' . $recargaId,
+                ]
+            ],
+        ];
+
+        error_log('[CR_PIX_RECARGA] recargaId=' . $recargaId . ' valorBrl=' . round($valorBrl, 2) . ' orderId=' . $orderId);
+
+        try {
+            $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+            $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+
+            $status = strtolower(trim((string) ($resp['status'] ?? '')));
+            if ($status !== '' && $status !== 'success') {
+                // Tentar com email alternativo se erro de email em uso
+                $hay = strtolower(json_encode($resp['errors'] ?? []) . ' ' . ($resp['message'] ?? ''));
+                if (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false)) {
+                    $origEmail = (string) ($customer['email'] ?? '');
+                    if ($origEmail !== '' && strpos($origEmail, '@') !== false) {
+                        [$local, $domain] = explode('@', $origEmail, 2);
+                        $altEmail = explode('+', $local, 2)[0] . '+rec' . $recargaId . substr(sha1(microtime(true)), 0, 4) . '@' . $domain;
+                        $payload['client']['email'] = $altEmail;
+                        $resp = $this->cambioRealRequest('POST', '/service/v2/checkout/request', $payload);
+                        $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : [];
+                        $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
+                        $status = strtolower(trim((string) ($resp['status'] ?? '')));
+                        if ($status !== '' && $status !== 'success') {
+                            return ['success' => false, 'error' => 'Câmbio Real: ' . ($resp['message'] ?? 'Falha ao gerar PIX'), 'raw' => $resp];
+                        }
+                    } else {
+                        return ['success' => false, 'error' => 'Câmbio Real: ' . ($resp['message'] ?? 'Falha ao gerar PIX'), 'raw' => $resp];
+                    }
+                } else {
+                    return ['success' => false, 'error' => 'Câmbio Real: ' . ($resp['message'] ?? 'Falha ao gerar PIX'), 'raw' => $resp];
+                }
+            }
+
+            $paymentId = (string) ($data['id'] ?? ($data['code'] ?? ''));
+            $pixPayload = (string) ($tx['pix_payload'] ?? ($tx['pix_code'] ?? ($tx['pix_copy_paste'] ?? '')));
+            $pixQrcode = (string) ($tx['pix_qrcode'] ?? ($tx['pix_qr_code_base64'] ?? ''));
+            $invoiceUrl = (string) ($data['invoice_url'] ?? ($data['url'] ?? ''));
+
+            if ($pixPayload === '' && $pixQrcode === '' && $invoiceUrl === '') {
+                error_log('[CR_PIX_RECARGA] Sem dados PIX na resposta: ' . json_encode($resp));
+                return ['success' => false, 'error' => 'Câmbio Real: PIX gerado mas sem dados de pagamento', 'raw' => $resp];
+            }
+
+            return [
+                'success' => true,
+                'gateway' => 'cambioreal',
+                'payment_id' => $paymentId,
+                'order_id' => $orderId,
+                'pix' => [
+                    'copy_paste' => $pixPayload,
+                    'image_url_png' => $pixQrcode,
+                    'image_url_svg' => '',
+                    'hosted_instructions_url' => $invoiceUrl,
+                    'expires_at' => null,
+                ],
+                'invoice_url' => $invoiceUrl,
+                'raw' => $resp,
+            ];
+        } catch (\Exception $e) {
+            error_log('[CR_PIX_RECARGA] Exception: ' . $e->getMessage());
+            return ['success' => false, 'error' => 'Câmbio Real: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Verifica status de um pagamento no Câmbio Real (polling)
+     */
+    public function checkCambioRealPaymentStatus(string $paymentId): array {
+        if (!$this->isCambioRealEnabled() || $paymentId === '') {
+            return ['paid' => false, 'status' => 'unknown'];
+        }
+
+        try {
+            $resp = $this->cambioRealRequest('GET', '/service/v2/checkout/' . $paymentId);
+            $data = is_array($resp['data'] ?? null) ? (array) $resp['data'] : (is_array($resp) ? $resp : []);
+
+            $status = strtolower(trim((string) ($data['status'] ?? ($resp['status'] ?? ''))));
+
+            // Status pagos no Câmbio Real: paid, approved, confirmed, completed
+            $paidStatuses = ['paid', 'approved', 'confirmed', 'completed', 'success'];
+            $isPaid = in_array($status, $paidStatuses, true);
+
+            // Fallback: verificar transaction.status
+            if (!$isPaid && isset($data['transaction']) && is_array($data['transaction'])) {
+                $txStatus = strtolower(trim((string) ($data['transaction']['status'] ?? '')));
+                $isPaid = in_array($txStatus, $paidStatuses, true);
+            }
+
+            return ['paid' => $isPaid, 'status' => $status, 'raw' => $data];
+        } catch (\Exception $e) {
+            error_log('[CR_CHECK_STATUS] Erro: ' . $e->getMessage() . ' paymentId=' . $paymentId);
+            return ['paid' => false, 'status' => 'error', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Cria PaymentIntent Stripe PIX para checkout de pedido (fora do BR).
      * O Stripe PIX só aceita BRL. Convertemos USD → BRL usando a taxa do sistema.
      */

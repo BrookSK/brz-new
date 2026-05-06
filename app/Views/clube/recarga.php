@@ -123,7 +123,7 @@ ob_start();
                             <div class="mb-3">
                                 <label class="form-label">Forma de pagamento</label>
                                 <div class="d-flex flex-wrap gap-2">
-                                    <button type="button" class="btn btn-outline-primary" id="qc_metodo_pix">PIX (Stripe)</button>
+                                    <button type="button" class="btn btn-outline-primary" id="qc_metodo_pix">PIX</button>
                                     <button type="button" class="btn btn-outline-secondary" id="qc_metodo_card" style="display:none;" disabled>Cartão</button>
                                 </div>
                                 <div class="form-text">Padrão: Pix</div>
@@ -200,7 +200,7 @@ ob_start();
                             </div>
 
                             <div class="mt-3 small text-muted">
-                                O pagamento é processado via Stripe em BRL para habilitar Pix. O crédito do Clube é contabilizado em USD.
+                                O pagamento é processado via PIX. O crédito do Clube é contabilizado em USD.
                             </div>
                         </div>
                     </div>
@@ -362,12 +362,9 @@ ob_start();
         const v = parseFloat((document.getElementById('qc_valor_usd')?.value || '0').toString().replace(',','.')) || 0;
         const usd = Math.max(v, MIN_USD);
         const brl = usd * USD_BRL_RATE;
-        const feeRate = 0.035;
-        const fee = brl * feeRate;
-        const totalPix = brl + fee;
         document.getElementById('qc_equiv_brl').textContent = 'R$ ' + brl.toFixed(2).replace('.', ',');
-        document.getElementById('qc_pix_fee').textContent = 'Taxa Stripe (3,5%): R$ ' + fee.toFixed(2).replace('.', ',');
-        document.getElementById('qc_pix_total').textContent = 'Valor final aproximado no Pix: R$ ' + totalPix.toFixed(2).replace('.', ',');
+        document.getElementById('qc_pix_fee').textContent = '';
+        document.getElementById('qc_pix_total').textContent = 'Valor do Pix: R$ ' + brl.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_text').textContent = 'Taxa: 1 USD = R$ ' + USD_BRL_RATE.toFixed(2).replace('.', ',');
         document.getElementById('qc_rate_hint').textContent = 'Mínimo: $' + MIN_USD.toFixed(2);
     }

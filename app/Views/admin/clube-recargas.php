@@ -141,11 +141,11 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
     echo '<div class="table-responsive">';
     echo '<table class="table table-hover align-middle mb-0">';
     echo '<thead><tr>';
-    echo '<th>ID</th><th>Usuário</th><th>Pagador</th><th>Documento</th><th>Tipo</th><th>Método</th>';
+    echo '<th>ID</th><th>Usuário</th><th>Pagador</th><th>Documento</th><th>Tipo</th><th>Método</th><th>Gateway</th>';
     echo '<th>Valor USD</th><th>Valor BRL</th><th>Status</th><th>Criado</th><th>Pago</th><th>Expira em</th>';
     echo '</tr></thead><tbody>';
     if (empty($rows)) {
-        echo '<tr><td colspan="12" class="text-muted">' . htmlspecialchars($emptyMsg) . '</td></tr>';
+        echo '<tr><td colspan="13" class="text-muted">' . htmlspecialchars($emptyMsg) . '</td></tr>';
     } else {
         foreach ($rows as $r) {
             $status = strtolower(trim((string) ($r['status'] ?? 'pending')));
@@ -194,6 +194,10 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
             echo '<td class="text-muted small">' . htmlspecialchars((string) ($r['pagador_documento'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
             echo '<td><span class="badge bg-' . $tipoBadge . '">' . $tipoLabel . '</span></td>';
             echo '<td>' . htmlspecialchars((string) ($r['metodo'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
+            $gw = strtolower(trim((string) ($r['gateway'] ?? ($r['payment_gateway'] ?? 'stripe'))));
+            $gwLabel = $gw === 'cambioreal' ? 'Câmbio Real' : ($gw === 'stripe' ? 'Stripe' : ucfirst($gw));
+            $gwBadge = $gw === 'cambioreal' ? 'primary' : ($gw === 'stripe' ? 'info' : 'secondary');
+            echo '<td><span class="badge bg-' . $gwBadge . '" style="font-size:10px;">' . htmlspecialchars($gwLabel) . '</span></td>';
             echo '<td>$ ' . number_format((float) ($r['valor'] ?? 0), 2, ',', '.') . '</td>';
             echo '<td>R$ ' . number_format((float) ($r['valor_brl'] ?? 0), 2, ',', '.') . '</td>';
             echo '<td><span class="badge bg-' . $badge . '">' . htmlspecialchars($status, ENT_QUOTES, 'UTF-8') . '</span></td>';
