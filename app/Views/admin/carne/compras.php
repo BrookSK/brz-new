@@ -114,9 +114,7 @@
                                     <div class="btn-group btn-group-sm">
                                         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#<?= $modalId ?>" title="Ver detalhes"><i class="fas fa-eye"></i></button>
                                         <?php if ($statusCompra === 'aguardando_compra'): ?>
-                                            <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $ci['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como comprado?')">
-                                                <button type="submit" class="btn btn-outline-success" title="Marcar comprado"><i class="fas fa-check"></i></button>
-                                            </form>
+                                            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#comprar_<?= $modalId ?>" title="Marcar comprado"><i class="fas fa-check"></i></button>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -137,6 +135,7 @@
 
 <!-- Modais (fora da tabela) -->
 <?php foreach ($allModals as $m): ?>
+<!-- Modal Ver Detalhes -->
 <div class="modal fade" id="<?= $m['id'] ?>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -165,6 +164,40 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Confirmar Compra -->
+<?php if ($m['statusCompra'] === 'aguardando_compra'): ?>
+<div class="modal fade" id="comprar_<?= $m['id'] ?>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-check-circle me-2 text-success"></i>Confirmar Compra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="bg-light rounded p-3 mb-3">
+                    <div class="fw-semibold"><?= htmlspecialchars($m['prodNome']) ?></div>
+                    <div class="small text-muted">Quantidade: <?= (int) ($m['ci']['quantidade'] ?? 1) ?> · Cliente: <?= htmlspecialchars($m['ci']['cliente_nome'] ?? '') ?></div>
+                    <div class="small text-muted">Pedido #<?= (int) $m['ci']['pedido_id'] ?> · Parcelas: <?= (int) ($m['ci']['parcelas_pagas'] ?? 0) ?>/<?= (int) ($m['ci']['quantidade_parcelas'] ?? 0) ?></div>
+                </div>
+                <p class="mb-2 fw-semibold">Como deseja marcar?</p>
+                <div class="d-flex flex-column gap-2">
+                    <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $m['ci']['id'] ?>">
+                        <button type="submit" class="btn btn-success w-100"><i class="fas fa-check-double me-1"></i>Compra Total (produto completo)</button>
+                    </form>
+                    <form method="POST" action="/admin/carnes/marcar-comprado/<?= (int) $m['ci']['id'] ?>">
+                        <input type="hidden" name="parcial" value="1">
+                        <button type="submit" class="btn btn-warning w-100"><i class="fas fa-check me-1"></i>Compra Parcial (parte do produto)</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <?php endforeach; ?>
 
 <?php $content = ob_get_clean(); ?>
