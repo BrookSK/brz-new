@@ -691,7 +691,8 @@ class CarneService {
         // Tentar usar template customizado da tabela email_templates (salvo via Configurações > Criar E-mail)
         try {
             $emailService = new \App\Services\EmailService();
-            $tplDb = $emailService->getTemplate('carne_' . $evento);
+            $templateNome = (strpos($evento, 'carne_') === 0) ? $evento : 'carne_' . $evento;
+            $tplDb = $emailService->getTemplate($templateNome);
             if (!empty($tplDb['corpo_html'])) {
                 // Renderizar variáveis no template do banco
                 $vars = [
@@ -763,7 +764,7 @@ class CarneService {
                 INSERT INTO email_logs (tipo, destinatario_email, destinatario_nome, assunto, corpo_resumo, status, erro_mensagem, carne_id, parcela_id, pedido_id, created_at)
                 VALUES (:tipo, :email, :nome, :assunto, :corpo, :status, :erro, :carne_id, :parcela_id, :pedido_id, NOW())
             ")->execute([
-                ':tipo' => 'carne_' . $evento,
+                ':tipo' => (strpos($evento, 'carne_') === 0) ? $evento : 'carne_' . $evento,
                 ':email' => $email,
                 ':nome' => $clienteNome,
                 ':assunto' => $assunto,
