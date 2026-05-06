@@ -14,7 +14,7 @@
                     <form method="POST" action="/register" id="registerForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?></label>
+                                <label for="nome" class="form-label"><?= __('auth.full_name', 'Nome Completo') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-user"></i></span>
                                     <input type="text" class="form-control" id="nome" name="nome" 
@@ -23,7 +23,7 @@
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?></label>
+                                <label for="telefone" class="form-label"><?= __('auth.phone', 'Telefone') ?> *</label>
                                 <div class="input-group w-100" style="flex-wrap: nowrap;">
                                     <span class="input-group-text" style="padding-left: 10px; padding-right: 10px;"><i class="fas fa-phone"></i></span>
                                     <select class="form-select" id="telefone_ddi" style="flex: 0 0 76px; min-width: 76px; padding-left: 8px; padding-right: 24px;">
@@ -52,7 +52,7 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?></label>
+                            <label for="email" class="form-label"><?= __('auth.email', 'E-mail') ?> *</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                 <input type="email" class="form-control" id="email" name="email" 
@@ -61,25 +61,25 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label for="documento" class="form-label" id="label-documento">CPF</label>
+                            <label for="documento" class="form-label" id="label-documento">CPF *</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-id-card"></i></span>
                                 <input type="text" class="form-control" id="documento" name="documento" 
-                                       placeholder="000.000.000-00">
+                                       placeholder="000.000.000-00" required>
                             </div>
                             <small class="text-muted" id="hint-documento" style="display:none;">Obrigatório apenas para residentes no Brasil.</small>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?></label>
+                                <label for="data_nascimento" class="form-label"><?= __('auth.birth_date', 'Data de Nascimento') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-cake-candles"></i></span>
                                     <input type="date" class="form-control" id="data_nascimento" name="data_nascimento" required>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="pais_residencia" class="form-label"><?= __('auth.country_residence', 'País de Residência') ?></label>
+                                <label for="pais_residencia" class="form-label"><?= __('auth.country_residence', 'País de Residência') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-flag"></i></span>
                                     <?php require __DIR__ . '/../_countries.php'; ?>
@@ -96,14 +96,14 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3" id="field-cep">
-                                <label for="cep" class="form-label" id="label-cep"><?= __('auth.zip', 'CEP') ?></label>
+                                <label for="cep" class="form-label" id="label-cep"><?= __('auth.zip', 'CEP') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-dot"></i></span>
                                     <input type="text" class="form-control" id="cep" name="cep" placeholder="00000-000" required>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="endereco" class="form-label" id="label-endereco"><?= __('auth.address', 'Endereço') ?></label>
+                                <label for="endereco" class="form-label" id="label-endereco"><?= __('auth.address', 'Endereço') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-map"></i></span>
                                     <input type="text" class="form-control" id="endereco" name="endereco" placeholder="<?= htmlspecialchars(__('auth.address_placeholder', 'Rua, Avenida, etc.'), ENT_QUOTES, 'UTF-8') ?>" required>
@@ -113,10 +113,10 @@
 
                         <div class="row">
                             <div class="col-md-4 mb-3" id="field-numero">
-                                <label for="numero" class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?></label>
+                                <label for="numero" class="form-label" id="label-numero"><?= __('auth.number_label', 'Número') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
-                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123">
+                                    <input type="text" class="form-control" id="numero" name="numero" placeholder="123" required>
                                 </div>
                             </div>
                             <div class="col-md-8 mb-3">
@@ -130,21 +130,21 @@
 
                         <div class="row">
                             <div class="col-md-4 mb-3" id="field-bairro">
-                                <label for="bairro" class="form-label" id="label-bairro"><?= __('auth.neighborhood', 'Bairro') ?></label>
+                                <label for="bairro" class="form-label" id="label-bairro"><?= __('auth.neighborhood', 'Bairro') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-location-crosshairs"></i></span>
-                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro">
+                                    <input type="text" class="form-control" id="bairro" name="bairro" placeholder="Centro" required>
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="cidade" class="form-label" id="label-cidade"><?= __('auth.city', 'Cidade') ?></label>
+                                <label for="cidade" class="form-label" id="label-cidade"><?= __('auth.city', 'Cidade') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-city"></i></span>
                                     <input type="text" class="form-control" id="cidade" name="cidade" placeholder="São Paulo" required>
                                 </div>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="estado" class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?></label>
+                                <label for="estado" class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-map-pin"></i></span>
                                     <input type="text" class="form-control" id="estado" name="estado" placeholder="SP" required>
@@ -154,7 +154,7 @@
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="senha" class="form-label"><?= __('auth.password_min', 'Senha') ?></label>
+                                <label for="senha" class="form-label"><?= __('auth.password_min', 'Senha') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                     <input type="password" class="form-control" id="senha" name="senha" 
@@ -166,7 +166,7 @@
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="confirmar_senha" class="form-label"><?= __('auth.confirm_password', 'Confirmar Senha') ?></label>
+                                <label for="confirmar_senha" class="form-label"><?= __('auth.confirm_password', 'Confirmar Senha') ?> *</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                     <input type="password" class="form-control" id="confirmar_senha" 
@@ -261,7 +261,7 @@ $(document).ready(function() {
         const $label = $('#label-documento');
         const $hint = $('#hint-documento');
 
-        $label.text(br ? I18N.cpf_required : I18N.cpf);
+        $label.text(br ? 'CPF *' : 'CPF');
         $doc.prop('required', br);
         $doc.attr('placeholder', br ? '000.000.000-00' : '');
         $hint.text(I18N.doc_hint);
@@ -271,29 +271,28 @@ $(document).ready(function() {
     function syncBairroRules() {
         const br = isBrazil();
         const $bairro = $('#bairro');
+        const $label = $('#label-bairro');
         if ($bairro.length) {
             $bairro.prop('required', br);
+            if ($label.length) $label.text(br ? (I18N.neighborhood_br + ' *') : I18N.neighborhood_br);
         }
     }
 
     function syncEnderecoRules() {
         const br = isBrazil();
 
-        $('#label-endereco').text(br ? I18N.address_br : I18N.address_line_1);
+        $('#label-endereco').text((br ? I18N.address_br : I18N.address_line_1) + ' *');
         $('#label-complemento').text(br ? I18N.complement_br : I18N.address_line_2_optional);
-        $('#label-cidade').text(br ? I18N.city_br : I18N.city_en);
-        $('#label-estado').text(br ? I18N.state_br : I18N.state_en);
-        $('#label-cep').text(I18N.zip_br);
-        $('#label-numero').text(I18N.number_br);
-        $('#label-bairro').text(I18N.neighborhood_br);
+        $('#label-cidade').text((br ? I18N.city_br : I18N.city_en) + ' *');
+        $('#label-estado').text((br ? I18N.state_br : I18N.state_en) + ' *');
+        $('#label-cep').text(I18N.zip_br + ' *');
+        $('#label-numero').text(I18N.number_br + (br ? ' *' : ''));
 
         $('#cep').prop('required', true);
+        $('#endereco').prop('required', true);
+        $('#cidade').prop('required', true);
+        $('#estado').prop('required', true);
         $('#numero').prop('required', br);
-        if (br) {
-            $('#numero').attr('required', 'required');
-        } else {
-            $('#numero').removeAttr('required');
-        }
 
         $('#field-cep').toggle(true);
         $('#field-numero').toggle(br);
