@@ -2291,6 +2291,11 @@ JS;
                                 <i class="fas fa-currency-brl"></i> Pagamentos em Reais
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pedidos-carne-tab" data-bs-toggle="pill" data-bs-target="#pedidos-carne" type="button">
+                                <i class="fas fa-file-invoice-dollar"></i> Carnê
+                            </button>
+                        </li>
                     </ul>
                     
                     <div class="tab-content" id="pedidosTabContent">
@@ -2689,6 +2694,34 @@ JS;
                 }
                 
                 echo '</main></div></div>';
+
+                // Tab Carnê — filtrar pedidos que são de carnê
+                echo '<div class="tab-pane fade" id="pedidos-carne" role="tabpanel"><div class="row">';
+                $pedidosCarne = array_filter($pedidos, function($p) {
+                    $fp = strtolower(trim((string) ($p['forma_pagamento'] ?? '')));
+                    $st = strtolower(trim((string) ($p['status'] ?? '')));
+                    return ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true));
+                });
+                if (empty($pedidosCarne)) {
+                    echo '<div class="col-12"><div class="text-muted text-center py-5">Nenhum pedido de carnê encontrado.</div></div>';
+                } else {
+                    echo '<div class="col-12 mb-2"><div class="badge bg-info">' . count($pedidosCarne) . ' pedidos de carnê</div></div>';
+                    foreach ($pedidosCarne as $pedido) {
+                        $pid = (int) ($pedido['id'] ?? 0);
+                        echo '<div class="col-12 mb-2"><div class="card border-start border-4 border-info"><div class="card-body py-2 d-flex justify-content-between align-items-center">'
+                            . '<div>'
+                            . '<strong>#' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT) . '</strong> '
+                            . htmlspecialchars((string) ($pedido['cliente_nome'] ?? '')) . ' '
+                            . '<span class="text-muted small">' . htmlspecialchars((string) ($pedido['cliente_email'] ?? '')) . '</span>'
+                            . '</div>'
+                            . '<div class="d-flex align-items-center gap-2">'
+                            . '<span class="fw-bold">' . $this->formatarMoeda((float) ($pedido['total'] ?? ($pedido['valor_total'] ?? 0)), (string) ($pedido['moeda'] ?? 'BRL')) . '</span>'
+                            . '<a href="/admin/pedidos/detalhes/' . $pid . '" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>'
+                            . '</div>'
+                            . '</div></div></div>';
+                    }
+                }
+                echo '</div></div>';
 
         echo <<<'HTML'
 
