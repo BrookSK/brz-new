@@ -2281,12 +2281,16 @@ JS;
                 
                 <!-- Abas de Pedidos por Moeda -->
                 <div class="mb-3">
-                    <ul class="nav nav-pills" id="pedidosTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">
-                                <i class="fas fa-list"></i> Todos os Pedidos
-                            </button>
-                        </li>
+                    <ul class="nav nav-pills" id="pedidosTabs" role="tablist">';
+                    $isCarneFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'carne');
+                    echo '
+                        <li class="nav-item" role="presentation">';
+                    if ($isCarneFiltro) {
+                        echo '<a class="nav-link" href="/admin/pedidos"><i class="fas fa-list"></i> Todos os Pedidos</a>';
+                    } else {
+                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button"><i class="fas fa-list"></i> Todos os Pedidos</button>';
+                    }
+                    echo '</li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">
                                 <i class="fas fa-dollar-sign"></i> Pagamentos em Dólar
@@ -2298,7 +2302,7 @@ JS;
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link" href="/admin/pedidos?fp=carne">
+                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">
                                 <i class="fas fa-file-invoice-dollar"></i> Carnê
                             </a>
                         </li>
