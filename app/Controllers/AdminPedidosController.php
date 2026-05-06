@@ -2044,6 +2044,45 @@ JS;
                 $aguardandoComprovanteMap = [];
             }
 
+            // Verificar quais pedidos de carnê realmente têm carnê criado + info de parcelas pagas
+            $carneInfoMap = []; // pedido_id => ['carne_id' => int, 'parcelas' => int, 'pagas' => int, 'total_geral' => float] ou false se não existe
+            try {
+                if (!empty($pedidoIds)) {
+                    $carnePedidoIds = [];
+                    foreach ($pedidos as $pp) {
+                        $fpCheck = strtolower(trim((string) ($pp['forma_pagamento'] ?? '')));
+                        $stCheck = strtolower(trim((string) ($pp['status'] ?? '')));
+                        if ($fpCheck === 'carne_braziliana' || in_array($stCheck, ['carne_pagando', 'carne_aguardando'], true)) {
+                            $carnePedidoIds[] = (int) ($pp['id'] ?? 0);
+                        }
+                    }
+                    if (!empty($carnePedidoIds)) {
+                        $phCarne = implode(',', array_fill(0, count($carnePedidoIds), '?'));
+                        $stCarneCheck = $pdo->prepare("
+                            SELECT c.pedido_id, c.id as carne_id, c.quantidade_parcelas, c.total_geral,
+                                (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas
+                            FROM carnes c WHERE c.pedido_id IN ({$phCarne})
+                        ");
+                        $stCarneCheck->execute($carnePedidoIds);
+                        foreach ($stCarneCheck->fetchAll(\PDO::FETCH_ASSOC) as $cr) {
+                            $cpid = (int) ($cr['pedido_id'] ?? 0);
+                            $carneInfoMap[$cpid] = [
+                                'carne_id' => (int) $cr['carne_id'],
+                                'parcelas' => (int) $cr['quantidade_parcelas'],
+                                'pagas' => (int) $cr['parcelas_pagas'],
+                                'total_geral' => (float) $cr['total_geral'],
+                            ];
+                        }
+                        // Marcar os que NÃO têm carnê
+                        foreach ($carnePedidoIds as $cpid) {
+                            if (!isset($carneInfoMap[$cpid])) {
+                                $carneInfoMap[$cpid] = false;
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
+
             // Normalizar moeda/total para exibição (sem alterar o banco)
             if (is_array($pedidos) && !empty($pedidos)) {
                 foreach ($pedidos as &$p) {
@@ -2392,7 +2431,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido) . '
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2400,6 +2439,7 @@ JS;
                                             <h5 class="mb-0 text-primary text-nowrap">' . $this->formatarMoeda($pedido['total'], $pedido['moeda']) . '</h5>
                                             <small class="text-muted">Total do Pedido</small>
                                             <div class="mt-1"><span class="badge ' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'bg-success' : 'bg-info') . '" style="font-size:.65rem;">' . (strtoupper(trim((string)($pedido['moeda'] ?? ''))) === 'BRL' ? 'Moeda: R$' : 'Moeda: US$') . '</span></div>
+                                            ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
@@ -2521,7 +2561,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido) . '
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2529,6 +2569,7 @@ JS;
                                             <h5 class="mb-0 text-success text-nowrap">$ ' . number_format((float) ($pedido['total'] ?? 0), 2, '.', ',') . '</h5>
                                             <small class="text-muted">Total (USD)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
@@ -2649,7 +2690,7 @@ JS;
                                         <div class="text-muted small mt-1">
                                             <span class="me-3" style="' . $paisStyle . '">' . htmlspecialchars($paisTxt) . '</span>
                                             <span class="me-3">UID: <strong>' . (int) ($pedido['usuario_id'] ?? 0) . '</strong></span>
-                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido) . '
+                                            <span class="me-3">Origem: <strong>' . htmlspecialchars($origemTxt) . '</strong></span>' . $this->getCarneBadgeHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-6 col-lg-3">
@@ -2657,6 +2698,7 @@ JS;
                                             <h5 class="mb-0 text-info text-nowrap">R$ ' . number_format($pedido['total'], 2, ',', '.') . '</h5>
                                             <small class="text-muted">Total (BRL)</small>
                                             ' . (((float) ($pedido['imposto_local'] ?? 0)) > 0 ? '<div class="mt-1"><span class="badge" style="background:rgba(245,158,11,.15);color:#92400e;border:1px solid rgba(245,158,11,.3);font-size:.7rem;">Imposto local</span></div>' : '') . '
+                                            ' . $this->getCarneProgressHtml($pedido, $carneInfoMap) . '
                                         </div>
                                     </div>
                                     <div class="col-12 col-lg-3">
@@ -4916,13 +4958,55 @@ LINKSCRIPT;
         }
     }
 
-    private function getCarneBadgeHtml(array $pedido): string {
+    private function getCarneBadgeHtml(array $pedido, array $carneInfoMap = []): string {
         $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
         $st = strtolower(trim((string) ($pedido['status'] ?? '')));
+        $pid = (int) ($pedido['id'] ?? 0);
         if ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true)) {
-            return ' <span class="badge text-white" style="background:#6f42c1;font-size:.7rem;"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>';
+            $html = ' <span class="badge text-white" style="background:#6f42c1;font-size:.7rem;"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>';
+            // Verificar se carnê existe
+            if ($pid > 0 && isset($carneInfoMap[$pid])) {
+                if ($carneInfoMap[$pid] === false) {
+                    // Carnê NÃO foi criado — erro
+                    $html .= ' <span class="badge bg-danger" style="font-size:.65rem;" title="Carnê não foi criado no sistema (erro na geração)"><i class="fas fa-exclamation-triangle me-1"></i>Erro</span>';
+                } else {
+                    // Carnê existe — mostrar parcelas pagas/total
+                    $info = $carneInfoMap[$pid];
+                    $pagas = (int) $info['pagas'];
+                    $total = (int) $info['parcelas'];
+                    $html .= ' <span class="badge bg-light text-dark border" style="font-size:.65rem;">' . $pagas . '/' . $total . '</span>';
+                }
+            }
+            return $html;
         }
         return '';
+    }
+
+    /**
+     * Gera HTML de progresso de pagamento do carnê para exibir abaixo do total na listagem
+     */
+    private function getCarneProgressHtml(array $pedido, array $carneInfoMap = []): string {
+        $fp = strtolower(trim((string) ($pedido['forma_pagamento'] ?? '')));
+        $st = strtolower(trim((string) ($pedido['status'] ?? '')));
+        $pid = (int) ($pedido['id'] ?? 0);
+        if (!($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true))) {
+            return '';
+        }
+        if ($pid <= 0 || !isset($carneInfoMap[$pid]) || $carneInfoMap[$pid] === false) {
+            return '';
+        }
+        $info = $carneInfoMap[$pid];
+        $pagas = (int) $info['pagas'];
+        $total = (int) $info['parcelas'];
+        $totalGeral = (float) $info['total_geral'];
+        $valorPago = $total > 0 ? round(($totalGeral / $total) * $pagas, 2) : 0;
+        $pct = $total > 0 ? round(($pagas / $total) * 100) : 0;
+
+        $html = '<div class="mt-1" style="font-size:.7rem;">';
+        $html .= '<div class="progress" style="height:5px;"><div class="progress-bar bg-success" style="width:' . $pct . '%"></div></div>';
+        $html .= '<span class="text-muted">' . $pagas . '/' . $total . ' parcelas &middot; R$ ' . number_format($valorPago, 2, ',', '.') . '</span>';
+        $html .= '</div>';
+        return $html;
     }
 
     private function formatarMoeda($valor, $moeda) {
