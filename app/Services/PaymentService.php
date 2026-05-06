@@ -3351,14 +3351,31 @@ class PaymentService {
                 }
             }
 
-            $paymentId = (string) ($data['id'] ?? ($data['code'] ?? ''));
-            $pixPayload = (string) ($tx['pix_payload'] ?? ($tx['pix_code'] ?? ($tx['pix_copy_paste'] ?? '')));
-            $pixQrcode = (string) ($tx['pix_qrcode'] ?? ($tx['pix_qr_code_base64'] ?? ''));
-            $invoiceUrl = (string) ($data['invoice_url'] ?? ($data['url'] ?? ''));
+            $paymentId = (string) ($data['id'] ?? ($data['code'] ?? ($data['transaction_id'] ?? '')));
+            $pixPayload = (string) ($tx['pix_payload'] ?? ($tx['pix_code'] ?? ($tx['pix_copy_paste'] ?? ($tx['pix'] ?? ''))));
+            $pixQrcode = (string) ($tx['pix_qrcode'] ?? ($tx['pix_qr_code_base64'] ?? ($tx['qr_code'] ?? ($tx['qr_code_base64'] ?? ''))));
+            $invoiceUrl = (string) ($data['invoice_url'] ?? ($data['url'] ?? ($data['checkout_url'] ?? ($data['payment_url'] ?? ''))));
+
+            // Fallback: dados PIX podem estar na raiz de $data
+            if ($pixPayload === '') $pixPayload = (string) ($data['pix_payload'] ?? ($data['pix_code'] ?? ($data['pix_copy_paste'] ?? '')));
+            if ($pixQrcode === '') $pixQrcode = (string) ($data['pix_qrcode'] ?? ($data['qr_code_base64'] ?? ($data['qr_code'] ?? '')));
 
             if ($pixPayload === '' && $pixQrcode === '' && $invoiceUrl === '') {
-                error_log('[CR_PIX_RECARGA] Sem dados PIX na resposta: ' . json_encode($resp));
-                return ['success' => false, 'error' => 'Câmbio Real: PIX gerado mas sem dados de pagamento', 'raw' => $resp];
+                error_log('[CR_PIX_RECARGA] Sem dados PIX na resposta. data=' . json_encode($data) . ' tx=' . json_encode($tx) . ' resp_keys=' . json_encode(array_keys($resp)));
+                // Tentar extrair de outros campos possíveis
+                $pixPayload = (string) ($data['pix_payload'] ?? ($data['pix_code'] ?? ($data['pix_copy_paste'] ?? ($data['pix'] ?? ''))));
+                if ($pixPayload === '' && isset($data['payment']) && is_array($data['payment'])) {
+                    $pixPayload = (string) ($data['payment']['pix_payload'] ?? ($data['payment']['pix_code'] ?? ''));
+                    $pixQrcode = (string) ($data['payment']['pix_qrcode'] ?? ($data['payment']['qr_code'] ?? ''));
+                }
+                // Se tem invoice_url na raiz da resposta
+                if ($invoiceUrl === '') {
+                    $invoiceUrl = (string) ($resp['invoice_url'] ?? ($resp['url'] ?? ($resp['checkout_url'] ?? '')));
+                }
+                // Se ainda não tem nada, usar invoice_url como fallback (o cliente pode abrir o link pra pagar)
+                if ($pixPayload === '' && $pixQrcode === '' && $invoiceUrl === '') {
+                    return ['success' => false, 'error' => 'Câmbio Real: PIX gerado mas sem dados de pagamento. Verifique se PIX está ativo na conta.', 'raw' => $resp];
+                }
             }
 
             return [
