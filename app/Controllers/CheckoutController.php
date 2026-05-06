@@ -2975,12 +2975,7 @@ class CheckoutController extends Controller {
                             $totalTaxas = 0;
                         }
 
-                        $clienteId = (int) ($usuario['id'] ?? 0);
-                        if ($clienteId <= 0) {
-                            throw new \Exception('Usuário não identificado para criar o carnê.');
-                        }
-
-                        // SALVAR quantidade de parcelas ANTES de criar o carnê (pra não perder se der erro)
+                        // SALVAR quantidade de parcelas ANTES de qualquer verificação (pra não perder se der erro)
                         try {
                             $dbMetaPre = \Config\Database::getConnection();
                             $dbMetaPre->exec("CREATE TABLE IF NOT EXISTS pedido_meta (
@@ -2995,11 +2990,42 @@ class CheckoutController extends Controller {
                             $stMetaPre->execute([(int) $pedidoId, 'carne_parcelas', (string) $qtdParcelas]);
                             $stMetaPre->execute([(int) $pedidoId, 'carne_subtotal_produtos', (string) $subtotalProdutos]);
                             $stMetaPre->execute([(int) $pedidoId, 'carne_total_taxas', (string) $totalTaxas]);
+                            error_log("[CARNE] Meta salvo com sucesso: pedido={$pedidoId} parcelas={$qtdParcelas}");
                         } catch (\Exception $e) {
                             error_log('[CARNE] Erro ao salvar meta parcelas (pre): ' . $e->getMessage());
                         }
 
+                        // Identificar cliente — tentar da sessão, depois do pedido
+                        $clienteId = (int) ($usuario['id'] ?? 0);
+                        if ($clienteId <= 0) {
+                            // Fallback: buscar usuario_id do próprio pedido
+                            try {
+                                $stUsr = \Config\Database::getConnection()->prepare('SELECT usuario_id FROM pedidos WHERE id = ? LIMIT 1');
+                                $stUsr->execute([(int) $pedidoId]);
+                                $clienteId = (int) ($stUsr->fetchColumn() ?: 0);
+                                error_log("[CARNE] clienteId obtido do pedido: {$clienteId}");
+                            } catch (\Exception $e) {
+                                error_log('[CARNE] Erro ao buscar usuario_id do pedido: ' . $e->getMessage());
+                            }
+                        }
+                        if ($clienteId <= 0) {
+                            error_log("[CARNE] FALHA ao criar carnê para pedido #{$pedidoId}: Usuário não identificado para criar o carnê. em " . __FILE__ . ':' . __LINE__);
+                            throw new \Exception('Usuário não identificado para criar o carnê.');
+                        }
+
                         error_log("[CARNE] Chamando criarCarne: pedido={$pedidoId} cliente={$clienteId} prodBrl={$subtotalProdutos} taxasBrl={$totalTaxas} parcelas={$qtdParcelas}");
+
+                        // Se $usuario está vazio, buscar dados do cliente pelo ID
+                        $clienteData = [];
+                        if (!empty($usuario) && is_array($usuario)) {
+                            $clienteData = $usuario;
+                        } elseif ($clienteId > 0) {
+                            try {
+                                $stCli = \Config\Database::getConnection()->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                                $stCli->execute([$clienteId]);
+                                $clienteData = $stCli->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            } catch (\Exception $e) {}
+                        }
 
                         // Tentativa 1
                         $carneId = null;
@@ -3012,11 +3038,11 @@ class CheckoutController extends Controller {
                                 $totalTaxas,
                                 $qtdParcelas,
                                 [
-                                    'nome' => $dados['nome'] ?? ($usuario['nome'] ?? ''),
-                                    'email' => $dados['email'] ?? ($usuario['email'] ?? ''),
-                                    'documento' => $dados['documento'] ?? ($usuario['documento'] ?? ''),
-                                    'data_nascimento' => $dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? ''),
-                                    'telefone' => $dados['telefone'] ?? ($usuario['telefone'] ?? ''),
+                                    'nome' => $dados['nome'] ?? ($clienteData['nome'] ?? ($clienteData['name'] ?? '')),
+                                    'email' => $dados['email'] ?? ($clienteData['email'] ?? ''),
+                                    'documento' => $dados['documento'] ?? ($clienteData['documento'] ?? ($clienteData['cpf'] ?? '')),
+                                    'data_nascimento' => $dados['data_nascimento'] ?? ($clienteData['data_nascimento'] ?? ''),
+                                    'telefone' => $dados['telefone'] ?? ($clienteData['telefone'] ?? ($clienteData['phone'] ?? '')),
                                     'cep' => $dados['cep'] ?? '',
                                     'endereco' => $dados['endereco'] ?? '',
                                     'numero' => $dados['numero'] ?? '',
@@ -3038,11 +3064,11 @@ class CheckoutController extends Controller {
                                     $totalTaxas,
                                     $qtdParcelas,
                                     [
-                                        'nome' => $dados['nome'] ?? ($usuario['nome'] ?? ''),
-                                        'email' => $dados['email'] ?? ($usuario['email'] ?? ''),
-                                        'documento' => $dados['documento'] ?? ($usuario['documento'] ?? ''),
-                                        'data_nascimento' => $dados['data_nascimento'] ?? ($usuario['data_nascimento'] ?? ''),
-                                        'telefone' => $dados['telefone'] ?? ($usuario['telefone'] ?? ''),
+                                        'nome' => $dados['nome'] ?? ($clienteData['nome'] ?? ($clienteData['name'] ?? '')),
+                                        'email' => $dados['email'] ?? ($clienteData['email'] ?? ''),
+                                        'documento' => $dados['documento'] ?? ($clienteData['documento'] ?? ($clienteData['cpf'] ?? '')),
+                                        'data_nascimento' => $dados['data_nascimento'] ?? ($clienteData['data_nascimento'] ?? ''),
+                                        'telefone' => $dados['telefone'] ?? ($clienteData['telefone'] ?? ($clienteData['phone'] ?? '')),
                                         'cep' => $dados['cep'] ?? '',
                                         'endereco' => $dados['endereco'] ?? '',
                                         'numero' => $dados['numero'] ?? '',
@@ -3061,24 +3087,6 @@ class CheckoutController extends Controller {
 
                         if (!$carneCriado || !$carneId) {
                             throw new \Exception('Carnê não foi criado (ID inválido).');
-                        }
-
-                        // Salvar quantidade de parcelas no pedido_meta para referência futura
-                        try {
-                            $dbMeta = \Config\Database::getConnection();
-                            // Garantir tabela pedido_meta existe
-                            $dbMeta->exec("CREATE TABLE IF NOT EXISTS pedido_meta (
-                                id INT AUTO_INCREMENT PRIMARY KEY,
-                                pedido_id INT NOT NULL,
-                                meta_key VARCHAR(100) NOT NULL,
-                                meta_value TEXT,
-                                INDEX idx_pedido_meta_pedido (pedido_id),
-                                INDEX idx_pedido_meta_key (meta_key)
-                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-                            $stMeta = $dbMeta->prepare('INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)');
-                            $stMeta->execute([(int) $pedidoId, 'carne_parcelas', (string) $qtdParcelas]);
-                        } catch (\Exception $e) {
-                            error_log('[CARNE] Erro ao salvar meta parcelas: ' . $e->getMessage());
                         }
 
                         // Atualizar status do pedido para indicar carnê
