@@ -3316,8 +3316,20 @@ class PaymentService {
 
             $status = strtolower(trim((string) ($resp['status'] ?? '')));
             if ($status !== '' && $status !== 'success') {
+                // Montar mensagem de erro detalhada
+                $errMsg = (string) ($resp['message'] ?? 'Falha ao gerar PIX');
+                $errDetails = '';
+                if (isset($resp['errors']) && is_array($resp['errors'])) {
+                    $flat = [];
+                    foreach ($resp['errors'] as $k => $v) {
+                        if (is_array($v)) { foreach ($v as $vv) { if (is_scalar($vv)) $flat[] = (string) $vv; } }
+                        elseif (is_scalar($v)) { $flat[] = (string) $v; }
+                    }
+                    if (!empty($flat)) $errDetails = ' | ' . implode(' | ', array_unique($flat));
+                }
+
                 // Tentar com email alternativo se erro de email em uso
-                $hay = strtolower(json_encode($resp['errors'] ?? []) . ' ' . ($resp['message'] ?? ''));
+                $hay = strtolower(json_encode($resp['errors'] ?? []) . ' ' . $errMsg);
                 if (strpos($hay, 'client.email') !== false && (strpos($hay, 'em uso') !== false || strpos($hay, 'already in use') !== false)) {
                     $origEmail = (string) ($customer['email'] ?? '');
                     if ($origEmail !== '' && strpos($origEmail, '@') !== false) {
@@ -3329,13 +3341,13 @@ class PaymentService {
                         $tx = is_array($data['transaction'] ?? null) ? (array) $data['transaction'] : [];
                         $status = strtolower(trim((string) ($resp['status'] ?? '')));
                         if ($status !== '' && $status !== 'success') {
-                            return ['success' => false, 'error' => 'Câmbio Real: ' . ($resp['message'] ?? 'Falha ao gerar PIX'), 'raw' => $resp];
+                            return ['success' => false, 'error' => 'Câmbio Real: ' . $errMsg . $errDetails, 'raw' => $resp];
                         }
                     } else {
-                        return ['success' => false, 'error' => 'Câmbio Real: ' . ($resp['message'] ?? 'Falha ao gerar PIX'), 'raw' => $resp];
+                        return ['success' => false, 'error' => 'Câmbio Real: ' . $errMsg . $errDetails, 'raw' => $resp];
                     }
                 } else {
-                    return ['success' => false, 'error' => 'Câmbio Real: ' . ($resp['message'] ?? 'Falha ao gerar PIX'), 'raw' => $resp];
+                    return ['success' => false, 'error' => 'Câmbio Real: ' . $errMsg . $errDetails, 'raw' => $resp];
                 }
             }
 

@@ -697,13 +697,12 @@ class ClubeRecargaController extends Controller {
             $descricao = 'Recarga Clube Braziliana #' . $recargaId . ' - ' . $nomeCompleto;
 
             $customerData = [
-                'email' => $email,
                 'name' => $nomeCompleto,
-                'first_name' => $nome,
-                'last_name' => $sobrenome,
-                'tax_id' => $doc,
+                'email' => $email,
                 'document' => $doc,
+                'birth_date' => $dataNascimento,
                 'phone' => $telefone,
+                'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
             ];
 
             if ($metodo === 'card') {
