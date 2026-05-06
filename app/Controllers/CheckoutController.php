@@ -2980,6 +2980,8 @@ class CheckoutController extends Controller {
                             throw new \Exception('Usuário não identificado para criar o carnê.');
                         }
 
+                        error_log("[CARNE] Chamando criarCarne: pedido={$pedidoId} cliente={$clienteId} prodBrl={$subtotalProdutos} taxasBrl={$totalTaxas} parcelas={$qtdParcelas}");
+
                         $carneId = $carneService->criarCarne(
                             (int) $pedidoId,
                             $clienteId,
@@ -3042,6 +3044,7 @@ class CheckoutController extends Controller {
                         $_SESSION['carne_id_criado'] = $carneId;
 
                     } catch (\Exception $e) {
+                        error_log('[CARNE] FALHA ao criar carnê para pedido #' . ($pedidoId ?? '?') . ': ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
                         throw new \Exception('Erro ao criar Carnê: ' . $e->getMessage());
                     }
                 }
