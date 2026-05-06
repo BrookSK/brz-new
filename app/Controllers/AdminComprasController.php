@@ -685,16 +685,19 @@ class AdminComprasController extends Controller {
                         $params[':loja_id'] = $lojaId;
                     }
                 }
+                $temTipoCompraLc = $this->columnExists('lista_compras', 'tipo_compra');
+                $excludeCarne = $temTipoCompraLc ? " AND (lc.tipo_compra IS NULL OR lc.tipo_compra = '' OR lc.tipo_compra != 'carne')" : '';
+                $excludeCarne .= " AND lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL)";
                 $stmt = $this->connection->prepare(
                     "SELECT DISTINCT lc.pedido_id FROM lista_compras lc
-                     WHERE lc.produto_id = :produto_id AND lc.pedido_id IS NOT NULL AND lc.pedido_id <> 0" . $whereLoja
+                     WHERE lc.produto_id = :produto_id AND lc.pedido_id IS NOT NULL AND lc.pedido_id <> 0" . $whereLoja . $excludeCarne
                 );
                 $stmt->execute($params);
                 $pedidoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             }
 
             // Estratégia 2: buscar pedidos que contêm esse produto na tabela de itens
-            // Excluir pedidos cancelados/apagados
+            // Excluir pedidos cancelados/apagados e pedidos de carnê
             $statusExcluidos = "('cancelado','cancelled','apagado','deleted','lixeira','trash','rejeitado','rejected')";
             try {
                 $stItens = $this->connection->prepare(
@@ -702,7 +705,9 @@ class AdminComprasController extends Controller {
                      INNER JOIN pedidos ped ON ped.id = i.pedido_id
                      WHERE i.produto_id = ? AND i.pedido_id IS NOT NULL AND i.pedido_id > 0
                      AND LOWER(COALESCE(ped.status,'')) NOT IN {$statusExcluidos}
-                     AND ped.deleted_at IS NULL"
+                     AND ped.deleted_at IS NULL
+                     AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'
+                     AND i.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL)"
                 );
                 $stItens->execute([$produtoId]);
                 $pedidoIdsFromItens = $stItens->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -1297,10 +1302,10 @@ class AdminComprasController extends Controller {
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
-                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','carne_pagando','carne_aguardando','pagamento')))" : '')
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','pagamento')))" : '')
                 . $whereTipoCompra
-                // Excluir itens de pedidos de carnê (tela separada)
-                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL))" : '')
+                // Excluir itens de pedidos de carnê (tela separada) - por tabela carnes E por forma_pagamento
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL) AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'))" : '')
                 . ($reabertos && !empty($reabertos['items'])
                     ? ($temLojaIdEmLista
                         ? (' AND (' . implode(' OR ', array_values(array_filter(array_map(function ($x) {
@@ -1434,8 +1439,12 @@ class AdminComprasController extends Controller {
                 }
             }
 
-            // Contadores gerais
-            $stmt = $this->connection->prepare("SELECT COUNT(*) as total_itens, SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes, SUM(CASE WHEN status = 'comprado' THEN 1 ELSE 0 END) as comprados, SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) as cancelados FROM lista_compras");
+            // Contadores gerais (excluindo itens de carnê)
+            $countWhere = "WHERE (tipo_compra IS NULL OR tipo_compra = '' OR tipo_compra != 'carne')";
+            if (!$temTipoCompraEmLista) {
+                $countWhere = "WHERE 1=1";
+            }
+            $stmt = $this->connection->prepare("SELECT COUNT(*) as total_itens, SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes, SUM(CASE WHEN status = 'comprado' THEN 1 ELSE 0 END) as comprados, SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) as cancelados FROM lista_compras {$countWhere}");
             $stmt->execute();
             $estatisticas = $stmt->fetch(\PDO::FETCH_ASSOC);
 
@@ -2734,6 +2743,9 @@ class AdminComprasController extends Controller {
             . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
             . "   WHERE lc.status = 'pendente'"
             . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAtPdf ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada')))" : '')
+            // Excluir itens de carnê do PDF
+            . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL) AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'))" : '')
+            . ($this->columnExists('lista_compras', 'tipo_compra') ? " AND (lc.tipo_compra IS NULL OR lc.tipo_compra = '' OR lc.tipo_compra != 'carne')" : '')
             . '   GROUP BY lc.produto_id, '
             . ($this->columnExists('lista_compras', 'nome_produto') ? "COALESCE(lc.nome_produto, ''), " : '')
             . ($temLojaIdEmLista && $temLojaIdEmProdutos ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0)' : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0)' : '0'))
