@@ -578,7 +578,7 @@ $(document).ready(function() {
                 index: index,
                 variacao_id: d.variacao_id,
                 quantidade: quantidade,
-                valor_informado_cliente: (p.valor_pendente || d.valor_pendente) ? (p.valor || 0) : null,
+                valor_informado_cliente: (p.valor_foi_informado_cliente || p.valor_pendente || d.valor_pendente) ? (p.valor || 0) : null,
                 observacao_cliente: p.observacao_cliente || null,
                 peso_manual: (p.peso_manual > 0) ? p.peso_manual : null
             });
@@ -715,6 +715,8 @@ $(document).ready(function() {
         if (!isNaN(index) && produtos[index]) {
             produtos[index].valor = (!isNaN(val) && val > 0) ? val : 0;
             produtos[index].valor_pendente = (!isNaN(val) && val > 0) ? false : true;
+            // Marcar que o valor foi informado manualmente pelo cliente
+            produtos[index].valor_foi_informado_cliente = (!isNaN(val) && val > 0);
         }
         calcularTotaisSelecionados();
     });

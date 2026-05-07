@@ -1036,10 +1036,22 @@ class CarrinhoController extends Controller {
         if (isset($_SESSION['carrinho'][$produtoId])) {
             $keyToRemove = $produtoId;
         } else {
-            foreach (($_SESSION['carrinho'] ?? []) as $k => $item) {
-                if (is_array($item) && array_key_exists('produto_id', $item) && (string) $item['produto_id'] === (string) $produtoId) {
-                    $keyToRemove = $k;
-                    break;
+            // Tentar sem o sufixo :0 (assessoria adiciona sem variação)
+            $produtoIdSemVariacao = $produtoId;
+            if (is_string($produtoId) && strpos($produtoId, ':') !== false) {
+                $parts = explode(':', $produtoId);
+                $produtoIdSemVariacao = $parts[0];
+                // Se variação é 0, tentar a key sem sufixo
+                if ((int) ($parts[1] ?? 0) === 0 && isset($_SESSION['carrinho'][$produtoIdSemVariacao])) {
+                    $keyToRemove = $produtoIdSemVariacao;
+                }
+            }
+            if ($keyToRemove === null) {
+                foreach (($_SESSION['carrinho'] ?? []) as $k => $item) {
+                    if (is_array($item) && array_key_exists('produto_id', $item) && (string) $item['produto_id'] === (string) $produtoIdSemVariacao) {
+                        $keyToRemove = $k;
+                        break;
+                    }
                 }
             }
         }
