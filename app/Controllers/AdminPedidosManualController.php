@@ -1328,7 +1328,9 @@ function calcTotal(){
             const impostos = Number(data.impostos || 0);
             const impostoLocal = Number(data.imposto_local || 0);
             const impostoLocalPct = Number(data.imposto_local_percent || 0);
-            const total = Number(data.total || 0);
+            // Recalcular total usando subtotal real (exibido) + taxas/impostos do backend
+            // Isso garante que brindes ($0 no subtotal) não inflam o total exibido
+            const total = subtotal + taxaServico + impostos + impostoLocal + frete;
 
             const pixPct = getPixPct();
             const moedaSel = getSelectedMoeda();
