@@ -335,6 +335,12 @@ class CarrinhoController extends Controller {
                 $precoPromo = floatval($produto['preco_promocao'] ?? 0);
                 if ($precoPromo < 0) $precoPromo = 0.0;
                 $itemPrice = ($precoPromo > 0 && $precoPromo < $precoBase) ? $precoPromo : $precoBase;
+
+                // Se o cliente informou o valor manualmente (assessoria), preservar o preço da sessão
+                $isValorInformado = !empty($item['valor_informado_cliente']);
+                if ($isValorInformado && $storedUnit !== null && $storedUnit > 0) {
+                    $itemPrice = $storedUnit;
+                }
                 $itemStock = intval($produto['estoque'] ?? 0);
                 if ($pvId > 0) {
                     $infoVar = $this->getVariacaoInfo($pvId);
