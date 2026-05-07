@@ -2471,7 +2471,7 @@ JS;
             }
 
             $custoCol = '';
-            foreach (['custo', 'cost', 'custo_produto', 'valor_custo'] as $c) {
+            foreach (['cost_price', 'custo', 'cost', 'custo_produto', 'valor_custo'] as $c) {
                 if (in_array($c, $cols, true)) {
                     $custoCol = $c;
                     break;
@@ -2479,7 +2479,7 @@ JS;
             }
 
             $ncmCol = '';
-            foreach (['ncm', 'ncm_code'] as $c) {
+            foreach (['ncm', 'ncm_code', 'codigo_ncm'] as $c) {
                 if (in_array($c, $cols, true)) {
                     $ncmCol = $c;
                     break;
@@ -2505,8 +2505,20 @@ JS;
                 $custoAtual = (float) ($row['custo'] ?? 0);
                 $ncmAtual = trim((string) ($row['ncm'] ?? ''));
 
-                $needsCusto = ($custoCol !== '' && !($custoAtual > 0));
-                $needsNcm = ($ncmCol !== '' && $ncmAtual === '');
+                // Sempre atualizar custo/NCM quando informado pelo admin (mesmo se já tem valor)
+                $custoInformado = (float) str_replace(',', '.', (string) ($custos[$i] ?? '0'));
+                $ncmInformado = trim((string) ($ncms[$i] ?? ''));
+
+                $needsCusto = ($custoCol !== '' && $custoInformado > 0);
+                $needsNcm = ($ncmCol !== '' && $ncmInformado !== '');
+
+                // Se não informou e não tem cadastrado, exigir
+                if ($custoCol !== '' && !($custoAtual > 0) && !($custoInformado > 0)) {
+                    throw new \Exception('Produto #' . $pid . ' sem custo cadastrado. Informe o custo (maior que 0).');
+                }
+                if ($ncmCol !== '' && $ncmAtual === '' && $ncmInformado === '') {
+                    throw new \Exception('Produto #' . $pid . ' sem NCM cadastrado. Informe o NCM.');
+                }
 
                 if (!$needsCusto && !$needsNcm) {
                     continue;
@@ -2516,19 +2528,11 @@ JS;
                 $params = [':id' => $pid];
 
                 if ($needsCusto) {
-                    $custoInformado = (float) str_replace(',', '.', (string) ($custos[$i] ?? '0'));
-                    if (!($custoInformado > 0)) {
-                        throw new \Exception('Produto #' . $pid . ' sem custo cadastrado. Informe o custo (maior que 0).');
-                    }
                     $set[] = $custoCol . ' = :custo';
                     $params[':custo'] = $custoInformado;
                 }
 
                 if ($needsNcm) {
-                    $ncmInformado = trim((string) ($ncms[$i] ?? ''));
-                    if ($ncmInformado === '') {
-                        throw new \Exception('Produto #' . $pid . ' sem NCM cadastrado. Informe o NCM.');
-                    }
                     $set[] = $ncmCol . ' = :ncm';
                     $params[':ncm'] = $ncmInformado;
                 }
