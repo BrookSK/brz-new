@@ -5926,7 +5926,7 @@ HTML;
                                             <input type="text" class="form-control" id="brindeBusca" placeholder="Buscar produto para brinde...">
                                             <button type="button" class="btn btn-outline-primary" id="brindeBuscarBtn"><i class="fas fa-search"></i></button>
                                         </div>
-                                        <div id="brindeResultados" style="max-height:150px;overflow-y:auto;display:none;" class="border rounded mb-2"></div>
+                                        <div id="brindeResultados" style="max-height:350px;overflow-y:auto;display:none;" class="border rounded mb-2"></div>
                                         <div class="row g-2" id="brindeCampos" style="display:none;">
                                             <input type="hidden" name="brinde_produto_id" id="brindeProdutoId" value="">
                                             <div class="col-6">
@@ -6236,7 +6236,7 @@ HTML;
             function buscarProdutos() {
                 const q = (busca.value || '').trim();
                 if (q.length < 2) { resultados.style.display = 'none'; return; }
-                fetch('/admin/produtos/busca-ajax?q=' + encodeURIComponent(q) + '&limit=10')
+                fetch('/admin/produtos/busca-ajax?q=' + encodeURIComponent(q) + '&limit=20')
                     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                     .then(data => {
                         if (!data.success || !data.produtos || data.produtos.length === 0) {
@@ -7741,6 +7741,8 @@ HTMLSCRIPT;
             if ($priceCol) $select[] = $priceCol . ' as price';
             if ($saleCol) $select[] = $saleCol . ' as sale_price';
             if ($fotoCol) $select[] = $fotoCol . ' as foto';
+            $imagesCol = in_array('images', $cols, true) ? 'images' : null;
+            if ($imagesCol) $select[] = $imagesCol . ' as images_json';
 
             $where = '1=1';
             $params = [];
@@ -7791,11 +7793,20 @@ HTMLSCRIPT;
                 if ($foto === '' && isset($fotosMap[(int) $r['id']])) {
                     $foto = $fotosMap[(int) $r['id']];
                 }
+                // Fallback para coluna images (JSON array de URLs)
+                if ($foto === '' && !empty($r['images_json'])) {
+                    $imgs = json_decode((string) $r['images_json'], true);
+                    if (is_array($imgs) && !empty($imgs)) {
+                        $first = is_string($imgs[0]) ? $imgs[0] : (is_array($imgs[0]) ? ($imgs[0]['url'] ?? ($imgs[0]['src'] ?? '')) : '');
+                        if (is_string($first) && trim($first) !== '') $foto = trim($first);
+                    }
+                }
                 if ($foto !== '' && !preg_match('#^https?://#i', $foto) && strpos($foto, '//') !== 0) {
                     $r['foto'] = '/uploads/produtos/' . ltrim($foto, '/');
                 } else {
                     $r['foto'] = $foto;
                 }
+                unset($r['images_json']);
                 $r['em_promocao'] = ((float) ($r['sale_price'] ?? 0) > 0 && (float) ($r['sale_price'] ?? 0) < (float) ($r['price'] ?? 0));
             }
             unset($r);
