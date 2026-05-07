@@ -256,10 +256,26 @@ ob_start();
                                                       style="font-size: 0.8rem;"></textarea>
                                         </div>
                                     <?php else: ?>
-                                        <div class="fw-bold text-primary h5">
+                                        <div class="fw-bold text-primary h5 valor-badge" data-index="<?= $index ?>">
                                             $<span class="valor-text" data-base-valor="<?= htmlspecialchars((string) $produto['valor']) ?>"><?= number_format($produto['valor'], 2) ?></span>
                                         </div>
                                         <small class="text-muted">USD</small>
+                                        <div class="mt-1">
+                                            <a href="#" class="text-decoration-none small text-warning valor-override-toggle" data-index="<?= $index ?>">
+                                                <i class="fas fa-edit me-1"></i>Preço errado?
+                                            </a>
+                                        </div>
+                                        <div class="valor-override-box mt-2" data-index="<?= $index ?>" style="display:none;">
+                                            <div class="input-group input-group-sm" style="max-width: 140px;">
+                                                <span class="input-group-text">$</span>
+                                                <input type="number" class="form-control valor-override-input" data-index="<?= $index ?>" 
+                                                       step="0.01" min="0.01" placeholder="0.00" value="">
+                                                <button type="button" class="btn btn-outline-danger btn-sm valor-override-clear" data-index="<?= $index ?>" title="Limpar">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <small class="text-muted">Valor correto em USD</small>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -706,6 +722,46 @@ $(document).ready(function() {
         input.val('');
         input.trigger('change');
         $('.peso-override-box[data-index="' + index + '"]').slideUp(200);
+    });
+
+    // Handler para preço manual (override - quando preço foi encontrado mas está errado)
+    $(document).on('click', '.valor-override-toggle', function(e) {
+        e.preventDefault();
+        const index = $(this).data('index');
+        const box = $('.valor-override-box[data-index="' + index + '"]');
+        box.slideToggle(200);
+    });
+
+    $(document).on('input change', '.valor-override-input', function() {
+        const index = parseInt($(this).data('index'));
+        const val = parseFloat($(this).val());
+        if (!isNaN(index) && produtos[index]) {
+            if (!isNaN(val) && val > 0) {
+                produtos[index].valor = val;
+                produtos[index].valor_foi_informado_cliente = true;
+                // Atualizar badge visual
+                const badge = $('.valor-badge[data-index="' + index + '"] .valor-text');
+                badge.text(val.toFixed(2));
+                badge.closest('.valor-badge').removeClass('text-primary').addClass('text-warning');
+            } else {
+                // Restaurar valor original
+                const badge = $('.valor-badge[data-index="' + index + '"] .valor-text');
+                const baseVal = parseFloat(badge.data('base-valor'));
+                produtos[index].valor = baseVal;
+                produtos[index].valor_foi_informado_cliente = false;
+                badge.text(baseVal.toFixed(2));
+                badge.closest('.valor-badge').removeClass('text-warning').addClass('text-primary');
+            }
+        }
+        calcularTotaisSelecionados();
+    });
+
+    $(document).on('click', '.valor-override-clear', function() {
+        const index = $(this).data('index');
+        const input = $('.valor-override-input[data-index="' + index + '"]');
+        input.val('');
+        input.trigger('change');
+        $('.valor-override-box[data-index="' + index + '"]').slideUp(200);
     });
 
     // Handler para valor manual (produtos com valor_pendente)
