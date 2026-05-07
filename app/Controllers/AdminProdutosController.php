@@ -6247,11 +6247,17 @@ HTML;
                         let html = '';
                         data.produtos.forEach(p => {
                             if (p.id == produtoId) return; // Não pode ser brinde de si mesmo
-                            html += '<div class="p-2 border-bottom brinde-resultado-item" style="cursor:pointer;" data-id="' + p.id + '" data-nome="' + (p.nome || p.name || '').replace(/"/g,'&quot;') + '">'
-                                + '<strong>' + (p.nome || p.name || 'Produto #' + p.id) + '</strong>'
-                                + (p.sku ? ' <small class="text-muted">(' + p.sku + ')</small>' : '')
-                                + (p.price ? ' — $' + Number(p.price).toFixed(2) : '')
-                                + '</div>';
+                            const foto = p.foto ? '<img src="' + p.foto + '" style="width:36px;height:36px;object-fit:cover;border-radius:4px;margin-right:8px;" onerror="this.style.display=\'none\'">' : '';
+                            const promo = p.em_promocao ? ' <span class="badge bg-danger" style="font-size:10px;">Promoção</span>' : '';
+                            const precoTxt = p.em_promocao
+                                ? '<span class="text-decoration-line-through text-muted">$' + Number(p.price).toFixed(2) + '</span> <span class="text-danger fw-bold">$' + Number(p.sale_price).toFixed(2) + '</span>'
+                                : (p.price ? '$' + Number(p.price).toFixed(2) : '');
+                            html += '<div class="p-2 border-bottom brinde-resultado-item d-flex align-items-center" style="cursor:pointer;" data-id="' + p.id + '" data-nome="' + (p.nome || p.name || '').replace(/"/g,'&quot;') + '">'
+                                + foto
+                                + '<div><strong>' + (p.nome || p.name || 'Produto #' + p.id) + '</strong>' + promo
+                                + (p.sku ? '<br><small class="text-muted">' + p.sku + '</small>' : '')
+                                + ' — ' + precoTxt
+                                + '</div></div>';
                         });
                         if (html === '') html = '<div class="p-2 text-muted small">Nenhum produto encontrado.</div>';
                         resultados.innerHTML = html;
@@ -7727,10 +7733,14 @@ HTMLSCRIPT;
             try { $st = $pdo->query('DESCRIBE produtos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
             $nomeCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : null);
             $priceCol = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : null);
+            $saleCol = in_array('sale_price', $cols, true) ? 'sale_price' : (in_array('preco_promocao', $cols, true) ? 'preco_promocao' : null);
+            $fotoCol = in_array('foto_principal', $cols, true) ? 'foto_principal' : (in_array('image', $cols, true) ? 'image' : (in_array('imagem', $cols, true) ? 'imagem' : null));
 
             $select = ['id', 'sku'];
             if ($nomeCol) $select[] = $nomeCol . ' as nome';
             if ($priceCol) $select[] = $priceCol . ' as price';
+            if ($saleCol) $select[] = $saleCol . ' as sale_price';
+            if ($fotoCol) $select[] = $fotoCol . ' as foto';
 
             $where = '1=1';
             $params = [];
@@ -7747,6 +7757,16 @@ HTMLSCRIPT;
             $st = $pdo->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE ' . $where . ' ORDER BY id DESC LIMIT ' . $limit);
             $st->execute($params);
             $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Resolver URLs de fotos
+            foreach ($rows as &$r) {
+                $foto = trim((string) ($r['foto'] ?? ''));
+                if ($foto !== '' && !preg_match('#^https?://#i', $foto) && strpos($foto, '//') !== 0) {
+                    $r['foto'] = '/uploads/produtos/' . ltrim($foto, '/');
+                }
+                $r['em_promocao'] = ((float) ($r['sale_price'] ?? 0) > 0 && (float) ($r['sale_price'] ?? 0) < (float) ($r['price'] ?? 0));
+            }
+            unset($r);
 
             $this->json(['success' => true, 'produtos' => $rows]);
         } catch (\Exception $e) {
