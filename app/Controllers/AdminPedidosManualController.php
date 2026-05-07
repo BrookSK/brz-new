@@ -1409,7 +1409,7 @@ function calcTotal(){
                 const el = document.getElementById(id);
                 if (el) el.value = String(v);
             };
-            setVal('subtotal_produtos', Number(data.subtotal || subtotal).toFixed(2));
+            setVal('subtotal_produtos', subtotal.toFixed(2));
             setVal('peso_total', Number(data.peso_total || pesoTotal).toFixed(3));
             setVal('taxa_servico', taxaServicoShown.toFixed(2));
             setVal('valor_impostos', impostos.toFixed(2));
