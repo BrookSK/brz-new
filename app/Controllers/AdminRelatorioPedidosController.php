@@ -188,6 +188,7 @@ class AdminRelatorioPedidosController extends Controller {
 
         // Renderizar com layout admin
         $title = 'Relatório de Pedidos';
+        $sidebarActive = 'relatorio-pedidos';
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
