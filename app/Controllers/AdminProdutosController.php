@@ -5069,32 +5069,6 @@ HTML;
                                         <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
                                     </div>
 
-                                    <!-- Brinde Vinculado -->
-                                    <div class="mb-3 border-top pt-3">
-                                        <label class="form-label fw-bold"><i class="fas fa-gift me-1 text-success"></i>Brinde Vinculado</label>
-                                        <small class="text-muted d-block mb-2">Quando este produto for adicionado ao carrinho, o brinde será incluído automaticamente (preço $0, taxa de serviço e impostos normais — impostos BR devolvidos na carteira após pagamento).</small>
-                                        <div id="brindeAtualBox"></div>
-                                        <div class="input-group input-group-sm mb-2">
-                                            <input type="text" class="form-control" id="brindeBusca" placeholder="Buscar produto para brinde...">
-                                            <button type="button" class="btn btn-outline-primary" id="brindeBuscarBtn"><i class="fas fa-search"></i></button>
-                                        </div>
-                                        <div id="brindeResultados" style="max-height:150px;overflow-y:auto;display:none;" class="border rounded mb-2"></div>
-                                        <div class="row g-2" id="brindeCampos" style="display:none;">
-                                            <input type="hidden" name="brinde_produto_id" id="brindeProdutoId" value="">
-                                            <div class="col-6">
-                                                <label class="form-label small">Início</label>
-                                                <input type="datetime-local" class="form-control form-control-sm" name="brinde_data_inicio" id="brindeDataInicio">
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="form-label small">Fim</label>
-                                                <input type="datetime-local" class="form-control form-control-sm" name="brinde_data_fim" id="brindeDataFim">
-                                            </div>
-                                            <div class="col-12">
-                                                <button type="button" class="btn btn-success btn-sm w-100" id="brindeSalvarBtn"><i class="fas fa-check me-1"></i>Salvar Brinde</button>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
                                 </div>
                             </div>
