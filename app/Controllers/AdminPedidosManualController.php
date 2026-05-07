@@ -148,13 +148,17 @@ class AdminPedidosManualController extends Controller {
             @session_start();
         }
 
-        $formToken = '';
-        try {
-            $formToken = bin2hex(random_bytes(16));
-        } catch (\Throwable $e) {
-            $formToken = bin2hex((string) microtime(true));
+        // Reutilizar token existente para evitar "Formulário expirado" quando a página
+        // é aberta em outra aba ou quando o usuário aguarda aprovação de desconto.
+        $formToken = $_SESSION['pedido_manual_form_token'] ?? '';
+        if ($formToken === '') {
+            try {
+                $formToken = bin2hex(random_bytes(16));
+            } catch (\Throwable $e) {
+                $formToken = bin2hex((string) microtime(true));
+            }
+            $_SESSION['pedido_manual_form_token'] = $formToken;
         }
-        $_SESSION['pedido_manual_form_token'] = $formToken;
 
         $usuarios = [];
         $pdo = \Config\Database::getConnection();
@@ -2081,7 +2085,12 @@ document.addEventListener('DOMContentLoaded', function(){
                 })
                 .catch(err => {
                     if (createBox) {
-                        createBox.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
+                        const msg = err && err.message ? err.message : String(err);
+                        if (msg.toLowerCase().includes('expirado')) {
+                            createBox.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml(msg)}<br><button class="btn btn-sm btn-outline-primary mt-2" onclick="window.location.reload()"><i class="fas fa-sync"></i> Recarregar página</button></div>`;
+                        } else {
+                            createBox.innerHTML = `<div class="alert alert-danger">Erro: ${escapeHtml(msg)}</div>`;
+                        }
                     }
                 })
                 .finally(() => {
