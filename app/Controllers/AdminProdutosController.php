@@ -7758,11 +7758,43 @@ HTMLSCRIPT;
             $st->execute($params);
             $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            // Resolver URLs de fotos
+            // Resolver URLs de fotos (fallback para produto_fotos)
+            $prodIds = array_column($rows, 'id');
+            $fotosMap = [];
+            if (!empty($prodIds)) {
+                try {
+                    $in = implode(',', array_map('intval', $prodIds));
+                    $stFotos = $pdo->query("SELECT produto_id, nome_arquivo FROM produto_fotos WHERE produto_id IN ({$in}) AND principal = 1");
+                    if ($stFotos) {
+                        foreach ($stFotos->fetchAll(\PDO::FETCH_ASSOC) as $f) {
+                            $fotosMap[(int) $f['produto_id']] = (string) $f['nome_arquivo'];
+                        }
+                    }
+                    // Fallback: primeira foto se não tem principal
+                    $semFoto = array_diff(array_map('intval', $prodIds), array_keys($fotosMap));
+                    if (!empty($semFoto)) {
+                        $in2 = implode(',', $semFoto);
+                        $stF2 = $pdo->query("SELECT produto_id, nome_arquivo FROM produto_fotos WHERE produto_id IN ({$in2}) ORDER BY id ASC");
+                        if ($stF2) {
+                            foreach ($stF2->fetchAll(\PDO::FETCH_ASSOC) as $f) {
+                                $pid = (int) $f['produto_id'];
+                                if (!isset($fotosMap[$pid])) $fotosMap[$pid] = (string) $f['nome_arquivo'];
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+
             foreach ($rows as &$r) {
                 $foto = trim((string) ($r['foto'] ?? ''));
+                // Fallback para produto_fotos
+                if ($foto === '' && isset($fotosMap[(int) $r['id']])) {
+                    $foto = $fotosMap[(int) $r['id']];
+                }
                 if ($foto !== '' && !preg_match('#^https?://#i', $foto) && strpos($foto, '//') !== 0) {
                     $r['foto'] = '/uploads/produtos/' . ltrim($foto, '/');
+                } else {
+                    $r['foto'] = $foto;
                 }
                 $r['em_promocao'] = ((float) ($r['sale_price'] ?? 0) > 0 && (float) ($r['sale_price'] ?? 0) < (float) ($r['price'] ?? 0));
             }
