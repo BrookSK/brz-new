@@ -120,6 +120,10 @@
                                         <?php if (!empty($item['is_free_offer'])): ?>
                                             <span class="badge bg-success ms-1"><i class="fas fa-gift me-1"></i>Produto Gratuito</span>
                                         <?php endif; ?>
+                                        <?php if (!empty($item['is_brinde'])): ?>
+                                            <span class="badge bg-success ms-1"><i class="fas fa-gift me-1"></i>Brinde</span>
+                                            <div class="small text-success mt-1"><i class="fas fa-info-circle me-1"></i>Produto grátis! Taxa de serviço e impostos normais. O imposto BR será devolvido na sua carteira após pagamento.</div>
+                                        <?php endif; ?>
                                         <?php if (!empty($isClubeAtivo)): ?>
                                             <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                         <?php endif; ?>

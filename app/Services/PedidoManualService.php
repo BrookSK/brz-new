@@ -1692,9 +1692,55 @@ class PedidoManualService {
                 $params[':ja_comprado'] = $jaComprado;
             }
 
+            // Salvar flag "brinde" quando existir
+            $isBrinde = (int) ($it['is_brinde'] ?? 0);
+            if ($isBrinde && !in_array('is_brinde', $colsItens, true)) {
+                try { $this->db->exec("ALTER TABLE {$table} ADD COLUMN is_brinde TINYINT(1) NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
+                $colsItens[] = 'is_brinde';
+            }
+            if (in_array('is_brinde', $colsItens, true)) {
+                $cols[] = 'is_brinde';
+                $vals[] = ':is_brinde';
+                $params[':is_brinde'] = $isBrinde;
+            }
+
             $sql = 'INSERT INTO ' . $table . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
+
+            // Registrar devolução de impostos para itens de brinde
+            if ($isBrinde && $pedidoId > 0) {
+                try {
+                    $brindeService = new \App\Services\BrindeService();
+                    // Buscar preço original do produto para calcular impostos
+                    $precoOriginal = 0.0;
+                    try {
+                        $stPr = $this->db->prepare('SELECT COALESCE(price, preco, 0) as preco FROM produtos WHERE id = ? LIMIT 1');
+                        $stPr->execute([(int) ($it['produto_id'] ?? 0)]);
+                        $precoOriginal = (float) ($stPr->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {}
+
+                    if ($precoOriginal > 0) {
+                        $impostosBrinde = $brindeService->calcularImpostosBrinde($precoOriginal);
+                        if ($impostosBrinde > 0) {
+                            // Buscar usuario_id do pedido
+                            $uidPedido = 0;
+                            try {
+                                $stU = $this->db->prepare('SELECT usuario_id FROM pedidos WHERE id = ? LIMIT 1');
+                                $stU->execute([$pedidoId]);
+                                $uidPedido = (int) ($stU->fetchColumn() ?: 0);
+                            } catch (\Exception $e) {}
+
+                            if ($uidPedido > 0) {
+                                $brindeService->registrarDevolucaoPendente($pedidoId, $uidPedido, (int) ($it['produto_id'] ?? 0), $impostosBrinde);
+                                error_log("[BRINDE MANUAL] Devolução pendente: pedido={$pedidoId} produto={$it['produto_id']} imposto=US\${$impostosBrinde}");
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('[BRINDE MANUAL] Erro: ' . $e->getMessage());
+                }
+            }
         }
     }
 

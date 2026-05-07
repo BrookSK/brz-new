@@ -144,6 +144,13 @@ $router->post('/admin/oferta-gratuita/adicionar', 'AdminOfertaGratuitaController
 $router->post('/admin/oferta-gratuita/remover', 'AdminOfertaGratuitaController', 'remover');
 $router->get('/admin/oferta-gratuita/buscar-produtos', 'AdminOfertaGratuitaController', 'buscarProdutos');
 
+// Brindes vinculados a produtos
+$router->get('/admin/brindes', 'AdminBrindesController', 'index');
+$router->get('/admin/produtos/brindes/listar', 'AdminProdutosController', 'brindesListar');
+$router->post('/admin/produtos/brindes/salvar', 'AdminProdutosController', 'brindeSalvar');
+$router->post('/admin/produtos/brindes/remover', 'AdminProdutosController', 'brindeRemover');
+$router->get('/admin/produtos/busca-ajax', 'AdminProdutosController', 'buscaAjax');
+
 // Configurações
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');

@@ -5068,6 +5068,33 @@ HTML;
                                         </select>
                                         <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
                                     </div>
+
+                                    <!-- Brinde Vinculado -->
+                                    <div class="mb-3 border-top pt-3">
+                                        <label class="form-label fw-bold"><i class="fas fa-gift me-1 text-success"></i>Brinde Vinculado</label>
+                                        <small class="text-muted d-block mb-2">Quando este produto for adicionado ao carrinho, o brinde será incluído automaticamente (preço $0, taxa de serviço e impostos normais — impostos BR devolvidos na carteira após pagamento).</small>
+                                        <div id="brindeAtualBox"></div>
+                                        <div class="input-group input-group-sm mb-2">
+                                            <input type="text" class="form-control" id="brindeBusca" placeholder="Buscar produto para brinde...">
+                                            <button type="button" class="btn btn-outline-primary" id="brindeBuscarBtn"><i class="fas fa-search"></i></button>
+                                        </div>
+                                        <div id="brindeResultados" style="max-height:150px;overflow-y:auto;display:none;" class="border rounded mb-2"></div>
+                                        <div class="row g-2" id="brindeCampos" style="display:none;">
+                                            <input type="hidden" name="brinde_produto_id" id="brindeProdutoId" value="">
+                                            <div class="col-6">
+                                                <label class="form-label small">Início</label>
+                                                <input type="datetime-local" class="form-control form-control-sm" name="brinde_data_inicio" id="brindeDataInicio">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Fim</label>
+                                                <input type="datetime-local" class="form-control form-control-sm" name="brinde_data_fim" id="brindeDataFim">
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="button" class="btn btn-success btn-sm w-100" id="brindeSalvarBtn"><i class="fas fa-check me-1"></i>Salvar Brinde</button>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
                                 </div>
                             </div>
@@ -6156,6 +6183,121 @@ HTML;
                         btn.disabled = false;
                     }
                 });
+            });
+        })();
+
+        // ─── Brinde Vinculado ───
+        (function() {
+            const produtoId = <?php echo (int) $id; ?>;
+            const box = document.getElementById('brindeAtualBox');
+            const busca = document.getElementById('brindeBusca');
+            const buscaBtn = document.getElementById('brindeBuscarBtn');
+            const resultados = document.getElementById('brindeResultados');
+            const campos = document.getElementById('brindeCampos');
+            const prodIdInput = document.getElementById('brindeProdutoId');
+            const salvarBtn = document.getElementById('brindeSalvarBtn');
+
+            // Carregar brinde atual
+            function carregarBrindeAtual() {
+                fetch('/admin/produtos/brindes/listar?produto_id=' + produtoId)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.success || !data.brindes || data.brindes.length === 0) {
+                            box.innerHTML = '<div class="text-muted small mb-2">Nenhum brinde configurado.</div>';
+                            return;
+                        }
+                        let html = '';
+                        data.brindes.forEach(b => {
+                            const ativo = b.ativo_agora ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>';
+                            html += '<div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2 bg-light">'
+                                + '<div><strong>' + (b.brinde_nome || 'Produto #' + b.brinde_produto_id) + '</strong> ' + ativo
+                                + '<br><small class="text-muted">' + (b.data_inicio || '') + ' até ' + (b.data_fim || '') + '</small></div>'
+                                + '<button type="button" class="btn btn-outline-danger btn-sm" onclick="removerBrinde(' + b.id + ')"><i class="fas fa-trash"></i></button>'
+                                + '</div>';
+                        });
+                        box.innerHTML = html;
+                    })
+                    .catch(() => { box.innerHTML = '<div class="text-muted small">Erro ao carregar brindes.</div>'; });
+            }
+            carregarBrindeAtual();
+
+            window.removerBrinde = function(brindeId) {
+                if (!confirm('Remover este brinde?')) return;
+                fetch('/admin/produtos/brindes/remover', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: brindeId}) })
+                    .then(r => r.json())
+                    .then(data => { if (data.success) carregarBrindeAtual(); else alert(data.error || 'Erro'); })
+                    .catch(() => alert('Erro de conexão'));
+            };
+
+            // Buscar produtos
+            function buscarProdutos() {
+                const q = (busca.value || '').trim();
+                if (q.length < 2) { resultados.style.display = 'none'; return; }
+                fetch('/admin/produtos/busca-ajax?q=' + encodeURIComponent(q) + '&limit=10')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.produtos || data.produtos.length === 0) {
+                            resultados.innerHTML = '<div class="p-2 text-muted small">Nenhum produto encontrado.</div>';
+                            resultados.style.display = '';
+                            return;
+                        }
+                        let html = '';
+                        data.produtos.forEach(p => {
+                            if (p.id == produtoId) return; // Não pode ser brinde de si mesmo
+                            html += '<div class="p-2 border-bottom brinde-resultado-item" style="cursor:pointer;" data-id="' + p.id + '" data-nome="' + (p.nome || p.name || '').replace(/"/g,'&quot;') + '">'
+                                + '<strong>' + (p.nome || p.name || 'Produto #' + p.id) + '</strong>'
+                                + (p.sku ? ' <small class="text-muted">(' + p.sku + ')</small>' : '')
+                                + (p.price ? ' — $' + Number(p.price).toFixed(2) : '')
+                                + '</div>';
+                        });
+                        resultados.innerHTML = html;
+                        resultados.style.display = '';
+                    })
+                    .catch(() => { resultados.style.display = 'none'; });
+            }
+
+            if (buscaBtn) buscaBtn.addEventListener('click', buscarProdutos);
+            if (busca) busca.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); buscarProdutos(); } });
+
+            // Selecionar produto brinde
+            resultados.addEventListener('click', function(e) {
+                const item = e.target.closest('.brinde-resultado-item');
+                if (!item) return;
+                const pid = item.getAttribute('data-id');
+                const nome = item.getAttribute('data-nome');
+                prodIdInput.value = pid;
+                busca.value = nome;
+                resultados.style.display = 'none';
+                campos.style.display = '';
+            });
+
+            // Salvar brinde
+            if (salvarBtn) salvarBtn.addEventListener('click', function() {
+                const brindeId = prodIdInput.value;
+                const inicio = document.getElementById('brindeDataInicio').value;
+                const fim = document.getElementById('brindeDataFim').value;
+                if (!brindeId) { alert('Selecione um produto brinde'); return; }
+                if (!inicio || !fim) { alert('Informe data de início e fim'); return; }
+
+                salvarBtn.disabled = true;
+                fetch('/admin/produtos/brindes/salvar', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ produto_id: produtoId, brinde_produto_id: parseInt(brindeId), data_inicio: inicio, data_fim: fim })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        carregarBrindeAtual();
+                        prodIdInput.value = '';
+                        busca.value = '';
+                        document.getElementById('brindeDataInicio').value = '';
+                        document.getElementById('brindeDataFim').value = '';
+                        campos.style.display = 'none';
+                    } else { alert(data.error || 'Erro ao salvar'); }
+                })
+                .catch(() => alert('Erro de conexão'))
+                .finally(() => { salvarBtn.disabled = false; });
             });
         })();
 </script>
@@ -7472,6 +7614,136 @@ HTMLSCRIPT;
             ]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // ─── Brindes Vinculados ───
+
+    public function brindesListar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        $produtoId = (int) $request->getParam('produto_id', 0);
+        if ($produtoId <= 0) { $this->json(['success' => false, 'error' => 'Produto inválido']); return; }
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $pdo->exec("CREATE TABLE IF NOT EXISTS produto_brindes (
+                id INT AUTO_INCREMENT PRIMARY KEY, produto_id INT NOT NULL, brinde_produto_id INT NOT NULL,
+                quantidade_brinde INT NOT NULL DEFAULT 1, data_inicio DATETIME NOT NULL, data_fim DATETIME NOT NULL,
+                ativo TINYINT(1) NOT NULL DEFAULT 1, criado_por INT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_pb_produto (produto_id), INDEX idx_pb_brinde (brinde_produto_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $cols = [];
+            try { $st = $pdo->query('DESCRIBE produtos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $nomeCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : null);
+
+            $sql = "SELECT pb.*, " . ($nomeCol ? "p.{$nomeCol} as brinde_nome" : "'' as brinde_nome") . " FROM produto_brindes pb LEFT JOIN produtos p ON p.id = pb.brinde_produto_id WHERE pb.produto_id = ? ORDER BY pb.id DESC";
+            $st = $pdo->prepare($sql);
+            $st->execute([$produtoId]);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $now = date('Y-m-d H:i:s');
+            foreach ($rows as &$r) {
+                $r['ativo_agora'] = ($r['ativo'] && $r['data_inicio'] <= $now && $r['data_fim'] >= $now);
+                $r['data_inicio'] = date('d/m/Y H:i', strtotime($r['data_inicio']));
+                $r['data_fim'] = date('d/m/Y H:i', strtotime($r['data_fim']));
+            }
+            unset($r);
+
+            $this->json(['success' => true, 'brindes' => $rows]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function brindeSalvar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $produtoId = (int) ($body['produto_id'] ?? 0);
+        $brindeId = (int) ($body['brinde_produto_id'] ?? 0);
+        $inicio = trim((string) ($body['data_inicio'] ?? ''));
+        $fim = trim((string) ($body['data_fim'] ?? ''));
+
+        if ($produtoId <= 0 || $brindeId <= 0) { $this->json(['success' => false, 'error' => 'Dados inválidos']); return; }
+        if ($inicio === '' || $fim === '') { $this->json(['success' => false, 'error' => 'Datas obrigatórias']); return; }
+        if ($produtoId === $brindeId) { $this->json(['success' => false, 'error' => 'Produto não pode ser brinde de si mesmo']); return; }
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $uid = 0;
+            if (session_status() === PHP_SESSION_NONE) @session_start();
+            $uid = (int) ($_SESSION['usuario_id'] ?? 0);
+
+            $st = $pdo->prepare("INSERT INTO produto_brindes (produto_id, brinde_produto_id, data_inicio, data_fim, ativo, criado_por) VALUES (?, ?, ?, ?, 1, ?)");
+            $st->execute([$produtoId, $brindeId, $inicio, $fim, $uid > 0 ? $uid : null]);
+
+            $this->json(['success' => true, 'id' => (int) $pdo->lastInsertId()]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function brindeRemover(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $id = (int) ($body['id'] ?? 0);
+        if ($id <= 0) { $this->json(['success' => false, 'error' => 'ID inválido']); return; }
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare("DELETE FROM produto_brindes WHERE id = ?");
+            $st->execute([$id]);
+            $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    public function buscaAjax(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $q = trim((string) $request->getParam('q', ''));
+        $limit = (int) $request->getParam('limit', 10);
+        if ($limit <= 0) $limit = 10;
+        if ($limit > 50) $limit = 50;
+
+        try {
+            $pdo = \Config\Database::getConnection();
+            $cols = [];
+            try { $st = $pdo->query('DESCRIBE produtos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $nomeCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : null);
+            $priceCol = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : null);
+
+            $select = ['id', 'sku'];
+            if ($nomeCol) $select[] = $nomeCol . ' as nome';
+            if ($priceCol) $select[] = $priceCol . ' as price';
+
+            $where = '1=1';
+            $params = [];
+            if ($q !== '') {
+                $parts = [];
+                if ($nomeCol) $parts[] = $nomeCol . ' LIKE ?';
+                $parts[] = 'sku LIKE ?';
+                $parts[] = 'CAST(id AS CHAR) LIKE ?';
+                $where = '(' . implode(' OR ', $parts) . ')';
+                $like = '%' . $q . '%';
+                $params = array_fill(0, count($parts), $like);
+            }
+
+            $st = $pdo->prepare('SELECT ' . implode(', ', $select) . ' FROM produtos WHERE ' . $where . ' ORDER BY id DESC LIMIT ' . $limit);
+            $st->execute($params);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $this->json(['success' => true, 'produtos' => $rows]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage(), 'produtos' => []]);
         }
     }
 }

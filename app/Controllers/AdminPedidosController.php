@@ -5984,6 +5984,19 @@ HTML;
                 }
             }
 
+            // Processar devoluções de impostos de brindes quando pedido é marcado como pago
+            if ($isPaid) {
+                try {
+                    $brindeService = new \App\Services\BrindeService();
+                    $resultado = $brindeService->processarDevolucoesParaPedido((int) $id);
+                    if ($resultado['processados'] > 0) {
+                        error_log('[BRINDE] Devoluções processadas para pedido #' . $id . ': ' . $resultado['processados'] . ' itens, US$ ' . number_format($resultado['valor_total'], 2));
+                    }
+                } catch (\Exception $e) {
+                    error_log('[BRINDE] Erro ao processar devoluções pedido #' . $id . ': ' . $e->getMessage());
+                }
+            }
+
             // Persistir histórico de status para exibição ao usuário (se a tabela existir)
             try {
                 $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");

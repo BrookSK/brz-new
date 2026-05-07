@@ -531,6 +531,7 @@ class AdminPedidosManualController extends Controller {
                                         <th style="width:160px">Valor</th>
                                         <th style="width:200px">Desconto</th>
                                         <th style="width:60px"></th>
+                                        <th style="width:80px" class="text-center" title="Marcar como brinde (preço zero, impostos devolvidos na carteira)">Brinde</th>
                                         <th style="width:100px" class="text-center">Já comprado</th>
                                         <th style="width:90px">Ações</th>
                                     </tr>
@@ -1021,6 +1022,12 @@ function addItemRow(){
             <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeRow(this)">
                 <i class="fas fa-trash"></i>
             </button>
+        </td>
+        <td class="text-center">
+            <div class="form-check d-flex justify-content-center">
+                <input type="hidden" class="isBrindeHidden" name="is_brinde[]" value="0">
+                <input type="checkbox" class="form-check-input isBrindeInp" value="1" title="Marcar como brinde (preço $0, impostos devolvidos na carteira)" onchange="this.previousElementSibling.value = this.checked ? '1' : '0'; if(this.checked){const vi=this.closest('tr').querySelector('.valorInp');if(vi)vi.value='0.00';} calcTotal();">
+            </div>
         </td>
         <td class="text-center">
             <div class="form-check d-flex justify-content-center">

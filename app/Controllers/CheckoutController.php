@@ -4834,11 +4834,44 @@ class CheckoutController extends Controller {
                 $placeholders[] = '?';
             }
 
+            // Item de brinde vinculado
+            $isBrindeItem = !empty($item['is_brinde']);
+            if ($isBrindeItem && is_array($colsItens) && in_array('is_brinde', $colsItens, true)) {
+                $cols[] = 'is_brinde';
+                $vals[] = 1;
+                $placeholders[] = '?';
+            }
+
                 $sql = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
                 $stmt = $db->prepare($sql);
                 $stmt->execute($vals);
             
                 $this->debugLog('[CHECKOUT_ITENS] Item inserido: produto_id=' . $produtoId . ', quantidade=' . $quantidade . ', valor=' . ($precoUnitario * $quantidade));
+
+                // Registrar devolução de impostos pendente para itens de brinde
+                $isBrinde = !empty($item['is_brinde']);
+                if ($isBrinde) {
+                    try {
+                        $brindeService = new \App\Services\BrindeService();
+                        $brindePrecoOriginal = (float) ($item['brinde_preco_original'] ?? 0);
+                        if ($brindePrecoOriginal > 0) {
+                            $impostosBrinde = $brindeService->calcularImpostosBrinde($brindePrecoOriginal);
+                            if ($impostosBrinde > 0 && $pedidoId > 0 && $uid > 0) {
+                                $brindeService->registrarDevolucaoPendente(
+                                    (int) $pedidoId,
+                                    (int) $uid,
+                                    (int) $produtoId,
+                                    $impostosBrinde,
+                                    null,
+                                    null
+                                );
+                                error_log("[BRINDE] Devolução pendente registrada: pedido={$pedidoId} produto={$produtoId} imposto=US\${$impostosBrinde}");
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        error_log('[BRINDE] Erro ao registrar devolução no checkout: ' . $e->getMessage());
+                    }
+                }
 
                 $controlaEstoque = !empty($prodStockCol);
                 if (!empty($prodControlaCol) && is_array($produtoRow) && array_key_exists($prodControlaCol, $produtoRow)) {

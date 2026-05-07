@@ -959,13 +959,44 @@ class CarrinhoController extends Controller {
         
         $this->debugLog("Total itens: $totalItens");
         $this->debugLog("Total valor: $totalValor");
+
+        // Verificar se o produto tem brinde ativo e adicionar automaticamente
+        $brindeAdicionado = null;
+        try {
+            $brindeService = new \App\Services\BrindeService();
+            $brinde = $brindeService->getBrindeAtivo($produtoId);
+            if ($brinde) {
+                $brindeKey = (string) $brinde['brinde_produto_id'] . ':brinde';
+                // Só adicionar se ainda não está no carrinho como brinde
+                if (!isset($_SESSION['carrinho'][$brindeKey])) {
+                    $_SESSION['carrinho'][$brindeKey] = [
+                        'produto_id' => (int) $brinde['brinde_produto_id'],
+                        'produto_variacao_id' => null,
+                        'nome' => (string) ($brinde['brinde_nome'] ?? 'Brinde'),
+                        'price' => 0,
+                        'preco_unitario' => 0,
+                        'quantidade' => (int) ($brinde['quantidade_brinde'] ?? 1),
+                        'subtotal' => 0,
+                        'is_brinde' => true,
+                        'brinde_de_produto_id' => $produtoId,
+                        'brinde_preco_original' => (float) ($brinde['brinde_preco'] ?? 0),
+                        'brinde_peso' => (float) ($brinde['brinde_peso'] ?? 0),
+                    ];
+                    $brindeAdicionado = (string) ($brinde['brinde_nome'] ?? 'Brinde');
+                    $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[BRINDE] Erro ao verificar brinde: ' . $e->getMessage());
+        }
         
         $response = [
             'success' => true,
-            'message' => 'Produto adicionado ao carrinho',
+            'message' => 'Produto adicionado ao carrinho' . ($brindeAdicionado ? ' + brinde: ' . $brindeAdicionado . ' 🎁' : ''),
             'carrinho' => $_SESSION['carrinho'],
             'total_itens' => $totalItens,
-            'total_valor' => $totalValor
+            'total_valor' => $totalValor,
+            'brinde_adicionado' => $brindeAdicionado,
         ];
         
         $this->debugLog('Resposta JSON: ' . json_encode($response));
@@ -1063,7 +1094,19 @@ class CarrinhoController extends Controller {
         }
 
         if ($keyToRemove !== null) {
+            // Se o item removido é um produto principal que tem brinde, remover o brinde também
+            $removedItem = $_SESSION['carrinho'][$keyToRemove] ?? [];
             unset($_SESSION['carrinho'][$keyToRemove]);
+
+            // Remover brindes vinculados a este produto
+            $removedProdutoId = (int) ($removedItem['produto_id'] ?? 0);
+            if ($removedProdutoId > 0) {
+                foreach ($_SESSION['carrinho'] as $bk => $bItem) {
+                    if (!empty($bItem['is_brinde']) && (int) ($bItem['brinde_de_produto_id'] ?? 0) === $removedProdutoId) {
+                        unset($_SESSION['carrinho'][$bk]);
+                    }
+                }
+            }
             
             $totalItens = array_sum(array_column($_SESSION['carrinho'], 'quantidade'));
             $totalValor = 0;
