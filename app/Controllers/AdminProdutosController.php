@@ -5955,6 +5955,8 @@ HTML;
 
         renderAdminScripts();
 
+        echo '<script>const BRINDE_PRODUTO_ID = ' . (int) $id . ';</script>';
+
         echo <<<'HTMLSCRIPT'
 <script>
         // Busca no select de NCM
@@ -6188,7 +6190,7 @@ HTML;
 
         // ─── Brinde Vinculado ───
         (function() {
-            const produtoId = <?php echo (int) $id; ?>;
+            const produtoId = BRINDE_PRODUTO_ID;
             const box = document.getElementById('brindeAtualBox');
             const busca = document.getElementById('brindeBusca');
             const buscaBtn = document.getElementById('brindeBuscarBtn');
