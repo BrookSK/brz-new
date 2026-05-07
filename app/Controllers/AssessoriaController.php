@@ -1814,8 +1814,8 @@ class AssessoriaController extends Controller {
             [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 160);
         }
 
-        // Retry automático em caso de bloqueio/indisponibilidade (HTML 503/429/403)
-        if (!$curlError && in_array((int) $httpCode, [503, 429, 403], true)) {
+        // Retry automático em caso de bloqueio/indisponibilidade (HTML 500/503/429/403)
+        if (!$curlError && in_array((int) $httpCode, [500, 503, 429, 403], true)) {
             $retryUrl = $buildUrl([
                 // Compatível e mais permissivo
                 'wait_browser' => 'load',
