@@ -7734,7 +7734,10 @@ HTMLSCRIPT;
             $nomeCol = in_array('name', $cols, true) ? 'name' : (in_array('nome', $cols, true) ? 'nome' : null);
             $priceCol = in_array('price', $cols, true) ? 'price' : (in_array('preco', $cols, true) ? 'preco' : null);
             $saleCol = in_array('sale_price', $cols, true) ? 'sale_price' : (in_array('preco_promocao', $cols, true) ? 'preco_promocao' : null);
-            $fotoCol = in_array('foto_principal', $cols, true) ? 'foto_principal' : (in_array('image', $cols, true) ? 'image' : (in_array('imagem', $cols, true) ? 'imagem' : null));
+            $fotoCol = null;
+            foreach (['foto_principal', 'image', 'imagem', 'thumbnail', 'thumb'] as $fc) {
+                if (in_array($fc, $cols, true)) { $fotoCol = $fc; break; }
+            }
 
             $select = ['id', 'sku'];
             if ($nomeCol) $select[] = $nomeCol . ' as nome';
@@ -7793,11 +7796,18 @@ HTMLSCRIPT;
                         if (is_string($first) && trim($first) !== '') $foto = trim($first);
                     }
                 }
-                if ($foto !== '' && !preg_match('#^https?://#i', $foto) && strpos($foto, '//') !== 0) {
-                    $r['foto'] = '/uploads/produtos/' . ltrim($foto, '/');
-                } else {
-                    $r['foto'] = $foto;
+                // Resolver URL: se já é URL completa ou path absoluto, usar direto
+                if ($foto !== '') {
+                    if (preg_match('#^https?://#i', $foto) || strpos($foto, '//') === 0) {
+                        // URL externa — usar direto
+                    } elseif (strpos($foto, '/uploads/') === 0 || strpos($foto, '/storage/') === 0) {
+                        // Já é path absoluto do site
+                    } else {
+                        // Nome de arquivo simples — adicionar prefixo
+                        $foto = '/uploads/produtos/' . ltrim($foto, '/');
+                    }
                 }
+                $r['foto'] = $foto;
                 unset($r['images_json']);
                 $r['em_promocao'] = ((float) ($r['sale_price'] ?? 0) > 0 && (float) ($r['sale_price'] ?? 0) < (float) ($r['price'] ?? 0));
             }
