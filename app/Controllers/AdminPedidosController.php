@@ -2965,7 +2965,7 @@ HTML;
                             <i class="fas fa-rotate me-1"></i>Sincronizar pagamentos
                         </button>
                     </form>
-                    <a href="/admin/pedidos/detalhes/' . $id . '/pdf" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
+                    <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i>Exportar PDF
                     </a>
                     <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
