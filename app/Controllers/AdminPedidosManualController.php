@@ -1026,7 +1026,7 @@ function addItemRow(){
         <td class="text-center">
             <div class="form-check d-flex justify-content-center">
                 <input type="hidden" class="isBrindeHidden" name="is_brinde[]" value="0">
-                <input type="checkbox" class="form-check-input isBrindeInp" value="1" title="Marcar como brinde (preço $0, impostos devolvidos na carteira)" onchange="this.previousElementSibling.value = this.checked ? '1' : '0'; if(this.checked){const vi=this.closest('tr').querySelector('.valorInp');if(vi)vi.value='0.00';} calcTotal();">
+                <input type="checkbox" class="form-check-input isBrindeInp" value="1" title="Marcar como brinde (preço $0, impostos devolvidos na carteira)" onchange="toggleBrinde(this)">
             </div>
         </td>
         <td class="text-center">
@@ -1106,6 +1106,31 @@ function prefillRowFromExisting(tr, item){
         resultsEl.style.display = 'none';
         resultsEl.innerHTML = '';
     }
+}
+
+function toggleBrinde(cb) {
+    const tr = cb.closest('tr');
+    const hidden = cb.previousElementSibling;
+    const valorInp = tr.querySelector('.valorInp');
+    hidden.value = cb.checked ? '1' : '0';
+    if (cb.checked) {
+        // Guardar valor original e zerar
+        if (valorInp) {
+            valorInp.dataset.valorAntesBrinde = valorInp.value;
+            valorInp.value = '0.00';
+            valorInp.readOnly = true;
+            valorInp.style.opacity = '0.5';
+        }
+    } else {
+        // Restaurar valor original
+        if (valorInp) {
+            valorInp.value = valorInp.dataset.valorAntesBrinde || '0.00';
+            valorInp.readOnly = false;
+            valorInp.style.opacity = '1';
+            delete valorInp.dataset.valorAntesBrinde;
+        }
+    }
+    calcTotal();
 }
 
 function removeRow(btn){
@@ -1257,7 +1282,19 @@ function calcTotal(){
             qtdItens += qtd;
             pesoTotal += (peso * qtd);
             if (pid > 0) {
-                itensPayload.push({ produto_id: pid, quantidade: qtd, valor_unitario: val });
+                // Para brindes: enviar o preço original para cálculo de impostos
+                const isBrinde = r.querySelector('.isBrindeInp')?.checked || false;
+                let valorParaImposto = val;
+                if (isBrinde && prod) {
+                    const saleP = Number(prod.sale_price || 0);
+                    const regP = Number(prod.price || 0);
+                    valorParaImposto = (saleP > 0 && saleP < regP) ? saleP : regP;
+                    // Converter se moeda BRL
+                    if (getSelectedMoeda() === 'BRL' && valorParaImposto > 0) {
+                        valorParaImposto = convertValueBetweenCurrencies(valorParaImposto, 'USD', 'BRL');
+                    }
+                }
+                itensPayload.push({ produto_id: pid, quantidade: qtd, valor_unitario: valorParaImposto });
             }
         }
     });
@@ -1356,6 +1393,9 @@ function calcTotal(){
                 document.getElementById('resumoTotal').textContent = formatForDisplay(totalComDesconto, moeda);
                 document.getElementById('resumoTotal2').textContent = formatForDisplay(totalComDesconto, moeda);
                 totalShown = totalComDesconto;
+
+                // Atualizar taxa_servico hidden com valor após desconto (para gerar link correto)
+                taxaServicoShown = Math.max(0, taxaServicoShown - dgReal);
 
                 const dgEl = document.getElementById('resumoDescontoGlobal');
                 if (dgEl) dgEl.textContent = formatForDisplay(dgReal, moeda);
