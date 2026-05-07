@@ -1814,8 +1814,8 @@ class AssessoriaController extends Controller {
             [$response, $httpCode, $curlErrno, $curlError] = $doRequest($retryUrl, 160);
         }
 
-        // Retry automático em caso de bloqueio/indisponibilidade (HTML 500/503/429/403)
-        if (!$curlError && in_array((int) $httpCode, [500, 503, 429, 403], true)) {
+        // Retry automático em caso de bloqueio/indisponibilidade (HTML 500/502/503/504/429/403)
+        if (!$curlError && in_array((int) $httpCode, [500, 502, 503, 504, 429, 403], true)) {
             $retryUrl = $buildUrl([
                 // Compatível e mais permissivo
                 'wait_browser' => 'load',
@@ -1865,15 +1865,21 @@ class AssessoriaController extends Controller {
                 header('X-ScrapingBee-HTTP-Error: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
             }
 
-            if (in_array((int) $httpCode, [503, 429, 403], true)) {
+            if (in_array((int) $httpCode, [502, 503, 504, 429, 403], true)) {
                 return [
                     'success' => false,
-                    'error' => "Site bloqueou/limitou o acesso no momento (HTTP {$httpCode}). Tente novamente mais tarde ou use outro link."
+                    'error' => "Não foi possível acessar este site no momento (HTTP {$httpCode}). O site pode estar bloqueando acessos automáticos. Tente novamente ou preencha os dados manualmente no orçamento."
+                ];
+            }
+            if ((int) $httpCode === 500) {
+                return [
+                    'success' => false,
+                    'error' => "O site retornou um erro ao tentar acessar este produto (HTTP 500). Tente novamente ou preencha os dados manualmente no orçamento."
                 ];
             }
             return [
                 'success' => false,
-                'error' => "Erro HTTP {$httpCode}: " . substr($response, 0, 500)
+                'error' => "Erro ao processar este link (HTTP {$httpCode}). Tente novamente ou preencha os dados manualmente."
             ];
         }
         
