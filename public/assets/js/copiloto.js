@@ -553,6 +553,7 @@
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
       buscar_produto: function () { return buscarProdutoInteligente(p.termo || p.busca || '', true) },
+      ir_para_assessoria: function () { salvarEstadoChat(); window.location.href = '/assessoria' },
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
       navegar: function () {
         var url = p.url || p.pagina || ''
@@ -1331,7 +1332,11 @@
           if (ctx.produto_preco_usd && ctx.produto_peso_kg) {
             var faixas = [1,2,3,4,5,6,7,8,9,10,15,20,25,30]
             var faixa = faixas.find(function(f){return f >= ctx.produto_peso_kg}) || 30
-            var total = ctx.produto_preco_usd + ctx.produto_preco_usd*(ctx.imposto_local_pct/100) + faixa*39 + ctx.produto_preco_usd*0.80
+            var valorAd = ctx.produto_preco_usd
+            var ii = valorAd <= 50 ? (valorAd * 0.20) : Math.max(0, (valorAd * 0.60) - 20)
+            var baseIcms = (valorAd + ii) / (1 - 0.17)
+            var icms = baseIcms * 0.17
+            var total = ctx.produto_preco_usd + ctx.produto_preco_usd*(ctx.imposto_local_pct/100) + faixa*39 + ii + icms
             msg = 'Esse produto fica ~R$ ' + Math.round(total * 5.80) + ' no total. Quer calcular em detalhe?'
           }
           mostrarBadge(msg)

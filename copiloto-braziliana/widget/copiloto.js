@@ -198,6 +198,7 @@
       ir_para_clube: function () { salvarEstadoChat(); window.location.href = '/clube/recarga' },
       ir_para_meus_dados: function () { salvarEstadoChat(); window.location.href = '/meus-dados' },
       buscar_produto: function () { salvarEstadoChat(); window.location.href = '/produtos?busca=' + encodeURIComponent(p.termo || p.busca || '') },
+      ir_para_assessoria: function () { salvarEstadoChat(); window.location.href = '/assessoria' },
       ir_para_grupo: function () { salvarEstadoChat(); window.location.href = '/grupo/' + (p.slug || '') },
       criar_ticket_suporte: function () { return executarCriarTicket('suporte', p) },
       criar_ticket_duvida: function () { return executarCriarTicket('duvidas_gerais', p) },
@@ -571,11 +572,15 @@
         if (!widgetAberto) {
           var msg = 'Quer saber quanto fica esse produto no total?'
           if (contexto.produto_preco_usd && contexto.produto_peso_kg) {
-            // Cálculo rápido local
+            // Cálculo rápido local (fórmula Receita Federal - Remessa Conforme)
             var faixas = [1,2,3,4,5,6,7,8,9,10,15,20,25,30]
             var faixa = faixas.find(function(f){return f >= contexto.produto_peso_kg}) || 30
             var taxa = faixa * 39
-            var impostos = contexto.produto_preco_usd * 0.80
+            var valorAduaneiro = contexto.produto_preco_usd
+            var ii = valorAduaneiro <= 50 ? (valorAduaneiro * 0.20) : Math.max(0, (valorAduaneiro * 0.60) - 20)
+            var baseIcms = (valorAduaneiro + ii) / (1 - 0.17)
+            var icms = baseIcms * 0.17
+            var impostos = ii + icms
             var impLocal = contexto.produto_preco_usd * (contexto.imposto_local_pct / 100)
             var total = contexto.produto_preco_usd + impLocal + taxa + impostos
             var cambio = 5.80
