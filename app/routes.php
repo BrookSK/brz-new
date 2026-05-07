@@ -334,6 +334,10 @@ $router->get('/admin/produtos/importar/modelo', 'AdminProdutosController', 'impo
 $router->post('/admin/produtos/importar/iniciar', 'AdminProdutosController', 'importarProdutosIniciar');
 $router->post('/admin/produtos/importar/processar', 'AdminProdutosController', 'importarProdutosProcessar');
 $router->post('/admin/produtos/variavel/salvar', 'AdminProdutosNovoController', 'salvarVariavel');
+$router->get('/admin/produtos/busca-ajax', 'AdminProdutosController', 'buscaAjax');
+$router->get('/admin/produtos/brindes/listar', 'AdminProdutosController', 'brindesListar');
+$router->post('/admin/produtos/brindes/salvar', 'AdminProdutosController', 'brindeSalvar');
+$router->post('/admin/produtos/brindes/remover', 'AdminProdutosController', 'brindeRemover');
 $router->get('/admin/produtos/editar/{id}', 'AdminProdutosController', 'editar');
 $router->post('/admin/produtos/atualizar/{id}', 'AdminProdutosController', 'atualizar');
 $router->post('/admin/produtos/{id}/variacoes/atributos', 'AdminProdutosController', 'salvarAtributosVariacoes');

@@ -6263,9 +6263,9 @@ HTML;
                 const q = (busca.value || '').trim();
                 if (q.length < 2) { resultados.style.display = 'none'; return; }
                 fetch('/admin/produtos/busca-ajax?q=' + encodeURIComponent(q) + '&limit=10')
-                    .then(r => r.json())
+                    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                     .then(data => {
-                        if (!data.produtos || data.produtos.length === 0) {
+                        if (!data.success || !data.produtos || data.produtos.length === 0) {
                             resultados.innerHTML = '<div class="p-2 text-muted small">Nenhum produto encontrado.</div>';
                             resultados.style.display = '';
                             return;
@@ -6279,10 +6279,14 @@ HTML;
                                 + (p.price ? ' — $' + Number(p.price).toFixed(2) : '')
                                 + '</div>';
                         });
+                        if (html === '') html = '<div class="p-2 text-muted small">Nenhum produto encontrado.</div>';
                         resultados.innerHTML = html;
                         resultados.style.display = '';
                     })
-                    .catch(() => { resultados.style.display = 'none'; });
+                    .catch(err => {
+                        resultados.innerHTML = '<div class="p-2 text-danger small">Erro: ' + err.message + '</div>';
+                        resultados.style.display = '';
+                    });
             }
 
             if (buscaBtn) buscaBtn.addEventListener('click', buscarProdutos);
