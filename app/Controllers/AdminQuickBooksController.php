@@ -142,4 +142,118 @@ class AdminQuickBooksController extends Controller {
             echo json_encode(['ok'=>true,'qb_invoice_id'=>$res['Invoice']['Id']??null]);
         }catch(\Throwable $ex){echo json_encode(['ok'=>false,'erro'=>$ex->getMessage()]);}
     }
+
+    /**
+     * POST /admin/quickbooks/sincronizar-lote
+     * Sincroniza todos os pedidos a partir de uma data que ainda não foram sincronizados
+     */
+    public function sincronizarLote(Request $req) {
+        (new AuthService())->requerPerfil('admin');
+        header('Content-Type: application/json');
+        set_time_limit(300);
+
+        $dataInicio = trim((string) ($req->getParam('data_inicio') ?? '2026-04-29'));
+        if ($dataInicio === '') $dataInicio = '2026-04-29';
+        $dataFim = trim((string) ($req->getParam('data_fim') ?? ''));
+
+        try {
+            $pdo = Database::getConnection();
+            $qb = $this->qb();
+
+            if (!$qb->isConectado()) {
+                echo json_encode(['ok' => false, 'erro' => 'QuickBooks não está conectado']);
+                return;
+            }
+
+            // Garantir tabela de mapeamento existe
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS quickbooks_pedido_map (
+                    id INT AUTO_INCREMENT PRIMARY KEY, pedido_id INT NOT NULL,
+                    qb_invoice_id VARCHAR(50) NULL, qb_payment_id VARCHAR(50) NULL,
+                    sincronizado_em DATETIME NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_qb_pedido (pedido_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } catch (\Throwable $e) {}
+
+            // Buscar pedidos no período que NÃO estão no mapeamento
+            $sql = "SELECT p.id FROM pedidos p
+                    WHERE p.created_at >= ?
+                    " . ($dataFim !== '' ? "AND p.created_at <= ?" : "") . "
+                    AND p.deleted_at IS NULL
+                    AND p.id NOT IN (SELECT pedido_id FROM quickbooks_pedido_map WHERE pedido_id IS NOT NULL)
+                    ORDER BY p.id ASC";
+            $params = [$dataInicio . ' 00:00:00'];
+            if ($dataFim !== '') $params[] = $dataFim . ' 23:59:59';
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+            $pedidoIds = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            $resultados = ['total' => count($pedidoIds), 'sucesso' => 0, 'erros' => []];
+
+            foreach ($pedidoIds as $pedidoId) {
+                try {
+                    $ped = $pdo->prepare('SELECT * FROM pedidos WHERE id = ? LIMIT 1');
+                    $ped->execute([$pedidoId]);
+                    $pedido = $ped->fetch(\PDO::FETCH_ASSOC);
+                    if (!$pedido) continue;
+
+                    // Buscar usuário
+                    $usuarioId = (int) ($pedido['usuario_id'] ?? 0);
+                    if ($usuarioId > 0) {
+                        $uStmt = $pdo->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                        $uStmt->execute([$usuarioId]);
+                        $usuario = $uStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $pedido['nome']     = $usuario['nome'] ?? $usuario['name'] ?? '';
+                        $pedido['email']    = $usuario['email'] ?? '';
+                        $pedido['telefone'] = $usuario['telefone'] ?? '';
+                        $pedido['cpf']      = $usuario['cpf'] ?? $usuario['documento'] ?? '';
+                    }
+
+                    // Buscar itens
+                    $itStmt = $pdo->prepare('SELECT * FROM pedido_itens WHERE pedido_id = ?');
+                    $itStmt->execute([$pedidoId]);
+                    $itens = $itStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    foreach ($itens as &$item) {
+                        $prodId = (int) ($item['produto_id'] ?? 0);
+                        if ($prodId > 0) {
+                            $pStmt = $pdo->prepare('SELECT name, nome FROM produtos WHERE id = ? LIMIT 1');
+                            $pStmt->execute([$prodId]);
+                            $prod = $pStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $item['produto_nome'] = $prod['name'] ?? $prod['nome'] ?? 'Produto #' . $prodId;
+                        }
+                    }
+                    unset($item);
+
+                    // Total BRL
+                    foreach (['total', 'valor_total'] as $col) {
+                        if (!empty($pedido[$col]) && (float) $pedido[$col] > 0) {
+                            $pedido['total_brl'] = (float) $pedido[$col];
+                            break;
+                        }
+                    }
+
+                    // Pagamentos
+                    try {
+                        $pgStmt = $pdo->prepare("SELECT componente, gateway, metodo, valor, moeda FROM pedido_pagamentos WHERE pedido_id = ? AND status IN ('paid','approved','confirmed') ORDER BY id ASC");
+                        $pgStmt->execute([$pedidoId]);
+                        $pedido['_pagamentos'] = $pgStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Throwable $e) { $pedido['_pagamentos'] = []; }
+
+                    $qb->criarInvoiceDePedido($pedido, $itens, $pedido);
+                    $resultados['sucesso']++;
+
+                    // Pequena pausa para não sobrecarregar a API do QB
+                    usleep(200000); // 200ms
+                } catch (\Throwable $e) {
+                    $resultados['erros'][] = '#' . $pedidoId . ': ' . $e->getMessage();
+                    error_log('[QB_LOTE] Erro pedido #' . $pedidoId . ': ' . $e->getMessage());
+                }
+            }
+
+            echo json_encode(['ok' => true, 'resultados' => $resultados]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
+        }
+    }
 }

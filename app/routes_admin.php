@@ -294,3 +294,4 @@ $router->get('/admin/quickbooks/callback', 'AdminQuickBooksController', 'oauthCa
 $router->post('/admin/quickbooks/desconectar', 'AdminQuickBooksController', 'desconectar');
 $router->post('/admin/quickbooks/config', 'AdminQuickBooksController', 'salvarConfig');
 $router->post('/admin/quickbooks/sincronizar-pedido', 'AdminQuickBooksController', 'sincronizarPedido');
+$router->post('/admin/quickbooks/sincronizar-lote', 'AdminQuickBooksController', 'sincronizarLote');

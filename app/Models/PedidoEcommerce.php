@@ -2053,5 +2053,22 @@ class PedidoEcommerce {
         } catch (\Exception $e) {
             error_log('[NOTIFICACOES] Falha ao disparar notificacoes: ' . $e->getMessage());
         }
+
+        // Sincronizar com QuickBooks automaticamente ao criar pedido
+        if ($eventoNome === 'novo_pedido') {
+            try {
+                $qbService = new \App\Services\QuickBooksService();
+                if ($qbService->isConectado()) {
+                    $pedido = $this->getComDetalhes((int) $pedidoId);
+                    if ($pedido) {
+                        $itens = $pedido['items'] ?? [];
+                        $qbService->criarInvoiceDePedido($pedido, $itens, $pedido);
+                        error_log("[QUICKBOOKS] Invoice criada automaticamente para pedido #{$pedidoId}");
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('[QUICKBOOKS] Erro ao sincronizar pedido #' . $pedidoId . ': ' . $e->getMessage());
+            }
+        }
     }
 }

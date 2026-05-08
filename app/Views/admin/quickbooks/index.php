@@ -66,6 +66,9 @@
                     <a href="/admin/quickbooks/invoices" class="btn btn-outline-primary">
                         <i class="fas fa-file-invoice-dollar me-1"></i>Ver Invoices
                     </a>
+                    <button type="button" class="btn btn-outline-warning" onclick="document.getElementById('syncLoteCard').style.display=document.getElementById('syncLoteCard').style.display==='none'?'':'none'">
+                        <i class="fas fa-sync me-1"></i>Sincronizar em Lote
+                    </button>
                 </div>
             </div>
         </div>
@@ -130,6 +133,82 @@
         </form>
     </div>
 </div>
+
+<!-- Sincronização em Lote (oculto - admin only) -->
+<?php if ($conectado): ?>
+<div class="card mb-4" id="syncLoteCard" style="display:none;">
+    <div class="card-header bg-warning text-dark"><i class="fas fa-sync me-2"></i>Sincronização em Lote</div>
+    <div class="card-body">
+        <p class="small text-muted">Sincroniza todos os pedidos no período que ainda não foram enviados ao QuickBooks. Pedidos já sincronizados são ignorados automaticamente.</p>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small">Data Início</label>
+                <input type="date" class="form-control form-control-sm" id="syncLoteInicio" value="2026-04-29">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Data Fim</label>
+                <input type="date" class="form-control form-control-sm" id="syncLoteFim" value="<?= date('Y-m-d') ?>">
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-warning btn-sm" id="btnSyncLote" onclick="executarSyncLote()">
+                    <i class="fas fa-play me-1"></i>Executar Sincronização
+                </button>
+            </div>
+        </div>
+        <div id="syncLoteResultado" class="mt-3" style="display:none;"></div>
+    </div>
+</div>
+<script>
+// Ctrl+Shift+Q para mostrar o painel de sync em lote
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'Q') {
+        var card = document.getElementById('syncLoteCard');
+        card.style.display = card.style.display === 'none' ? '' : 'none';
+    }
+});
+function executarSyncLote() {
+    var btn = document.getElementById('btnSyncLote');
+    var res = document.getElementById('syncLoteResultado');
+    var inicio = document.getElementById('syncLoteInicio').value;
+    var fim = document.getElementById('syncLoteFim').value;
+    if (!inicio) { alert('Informe a data de início'); return; }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando...';
+    res.style.display = '';
+    res.innerHTML = '<div class="alert alert-info">Sincronizando pedidos... Isso pode levar alguns minutos.</div>';
+
+    var fd = new FormData();
+    fd.append('data_inicio', inicio);
+    if (fim) fd.append('data_fim', fim);
+
+    fetch('/admin/quickbooks/sincronizar-lote', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok && data.resultados) {
+                var r = data.resultados;
+                var html = '<div class="alert alert-success">'
+                    + '<strong>Concluído!</strong> ' + r.sucesso + '/' + r.total + ' pedidos sincronizados.'
+                    + '</div>';
+                if (r.erros && r.erros.length > 0) {
+                    html += '<div class="alert alert-warning"><strong>Erros (' + r.erros.length + '):</strong><ul class="mb-0 small">';
+                    r.erros.forEach(function(e) { html += '<li>' + e + '</li>'; });
+                    html += '</ul></div>';
+                }
+                res.innerHTML = html;
+            } else {
+                res.innerHTML = '<div class="alert alert-danger">Erro: ' + (data.erro || 'Falha desconhecida') + '</div>';
+            }
+        })
+        .catch(function(e) {
+            res.innerHTML = '<div class="alert alert-danger">Erro de conexão: ' + e.message + '</div>';
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play me-1"></i>Executar Sincronização';
+        });
+}
+</script>
+<?php endif; ?>
 
 <!-- Logs de Sincronização -->
 <?php if ($conectado && !empty($logs)): ?>

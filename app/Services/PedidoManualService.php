@@ -1584,6 +1584,22 @@ class PedidoManualService {
             }
 
             $this->db->commit();
+
+            // Disparar sincronização QuickBooks para pedido manual
+            try {
+                $qbService = new \App\Services\QuickBooksService();
+                if ($qbService->isConectado()) {
+                    $pedidoModel = new \App\Models\PedidoEcommerce();
+                    $pedidoData = $pedidoModel->getComDetalhes($pedidoId);
+                    if ($pedidoData) {
+                        $qbService->criarInvoiceDePedido($pedidoData, $pedidoData['items'] ?? [], $pedidoData);
+                        error_log("[QUICKBOOKS] Invoice criada para pedido manual #{$pedidoId}");
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('[QUICKBOOKS] Erro sync pedido manual #' . $pedidoId . ': ' . $e->getMessage());
+            }
+
             return $pedidoId;
         } catch (\Exception $e) {
             $this->db->rollBack();
