@@ -5161,6 +5161,7 @@ LINKSCRIPT;
             'pendente'                       => 'Pendente',
             'processando'                    => 'Processando',
             'pago'                           => 'Pago',
+            'itens_comprados'                => 'Produto Comprado',
             'carne_pagando'                  => 'Carnê em Pagamento',
             'carne_aguardando'               => 'Carnê Aguardando',
             'produto_consolidado'            => 'Caixa Fechada',
