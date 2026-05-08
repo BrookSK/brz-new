@@ -2201,6 +2201,27 @@ class CheckoutController extends Controller {
         $taxaServico = $descontoTaxaInfo['final'];
 
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
+
+        // Somar preço real dos brindes para cálculo de impostos
+        $subtotalParaImpostosCheckout = $subtotal;
+        if (is_array($carrinho ?? null)) {
+            $pdo = \Config\Database::getConnection();
+            foreach ($carrinho as $prod) {
+                $subItem = (float) ($prod['subtotal'] ?? ($prod['preco_unitario'] ?? 1));
+                if ($subItem === 0.0 && !empty($prod['produto_id'])) {
+                    try {
+                        $stBr = $pdo->prepare('SELECT price FROM produtos WHERE id = ? LIMIT 1');
+                        $stBr->execute([(int) $prod['produto_id']]);
+                        $precoReal = (float) ($stBr->fetchColumn() ?: 0);
+                        $subtotalParaImpostosCheckout += $precoReal * (int) ($prod['quantidade'] ?? 1);
+                    } catch (\Exception $e) {}
+                }
+            }
+        }
+        if ($subtotalParaImpostosCheckout > $subtotal) {
+            $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotalParaImpostosCheckout, $frete);
+        }
+
         $total = $subtotal + $frete + $taxaServico + $impostos;
 
         // Se o DB tiver valores válidos, usar; senão manter cálculo atual
@@ -5973,6 +5994,26 @@ class CheckoutController extends Controller {
             $taxaServicoUsd = $descontoTaxaInfo['final'];
 
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
+
+            // Somar preço real dos brindes para cálculo de impostos no processar
+            $subtotalParaImpostosProc = $subtotal;
+            if (is_array($carrinho ?? null)) {
+                $pdoImp = \Config\Database::getConnection();
+                foreach ($carrinho as $prod) {
+                    $subItem = (float) ($prod['subtotal'] ?? ($prod['preco_unitario'] ?? 1));
+                    if ($subItem === 0.0 && !empty($prod['produto_id'])) {
+                        try {
+                            $stBr = $pdoImp->prepare('SELECT price FROM produtos WHERE id = ? LIMIT 1');
+                            $stBr->execute([(int) $prod['produto_id']]);
+                            $precoReal = (float) ($stBr->fetchColumn() ?: 0);
+                            $subtotalParaImpostosProc += $precoReal * (int) ($prod['quantidade'] ?? 1);
+                        } catch (\Exception $e) {}
+                    }
+                }
+            }
+            if ($subtotalParaImpostosProc > $subtotal) {
+                $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotalParaImpostosProc, $freteUsd);
+            }
 
             // Admin: modo teste — taxa de serviço fixa em $2.50
             if (!empty($dados['admin_taxa_teste'])) {
