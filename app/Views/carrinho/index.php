@@ -160,7 +160,10 @@
                                         <div class="small text-muted fst-italic"><?= __('cart.select_to_activate', 'Selecione o item para ativar e prossiga.') ?></div>
                                     <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
-                                        <?php if (empty($item['is_free_offer'])): ?>
+                                        <?php
+                                        $isBrindeItem = (!empty($item['is_brinde']) || ((float)($item['preco_unitario'] ?? ($item['price'] ?? 1)) === 0.0 && (float)($item['stored_price'] ?? 1) === 0.0));
+                                        ?>
+                                        <?php if (empty($item['is_free_offer']) && !$isBrindeItem): ?>
                                         <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
                                             <i class="fas fa-minus"></i>
                                         </button>
@@ -174,6 +177,8 @@
                                         <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= $item['quantidade'] + 1 ?>)'>
                                             <i class="fas fa-plus"></i>
                                         </button>
+                                        <?php elseif ($isBrindeItem): ?>
+                                        <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Qtd: <?= (int) $item['quantidade'] ?></span>
                                         <?php else: ?>
                                         <span class="badge bg-success"><i class="fas fa-gift me-1"></i>Qtd: 1</span>
                                         <?php endif; ?>
