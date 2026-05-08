@@ -657,7 +657,12 @@ class CarrinhoController extends Controller {
                     $cartMoedaFromDb = strtoupper(trim((string) ($row['moeda'] ?? '')));
                     if (array_key_exists('subtotal_produtos', $row)) {
                         $subtotalFromDb = (float) ($row['subtotal_produtos'] ?? 0);
-                        if ($subtotalFromDb > 0) {
+                        // Não sobrescrever se temos brinde (subtotal calculado é mais preciso)
+                        $temBrindeNoCart = false;
+                        foreach ($carrinho as $ci) {
+                            if ((float)($ci['preco_unitario'] ?? ($ci['price'] ?? 1)) === 0.0) { $temBrindeNoCart = true; break; }
+                        }
+                        if ($subtotalFromDb > 0 && !$temBrindeNoCart) {
                             $subtotal = $subtotalFromDb;
                         }
                     }
