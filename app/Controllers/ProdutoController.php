@@ -596,6 +596,7 @@ class ProdutoController extends Controller {
 
     public function selecionar(Request $request) {
         $produtoId = $request->getParam('id');
+        error_log("[PRODUTO_CART] selecionar chamado produto_id={$produtoId}");
         $produtoVariacaoId = $request->getParam('produto_variacao_id');
         $quantidade = $request->getParam('quantidade', 1);
         
