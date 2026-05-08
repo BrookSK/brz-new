@@ -26,7 +26,7 @@ class BrindeService {
             $now = (new \DateTime('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s');
             $st = $this->db->prepare("
                 SELECT pb.*, p.name as brinde_nome, p.sku as brinde_sku, p.price as brinde_preco,
-                       COALESCE(p.weight, p.peso, 0) as brinde_peso
+                       COALESCE(p.weight, 0) as brinde_peso
                 FROM produto_brindes pb
                 JOIN produtos p ON p.id = pb.brinde_produto_id
                 WHERE pb.produto_id = ? AND pb.ativo = 1
