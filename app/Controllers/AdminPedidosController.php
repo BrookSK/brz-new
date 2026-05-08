@@ -6523,6 +6523,10 @@ HTML;
                 } catch (\Exception $e) {
                     $temReservas = false;
                 }
+
+                // Void invoice no QuickBooks ao cancelar pedido
+                try { $__qb = new \App\Services\QuickBooksService(); if ($__qb->isConectado()) { $__qb->voidInvoiceDePedido((int) $id); } } catch (\Exception $e) { error_log('[QB] Void erro #' . $id . ': ' . $e->getMessage()); }
+
                 if (!empty($temReservas)) {
                     try {
                         $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas' AND column_name = 'pedido_id'");

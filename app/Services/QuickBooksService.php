@@ -112,8 +112,8 @@ class QuickBooksService
     }
 
     public function getMapeamentoPedido(int $pid): ?array {
-        $s = $this->pdo->prepare('SELECT * FROM quickbooks_pedido_map WHERE pedido_id = ? LIMIT 1');
-        $s->execute([$pid]);
+        $s = $this->pdo->prepare('SELECT * FROM quickbooks_pedido_map WHERE pedido_id = ? AND ambiente = ? LIMIT 1');
+        $s->execute([$pid, $this->ambiente]);
         $r = $s->fetch(\PDO::FETCH_ASSOC);
         return $r ?: null;
     }
@@ -383,10 +383,42 @@ class QuickBooksService
     public function listarPayments(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Payment ORDERBY TxnDate DESC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
     public function listarCustomers(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Customer ORDERBY DisplayName ASC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
     private function salvarMapeamentoPedido(int $pid,array $d): void {
+        $d["ambiente"]=$this->ambiente;
         $ex=$this->getMapeamentoPedido($pid);
-        if($ex){$sets=[];$vals=[];foreach($d as $col=>$val){$sets[]=$col."=?";$vals[]=$val;}$vals[]=$pid;$this->pdo->prepare("UPDATE quickbooks_pedido_map SET ".implode(",",$sets)." WHERE pedido_id=?") ->execute($vals);}
+        if($ex){$sets=[];$vals=[];foreach($d as $col=>$val){$sets[]=$col."=?";$vals[]=$val;}$vals[]=$pid;$vals[]=$this->ambiente;$this->pdo->prepare("UPDATE quickbooks_pedido_map SET ".implode(",",$sets)." WHERE pedido_id=? AND ambiente=?") ->execute($vals);}
         else{$d["pedido_id"]=$pid;$cols=implode(",",array_keys($d));$pls=implode(",",array_fill(0,count($d),"?"));$this->pdo->prepare("INSERT INTO quickbooks_pedido_map(".$cols.") VALUES(".$pls.")") ->execute(array_values($d));}
     }
+    /**
+     * Cancela (void) uma invoice no QuickBooks quando pedido é cancelado/excluído
+     */
+    public function voidInvoiceDePedido(int $pedidoId): bool {
+        $map = $this->getMapeamentoPedido($pedidoId);
+        if (!$map || empty($map['qb_invoice_id'])) return false;
+
+        try {
+            $qbId = (string) $map['qb_invoice_id'];
+            // Buscar SyncToken atual da invoice
+            $res = $this->apiQuery("SELECT * FROM Invoice WHERE Id = '" . addslashes($qbId) . "' MAXRESULTS 1");
+            $inv = $res['QueryResponse']['Invoice'][0] ?? null;
+            if (!$inv) return false;
+
+            $syncToken = (string) ($inv['SyncToken'] ?? '0');
+
+            // Void the invoice
+            $payload = ['Id' => $qbId, 'SyncToken' => $syncToken];
+            $this->apiPost('/invoice?operation=void', $payload);
+
+            $this->registrarLog('invoice', $pedidoId, $qbId, 'void', 'success', ['pedido_id' => $pedidoId]);
+            return true;
+        } catch (\Throwable $e) {
+            $this->registrarLog('invoice', $pedidoId, $map['qb_invoice_id'] ?? null, 'void', 'error', [], $e->getMessage());
+            error_log('[QUICKBOOKS] Erro ao void invoice pedido #' . $pedidoId . ': ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getAmbiente(): string { return $this->ambiente; }
+
     private function registrarLog(string $ent,?int $eid,?string $qid,string $ac,string $st,array $pl=[],string $err=""): void {
         try{$uid=isset($_SESSION["usuario_id"])?(int)$_SESSION["usuario_id"]:null;$this->pdo->prepare("INSERT INTO quickbooks_sync_log(entidade,entidade_id,qb_id,acao,status,payload,erro,usuario_id) VALUES(?,?,?,?,?,?,?,?)")->execute([$ent,$eid,$qid,$ac,$st,json_encode($pl,JSON_UNESCAPED_UNICODE),$err?:null,$uid]);}catch(\Throwable $e){}
     }

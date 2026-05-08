@@ -170,20 +170,29 @@ class AdminQuickBooksController extends Controller {
                 $pdo->exec("CREATE TABLE IF NOT EXISTS quickbooks_pedido_map (
                     id INT AUTO_INCREMENT PRIMARY KEY, pedido_id INT NOT NULL,
                     qb_invoice_id VARCHAR(50) NULL, qb_payment_id VARCHAR(50) NULL,
+                    ambiente VARCHAR(20) NOT NULL DEFAULT 'sandbox',
                     sincronizado_em DATETIME NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY uq_qb_pedido (pedido_id)
+                    UNIQUE KEY uq_qb_pedido_amb (pedido_id, ambiente)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                // Garantir coluna ambiente existe
+                try { $pdo->exec("ALTER TABLE quickbooks_pedido_map ADD COLUMN ambiente VARCHAR(20) NOT NULL DEFAULT 'sandbox' AFTER qb_payment_id"); } catch (\Throwable $e) {}
+                // Atualizar unique key
+                try { $pdo->exec("ALTER TABLE quickbooks_pedido_map DROP INDEX uq_qb_pedido"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE quickbooks_pedido_map ADD UNIQUE KEY uq_qb_pedido_amb (pedido_id, ambiente)"); } catch (\Throwable $e) {}
             } catch (\Throwable $e) {}
 
-            // Buscar pedidos no período que NÃO estão no mapeamento
+            $ambiente = $qb->getAmbiente();
+
+            // Buscar pedidos no período que NÃO estão no mapeamento PARA ESTE AMBIENTE
             $sql = "SELECT p.id FROM pedidos p
                     WHERE p.created_at >= ?
                     " . ($dataFim !== '' ? "AND p.created_at <= ?" : "") . "
                     AND p.deleted_at IS NULL
-                    AND p.id NOT IN (SELECT pedido_id FROM quickbooks_pedido_map WHERE pedido_id IS NOT NULL)
+                    AND p.id NOT IN (SELECT pedido_id FROM quickbooks_pedido_map WHERE pedido_id IS NOT NULL AND ambiente = ?)
                     ORDER BY p.id ASC";
             $params = [$dataInicio . ' 00:00:00'];
             if ($dataFim !== '') $params[] = $dataFim . ' 23:59:59';
+            $params[] = $ambiente;
             $st = $pdo->prepare($sql);
             $st->execute($params);
             $pedidoIds = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
