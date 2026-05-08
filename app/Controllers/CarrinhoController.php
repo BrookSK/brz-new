@@ -345,10 +345,12 @@ class CarrinhoController extends Controller {
                 // Se o item foi adicionado como brinde (preço 0 no carrinho), manter preço 0
                 if ($storedUnit !== null && (float) $storedUnit === 0.0 && $itemPrice > 0) {
                     $itemPrice = 0;
+                    $changedFields = []; // Não marcar como "alterado"
                 }
                 // Fallback: verificar preco_unitario original do item
                 if (isset($item['price']) && (float) $item['price'] === 0.0 && $itemPrice > 0) {
                     $itemPrice = 0;
+                    $changedFields = [];
                 }
                 $itemStock = intval($produto['estoque'] ?? 0);
                 if ($pvId > 0) {
@@ -915,6 +917,8 @@ class CarrinhoController extends Controller {
                         if (!$stCheck->fetchColumn()) {
                             $this->carrinhoModel->adicionarItem($cartId, $brindeProductId, (int) ($brinde['quantidade_brinde'] ?? 1), null, null);
                             $this->carrinhoModel->getConnection()->prepare('UPDATE carrinho_items SET preco_unitario = 0, subtotal = 0 WHERE carrinho_id = ? AND produto_id = ? ORDER BY id DESC LIMIT 1')->execute([$cartId, $brindeProductId]);
+                            // Recalcular totais do carrinho após zerar preço do brinde
+                            $this->carrinhoModel->atualizarTotais($cartId);
                             $brindeMsg = ' + brinde: ' . ($brinde['brinde_nome'] ?? 'Brinde') . ' 🎁';
                             $totalItens++;
                         }
