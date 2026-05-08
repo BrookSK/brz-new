@@ -380,11 +380,35 @@ class ApiController extends Controller {
                 $stTot->execute([$cartId]);
                 $totalValor = (float) ($stTot->fetchColumn() ?: 0);
 
+                // Verificar brinde ativo para este produto
+                $brindeAdicionado = null;
+                try {
+                    $brindeService = new \App\Services\BrindeService();
+                    $brinde = $brindeService->getBrindeAtivo((int) $produtoId);
+                    if ($brinde) {
+                        $brindeProductId = (int) $brinde['brinde_produto_id'];
+                        // Verificar se brinde já está no carrinho
+                        $stCheck = $this->carrinhoModel->getConnection()->prepare('SELECT id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1');
+                        $stCheck->execute([$cartId, $brindeProductId]);
+                        if (!$stCheck->fetchColumn()) {
+                            // Adicionar brinde com preço 0
+                            $this->carrinhoModel->adicionarItem($cartId, $brindeProductId, (int) ($brinde['quantidade_brinde'] ?? 1), null, 0.00);
+                            // Marcar como brinde (atualizar preco para 0)
+                            $this->carrinhoModel->getConnection()->prepare('UPDATE carrinho_items SET preco_unitario = 0, subtotal = 0 WHERE carrinho_id = ? AND produto_id = ? ORDER BY id DESC LIMIT 1')->execute([$cartId, $brindeProductId]);
+                            $brindeAdicionado = (string) ($brinde['brinde_nome'] ?? 'Brinde');
+                            $totalItens++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('[BRINDE] Erro ao adicionar brinde via API: ' . $e->getMessage());
+                }
+
                 $this->json([
                     'success' => true,
-                    'message' => 'Produto adicionado ao carrinho',
+                    'message' => 'Produto adicionado ao carrinho' . ($brindeAdicionado ? ' + brinde: ' . $brindeAdicionado . ' 🎁' : ''),
                     'total_itens' => $totalItens,
-                    'total_valor' => $totalValor
+                    'total_valor' => $totalValor,
+                    'brinde_adicionado' => $brindeAdicionado,
                 ]);
                 return;
             } catch (\Exception $e) {
