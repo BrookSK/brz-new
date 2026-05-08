@@ -346,6 +346,10 @@ class CarrinhoController extends Controller {
                 if ($storedUnit !== null && (float) $storedUnit === 0.0 && $itemPrice > 0) {
                     $itemPrice = 0;
                 }
+                // Fallback: verificar preco_unitario original do item
+                if (isset($item['price']) && (float) $item['price'] === 0.0 && $itemPrice > 0) {
+                    $itemPrice = 0;
+                }
                 $itemStock = intval($produto['estoque'] ?? 0);
                 if ($pvId > 0) {
                     $infoVar = $this->getVariacaoInfo($pvId);
