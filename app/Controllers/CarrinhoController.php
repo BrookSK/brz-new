@@ -525,6 +525,22 @@ class CarrinhoController extends Controller {
 
         $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotal, $frete);
 
+        // Somar preço real dos brindes para cálculo de impostos
+        $subtotalParaImpostos = $subtotal;
+        foreach ($carrinho as $cItem) {
+            $isBrindeCalc = ((float)($cItem['preco_unitario'] ?? ($cItem['price'] ?? 1)) === 0.0 && (float)($cItem['stored_price'] ?? 1) === 0.0);
+            if ($isBrindeCalc && !empty($cItem['produto_id'])) {
+                $prodBrinde = $this->produtoModel->find((int) $cItem['produto_id']);
+                if ($prodBrinde) {
+                    $precoBrinde = (float) ($prodBrinde['preco'] ?? ($prodBrinde['valor'] ?? ($prodBrinde['price'] ?? 0)));
+                    $subtotalParaImpostos += $precoBrinde * (int) ($cItem['quantidade'] ?? 1);
+                }
+            }
+        }
+        if ($subtotalParaImpostos > $subtotal) {
+            $impostos = (float) $this->carrinhoModel->calcularImpostos($subtotalParaImpostos, $frete);
+        }
+
         // Detectar país do usuário para isenção de impostos BR
         $entregaForaBR = false;
         if ($uid > 0) {
