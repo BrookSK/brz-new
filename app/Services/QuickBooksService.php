@@ -334,11 +334,19 @@ class QuickBooksService
             $nome = $em !== '' ? $em : 'Cliente';
         }
 
+        // Buscar por email primeiro
         if ($em !== '') {
             $res  = $this->apiQuery("SELECT * FROM Customer WHERE PrimaryEmailAddr = '" . addslashes($em) . "' MAXRESULTS 1");
             $rows = $res['QueryResponse']['Customer'] ?? [];
             if (!empty($rows[0]['Id'])) return (string) $rows[0]['Id'];
         }
+
+        // Buscar por DisplayName (evita "Duplicate Name Exists Error")
+        try {
+            $res = $this->apiQuery("SELECT * FROM Customer WHERE DisplayName = '" . addslashes($nome) . "' MAXRESULTS 1");
+            $rows = $res['QueryResponse']['Customer'] ?? [];
+            if (!empty($rows[0]['Id'])) return (string) $rows[0]['Id'];
+        } catch (\Throwable $e) {}
 
         $pl = [
             'DisplayName'      => $nome,
@@ -353,10 +361,24 @@ class QuickBooksService
             ],
         ];
 
-        $res = $this->apiPost('/customer', $pl);
-        $id  = (string) ($res['Customer']['Id'] ?? '');
-        $this->registrarLog('customer', null, $id, 'create', 'success', $pl);
-        return $id;
+        try {
+            $res = $this->apiPost('/customer', $pl);
+            $id  = (string) ($res['Customer']['Id'] ?? '');
+            $this->registrarLog('customer', null, $id, 'create', 'success', $pl);
+            return $id;
+        } catch (\Throwable $e) {
+            // Se deu "Duplicate Name", tentar buscar novamente com variação
+            if (strpos($e->getMessage(), 'Duplicate Name') !== false || strpos($e->getMessage(), '6240') !== false) {
+                // Tentar com sufixo do pedido_id ou email
+                $suffix = $em !== '' ? ' (' . substr($em, 0, 20) . ')' : ' (' . date('YmdHis') . ')';
+                $pl['DisplayName'] = $nome . $suffix;
+                $res = $this->apiPost('/customer', $pl);
+                $id  = (string) ($res['Customer']['Id'] ?? '');
+                $this->registrarLog('customer', null, $id, 'create', 'success', $pl);
+                return $id;
+            }
+            throw $e;
+        }
     }
     public function listarPayments(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Payment ORDERBY TxnDate DESC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
     public function listarCustomers(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Customer ORDERBY DisplayName ASC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
