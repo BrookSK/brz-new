@@ -126,6 +126,21 @@ class BrindeService {
         $resultado = ['processados' => 0, 'valor_total' => 0.0, 'erros' => []];
 
         try {
+            // Verificar se é pedido de carnê — só devolver quando última parcela for paga
+            try {
+                $stCarne = $this->db->prepare("SELECT c.id, c.quantidade_parcelas, (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as pagas FROM carnes c WHERE c.pedido_id = ? LIMIT 1");
+                $stCarne->execute([$pedidoId]);
+                $carne = $stCarne->fetch(\PDO::FETCH_ASSOC);
+                if ($carne) {
+                    $totalParcelas = (int) ($carne['quantidade_parcelas'] ?? 0);
+                    $pagas = (int) ($carne['pagas'] ?? 0);
+                    if ($pagas < $totalParcelas) {
+                        // Carnê ainda não quitado — não devolver agora
+                        return $resultado;
+                    }
+                }
+            } catch (\Exception $e) {}
+
             $st = $this->db->prepare("SELECT * FROM brinde_devolucao_impostos WHERE pedido_id = ? AND status = 'pendente'");
             $st->execute([$pedidoId]);
             $pendentes = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];

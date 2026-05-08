@@ -2070,5 +2070,18 @@ class PedidoEcommerce {
                 error_log('[QUICKBOOKS] Erro ao sincronizar pedido #' . $pedidoId . ': ' . $e->getMessage());
             }
         }
+
+        // Processar devoluções de impostos de brindes quando pagamento é aprovado
+        if ($eventoNome === 'pagamento_aprovado') {
+            try {
+                $brindeService = new \App\Services\BrindeService();
+                $resultado = $brindeService->processarDevolucoesParaPedido((int) $pedidoId);
+                if ($resultado['processados'] > 0) {
+                    error_log('[BRINDE] Devoluções processadas (webhook) pedido #' . $pedidoId . ': ' . $resultado['processados'] . ' itens, US$ ' . number_format($resultado['valor_total'], 2));
+                }
+            } catch (\Exception $e) {
+                error_log('[BRINDE] Erro ao processar devoluções pedido #' . $pedidoId . ': ' . $e->getMessage());
+            }
+        }
     }
 }

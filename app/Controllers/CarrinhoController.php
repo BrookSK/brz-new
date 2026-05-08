@@ -341,6 +341,21 @@ class CarrinhoController extends Controller {
                 if ($isValorInformado && $storedUnit !== null && $storedUnit > 0) {
                     $itemPrice = $storedUnit;
                 }
+
+                // Se o item foi adicionado como brinde (preço 0 no carrinho), manter preço 0
+                if ($storedUnit !== null && $storedUnit == 0 && $itemPrice > 0) {
+                    // Verificar se realmente é brinde (preço 0 intencional, não erro)
+                    $isBrindeItem = false;
+                    if (is_array($item) && !empty($item['is_brinde'])) {
+                        $isBrindeItem = true;
+                    } elseif ($storedUnit === 0.0 || $storedUnit === 0) {
+                        // Preço 0 no carrinho_items = brinde adicionado automaticamente
+                        $isBrindeItem = true;
+                    }
+                    if ($isBrindeItem) {
+                        $itemPrice = 0;
+                    }
+                }
                 $itemStock = intval($produto['estoque'] ?? 0);
                 if ($pvId > 0) {
                     $infoVar = $this->getVariacaoInfo($pvId);

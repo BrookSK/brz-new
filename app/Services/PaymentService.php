@@ -4000,6 +4000,7 @@ class PaymentService {
             if ($statusAgregado === 'approved') {
                 // Garante cashback/efeitos apenas quando ambos pagos
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
+                $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
             }
         } catch (\Exception $e) {
         }
@@ -4669,6 +4670,7 @@ class PaymentService {
         try {
             $db = \Config\Database::getConnection();
             $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
+            $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
         } catch (\Exception $e) {
         }
     }
@@ -6938,6 +6940,7 @@ class PaymentService {
 
             if ($aprovado && !$hasSplitBoth) {
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
+                $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
             }
 
             if ($paymentStatusInterno === 'refunded') {
