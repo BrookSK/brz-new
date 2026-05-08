@@ -188,6 +188,7 @@ function executarSyncLote() {
                 var r = data.resultados;
                 var html = '<div class="alert alert-success">'
                     + '<strong>Concluído!</strong> ' + r.sucesso + '/' + r.total + ' pedidos sincronizados.'
+                    + (r.voided ? ' | ' + r.voided + ' invoice(s) cancelada(s) no QB.' : '')
                     + '</div>';
                 if (r.erros && r.erros.length > 0) {
                     html += '<div class="alert alert-warning"><strong>Erros (' + r.erros.length + '):</strong><ul class="mb-0 small">';

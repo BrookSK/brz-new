@@ -260,6 +260,32 @@ class AdminQuickBooksController extends Controller {
                 }
             }
 
+            // Void invoices de pedidos cancelados/na lixeira que já foram sincronizados
+            $voidCount = 0;
+            try {
+                $sqlVoid = "SELECT qm.pedido_id, qm.qb_invoice_id FROM quickbooks_pedido_map qm
+                    INNER JOIN pedidos p ON p.id = qm.pedido_id
+                    WHERE qm.ambiente = ?
+                    AND (p.deleted_at IS NOT NULL OR LOWER(COALESCE(p.status,'')) = 'cancelado')
+                    AND qm.qb_invoice_id IS NOT NULL
+                    AND qm.pedido_id NOT IN (SELECT entidade_id FROM quickbooks_sync_log WHERE acao = 'void' AND status = 'success' AND entidade_id IS NOT NULL)";
+                $stVoid = $pdo->prepare($sqlVoid);
+                $stVoid->execute([$ambiente]);
+                $pedidosVoid = $stVoid->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                foreach ($pedidosVoid as $pv) {
+                    try {
+                        $qb->voidInvoiceDePedido((int) $pv['pedido_id']);
+                        $voidCount++;
+                        usleep(200000);
+                    } catch (\Throwable $e) {
+                        $resultados['erros'][] = 'Void #' . $pv['pedido_id'] . ': ' . $e->getMessage();
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            $resultados['voided'] = $voidCount;
+
             echo json_encode(['ok' => true, 'resultados' => $resultados]);
         } catch (\Throwable $e) {
             echo json_encode(['ok' => false, 'erro' => $e->getMessage()]);
