@@ -422,6 +422,27 @@
                 </div>
             </div>
             
+                <!-- Brinde Info -->
+                <?php
+                $temBrindeNoCarrinho = false;
+                foreach ($carrinho as $cItem) {
+                    if ((float)($cItem['preco_unitario'] ?? ($cItem['price'] ?? 1)) === 0.0 && (float)($cItem['stored_price'] ?? 1) === 0.0) {
+                        $temBrindeNoCarrinho = true;
+                        break;
+                    }
+                }
+                if ($temBrindeNoCarrinho):
+                ?>
+                <div class="card shadow-sm border-0 mt-3 border-success">
+                    <div class="card-body py-3">
+                        <h6 class="card-title text-success mb-2"><i class="fas fa-gift me-1"></i> Brinde Incluído</h6>
+                        <p class="small mb-1">Você ganhou um <strong>produto grátis</strong>! O valor do produto é $0, mas a taxa de serviço e impostos são cobrados normalmente.</p>
+                        <p class="small mb-1"><strong><i class="fas fa-wallet me-1"></i>Devolução:</strong> O valor do imposto de importação (II + ICMS) do brinde será <strong>devolvido na sua carteira</strong> após a confirmação do pagamento.</p>
+                        <p class="small text-muted mb-0"><i class="fas fa-file-invoice-dollar me-1"></i>Para pagamentos via Carnê: a devolução ocorre após o pagamento da última parcela.</p>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- Informações Importantes -->
                 <div class="card shadow-sm border-0 mt-3">
                     <div class="card-body">
