@@ -742,6 +742,25 @@ class AdminPedidosController extends Controller {
             }
             $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $st->execute([(int) $id]);
+
+            // Re-sincronizar com QuickBooks ao restaurar pedido
+            try {
+                $qbR = new \App\Services\QuickBooksService();
+                if ($qbR->isConectado()) {
+                    // Remover mapeamento antigo (void) para permitir re-criação
+                    $amb = $qbR->getAmbiente();
+                    $pdo->prepare("DELETE FROM quickbooks_pedido_map WHERE pedido_id = ? AND ambiente = ?")->execute([(int) $id, $amb]);
+                    // Re-criar invoice
+                    $pedidoModel = new \App\Models\PedidoEcommerce();
+                    $pedidoData = $pedidoModel->getComDetalhes((int) $id);
+                    if ($pedidoData) {
+                        $qbR->criarInvoiceDePedido($pedidoData, $pedidoData['items'] ?? [], $pedidoData);
+                        error_log("[QB] Invoice re-criada ao restaurar pedido #{$id}");
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('[QB] Erro ao re-sync restaurar #' . $id . ': ' . $e->getMessage());
+            }
         } catch (\Exception $e) {
         }
 
@@ -6655,6 +6674,10 @@ HTML;
                 $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
                 $st->execute($params);
                 $pdo->commit();
+
+                // Void invoice no QuickBooks ao mover para lixeira
+                try { $__qbLix = new \App\Services\QuickBooksService(); if ($__qbLix->isConectado()) { $__qbLix->voidInvoiceDePedido((int) $id); } } catch (\Exception $e) { error_log('[QB] Void lixeira #' . $id . ': ' . $e->getMessage()); }
+
                 header('Location: /admin/pedidos?success=lixeira');
                 exit;
             }
