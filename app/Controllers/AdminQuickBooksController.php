@@ -205,7 +205,7 @@ class AdminQuickBooksController extends Controller {
                         $usuario = $uStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
                         $pedido['nome']     = $usuario['nome'] ?? $usuario['name'] ?? '';
                         $pedido['email']    = $usuario['email'] ?? '';
-                        $pedido['telefone'] = $usuario['telefone'] ?? '';
+                        $pedido['telefone'] = $usuario['telefone'] ?? $usuario['phone'] ?? '';
                         $pedido['cpf']      = $usuario['cpf'] ?? $usuario['documento'] ?? '';
                     }
 
@@ -217,7 +217,7 @@ class AdminQuickBooksController extends Controller {
                     foreach ($itens as &$item) {
                         $prodId = (int) ($item['produto_id'] ?? 0);
                         if ($prodId > 0) {
-                            $pStmt = $pdo->prepare('SELECT name, nome FROM produtos WHERE id = ? LIMIT 1');
+                            $pStmt = $pdo->prepare('SELECT * FROM produtos WHERE id = ? LIMIT 1');
                             $pStmt->execute([$prodId]);
                             $prod = $pStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
                             $item['produto_nome'] = $prod['name'] ?? $prod['nome'] ?? 'Produto #' . $prodId;
