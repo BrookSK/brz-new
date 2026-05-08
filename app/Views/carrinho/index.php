@@ -122,11 +122,6 @@
                                         <?php endif; ?>
                                         <?php if (!empty($item['is_brinde']) || ((float)($item['preco_unitario'] ?? ($item['price'] ?? 1)) === 0.0 && (float)($item['stored_price'] ?? 1) === 0.0)): ?>
                                             <span class="badge bg-success ms-1"><i class="fas fa-gift me-1"></i>Brinde</span>
-                                            <div class="small text-success mt-1">
-                                                <i class="fas fa-info-circle me-1"></i>Produto grátis! Você paga apenas a taxa de serviço e impostos.
-                                                <strong>O valor do imposto de importação será devolvido na sua carteira</strong> após confirmação do pagamento.
-                                                <span class="text-muted d-block mt-1" style="font-size:0.7rem;">Para pagamentos via Carnê: a devolução ocorre após o pagamento da última parcela.</span>
-                                            </div>
                                         <?php endif; ?>
                                         <?php if (!empty($isClubeAtivo)): ?>
                                             <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
