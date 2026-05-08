@@ -4,18 +4,18 @@
         <div class="card-header bg-white border-0 pt-4 d-flex justify-content-between align-items-center">
             <h6 class="mb-0 fw-bold">
                 <i class="fas fa-calendar-alt me-2 text-primary"></i>
-                <?= __('admin.dashboard.marketing_calendar', 'Calendário de Marketing') ?>
+                <?= __('admin.dashboard.marketing_calendar', 'Marketing Calendar') ?>
             </h6>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRefreshCalendar" title="Atualizar">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRefreshCalendar" title="<?= __('common.refresh', 'Refresh') ?>">
                 <i class="fas fa-sync-alt"></i>
             </button>
         </div>
         <div class="card-body" id="marketingCalendarContent">
             <div class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando...</span>
+                    <span class="visually-hidden"><?= __('common.loading', 'Loading...') ?></span>
                 </div>
-                <p class="text-muted mt-2 mb-0">Carregando datas comemorativas...</p>
+                <p class="text-muted mt-2 mb-0"><?= __('admin.dashboard.loading_dates', 'Loading commemorative dates...') ?></p>
             </div>
         </div>
     </div>
@@ -23,23 +23,33 @@
 
 <script>
 (function() {
+    var i18n = {
+        usaTitle: <?= json_encode(__('admin.dashboard.marketing_usa', 'United States'), JSON_UNESCAPED_UNICODE) ?>,
+        brazilTitle: <?= json_encode(__('admin.dashboard.marketing_brazil', 'Brazil'), JSON_UNESCAPED_UNICODE) ?>,
+        noUpcoming: <?= json_encode(__('admin.dashboard.no_upcoming_dates', 'No upcoming dates found.'), JSON_UNESCAPED_UNICODE) ?>,
+        today: <?= json_encode(__('admin.dashboard.today', 'Today!'), JSON_UNESCAPED_UNICODE) ?>,
+        days: <?= json_encode(__('admin.dashboard.days', 'days'), JSON_UNESCAPED_UNICODE) ?>,
+        loadError: <?= json_encode(__('admin.dashboard.calendar_load_error', 'Could not load marketing calendar.'), JSON_UNESCAPED_UNICODE) ?>,
+        loading: <?= json_encode(__('admin.dashboard.loading_dates', 'Loading commemorative dates...'), JSON_UNESCAPED_UNICODE) ?>
+    };
+
     function loadMarketingCalendar() {
         var container = document.getElementById('marketingCalendarContent');
         if (!container) return;
 
-        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><p class="text-muted mt-2 mb-0">Carregando datas comemorativas...</p></div>';
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden"></span></div><p class="text-muted mt-2 mb-0">' + i18n.loading + '</p></div>';
 
         fetch('/admin/marketing-calendar/dates')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (!data.ok || !data.data) {
-                    container.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Não foi possível carregar as datas.</div>';
+                    container.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-triangle me-2"></i>' + i18n.loadError + '</div>';
                     return;
                 }
                 renderCalendar(data.data);
             })
             .catch(function() {
-                container.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Erro ao carregar calendário de marketing.</div>';
+                container.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-triangle me-2"></i>' + i18n.loadError + '</div>';
             });
     }
 
@@ -51,14 +61,14 @@
         html += '<div class="col-md-6">';
         html += '<div class="d-flex align-items-center mb-3">';
         html += '<span class="me-2" style="font-size:1.4rem;">🇺🇸</span>';
-        html += '<h6 class="mb-0 fw-bold text-dark">Estados Unidos</h6>';
+        html += '<h6 class="mb-0 fw-bold text-dark">' + i18n.usaTitle + '</h6>';
         html += '</div>';
         if (data.usa && data.usa.length > 0) {
             data.usa.forEach(function(item) {
-                html += buildDateCard(item, 'usa');
+                html += buildDateCard(item);
             });
         } else {
-            html += '<p class="text-muted small">Nenhuma data próxima encontrada.</p>';
+            html += '<p class="text-muted small">' + i18n.noUpcoming + '</p>';
         }
         html += '</div>';
 
@@ -66,14 +76,14 @@
         html += '<div class="col-md-6">';
         html += '<div class="d-flex align-items-center mb-3">';
         html += '<span class="me-2" style="font-size:1.4rem;">🇧🇷</span>';
-        html += '<h6 class="mb-0 fw-bold text-dark">Brasil</h6>';
+        html += '<h6 class="mb-0 fw-bold text-dark">' + i18n.brazilTitle + '</h6>';
         html += '</div>';
         if (data.brazil && data.brazil.length > 0) {
             data.brazil.forEach(function(item) {
-                html += buildDateCard(item, 'brazil');
+                html += buildDateCard(item);
             });
         } else {
-            html += '<p class="text-muted small">Nenhuma data próxima encontrada.</p>';
+            html += '<p class="text-muted small">' + i18n.noUpcoming + '</p>';
         }
         html += '</div>';
 
@@ -81,8 +91,7 @@
         container.innerHTML = html;
     }
 
-    function buildDateCard(item, country) {
-        var daysText = item.days_until === 0 ? 'Hoje!' : item.days_until + ' dias';
+    function buildDateCard(item) {
         var urgencyClass = '';
         var badgeBg = '';
 
@@ -113,7 +122,7 @@
         html += '</div>';
         html += '<div>';
         html += '<span class="badge px-2 py-1 fw-bold" style="' + badgeBg + ' font-size:0.85rem;">';
-        html += item.days_until === 0 ? '🎉 Hoje!' : item.days_until + ' <small>dias</small>';
+        html += item.days_until === 0 ? '🎉 ' + i18n.today : item.days_until + ' <small>' + i18n.days + '</small>';
         html += '</span>';
         html += '</div>';
         html += '</div>';
@@ -124,7 +133,7 @@
 
     function formatDate(dateStr) {
         var parts = dateStr.split('-');
-        var months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return parts[2] + ' ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
     }
 

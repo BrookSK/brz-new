@@ -16,6 +16,11 @@
         </div>
     </div>
 
+    <!-- Calendário de Marketing -->
+    <div class="row g-4 mb-4">
+        <?php include __DIR__ . '/partials/marketing_calendar_widget.php'; ?>
+    </div>
+
     <!-- Cards de Estatísticas -->
     <div class="row g-4 mb-4">
         <div class="col-xl-3 col-md-6">
@@ -201,11 +206,6 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Calendário de Marketing -->
-    <div class="row g-4 mb-4">
-        <?php include __DIR__ . '/partials/marketing_calendar_widget.php'; ?>
     </div>
 
     <!-- Ações Rápidas -->

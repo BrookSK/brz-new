@@ -665,9 +665,14 @@ class AdminDashboardController extends Controller {
                             <i class="fas fa-sync"></i> Atualizar
                         </button>
                     </div>
-                </div>
-                
-                <div class="row mb-4">
+                </div>';
+
+        // Calendário de Marketing (acima dos cards)
+        echo '<div class="row mb-4"><div class="col-12">';
+        include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
+        echo '</div></div>';
+
+        echo '<div class="row mb-4">
                     <div class="col-xl-3 col-md-6 mb-4">
                         <div class="card stat-card border-left-primary shadow h-100 py-2">
                             <div class="card-body">
@@ -984,11 +989,6 @@ class AdminDashboardController extends Controller {
                         </div>
                     </div>
                 </div>';
-
-        // Calendário de Marketing
-        echo '<div class="row mb-4"><div class="col-12">';
-        include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
-        echo '</div></div>';
 
         echo '</div>
     </div>';
