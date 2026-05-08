@@ -894,9 +894,29 @@ class CarrinhoController extends Controller {
                 $stTot->execute([$cartId]);
                 $totalValor = (float) ($stTot->fetchColumn() ?: 0);
 
+                // Verificar brinde para usuário logado (DB path)
+                $brindeMsg = '';
+                try {
+                    $brindeService = new \App\Services\BrindeService();
+                    $brinde = $brindeService->getBrindeAtivo((int) $produtoId);
+                    if ($brinde) {
+                        $brindeProductId = (int) $brinde['brinde_produto_id'];
+                        $stCheck = $this->carrinhoModel->getConnection()->prepare('SELECT id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1');
+                        $stCheck->execute([$cartId, $brindeProductId]);
+                        if (!$stCheck->fetchColumn()) {
+                            $this->carrinhoModel->adicionarItem($cartId, $brindeProductId, (int) ($brinde['quantidade_brinde'] ?? 1), null, null);
+                            $this->carrinhoModel->getConnection()->prepare('UPDATE carrinho_items SET preco_unitario = 0, subtotal = 0 WHERE carrinho_id = ? AND produto_id = ? ORDER BY id DESC LIMIT 1')->execute([$cartId, $brindeProductId]);
+                            $brindeMsg = ' + brinde: ' . ($brinde['brinde_nome'] ?? 'Brinde') . ' 🎁';
+                            $totalItens++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('[BRINDE] Erro CarrinhoController DB path: ' . $e->getMessage());
+                }
+
                 $this->json([
                     'success' => true,
-                    'message' => 'Produto adicionado ao carrinho',
+                    'message' => 'Produto adicionado ao carrinho' . $brindeMsg,
                     'total_itens' => $totalItens,
                     'total_valor' => $totalValor
                 ]);
