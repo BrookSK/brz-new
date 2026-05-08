@@ -528,13 +528,16 @@ class CarrinhoController extends Controller {
         // Somar preço real dos brindes para cálculo de impostos
         $subtotalParaImpostos = $subtotal;
         foreach ($carrinho as $cItem) {
-            $isBrindeCalc = ((float)($cItem['preco_unitario'] ?? ($cItem['price'] ?? 1)) === 0.0 && (float)($cItem['stored_price'] ?? 1) === 0.0);
-            if ($isBrindeCalc && !empty($cItem['produto_id'])) {
-                $prodBrinde = $this->produtoModel->find((int) $cItem['produto_id']);
-                if ($prodBrinde) {
-                    $precoBrinde = (float) ($prodBrinde['preco'] ?? ($prodBrinde['valor'] ?? ($prodBrinde['price'] ?? 0)));
-                    $subtotalParaImpostos += $precoBrinde * (int) ($cItem['quantidade'] ?? 1);
-                }
+            // Brinde = item com preço 0 no carrinho
+            $precoItem = (float)($cItem['preco_unitario'] ?? ($cItem['price'] ?? -1));
+            if ($precoItem === 0.0 && !empty($cItem['produto_id'])) {
+                try {
+                    $pdoBrinde = \Config\Database::getConnection();
+                    $stBr = $pdoBrinde->prepare('SELECT price FROM produtos WHERE id = ? LIMIT 1');
+                    $stBr->execute([(int) $cItem['produto_id']]);
+                    $precoBrindeUsd = (float) ($stBr->fetchColumn() ?: 0);
+                    $subtotalParaImpostos += $precoBrindeUsd * (int) ($cItem['quantidade'] ?? 1);
+                } catch (\Exception $e) {}
             }
         }
         if ($subtotalParaImpostos > $subtotal) {
