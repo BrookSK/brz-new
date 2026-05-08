@@ -962,6 +962,7 @@ class CarrinhoController extends Controller {
 
         // Verificar se o produto tem brinde ativo e adicionar automaticamente
         $brindeAdicionado = null;
+        error_log("[BRINDE_CART] Verificando brinde para produto_id={$produtoId}");
         try {
             $brindeService = new \App\Services\BrindeService();
             $brinde = $brindeService->getBrindeAtivo($produtoId);
