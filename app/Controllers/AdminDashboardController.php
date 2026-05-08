@@ -983,8 +983,14 @@ class AdminDashboardController extends Controller {
                             echo '</div>
                         </div>
                     </div>
-                </div>
-        </div>
+                </div>';
+
+        // Calendário de Marketing
+        echo '<div class="row mb-4"><div class="col-12">';
+        include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
+        echo '</div></div>';
+
+        echo '</div>
     </div>';
 
     // Renderizar scripts

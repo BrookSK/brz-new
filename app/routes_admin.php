@@ -4,6 +4,9 @@
 // Dashboard
 $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
+// Marketing Calendar
+$router->get('/admin/marketing-calendar/dates', 'AdminMarketingCalendarController', 'getDates');
+
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
 $router->get('/admin/produtos/arquivados', 'AdminProdutosController', 'arquivados');
