@@ -382,7 +382,7 @@ class CarrinhoController extends Controller {
                 $pesoItem = ((int) ($item['quantidade'] ?? 0)) * $pesoUnit;
 
                 $changedFields = [];
-                if (!$isFreeOffer && $storedUnit !== null && $storedUnit > 0) {
+                if (!$isFreeOffer && $itemPrice > 0 && $storedUnit !== null && $storedUnit > 0) {
                     if (abs(((float) $itemPrice) - ((float) $storedUnit)) > 0.009) {
                         $changedFields[] = 'price';
                     }
@@ -916,7 +916,7 @@ class CarrinhoController extends Controller {
                         $stCheck->execute([$cartId, $brindeProductId]);
                         if (!$stCheck->fetchColumn()) {
                             $this->carrinhoModel->adicionarItem($cartId, $brindeProductId, (int) ($brinde['quantidade_brinde'] ?? 1), null, null);
-                            $this->carrinhoModel->getConnection()->prepare('UPDATE carrinho_items SET preco_unitario = 0, subtotal = 0 WHERE carrinho_id = ? AND produto_id = ? ORDER BY id DESC LIMIT 1')->execute([$cartId, $brindeProductId]);
+                            $this->carrinhoModel->getConnection()->prepare('UPDATE carrinho_items SET preco_unitario = 0, subtotal = 0, preco_unit_snapshot = 0 WHERE carrinho_id = ? AND produto_id = ? ORDER BY id DESC LIMIT 1')->execute([$cartId, $brindeProductId]);
                             // Recalcular totais do carrinho após zerar preço do brinde
                             $this->carrinhoModel->atualizarTotais($cartId);
                             $brindeMsg = ' + brinde: ' . ($brinde['brinde_nome'] ?? 'Brinde') . ' 🎁';
