@@ -448,36 +448,60 @@ class AdminPedidosManualController extends Controller {
                     <div class="card-header"><strong>Endereço de Entrega</strong></div>
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">CEP</label>
+                            <div class="col-md-4">
+                                <label class="form-label">País</label>
+                                <select class="form-select" name="endereco_entrega_pais" id="endereco_entrega_pais" onchange="onPaisChange()">
+                                    <option value="BR" selected>Brasil</option>
+                                    <option value="US">Estados Unidos</option>
+                                    <option value="PT">Portugal</option>
+                                    <option value="JP">Japão</option>
+                                    <option value="GB">Reino Unido</option>
+                                    <option value="DE">Alemanha</option>
+                                    <option value="FR">França</option>
+                                    <option value="ES">Espanha</option>
+                                    <option value="IT">Itália</option>
+                                    <option value="CA">Canadá</option>
+                                    <option value="AU">Austrália</option>
+                                    <option value="AR">Argentina</option>
+                                    <option value="CL">Chile</option>
+                                    <option value="CO">Colômbia</option>
+                                    <option value="MX">México</option>
+                                    <option value="OTHER">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4" id="wrap_cep">
+                                <label class="form-label" id="label_cep">CEP</label>
                                 <input type="text" class="form-control" name="endereco_entrega_cep" id="endereco_entrega_cep" value="">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Endereço</label>
-                                <input type="text" class="form-control" name="endereco_entrega_endereco" id="endereco_entrega_endereco" value="">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Número</label>
+                            <div class="col-md-4" id="wrap_numero">
+                                <label class="form-label" id="label_numero">Número</label>
                                 <input type="text" class="form-control" name="endereco_entrega_numero" id="endereco_entrega_numero" value="">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Complemento</label>
+                            <div class="col-md-8">
+                                <label class="form-label" id="label_endereco">Endereço</label>
+                                <input type="text" class="form-control" name="endereco_entrega_endereco" id="endereco_entrega_endereco" value="">
+                            </div>
+                            <div class="col-md-4" id="wrap_complemento">
+                                <label class="form-label" id="label_complemento">Complemento</label>
                                 <input type="text" class="form-control" name="endereco_entrega_complemento" id="endereco_entrega_complemento" value="">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Bairro</label>
+                            <div class="col-md-4" id="wrap_bairro">
+                                <label class="form-label" id="label_bairro">Bairro</label>
                                 <input type="text" class="form-control" name="endereco_entrega_bairro" id="endereco_entrega_bairro" value="">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Cidade</label>
+                            <div class="col-md-4">
+                                <label class="form-label" id="label_cidade">Cidade</label>
                                 <input type="text" class="form-control" name="endereco_entrega_cidade" id="endereco_entrega_cidade" value="">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Estado</label>
+                            <div class="col-md-4">
+                                <label class="form-label" id="label_estado">Estado</label>
                                 <input type="text" class="form-control" name="endereco_entrega_estado" id="endereco_entrega_estado" value="">
                             </div>
                             <div class="col-12">
                                 <div class="form-text">Se o cliente não tiver endereço cadastrado, preencha aqui para criar e vincular ao pedido manual.</div>
+                                <div class="alert alert-info small mt-2" id="aviso_pais_impostos" style="display:none;">
+                                    <i class="fas fa-info-circle me-1"></i>Entrega fora do Brasil: impostos de importação brasileiros <strong>não serão cobrados</strong>. A tributação local é responsabilidade do destinatário.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1108,6 +1132,34 @@ function prefillRowFromExisting(tr, item){
     }
 }
 
+function onPaisChange() {
+    const pais = (document.getElementById('endereco_entrega_pais')?.value || 'BR').toUpperCase();
+    const isBR = (pais === 'BR');
+
+    // Adaptar labels e visibilidade
+    document.getElementById('label_cep').textContent = isBR ? 'CEP' : 'ZIP / Postal Code';
+    document.getElementById('label_endereco').textContent = isBR ? 'Endereço' : 'Address line 1';
+    document.getElementById('label_numero').textContent = isBR ? 'Número' : 'Number';
+    document.getElementById('label_complemento').textContent = isBR ? 'Complemento' : 'Address line 2';
+    document.getElementById('label_bairro').textContent = isBR ? 'Bairro' : 'District';
+    document.getElementById('label_cidade').textContent = isBR ? 'Cidade' : 'City';
+    document.getElementById('label_estado').textContent = isBR ? 'Estado' : 'State / Province';
+
+    // Mostrar/ocultar campos BR-only
+    document.getElementById('wrap_bairro').style.display = isBR ? '' : 'none';
+    document.getElementById('wrap_numero').style.display = isBR ? '' : 'none';
+
+    // Aviso de impostos
+    document.getElementById('aviso_pais_impostos').style.display = isBR ? 'none' : '';
+
+    // Recalcular totais (impostos mudam)
+    calcTotal();
+}
+
+function getSelectedPais() {
+    return (document.getElementById('endereco_entrega_pais')?.value || 'BR').toUpperCase();
+}
+
 function toggleBrinde(cb) {
     const tr = cb.closest('tr');
     const hidden = cb.previousElementSibling;
@@ -1315,6 +1367,7 @@ function calcTotal(){
     fd.append('subtotal', String(subtotal.toFixed(2)));
     fd.append('peso_total', String(pesoTotal.toFixed(3)));
     fd.append('itens', JSON.stringify(itensPayload));
+    fd.append('pais_entrega', getSelectedPais());
     fetch('/admin/pedidos/novo-manual/calcular-resumo', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
@@ -2914,6 +2967,13 @@ JS;
                 $taxaServico = $taxaServicoUsd * $taxaConversao;
                 $impostos = $impostosUsd * $taxaConversao;
                 $frete = $freteUsd * $taxaConversao;
+
+                // Zerar impostos para entregas fora do Brasil (BRL path)
+                $paisEntregaBrl = strtoupper(trim((string) $request->getParam('pais_entrega', 'BR')));
+                if ($paisEntregaBrl !== '' && $paisEntregaBrl !== 'BR') {
+                    $impostos = 0.0;
+                }
+
                 $total = $subtotal + $frete + $taxaServico + $impostos;
             } else {
                 $freteCalc = (float) $calcularFrete((float) $subtotal, (float) $pesoTotal);
@@ -2934,6 +2994,13 @@ JS;
                 $impostos = $impostosCalc;
                 $total = $subtotal + $frete + $taxaServico + $impostos;
                 error_log('[CALC_RESUMO_USD] subtotal=' . $subtotal . ' pesoTotal=' . $pesoTotal . ' taxaServico=' . $taxaServico . ' frete=' . $frete . ' impostos=' . $impostos . ' total=' . $total);
+            }
+
+            // Zerar impostos para entregas fora do Brasil
+            $paisEntrega = strtoupper(trim((string) $request->getParam('pais_entrega', 'BR')));
+            if ($paisEntrega !== '' && $paisEntrega !== 'BR') {
+                $total = $total - $impostos;
+                $impostos = 0.0;
             }
 
             // Imposto local do grupo de compras
