@@ -184,27 +184,38 @@ function stopWebRTC() {
 // ─── Toggle Câmera e Microfone ──────────────────────────────
 function toggleCamera() {
     if (!localStream) return;
-    var videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        var btn = document.getElementById('btnToggleCam');
-        if (btn) {
-            btn.classList.toggle('off', !videoTrack.enabled);
-            btn.innerHTML = videoTrack.enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
-        }
+    var tracks = localStream.getVideoTracks();
+    if (tracks.length === 0) return;
+    var videoTrack = tracks[0];
+    videoTrack.enabled = !videoTrack.enabled;
+    var btn = document.getElementById('btnToggleCam');
+    if (btn) {
+        btn.classList.toggle('off', !videoTrack.enabled);
+        btn.innerHTML = videoTrack.enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
     }
 }
 
 function toggleMic() {
     if (!localStream) return;
-    var audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        var btn = document.getElementById('btnToggleMic');
-        if (btn) {
-            btn.classList.toggle('off', !audioTrack.enabled);
-            btn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
-        }
+    var tracks = localStream.getAudioTracks();
+    if (tracks.length === 0) {
+        // Não tem audio track — pedir permissão de áudio
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(audioStream) {
+            var audioTrack = audioStream.getAudioTracks()[0];
+            localStream.addTrack(audioTrack);
+            // Mutar imediatamente para toggle funcionar
+            audioTrack.enabled = true;
+            var btn = document.getElementById('btnToggleMic');
+            if (btn) { btn.classList.remove('off'); btn.innerHTML = '<i class="fas fa-microphone"></i>'; }
+        }).catch(function() {});
+        return;
+    }
+    var audioTrack = tracks[0];
+    audioTrack.enabled = !audioTrack.enabled;
+    var btn = document.getElementById('btnToggleMic');
+    if (btn) {
+        btn.classList.toggle('off', !audioTrack.enabled);
+        btn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
     }
 }
 
@@ -345,8 +356,8 @@ function escapeHtml(text) {
 if (IS_LIVE) {
     connectSSE();
     if (IS_WEBRTC) {
-        // Tentar iniciar preview da câmera
-        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        // Tentar iniciar preview da câmera com áudio
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then(stream => {
                 const video = document.getElementById('localVideo');
                 if (video) { video.srcObject = stream; video.play(); }
