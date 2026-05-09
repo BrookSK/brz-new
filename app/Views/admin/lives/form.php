@@ -171,7 +171,7 @@ $isEdit = !empty($live);
 function filterProducts(term) {
     term = term.toLowerCase();
     document.querySelectorAll('.eligible-item').forEach(el => {
-        const name = el.dataset.name.toLowerCase();
+        const name = (el.dataset.name || el.textContent || '').toLowerCase();
         el.style.display = name.includes(term) ? '' : 'none';
     });
 }
