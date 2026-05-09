@@ -4485,7 +4485,7 @@ LINKSCRIPT;
                                                 echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante do pagamento dos produtos.</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
                                                     . '<input type="hidden" name="tipo_comprovante" value="produtos">'
-                                                    . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante" accept="image/*,application/pdf" required></div>'
+                                                    . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante[]" accept="image/*,application/pdf" multiple required></div>'
                                                     . '<button type="submit" class="btn btn-sm btn-primary">Anexar</button>'
                                                     . '</form>';
                                             }
@@ -4507,7 +4507,7 @@ LINKSCRIPT;
                                                 echo '<div class="alert alert-warning py-2 mb-2"><strong>Aguardando.</strong> Comprovante de taxas, impostos.</div>';
                                                 echo '<form method="POST" action="/admin/pedidos/upload-comprovante/' . (int) $pedido['id'] . '" enctype="multipart/form-data">'
                                                     . '<input type="hidden" name="tipo_comprovante" value="taxas">'
-                                                    . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante" accept="image/*,application/pdf" required></div>'
+                                                    . '<div class="mb-2"><input class="form-control form-control-sm" type="file" name="comprovante[]" accept="image/*,application/pdf" multiple required></div>'
                                                     . '<button type="submit" class="btn btn-sm btn-primary">Anexar</button>'
                                                     . '</form>';
                                             }
@@ -4860,31 +4860,37 @@ LINKSCRIPT;
 
             if (!isset($_FILES['comprovante']) || !is_array($_FILES['comprovante'])) {
                 $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+                return;
             }
 
-            $f = $_FILES['comprovante'];
-            $err = (int) ($f['error'] ?? UPLOAD_ERR_NO_FILE);
-            if ($err !== UPLOAD_ERR_OK) {
-                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
-            }
-
-            $tmp = (string) ($f['tmp_name'] ?? '');
-            $origName = (string) ($f['name'] ?? '');
-            $mime = (string) ($f['type'] ?? '');
-            if ($tmp === '' || !is_uploaded_file($tmp)) {
-                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
-            }
-
-            $ext = '';
-            if (strpos($origName, '.') !== false) {
-                $parts = explode('.', $origName);
-                $ext = strtolower(trim((string) end($parts)));
-                if ($ext !== '') {
-                    $ext = '.' . preg_replace('/[^a-z0-9]/', '', $ext);
+            // Suporte a múltiplos arquivos (name="comprovante[]")
+            $files = $_FILES['comprovante'];
+            $fileList = [];
+            if (is_array($files['name'] ?? null)) {
+                // Múltiplos arquivos
+                for ($i = 0; $i < count($files['name']); $i++) {
+                    if ((int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                        $fileList[] = [
+                            'tmp_name' => (string) $files['tmp_name'][$i],
+                            'name' => (string) $files['name'][$i],
+                            'type' => (string) $files['type'][$i],
+                        ];
+                    }
+                }
+            } else {
+                // Arquivo único (compatibilidade)
+                if ((int) ($files['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                    $fileList[] = [
+                        'tmp_name' => (string) $files['tmp_name'],
+                        'name' => (string) $files['name'],
+                        'type' => (string) $files['type'],
+                    ];
                 }
             }
-            if ($ext === '') {
-                $ext = '.bin';
+
+            if (empty($fileList)) {
+                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
+                return;
             }
 
             $baseDir = realpath(__DIR__ . '/../../public');
@@ -4896,13 +4902,29 @@ LINKSCRIPT;
                 @mkdir($targetDir, 0775, true);
             }
 
-            $fname = 'pedido_' . (int) $pedidoId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . $ext;
-            $absPath = rtrim($targetDir, '/\\') . '/' . $fname;
-            $relPath = '/uploads/comprovantes/' . $fname;
+            foreach ($fileList as $f) {
+                $tmp = (string) $f['tmp_name'];
+                $origName = (string) $f['name'];
+                if ($tmp === '' || !is_uploaded_file($tmp)) continue;
 
-            if (!move_uploaded_file($tmp, $absPath)) {
-                $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
-            }
+                $ext = '';
+                if (strpos($origName, '.') !== false) {
+                    $parts = explode('.', $origName);
+                    $ext = strtolower(trim((string) end($parts)));
+                    if ($ext !== '') {
+                        $ext = '.' . preg_replace('/[^a-z0-9]/', '', $ext);
+                    }
+                }
+                if ($ext === '') {
+                    $ext = '.bin';
+                }
+
+                $fname = 'pedido_' . (int) $pedidoId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . $ext;
+                $absPath = rtrim($targetDir, '/\\') . '/' . $fname;
+                $relPath = '/uploads/comprovantes/' . $fname;
+                $mime = (string) ($f['type'] ?? '');
+
+                if (!move_uploaded_file($tmp, $absPath)) continue;
 
             $colsDocs = [];
             try {
@@ -4977,6 +4999,7 @@ LINKSCRIPT;
                 $st = $pdo->prepare($sql);
                 $st->execute($params);
             }
+            } // end foreach fileList
 
             $this->redirect('/admin/pedidos/detalhes/' . (int) $pedidoId);
         } catch (\Exception $e) {
