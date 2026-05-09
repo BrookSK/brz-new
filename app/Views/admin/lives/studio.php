@@ -38,56 +38,55 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
         </div>
     </header>
 
-    <!-- Preview de vídeo -->
-    <section class="studio-preview">
-        <?php if ($isWebRTC): ?>
-            <video id="localVideo" autoplay muted playsinline></video>
-            <div id="cameraPlaceholder" class="camera-placeholder <?= $isLive ? 'd-none' : '' ?>">
-                <i class="fas fa-video fa-3x"></i>
-                <p>Câmera será ativada ao iniciar</p>
-            </div>
-        <?php else: ?>
-            <div class="obs-instructions">
-                <h5><i class="fas fa-desktop me-2"></i>Transmissão via OBS</h5>
-                <?php if ($isLive): ?>
-                    <div class="obs-credentials">
-                        <div class="mb-2">
-                            <label class="form-label text-white-50 small">URL do Servidor</label>
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control" value="<?= htmlspecialchars($live['cf_rtmps_url'] ?? '') ?>" readonly id="rtmpsUrl">
-                                <button class="btn btn-outline-light" onclick="copyToClipboard('rtmpsUrl')">
-                                    <i class="fas fa-copy"></i>
-                                </button>
+    <!-- Área esquerda (vídeo + controles) -->
+    <div class="studio-left">
+        <section class="studio-preview">
+            <?php if ($isWebRTC): ?>
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div id="cameraPlaceholder" class="camera-placeholder <?= $isLive ? 'd-none' : '' ?>">
+                    <i class="fas fa-video fa-3x"></i>
+                    <p>Câmera será ativada ao iniciar</p>
+                </div>
+            <?php else: ?>
+                <div class="obs-instructions">
+                    <h5><i class="fas fa-desktop me-2"></i>Transmissão via OBS</h5>
+                    <?php if ($isLive): ?>
+                        <div class="obs-credentials">
+                            <div class="mb-2">
+                                <label class="form-label text-white-50 small">URL do Servidor</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" value="<?= htmlspecialchars($live['cf_rtmps_url'] ?? '') ?>" readonly id="rtmpsUrl">
+                                    <button class="btn btn-outline-light" onclick="copyToClipboard('rtmpsUrl')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-label text-white-50 small">Chave de Transmissão</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="password" class="form-control" value="<?= htmlspecialchars($live['cf_rtmps_key'] ?? '') ?>" readonly id="rtmpsKey">
+                                    <button class="btn btn-outline-light" onclick="toggleShow('rtmpsKey')">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-light" onclick="copyToClipboard('rtmpsKey')">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <label class="form-label text-white-50 small">Chave de Transmissão</label>
-                            <div class="input-group input-group-sm">
-                                <input type="password" class="form-control" value="<?= htmlspecialchars($live['cf_rtmps_key'] ?? '') ?>" readonly id="rtmpsKey">
-                                <button class="btn btn-outline-light" onclick="toggleShow('rtmpsKey')">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn btn-outline-light" onclick="copyToClipboard('rtmpsKey')">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <p class="text-white-50">Inicie a live para obter as credenciais RTMPS</p>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-    </section>
+                    <?php else: ?>
+                        <p class="text-white-50">Inicie a live para obter as credenciais RTMPS</p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+        </section>
 
-    <!-- Botão principal -->
-    <section class="studio-controls">
-        <?php if (!$isLive): ?>
-            <button id="btnStart" class="btn-live btn-live-start" onclick="startLive()">
-                <i class="fas fa-play me-2"></i> INICIAR LIVE
-            </button>
-        <?php else: ?>
-            <div class="d-flex align-items-center gap-3 justify-content-center">
+        <section class="studio-controls">
+            <?php if (!$isLive): ?>
+                <button id="btnStart" class="btn-live btn-live-start" onclick="startLive()">
+                    <i class="fas fa-play me-2"></i> INICIAR LIVE
+                </button>
+            <?php else: ?>
                 <button id="btnToggleCam" class="btn-media-toggle" onclick="toggleCamera()" title="Câmera">
                     <i class="fas fa-video"></i>
                 </button>
@@ -97,11 +96,11 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
                 <button id="btnStop" class="btn-live btn-live-stop" onclick="stopLive()">
                     <i class="fas fa-stop me-2"></i> ENCERRAR LIVE
                 </button>
-            </div>
-        <?php endif; ?>
-    </section>
+            <?php endif; ?>
+        </section>
+    </div>
 
-    <!-- Painéis inferiores (drawer) -->
+    <!-- Painéis (direita) -->
     <section class="studio-panels">
         <!-- Tabs -->
         <div class="panel-tabs">
