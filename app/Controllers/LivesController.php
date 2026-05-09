@@ -93,13 +93,6 @@ class LivesController {
             return;
         }
 
-        // Se live ainda não começou, mostrar página de espera
-        if ($live['status'] === 'scheduled') {
-            $title = $live['title'] . ' - Em breve';
-        } else {
-            $title = $live['title'];
-        }
-
         // Dados para a view
         $products = $this->liveProductModel->getByLiveId($id);
         $featuredHistory = $this->featuredEventModel->getHistory($id);
@@ -122,7 +115,16 @@ class LivesController {
             $hasCard = !empty($defaultCard);
         }
 
-        require __DIR__ . '/../Views/lives/watch.php';
+        // Se live está ao vivo → player full-screen (TikTok-style)
+        if ($live['status'] === 'live') {
+            $title = $live['title'];
+            include __DIR__ . '/../Views/lives/watch.php';
+            return;
+        }
+
+        // Se agendada ou encerrada → layout normal do site
+        $title = $live['title'] . ' - Lives';
+        include __DIR__ . '/../Views/lives/watch-layout.php';
     }
 
     /**
