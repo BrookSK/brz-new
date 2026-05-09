@@ -181,6 +181,33 @@ function stopWebRTC() {
     }
 }
 
+// ─── Toggle Câmera e Microfone ──────────────────────────────
+function toggleCamera() {
+    if (!localStream) return;
+    var videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        var btn = document.getElementById('btnToggleCam');
+        if (btn) {
+            btn.classList.toggle('off', !videoTrack.enabled);
+            btn.innerHTML = videoTrack.enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
+        }
+    }
+}
+
+function toggleMic() {
+    if (!localStream) return;
+    var audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        var btn = document.getElementById('btnToggleMic');
+        if (btn) {
+            btn.classList.toggle('off', !audioTrack.enabled);
+            btn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
+        }
+    }
+}
+
 // ─── Destacar Produto ───────────────────────────────────────
 async function toggleFeature(productId) {
     const newId = (currentFeaturedId === productId) ? null : productId;

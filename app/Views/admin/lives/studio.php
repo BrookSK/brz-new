@@ -87,9 +87,17 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
                 <i class="fas fa-play me-2"></i> INICIAR LIVE
             </button>
         <?php else: ?>
-            <button id="btnStop" class="btn-live btn-live-stop" onclick="stopLive()">
-                <i class="fas fa-stop me-2"></i> ENCERRAR LIVE
-            </button>
+            <div class="d-flex align-items-center gap-3 justify-content-center">
+                <button id="btnToggleCam" class="btn-media-toggle" onclick="toggleCamera()" title="Câmera">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button id="btnToggleMic" class="btn-media-toggle" onclick="toggleMic()" title="Microfone">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="btnStop" class="btn-live btn-live-stop" onclick="stopLive()">
+                    <i class="fas fa-stop me-2"></i> ENCERRAR LIVE
+                </button>
+            </div>
         <?php endif; ?>
     </section>
 
