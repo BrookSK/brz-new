@@ -315,6 +315,7 @@ $router->post('/admin/lives/{id}/stop', 'AdminLivesController', 'stop');
 $router->post('/admin/lives/{id}/feature', 'AdminLivesController', 'feature');
 
 // Admin — Produtos da Live
+$router->get('/admin/lives/buscar-produtos', 'AdminLivesController', 'searchProducts');
 $router->post('/admin/lives/{id}/products', 'AdminLivesController', 'addProduct');
 $router->post('/admin/lives/{id}/products/{lpId}/update', 'AdminLivesController', 'updateProduct');
 $router->post('/admin/lives/{id}/products/{lpId}/remove', 'AdminLivesController', 'removeProduct');

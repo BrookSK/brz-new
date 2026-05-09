@@ -131,35 +131,9 @@ $isEdit = !empty($live);
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="text" class="form-control mb-3" placeholder="Buscar produto..." id="searchProduct">
+                <input type="text" class="form-control mb-3" placeholder="Digite o nome do produto..." id="searchProduct" autocomplete="off">
                 <div id="eligibleList" style="max-height:300px;overflow-y:auto">
-                    <?php foreach ($eligibleProducts as $ep): 
-                        $img = $ep['foto_principal'] ?? '';
-                        if (empty($img) && !empty($ep['imagens'])) {
-                            $imgs = json_decode($ep['imagens'], true);
-                            if (is_array($imgs) && !empty($imgs)) $img = $imgs[0];
-                            elseif (is_string($ep['imagens'])) $img = explode(',', $ep['imagens'])[0];
-                        }
-                    ?>
-                        <div class="eligible-item d-flex align-items-center p-2 border-bottom" 
-                             data-id="<?= $ep['id'] ?>" data-name="<?= htmlspecialchars($ep['nome'] ?? '') ?>"
-                             data-price="<?= (float)($ep['preco'] ?? 0) ?>" data-img="<?= htmlspecialchars($img) ?>">
-                            <div style="width:45px;height:45px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center">
-                                <?php if (!empty($img)): ?>
-                                    <img src="<?= htmlspecialchars($img) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
-                                <?php else: ?>
-                                    <i class="fas fa-image text-muted"></i>
-                                <?php endif; ?>
-                            </div>
-                            <div class="flex-grow-1">
-                                <strong><?= htmlspecialchars($ep['nome'] ?? 'Produto #' . $ep['id']) ?></strong>
-                                <br><small>R$ <?= number_format((float)($ep['preco'] ?? 0), 2, ',', '.') ?></small>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-success" onclick="addProductToLive(this)">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    <?php endforeach; ?>
+                    <p class="text-center text-muted py-3" id="searchHint">Digite para buscar produtos</p>
                 </div>
             </div>
         </div>
@@ -167,31 +141,65 @@ $isEdit = !empty($live);
 </div>
 
 <script>
-function filterProducts(term) {
-    term = (term || '').toLowerCase().trim();
-    var items = document.querySelectorAll('#eligibleList .eligible-item');
-    for (var i = 0; i < items.length; i++) {
-        var el = items[i];
-        var text = (el.getAttribute('data-name') || '') + ' ' + (el.innerText || '');
-        if (term === '' || text.toLowerCase().indexOf(term) !== -1) {
-            el.style.display = '';
-        } else {
-            el.style.display = 'none';
-        }
-    }
-}
+var searchTimer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     var searchInput = document.getElementById('searchProduct');
     if (searchInput) {
         searchInput.addEventListener('input', function() {
-            filterProducts(this.value);
+            var term = this.value.trim();
+            clearTimeout(searchTimer);
+            if (term.length < 2) {
+                document.getElementById('eligibleList').innerHTML = '<p class="text-center text-muted py-3">Digite pelo menos 2 caracteres</p>';
+                return;
+            }
+            searchTimer = setTimeout(function() { searchProducts(term); }, 300);
         });
-        searchInput.addEventListener('keyup', function() {
-            filterProducts(this.value);
-        });
+
+        // Focar no input ao abrir o modal
+        var modal = document.getElementById('addProductModal');
+        if (modal) {
+            modal.addEventListener('shown.bs.modal', function() {
+                searchInput.value = '';
+                searchInput.focus();
+                document.getElementById('eligibleList').innerHTML = '<p class="text-center text-muted py-3">Digite para buscar produtos</p>';
+            });
+        }
     }
 });
+
+function searchProducts(term) {
+    var list = document.getElementById('eligibleList');
+    list.innerHTML = '<p class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> Buscando...</p>';
+
+    fetch('/admin/lives/buscar-produtos?q=' + encodeURIComponent(term))
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (!data.products || data.products.length === 0) {
+                list.innerHTML = '<p class="text-center text-muted py-3">Nenhum produto encontrado</p>';
+                return;
+            }
+            var html = '';
+            data.products.forEach(function(p) {
+                // Verificar se já está adicionado
+                if (document.querySelector('#productsList [data-product-id="' + p.id + '"]')) return;
+
+                var imgHtml = p.image 
+                    ? '<img src="' + p.image + '" style="width:100%;height:100%;object-fit:cover" alt="">'
+                    : '<i class="fas fa-image text-muted"></i>';
+
+                html += '<div class="eligible-item d-flex align-items-center p-2 border-bottom" data-id="' + p.id + '" data-name="' + (p.name || '').replace(/"/g, '&quot;') + '" data-price="' + p.price + '" data-img="' + (p.image || '') + '">'
+                    + '<div style="width:45px;height:45px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center">' + imgHtml + '</div>'
+                    + '<div class="flex-grow-1"><strong>' + (p.name || 'Produto #' + p.id) + '</strong><br><small>R$ ' + parseFloat(p.price).toFixed(2).replace('.', ',') + '</small></div>'
+                    + '<button type="button" class="btn btn-sm btn-success" onclick="addProductToLive(this)"><i class="fas fa-plus"></i></button>'
+                    + '</div>';
+            });
+            list.innerHTML = html || '<p class="text-center text-muted py-3">Nenhum produto encontrado</p>';
+        })
+        .catch(function() {
+            list.innerHTML = '<p class="text-center text-muted py-3">Erro na busca</p>';
+        });
+}
 
 function addProductToLive(btn) {
     const item = btn.closest('.eligible-item');

@@ -413,6 +413,54 @@ class AdminLivesController {
         $this->jsonResponse(['success' => true]);
     }
 
+    /**
+     * Busca produtos por nome (AJAX autocomplete)
+     */
+    public function searchProducts(Request $request) {
+        $q = trim($request->getParam('q') ?? '');
+        if (mb_strlen($q) < 2) {
+            $this->jsonResponse(['products' => []]);
+            return;
+        }
+
+        $produto = new Produto();
+        $pdo = $produto->getConnection();
+        $stmt = $pdo->prepare(
+            "SELECT id, name, price, sale_price, foto_principal, images
+             FROM produtos 
+             WHERE active = 1 AND name LIKE :q
+             ORDER BY name ASC
+             LIMIT 20"
+        );
+        $stmt->execute([':q' => '%' . $q . '%']);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $products = array_map(function($r) {
+            $img = $r['foto_principal'] ?? '';
+            if (empty($img) && !empty($r['images'])) {
+                $imgs = json_decode($r['images'], true);
+                if (is_array($imgs) && !empty($imgs)) {
+                    $img = $imgs[0];
+                    // Se for só nome de arquivo, adicionar path
+                    if (!empty($img) && strpos($img, '/') === false && strpos($img, 'http') !== 0) {
+                        $img = '/uploads/produtos/' . $img;
+                    }
+                }
+            }
+            if (!empty($img) && strpos($img, '/') === false && strpos($img, 'http') !== 0) {
+                $img = '/uploads/produtos/' . $img;
+            }
+            return [
+                'id' => (int)$r['id'],
+                'name' => $r['name'],
+                'price' => (float)($r['sale_price'] ?: $r['price']),
+                'image' => $img,
+            ];
+        }, $rows);
+
+        $this->jsonResponse(['products' => $products]);
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────
 
     private function getEligibleProducts(): array {
