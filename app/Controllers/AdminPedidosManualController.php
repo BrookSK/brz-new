@@ -3086,7 +3086,7 @@ JS;
             $bairroCol = in_array('bairro', $cols, true) ? 'bairro' : '';
             $cidadeCol = in_array('cidade', $cols, true) ? 'cidade' : '';
             $estadoCol = in_array('estado', $cols, true) ? 'estado' : (in_array('uf', $cols, true) ? 'uf' : '');
-            $paisCol = in_array('pais', $cols, true) ? 'pais' : (in_array('country', $cols, true) ? 'country' : '');
+            $paisCol = in_array('pais', $cols, true) ? 'pais' : (in_array('country', $cols, true) ? 'country' : (in_array('country_code', $cols, true) ? 'country_code' : (in_array('pais_code', $cols, true) ? 'pais_code' : '')));
             $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
 
             $select = ['id'];
@@ -3130,6 +3130,7 @@ JS;
                     'bairro' => (string) ($row['bairro'] ?? ''),
                     'cidade' => (string) ($row['cidade'] ?? ''),
                     'estado' => (string) ($row['estado'] ?? ''),
+                    'pais' => strtoupper(trim((string) ($row['pais'] ?? 'BR'))),
                 ],
             ]);
         } catch (\Exception $e) {
