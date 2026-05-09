@@ -24,10 +24,15 @@ class AdminLivesConfigController {
         $config = $this->shoppingService->getConfig();
         $credentials = $this->streamService->getCredentials();
         $quota = $this->shoppingService->checkQuota();
-        $activePage = 'lives';
+        $activePage = 'lives-config';
         $title = 'Configurações - Lives';
+        $sidebarActive = 'lives-config';
 
-        require __DIR__ . '/../Views/admin/lives/config.php';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/lives/config.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
     }
 
     /**
