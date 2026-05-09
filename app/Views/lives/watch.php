@@ -45,7 +45,7 @@ ob_start();
                 <div class="position-absolute top-0 start-0 end-0 p-3" style="background:linear-gradient(to bottom,rgba(0,0,0,0.5),transparent);z-index:5">
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge bg-danger" style="animation:pulse 2s infinite"><i class="fas fa-circle me-1" style="font-size:6px"></i> AO VIVO</span>
-                        <span class="text-white small"><i class="fas fa-eye"></i> <span id="viewers">0</span></span>
+                        <span class="text-white small"><i class="fas fa-eye"></i> <span id="viewers"><?= (int)($live['viewers_current'] ?? 0) ?></span></span>
                     </div>
                 </div>
             <?php endif; ?>
@@ -54,11 +54,11 @@ ob_start();
             <div class="position-absolute end-0 d-flex flex-column align-items-center gap-3" style="bottom:100px;right:12px;z-index:5">
                 <button class="btn btn-link text-white text-center p-0" id="btnLike" onclick="sendLike()" style="text-decoration:none">
                     <i class="fas fa-heart" style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
-                    <br><small id="likeCount">0</small>
+                    <br><small id="likeCount"><?= (int)($live['likes_count'] ?? 0) ?></small>
                 </button>
                 <button class="btn btn-link text-white text-center p-0" onclick="shareModal()" style="text-decoration:none">
                     <i class="fas fa-share" style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
-                    <br><small id="shareCount">0</small>
+                    <br><small id="shareCount"><?= (int)($live['shares_count'] ?? 0) ?></small>
                 </button>
                 <button class="btn btn-link text-white text-center p-0" onclick="toggleChat()" style="text-decoration:none">
                     <i class="fas fa-comment" style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
