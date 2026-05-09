@@ -98,16 +98,13 @@ class LivesController {
         $featuredHistory = $this->featuredEventModel->getHistory($id);
         $playbackUrl = $live['cf_playback_url'] ?? '';
         
-        // Gerar URL assinada se necessário
         if (!empty($playbackUrl)) {
             $playbackUrl = $this->streamService->generateSignedPlaybackUrl($playbackUrl);
         }
 
-        // Dados do usuário logado
         $userId = (int) ($_SESSION['usuario_id'] ?? 0);
         $isLoggedIn = $userId > 0;
 
-        // Verificar se tem cartão cadastrado
         $hasCard = false;
         if ($isLoggedIn) {
             $paymentMethod = new \App\Models\CustomerPaymentMethod();
@@ -117,7 +114,14 @@ class LivesController {
 
         $title = $live['title'] . ' - Lives';
 
-        include __DIR__ . '/../Views/lives/watch.php';
+        // Se live está ao vivo → player full-screen TikTok (sem menu/footer)
+        if ($live['status'] === 'live') {
+            include __DIR__ . '/../Views/lives/watch-fullscreen.php';
+            return;
+        }
+
+        // Agendada ou encerrada → página normal com layout do site
+        include __DIR__ . '/../Views/lives/detail.php';
     }
 
     /**
