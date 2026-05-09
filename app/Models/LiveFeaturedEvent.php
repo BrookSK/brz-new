@@ -36,8 +36,8 @@ class LiveFeaturedEvent extends Model {
     public function getHistory(int $liveId): array {
         $stmt = $this->connection->prepare(
             "SELECT fe.*, 
-                    COALESCE(lp.override_name, p.name, p.nome) AS product_name,
-                    COALESCE(lp.override_price, p.sale_price, p.price, p.preco) AS product_price,
+                    COALESCE(lp.override_name, p.name) AS product_name,
+                    COALESCE(lp.override_price, CASE WHEN p.sale_price > 0 THEN p.sale_price ELSE p.price END) AS product_price,
                     COALESCE(lp.override_image, p.foto_principal) AS product_image
              FROM {$this->table} fe
              LEFT JOIN live_products lp ON lp.live_id = fe.live_id AND lp.product_id = fe.product_id

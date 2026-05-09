@@ -23,7 +23,7 @@ class LiveOrder extends Model {
         $stmt = $this->connection->prepare(
             "SELECT lo.*, 
                     p.id AS pedido_id, p.total AS pedido_total, p.status AS pedido_status,
-                    COALESCE(pr.name, pr.nome) AS produto_nome
+                    pr.name AS produto_nome
              FROM {$this->table} lo
              LEFT JOIN pedidos p ON p.id = lo.order_id
              LEFT JOIN produtos pr ON pr.id = lo.product_id
@@ -41,7 +41,7 @@ class LiveOrder extends Model {
     public function getConversionReport(int $liveId): array {
         $stmt = $this->connection->prepare(
             "SELECT lo.product_id,
-                    COALESCE(pr.name, pr.nome) AS produto_nome,
+                    pr.name AS produto_nome,
                     COUNT(*) AS total_pedidos,
                     SUM(CASE WHEN p.status IN ('paid','pago','aprovado') THEN 1 ELSE 0 END) AS pedidos_pagos,
                     SUM(CASE WHEN p.status IN ('paid','pago','aprovado') THEN p.total ELSE 0 END) AS faturamento

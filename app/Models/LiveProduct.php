@@ -10,14 +10,13 @@ class LiveProduct extends Model {
     public function getByLiveId(int $liveId): array {
         $stmt = $this->connection->prepare(
             "SELECT lp.*, 
-                    COALESCE(lp.override_name, p.name, p.nome) AS display_name,
-                    COALESCE(lp.override_price, p.sale_price, p.price, p.preco) AS display_price,
-                    COALESCE(lp.override_weight, p.weight, p.peso) AS display_weight,
-                    COALESCE(lp.override_image, p.foto_principal, 
-                        SUBSTRING_INDEX(COALESCE(p.images, p.imagens, ''), ',', 1)) AS display_image,
-                    COALESCE(p.name, p.nome) AS original_name,
-                    COALESCE(p.price, p.preco) AS original_price,
-                    COALESCE(p.description, p.descricao, '') AS original_description
+                    COALESCE(lp.override_name, p.name) AS display_name,
+                    COALESCE(lp.override_price, CASE WHEN p.sale_price > 0 THEN p.sale_price ELSE p.price END) AS display_price,
+                    COALESCE(lp.override_weight, p.weight) AS display_weight,
+                    COALESCE(lp.override_image, p.foto_principal) AS display_image,
+                    p.name AS original_name,
+                    p.price AS original_price,
+                    COALESCE(p.description, '') AS original_description
              FROM {$this->table} lp
              LEFT JOIN produtos p ON p.id = lp.product_id
              WHERE lp.live_id = :live_id
@@ -34,12 +33,11 @@ class LiveProduct extends Model {
     public function getByLiveAndProduct(int $liveId, int $productId): ?array {
         $stmt = $this->connection->prepare(
             "SELECT lp.*, 
-                    COALESCE(lp.override_name, p.name, p.nome) AS display_name,
-                    COALESCE(lp.override_price, p.sale_price, p.price, p.preco) AS display_price,
-                    COALESCE(lp.override_weight, p.weight, p.peso) AS display_weight,
-                    COALESCE(lp.override_image, p.foto_principal,
-                        SUBSTRING_INDEX(COALESCE(p.images, p.imagens, ''), ',', 1)) AS display_image,
-                    COALESCE(p.description, p.descricao, '') AS original_description
+                    COALESCE(lp.override_name, p.name) AS display_name,
+                    COALESCE(lp.override_price, CASE WHEN p.sale_price > 0 THEN p.sale_price ELSE p.price END) AS display_price,
+                    COALESCE(lp.override_weight, p.weight) AS display_weight,
+                    COALESCE(lp.override_image, p.foto_principal) AS display_image,
+                    COALESCE(p.description, '') AS original_description
              FROM {$this->table} lp
              LEFT JOIN produtos p ON p.id = lp.product_id
              WHERE lp.live_id = :live_id AND lp.product_id = :product_id
