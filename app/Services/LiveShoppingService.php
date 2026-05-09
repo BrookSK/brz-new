@@ -173,19 +173,18 @@ class LiveShoppingService {
     public function checkQuota(): array {
         $config = $this->getConfig();
         $minutosInclusos = (int) ($config['minutos_inclusos'] ?? 300);
-        $modoExcedente = $config['modo_excedente'] ?? 'block';
 
         $usage = $this->streamingUsageModel->getCurrentMonth();
         $minutosUsados = (int) $usage['minutes_streamed'];
 
-        $exceeded = $minutosUsados >= $minutosInclusos;
+        // Se minutos_inclusos = 0, cota desativada (sem limite)
+        $exceeded = ($minutosInclusos > 0) && ($minutosUsados >= $minutosInclusos);
 
         return [
             'minutes_used' => $minutosUsados,
             'minutes_included' => $minutosInclusos,
             'exceeded' => $exceeded,
-            'mode' => $modoExcedente,
-            'can_stream' => !$exceeded || $modoExcedente === 'charge',
+            'can_stream' => !$exceeded,
         ];
     }
 

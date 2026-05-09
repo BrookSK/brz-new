@@ -92,22 +92,7 @@ $modo = $config['modo_operacao'] ?? 'desligado';
                             <label class="form-label">Minutos inclusos por mês</label>
                             <input type="number" name="minutos_inclusos" class="form-control" min="0"
                                    value="<?= (int)($config['minutos_inclusos'] ?? 300) ?>">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Ao exceder a cota</label>
-                            <select name="modo_excedente" class="form-select">
-                                <option value="block" <?= ($config['modo_excedente'] ?? 'block') === 'block' ? 'selected' : '' ?>>
-                                    Bloquear novas lives
-                                </option>
-                                <option value="charge" <?= ($config['modo_excedente'] ?? '') === 'charge' ? 'selected' : '' ?>>
-                                    Cobrar por minuto excedente
-                                </option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Preço por minuto excedente (R$)</label>
-                            <input type="number" name="preco_minuto_excedente" class="form-control" min="0" step="0.01"
-                                   value="<?= number_format((float)($config['preco_minuto_excedente'] ?? 0), 2, '.', '') ?>">
+                            <small class="text-muted">Ao atingir esse limite, novas lives serão bloqueadas até o próximo mês. Coloque 0 para desativar o controle.</small>
                         </div>
 
                         <!-- Uso atual -->
