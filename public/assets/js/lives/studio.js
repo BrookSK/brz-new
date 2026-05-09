@@ -124,44 +124,58 @@ async function startWebRTC(whipUrl) {
         const placeholder = document.getElementById('cameraPlaceholder');
         if (placeholder) placeholder.classList.add('d-none');
 
-        // WHIP: criar PeerConnection e enviar SDP
+        // WHIP: criar PeerConnection e enviar SDP para Cloudflare
         peerConnection = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }]
+            iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+            bundlePolicy: 'max-bundle'
         });
 
+        // Adicionar tracks ao peer connection
         localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
+            peerConnection.addTransceiver(track, { direction: 'sendonly' });
         });
 
+        // Criar offer
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        // Esperar ICE gathering
-        await new Promise(resolve => {
+        // Esperar ICE gathering completar
+        await new Promise((resolve) => {
             if (peerConnection.iceGatheringState === 'complete') {
                 resolve();
             } else {
-                peerConnection.addEventListener('icegatheringstatechange', () => {
-                    if (peerConnection.iceGatheringState === 'complete') resolve();
-                });
+                const checkState = () => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        peerConnection.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                };
+                peerConnection.addEventListener('icegatheringstatechange', checkState);
+                // Timeout de 5s
+                setTimeout(resolve, 5000);
             }
         });
 
-        // Enviar SDP para WHIP endpoint
+        // Enviar SDP para WHIP endpoint do Cloudflare
         const response = await fetch(whipUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/sdp' },
+            headers: {
+                'Content-Type': 'application/sdp'
+            },
             body: peerConnection.localDescription.sdp
         });
 
-        if (response.ok) {
+        if (response.ok || response.status === 201) {
             const answerSdp = await response.text();
             await peerConnection.setRemoteDescription({
                 type: 'answer',
                 sdp: answerSdp
             });
+            console.log('WHIP connected successfully');
         } else {
-            console.error('WHIP error:', response.status);
+            const errText = await response.text();
+            console.error('WHIP error:', response.status, errText);
+            alert('Erro ao conectar stream: ' + response.status + '. Verifique as credenciais do Cloudflare.');
         }
 
     } catch (e) {

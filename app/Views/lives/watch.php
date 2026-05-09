@@ -16,20 +16,14 @@ ob_start();
     <!-- Player da Live -->
     <div class="live-player-wrapper mb-4">
         <div class="live-video-container position-relative" style="border-radius:16px;overflow:hidden;background:#000;aspect-ratio:9/16;max-height:70vh;margin:0 auto;max-width:400px">
-            <?php if ($isActive && !empty($playbackUrl)): ?>
+            <?php if ($isActive): ?>
                 <video id="liveVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
-            <?php elseif ($isActive && empty($playbackUrl)): ?>
-                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white text-center p-4" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
-                    <?php if (!empty($live['cover_url'])): ?>
-                        <img src="<?= htmlspecialchars($live['cover_url']) ?>" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0.4" alt="">
-                    <?php endif; ?>
-                    <div style="position:relative;z-index:2">
-                        <div class="mb-3"><span class="badge bg-danger" style="animation:pulse 2s infinite;font-size:14px"><i class="fas fa-circle me-1" style="font-size:8px"></i> AO VIVO</span></div>
-                        <h3><?= htmlspecialchars($live['title']) ?></h3>
-                        <p class="text-white-50">Transmissão em andamento</p>
-                        <p class="text-white-50 small">O vídeo estará disponível em instantes...</p>
+                <?php if (empty($playbackUrl)): ?>
+                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#fff;z-index:2">
+                        <div class="mb-2"><span class="badge bg-danger" style="animation:pulse 2s infinite;font-size:14px"><i class="fas fa-circle me-1" style="font-size:8px"></i> AO VIVO</span></div>
+                        <p class="text-white-50 small">Conectando ao stream...</p>
                     </div>
-                </div>
+                <?php endif; ?>
             <?php elseif ($live['status'] === 'ended' && !empty($live['recording_url'])): ?>
                 <video id="liveVideo" controls playsinline style="width:100%;height:100%;object-fit:cover"></video>
             <?php elseif ($live['status'] === 'scheduled'): ?>
