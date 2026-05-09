@@ -119,13 +119,17 @@ function sendLike() {
     if (!IS_LOGGED_IN) return;
     if (likeThrottle) return;
 
+    // Atualizar contador imediatamente (otimista)
+    var countEl = document.getElementById('likeCount');
+    countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+
     // Animação de coração
     spawnHeart();
 
     // Enviar ao servidor
     fetch(`/api/live/${LIVE_ID}/like`, { method: 'POST' }).catch(() => {});
 
-    // Throttle visual (não bloquear completamente)
+    // Throttle visual
     likeThrottle = true;
     setTimeout(() => { likeThrottle = false; }, 200);
 
@@ -148,6 +152,10 @@ function spawnHeart() {
 
 // ─── Compartilhar ───────────────────────────────────────────
 function shareModal() {
+    // Atualizar contador imediatamente
+    var countEl = document.getElementById('shareCount');
+    countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+
     if (navigator.share) {
         navigator.share({
             title: document.title,
@@ -200,19 +208,23 @@ function showPaywall(data) {
     showToast(`Tempo grátis esgotado. Desbloqueie por R$ ${formatPrice(data.unlock_price)}`, 'info');
 }
 
+// ─── Toggle Produtos ────────────────────────────────────────
+function toggleProducts() {
+    var section = document.getElementById('productsSection');
+    if (section) {
+        if (section.style.display === 'none') {
+            section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            section.style.display = 'none';
+        }
+    }
+}
+
 // ─── Chat Toggle ────────────────────────────────────────────
 function toggleChat() {
     const overlay = document.getElementById('chatOverlay');
     overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
-}
-
-// ─── Drawer de Produtos ─────────────────────────────────────
-function showProductsDrawer() {
-    document.getElementById('productsDrawer').classList.add('open');
-}
-
-function closeProductsDrawer() {
-    document.getElementById('productsDrawer').classList.remove('open');
 }
 
 function selectProduct(productId, el) {

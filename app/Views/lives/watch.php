@@ -63,7 +63,7 @@ ob_start();
                 <button class="btn btn-link text-white text-center p-0" onclick="toggleChat()" style="text-decoration:none">
                     <i class="fas fa-comment" style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
                 </button>
-                <button class="btn btn-link text-white text-center p-0" onclick="showProductsDrawer()" style="text-decoration:none">
+                <button class="btn btn-link text-white text-center p-0" onclick="toggleProducts()" style="text-decoration:none">
                     <i class="fas fa-shopping-bag" style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
                     <br><small><?= count($products) ?></small>
                 </button>
@@ -77,8 +77,8 @@ ob_start();
                 <div id="chatMessages" style="overflow-y:auto;max-height:150px;display:flex;flex-direction:column;gap:4px;mask-image:linear-gradient(to bottom,transparent 0%,black 30%)"></div>
                 <?php if ($isLoggedIn): ?>
                     <div class="d-flex gap-2 mt-2">
-                        <input type="text" id="chatInput" class="form-control form-control-sm" placeholder="Enviar mensagem..." maxlength="500" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:20px;font-size:13px" onkeydown="if(event.key==='Enter')sendChat()">
-                        <button onclick="sendChat()" class="btn btn-sm btn-danger" style="border-radius:50%;width:32px;height:32px;padding:0"><i class="fas fa-paper-plane" style="font-size:12px"></i></button>
+                        <input type="text" id="chatInput" class="form-control" placeholder="Enviar mensagem..." maxlength="500" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:24px;font-size:14px;padding:10px 18px" onkeydown="if(event.key==='Enter')sendChat()">
+                        <button onclick="sendChat()" class="btn btn-danger" style="border-radius:50%;width:42px;height:42px;padding:0;flex-shrink:0"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 <?php else: ?>
                     <a href="/login?redirect=/lives/<?= $liveId ?>" class="d-block text-center small text-white-50 mt-2" style="background:rgba(0,0,0,0.3);border-radius:20px;padding:8px">Faça login para participar do chat</a>
@@ -99,25 +99,27 @@ ob_start();
         </div>
     </div>
 
-    <!-- Produtos da live (abaixo do player) -->
+    <!-- Produtos da live (oculto, aparece ao clicar na sacolinha) -->
     <?php if (!empty($products)): ?>
-        <h5 class="mb-3"><i class="fas fa-shopping-bag me-2"></i>Produtos desta live</h5>
-        <div class="row g-3 mb-4">
-            <?php foreach ($products as $p): ?>
-                <div class="col-6 col-md-4 col-lg-3">
-                    <div class="card h-100 border-0 shadow-sm" style="border-radius:12px;overflow:hidden;cursor:pointer" onclick="selectProduct(<?= $p['product_id'] ?>)">
-                        <?php if (!empty($p['display_image'])): ?>
-                            <img src="<?= htmlspecialchars($p['display_image']) ?>" class="card-img-top" style="height:120px;object-fit:cover" alt="">
-                        <?php else: ?>
-                            <div class="card-img-top d-flex align-items-center justify-content-center" style="height:120px;background:#f5f5f5"><i class="fas fa-image fa-2x text-muted"></i></div>
-                        <?php endif; ?>
-                        <div class="card-body p-2">
-                            <small class="d-block text-dark" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
-                            <strong class="text-danger">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
+        <div id="productsSection" style="display:none">
+            <h5 class="mb-3"><i class="fas fa-shopping-bag me-2"></i>Produtos desta live</h5>
+            <div class="row g-3 mb-4">
+                <?php foreach ($products as $p): ?>
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <div class="card h-100 border-0 shadow-sm" style="border-radius:12px;overflow:hidden;cursor:pointer" onclick="selectProduct(<?= $p['product_id'] ?>)">
+                            <?php if (!empty($p['display_image'])): ?>
+                                <img src="<?= htmlspecialchars($p['display_image']) ?>" class="card-img-top" style="height:120px;object-fit:cover" alt="">
+                            <?php else: ?>
+                                <div class="card-img-top d-flex align-items-center justify-content-center" style="height:120px;background:#f5f5f5"><i class="fas fa-image fa-2x text-muted"></i></div>
+                            <?php endif; ?>
+                            <div class="card-body p-2">
+                                <small class="d-block text-dark" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
+                                <strong class="text-danger">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
+                            </div>
                         </div>
                     </div>
-                </div>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
         </div>
     <?php endif; ?>
 </div>
