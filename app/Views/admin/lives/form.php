@@ -131,8 +131,7 @@ $isEdit = !empty($live);
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="text" class="form-control mb-3" placeholder="Buscar produto..." id="searchProduct"
-                       oninput="filterProducts(this.value)">
+                <input type="text" class="form-control mb-3" placeholder="Buscar produto..." id="searchProduct">
                 <div id="eligibleList" style="max-height:300px;overflow-y:auto">
                     <?php foreach ($eligibleProducts as $ep): 
                         $img = $ep['foto_principal'] ?? '';
@@ -169,12 +168,30 @@ $isEdit = !empty($live);
 
 <script>
 function filterProducts(term) {
-    term = term.toLowerCase();
-    document.querySelectorAll('.eligible-item').forEach(el => {
-        const name = (el.dataset.name || el.textContent || '').toLowerCase();
-        el.style.display = name.includes(term) ? '' : 'none';
-    });
+    term = (term || '').toLowerCase().trim();
+    var items = document.querySelectorAll('#eligibleList .eligible-item');
+    for (var i = 0; i < items.length; i++) {
+        var el = items[i];
+        var text = (el.getAttribute('data-name') || '') + ' ' + (el.innerText || '');
+        if (term === '' || text.toLowerCase().indexOf(term) !== -1) {
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+        }
+    }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('searchProduct');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterProducts(this.value);
+        });
+        searchInput.addEventListener('keyup', function() {
+            filterProducts(this.value);
+        });
+    }
+});
 
 function addProductToLive(btn) {
     const item = btn.closest('.eligible-item');
