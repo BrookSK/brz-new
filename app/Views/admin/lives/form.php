@@ -81,7 +81,7 @@ $isEdit = !empty($live);
                         </div>
                         <?php if (empty($products)): ?>
                             <p class="text-center text-muted py-3 mb-0" id="noProductsMsg">
-                                Nenhum produto adicionado. Adicione produtos marcados como "Disponível para Live".
+                                Nenhum produto adicionado. Selecione os produtos que serão vendidos nesta live.
                             </p>
                         <?php endif; ?>
                     </div>
@@ -127,7 +127,7 @@ $isEdit = !empty($live);
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Adicionar Produto à Live</h5>
+                <h5 class="modal-title">Produtos da Live</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

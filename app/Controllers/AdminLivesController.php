@@ -421,7 +421,7 @@ class AdminLivesController {
         $stmt = $pdo->prepare(
             "SELECT id, name, price, sale_price, foto_principal, images
              FROM produtos 
-             WHERE is_live_eligible = 1 AND active = 1
+             WHERE active = 1
              ORDER BY name ASC"
         );
         $stmt->execute();
