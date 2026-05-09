@@ -1,0 +1,556 @@
+/* ═══════════════════════════════════════════════════════════
+   Live Player — TikTok-style (Mobile-first)
+   ═══════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.live-player-body {
+    background: #000;
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.live-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+/* ─── Vídeo ─────────────────────────────────────────────── */
+.video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.video-wrapper video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.waiting-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 2rem;
+}
+
+.waiting-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0.4;
+}
+
+.waiting-info {
+    position: relative;
+    z-index: 2;
+}
+
+/* ─── Overlay Superior ──────────────────────────────────── */
+.overlay-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 16px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+    z-index: 10;
+}
+
+.live-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-back {
+    color: #fff;
+    text-decoration: none;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(4px);
+}
+
+.live-badge-pill {
+    background: rgba(255,0,0,0.85);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    animation: livePulse 2s infinite;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.dot-red {
+    width: 6px;
+    height: 6px;
+    background: #fff;
+    border-radius: 50%;
+}
+
+.viewer-count {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(4px);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+}
+
+/* ─── Overlay Lateral Direita (Ações) ───────────────────── */
+.overlay-right {
+    position: absolute;
+    right: 12px;
+    bottom: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    z-index: 10;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.action-btn i {
+    font-size: 28px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.action-btn:active i {
+    transform: scale(1.3);
+}
+
+#btnLike.liked i {
+    color: #ff2d55;
+    animation: heartBeat 0.3s ease;
+}
+
+@keyframes heartBeat {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+}
+
+/* ─── Animação de Corações ──────────────────────────────── */
+.hearts-container {
+    position: absolute;
+    right: 40px;
+    bottom: 200px;
+    width: 60px;
+    height: 300px;
+    pointer-events: none;
+    z-index: 9;
+    overflow: hidden;
+}
+
+.floating-heart {
+    position: absolute;
+    bottom: 0;
+    font-size: 24px;
+    animation: floatUp 2s ease-out forwards;
+    opacity: 0;
+}
+
+@keyframes floatUp {
+    0% { transform: translateY(0) scale(0.5); opacity: 1; }
+    50% { opacity: 1; }
+    100% { transform: translateY(-280px) translateX(var(--drift)) scale(0.3); opacity: 0; }
+}
+
+/* ─── Chat Overlay ──────────────────────────────────────── */
+.chat-overlay {
+    position: absolute;
+    bottom: 80px;
+    left: 0;
+    right: 80px;
+    max-height: 250px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    padding: 0 12px;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 8px;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 20%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%);
+}
+
+.chat-msg {
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    border-radius: 16px;
+    padding: 6px 12px;
+    font-size: 13px;
+    max-width: 85%;
+    word-break: break-word;
+}
+
+.chat-msg .chat-user {
+    font-weight: 600;
+    color: #69c9ff;
+    margin-right: 6px;
+}
+
+.chat-input-wrapper {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.chat-input-wrapper input {
+    flex: 1;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    backdrop-filter: blur(4px);
+}
+
+.chat-input-wrapper input::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
+.btn-send {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #ff2d55;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.chat-login-prompt {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    font-size: 13px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 20px;
+}
+
+/* ─── Pílula "Falando agora" ────────────────────────────── */
+.featured-pill {
+    position: absolute;
+    bottom: 340px;
+    left: 12px;
+    right: 80px;
+    z-index: 15;
+    animation: slideInPill 0.4s ease-out;
+}
+
+@keyframes slideInPill {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.pill-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: pillPulse 3s infinite;
+}
+
+@keyframes pillPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,45,85,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(255,45,85,0); }
+}
+
+.pill-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.pill-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.pill-text small {
+    display: block;
+    font-size: 10px;
+    color: rgba(255,255,255,0.6);
+}
+
+.pill-text strong {
+    display: block;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pill-price {
+    font-weight: 700;
+    font-size: 14px;
+    color: #ff2d55;
+    white-space: nowrap;
+}
+
+/* ─── Bottom Sheets ─────────────────────────────────────── */
+.bottom-sheet {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    display: none;
+}
+
+.bottom-sheet.open {
+    display: block;
+}
+
+.sheet-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1a1a1a;
+    border-radius: 20px 20px 0 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease-out;
+}
+
+.sheet-tall {
+    max-height: 85vh;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+    margin: 12px auto;
+}
+
+.sheet-body {
+    padding: 0 20px 30px;
+}
+
+.sheet-product-img {
+    width: 100%;
+    max-height: 250px;
+    object-fit: contain;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    background: #2a2a2a;
+}
+
+.sheet-price .price-main {
+    font-size: 24px;
+    font-weight: 700;
+    color: #ff2d55;
+}
+
+.btn-buy-now {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    background: #ff2d55;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: transform 0.1s;
+}
+
+.btn-buy-now:active {
+    transform: scale(0.97);
+}
+
+.btn-buy-now:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-buy-login {
+    text-decoration: none;
+    text-align: center;
+    background: #333;
+}
+
+.btn-cancel {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.buy-card-info {
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 8px;
+}
+
+.buy-card-info a {
+    color: #69c9ff;
+}
+
+/* ─── Drawer de Produtos ────────────────────────────────── */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.product-mini-card {
+    background: #2a2a2a;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.product-mini-card:active {
+    transform: scale(0.95);
+}
+
+.mini-img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+}
+
+.mini-info {
+    padding: 8px;
+}
+
+.mini-name {
+    display: block;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mini-price {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #ff2d55;
+    margin-top: 4px;
+}
+
+/* ─── Toast ─────────────────────────────────────────────── */
+.toast-notification {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: rgba(0,0,0,0.9);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    z-index: 200;
+    transition: transform 0.3s ease;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+}
+
+.toast-notification.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast-notification.success {
+    border: 1px solid #4caf50;
+}
+
+.toast-notification.error {
+    border: 1px solid #ff2d55;
+}
+
+/* ─── Responsivo ────────────────────────────────────────── */
+@media (min-width: 768px) {
+    .live-container {
+        max-width: 430px;
+        margin: 0 auto;
+    }
+}

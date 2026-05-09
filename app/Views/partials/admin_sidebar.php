@@ -261,7 +261,11 @@ function renderAdminSidebar($activePage = '') {
         'redirecionamento-tabela-pesos' => ['icon' => 'fas fa-table', 'label' => '(RED) Tabela de Pesos e Preços', 'url' => '/admin/redirecionamento/tabela-pesos', 'roles' => ['admin', 'suporte']],
         'redirecionamento-pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => '(RED) Pagamentos', 'url' => '/admin/redirecionamento/pagamentos', 'roles' => ['admin', 'suporte']],
         'redirecionamento-comprovantes' => ['icon' => 'fas fa-file-upload', 'label' => '(RED) Comprovantes', 'url' => '/admin/redirecionamento/comprovantes', 'roles' => ['admin', 'suporte']],
-        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => '(RED) Coletas', 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']]
+        'redirecionamento-coletas' => ['icon' => 'fas fa-calendar-check', 'label' => '(RED) Coletas', 'url' => '/admin/redirecionamento/coletas', 'roles' => ['admin', 'suporte']],
+
+        // Módulo Lives (Live Shopping)
+        'lives' => ['icon' => 'fas fa-video', 'label' => 'Lives', 'url' => '/admin/lives', 'roles' => ['admin']],
+        'lives-config' => ['icon' => 'fas fa-sliders-h', 'label' => 'Config Lives', 'url' => '/admin/configuracoes/lives', 'roles' => ['admin']],
     ];
 
     $unreadTickets = 0;
@@ -426,6 +430,7 @@ function renderAdminSidebar($activePage = '') {
                 'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'remessa-shipstation']],
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'resumo-financeiro', 'comissoes-global', 'clube-recargas', 'quickbooks']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
+                'Lives' => ['icon' => 'fas fa-video', 'items' => ['lives', 'lives-config']],
                 'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup']],
             ];
 

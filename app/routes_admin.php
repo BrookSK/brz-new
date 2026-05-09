@@ -295,3 +295,59 @@ $router->post('/admin/quickbooks/desconectar', 'AdminQuickBooksController', 'des
 $router->post('/admin/quickbooks/config', 'AdminQuickBooksController', 'salvarConfig');
 $router->post('/admin/quickbooks/sincronizar-pedido', 'AdminQuickBooksController', 'sincronizarPedido');
 $router->post('/admin/quickbooks/sincronizar-lote', 'AdminQuickBooksController', 'sincronizarLote');
+
+// ═══════════════════════════════════════════════════════════════
+// Lives — Live Shopping (TikTok-style)
+// ═══════════════════════════════════════════════════════════════
+
+// Admin — CRUD de Lives
+$router->get('/admin/lives', 'AdminLivesController', 'index');
+$router->get('/admin/lives/nova', 'AdminLivesController', 'create');
+$router->post('/admin/lives', 'AdminLivesController', 'store');
+$router->get('/admin/lives/{id}/editar', 'AdminLivesController', 'edit');
+$router->post('/admin/lives/{id}/atualizar', 'AdminLivesController', 'update');
+$router->delete('/admin/lives/{id}', 'AdminLivesController', 'destroy');
+
+// Admin — Estúdio e Transmissão
+$router->get('/admin/lives/{id}/studio', 'AdminLivesController', 'studio');
+$router->post('/admin/lives/{id}/start', 'AdminLivesController', 'start');
+$router->post('/admin/lives/{id}/stop', 'AdminLivesController', 'stop');
+$router->post('/admin/lives/{id}/feature', 'AdminLivesController', 'feature');
+
+// Admin — Produtos da Live
+$router->post('/admin/lives/{id}/products', 'AdminLivesController', 'addProduct');
+$router->post('/admin/lives/{id}/products/{lpId}/update', 'AdminLivesController', 'updateProduct');
+$router->post('/admin/lives/{id}/products/{lpId}/remove', 'AdminLivesController', 'removeProduct');
+
+// Admin — Moderação
+$router->post('/admin/lives/{id}/chat/{msgId}/hide', 'AdminLivesController', 'hideMessage');
+$router->post('/admin/lives/{id}/ban/{userId}', 'AdminLivesController', 'banUser');
+
+// Admin — Relatório
+$router->get('/admin/lives/{id}/report', 'AdminLivesController', 'report');
+
+// Admin — Configurações Lives
+$router->get('/admin/configuracoes/lives', 'AdminLivesConfigController', 'index');
+$router->post('/admin/configuracoes/lives', 'AdminLivesConfigController', 'store');
+
+// Cliente — Páginas públicas
+$router->get('/lives/ao-vivo', 'LivesController', 'liveNow');
+$router->get('/lives/{id}', 'LivesController', 'watch');
+$router->get('/api/lives/status', 'LivesController', 'checkLiveStatus');
+
+// Cliente — API REST
+$router->post('/api/live/{id}/heartbeat', 'LiveApiController', 'heartbeat');
+$router->post('/api/live/{id}/chat', 'LiveApiController', 'chat');
+$router->post('/api/live/{id}/like', 'LiveApiController', 'like');
+$router->post('/api/live/{id}/share', 'LiveApiController', 'share');
+$router->post('/api/live/{id}/buy', 'LiveApiController', 'buy');
+
+// Cliente — SSE (Server-Sent Events)
+$router->get('/api/live/{id}/events', 'LiveSseController', 'stream');
+$router->get('/api/live/{id}/status', 'LiveSseController', 'status');
+
+// Cliente — Métodos de Pagamento
+$router->get('/api/me/payment-methods', 'LiveApiController', 'paymentMethods');
+$router->post('/api/me/payment-methods', 'LiveApiController', 'storePaymentMethod');
+$router->post('/api/me/payment-methods/{id}/default', 'LiveApiController', 'setDefaultPaymentMethod');
+$router->post('/api/me/payment-methods/{id}/delete', 'LiveApiController', 'deletePaymentMethod');
