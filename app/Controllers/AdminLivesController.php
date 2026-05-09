@@ -200,6 +200,11 @@ class AdminLivesController {
         }
 
         $products = $this->liveProductModel->getByLiveId($id);
+        
+        // Carregar mensagens do chat
+        $chatModel = new \App\Models\LiveChatMessage();
+        $chatMessages = $chatModel->getRecent((int)$id, 20);
+
         $activePage = 'lives';
         $title = 'Estúdio - ' . $live['title'];
 

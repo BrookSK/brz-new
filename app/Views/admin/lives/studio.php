@@ -138,7 +138,20 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
 
         <!-- Painel de Chat -->
         <div id="panelChat" class="panel-content">
-            <div id="chatMessages" class="chat-messages"></div>
+            <div id="chatMessages" class="chat-messages">
+                <?php if (!empty($chatMessages)): ?>
+                    <?php foreach ($chatMessages as $msg): ?>
+                        <div class="chat-msg-studio">
+                            <span class="user"><?= htmlspecialchars($msg['user_name'] ?? $msg['user_name_alt'] ?? 'Anônimo') ?></span>
+                            <span class="text"><?= htmlspecialchars($msg['content']) ?></span>
+                            <span class="actions">
+                                <button onclick="hideMsg(<?= $msg['id'] ?>)" title="Ocultar"><i class="fas fa-eye-slash"></i></button>
+                                <button onclick="banUserChat(<?= $msg['user_id'] ?>)" title="Banir"><i class="fas fa-ban"></i></button>
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
             <div class="p-2" style="border-top:1px solid #333">
                 <div class="d-flex gap-2">
                     <input type="text" id="adminChatInput" class="form-control form-control-sm" placeholder="Enviar mensagem..." maxlength="500" style="background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:20px;font-size:13px" onkeydown="if(event.key==='Enter')sendAdminChat()">
