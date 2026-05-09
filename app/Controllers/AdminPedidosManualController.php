@@ -1984,6 +1984,17 @@ document.addEventListener('DOMContentLoaded', function(){
                 setEnderecoValue('endereco_entrega_bairro', e.bairro);
                 setEnderecoValue('endereco_entrega_cidade', e.cidade);
                 setEnderecoValue('endereco_entrega_estado', e.estado);
+                // Setar país e adaptar formulário
+                if (e.pais) {
+                    const paisSel = document.getElementById('endereco_entrega_pais');
+                    if (paisSel) {
+                        const paisVal = String(e.pais).toUpperCase();
+                        // Verificar se o valor existe no select
+                        const optExists = Array.from(paisSel.options).some(o => o.value === paisVal);
+                        paisSel.value = optExists ? paisVal : 'OTHER';
+                        onPaisChange();
+                    }
+                }
             })
             .catch(() => {});
     }
@@ -3075,6 +3086,7 @@ JS;
             $bairroCol = in_array('bairro', $cols, true) ? 'bairro' : '';
             $cidadeCol = in_array('cidade', $cols, true) ? 'cidade' : '';
             $estadoCol = in_array('estado', $cols, true) ? 'estado' : (in_array('uf', $cols, true) ? 'uf' : '');
+            $paisCol = in_array('pais', $cols, true) ? 'pais' : (in_array('country', $cols, true) ? 'country' : '');
             $principalCol = in_array('principal', $cols, true) ? 'principal' : (in_array('is_principal', $cols, true) ? 'is_principal' : '');
 
             $select = ['id'];
@@ -3085,6 +3097,7 @@ JS;
             if ($bairroCol !== '') $select[] = $bairroCol . ' AS bairro';
             if ($cidadeCol !== '') $select[] = $cidadeCol . ' AS cidade';
             if ($estadoCol !== '') $select[] = $estadoCol . ' AS estado';
+            if ($paisCol !== '') $select[] = $paisCol . ' AS pais';
 
             $order = ' ORDER BY id DESC';
             if ($principalCol !== '') {
