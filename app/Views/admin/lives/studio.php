@@ -33,8 +33,8 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
             <span id="liveDuration" class="ms-2 text-white-50">00:00:00</span>
         </div>
         <div class="studio-metrics">
-            <span><i class="fas fa-eye"></i> <span id="viewerCount">0</span></span>
-            <span><i class="fas fa-heart"></i> <span id="likeCount">0</span></span>
+            <span><i class="fas fa-eye"></i> <span id="viewerCount"><?= (int)($live['viewers_current'] ?? 0) ?></span></span>
+            <span><i class="fas fa-heart"></i> <span id="likeCount"><?= (int)($live['likes_count'] ?? 0) ?></span></span>
         </div>
     </header>
 
@@ -139,6 +139,12 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
         <!-- Painel de Chat -->
         <div id="panelChat" class="panel-content">
             <div id="chatMessages" class="chat-messages"></div>
+            <div class="p-2" style="border-top:1px solid #333">
+                <div class="d-flex gap-2">
+                    <input type="text" id="adminChatInput" class="form-control form-control-sm" placeholder="Enviar mensagem..." maxlength="500" style="background:#2a2a2a;border:1px solid #444;color:#fff;border-radius:20px;font-size:13px" onkeydown="if(event.key==='Enter')sendAdminChat()">
+                    <button onclick="sendAdminChat()" class="btn btn-sm btn-danger" style="border-radius:50%;width:32px;height:32px;padding:0;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:11px"></i></button>
+                </div>
+            </div>
         </div>
     </section>
 </div>

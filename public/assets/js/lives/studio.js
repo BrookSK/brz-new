@@ -268,6 +268,25 @@ function renderStudioChatMsg(msg) {
 }
 
 // ─── Moderação ──────────────────────────────────────────────
+async function sendAdminChat() {
+    var input = document.getElementById('adminChatInput');
+    if (!input) return;
+    var content = input.value.trim();
+    if (!content) return;
+    input.disabled = true;
+
+    try {
+        await fetch('/api/live/' + LIVE_ID + '/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'content=' + encodeURIComponent(content)
+        });
+        input.value = '';
+    } catch(e) {}
+    input.disabled = false;
+    input.focus();
+}
+
 async function hideMsg(msgId) {
     await fetch(`/admin/lives/${LIVE_ID}/chat/${msgId}/hide`, { method: 'POST' });
 }
