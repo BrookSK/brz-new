@@ -115,10 +115,16 @@ class LivesController {
             $hasCard = !empty($defaultCard);
         }
 
-        // Sempre usar layout do site (com menu/footer)
-        // A view watch tem visual imersivo mas dentro do layout
-        $title = $live['title'] . ' - Lives';
-        include __DIR__ . '/../Views/lives/watch-layout.php';
+        $title = $live['title'];
+
+        // Se live está ao vivo ou tem gravação → player full-screen (TikTok-style)
+        if ($live['status'] === 'live' || ($live['status'] === 'ended' && !empty($live['recording_url']))) {
+            include __DIR__ . '/../Views/lives/watch.php';
+            return;
+        }
+
+        // Se está agendada ou encerrada sem gravação → página normal com layout do site
+        include __DIR__ . '/../Views/lives/detail.php';
     }
 
     /**
