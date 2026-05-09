@@ -284,18 +284,19 @@ class AdminLivesController {
         $startedAt = strtotime($live['live_started_at']);
         $minutes = max(1, (int) ceil((time() - $startedAt) / 60));
 
+        // Atualizar status IMEDIATAMENTE (antes de chamar CF)
+        $this->liveModel->updateStatus($id, 'ended', [
+            'live_ended_at' => date('Y-m-d H:i:s'),
+            'viewers_current' => 0,
+        ]);
+
         // Somar minutos na cota
         $this->shoppingService->addMinutesUsed($minutes);
 
         // Encerrar destaque ativo
         $this->shoppingService->unfeatureProduct($id);
 
-        // Atualizar status
-        $this->liveModel->updateStatus($id, 'ended', [
-            'live_ended_at' => date('Y-m-d H:i:s'),
-            'viewers_current' => 0,
-        ]);
-
+        // Responder imediatamente
         $this->jsonResponse([
             'success' => true,
             'minutes_streamed' => $minutes,

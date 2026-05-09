@@ -82,26 +82,24 @@ async function stopLive() {
     if (!confirm('Encerrar a live?')) return;
 
     const btn = document.getElementById('btnStop');
-    if (btn) btn.disabled = true;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Encerrando...'; }
 
-    try {
-        const res = await fetch(`/admin/lives/${LIVE_ID}/stop`, { method: 'POST' });
-        const data = await res.json();
+    // Parar câmera/mic imediatamente
+    stopWebRTC();
 
-        if (data.success) {
-            // Parar WebRTC
-            stopWebRTC();
-            // Redirecionar
-            alert(`Live encerrada! ${data.minutes_streamed} minutos transmitidos.`);
-            location.href = '/admin/lives';
-        } else {
-            alert(data.error || 'Erro ao encerrar');
-            if (btn) btn.disabled = false;
-        }
-    } catch (e) {
-        alert('Erro de conexão');
-        if (btn) btn.disabled = false;
-    }
+    // Enviar request ao backend (não esperar resposta para redirecionar)
+    fetch(`/admin/lives/${LIVE_ID}/stop`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            // Já redirecionou, mas logar resultado
+            console.log('Stop result:', data);
+        })
+        .catch(() => {});
+
+    // Redirecionar imediatamente
+    setTimeout(function() {
+        window.location.href = '/admin/lives';
+    }, 500);
 }
 
 // ─── WebRTC / WHIP ──────────────────────────────────────────
