@@ -89,7 +89,10 @@ class LiveApiController {
         $userId = $this->requireAuth();
         if (!$userId) return;
 
-        $result = $this->metricsService->addLike((int) $id, $userId);
+        $action = $request->getParam('action') ?? 'like';
+        $unlike = ($action === 'unlike');
+
+        $result = $this->metricsService->addLike((int) $id, $userId, $unlike);
         $this->json($result);
     }
 

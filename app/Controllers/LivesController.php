@@ -122,6 +122,15 @@ class LivesController {
             $hasCard = !empty($defaultCard);
         }
 
+        // Verificar se usuário já curtiu
+        $userLiked = false;
+        if ($isLoggedIn) {
+            $pdo = \Config\Database::getConnection();
+            $stLike = $pdo->prepare("SELECT 1 FROM live_likes WHERE live_id = :lid AND user_id = :uid LIMIT 1");
+            $stLike->execute([':lid' => $id, ':uid' => $userId]);
+            $userLiked = (bool) $stLike->fetchColumn();
+        }
+
         include __DIR__ . '/../Views/lives/watch.php';
     }
 

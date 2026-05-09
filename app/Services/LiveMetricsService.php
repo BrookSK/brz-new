@@ -84,9 +84,26 @@ class LiveMetricsService {
     }
 
     /**
-     * Registra curtida
+     * Registra ou remove curtida (toggle)
      */
-    public function addLike(int $liveId, int $userId): array {
+    public function addLike(int $liveId, int $userId, bool $unlike = false): array {
+        if ($unlike) {
+            // Remover like
+            $stmt = $this->pdo->prepare(
+                "DELETE FROM live_likes WHERE live_id = :lid AND user_id = :uid"
+            );
+            $stmt->execute([':lid' => $liveId, ':uid' => $userId]);
+
+            // Decrementar contador global
+            $stmt2 = $this->pdo->prepare(
+                "UPDATE lives SET likes_count = GREATEST(0, likes_count - 1) WHERE id = :id"
+            );
+            $stmt2->execute([':id' => $liveId]);
+
+            $live = $this->liveModel->find($liveId);
+            return ['success' => true, 'liked' => false, 'total_likes' => (int)($live['likes_count'] ?? 0)];
+        }
+
         // Rate limit: verificar últimas curtidas (10/s)
         if (!$this->canLike($liveId, $userId)) {
             return ['success' => false, 'error' => 'Rate limit'];
@@ -108,6 +125,7 @@ class LiveMetricsService {
 
         return [
             'success' => true,
+            'liked' => true,
             'total_likes' => (int) ($live['likes_count'] ?? 0) + 1,
         ];
     }

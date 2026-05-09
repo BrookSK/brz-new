@@ -53,7 +53,7 @@ ob_start();
             <!-- Overlay lateral (ações) -->
             <div class="position-absolute end-0 d-flex flex-column align-items-center gap-3" style="bottom:100px;right:12px;z-index:5">
                 <button class="btn btn-link text-white text-center p-0" id="btnLike" onclick="sendLike()" style="text-decoration:none">
-                    <i class="fas fa-heart" style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
+                    <i class="fas fa-heart" style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));<?= (!empty($userLiked)) ? 'color:#ff2d55' : '' ?>"></i>
                     <br><small id="likeCount"><?= (int)($live['likes_count'] ?? 0) ?></small>
                 </button>
                 <button class="btn btn-link text-white text-center p-0" onclick="shareModal()" style="text-decoration:none">
@@ -200,6 +200,7 @@ const RECORDING_URL = <?= json_encode($live['recording_url'] ?? '') ?>;
 const IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
 const HAS_CARD = <?= $hasCard ? 'true' : 'false' ?>;
 const USER_ID = <?= $userId ?>;
+const USER_LIKED = <?= (!empty($userLiked)) ? 'true' : 'false' ?>;
 const PRODUCTS = <?= json_encode(array_map(function($p) {
     return [
         'id' => (int)$p['product_id'],
@@ -219,10 +220,24 @@ const PRODUCTS = <?= json_encode(array_map(function($p) {
 // Override para garantir que contadores funcionam
 window.sendLike = function() {
     if (!IS_LOGGED_IN) return;
+    var btn = document.getElementById('btnLike');
+    var icon = btn.querySelector('i');
     var countEl = document.getElementById('likeCount');
-    countEl.textContent = parseInt(countEl.textContent || 0) + 1;
-    spawnHeart();
-    fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST' });
+    var currentCount = parseInt(countEl.textContent || 0);
+    var isLiked = icon.style.color === 'rgb(255, 45, 85)';
+
+    if (isLiked) {
+        // Descurtir
+        icon.style.color = '';
+        countEl.textContent = Math.max(0, currentCount - 1);
+        fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'unlike'}) });
+    } else {
+        // Curtir
+        icon.style.color = '#ff2d55';
+        countEl.textContent = currentCount + 1;
+        spawnHeart();
+        fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST' });
+    }
 };
 
 window.shareModal = function() {
