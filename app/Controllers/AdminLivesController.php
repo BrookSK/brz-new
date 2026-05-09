@@ -2,7 +2,6 @@
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Core\Services\AuthService;
 use App\Models\Live;
 use App\Models\LiveProduct;
 use App\Models\LiveFeaturedEvent;
@@ -23,7 +22,7 @@ class AdminLivesController {
     private $chatService;
 
     public function __construct() {
-        $this->auth = new AuthService();
+        $this->auth = new \App\Services\AuthService();
         $this->auth->requerPerfis(['admin']);
         $this->liveModel = new Live();
         $this->liveProductModel = new LiveProduct();

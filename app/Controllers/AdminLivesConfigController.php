@@ -2,7 +2,6 @@
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Core\Services\AuthService;
 use App\Services\LiveStreamService;
 use App\Services\LiveShoppingService;
 
@@ -12,7 +11,7 @@ class AdminLivesConfigController {
     private $shoppingService;
 
     public function __construct() {
-        $this->auth = new AuthService();
+        $this->auth = new \App\Services\AuthService();
         $this->auth->requerPerfis(['admin']);
         $this->streamService = new LiveStreamService();
         $this->shoppingService = new LiveShoppingService();
