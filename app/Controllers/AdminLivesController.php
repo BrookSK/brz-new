@@ -419,15 +419,24 @@ class AdminLivesController {
         $produto = new Produto();
         $pdo = $produto->getConnection();
         $stmt = $pdo->prepare(
-            "SELECT id, COALESCE(name, nome) AS nome, COALESCE(price, preco) AS preco, 
-                    COALESCE(sale_price, preco_promocao) AS preco_promocao,
-                    foto_principal, COALESCE(images, imagens) AS imagens
+            "SELECT id, name, price, sale_price, foto_principal, images
              FROM produtos 
-             WHERE is_live_eligible = 1 AND (active = 1 OR status = 'published')
-             ORDER BY COALESCE(name, nome) ASC"
+             WHERE is_live_eligible = 1 AND active = 1
+             ORDER BY name ASC"
         );
         $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Mapear para formato esperado pelas views
+        return array_map(function($r) {
+            return [
+                'id' => $r['id'],
+                'nome' => $r['name'],
+                'preco' => (float)($r['sale_price'] ?: $r['price']),
+                'foto_principal' => $r['foto_principal'] ?? '',
+                'imagens' => $r['images'] ?? '',
+            ];
+        }, $rows);
     }
 
     private function uploadCover(array $file): ?string {
