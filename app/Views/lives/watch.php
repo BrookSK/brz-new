@@ -102,7 +102,7 @@ ob_start();
     <!-- Produtos da live (modal, aparece ao clicar na sacolinha) -->
     <?php if (!empty($products)): ?>
         <div class="modal fade" id="productsModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content" style="border-radius:16px">
                     <div class="modal-header">
                         <h5 class="modal-title"><i class="fas fa-shopping-bag me-2"></i>Produtos desta live</h5>
@@ -112,15 +112,18 @@ ob_start();
                         <div class="row g-3">
                             <?php foreach ($products as $p): ?>
                                 <div class="col-6">
-                                    <div class="card h-100 border-0 shadow-sm" style="border-radius:12px;overflow:hidden;cursor:pointer" onclick="selectProduct(<?= $p['product_id'] ?>); bootstrap.Modal.getInstance(document.getElementById('productsModal')).hide();">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius:12px;overflow:hidden">
                                         <?php if (!empty($p['display_image'])): ?>
-                                            <img src="<?= htmlspecialchars($p['display_image']) ?>" class="card-img-top" style="height:120px;object-fit:cover" alt="">
+                                            <img src="<?= htmlspecialchars($p['display_image']) ?>" class="card-img-top" style="height:120px;object-fit:cover;cursor:pointer" alt="" onclick="selectProduct(<?= $p['product_id'] ?>); bootstrap.Modal.getInstance(document.getElementById('productsModal')).hide();">
                                         <?php else: ?>
-                                            <div class="card-img-top d-flex align-items-center justify-content-center" style="height:120px;background:#f5f5f5"><i class="fas fa-image fa-2x text-muted"></i></div>
+                                            <div class="card-img-top d-flex align-items-center justify-content-center" style="height:120px;background:#f5f5f5;cursor:pointer" onclick="selectProduct(<?= $p['product_id'] ?>); bootstrap.Modal.getInstance(document.getElementById('productsModal')).hide();"><i class="fas fa-image fa-2x text-muted"></i></div>
                                         <?php endif; ?>
                                         <div class="card-body p-2">
-                                            <small class="d-block text-dark" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
-                                            <strong class="text-danger">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
+                                            <small class="d-block text-dark mb-1" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
+                                            <strong class="text-danger d-block mb-2">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
+                                            <a href="/carrinho/adicionar/<?= $p['product_id'] ?>" class="btn btn-sm btn-outline-danger w-100" style="border-radius:8px;font-size:12px">
+                                                <i class="fas fa-cart-plus me-1"></i>Adicionar
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
