@@ -1991,7 +1991,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 if (e.pais) {
                     const paisSel = document.getElementById('endereco_entrega_pais');
                     if (paisSel) {
-                        const paisVal = String(e.pais).toUpperCase();
+                        let paisVal = String(e.pais).toUpperCase().trim();
+                        // Normalizar variações de Brasil
+                        if (paisVal === 'BRASIL' || paisVal === 'BRAZIL') paisVal = 'BR';
                         // Verificar se o valor existe no select
                         const optExists = Array.from(paisSel.options).some(o => o.value === paisVal);
                         paisSel.value = optExists ? paisVal : 'OTHER';
