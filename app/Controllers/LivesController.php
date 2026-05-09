@@ -43,7 +43,7 @@ class LivesController {
 
         $title = 'Lives - Braziliana';
 
-        require __DIR__ . '/../Views/lives/index.php';
+        include __DIR__ . '/../Views/lives/index.php';
     }
 
     /**
