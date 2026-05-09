@@ -425,8 +425,26 @@ class AdminLivesController {
 
         $produto = new Produto();
         $pdo = $produto->getConnection();
+        
+        // Verificar quais colunas existem
+        $cols = [];
+        try {
+            $stCols = $pdo->query('DESCRIBE produtos');
+            $cols = $stCols ? $stCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+        } catch (\Exception $e) {
+            $cols = [];
+        }
+
+        $priceExpr = 'price';
+        if (in_array('sale_price', $cols)) {
+            $priceExpr = 'CASE WHEN sale_price > 0 THEN sale_price ELSE price END';
+        }
+
+        $imgCol = in_array('foto_principal', $cols) ? 'foto_principal' : 'NULL';
+        $imagesCol = in_array('images', $cols) ? 'images' : 'NULL';
+
         $stmt = $pdo->prepare(
-            "SELECT id, name, price, sale_price, foto_principal, images
+            "SELECT id, name, ({$priceExpr}) AS final_price, {$imgCol} AS foto_principal, {$imagesCol} AS images
              FROM produtos 
              WHERE active = 1 AND name LIKE :q
              ORDER BY name ASC
@@ -438,22 +456,21 @@ class AdminLivesController {
         $products = array_map(function($r) {
             $img = $r['foto_principal'] ?? '';
             if (empty($img) && !empty($r['images'])) {
-                $imgs = json_decode($r['images'], true);
-                if (is_array($imgs) && !empty($imgs)) {
-                    $img = $imgs[0];
-                    // Se for só nome de arquivo, adicionar path
-                    if (!empty($img) && strpos($img, '/') === false && strpos($img, 'http') !== 0) {
-                        $img = '/uploads/produtos/' . $img;
-                    }
+                $decoded = json_decode($r['images'], true);
+                if (is_array($decoded) && !empty($decoded)) {
+                    $img = is_array($decoded[0]) ? ($decoded[0]['url'] ?? $decoded[0]['src'] ?? '') : $decoded[0];
+                } elseif (is_string($r['images']) && !empty($r['images'])) {
+                    $img = explode(',', $r['images'])[0];
                 }
             }
+            // Garantir path completo
             if (!empty($img) && strpos($img, '/') === false && strpos($img, 'http') !== 0) {
                 $img = '/uploads/produtos/' . $img;
             }
             return [
                 'id' => (int)$r['id'],
                 'name' => $r['name'],
-                'price' => (float)($r['sale_price'] ?: $r['price']),
+                'price' => (float)($r['final_price'] ?? 0),
                 'image' => $img,
             ];
         }, $rows);
