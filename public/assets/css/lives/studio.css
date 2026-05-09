@@ -160,8 +160,8 @@
 
 /* ─── Painéis ───────────────────────────────────────────── */
 .studio-panels {
-    flex-shrink: 0;
-    max-height: 40vh;
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     background: #1a1a1a;
@@ -197,10 +197,11 @@
     overflow-y: auto;
     padding: 12px;
     min-height: 0;
+    flex-direction: column;
 }
 
 .panel-content.active {
-    display: block;
+    display: flex;
 }
 
 /* ─── Produtos no Estúdio ───────────────────────────────── */
@@ -302,9 +303,13 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: 200px;
+    flex: 1;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
+
+.chat-messages::-webkit-scrollbar { display: none; }
 
 .chat-msg-studio {
     display: flex;
