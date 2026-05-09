@@ -63,7 +63,7 @@ ob_start();
                 <button class="btn btn-link text-white text-center p-0" onclick="toggleChat()" style="text-decoration:none">
                     <i class="fas fa-comment" style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
                 </button>
-                <button class="btn btn-link text-white text-center p-0" onclick="toggleProducts()" style="text-decoration:none">
+                <button class="btn btn-link text-white text-center p-0" data-bs-toggle="modal" data-bs-target="#productsModal" style="text-decoration:none">
                     <i class="fas fa-shopping-bag" style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
                     <br><small><?= count($products) ?></small>
                 </button>
@@ -99,26 +99,35 @@ ob_start();
         </div>
     </div>
 
-    <!-- Produtos da live (oculto, aparece ao clicar na sacolinha) -->
+    <!-- Produtos da live (modal, aparece ao clicar na sacolinha) -->
     <?php if (!empty($products)): ?>
-        <div id="productsSection" style="display:none">
-            <h5 class="mb-3"><i class="fas fa-shopping-bag me-2"></i>Produtos desta live</h5>
-            <div class="row g-3 mb-4">
-                <?php foreach ($products as $p): ?>
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <div class="card h-100 border-0 shadow-sm" style="border-radius:12px;overflow:hidden;cursor:pointer" onclick="selectProduct(<?= $p['product_id'] ?>)">
-                            <?php if (!empty($p['display_image'])): ?>
-                                <img src="<?= htmlspecialchars($p['display_image']) ?>" class="card-img-top" style="height:120px;object-fit:cover" alt="">
-                            <?php else: ?>
-                                <div class="card-img-top d-flex align-items-center justify-content-center" style="height:120px;background:#f5f5f5"><i class="fas fa-image fa-2x text-muted"></i></div>
-                            <?php endif; ?>
-                            <div class="card-body p-2">
-                                <small class="d-block text-dark" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
-                                <strong class="text-danger">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
-                            </div>
+        <div class="modal fade" id="productsModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content" style="border-radius:16px">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-shopping-bag me-2"></i>Produtos desta live</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <?php foreach ($products as $p): ?>
+                                <div class="col-6">
+                                    <div class="card h-100 border-0 shadow-sm" style="border-radius:12px;overflow:hidden;cursor:pointer" onclick="selectProduct(<?= $p['product_id'] ?>); bootstrap.Modal.getInstance(document.getElementById('productsModal')).hide();">
+                                        <?php if (!empty($p['display_image'])): ?>
+                                            <img src="<?= htmlspecialchars($p['display_image']) ?>" class="card-img-top" style="height:120px;object-fit:cover" alt="">
+                                        <?php else: ?>
+                                            <div class="card-img-top d-flex align-items-center justify-content-center" style="height:120px;background:#f5f5f5"><i class="fas fa-image fa-2x text-muted"></i></div>
+                                        <?php endif; ?>
+                                        <div class="card-body p-2">
+                                            <small class="d-block text-dark" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
+                                            <strong class="text-danger">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                </div>
             </div>
         </div>
     <?php endif; ?>
@@ -203,6 +212,62 @@ const PRODUCTS = <?= json_encode(array_map(function($p) {
 <script src="/assets/js/lives/player.js"></script>
 <script src="/assets/js/lives/chat.js"></script>
 <script src="/assets/js/lives/shopping.js"></script>
+<script>
+// Override para garantir que contadores funcionam
+window.sendLike = function() {
+    if (!IS_LOGGED_IN) return;
+    var countEl = document.getElementById('likeCount');
+    countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+    spawnHeart();
+    fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST' });
+};
+
+window.shareModal = function() {
+    var countEl = document.getElementById('shareCount');
+    countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+    if (navigator.share) {
+        navigator.share({ title: document.title, url: window.location.href }).then(function() {
+            fetch('/api/live/' + LIVE_ID + '/share', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({channel:'native'}) });
+        }).catch(function(){});
+    } else {
+        navigator.clipboard.writeText(window.location.href).then(function() {
+            showToast('Link copiado!', 'success');
+            fetch('/api/live/' + LIVE_ID + '/share', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({channel:'link'}) });
+        });
+    }
+};
+
+window.spawnHeart = function() {
+    var container = document.getElementById('heartsContainer');
+    if (!container) return;
+    var heart = document.createElement('span');
+    heart.className = 'floating-heart';
+    heart.textContent = ['❤️','💖','💕','💗','🩷'][Math.floor(Math.random()*5)];
+    heart.style.left = Math.random()*40 + 'px';
+    heart.style.setProperty('--drift', (Math.random()*40-20) + 'px');
+    container.appendChild(heart);
+    setTimeout(function(){ heart.remove(); }, 2000);
+};
+
+window.toggleChat = function() {
+    var overlay = document.getElementById('chatOverlay');
+    if (overlay) overlay.style.display = overlay.style.display === 'none' ? '' : 'none';
+};
+
+window.showToast = function(message, type) {
+    var toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = 'show';
+    setTimeout(function(){ toast.className = ''; }, 3000);
+};
+
+window.openProductSheet = function() {
+    if (typeof currentFeaturedProduct !== 'undefined' && currentFeaturedProduct) {
+        showProductDetail(currentFeaturedProduct);
+    }
+};
+</script>
 
 <?php
 $content = ob_get_clean();
