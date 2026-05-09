@@ -513,7 +513,9 @@ class AdminUsuariosController extends Controller {
 
     function atualizarCamposPorPais() {
         var paisSel = document.getElementById("end_pais");
-        var pais = paisSel ? paisSel.value : "BR";
+        var pais = paisSel ? paisSel.value.toUpperCase().trim() : "BR";
+        // Normalizar variações de Brasil
+        if (pais === "BRASIL" || pais === "BRAZIL") pais = "BR";
         var cep = document.getElementById("end_cep");
         var lblCep = document.getElementById("lbl_cep");
         var lblEnd = document.getElementById("lbl_endereco");
