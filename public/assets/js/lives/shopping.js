@@ -14,11 +14,13 @@ function showProductDetail(product) {
     document.getElementById('sheetProductDesc').textContent = product.description || '';
     document.getElementById('sheetProductPrice').textContent = 'R$ ' + formatPrice(product.price);
 
-    document.getElementById('productSheet').classList.add('open');
+    var modal = new bootstrap.Modal(document.getElementById('productSheetModal'));
+    modal.show();
 }
 
 function closeProductSheet() {
-    document.getElementById('productSheet').classList.remove('open');
+    var modal = bootstrap.Modal.getInstance(document.getElementById('productSheetModal'));
+    if (modal) modal.hide();
 }
 
 // ─── Comprar Agora ──────────────────────────────────────────
@@ -35,9 +37,10 @@ function buyNow() {
 
     if (!selectedProductForBuy) return;
 
-    // Mostrar confirmação
-    closeProductSheet();
-    showConfirmation();
+    // Confirmar direto
+    if (!confirm('Confirmar compra de ' + selectedProductForBuy.name + ' por R$ ' + formatPrice(selectedProductForBuy.price) + '?')) return;
+
+    confirmPurchase();
 }
 
 function showConfirmation() {
@@ -56,14 +59,16 @@ async function confirmPurchase() {
     if (buyInProgress) return;
     buyInProgress = true;
 
-    const btn = document.getElementById('btnConfirm');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processando...';
+    var btn = document.getElementById('btnBuyNow');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processando...';
+    }
 
-    const idempotencyKey = generateUUID();
+    var idempotencyKey = generateUUID();
 
     try {
-        const res = await fetch(`/api/live/${LIVE_ID}/buy`, {
+        var res = await fetch('/api/live/' + LIVE_ID + '/buy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -72,32 +77,31 @@ async function confirmPurchase() {
             })
         });
 
-        const data = await res.json();
+        var data = await res.json();
 
-        closeConfirmSheet();
+        closeProductSheet();
 
         if (data.success) {
-            showToast(`✓ Pedido #${data.order_id} confirmado!`, 'success');
+            showToast('✓ Pedido #' + data.order_id + ' confirmado!', 'success');
         } else if (data.error === 'requires_card') {
             showToast('Cadastre um cartão para comprar', 'error');
-            showCardForm();
         } else if (data.error === 'requires_address') {
             showToast('Cadastre um endereço para comprar', 'error');
-            // TODO: Abrir form de endereço
         } else {
             showToast(data.error || 'Erro ao processar compra', 'error');
         }
 
     } catch (e) {
-        closeConfirmSheet();
+        closeProductSheet();
         showToast('Erro de conexão', 'error');
     }
 
-    // Cooldown de 3s para evitar duplo clique
-    setTimeout(() => {
+    setTimeout(function() {
         buyInProgress = false;
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check me-2"></i> Confirmar';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-bolt me-2"></i> Comprar agora';
+        }
     }, 3000);
 }
 

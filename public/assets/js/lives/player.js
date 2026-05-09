@@ -218,7 +218,6 @@ function closeProductsDrawer() {
 function selectProduct(productId, el) {
     const product = PRODUCTS.find(p => p.id === productId);
     if (product) {
-        closeProductsDrawer();
         showProductDetail(product);
     }
 }
