@@ -115,14 +115,8 @@ class LivesController {
             $hasCard = !empty($defaultCard);
         }
 
-        // Se live está ao vivo → player full-screen (TikTok-style)
-        if ($live['status'] === 'live') {
-            $title = $live['title'];
-            include __DIR__ . '/../Views/lives/watch.php';
-            return;
-        }
-
-        // Se agendada ou encerrada → layout normal do site
+        // Sempre usar layout do site (com menu/footer)
+        // A view watch tem visual imersivo mas dentro do layout
         $title = $live['title'] . ' - Lives';
         include __DIR__ . '/../Views/lives/watch-layout.php';
     }
