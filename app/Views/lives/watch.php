@@ -74,7 +74,13 @@ ob_start();
 
             <!-- Chat overlay -->
             <div class="position-absolute bottom-0 start-0 p-3" id="chatOverlay" style="right:70px;z-index:5">
-                <div id="chatMessages" style="overflow-y:auto;max-height:120px;display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
+                <div id="chatMessages" style="overflow-y:auto;max-height:120px;display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+                    <?php foreach ($chatMessages as $msg): ?>
+                        <div class="chat-msg">
+                            <span class="chat-user"><?= htmlspecialchars($msg['user_name'] ?? $msg['user_name_alt'] ?? 'Anônimo') ?></span><?= htmlspecialchars($msg['content']) ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
                 <?php if ($isLoggedIn): ?>
                     <div class="d-flex gap-2">
                         <input type="text" id="chatInput" class="form-control" placeholder="Enviar mensagem..." maxlength="500" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:24px;font-size:14px;padding:10px 18px" onkeydown="if(event.key==='Enter')sendChat()">

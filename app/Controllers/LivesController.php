@@ -131,6 +131,11 @@ class LivesController {
             $userLiked = (bool) $stLike->fetchColumn();
         }
 
+        // Carregar últimas mensagens do chat
+        $chatMessages = [];
+        $chatModel = new \App\Models\LiveChatMessage();
+        $chatMessages = $chatModel->getRecent((int)$id, 5);
+
         include __DIR__ . '/../Views/lives/watch.php';
     }
 
