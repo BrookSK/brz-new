@@ -695,34 +695,25 @@ class AdminUsuariosController extends Controller {
                 exit;
             }
 
-            // Buscar endereço da tabela enderecos como fallback
+            // Buscar endereço da tabela enderecos (sempre preferir sobre campos da tabela usuarios)
             $endFields = ['cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'pais'];
-            $temEnderecoNoUsuario = false;
-            foreach ($endFields as $ef) {
-                if (!empty($usuario[$ef]) && trim((string) $usuario[$ef]) !== '') {
-                    $temEnderecoNoUsuario = true;
-                    break;
-                }
-            }
-            if (!$temEnderecoNoUsuario) {
-                try {
-                    $dbEnd = \Config\Database::getConnection();
-                    $stEnd = $dbEnd->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
-                    $stEnd->execute([(int) $id]);
-                    $endRow = $stEnd->fetch(\PDO::FETCH_ASSOC);
-                    if ($endRow) {
-                        foreach ($endFields as $ef) {
-                            if (empty($usuario[$ef]) && !empty($endRow[$ef])) {
-                                $usuario[$ef] = (string) $endRow[$ef];
-                            }
-                        }
-                        // Fallback logradouro -> endereco
-                        if (empty($usuario['endereco']) && !empty($endRow['logradouro'])) {
-                            $usuario['endereco'] = (string) $endRow['logradouro'];
+            try {
+                $dbEnd = \Config\Database::getConnection();
+                $stEnd = $dbEnd->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
+                $stEnd->execute([(int) $id]);
+                $endRow = $stEnd->fetch(\PDO::FETCH_ASSOC);
+                if ($endRow) {
+                    foreach ($endFields as $ef) {
+                        if (!empty($endRow[$ef])) {
+                            $usuario[$ef] = (string) $endRow[$ef];
                         }
                     }
-                } catch (\Exception $e) {}
-            }
+                    // Fallback logradouro -> endereco
+                    if (empty($usuario['endereco']) && !empty($endRow['logradouro'])) {
+                        $usuario['endereco'] = (string) $endRow['logradouro'];
+                    }
+                }
+            } catch (\Exception $e) {}
             
             $pedidos = $helper->getPedidosUsuario($id);
 
