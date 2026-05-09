@@ -134,10 +134,24 @@ $isEdit = !empty($live);
                 <input type="text" class="form-control mb-3" placeholder="Buscar produto..." id="searchProduct"
                        oninput="filterProducts(this.value)">
                 <div id="eligibleList" style="max-height:300px;overflow-y:auto">
-                    <?php foreach ($eligibleProducts as $ep): ?>
+                    <?php foreach ($eligibleProducts as $ep): 
+                        $img = $ep['foto_principal'] ?? '';
+                        if (empty($img) && !empty($ep['imagens'])) {
+                            $imgs = json_decode($ep['imagens'], true);
+                            if (is_array($imgs) && !empty($imgs)) $img = $imgs[0];
+                            elseif (is_string($ep['imagens'])) $img = explode(',', $ep['imagens'])[0];
+                        }
+                    ?>
                         <div class="eligible-item d-flex align-items-center p-2 border-bottom" 
                              data-id="<?= $ep['id'] ?>" data-name="<?= htmlspecialchars($ep['nome'] ?? '') ?>"
-                             data-price="<?= (float)($ep['preco'] ?? 0) ?>">
+                             data-price="<?= (float)($ep['preco'] ?? 0) ?>" data-img="<?= htmlspecialchars($img) ?>">
+                            <div style="width:45px;height:45px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex-shrink:0;margin-right:10px;display:flex;align-items:center;justify-content:center">
+                                <?php if (!empty($img)): ?>
+                                    <img src="<?= htmlspecialchars($img) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
+                                <?php else: ?>
+                                    <i class="fas fa-image text-muted"></i>
+                                <?php endif; ?>
+                            </div>
                             <div class="flex-grow-1">
                                 <strong><?= htmlspecialchars($ep['nome'] ?? 'Produto #' . $ep['id']) ?></strong>
                                 <br><small>R$ <?= number_format((float)($ep['preco'] ?? 0), 2, ',', '.') ?></small>
@@ -167,6 +181,7 @@ function addProductToLive(btn) {
     const id = item.dataset.id;
     const name = item.dataset.name;
     const price = parseFloat(item.dataset.price);
+    const img = item.dataset.img || '';
 
     if (document.querySelector(`#productsList [data-product-id="${id}"]`)) {
         alert('Produto já adicionado');
@@ -176,9 +191,14 @@ function addProductToLive(btn) {
     const noMsg = document.getElementById('noProductsMsg');
     if (noMsg) noMsg.remove();
 
+    const imgHtml = img 
+        ? `<img src="${img}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:10px" alt="">`
+        : `<div style="width:40px;height:40px;border-radius:6px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;margin-right:10px"><i class="fas fa-image text-muted"></i></div>`;
+
     const html = `
         <div class="list-group-item d-flex align-items-center" data-product-id="${id}">
             <i class="fas fa-grip-vertical text-muted me-2" style="cursor:grab"></i>
+            ${imgHtml}
             <div class="flex-grow-1">
                 <strong>${name}</strong>
                 <br><small class="text-muted">R$ ${price.toFixed(2).replace('.', ',')}</small>
