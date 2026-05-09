@@ -286,6 +286,45 @@ window.openProductSheet = function() {
     }
 };
 
+window.sendChat = function() {
+    var input = document.getElementById('chatInput');
+    if (!input) return;
+    var content = input.value.trim();
+    if (!content || content.length === 0) {
+        showToast('Mensagem vazia', 'error');
+        return;
+    }
+    input.disabled = true;
+    fetch('/api/live/' + LIVE_ID + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'content=' + encodeURIComponent(content)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            input.value = '';
+            // Renderizar mensagem localmente
+            var container = document.getElementById('chatMessages');
+            if (container) {
+                var div = document.createElement('div');
+                div.className = 'chat-msg';
+                div.innerHTML = '<span class="chat-user">Você</span>' + content;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+        } else {
+            showToast(data.error || 'Erro ao enviar', 'error');
+        }
+        input.disabled = false;
+        input.focus();
+    })
+    .catch(function() {
+        showToast('Erro de conexão', 'error');
+        input.disabled = false;
+    });
+};
+
 // Adicionar ao carrinho via AJAX
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-add-cart').forEach(function(btn) {
