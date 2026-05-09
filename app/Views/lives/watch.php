@@ -121,13 +121,9 @@ ob_start();
                                         <div class="card-body p-2">
                                             <small class="d-block text-dark mb-1" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
                                             <strong class="text-danger d-block mb-2">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
-                                            <form method="POST" action="/carrinho/adicionar" style="margin:0">
-                                                <input type="hidden" name="id" value="<?= $p['product_id'] ?>">
-                                                <input type="hidden" name="quantidade" value="1">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger w-100" style="border-radius:8px;font-size:12px">
-                                                    <i class="fas fa-cart-plus me-1"></i>Adicionar
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-add-cart" data-id="<?= $p['product_id'] ?>" style="border-radius:8px;font-size:12px">
+                                                <i class="fas fa-cart-plus me-1"></i>Adicionar
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -274,6 +270,48 @@ window.openProductSheet = function() {
         showProductDetail(currentFeaturedProduct);
     }
 };
+
+// Adicionar ao carrinho via AJAX
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.btn-add-cart').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var id = this.dataset.id;
+            var button = this;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            fetch('/carrinho/adicionar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'id=' + id + '&quantidade=1'
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    button.innerHTML = '<i class="fas fa-check me-1"></i>Adicionado!';
+                    button.classList.remove('btn-outline-danger');
+                    button.classList.add('btn-success');
+                    showToast('✓ Produto adicionado ao carrinho', 'success');
+                    setTimeout(function() {
+                        button.innerHTML = '<i class="fas fa-cart-plus me-1"></i>Adicionar';
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-outline-danger');
+                        button.disabled = false;
+                    }, 2000);
+                } else {
+                    button.innerHTML = '<i class="fas fa-cart-plus me-1"></i>Adicionar';
+                    button.disabled = false;
+                    showToast(data.error || 'Erro ao adicionar', 'error');
+                }
+            })
+            .catch(function() {
+                button.innerHTML = '<i class="fas fa-cart-plus me-1"></i>Adicionar';
+                button.disabled = false;
+                showToast('Erro de conexão', 'error');
+            });
+        });
+    });
+});
 </script>
 
 <?php
