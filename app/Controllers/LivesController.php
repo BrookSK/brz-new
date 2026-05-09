@@ -27,6 +27,26 @@ class LivesController {
     }
 
     /**
+     * Página de programação de lives (listagem pública)
+     */
+    public function index(Request $request) {
+        if (!$this->checkAccess()) return;
+
+        $liveAtiva = $this->liveModel->getActive();
+        $agendadas = $this->liveModel->getByStatus('scheduled', 10);
+        $encerradas = $this->liveModel->getByStatus('ended', 12);
+
+        // Para encerradas, só mostrar as que têm gravação
+        $encerradas = array_filter($encerradas, function($l) {
+            return !empty($l['recording_url']);
+        });
+
+        $title = 'Lives - Braziliana';
+
+        require __DIR__ . '/../Views/lives/index.php';
+    }
+
+    /**
      * Verifica se módulo está acessível
      */
     private function checkAccess(): bool {

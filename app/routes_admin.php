@@ -332,6 +332,7 @@ $router->get('/admin/configuracoes/lives', 'AdminLivesConfigController', 'index'
 $router->post('/admin/configuracoes/lives', 'AdminLivesConfigController', 'store');
 
 // Cliente — Páginas públicas
+$router->get('/lives', 'LivesController', 'index');
 $router->get('/lives/ao-vivo', 'LivesController', 'liveNow');
 $router->get('/lives/{id}', 'LivesController', 'watch');
 $router->get('/api/lives/status', 'LivesController', 'checkLiveStatus');
