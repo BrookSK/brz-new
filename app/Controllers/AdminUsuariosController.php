@@ -653,6 +653,10 @@ class AdminUsuariosController extends Controller {
                         } else {
                             // Criar novo endereço
                             $endData['usuario_id'] = (int) $id;
+                            // Campo 'nome' obrigatório na tabela enderecos
+                            if (in_array('nome', $colsEnd, true) && !isset($endData['nome'])) {
+                                $endData['nome'] = trim((string) ($dados['nome'] ?? 'Endereço Principal'));
+                            }
                             if (in_array('created_at', $colsEnd, true)) $endData['created_at'] = date('Y-m-d H:i:s');
                             if (in_array('updated_at', $colsEnd, true)) $endData['updated_at'] = date('Y-m-d H:i:s');
 
