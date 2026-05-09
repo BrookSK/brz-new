@@ -1133,8 +1133,8 @@ function prefillRowFromExisting(tr, item){
 }
 
 function onPaisChange() {
-    const pais = (document.getElementById('endereco_entrega_pais')?.value || 'BR').toUpperCase();
-    const isBR = (pais === 'BR');
+    const pais = (document.getElementById('endereco_entrega_pais')?.value || 'BR').toUpperCase().trim();
+    const isBR = (pais === 'BR' || pais === 'BRASIL' || pais === 'BRAZIL');
 
     // Adaptar labels e visibilidade
     document.getElementById('label_cep').textContent = isBR ? 'CEP' : 'ZIP / Postal Code';
@@ -1157,7 +1157,10 @@ function onPaisChange() {
 }
 
 function getSelectedPais() {
-    return (document.getElementById('endereco_entrega_pais')?.value || 'BR').toUpperCase();
+    const val = (document.getElementById('endereco_entrega_pais')?.value || 'BR').toUpperCase().trim();
+    // Normalizar para código ISO
+    if (val === 'BRASIL' || val === 'BRAZIL') return 'BR';
+    return val;
 }
 
 function toggleBrinde(cb) {
@@ -2981,7 +2984,8 @@ JS;
 
                 // Zerar impostos para entregas fora do Brasil (BRL path)
                 $paisEntregaBrl = strtoupper(trim((string) $request->getParam('pais_entrega', 'BR')));
-                if ($paisEntregaBrl !== '' && $paisEntregaBrl !== 'BR') {
+                $isBrasilBrl = in_array($paisEntregaBrl, ['BR', 'BRASIL', 'BRAZIL'], true);
+                if ($paisEntregaBrl !== '' && !$isBrasilBrl) {
                     $impostos = 0.0;
                 }
 
@@ -3009,7 +3013,8 @@ JS;
 
             // Zerar impostos para entregas fora do Brasil
             $paisEntrega = strtoupper(trim((string) $request->getParam('pais_entrega', 'BR')));
-            if ($paisEntrega !== '' && $paisEntrega !== 'BR') {
+            $isBrasil = in_array($paisEntrega, ['BR', 'BRASIL', 'BRAZIL'], true);
+            if ($paisEntrega !== '' && !$isBrasil) {
                 $total = $total - $impostos;
                 $impostos = 0.0;
             }
