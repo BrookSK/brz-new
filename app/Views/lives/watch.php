@@ -73,15 +73,15 @@ ob_start();
             <div id="heartsContainer" style="position:absolute;right:40px;bottom:100px;width:60px;height:200px;pointer-events:none;z-index:4;overflow:hidden"></div>
 
             <!-- Chat overlay -->
-            <div class="position-absolute bottom-0 start-0 p-3" id="chatOverlay" style="right:70px;max-height:200px;z-index:5">
-                <div id="chatMessages" style="overflow-y:auto;max-height:150px;display:flex;flex-direction:column;gap:4px;mask-image:linear-gradient(to bottom,transparent 0%,black 30%)"></div>
+            <div class="position-absolute bottom-0 start-0 p-3" id="chatOverlay" style="right:70px;z-index:5">
+                <div id="chatMessages" style="overflow-y:auto;max-height:120px;display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>
                 <?php if ($isLoggedIn): ?>
-                    <div class="d-flex gap-2 mt-2">
+                    <div class="d-flex gap-2">
                         <input type="text" id="chatInput" class="form-control" placeholder="Enviar mensagem..." maxlength="500" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:24px;font-size:14px;padding:10px 18px" onkeydown="if(event.key==='Enter')sendChat()">
                         <button onclick="sendChat()" class="btn btn-danger" style="border-radius:50%;width:42px;height:42px;padding:0;flex-shrink:0"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 <?php else: ?>
-                    <a href="/login?redirect=/lives/<?= $liveId ?>" class="d-block text-center small text-white-50 mt-2" style="background:rgba(0,0,0,0.3);border-radius:20px;padding:8px">Faça login para participar do chat</a>
+                    <a href="/login?redirect=/lives/<?= $liveId ?>" class="d-block text-center small text-white-50" style="background:rgba(0,0,0,0.3);border-radius:20px;padding:8px">Faça login para participar do chat</a>
                 <?php endif; ?>
             </div>
 
@@ -179,14 +179,15 @@ ob_start();
     opacity: 0;
 }
 .chat-msg {
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.5);
     backdrop-filter: blur(4px);
-    border-radius: 16px;
-    padding: 4px 10px;
+    border-radius: 12px;
+    padding: 5px 10px;
     font-size: 12px;
     color: #fff;
-    max-width: 85%;
+    max-width: 80%;
     word-break: break-word;
+    line-height: 1.3;
 }
 .chat-msg .chat-user { font-weight: 600; color: #69c9ff; margin-right: 4px; }
 #toast.show { transform: translateX(-50%) translateY(0); }
@@ -312,6 +313,10 @@ window.sendChat = function() {
                 div.innerHTML = '<span class="chat-user">Você</span>' + content;
                 container.appendChild(div);
                 container.scrollTop = container.scrollHeight;
+                // Limitar a 5 mensagens visíveis
+                while (container.children.length > 5) {
+                    container.removeChild(container.firstChild);
+                }
             }
         } else {
             showToast(data.error || 'Erro ao enviar', 'error');
