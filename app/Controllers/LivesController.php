@@ -93,6 +93,35 @@ class LivesController {
             return;
         }
 
+        // Dados do usuário logado
+        $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+        $isLoggedIn = $userId > 0;
+        $perfil = $_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? 'cliente';
+        $isAdmin = ($perfil === 'admin');
+
+        // Verificar se tem cartão cadastrado (obrigatório para clientes)
+        $hasCard = false;
+        $defaultCard = null;
+        if ($isLoggedIn) {
+            $paymentMethod = new \App\Models\CustomerPaymentMethod();
+            $defaultCard = $paymentMethod->getDefault($userId);
+            $hasCard = !empty($defaultCard);
+        }
+
+        // Se não está logado → redirecionar para login
+        if (!$isLoggedIn) {
+            header('Location: /login?redirect=/lives/' . $id);
+            exit;
+        }
+
+        // Se é cliente (não admin) e não tem cartão → mostrar página de cadastro de cartão
+        if (!$isAdmin && !$hasCard) {
+            $title = 'Cadastrar Cartão - ' . $live['title'];
+            $liveId = $id;
+            include __DIR__ . '/../Views/lives/register-card.php';
+            return;
+        }
+
         // Se live ainda não começou, mostrar página de espera
         if ($live['status'] === 'scheduled') {
             $title = $live['title'] . ' - Em breve';
@@ -108,18 +137,6 @@ class LivesController {
         // Gerar URL assinada se necessário
         if (!empty($playbackUrl)) {
             $playbackUrl = $this->streamService->generateSignedPlaybackUrl($playbackUrl);
-        }
-
-        // Dados do usuário logado
-        $userId = (int) ($_SESSION['usuario_id'] ?? 0);
-        $isLoggedIn = $userId > 0;
-
-        // Verificar se tem cartão cadastrado
-        $hasCard = false;
-        if ($isLoggedIn) {
-            $paymentMethod = new \App\Models\CustomerPaymentMethod();
-            $defaultCard = $paymentMethod->getDefault($userId);
-            $hasCard = !empty($defaultCard);
         }
 
         // Verificar se usuário já curtiu
