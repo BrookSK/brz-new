@@ -12,6 +12,13 @@ function initPlayer() {
     if (!video) return;
 
     var url = PLAYBACK_URL || RECORDING_URL;
+    
+    // Se a URL é WHEP (webRTC/play), converter para HLS
+    if (url && url.indexOf('/webRTC/play') !== -1) {
+        url = url.replace('/webRTC/play', '/manifest/video.m3u8');
+        console.log('Converted WHEP URL to HLS:', url);
+    }
+    
     console.log('Player URL:', url);
     
     if (!url) {

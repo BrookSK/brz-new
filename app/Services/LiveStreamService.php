@@ -81,13 +81,25 @@ class LiveStreamService {
         }
 
         $result = $response['result'];
+        
+        // Construir URL HLS se não vier na resposta
+        $hlsUrl = $result['playback']['hls'] ?? null;
+        if (empty($hlsUrl) && !empty($result['uid'])) {
+            // Pegar subdomain das credenciais
+            $creds = $this->getCredentials();
+            $subdomain = $creds['subdomain'] ?? '';
+            if (!empty($subdomain)) {
+                $hlsUrl = 'https://' . $subdomain . '/' . $result['uid'] . '/manifest/video.m3u8';
+            }
+        }
+
         return [
             'uid' => $result['uid'] ?? null,
             'rtmps_url' => $result['rtmps']['url'] ?? null,
             'rtmps_key' => $result['rtmps']['streamKey'] ?? null,
             'webrtc_url' => $result['webRTC']['url'] ?? ($result['webrtc']['url'] ?? null),
             'webrtc_playback_url' => $result['webRTCPlayback']['url'] ?? ($result['webrtcPlayback']['url'] ?? null),
-            'playback_hls' => $result['playback']['hls'] ?? null,
+            'playback_hls' => $hlsUrl,
         ];
     }
 
