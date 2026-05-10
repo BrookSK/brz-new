@@ -125,7 +125,7 @@ async function startWebRTC(whipUrl) {
         const placeholder = document.getElementById('cameraPlaceholder');
         if (placeholder) placeholder.classList.add('d-none');
 
-        // WHIP via proxy do backend (evita CORS)
+        // WHIP direto para Cloudflare (CF permite CORS)
         peerConnection = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
             bundlePolicy: 'max-bundle'
@@ -138,26 +138,48 @@ async function startWebRTC(whipUrl) {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        // Usar proxy local ao invés da URL direta do CF
-        const proxyUrl = '/api/live/' + LIVE_ID + '/whip';
+        // Tentar direto no CF primeiro
+        try {
+            const response = await fetch(whipUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/sdp' },
+                body: peerConnection.localDescription.sdp
+            });
 
-        const response = await fetch(proxyUrl, {
+            if (response.status === 201 || response.ok) {
+                const answerSdp = await response.text();
+                if (answerSdp.startsWith('v=')) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription({
+                        type: 'answer',
+                        sdp: answerSdp
+                    }));
+                    console.log('WHIP: Connected directly to CF!');
+                    return;
+                }
+            }
+            console.log('WHIP direct failed, trying proxy...');
+        } catch(directErr) {
+            console.log('WHIP direct error (trying proxy):', directErr.message);
+        }
+
+        // Fallback: proxy
+        const proxyResponse = await fetch('/api/live/' + LIVE_ID + '/whip', {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/sdp' },
             body: peerConnection.localDescription.sdp
         });
 
-        if (response.status === 201 || response.ok) {
-            const answerSdp = await response.text();
-            await peerConnection.setRemoteDescription(new RTCSessionDescription({
-                type: 'answer',
-                sdp: answerSdp
-            }));
-            console.log('WHIP: Connected via proxy!');
-        } else {
-            const errText = await response.text();
-            console.error('WHIP proxy error:', response.status, errText);
+        if (proxyResponse.status === 201 || proxyResponse.ok) {
+            const answerSdp = await proxyResponse.text();
+            if (answerSdp.startsWith('v=')) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                }));
+                console.log('WHIP: Connected via proxy');
+            }
         }
 
     } catch (e) {
