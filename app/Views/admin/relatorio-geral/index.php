@@ -44,12 +44,14 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                 </div>
                 <div class="col-md-3 col-sm-6">
                     <label class="form-label small fw-semibold">Status</label>
-                    <select name="status[]" class="form-select" multiple size="4" style="min-height:38px;">
+                    <div class="border rounded p-2" style="max-height:150px;overflow-y:auto;background:#fff;">
                         <?php foreach ($statusList as $key => $label): ?>
-                        <option value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $statusFilter) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="status[]" value="<?= htmlspecialchars($key) ?>" id="st_<?= htmlspecialchars($key) ?>" <?= in_array($key, $statusFilter) ? 'checked' : '' ?>>
+                            <label class="form-check-label small" for="st_<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></label>
+                        </div>
                         <?php endforeach; ?>
-                    </select>
-                    <div class="form-text" style="font-size:.7rem;">Ctrl+click para selecionar múltiplos</div>
+                    </div>
                 </div>
                 <div class="col-md-2 col-sm-6">
                     <label class="form-label small fw-semibold">Moeda</label>
