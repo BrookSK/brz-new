@@ -5,8 +5,7 @@ use App\Core\Request;
 use Config\Database;
 
 /**
- * Controller leve para polling de lives
- * Não instancia serviços pesados — acessa banco direto
+ * Controller leve para polling de lives e proxy WHEP
  */
 class LivePollController {
 
@@ -19,7 +18,6 @@ class LivePollController {
             $liveId = (int) $id;
             $sinceId = (int) ($request->getParam('since') ?? 0);
 
-            // Buscar live
             $stLive = $pdo->prepare("SELECT status, likes_count, shares_count, viewers_current, current_featured_product_id FROM lives WHERE id = ? LIMIT 1");
             $stLive->execute([$liveId]);
             $live = $stLive->fetch(\PDO::FETCH_ASSOC);
@@ -29,7 +27,6 @@ class LivePollController {
                 return;
             }
 
-            // Mensagens novas
             $stmt = $pdo->prepare(
                 "SELECT m.id, m.user_id, m.content, m.created_at, 
                         COALESCE(u.nome, u.name, u.email) AS user_name
@@ -41,19 +38,20 @@ class LivePollController {
             $stmt->execute([$liveId, $sinceId]);
             $messages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            // IDs ocultos
             $stHidden = $pdo->prepare("SELECT id FROM live_chat_messages WHERE live_id = ? AND hidden = 1 ORDER BY id DESC LIMIT 50");
             $stHidden->execute([$liveId]);
             $hiddenIds = $stHidden->fetchAll(\PDO::FETCH_COLUMN);
 
-            // Métricas
+            $stmtLikes = $pdo->prepare("SELECT likes_count, shares_count, viewers_current FROM lives WHERE id = ?");
+            $stmtLikes->execute([$liveId]);
+            $liveMetrics = $stmtLikes->fetch(\PDO::FETCH_ASSOC);
+
             $metrics = [
-                'viewers' => (int)($live['viewers_current'] ?? 0),
-                'likes' => (int)($live['likes_count'] ?? 0),
-                'shares' => (int)($live['shares_count'] ?? 0),
+                'viewers' => (int)($liveMetrics['viewers_current'] ?? 0),
+                'likes' => (int)($liveMetrics['likes_count'] ?? 0),
+                'shares' => (int)($liveMetrics['shares_count'] ?? 0),
             ];
 
-            // Produto em destaque
             $featured = null;
             if (!empty($live['current_featured_product_id'])) {
                 $stFeat = $pdo->prepare(
@@ -89,50 +87,29 @@ class LivePollController {
         }
     }
 
-    private function json(array $data, int $status = 200): void {
-        http_response_code($status);
-        header('Content-Type: application/json');
-        echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    }
-}
-
     /**
-     * POST /api/live/{id}/whep — Proxy WHEP para Cloudflare (evita CORS)
+     * POST /api/live/{id}/whep — Proxy WHEP para Cloudflare
      */
     public function whepProxy(Request $request, $id) {
         try {
-            $pdo = \Config\Database::getConnection();
+            $pdo = Database::getConnection();
             $st = $pdo->prepare("SELECT cf_playback_url FROM lives WHERE id = ? LIMIT 1");
             $st->execute([(int)$id]);
             $playbackUrl = $st->fetchColumn();
 
-            if (empty($playbackUrl)) {
-                http_response_code(404);
-                header('Content-Type: text/plain');
-                echo 'No playback URL';
-                return;
-            }
-
-            // Se a URL não é WHEP, não pode usar este proxy
-            if (strpos($playbackUrl, 'webRTC/play') === false) {
+            if (empty($playbackUrl) || strpos($playbackUrl, 'webRTC/play') === false) {
                 http_response_code(400);
                 header('Content-Type: text/plain');
-                echo 'Not a WHEP URL';
-                return;
+                echo 'No valid WHEP URL';
+                exit;
             }
 
-            // Ler SDP do body raw
             $sdp = file_get_contents('php://input');
             if (empty($sdp)) {
-                // Tentar de outra forma
-                $sdp = $request->getBody();
-                if (is_array($sdp)) $sdp = '';
-            }
-            if (empty($sdp)) {
                 http_response_code(400);
                 header('Content-Type: text/plain');
-                echo 'Empty SDP body';
-                return;
+                echo 'Empty SDP';
+                exit;
             }
 
             $ch = curl_init($playbackUrl);
@@ -146,17 +123,9 @@ class LivePollController {
 
             $body = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
             curl_close($ch);
 
-            if ($body === false || !empty($curlError)) {
-                http_response_code(502);
-                header('Content-Type: text/plain');
-                echo 'Proxy error: ' . $curlError;
-                return;
-            }
-
-            http_response_code($httpCode);
+            http_response_code($httpCode ?: 502);
             header('Content-Type: application/sdp');
             echo $body;
             exit;
@@ -164,5 +133,13 @@ class LivePollController {
             http_response_code(500);
             header('Content-Type: text/plain');
             echo $e->getMessage();
+            exit;
         }
     }
+
+    private function json(array $data, int $status = 200): void {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    }
+}
