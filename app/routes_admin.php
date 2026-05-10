@@ -338,15 +338,15 @@ $router->get('/lives/{id}', 'LivesController', 'watch');
 $router->get('/api/lives/status', 'LivesController', 'checkLiveStatus');
 
 // Cliente — API REST
-$router->get('/api/live/{id}/poll', 'LiveApiController', 'poll');
+$router->get('/api/live/{id}/poll', 'LivePollController', 'poll');
 $router->post('/api/live/{id}/heartbeat', 'LiveApiController', 'heartbeat');
 $router->post('/api/live/{id}/chat', 'LiveApiController', 'chat');
 $router->post('/api/live/{id}/like', 'LiveApiController', 'like');
 $router->post('/api/live/{id}/share', 'LiveApiController', 'share');
 $router->post('/api/live/{id}/buy', 'LiveApiController', 'buy');
 
-// Cliente — SSE (Server-Sent Events)
-$router->get('/api/live/{id}/events', 'LiveSseController', 'stream');
+// Cliente — SSE (DESATIVADO - usar polling via /api/live/{id}/poll)
+// $router->get('/api/live/{id}/events', 'LiveSseController', 'stream');
 $router->get('/api/live/{id}/status', 'LiveSseController', 'status');
 
 // Cliente — Métodos de Pagamento

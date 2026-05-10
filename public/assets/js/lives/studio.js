@@ -35,7 +35,15 @@ async function startLive() {
     if (btn) btn.disabled = true;
 
     try {
-        const res = await fetch('/admin/lives/' + LIVE_ID + '/start', { method: 'POST', credentials: 'same-origin' });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
+        const res = await fetch('/admin/lives/' + LIVE_ID + '/start', { 
+            method: 'POST', 
+            credentials: 'same-origin',
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
         
         let data;
         try {
