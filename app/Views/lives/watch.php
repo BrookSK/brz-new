@@ -318,19 +318,6 @@ window.sendChat = function() {
     .then(function(data) {
         if (data.success) {
             input.value = '';
-            // Renderizar mensagem localmente
-            var container = document.getElementById('chatMessages');
-            if (container) {
-                var div = document.createElement('div');
-                div.className = 'chat-msg';
-                div.innerHTML = '<span class="chat-user">Você</span>' + content;
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
-                // Limitar a 5 mensagens visíveis
-                while (container.children.length > 5) {
-                    container.removeChild(container.firstChild);
-                }
-            }
         } else {
             showToast(data.error || 'Erro ao enviar', 'error');
         }
@@ -342,6 +329,82 @@ window.sendChat = function() {
         input.disabled = false;
     });
 };
+
+// ─── Polling para chat e métricas em tempo real ─────────────
+var lastMsgId = 0;
+var pollInterval = null;
+
+function startPolling() {
+    // Pegar ID da última mensagem carregada
+    var msgs = document.querySelectorAll('#chatMessages .chat-msg');
+    if (msgs.length > 0) {
+        var lastMsg = msgs[msgs.length - 1];
+        if (lastMsg.dataset && lastMsg.dataset.id) lastMsgId = parseInt(lastMsg.dataset.id);
+    }
+
+    pollInterval = setInterval(function() {
+        fetch('/api/live/' + LIVE_ID + '/status')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                // Atualizar métricas
+                if (data.metrics) {
+                    var v = document.getElementById('viewers');
+                    var l = document.getElementById('likeCount');
+                    var s = document.getElementById('shareCount');
+                    if (v) v.textContent = data.metrics.viewers || 0;
+                    if (l) l.textContent = data.metrics.likes || 0;
+                    if (s) s.textContent = data.metrics.shares || 0;
+                }
+
+                // Novas mensagens
+                if (data.messages && data.messages.length > 0) {
+                    var container = document.getElementById('chatMessages');
+                    data.messages.forEach(function(msg) {
+                        var msgId = parseInt(msg.id || 0);
+                        if (msgId <= lastMsgId) return;
+                        lastMsgId = msgId;
+                        var div = document.createElement('div');
+                        div.className = 'chat-msg';
+                        div.dataset.id = msgId;
+                        var userName = msg.user_name || msg.user_name_alt || 'Anônimo';
+                        div.innerHTML = '<span class="chat-user">' + userName + '</span>' + (msg.content || '');
+                        container.appendChild(div);
+                        // Limitar a 10 mensagens
+                        while (container.children.length > 10) {
+                            container.removeChild(container.firstChild);
+                        }
+                        container.scrollTop = container.scrollHeight;
+                    });
+                }
+
+                // Produto em destaque
+                if (data.featured) {
+                    var pill = document.getElementById('featuredPill');
+                    if (pill && data.featured.product_id) {
+                        document.getElementById('featuredImg').src = data.featured.image || '';
+                        document.getElementById('featuredName').textContent = data.featured.name || '';
+                        document.getElementById('featuredPrice').textContent = 'R$ ' + parseFloat(data.featured.price || 0).toFixed(2).replace('.', ',');
+                        pill.style.display = 'block';
+                        window.currentFeaturedProduct = data.featured;
+                    } else if (pill) {
+                        pill.style.display = 'none';
+                    }
+                }
+
+                // Live encerrada
+                if (data.status === 'ended') {
+                    clearInterval(pollInterval);
+                    showToast('A live foi encerrada', 'info');
+                }
+            })
+            .catch(function() {});
+    }, 2000); // A cada 2 segundos
+}
+
+// Iniciar polling quando a live está ativa
+if (IS_ACTIVE) {
+    startPolling();
+}
 
 // Adicionar ao carrinho via AJAX
 document.addEventListener('DOMContentLoaded', function() {

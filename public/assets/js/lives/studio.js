@@ -266,40 +266,13 @@ function updateFeaturedUI() {
     });
 }
 
-// ─── SSE (receber chat e métricas) ──────────────────────────
-function connectSSE() {
-    if (sseSource) sseSource.close();
-
-    sseSource = new EventSource(`/api/live/${LIVE_ID}/events`);
-
-    sseSource.addEventListener('chat', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.messages) {
-            data.messages.forEach(renderStudioChatMsg);
-        }
-    });
-
-    sseSource.addEventListener('metrics', (e) => {
-        const data = JSON.parse(e.data);
-        document.getElementById('viewerCount').textContent = data.viewers || 0;
-        document.getElementById('likeCount').textContent = data.likes || 0;
-    });
-
-    sseSource.addEventListener('ended', () => {
-        sseSource.close();
-    });
-
-    sseSource.onerror = () => {
-        setTimeout(connectSSE, 3000);
-    };
-}
-
+// ─── Renderizar mensagem no chat do estúdio ─────────────────
 function renderStudioChatMsg(msg) {
     const container = document.getElementById('chatMessages');
     const div = document.createElement('div');
     div.className = 'chat-msg-studio';
     div.innerHTML = `
-        <span class="user">${escapeHtml(msg.user_name || 'Anônimo')}</span>
+        <span class="user">${escapeHtml(msg.user_name || msg.user_name_alt || 'Anônimo')}</span>
         <span class="text">${escapeHtml(msg.content)}</span>
         <span class="actions">
             <button onclick="hideMsg(${msg.id})" title="Ocultar"><i class="fas fa-eye-slash"></i></button>
@@ -315,6 +288,36 @@ function renderStudioChatMsg(msg) {
         badge.classList.remove('d-none');
         badge.textContent = parseInt(badge.textContent || 0) + 1;
     }
+}
+
+// ─── Polling para chat e métricas (substitui SSE) ───────────
+var adminLastMsgId = 0;
+var adminPollInterval = null;
+
+function startAdminPolling() {
+    adminPollInterval = setInterval(function() {
+        fetch('/api/live/' + LIVE_ID + '/status')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                // Atualizar métricas
+                if (data.metrics) {
+                    document.getElementById('viewerCount').textContent = data.metrics.viewers || 0;
+                    document.getElementById('likeCount').textContent = data.metrics.likes || 0;
+                }
+
+                // Novas mensagens
+                if (data.messages && data.messages.length > 0) {
+                    var container = document.getElementById('chatMessages');
+                    data.messages.forEach(function(msg) {
+                        var msgId = parseInt(msg.id || 0);
+                        if (msgId <= adminLastMsgId) return;
+                        adminLastMsgId = msgId;
+                        renderStudioChatMsg(msg);
+                    });
+                }
+            })
+            .catch(function() {});
+    }, 2000);
 }
 
 // ─── Moderação ──────────────────────────────────────────────
@@ -366,7 +369,7 @@ function escapeHtml(text) {
 
 // ─── Inicialização ──────────────────────────────────────────
 if (IS_LIVE) {
-    connectSSE();
+    startAdminPolling();
     if (IS_WEBRTC) {
         // Tentar iniciar preview da câmera com áudio
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
