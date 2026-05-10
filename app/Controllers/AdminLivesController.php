@@ -244,7 +244,14 @@ class AdminLivesController {
             }
 
             // Atualizar live com dados do CF
-            $playbackUrl = $cfResult['playback_hls'] ?: ($cfResult['webrtc_playback_url'] ?: '');
+            // Se WebRTC, usar WHEP para playback (CF exige WHIP+WHEP juntos)
+            // Se OBS/RTMPS, usar HLS
+            $playbackUrl = '';
+            if ($live['ingest_method'] === 'webrtc' && !empty($cfResult['webrtc_playback_url'])) {
+                $playbackUrl = $cfResult['webrtc_playback_url'];
+            } else {
+                $playbackUrl = $cfResult['playback_hls'] ?: ($cfResult['webrtc_playback_url'] ?: '');
+            }
             
             $this->liveModel->update($id, [
                 'cf_live_input_id' => $cfResult['uid'],
