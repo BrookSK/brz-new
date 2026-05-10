@@ -115,11 +115,15 @@ class LiveApiController {
         $stmtHidden->execute([':lid' => (int)$id]);
         $hiddenIds = $stmtHidden->fetchAll(\PDO::FETCH_COLUMN);
 
-        // Métricas
+        // Métricas (buscar valores atualizados direto do banco)
+        $stmtLikes = $pdo->prepare("SELECT likes_count, shares_count, viewers_current FROM lives WHERE id = :id");
+        $stmtLikes->execute([':id' => (int)$id]);
+        $liveMetrics = $stmtLikes->fetch(\PDO::FETCH_ASSOC);
+
         $metrics = [
-            'viewers' => (int)($live['viewers_current'] ?? 0),
-            'likes' => (int)($live['likes_count'] ?? 0),
-            'shares' => (int)($live['shares_count'] ?? 0),
+            'viewers' => (int)($liveMetrics['viewers_current'] ?? 0),
+            'likes' => (int)($liveMetrics['likes_count'] ?? 0),
+            'shares' => (int)($liveMetrics['shares_count'] ?? 0),
         ];
 
         // Produto em destaque
