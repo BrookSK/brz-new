@@ -341,3 +341,54 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <div class="tab-pane fade" id="pane-regional" role="tabpanel"><div id="regional-content"></div></div>
     </div>
 </div>
+
+<!-- Modal Regional -->
+<div class="modal fade" id="modalRegional" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-globe me-2"></i>Relatório Regional</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label fw-semibold small">Moeda de exibição</label><select id="regional-moeda" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                <div><label class="form-label fw-semibold small">Idioma</label><select id="regional-idioma" class="form-select"><option value="pt">Português (PT-BR)</option><option value="en">English (EN)</option></select></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary btn-sm" onclick="gerarRelatorioRegional()"><i class="fas fa-check me-1"></i>Gerar</button></div>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+const DATA=<?= json_encode($regionalData, JSON_UNESCAPED_UNICODE|JSON_NUMERIC_CHECK) ?>;
+const i18n={pt:{title:'Relatório Regional',orders:'Total de Pedidos',total:'Total Geral',subtotal:'Subtotal Produtos',servicos:'Taxa de Serviço',impostos:'Impostos',imposto_local:'Imposto Local',frete:'Frete',byStatus:'Por Status',byPayment:'Por Forma de Pagamento',status:'Status',qty:'Qtd',form:'Forma',noData:'Nenhum dado',allConverted:'Todos os valores convertidos para',rate:'Taxa de conversão'},en:{title:'Regional Report',orders:'Total Orders',total:'Grand Total',subtotal:'Products Subtotal',servicos:'Service Fee',impostos:'Taxes',imposto_local:'Local Tax',frete:'Shipping',byStatus:'By Status',byPayment:'By Payment Method',status:'Status',qty:'Qty',form:'Method',noData:'No data',allConverted:'All values converted to',rate:'Conversion rate'}};
+const enLabels={'pendente':'Pending','processando':'Processing','pago':'Paid','carne_pagando':'Installment Paying','carne_aguardando':'Installment Waiting','produto_consolidado':'Box Closed','etiqueta_gerada':'Label Generated','em_transporte':'In Transit','aguardando_liberacao_aduaneira':'Customs Clearance','enviado_ao_destinatario':'Sent to Recipient','entregue':'Delivered','cancelado':'Cancelled'};
+function fmt(v,m){const n=parseFloat(v)||0;return m==='USD'?'$ '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function cv(v,o,t,tx){const n=parseFloat(v)||0;if(o===t)return n;if(o==='USD'&&t==='BRL')return n*tx;if(o==='BRL'&&t==='USD')return n/tx;return n;}
+window.abrirModalRegional=function(){new bootstrap.Modal(document.getElementById('modalRegional')).show();};
+window.gerarRelatorioRegional=function(){
+    const moeda=document.getElementById('regional-moeda').value,idioma=document.getElementById('regional-idioma').value,t=i18n[idioma]||i18n.pt,taxa=DATA.taxaUsdBrl,labels=idioma==='en'?enLabels:DATA.statusLabels;
+    const uD=DATA.usd||{},bD=DATA.brl||{},keys=['total','subtotal','servicos','impostos','imposto_local','frete'],tots={};
+    keys.forEach(k=>{tots[k]=cv(uD[k]||0,'USD',moeda,taxa)+cv(bD[k]||0,'BRL',moeda,taxa);});
+    const sMap={};(DATA.porStatus||[]).forEach(r=>{const st=r.status||'N/A';if(!sMap[st])sMap[st]={status:st,qtd:0,subtotal:0,servicos:0,impostos:0,frete:0,total:0};const o=(r.moeda||'USD').toUpperCase();sMap[st].qtd+=parseInt(r.qtd)||0;sMap[st].subtotal+=cv(r.subtotal||0,o,moeda,taxa);sMap[st].servicos+=cv(r.servicos||0,o,moeda,taxa);sMap[st].impostos+=cv(r.impostos||0,o,moeda,taxa);sMap[st].frete+=cv(r.frete||0,o,moeda,taxa);sMap[st].total+=cv(r.total||0,o,moeda,taxa);});
+    const sArr=Object.values(sMap).sort((a,b)=>b.total-a.total);
+    const pMap={};(DATA.porPagamento||[]).forEach(r=>{const f=r.forma||'N/A';if(!pMap[f])pMap[f]={forma:f,qtd:0,total:0};pMap[f].qtd+=parseInt(r.qtd)||0;pMap[f].total+=parseFloat(r.total)||0;});
+    const qtd=parseInt(DATA.totais.qtd_pedidos)||0;
+    const rl=moeda==='BRL'?'1 USD = '+taxa.toFixed(2)+' BRL':'1 BRL = '+(1/taxa).toFixed(4)+' USD';
+    let h='<div class="alert alert-info small mb-3"><i class="fas fa-info-circle me-1"></i>'+t.allConverted+' <strong>'+moeda+'</strong>. '+t.rate+': '+rl+'</div>';
+    h+='<div class="row g-3 mb-4">';
+    [{key:'total',label:t.total,color:'#3b82f6'},{key:'subtotal',label:t.subtotal,color:'#10b981'},{key:'servicos',label:t.servicos,color:'#06b6d4'},{key:'impostos',label:t.impostos,color:'#f59e0b'},{key:'imposto_local',label:t.imposto_local,color:'#ef4444'},{key:'frete',label:t.frete,color:'#64748b'}].forEach(c=>{const v=tots[c.key]||0;if(c.key==='imposto_local'&&v<=0)return;h+='<div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid '+c.color+';"><div class="card-body"><div class="text-muted small mb-1">'+c.label+'</div><div class="fs-4 fw-bold">'+fmt(v,moeda)+'</div></div></div></div>';});
+    h+='</div>';
+    h+='<div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#1e293b,#334155);"><div class="card-body d-flex align-items-center justify-content-between py-3"><div class="text-white fw-semibold">'+t.orders+'</div><span class="fs-2 fw-bold text-white">'+qtd.toLocaleString()+'</span></div></div>';
+    h+='<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0">'+t.byStatus+'</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>'+t.status+'</th><th class="text-end">'+t.qty+'</th><th class="text-end">Subtotal</th><th class="text-end">Serviço</th><th class="text-end">Impostos</th><th class="text-end">Frete</th><th class="text-end">Total</th></tr></thead><tbody>';
+    if(!sArr.length)h+='<tr><td colspan="7" class="text-center text-muted py-3">'+t.noData+'</td></tr>';
+    else sArr.forEach(r=>{h+='<tr><td>'+(labels[r.status]||r.status.replace(/_/g,' '))+'</td><td class="text-end">'+r.qtd+'</td><td class="text-end">'+fmt(r.subtotal,moeda)+'</td><td class="text-end">'+fmt(r.servicos,moeda)+'</td><td class="text-end">'+fmt(r.impostos,moeda)+'</td><td class="text-end">'+fmt(r.frete,moeda)+'</td><td class="text-end fw-bold">'+fmt(r.total,moeda)+'</td></tr>';});
+    h+='</tbody></table></div></div></div>';
+    h+='<div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0">'+t.byPayment+'</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>'+t.form+'</th><th class="text-end">'+t.qty+'</th><th class="text-end">Total</th></tr></thead><tbody>';
+    const pArr=Object.values(pMap).sort((a,b)=>b.total-a.total);
+    if(!pArr.length)h+='<tr><td colspan="3" class="text-center text-muted py-3">'+t.noData+'</td></tr>';
+    else pArr.forEach(r=>{h+='<tr><td>'+r.forma.replace(/_/g,' ')+'</td><td class="text-end">'+r.qtd+'</td><td class="text-end fw-bold">'+fmt(r.total,moeda)+'</td></tr>';});
+    h+='</tbody></table></div></div></div>';
+    document.getElementById('regional-content').innerHTML=h;
+    bootstrap.Modal.getInstance(document.getElementById('modalRegional')).hide();
+    const el=document.getElementById('tab-regional');el.setAttribute('data-bs-toggle','tab');el.setAttribute('data-bs-target','#pane-regional');new bootstrap.Tab(el).show();
+};
+})();
+</script>
