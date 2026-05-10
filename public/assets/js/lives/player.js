@@ -69,39 +69,34 @@ async function initWHEPPlayer(video, whepUrl) {
             bundlePolicy: 'max-bundle'
         });
 
-        // Receber tracks
         pc.addTransceiver('video', { direction: 'recvonly' });
         pc.addTransceiver('audio', { direction: 'recvonly' });
 
         pc.ontrack = function(event) {
+            console.log('WHEP: Got track!', event.track.kind);
             if (event.streams && event.streams[0]) {
                 video.srcObject = event.streams[0];
-                video.play().catch(() => { video.muted = true; video.play(); });
+                video.play().catch(function() { video.muted = true; video.play(); });
             }
         };
 
-        // Criar offer
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Usar proxy local (evita CORS)
-        const proxyUrl = '/api/live/' + LIVE_ID + '/whep';
-
-        const response = await fetch(proxyUrl, {
+        // Chamar Cloudflare DIRETAMENTE (CF permite CORS em WHEP/play)
+        const response = await fetch(whepUrl, {
             method: 'POST',
-            credentials: 'same-origin',
+            mode: 'cors',
             headers: { 'Content-Type': 'application/sdp' },
             body: pc.localDescription.sdp
         });
 
         if (response.status === 201 || response.ok) {
             const answerSdp = await response.text();
-            console.log('WHEP response status:', response.status);
-            console.log('WHEP answer length:', answerSdp.length);
-            console.log('WHEP answer starts with:', answerSdp.substring(0, 50));
+            console.log('WHEP: Got answer from CF, length:', answerSdp.length);
             
             if (!answerSdp.startsWith('v=')) {
-                console.error('WHEP: Invalid SDP response:', answerSdp.substring(0, 200));
+                console.error('WHEP: Invalid SDP');
                 setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
                 return;
             }
@@ -110,14 +105,66 @@ async function initWHEPPlayer(video, whepUrl) {
                 type: 'answer',
                 sdp: answerSdp
             }));
-            console.log('WHEP: Connected! Receiving stream...');
+            console.log('WHEP: Connected directly to CF!');
         } else {
             const errText = await response.text();
-            console.error('WHEP error status:', response.status, errText.substring(0, 200));
-            setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
+            console.error('WHEP direct error:', response.status, errText.substring(0, 100));
+            // Se CORS falhar, tentar via proxy
+            console.log('Trying WHEP via proxy...');
+            initWHEPViaProxy(video, whepUrl);
         }
     } catch (e) {
-        console.error('WHEP error:', e);
+        console.error('WHEP error:', e.message);
+        // Se falhar (CORS), tentar via proxy
+        if (e.message && e.message.indexOf('CORS') !== -1) {
+            initWHEPViaProxy(video, whepUrl);
+        } else {
+            setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
+        }
+    }
+}
+
+// Fallback: WHEP via proxy (se CORS bloquear)
+async function initWHEPViaProxy(video, whepUrl) {
+    try {
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+            bundlePolicy: 'max-bundle'
+        });
+
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        pc.ontrack = function(event) {
+            console.log('WHEP proxy: Got track!', event.track.kind);
+            if (event.streams && event.streams[0]) {
+                video.srcObject = event.streams[0];
+                video.play().catch(function() { video.muted = true; video.play(); });
+            }
+        };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const response = await fetch('/api/live/' + LIVE_ID + '/whep', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/sdp' },
+            body: pc.localDescription.sdp
+        });
+
+        if (response.status === 201 || response.ok) {
+            const answerSdp = await response.text();
+            if (answerSdp.startsWith('v=')) {
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                }));
+                console.log('WHEP proxy: Connected!');
+            }
+        }
+    } catch (e) {
+        console.error('WHEP proxy error:', e);
         setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
     }
 }
