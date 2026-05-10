@@ -158,7 +158,7 @@ class AdminDreCompletoController extends Controller {
 
         // === ENTRADAS DE PEDIDOS DETALHADAS (com paginação) ===
         $page = max(1, (int)$request->getParam('page', 1));
-        $perPage = 25;
+        $perPage = 10;
         $statusFilterDre = $request->getParam('status_dre', '');
         $entradasDetalhadas = [];
         $totalEntradas = 0;

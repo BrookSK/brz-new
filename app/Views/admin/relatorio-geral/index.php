@@ -421,6 +421,17 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
 
     <!-- DRE COMPLETO -->
     <div class="tab-pane fade" id="pane-dre" role="tabpanel">
+        <!-- Filtros de data próprios do DRE -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body py-3">
+                <div class="d-flex align-items-end gap-3 flex-wrap">
+                    <div><label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i>Data início</label><input type="date" id="dre-date-start" class="form-control form-control-sm" value="<?= htmlspecialchars($dateStart) ?>"></div>
+                    <div><label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i>Data fim</label><input type="date" id="dre-date-end" class="form-control form-control-sm" value="<?= htmlspecialchars($dateEnd) ?>"></div>
+                    <div><button class="btn btn-dark btn-sm px-4" onclick="dreApplyFilter()"><i class="fas fa-filter me-1"></i>Filtrar DRE</button></div>
+                    <div class="ms-auto"><button class="btn btn-outline-secondary btn-sm" onclick="dreExport()"><i class="fas fa-download me-1"></i>Exportar CSV</button></div>
+                </div>
+            </div>
+        </div>
         <div id="dre-completo-container">
             <div class="text-center py-5"><i class="fas fa-spinner fa-spin fs-3 text-muted"></i><div class="text-muted mt-2">Carregando DRE Completo...</div></div>
         </div>
@@ -505,9 +516,7 @@ const DRE_DATA = <?= json_encode([
 ], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
 
 function exportarDRE() {
-    const ds = '<?= $dateStart ?>';
-    const de = '<?= $dateEnd ?>';
-    window.location.href = '/admin/dre-completo/exportar?date_start=' + ds + '&date_end=' + de;
+    dreExport();
 }
 
 function fmtCSV(v) {
@@ -523,12 +532,25 @@ document.getElementById('tab-dre').addEventListener('shown.bs.tab', function() {
 });
 
 function loadDreCompleto() {
-    const ds = '<?= $dateStart ?>';
-    const de = '<?= $dateEnd ?>';
+    const ds = document.getElementById('dre-date-start').value;
+    const de = document.getElementById('dre-date-end').value;
     fetch('/admin/dre-completo/dados?date_start=' + ds + '&date_end=' + de)
         .then(r => r.json())
         .then(d => { if (d.success) renderDreCompleto(d); else document.getElementById('dre-completo-container').innerHTML = '<div class="alert alert-danger">Erro ao carregar dados</div>'; })
         .catch(e => { document.getElementById('dre-completo-container').innerHTML = '<div class="alert alert-danger">Erro: ' + e.message + '</div>'; });
+}
+
+function dreApplyFilter() {
+    dreLoaded = false;
+    dreCurrentPage = 1;
+    dreCurrentStatus = '';
+    loadDreCompletoWithParams();
+}
+
+function dreExport() {
+    const ds = document.getElementById('dre-date-start').value;
+    const de = document.getElementById('dre-date-end').value;
+    window.location.href = '/admin/dre-completo/exportar?date_start=' + ds + '&date_end=' + de;
 }
 
 function fmtR(v) { const n = parseFloat(v)||0; return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -587,14 +609,11 @@ function renderDreCompleto(d) {
     (d.entradas_detalhadas||[]).forEach(p=>{h+='<tr><td class="fw-semibold">#'+p.id+'</td><td>'+(p.data_pedido||'').substring(0,10)+'</td><td><span class="badge bg-light text-dark border" style="font-size:9px;">'+(p.status||'')+'</span></td><td>'+(p.gateway||'-')+'</td><td>'+(p.moeda||'BRL')+'</td><td class="text-end">'+fmtR(p.subtotal)+'</td><td class="text-end">'+fmtR(p.servicos)+'</td><td class="text-end">'+fmtR(p.impostos)+'</td><td class="text-end fw-bold">'+fmtR(p.total)+'</td></tr>';});
     if(!(d.entradas_detalhadas||[]).length)h+='<tr><td colspan="9" class="text-center text-muted py-3">Nenhum pedido no período</td></tr>';
     h += '</tbody></table></div>';
-    // Paginação
-    if (pg.total_pages > 1) {
-        h += '<div class="d-flex align-items-center justify-content-between px-3 py-2 border-top"><span class="text-muted small">Mostrando '+(((pg.page-1)*pg.per_page)+1)+'–'+Math.min(pg.page*pg.per_page,pg.total)+' de '+pg.total+'</span><div class="d-flex gap-1">';
-        if (pg.page > 1) h += '<button class="btn btn-sm btn-outline-secondary" onclick="dreChangePage('+(pg.page-1)+')">← Anterior</button>';
-        for (let i=1;i<=Math.min(pg.total_pages,7);i++){h+='<button class="btn btn-sm '+(i===pg.page?'btn-dark':'btn-outline-secondary')+'" onclick="dreChangePage('+i+')">'+i+'</button>';}
-        if (pg.total_pages > 7) h += '<span class="align-self-center text-muted">...</span><button class="btn btn-sm btn-outline-secondary" onclick="dreChangePage('+pg.total_pages+')">'+pg.total_pages+'</button>';
-        if (pg.page < pg.total_pages) h += '<button class="btn btn-sm btn-outline-secondary" onclick="dreChangePage('+(pg.page+1)+')">Próxima →</button>';
-        h += '</div></div>';
+    // Paginação - botão "Ver mais"
+    if (pg.total_pages > 1 && pg.page < pg.total_pages) {
+        h += '<div class="text-center" style="margin-top:10px;padding-bottom:12px;"><button class="btn btn-sm btn-outline-primary rounded-pill px-4" onclick="dreChangePage('+(pg.page+1)+')"><i class="fas fa-chevron-down me-1"></i>Ver mais pedidos ('+pg.total+' total)</button></div>';
+    } else if (pg.page > 1) {
+        h += '<div class="text-center" style="margin-top:10px;padding-bottom:12px;"><button class="btn btn-sm btn-outline-secondary rounded-pill px-4" onclick="dreChangePage(1)"><i class="fas fa-chevron-up me-1"></i>Voltar ao início</button></div>';
     }
     h += '</div></div>';
 
@@ -636,18 +655,16 @@ let dreCurrentStatus = '';
 
 function dreChangePage(page) {
     dreCurrentPage = page;
-    dreLoaded = false;
     loadDreCompletoWithParams();
 }
 function dreFilterStatus(status) {
     dreCurrentStatus = status;
     dreCurrentPage = 1;
-    dreLoaded = false;
     loadDreCompletoWithParams();
 }
 function loadDreCompletoWithParams() {
-    const ds = '<?= $dateStart ?>';
-    const de = '<?= $dateEnd ?>';
+    const ds = document.getElementById('dre-date-start').value;
+    const de = document.getElementById('dre-date-end').value;
     let url = '/admin/dre-completo/dados?date_start=' + ds + '&date_end=' + de + '&page=' + dreCurrentPage;
     if (dreCurrentStatus) url += '&status_dre=' + encodeURIComponent(dreCurrentStatus);
     document.getElementById('dre-completo-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
