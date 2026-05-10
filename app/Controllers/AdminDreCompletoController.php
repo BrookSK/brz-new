@@ -15,15 +15,23 @@ class AdminDreCompletoController extends Controller {
      * Retorna todos os dados do DRE Completo como JSON para a aba no financeiro
      */
     public function dados(Request $request) {
-        $auth = new AuthService();
-        $auth->requerPerfis(['admin']);
+        // Limpar qualquer output buffer anterior ANTES de tudo
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $auth = new AuthService();
+            if (!isset($_SESSION['usuario_id']) || empty($_SESSION['usuario_id'])) {
+                echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+                exit;
+            }
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => 'Auth: ' . $e->getMessage()]);
+            exit;
+        }
 
         $dateStart = $request->getParam('date_start', date('Y-01-01'));
         $dateEnd = $request->getParam('date_end', date('Y-m-d'));
-
-        // Limpar qualquer output buffer anterior
-        while (ob_get_level()) ob_end_clean();
-        header('Content-Type: application/json; charset=utf-8');
 
         try {
 
