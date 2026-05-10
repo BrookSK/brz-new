@@ -34,7 +34,7 @@ ob_start();
                     <div style="position:relative;z-index:2">
                         <i class="fas fa-calendar fa-3x mb-3"></i>
                         <h3><?= htmlspecialchars($live['title']) ?></h3>
-                        <p><i class="fas fa-clock"></i> <?= date('d/m/Y \à\s H:i', strtotime($live['scheduled_at'])) ?></p>
+                        <p><i class="fas fa-clock"></i> <?= !empty($live['scheduled_at']) ? date('d/m/Y \à\s H:i', strtotime($live['scheduled_at'])) : '' ?></p>
                         <p class="text-white-50">A live ainda não começou</p>
                     </div>
                 </div>
