@@ -112,6 +112,13 @@ class LivePollController {
                 return;
             }
 
+            // Se a URL não é WHEP, não pode usar este proxy
+            if (strpos($playbackUrl, 'webRTC/play') === false) {
+                http_response_code(400);
+                echo 'Not a WHEP URL';
+                return;
+            }
+
             $sdp = file_get_contents('php://input');
             if (empty($sdp)) {
                 http_response_code(400);
@@ -126,17 +133,20 @@ class LivePollController {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 10,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/sdp'],
-                CURLOPT_HEADER => true,
             ]);
 
-            $response = curl_exec($ch);
+            $body = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            $curlError = curl_error($ch);
             curl_close($ch);
 
-            $body = substr($response, $headerSize);
+            if ($body === false || !empty($curlError)) {
+                http_response_code(502);
+                echo 'Proxy error: ' . $curlError;
+                return;
+            }
 
-            http_response_code($httpCode ?: 502);
+            http_response_code($httpCode);
             header('Content-Type: application/sdp');
             echo $body;
         } catch (\Exception $e) {

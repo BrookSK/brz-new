@@ -519,23 +519,15 @@ class AdminLivesController {
             CURLOPT_POSTFIELDS => $sdp,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 10,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/sdp',
-            ],
-            CURLOPT_HEADER => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/sdp'],
         ]);
 
-        $response = curl_exec($ch);
+        $body = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         curl_close($ch);
 
-        $body = substr($response, $headerSize);
-
-        // Retornar a resposta do CF para o navegador
         http_response_code($httpCode ?: 502);
         header('Content-Type: application/sdp');
-        header('Access-Control-Allow-Origin: *');
         echo $body;
     }
 
