@@ -224,28 +224,49 @@ class AdminRelatorioGeralController extends Controller {
         $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'totaisPorMoedaCards', 'taxaUsdBrl', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList');
 
         // === INTEGRAÇÃO DESPESAS ===
-        $despesasResumo = ['total' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
+        $despesasResumo = ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
         try {
             $stDespExists = $this->db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'despesas'");
             if ((int)$stDespExists->fetchColumn() > 0) {
-                // Total despesas no período (por competência)
-                $stD = $this->db->prepare("SELECT COALESCE(SUM(valor),0) FROM despesas WHERE competencia >= ? AND competencia <= ? AND status != 'cancelada' AND deleted_at IS NULL");
+                // Total despesas no período por moeda (por competência)
+                $stD = $this->db->prepare("SELECT UPPER(COALESCE(moeda,'BRL')) as moeda, COALESCE(SUM(valor),0) as total FROM despesas WHERE competencia >= ? AND competencia <= ? AND status != 'cancelada' AND deleted_at IS NULL GROUP BY UPPER(COALESCE(moeda,'BRL'))");
                 $stD->execute([$dateStart, $dateEnd]);
-                $despesasResumo['total'] = (float)$stD->fetchColumn();
+                foreach ($stD->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    if (strtoupper($r['moeda']) === 'USD') $despesasResumo['total_usd'] = (float)$r['total'];
+                    else $despesasResumo['total_brl'] = (float)$r['total'];
+                }
+                // Total convertido para BRL
+                $despesasResumo['total'] = $despesasResumo['total_brl'] + ($despesasResumo['total_usd'] * $taxaUsdBrl);
 
-                // Pago no período
-                $stDP = $this->db->prepare("SELECT COALESCE(SUM(valor),0) FROM despesas WHERE status = 'paga' AND data_pagamento >= ? AND data_pagamento <= ? AND deleted_at IS NULL");
+                // Pago no período por moeda
+                $stDP = $this->db->prepare("SELECT UPPER(COALESCE(moeda,'BRL')) as moeda, COALESCE(SUM(valor),0) as total FROM despesas WHERE status = 'paga' AND data_pagamento >= ? AND data_pagamento <= ? AND deleted_at IS NULL GROUP BY UPPER(COALESCE(moeda,'BRL'))");
                 $stDP->execute([$dateStart, $dateEnd]);
-                $despesasResumo['pago'] = (float)$stDP->fetchColumn();
+                foreach ($stDP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    if (strtoupper($r['moeda']) === 'USD') $despesasResumo['pago_usd'] = (float)$r['total'];
+                    else $despesasResumo['pago_brl'] = (float)$r['total'];
+                }
+                $despesasResumo['pago'] = $despesasResumo['pago_brl'] + ($despesasResumo['pago_usd'] * $taxaUsdBrl);
 
                 // Em aberto
                 $despesasResumo['aberto'] = $despesasResumo['total'] - $despesasResumo['pago'];
                 if ($despesasResumo['aberto'] < 0) $despesasResumo['aberto'] = 0;
 
-                // Por categoria
-                $stDC = $this->db->prepare("SELECT c.nome as categoria, c.cor, c.grupo, COALESCE(SUM(d.valor),0) as total, COUNT(*) as qtd FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE d.competencia >= ? AND d.competencia <= ? AND d.status != 'cancelada' AND d.deleted_at IS NULL GROUP BY d.categoria_id ORDER BY total DESC");
+                // Por categoria (convertido para BRL)
+                $stDC = $this->db->prepare("SELECT c.nome as categoria, c.cor, c.grupo, d.moeda, COALESCE(SUM(d.valor),0) as total, COUNT(*) as qtd FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE d.competencia >= ? AND d.competencia <= ? AND d.status != 'cancelada' AND d.deleted_at IS NULL GROUP BY d.categoria_id, d.moeda ORDER BY total DESC");
                 $stDC->execute([$dateStart, $dateEnd]);
-                $despesasResumo['por_categoria'] = $stDC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $rawCats = $stDC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                // Consolidar por categoria convertendo USD→BRL
+                $catMap = [];
+                foreach ($rawCats as $rc) {
+                    $catNome = $rc['categoria'] ?? 'Sem categoria';
+                    if (!isset($catMap[$catNome])) $catMap[$catNome] = ['categoria' => $catNome, 'cor' => $rc['cor'] ?? '#6b7280', 'grupo' => $rc['grupo'] ?? '', 'total' => 0, 'qtd' => 0];
+                    $val = (float)($rc['total'] ?? 0);
+                    if (strtoupper($rc['moeda'] ?? '') === 'USD') $val *= $taxaUsdBrl;
+                    $catMap[$catNome]['total'] += $val;
+                    $catMap[$catNome]['qtd'] += (int)($rc['qtd'] ?? 0);
+                }
+                usort($catMap, function($a, $b) { return $b['total'] <=> $a['total']; });
+                $despesasResumo['por_categoria'] = array_values($catMap);
             }
         } catch (\Exception $e) {}
 

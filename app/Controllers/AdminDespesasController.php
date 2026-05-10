@@ -342,11 +342,213 @@ class AdminDespesasController extends Controller {
     }
 
     private function getComissoes(array $filtros): array {
-        // Puxar comissões da tabela despesas com tipo = comissao
+        // Puxar comissões usando a mesma lógica do AdminComissoesGlobalController
+        // Período: ciclo dia 10 → dia 9 do mês seguinte
+        $periodoParam = date('Y-m');
+        $compDe = $filtros['competencia_de'] ?? '';
+        if ($compDe !== '' && preg_match('/^\d{4}-\d{2}/', $compDe)) {
+            $periodoParam = substr($compDe, 0, 7);
+        }
+
+        [$ano, $mes] = explode('-', $periodoParam);
+        $ano = (int)$ano; $mes = (int)$mes;
+        $dataInicio = sprintf('%04d-%02d-10', $ano, $mes);
+        $proxMes = $mes === 12 ? 1 : $mes + 1;
+        $proxAno = $mes === 12 ? $ano + 1 : $ano;
+        $dataFim = sprintf('%04d-%02d-09', $proxAno, $proxMes);
+
+        // Taxa USD→BRL
+        $usdToBrl = 5.85;
         try {
-            $st = $this->db->query("SELECT d.*, c.nome as categoria_nome FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE d.tipo = 'comissao' AND d.deleted_at IS NULL ORDER BY d.created_at DESC LIMIT 100");
-            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } catch (\Exception $e) { return []; }
+            $svc = new \App\Services\PedidoManualService();
+            $r = $svc->getTaxaConversaoUSDBRL();
+            if ($r > 1) $usdToBrl = $r;
+        } catch (\Exception $e) {}
+
+        // Detectar colunas
+        $cols = [];
+        try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+
+        $pick = function($candidates) use ($cols) { foreach ($candidates as $c) { if (in_array($c, $cols, true)) return $c; } return ''; };
+        $colTotal = $pick(['valor_total', 'total', 'amount']);
+        $colImpostos = $pick(['valor_impostos', 'impostos']);
+        $colMoeda = $pick(['moeda', 'currency']);
+        $colCreatedAt = $pick(['created_at', 'data_criacao']);
+        $colOrigem = $pick(['origem_pedido', 'origem']);
+        $colStatus = $pick(['status']);
+        $colPayStatus = $pick(['payment_status', 'status_pagamento']);
+        $colCriadoPor = $pick(['admin_criador_id', 'criado_por', 'vendedor_id', 'created_by']);
+        $colSemComissao = $pick(['sem_comissao']);
+
+        if (!$colTotal || !$colCreatedAt) return ['vendedores' => [], 'total' => 0, 'periodo' => $periodoParam, 'dataInicio' => $dataInicio, 'dataFim' => $dataFim, 'usdToBrl' => $usdToBrl];
+
+        // Query pedidos manuais pagos no período
+        $where = [];
+        $params = [];
+
+        if ($colOrigem && $colCriadoPor) {
+            $where[] = "(LOWER(COALESCE(p.{$colOrigem},'')) IN ('manual','admin') OR (p.{$colCriadoPor} IS NOT NULL AND p.{$colCriadoPor} > 0))";
+        } elseif ($colOrigem) {
+            $where[] = "LOWER(COALESCE(p.{$colOrigem},'')) IN ('manual','admin')";
+        } elseif ($colCriadoPor) {
+            $where[] = "(p.{$colCriadoPor} IS NOT NULL AND p.{$colCriadoPor} > 0)";
+        }
+
+        if (in_array('deleted_at', $cols, true)) $where[] = "p.deleted_at IS NULL";
+
+        $paidParts = [];
+        if ($colStatus) $paidParts[] = "LOWER(COALESCE(p.{$colStatus},'')) IN ('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
+        if ($colPayStatus) $paidParts[] = "LOWER(COALESCE(p.{$colPayStatus},'')) IN ('approved','paid','pago','confirmed','succeeded','success')";
+        if (!empty($paidParts)) $where[] = '(' . implode(' OR ', $paidParts) . ')';
+
+        if ($colSemComissao) $where[] = "(p.{$colSemComissao} IS NULL OR p.{$colSemComissao} = 0)";
+
+        $where[] = "DATE(p.{$colCreatedAt}) >= :di";
+        $params[':di'] = $dataInicio;
+        $where[] = "DATE(p.{$colCreatedAt}) <= :df";
+        $params[':df'] = $dataFim;
+
+        $sql = "SELECT p.id, p.{$colTotal} AS valor_total"
+            . ($colImpostos ? ", p.{$colImpostos} AS impostos" : ", 0 AS impostos")
+            . ($colMoeda ? ", p.{$colMoeda} AS moeda" : ", 'BRL' AS moeda")
+            . ($colCriadoPor ? ", p.{$colCriadoPor} AS criado_por" : ", 0 AS criado_por")
+            . " FROM pedidos p WHERE " . implode(' AND ', $where)
+            . " ORDER BY p.{$colCreatedAt} DESC LIMIT 2000";
+
+        $rows = [];
+        try { $st = $this->db->prepare($sql); $st->execute($params); $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
+
+        // Custo produtos por pedido
+        $custoByPedido = [];
+        $itensTable = 'pedido_itens';
+        try {
+            $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+            $stT->execute(['pedido_itens']);
+            if ((int)$stT->fetchColumn() === 0) { $stT->execute(['pedido_items']); if ((int)$stT->fetchColumn() > 0) $itensTable = 'pedido_items'; else $itensTable = ''; }
+        } catch (\Exception $e) { $itensTable = ''; }
+
+        if ($itensTable && !empty($rows)) {
+            $ids = array_column($rows, 'id');
+            $chunks = array_chunk($ids, 500);
+            $colsIt = [];
+            try { $st = $this->db->query("DESCRIBE {$itensTable}"); $colsIt = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $colCusto = in_array('custo_unitario', $colsIt, true) ? 'custo_unitario' : (in_array('cost', $colsIt, true) ? 'cost' : '');
+            $colQtd = in_array('quantidade', $colsIt, true) ? 'quantidade' : (in_array('qty', $colsIt, true) ? 'qty' : '');
+            if ($colCusto && $colQtd) {
+                foreach ($chunks as $chunk) {
+                    $in = implode(',', array_fill(0, count($chunk), '?'));
+                    try {
+                        $st = $this->db->prepare("SELECT pedido_id, SUM({$colCusto} * {$colQtd}) AS custo FROM {$itensTable} WHERE pedido_id IN ({$in}) GROUP BY pedido_id");
+                        $st->execute($chunk);
+                        foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) { $custoByPedido[(int)$r['pedido_id']] = (float)($r['custo'] ?? 0); }
+                    } catch (\Exception $e) {}
+                }
+            }
+        }
+
+        // Comissões de processamento
+        $comProc = [];
+        try {
+            $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'comissoes_processamento'");
+            $stT->execute();
+            if ((int)($stT->fetchColumn() ?: 0) > 0) {
+                $sqlP = "SELECT usuario_id, moeda, SUM(valor_comissao) AS total_comissao FROM comissoes_processamento WHERE DATE(created_at) >= ? AND DATE(created_at) <= ? GROUP BY usuario_id, moeda";
+                $stP = $this->db->prepare($sqlP);
+                $stP->execute([$dataInicio, $dataFim]);
+                foreach ($stP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    $uid = (int)($r['usuario_id'] ?? 0);
+                    $com = (float)($r['total_comissao'] ?? 0);
+                    if (strtoupper(trim($r['moeda'] ?? '')) === 'USD') $com *= $usdToBrl;
+                    $comProc[$uid] = ($comProc[$uid] ?? 0.0) + $com;
+                }
+            }
+        } catch (\Exception $e) {}
+
+        // Faixas de comissão
+        $faixas = [['min' => 0, 'max' => 999999999, 'percent' => 5]];
+        try {
+            $stF = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'comissao_manual_faixas' LIMIT 1");
+            $stF->execute();
+            $raw = (string)($stF->fetchColumn() ?: '');
+            if ($raw !== '') { $arr = json_decode($raw, true); if (is_array($arr) && !empty($arr)) $faixas = $arr; }
+        } catch (\Exception $e) {
+            try {
+                $stF = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'comissao' AND chave = 'manual_faixas' LIMIT 1");
+                $stF->execute();
+                $raw = (string)($stF->fetchColumn() ?: '');
+                if ($raw !== '') { $arr = json_decode($raw, true); if (is_array($arr) && !empty($arr)) $faixas = $arr; }
+            } catch (\Exception $e2) {}
+        }
+
+        // Agrupar por vendedor
+        $porVendedor = [];
+        foreach ($rows as $r) {
+            $uid = (int)($r['criado_por'] ?? 0);
+            $m = strtoupper(trim($r['moeda'] ?? 'BRL'));
+            if ($m === '') $m = 'BRL';
+            $pid = (int)$r['id'];
+            $fat = (float)($r['valor_total'] ?? 0);
+            $imp = (float)($r['impostos'] ?? 0);
+            $custo = (float)($custoByPedido[$pid] ?? 0);
+            $liq = $fat - $custo - $imp;
+            if ($m === 'USD') { $fat *= $usdToBrl; $imp *= $usdToBrl; $custo *= $usdToBrl; $liq *= $usdToBrl; }
+
+            if (!isset($porVendedor[$uid])) $porVendedor[$uid] = ['faturado' => 0, 'impostos' => 0, 'custo' => 0, 'liquido' => 0, 'qtd' => 0];
+            $porVendedor[$uid]['faturado'] += $fat;
+            $porVendedor[$uid]['impostos'] += $imp;
+            $porVendedor[$uid]['custo'] += $custo;
+            $porVendedor[$uid]['liquido'] += $liq;
+            $porVendedor[$uid]['qtd']++;
+        }
+
+        // Nomes
+        $nomes = [];
+        $uids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
+        if (!empty($uids)) {
+            $in = implode(',', array_fill(0, count($uids), '?'));
+            try { $st = $this->db->prepare("SELECT id, nome, email FROM usuarios WHERE id IN ({$in})"); $st->execute(array_values($uids)); foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $u) { $nomes[(int)$u['id']] = ['nome' => $u['nome'] ?? '', 'email' => $u['email'] ?? '']; } } catch (\Exception $e) {}
+        }
+
+        // Montar resultado
+        $vendedores = [];
+        $grandTotal = 0;
+        $allUids = array_unique(array_merge(array_keys($porVendedor), array_keys($comProc)));
+        foreach ($allUids as $uid) {
+            if ($uid <= 0) continue;
+            $t = $porVendedor[$uid] ?? ['faturado' => 0, 'impostos' => 0, 'custo' => 0, 'liquido' => 0, 'qtd' => 0];
+            $pct = 0;
+            foreach ($faixas as $f) { if ($t['faturado'] >= (float)($f['min'] ?? 0) && $t['faturado'] <= (float)($f['max'] ?? PHP_FLOAT_MAX)) { $pct = (float)($f['percent'] ?? 0); break; } }
+            $comManual = max(0, $t['liquido']) * ($pct / 100);
+            $comProcVal = (float)($comProc[$uid] ?? 0);
+            $totalCom = $comManual + $comProcVal;
+            $grandTotal += $totalCom;
+
+            $vendedores[] = [
+                'uid' => $uid,
+                'nome' => $nomes[$uid]['nome'] ?? 'Vendedor #' . $uid,
+                'email' => $nomes[$uid]['email'] ?? '',
+                'pedidos' => $t['qtd'],
+                'faturado' => $t['faturado'],
+                'custo' => $t['custo'],
+                'impostos' => $t['impostos'],
+                'liquido' => $t['liquido'],
+                'percentual' => $pct,
+                'comissao_manual' => $comManual,
+                'comissao_proc' => $comProcVal,
+                'total_comissao' => $totalCom,
+            ];
+        }
+
+        usort($vendedores, function($a, $b) { return $b['total_comissao'] <=> $a['total_comissao']; });
+
+        return [
+            'vendedores' => $vendedores,
+            'total' => $grandTotal,
+            'periodo' => $periodoParam,
+            'dataInicio' => $dataInicio,
+            'dataFim' => $dataFim,
+            'usdToBrl' => $usdToBrl,
+        ];
     }
 
     private function ensureTables() {

@@ -105,6 +105,74 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
 
     <?php if ($tab === 'todas' || $tab === 'comissoes'): ?>
     <!-- FILTROS + TABELA -->
+    <?php if ($tab === 'comissoes'): ?>
+    <!-- COMISSÕES DINÂMICAS -->
+    <?php
+    $comData = $comissoes;
+    $comVendedores = $comData['vendedores'] ?? [];
+    $comTotal = (float)($comData['total'] ?? 0);
+    $comPeriodo = $comData['periodo'] ?? date('Y-m');
+    $comInicio = $comData['dataInicio'] ?? '';
+    $comFim = $comData['dataFim'] ?? '';
+    $comUsd = (float)($comData['usdToBrl'] ?? 5.85);
+    ?>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <div class="rounded-circle bg-purple bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:#8b5cf620;"><i class="fas fa-hand-holding-usd" style="color:#8b5cf6;font-size:12px;"></i></div>
+                <div><h6 class="fw-bold mb-0">Comissões · sincronizadas do sistema</h6><span class="text-muted" style="font-size:10px;">Geradas automaticamente a partir dos pedidos · Câmbio: 1 USD = R$ <?= number_format($comUsd, 2, ',', '.') ?></span></div>
+            </div>
+            <a href="/admin/comissoes-global?periodo=<?= htmlspecialchars($comPeriodo) ?>" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i>Ver completo</a>
+        </div>
+        <div class="card-body">
+            <!-- Período -->
+            <form method="GET" action="/admin/despesas" class="d-flex align-items-end gap-3 mb-4">
+                <input type="hidden" name="tab" value="comissoes">
+                <div>
+                    <label class="form-label small text-muted mb-1">Período de comissão</label>
+                    <input type="month" name="competencia_de" class="form-control form-control-sm" value="<?= htmlspecialchars($comPeriodo) ?>">
+                </div>
+                <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                <span class="text-muted small">De <?= $comInicio ? date('d/m/Y', strtotime($comInicio)) : '' ?> até <?= $comFim ? date('d/m/Y', strtotime($comFim)) : '' ?></span>
+            </form>
+
+            <!-- Stats -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Geradas no período</div><div class="fw-bold fs-5"><?= fmtD($comTotal) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Vendedores</div><div class="fw-bold fs-5"><?= count($comVendedores) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Pedidos</div><div class="fw-bold fs-5"><?= array_sum(array_column($comVendedores, 'pedidos')) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Faturado (BRL)</div><div class="fw-bold fs-5"><?= fmtD(array_sum(array_column($comVendedores, 'faturado'))) ?></div></div></div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size:12px;">
+                    <thead class="table-light"><tr><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Bruto (R$)</th><th class="text-end">Custo Produto</th><th class="text-end">Impostos</th><th class="text-end">Líquido</th><th class="text-end">% Comissão</th><th class="text-end">Comissão Manual</th><th class="text-end">Comissão Proc.</th><th class="text-end fw-bold">Total Comissão</th></tr></thead>
+                    <tbody>
+                    <?php if (empty($comVendedores)): ?>
+                    <tr><td colspan="10" class="text-center text-muted py-4">Nenhuma comissão no período.</td></tr>
+                    <?php else: foreach ($comVendedores as $v): ?>
+                    <tr>
+                        <td><div class="fw-semibold"><?= htmlspecialchars($v['nome']) ?></div><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($v['email']) ?></div></td>
+                        <td class="text-end"><?= $v['pedidos'] ?></td>
+                        <td class="text-end"><?= fmtD($v['faturado']) ?></td>
+                        <td class="text-end"><?= fmtD($v['custo']) ?></td>
+                        <td class="text-end"><?= fmtD($v['impostos']) ?></td>
+                        <td class="text-end"><?= fmtD($v['liquido']) ?></td>
+                        <td class="text-end"><?= number_format($v['percentual'], 2, ',', '.') ?>%</td>
+                        <td class="text-end"><?= fmtD($v['comissao_manual']) ?></td>
+                        <td class="text-end"><?= fmtD($v['comissao_proc']) ?></td>
+                        <td class="text-end fw-bold"><?= fmtD($v['total_comissao']) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <tr class="table-dark fw-bold"><td colspan="9" class="text-end">Total Geral</td><td class="text-end"><?= fmtD($comTotal) ?></td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <div class="d-flex flex-wrap gap-2 mb-3">
@@ -155,7 +223,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= $tipoBadge[$d['tipo'] ?? ''] ?? $d['tipo'] ?></span></td>
                         <td><?= $d['competencia'] ? date('m/Y', strtotime($d['competencia'])) : '-' ?></td>
                         <td><?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></td>
-                        <td class="text-end fw-bold"><?= fmtD($d['valor']) ?></td>
+                        <td class="text-end fw-bold"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></td>
                         <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
                         <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
                         <td>
@@ -172,7 +240,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
             </div>
         </div>
     </div>
-    <?php endif; ?>
+    <?php endif; // end comissoes else (todas) ?>
 
     <?php if ($tab === 'recorrentes'): ?>
     <!-- RECORRENTES -->
