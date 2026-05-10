@@ -342,12 +342,25 @@ async function sendAdminChat() {
 }
 
 async function hideMsg(msgId) {
-    await fetch('/admin/lives/' + LIVE_ID + '/chat/' + msgId + '/hide', { method: 'POST', credentials: 'same-origin' });
+    var res = await fetch('/admin/lives/' + LIVE_ID + '/chat/' + msgId + '/hide', { method: 'POST', credentials: 'same-origin' });
+    if (res.ok) {
+        // Remover a mensagem da tela
+        var el = document.querySelector('[data-msg-id="' + msgId + '"]');
+        if (el) el.remove();
+    }
 }
 
 async function banUserChat(userId) {
     if (!confirm('Banir este usuário da live?')) return;
-    await fetch('/admin/lives/' + LIVE_ID + '/ban/' + userId, { method: 'POST', credentials: 'same-origin' });
+    var res = await fetch('/admin/lives/' + LIVE_ID + '/ban/' + userId, { method: 'POST', credentials: 'same-origin' });
+    if (res.ok) {
+        // Remover todas as mensagens desse usuário da tela
+        document.querySelectorAll('.chat-msg-studio').forEach(function(el) {
+            if (el.querySelector('[onclick*="banUserChat(' + userId + ')"]')) {
+                el.remove();
+            }
+        });
+    }
 }
 
 // ─── Helpers ────────────────────────────────────────────────
