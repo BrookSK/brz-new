@@ -94,46 +94,7 @@ async function initWHEPPlayer(video, whepUrl) {
     }
 }
 
-// ─── SSE (Realtime) ─────────────────────────────────────────
-function connectSSE() {
-    if (sseSource) sseSource.close();
-
-    sseSource = new EventSource(`/api/live/${LIVE_ID}/events`);
-
-    sseSource.addEventListener('featured', (e) => {
-        const data = JSON.parse(e.data);
-        handleFeaturedUpdate(data);
-    });
-
-    sseSource.addEventListener('chat', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.messages) {
-            data.messages.forEach(renderChatMessage);
-        }
-    });
-
-    sseSource.addEventListener('metrics', (e) => {
-        const data = JSON.parse(e.data);
-        document.getElementById('viewers').textContent = data.viewers || 0;
-        document.getElementById('likeCount').textContent = data.likes || 0;
-        document.getElementById('shareCount').textContent = data.shares || 0;
-    });
-
-    sseSource.addEventListener('ended', () => {
-        sseSource.close();
-        showToast('A live foi encerrada', 'info');
-    });
-
-    sseSource.addEventListener('reconnect', () => {
-        sseSource.close();
-        setTimeout(connectSSE, 2000);
-    });
-
-    sseSource.onerror = () => {
-        sseSource.close();
-        setTimeout(connectSSE, 3000);
-    };
-}
+// ─── SSE removido — usar polling via watch.php inline ───────
 
 // ─── Produto em Destaque ────────────────────────────────────
 let currentFeaturedProduct = null;
@@ -310,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initPlayer();
     }
     if (IS_ACTIVE) {
-        connectSSE();
         startHeartbeat();
     }
 });

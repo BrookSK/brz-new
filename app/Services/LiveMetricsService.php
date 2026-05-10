@@ -21,6 +21,13 @@ class LiveMetricsService {
      * Registra heartbeat (freemium gate)
      */
     public function recordHeartbeat(int $liveId, int $userId, int $secondsWatched): array {
+        // Verificar se live existe
+        $stCheck = $this->pdo->prepare("SELECT id FROM lives WHERE id = ? LIMIT 1");
+        $stCheck->execute([$liveId]);
+        if (!$stCheck->fetchColumn()) {
+            return ['can_continue' => true, 'seconds_watched' => 0];
+        }
+
         // Buscar progresso atual
         $stmt = $this->pdo->prepare(
             "SELECT seconds_watched, last_heartbeat_at FROM live_watch_progress 
