@@ -17,30 +17,30 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
 
 <div class="container-fluid py-3">
     <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="fas fa-wallet text-danger"></i></div>
-            <div><h4 class="fw-bold mb-0">Despesas</h4><p class="text-muted small mb-0">Centro de controle de saídas, recorrências, parcelas e comissões</p></div>
+            <div class="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center d-none d-md-flex" style="width:44px;height:44px;"><i class="fas fa-wallet text-danger"></i></div>
+            <div><h4 class="fw-bold mb-0">Despesas</h4><p class="text-muted small mb-0 d-none d-md-block">Centro de controle de saídas, recorrências, parcelas e comissões</p></div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <div class="border rounded-pill px-3 py-1 d-flex align-items-center gap-2 bg-white small">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="border rounded-pill px-3 py-1 d-none d-lg-flex align-items-center gap-2 bg-white small">
                 <i class="fas fa-arrow-down text-danger" style="font-size:10px;"></i><span class="text-muted">Saídas hoje</span><span class="fw-bold"><?= fmtD($stats['vencido'] ?? 0) ?></span>
             </div>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i>Exportar</button>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDespView"><i class="fas fa-globe me-1"></i>Moeda / Idioma</button>
-            <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i>Nova despesa</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i><span class="d-none d-md-inline">Exportar</span></button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDespView"><i class="fas fa-globe me-1"></i><span class="d-none d-md-inline">Moeda</span></button>
+            <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">Nova</span></button>
         </div>
     </div>
 
     <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" role="tablist">
-        <li class="nav-item"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral">Visão Geral</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas">Todas as despesas <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes">Recorrentes <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas">Parceladas <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes">Comissões <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias">Categorias</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios">Relatórios</a></li>
+    <ul class="nav nav-tabs mb-4 flex-nowrap overflow-auto" role="tablist" style="-webkit-overflow-scrolling:touch;">
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral">Visão Geral</a></li>
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas">Todas <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes">Recorrentes <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas">Parceladas <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes">Comissões <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias">Categorias</a></li>
+        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios">Relatórios</a></li>
     </ul>
 
     <?php if (!empty($_SESSION['message'])): ?>

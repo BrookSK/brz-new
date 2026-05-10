@@ -52,33 +52,33 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
 
 <div class="container-fluid py-4">
     <!-- Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center" style="width:44px;height:44px;">
+            <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center d-none d-md-flex" style="width:44px;height:44px;">
                 <i class="fas fa-chart-line text-white"></i>
             </div>
             <div>
                 <h4 class="fw-bold mb-0">Financeiro</h4>
-                <p class="text-muted small mb-0">Visão consolidada de pedidos, receitas e impostos</p>
+                <p class="text-muted small mb-0 d-none d-md-block">Visão consolidada de pedidos, receitas e impostos</p>
             </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <div class="border rounded-pill px-3 py-1 d-flex align-items-center gap-2 bg-white">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="border rounded-pill px-3 py-1 d-none d-lg-flex align-items-center gap-2 bg-white">
                 <i class="fas fa-exchange-alt text-muted" style="font-size:11px;"></i>
                 <span class="small">USD → BRL</span>
                 <span class="fw-bold"><?= fmtNum($taxaUsdBrl) ?></span>
             </div>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalViewConfig"><i class="fas fa-globe me-1"></i>Moeda / Idioma</button>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i>Exportar</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalViewConfig"><i class="fas fa-globe me-1"></i><span class="d-none d-md-inline">Moeda</span></button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i><span class="d-none d-md-inline">Exportar</span></button>
         </div>
     </div>
 
     <!-- Tabs -->
     <div class="mb-4">
-        <ul class="nav nav-pills gap-2" role="tablist">
-            <li class="nav-item"><button class="nav-link active px-3 py-2" id="tab-geral" data-bs-toggle="tab" data-bs-target="#pane-geral" type="button"><i class="fas fa-chart-bar me-1"></i>Relatório Geral</button></li>
-            <li class="nav-item"><button class="nav-link px-3 py-2" id="tab-regional" type="button" onclick="abrirModalRegional()"><i class="fas fa-globe me-1"></i>Relatório Regional</button></li>
-            <li class="nav-item"><button class="nav-link px-3 py-2" id="tab-dre" data-bs-toggle="tab" data-bs-target="#pane-dre" type="button"><i class="fas fa-file-invoice-dollar me-1"></i>DRE Completo</button></li>
+        <ul class="nav nav-pills gap-2 flex-nowrap overflow-auto" role="tablist" style="-webkit-overflow-scrolling:touch;">
+            <li class="nav-item flex-shrink-0"><button class="nav-link active px-3 py-2" id="tab-geral" data-bs-toggle="tab" data-bs-target="#pane-geral" type="button"><i class="fas fa-chart-bar me-1"></i><span class="d-none d-sm-inline">Relatório </span>Geral</button></li>
+            <li class="nav-item flex-shrink-0"><button class="nav-link px-3 py-2" id="tab-regional" type="button" onclick="abrirModalRegional()"><i class="fas fa-globe me-1"></i>Regional</button></li>
+            <li class="nav-item flex-shrink-0"><button class="nav-link px-3 py-2" id="tab-dre" data-bs-toggle="tab" data-bs-target="#pane-dre" type="button"><i class="fas fa-file-invoice-dollar me-1"></i>DRE</button></li>
         </ul>
     </div>
 
@@ -95,11 +95,11 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
             <form method="GET" action="/admin/relatorio-geral">
                 <div class="d-flex align-items-end flex-wrap gap-3">
                     <!-- Datas -->
-                    <div>
+                    <div class="flex-shrink-0">
                         <label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i>DATA INÍCIO</label>
                         <input type="date" name="date_start" class="form-control form-control-sm" value="<?= htmlspecialchars($dateStart) ?>">
                     </div>
-                    <div>
+                    <div class="flex-shrink-0">
                         <label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i>DATA FIM</label>
                         <input type="date" name="date_end" class="form-control form-control-sm" value="<?= htmlspecialchars($dateEnd) ?>">
                     </div>

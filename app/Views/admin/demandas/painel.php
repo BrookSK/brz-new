@@ -7,15 +7,15 @@ foreach ($colunas as $k => $v) $porStatus[$k] = [];
 foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatus[$s])) $porStatus[$s][] = $d; }
 ?>
 <div class="container-fluid py-3">
-    <div class="d-flex align-items-center justify-content-between mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
         <h4 class="fw-bold mb-0"><i class="fas fa-columns me-2"></i>Painel de Demandas</h4>
         <a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>
     </div>
     <?php if (!empty($_SESSION['message'])): ?><div class="alert alert-<?= $_SESSION['message_type'] ?? 'info' ?> alert-dismissible fade show"><?= htmlspecialchars($_SESSION['message']) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php unset($_SESSION['message'], $_SESSION['message_type']); endif; ?>
 
-    <div class="d-flex gap-3 overflow-auto pb-3" style="min-height:70vh;">
+    <div class="d-flex gap-3 overflow-auto pb-3" style="min-height:70vh;-webkit-overflow-scrolling:touch;">
         <?php foreach ($colunas as $statusKey => $statusLabel): $cards = $porStatus[$statusKey]; ?>
-        <div class="flex-shrink-0" style="width:280px;">
+        <div class="flex-shrink-0" style="width:260px;min-width:260px;">
             <div class="card border-0 shadow-sm h-100" style="border-top:3px solid <?= $cores[$statusKey] ?>;">
                 <div class="card-header bg-white border-0 py-2 d-flex align-items-center justify-content-between">
                     <span class="fw-bold small"><?= $statusLabel ?></span>
@@ -31,7 +31,7 @@ foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatu
                     ?>
                     <a href="/admin/demandas/detalhe/<?= $card['id'] ?>" class="card mb-2 border-0 shadow-sm text-decoration-none <?= $testeExpired ? 'border-danger border-2' : '' ?>" style="<?= $testeExpired ? 'border:2px solid #ef4444!important;' : '' ?>">
                         <div class="card-body p-2">
-                            <div class="fw-semibold small text-dark"><?= htmlspecialchars($card['titulo'] ?? $card['bloco1_titulo'] ?? '') ?></div>
+                            <div class="fw-semibold small text-dark text-truncate"><?= htmlspecialchars($card['titulo'] ?? $card['bloco1_titulo'] ?? '') ?></div>
                             <div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($card['solicitante'] ?? '') ?> · <?= date('d/m', strtotime($card['created_at'])) ?></div>
                             <?php if ($prazo && $statusKey === 'em_execucao'): ?><div class="mt-1"><span class="badge bg-warning text-dark" style="font-size:9px;"><i class="fas fa-clock me-1"></i>Prazo: <?= date('d/m/Y', strtotime($prazo)) ?></span></div><?php endif; ?>
                             <?php if ($teste && $statusKey === 'em_teste'):

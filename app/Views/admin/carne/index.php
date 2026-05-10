@@ -32,12 +32,12 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
             <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice-dollar me-2"></i>Gestão de Carnês</h4>
-            <p class="text-muted small mb-0">Braziliana · Painel completo do ciclo de carnê</p>
+            <p class="text-muted small mb-0 d-none d-md-block">Braziliana · Painel completo do ciclo de carnê</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            <a href="/admin/carnes/logs" class="btn btn-outline-info btn-sm"><i class="fas fa-history me-1"></i>Logs</a>
-            <a href="/admin/carnes/configuracoes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog me-1"></i>Configurações</a>
-            <a href="/admin" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+            <a href="/admin/carnes/logs" class="btn btn-outline-info btn-sm"><i class="fas fa-history me-1"></i><span class="d-none d-md-inline">Logs</span></a>
+            <a href="/admin/carnes/configuracoes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog me-1"></i><span class="d-none d-md-inline">Configurações</span></a>
+            <a href="/admin" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">Voltar</span></a>
         </div>
     </div>
 
@@ -101,18 +101,18 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
 
     <!-- Mini stats row -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= $countAguardando1 ?></div><div class="text-muted small">Aguard. 1ª Parcela</div></div><i class="fas fa-hourglass-half text-info"></i></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['vence_7_dias'] ?? 0) ?></div><div class="text-muted small">Vencem em 7 dias</div></div><i class="fas fa-calendar-day text-warning"></i></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['compras_pendentes'] ?? 0) ?></div><div class="text-muted small">Compras Pendentes</div></div><i class="fas fa-shopping-cart text-primary"></i></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['envios_pendentes'] ?? 0) ?></div><div class="text-muted small">Envios Pendentes</div></div><i class="fas fa-truck text-success"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= $countAguardando1 ?></div><div class="text-muted small">Aguard. 1ª Parcela</div></div><i class="fas fa-hourglass-half text-info"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['vence_7_dias'] ?? 0) ?></div><div class="text-muted small">Vencem em 7 dias</div></div><i class="fas fa-calendar-day text-warning"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['compras_pendentes'] ?? 0) ?></div><div class="text-muted small">Compras Pendentes</div></div><i class="fas fa-shopping-cart text-primary"></i></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['envios_pendentes'] ?? 0) ?></div><div class="text-muted small">Envios Pendentes</div></div><i class="fas fa-truck text-success"></i></div></div></div>
     </div>
 
     <!-- Tabs -->
-    <ul class="nav nav-tabs mb-0" role="tablist">
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'carnes' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-carnes" type="button"><i class="fas fa-list me-1"></i>Carnês <span class="badge bg-secondary ms-1"><?= count($carnes) ?></span></button></li>
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'cobrancas' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-cobrancas" type="button"><i class="fas fa-bell me-1"></i>Cobranças <span class="badge bg-danger ms-1"><?= count($cobrancas) ?></span></button></li>
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'compras' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button"><i class="fas fa-shopping-basket me-1"></i>Compras <span class="badge bg-warning text-dark ms-1"><?= count($comprasPendentes) ?></span></button></li>
-        <li class="nav-item"><button class="nav-link <?= $activeTab === 'envios' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-envios" type="button"><i class="fas fa-truck me-1"></i>Envios <span class="badge bg-success ms-1"><?= count($enviosPendentes) ?></span></button></li>
+    <ul class="nav nav-tabs mb-0 flex-nowrap overflow-auto" role="tablist" style="-webkit-overflow-scrolling:touch;">
+        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'carnes' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-carnes" type="button"><i class="fas fa-list me-1"></i>Carnês <span class="badge bg-secondary ms-1"><?= count($carnes) ?></span></button></li>
+        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'cobrancas' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-cobrancas" type="button"><i class="fas fa-bell me-1"></i>Cobranças <span class="badge bg-danger ms-1"><?= count($cobrancas) ?></span></button></li>
+        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'compras' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button"><i class="fas fa-shopping-basket me-1"></i>Compras <span class="badge bg-warning text-dark ms-1"><?= count($comprasPendentes) ?></span></button></li>
+        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'envios' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-envios" type="button"><i class="fas fa-truck me-1"></i>Envios <span class="badge bg-success ms-1"><?= count($enviosPendentes) ?></span></button></li>
     </ul>
 
     <div class="tab-content">
@@ -218,10 +218,10 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th><th>Pedido / Cliente</th><th class="text-end">Total</th>
-                                <th class="text-end">Pago / Saldo</th><th>Parcelas</th>
-                                <th>Próx. Vencimento</th><th>Status Financeiro</th>
-                                <th>Compra</th><th>Envio</th><th>Ações</th>
+                                <th>ID</th><th>Pedido / Cliente</th><th class="text-end d-none d-lg-table-cell">Total</th>
+                                <th class="text-end d-none d-lg-table-cell">Pago / Saldo</th><th>Parcelas</th>
+                                <th class="d-none d-md-table-cell">Próx. Vencimento</th><th>Status</th>
+                                <th class="d-none d-xl-table-cell">Compra</th><th class="d-none d-xl-table-cell">Envio</th><th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -239,23 +239,23 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 <td class="fw-semibold"><?= $c['id'] ?></td>
                                 <td>
                                     <a href="/admin/pedidos/detalhes/<?= $c['pedido_id'] ?>" class="text-decoration-none fw-semibold">#<?= $c['pedido_id'] ?></a>
-                                    <div class="text-muted small"><?= htmlspecialchars($c['cliente_nome'] ?? '') ?></div>
+                                    <div class="text-muted small text-truncate" style="max-width:120px;"><?= htmlspecialchars($c['cliente_nome'] ?? '') ?></div>
                                 </td>
-                                <td class="text-end fw-semibold"><?= fmtBrl($c['total_geral']) ?></td>
-                                <td class="text-end">
+                                <td class="text-end fw-semibold d-none d-lg-table-cell"><?= fmtBrl($c['total_geral']) ?></td>
+                                <td class="text-end d-none d-lg-table-cell">
                                     <span class="text-success small"><?= fmtBrl($pago) ?></span>
                                     <div class="text-muted small"><?= fmtBrl($saldo) ?> restante</div>
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark border"><?= $pagas ?>/<?= $totalParcelas ?></span>
                                     <?php if (($c['parcelas_atrasadas'] ?? 0) > 0): ?>
-                                    <span class="badge bg-danger ms-1"><?= $c['parcelas_atrasadas'] ?> atraso</span>
+                                    <span class="badge bg-danger ms-1"><?= $c['parcelas_atrasadas'] ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?= !empty($c['proximo_vencimento']) ? date('d/m/Y', strtotime($c['proximo_vencimento'])) : '-' ?></td>
+                                <td class="d-none d-md-table-cell"><?= !empty($c['proximo_vencimento']) ? date('d/m/Y', strtotime($c['proximo_vencimento'])) : '-' ?></td>
                                 <td><span class="badge bg-<?= $st['cor'] ?>"><?= $st['label'] ?></span></td>
-                                <td><?= !empty($c['compra_interna_liberada']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-clock text-muted"></i>' ?></td>
-                                <td><?= !empty($c['envio_liberado']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-lock text-muted"></i>' ?></td>
+                                <td class="d-none d-xl-table-cell"><?= !empty($c['compra_interna_liberada']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-clock text-muted"></i>' ?></td>
+                                <td class="d-none d-xl-table-cell"><?= !empty($c['envio_liberado']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-lock text-muted"></i>' ?></td>
                                 <td><a href="/admin/carnes/detalhes/<?= $c['id'] ?>" class="btn btn-sm btn-outline-primary" title="Detalhes"><i class="fas fa-eye"></i></a></td>
                             </tr>
                             <?php endforeach; ?>

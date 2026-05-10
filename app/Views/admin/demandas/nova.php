@@ -6,7 +6,7 @@
             <!-- Seletor de tipo -->
             <div class="card border-0 shadow-sm mb-4"><div class="card-body">
                 <label class="form-label fw-bold">Tipo de solicitação</label>
-                <div class="d-flex gap-3">
+                <div class="d-flex flex-column flex-sm-row gap-3">
                     <label class="btn btn-outline-primary px-4 py-3 flex-fill text-center" id="btn-tipo-funcao" style="cursor:pointer;">
                         <input type="radio" name="tipo_solicitacao" value="funcao" class="d-none" onchange="toggleTipo()" checked>
                         <i class="fas fa-rocket d-block fs-4 mb-1"></i><span class="fw-semibold">Nova Função</span><br><small class="text-muted">Recurso, melhoria ou mudança</small>
