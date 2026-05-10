@@ -77,6 +77,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
         <ul class="nav nav-pills gap-2" role="tablist">
             <li class="nav-item"><button class="nav-link active px-3 py-2" id="tab-geral" data-bs-toggle="tab" data-bs-target="#pane-geral" type="button"><i class="fas fa-chart-bar me-1"></i>Relatório Geral</button></li>
             <li class="nav-item"><button class="nav-link px-3 py-2" id="tab-regional" type="button" onclick="abrirModalRegional()"><i class="fas fa-globe me-1"></i>Relatório Regional</button></li>
+            <li class="nav-item"><button class="nav-link px-3 py-2" id="tab-dre" data-bs-toggle="tab" data-bs-target="#pane-dre" type="button"><i class="fas fa-file-invoice-dollar me-1"></i>DRE Completo</button></li>
         </ul>
     </div>
 
@@ -220,7 +221,85 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <?php endforeach; ?>
     </div>
 
-    <!-- Tabelas: Status (esquerda), Moeda + Pagamento (direita) -->
+    <!-- DRE - Demonstrativo de Resultado -->
+    <?php
+    $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
+    $receitaBruta = $totalTotal;
+    $totalDespesas = (float)($despesasResumo['total'] ?? 0);
+    $lucroLiquido = $receitaBruta - $totalDespesas;
+    $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
+    $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
+    $despBrl = (float)($despesasResumo['total_brl'] ?? 0);
+    $despPagoUsd = (float)($despesasResumo['pago_usd'] ?? 0);
+    $despPagoBrl = (float)($despesasResumo['pago_brl'] ?? 0);
+    ?>
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-top:3px solid #1e293b;">
+                <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:12px;"></i></div>
+                        <div><h6 class="fw-bold mb-0">DRE — Demonstrativo de Resultado</h6><span class="text-muted" style="font-size:10px;">Receitas vs Despesas no período</span></div>
+                    </div>
+                    <a href="/admin/despesas" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i>Ver despesas</a>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-lg-5">
+                            <table class="table table-sm mb-0" style="font-size:13px;">
+                                <tbody>
+                                    <tr class="border-bottom"><td class="fw-bold text-success"><i class="fas fa-arrow-up me-1"></i>RECEITA BRUTA</td><td class="text-end fw-bold text-success fs-5"><?= fmtNum($receitaBruta) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Subtotal produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Taxa de serviço</td><td class="text-end"><?= fmtNum($totalServicos) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Impostos cobrados</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Frete</td><td class="text-end"><?= fmtNum($totalFrete) ?></td></tr>
+                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5"><?= fmtNum($totalDespesas) ?></td></tr>
+                                    <?php if ($despUsd > 0): ?>
+                                    <tr><td class="ps-3 text-muted">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
+                                    <?php endif; ?>
+                                    <?php if ($despBrl > 0): ?>
+                                    <tr><td class="ps-3 text-muted">BRL</td><td class="text-end">R$ <?= fmtNum($despBrl) ?></td></tr>
+                                    <?php endif; ?>
+                                    <tr><td class="ps-3 text-muted">Pagas no período</td><td class="text-end"><?= fmtNum($despesasResumo['pago']) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Em aberto</td><td class="text-end"><?= fmtNum($despesasResumo['aberto']) ?></td></tr>
+                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;"><i class="fas fa-equals me-1"></i>RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
+                                    <tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge <?= $margemLucro >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $margemLucro ?>%</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-lg-7">
+                            <h6 class="fw-bold small mb-2"><i class="fas fa-chart-pie me-1 text-muted"></i>Despesas por Categoria</h6>
+                            <?php if (empty($despesasResumo['por_categoria'])): ?>
+                            <div class="text-center text-muted py-4 small"><i class="fas fa-inbox d-block mb-2" style="font-size:24px;opacity:.4;"></i>Nenhuma despesa registrada no período.<br><a href="/admin/despesas" class="mt-2 d-inline-block">Cadastrar despesas →</a></div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0" style="font-size:12px;">
+                                    <thead class="table-light"><tr><th>Categoria</th><th>Grupo</th><th class="text-end">Qtd</th><th class="text-end">Total (R$)</th><th>%</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($despesasResumo['por_categoria'] as $dc):
+                                        $pctCat = $totalDespesas > 0 ? round((float)$dc['total'] / $totalDespesas * 100, 1) : 0;
+                                    ?>
+                                    <tr>
+                                        <td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:<?= $dc['cor'] ?? '#6b7280' ?>;"></span><?= htmlspecialchars($dc['categoria'] ?? 'Sem categoria') ?></td>
+                                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $dc['grupo'] ?? '')) ?></span></td>
+                                        <td class="text-end"><?= (int)($dc['qtd'] ?? 0) ?></td>
+                                        <td class="text-end fw-bold"><?= fmtNum($dc['total'] ?? 0) ?></td>
+                                        <td><div class="d-flex align-items-center gap-1"><div class="progress flex-grow-1" style="height:4px;width:60px;"><div class="progress-bar bg-danger" style="width:<?= $pctCat ?>%"></div></div><span class="text-muted" style="font-size:10px;"><?= $pctCat ?>%</span></div></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    <tr class="fw-bold border-top"><td>Total</td><td></td><td class="text-end"><?= array_sum(array_column($despesasResumo['por_categoria'], 'qtd')) ?></td><td class="text-end"><?= fmtNum($totalDespesas) ?></td><td></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabelas: Status, Moeda, Pagamento -->
     <div class="row g-4">
         <!-- Por Status -->
         <div class="col-lg-5">
@@ -337,88 +416,98 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
         </div>
     </div>
 
-    <!-- DRE - Demonstrativo de Resultado -->
-    <?php
-    $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
-    $receitaBruta = $totalTotal; // Total de receitas convertido em BRL
-    $totalDespesas = (float)($despesasResumo['total'] ?? 0);
-    $lucroLiquido = $receitaBruta - $totalDespesas;
-    $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
-    $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
-    $despBrl = (float)($despesasResumo['total_brl'] ?? 0);
-    $despPagoUsd = (float)($despesasResumo['pago_usd'] ?? 0);
-    $despPagoBrl = (float)($despesasResumo['pago_brl'] ?? 0);
-    ?>
-    <div class="row g-4 mt-2">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm" style="border-top:3px solid #1e293b;">
-                <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
+    </div><!-- /pane-geral -->
+    <div class="tab-pane fade" id="pane-regional" role="tabpanel"><div id="regional-content"></div></div>
+
+    <!-- DRE COMPLETO -->
+    <div class="tab-pane fade" id="pane-dre" role="tabpanel">
+        <?php
+        $dreGateways = $dreGateways ?? [];
+        $totalGwQtd = 0; $totalGwBrl = 0; $totalGwUsd = 0; $totalGwAprov = 0; $totalGwPend = 0; $totalGwRej = 0; $totalGwEst = 0;
+        foreach ($dreGateways as $gw) { $totalGwQtd += (int)$gw['qtd']; $totalGwBrl += (float)$gw['total_brl']; $totalGwUsd += (float)$gw['total_usd']; $totalGwAprov += (int)$gw['aprovados']; $totalGwPend += (int)$gw['pendentes']; $totalGwRej += (int)$gw['rejeitados']; $totalGwEst += (int)$gw['estornados']; }
+        $totalGwConvertido = $totalGwBrl + ($totalGwUsd * $taxaUsdBrl);
+        $gwNames = ['stripe'=>'Stripe','cambioreal'=>'Câmbio Real','cambioreal_taxas'=>'Câmbio Real (Taxas)','mercadopago'=>'Mercado Pago','asaas'=>'Asaas','appmax'=>'AppMax','pagdev'=>'PagDev','n/a'=>'Sem gateway'];
+        $gwColors = ['stripe'=>'#635bff','cambioreal'=>'#00a86b','cambioreal_taxas'=>'#00a86b','mercadopago'=>'#009ee3','asaas'=>'#1a1a2e','appmax'=>'#ff6b35','pagdev'=>'#6366f1','n/a'=>'#94a3b8'];
+        ?>
+
+        <!-- Header DRE -->
+        <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #1e293b;">
+            <div class="card-header bg-white border-0 pt-3">
+                <div class="d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:12px;"></i></div>
-                        <div><h6 class="fw-bold mb-0">DRE — Demonstrativo de Resultado</h6><span class="text-muted" style="font-size:10px;">Receitas vs Despesas no período</span></div>
-                    </div>
-                    <a href="/admin/despesas" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i>Ver despesas</a>
-                </div>
-                <div class="card-body">
-                    <div class="row g-4">
-                        <!-- Resumo DRE -->
-                        <div class="col-lg-5">
-                            <table class="table table-sm mb-0" style="font-size:13px;">
-                                <tbody>
-                                    <tr class="border-bottom"><td class="fw-bold text-success"><i class="fas fa-arrow-up me-1"></i>RECEITA BRUTA</td><td class="text-end fw-bold text-success fs-5"><?= fmtNum($receitaBruta) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Subtotal produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Taxa de serviço</td><td class="text-end"><?= fmtNum($totalServicos) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Impostos cobrados</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Frete</td><td class="text-end"><?= fmtNum($totalFrete) ?></td></tr>
-                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5"><?= fmtNum($totalDespesas) ?></td></tr>
-                                    <?php if ($despUsd > 0): ?>
-                                    <tr><td class="ps-3 text-muted">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
-                                    <?php endif; ?>
-                                    <?php if ($despBrl > 0): ?>
-                                    <tr><td class="ps-3 text-muted">BRL</td><td class="text-end">R$ <?= fmtNum($despBrl) ?></td></tr>
-                                    <?php endif; ?>
-                                    <tr><td class="ps-3 text-muted">Pagas no período</td><td class="text-end"><?= fmtNum($despesasResumo['pago']) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Em aberto</td><td class="text-end"><?= fmtNum($despesasResumo['aberto']) ?></td></tr>
-                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;"><i class="fas fa-equals me-1"></i>RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
-                                    <tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge <?= $margemLucro >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $margemLucro ?>%</span></td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <!-- Despesas por categoria -->
-                        <div class="col-lg-7">
-                            <h6 class="fw-bold small mb-2"><i class="fas fa-chart-pie me-1 text-muted"></i>Despesas por Categoria</h6>
-                            <?php if (empty($despesasResumo['por_categoria'])): ?>
-                            <div class="text-center text-muted py-4 small"><i class="fas fa-inbox d-block mb-2" style="font-size:24px;opacity:.4;"></i>Nenhuma despesa registrada no período.<br><a href="/admin/despesas" class="mt-2 d-inline-block">Cadastrar despesas →</a></div>
-                            <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm mb-0" style="font-size:12px;">
-                                    <thead class="table-light"><tr><th>Categoria</th><th>Grupo</th><th class="text-end">Qtd</th><th class="text-end">Total (R$)</th><th>%</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($despesasResumo['por_categoria'] as $dc):
-                                        $pctCat = $totalDespesas > 0 ? round((float)$dc['total'] / $totalDespesas * 100, 1) : 0;
-                                    ?>
-                                    <tr>
-                                        <td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:<?= $dc['cor'] ?? '#6b7280' ?>;"></span><?= htmlspecialchars($dc['categoria'] ?? 'Sem categoria') ?></td>
-                                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $dc['grupo'] ?? '')) ?></span></td>
-                                        <td class="text-end"><?= (int)($dc['qtd'] ?? 0) ?></td>
-                                        <td class="text-end fw-bold"><?= fmtNum($dc['total'] ?? 0) ?></td>
-                                        <td><div class="d-flex align-items-center gap-1"><div class="progress flex-grow-1" style="height:4px;width:60px;"><div class="progress-bar bg-danger" style="width:<?= $pctCat ?>%"></div></div><span class="text-muted" style="font-size:10px;"><?= $pctCat ?>%</span></div></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                    <tr class="fw-bold border-top"><td>Total</td><td></td><td class="text-end"><?= array_sum(array_column($despesasResumo['por_categoria'], 'qtd')) ?></td><td class="text-end"><?= fmtNum($totalDespesas) ?></td><td></td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php endif; ?>
-                        </div>
+                        <div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="fas fa-university text-dark" style="font-size:12px;"></i></div>
+                        <div><h6 class="fw-bold mb-0">DRE Completo — Conciliação Bancária</h6><span class="text-muted" style="font-size:10px;">Entradas e saídas por gateway · Período: <?= $periodoLabel ?></span></div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+            <div class="card-body">
+                <!-- DRE Profissional -->
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm mb-0" style="font-size:13px;">
+                        <tbody>
+                            <tr class="table-light fw-bold"><td colspan="2" class="text-uppercase small">DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO</td></tr>
+                            <tr class="border-bottom"><td class="fw-bold text-success"><i class="fas fa-plus-circle me-1"></i>RECEITA OPERACIONAL BRUTA</td><td class="text-end fw-bold text-success fs-5">R$ <?= fmtNum($totalGwConvertido) ?></td></tr>
+                            <tr><td class="ps-3 text-muted">Receitas em BRL</td><td class="text-end">R$ <?= fmtNum($totalGwBrl) ?></td></tr>
+                            <tr><td class="ps-3 text-muted">Receitas em USD ($ <?= fmtNum($totalGwUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($totalGwUsd * $taxaUsdBrl) ?></td></tr>
+                            <tr><td class="ps-3 text-muted">(-) Impostos sobre receita</td><td class="text-end text-danger">- R$ <?= fmtNum($totalImpostos) ?></td></tr>
+                            <tr class="border-top"><td class="fw-semibold">= RECEITA OPERACIONAL LÍQUIDA</td><td class="text-end fw-bold">R$ <?= fmtNum($totalGwConvertido - $totalImpostos) ?></td></tr>
+                            <tr><td class="ps-3 text-muted">(-) Custo dos produtos (subtotal)</td><td class="text-end text-danger">- R$ <?= fmtNum($totalSubtotal) ?></td></tr>
+                            <tr class="border-top"><td class="fw-semibold">= LUCRO BRUTO</td><td class="text-end fw-bold">R$ <?= fmtNum($totalGwConvertido - $totalImpostos - $totalSubtotal) ?></td></tr>
+                            <tr><td class="ps-3 text-muted">(-) Despesas operacionais</td><td class="text-end text-danger">- R$ <?= fmtNum($totalDespesas) ?></td></tr>
+                            <tr><td class="ps-3 text-muted">(-) Frete</td><td class="text-end text-danger">- R$ <?= fmtNum($totalFrete) ?></td></tr>
+                            <?php $lucroOperacional = $totalGwConvertido - $totalImpostos - $totalSubtotal - $totalDespesas - $totalFrete; ?>
+                            <tr class="border-top table-light"><td class="fw-bold" style="font-size:14px;">= RESULTADO OPERACIONAL (EBITDA)</td><td class="text-end fw-bold fs-4 <?= $lucroOperacional >= 0 ? 'text-success' : 'text-danger' ?>">R$ <?= fmtNum($lucroOperacional) ?></td></tr>
+                            <tr><td class="text-muted small">Margem operacional</td><td class="text-end"><span class="badge <?= $lucroOperacional >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $totalGwConvertido > 0 ? round($lucroOperacional / $totalGwConvertido * 100, 1) : 0 ?>%</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
 
-    </div><!-- /pane-geral -->
-    <div class="tab-pane fade" id="pane-regional" role="tabpanel"><div id="regional-content"></div></div>
+                <!-- Conciliação por Gateway -->
+                <h6 class="fw-bold small mb-3"><i class="fas fa-credit-card me-2 text-muted"></i>Processamento por Gateway de Pagamento</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0" style="font-size:12px;">
+                        <thead class="table-light">
+                            <tr><th>Gateway</th><th class="text-end">Pedidos</th><th class="text-end">Total BRL</th><th class="text-end">Total USD</th><th class="text-end">Total (R$)</th><th class="text-end">Aprovados</th><th class="text-end">Pendentes</th><th class="text-end">Rejeitados</th><th class="text-end">Estornados</th></tr>
+                        </thead>
+                        <tbody>
+                        <?php if (empty($dreGateways)): ?>
+                            <tr><td colspan="9" class="text-center text-muted py-3">Nenhum dado no período</td></tr>
+                        <?php else: foreach ($dreGateways as $gw):
+                            $gwKey = strtolower($gw['gateway'] ?? 'n/a');
+                            $gwLabel = $gwNames[$gwKey] ?? ucfirst(str_replace('_', ' ', $gwKey));
+                            $gwColor = $gwColors[$gwKey] ?? '#6b7280';
+                            $gwTotalConv = (float)$gw['total_brl'] + ((float)$gw['total_usd'] * $taxaUsdBrl);
+                        ?>
+                        <tr>
+                            <td><span class="d-inline-block rounded me-1" style="width:10px;height:10px;background:<?= $gwColor ?>;"></span><span class="fw-semibold"><?= htmlspecialchars($gwLabel) ?></span></td>
+                            <td class="text-end"><?= (int)$gw['qtd'] ?></td>
+                            <td class="text-end">R$ <?= fmtNum($gw['total_brl']) ?></td>
+                            <td class="text-end">$ <?= fmtNum($gw['total_usd']) ?></td>
+                            <td class="text-end fw-bold">R$ <?= fmtNum($gwTotalConv) ?></td>
+                            <td class="text-end"><span class="badge bg-success"><?= (int)$gw['aprovados'] ?></span></td>
+                            <td class="text-end"><span class="badge bg-warning text-dark"><?= (int)$gw['pendentes'] ?></span></td>
+                            <td class="text-end"><span class="badge bg-danger"><?= (int)$gw['rejeitados'] ?></span></td>
+                            <td class="text-end"><span class="badge bg-secondary"><?= (int)$gw['estornados'] ?></span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <tr class="fw-bold border-top table-light">
+                            <td>TOTAL</td>
+                            <td class="text-end"><?= $totalGwQtd ?></td>
+                            <td class="text-end">R$ <?= fmtNum($totalGwBrl) ?></td>
+                            <td class="text-end">$ <?= fmtNum($totalGwUsd) ?></td>
+                            <td class="text-end">R$ <?= fmtNum($totalGwConvertido) ?></td>
+                            <td class="text-end"><?= $totalGwAprov ?></td>
+                            <td class="text-end"><?= $totalGwPend ?></td>
+                            <td class="text-end"><?= $totalGwRej ?></td>
+                            <td class="text-end"><?= $totalGwEst ?></td>
+                        </tr>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div><!-- /pane-dre -->
     </div>
 </div>
 

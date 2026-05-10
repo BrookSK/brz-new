@@ -272,6 +272,43 @@ class AdminRelatorioGeralController extends Controller {
 
         $data['despesasResumo'] = $despesasResumo;
 
+        // === DRE COMPLETO — Conciliação por Gateway ===
+        $dreGateways = [];
+        try {
+            $stGw = $this->db->prepare("
+                SELECT 
+                    LOWER(COALESCE(payment_gateway,'N/A')) as gateway,
+                    COUNT(*) as qtd,
+                    COALESCE(SUM(CASE WHEN UPPER(COALESCE(moeda,'BRL'))='USD' THEN total ELSE 0 END),0) as total_usd,
+                    COALESCE(SUM(CASE WHEN UPPER(COALESCE(moeda,'BRL'))!='USD' THEN total ELSE 0 END),0) as total_brl,
+                    COALESCE(SUM(CASE WHEN payment_status='approved' THEN 1 ELSE 0 END),0) as aprovados,
+                    COALESCE(SUM(CASE WHEN payment_status='pending' OR payment_status IS NULL THEN 1 ELSE 0 END),0) as pendentes,
+                    COALESCE(SUM(CASE WHEN payment_status='rejected' THEN 1 ELSE 0 END),0) as rejeitados,
+                    COALESCE(SUM(CASE WHEN payment_status='refunded' THEN 1 ELSE 0 END),0) as estornados
+                FROM pedidos 
+                WHERE created_at >= :ds AND created_at < DATE_ADD(:de, INTERVAL 1 DAY)
+                AND " . (in_array('deleted_at', $cols, true) ? "deleted_at IS NULL AND" : "") . "
+                LOWER(COALESCE(status,'')) NOT IN ('apagado','deleted','lixeira','trash')
+                GROUP BY LOWER(COALESCE(payment_gateway,'N/A'))
+                ORDER BY total_brl DESC
+            ");
+            $stGw->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+            $dreGateways = $stGw->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Configurações DRE (alíquotas)
+        $dreConfig = ['imposto_percentual' => 15.0, 'taxa_gateway_percentual' => 0.0];
+        try {
+            $stCfg = $this->db->query("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('dre_imposto_percentual','dre_taxa_gateway_percentual')");
+            foreach ($stCfg->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $cfg) {
+                if ($cfg['chave'] === 'dre_imposto_percentual') $dreConfig['imposto_percentual'] = (float)$cfg['valor'];
+                if ($cfg['chave'] === 'dre_taxa_gateway_percentual') $dreConfig['taxa_gateway_percentual'] = (float)$cfg['valor'];
+            }
+        } catch (\Exception $e) {}
+
+        $data['dreGateways'] = $dreGateways;
+        $data['dreConfig'] = $dreConfig;
+
         extract($data);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
