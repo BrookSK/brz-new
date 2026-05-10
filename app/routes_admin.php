@@ -350,6 +350,7 @@ $router->post('/admin/lives/{id}/ban/{userId}', 'AdminLivesController', 'banUser
 
 // Admin — Relatório
 $router->get('/admin/lives/{id}/report', 'AdminLivesController', 'report');
+$router->get('/admin/live-shop/orders', 'AdminLivesController', 'orders');
 
 // Admin — Configurações Lives
 $router->get('/admin/configuracoes/lives', 'AdminLivesConfigController', 'index');

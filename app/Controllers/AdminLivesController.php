@@ -358,6 +358,38 @@ class AdminLivesController {
     }
 
     /**
+     * Listagem de todos os pedidos de lives
+     */
+    public function orders(Request $request) {
+        $pdo = \Config\Database::getConnection();
+        $stmt = $pdo->prepare(
+            "SELECT lo.*, l.title AS live_title, 
+                    p.total AS pedido_total, p.status AS pedido_status,
+                    pr.name AS produto_nome,
+                    COALESCE(u.nome, u.name, u.email) AS cliente_nome
+             FROM live_orders lo
+             LEFT JOIN lives l ON l.id = lo.live_id
+             LEFT JOIN pedidos p ON p.id = lo.order_id
+             LEFT JOIN produtos pr ON pr.id = lo.product_id
+             LEFT JOIN usuarios u ON u.id = p.usuario_id
+             ORDER BY lo.created_at DESC
+             LIMIT 100"
+        );
+        $stmt->execute();
+        $orders = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $activePage = 'live-orders';
+        $title = 'Pedidos da Live';
+        $sidebarActive = 'live-orders';
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        include __DIR__ . '/../Views/admin/lives/orders.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
      * Relatório de conversão
      */
     public function report(Request $request, $id) {
