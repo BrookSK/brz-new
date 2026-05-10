@@ -16,19 +16,44 @@ $brl = $totaisPorMoedaCards['BRL'] ?? [];
 
 function fmtNum($v) { return number_format((float)($v ?? 0), 2, ',', '.'); }
 
-// Calcula total convertido para BRL
 function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
     $vUsd = (float)($usdRow[$campo] ?? 0);
     $vBrl = (float)($brlRow[$campo] ?? 0);
     return $vBrl + ($vUsd * $taxa);
 }
+
+// Dados para o Relatório Regional (JSON para JS)
+$regionalData = [
+    'taxaUsdBrl' => $taxaUsdBrl,
+    'usd' => $usd,
+    'brl' => $brl,
+    'porStatus' => $porStatus,
+    'porMoeda' => $porMoeda,
+    'porPagamento' => $porPagamento,
+    'totais' => $totais,
+    'statusLabels' => $statusList,
+];
 ?>
 
 <div class="container-fluid py-4">
     <div class="d-flex align-items-center justify-content-between mb-4">
-        <h4 class="fw-bold mb-0"><i class="fas fa-chart-bar me-2"></i>Relatório Geral</h4>
+        <h4 class="fw-bold mb-0"><i class="fas fa-chart-bar me-2"></i>Financeiro</h4>
         <span class="text-muted small">Taxa USD→BRL: <strong><?= fmtNum($taxaUsdBrl) ?></strong></span>
     </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" id="tab-geral" data-bs-toggle="tab" data-bs-target="#pane-geral" type="button" role="tab">Relatório Geral</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="tab-regional" type="button" role="tab" onclick="abrirModalRegional()">Relatório Regional</button>
+        </li>
+    </ul>
+
+    <!-- Tab Geral -->
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="pane-geral" role="tabpanel">
 
     <!-- Filtros -->
     <div class="card border-0 shadow-sm mb-4">
@@ -61,7 +86,7 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                         <option value="BRL" <?= $moedaFilter === 'BRL' ? 'selected' : '' ?>>BRL</option>
                     </select>
                 </div>
-                <div class="col-md-2 col-sm-12">
+                <div class="col-md-1 col-sm-12">
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i> Filtrar</button>
                 </div>
             </form>
@@ -80,7 +105,7 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
         </div>
     </div>
 
-    <!-- Cards financeiros com breakdown por moeda -->
+    <!-- Cards financeiros -->
     <?php
     $campos = [
         ['key' => 'total', 'label' => 'Total Geral', 'icon' => 'fas fa-dollar-sign', 'color' => 'primary', 'totaisKey' => 'total_geral'],
@@ -106,7 +131,6 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="text-muted small"><i class="<?= $c['icon'] ?> me-1"></i><?= $c['label'] ?></span>
                     </div>
-
                     <?php if ($vUsd > 0): ?>
                     <div class="d-flex align-items-baseline justify-content-between">
                         <span class="text-muted small">USD</span>
@@ -117,21 +141,18 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                         <span class="text-muted small">R$ <?= fmtNum($vUsd * $taxaUsdBrl) ?></span>
                     </div>
                     <?php endif; ?>
-
                     <?php if ($vBrl > 0): ?>
                     <div class="d-flex align-items-baseline justify-content-between <?= $vUsd > 0 ? 'mt-1 pt-1 border-top' : '' ?>">
                         <span class="text-muted small">BRL</span>
                         <span class="fs-5 fw-bold">R$ <?= fmtNum($vBrl) ?></span>
                     </div>
                     <?php endif; ?>
-
                     <?php if ($temDuasMoedas): ?>
                     <div class="mt-2 pt-2 border-top d-flex align-items-baseline justify-content-between">
                         <span class="fw-semibold small text-<?= $c['color'] ?>">Total em BRL</span>
                         <span class="fw-bold text-<?= $c['color'] ?>">R$ <?= fmtNum($convertidoBrl) ?></span>
                     </div>
                     <?php endif; ?>
-
                     <?php if (!$vUsd && !$vBrl && $totalGeral > 0): ?>
                     <div class="fs-5 fw-bold"><?= fmtNum($totalGeral) ?></div>
                     <?php endif; ?>
@@ -150,9 +171,7 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                 </div>
                 <div class="card-body p-0">
                     <?php
-                    // Mapa de labels canônicos para exibição na tabela
                     $statusLabels = $statusList;
-                    // Consolidar porStatus (que vem agrupado por status+moeda) em uma linha por status, convertendo USD→BRL
                     $statusConsolidado = [];
                     foreach ($porStatus as $row) {
                         $st = $row['status'] ?? 'N/A';
@@ -175,13 +194,9 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Status</th>
-                                    <th class="text-end">Qtd</th>
-                                    <th class="text-end">Subtotal</th>
-                                    <th class="text-end">Serviço</th>
-                                    <th class="text-end">Impostos</th>
-                                    <th class="text-end">Frete</th>
-                                    <th class="text-end">Total (R$)</th>
+                                    <th>Status</th><th class="text-end">Qtd</th><th class="text-end">Subtotal</th>
+                                    <th class="text-end">Serviço</th><th class="text-end">Impostos</th>
+                                    <th class="text-end">Frete</th><th class="text-end">Total (R$)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -220,9 +235,7 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
-                            <thead class="table-light">
-                                <tr><th>Moeda</th><th class="text-end">Qtd</th><th class="text-end">Total</th></tr>
-                            </thead>
+                            <thead class="table-light"><tr><th>Moeda</th><th class="text-end">Qtd</th><th class="text-end">Total</th></tr></thead>
                             <tbody>
                                 <?php if (empty($porMoeda)): ?>
                                 <tr><td colspan="3" class="text-center text-muted py-3">N/A</td></tr>
@@ -251,9 +264,7 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
-                            <thead class="table-light">
-                                <tr><th>Forma</th><th class="text-end">Qtd</th><th class="text-end">Total</th></tr>
-                            </thead>
+                            <thead class="table-light"><tr><th>Forma</th><th class="text-end">Qtd</th><th class="text-end">Total</th></tr></thead>
                             <tbody>
                                 <?php if (empty($porPagamento)): ?>
                                 <tr><td colspan="3" class="text-center text-muted py-3">N/A</td></tr>
@@ -273,4 +284,237 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
             </div>
         </div>
     </div>
+
+        </div><!-- /pane-geral -->
+
+        <!-- Tab Regional (conteúdo gerado via JS) -->
+        <div class="tab-pane fade" id="pane-regional" role="tabpanel">
+            <div id="regional-content"></div>
+        </div>
+    </div><!-- /tab-content -->
 </div>
+
+<!-- Modal Relatório Regional -->
+<div class="modal fade" id="modalRegional" tabindex="-1" aria-labelledby="modalRegionalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRegionalLabel"><i class="fas fa-globe me-2"></i>Relatório Regional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Moeda de exibição</label>
+                    <select id="regional-moeda" class="form-select">
+                        <option value="BRL">BRL (Real)</option>
+                        <option value="USD">USD (Dólar)</option>
+                    </select>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-semibold small">Idioma</label>
+                    <select id="regional-idioma" class="form-select">
+                        <option value="pt">Português (PT-BR)</option>
+                        <option value="en">English (EN)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="gerarRelatorioRegional()"><i class="fas fa-check me-1"></i>Gerar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const DATA = <?= json_encode($regionalData, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
+
+    const i18n = {
+        pt: {
+            title: 'Relatório Regional',
+            orders: 'Total de Pedidos',
+            total: 'Total Geral',
+            subtotal: 'Subtotal Produtos',
+            servicos: 'Taxa de Serviço',
+            impostos: 'Impostos',
+            imposto_local: 'Imposto Local',
+            frete: 'Frete',
+            byStatus: 'Por Status',
+            byPayment: 'Por Forma de Pagamento',
+            status: 'Status',
+            qty: 'Qtd',
+            form: 'Forma',
+            noData: 'Nenhum dado',
+            currency: 'Moeda',
+            allConverted: 'Todos os valores convertidos para',
+            rate: 'Taxa de conversão'
+        },
+        en: {
+            title: 'Regional Report',
+            orders: 'Total Orders',
+            total: 'Grand Total',
+            subtotal: 'Products Subtotal',
+            servicos: 'Service Fee',
+            impostos: 'Taxes',
+            imposto_local: 'Local Tax',
+            frete: 'Shipping',
+            byStatus: 'By Status',
+            byPayment: 'By Payment Method',
+            status: 'Status',
+            qty: 'Qty',
+            form: 'Method',
+            noData: 'No data',
+            currency: 'Currency',
+            allConverted: 'All values converted to',
+            rate: 'Conversion rate'
+        }
+    };
+
+    const statusLabelsEn = {
+        'pendente': 'Pending',
+        'processando': 'Processing',
+        'pago': 'Paid',
+        'carne_pagando': 'Installment Paying',
+        'carne_aguardando': 'Installment Waiting',
+        'produto_consolidado': 'Box Closed',
+        'etiqueta_gerada': 'Label Generated',
+        'em_transporte': 'In Transit',
+        'aguardando_liberacao_aduaneira': 'Customs Clearance',
+        'enviado_ao_destinatario': 'Sent to Recipient',
+        'entregue': 'Delivered',
+        'cancelado': 'Cancelled'
+    };
+
+    function fmt(v, moeda) {
+        const n = parseFloat(v) || 0;
+        if (moeda === 'USD') return '$ ' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+
+    function convertToTarget(val, originalMoeda, targetMoeda, taxa) {
+        const v = parseFloat(val) || 0;
+        if (originalMoeda === targetMoeda) return v;
+        if (originalMoeda === 'USD' && targetMoeda === 'BRL') return v * taxa;
+        if (originalMoeda === 'BRL' && targetMoeda === 'USD') return v / taxa;
+        return v;
+    }
+
+    window.abrirModalRegional = function() {
+        const modal = new bootstrap.Modal(document.getElementById('modalRegional'));
+        modal.show();
+    };
+
+    window.gerarRelatorioRegional = function() {
+        const moeda = document.getElementById('regional-moeda').value;
+        const idioma = document.getElementById('regional-idioma').value;
+        const t = i18n[idioma] || i18n.pt;
+        const taxa = DATA.taxaUsdBrl;
+        const labels = idioma === 'en' ? statusLabelsEn : DATA.statusLabels;
+
+        // Calcular totais unificados
+        const usdData = DATA.usd || {};
+        const brlData = DATA.brl || {};
+        const keys = ['total','subtotal','servicos','impostos','imposto_local','frete'];
+        const totaisUnificados = {};
+        keys.forEach(k => {
+            const fromUsd = convertToTarget(usdData[k] || 0, 'USD', moeda, taxa);
+            const fromBrl = convertToTarget(brlData[k] || 0, 'BRL', moeda, taxa);
+            totaisUnificados[k] = fromUsd + fromBrl;
+        });
+
+        // Por status unificado
+        const statusMap = {};
+        (DATA.porStatus || []).forEach(row => {
+            const st = row.status || 'N/A';
+            if (!statusMap[st]) statusMap[st] = {status:st, qtd:0, subtotal:0, servicos:0, impostos:0, frete:0, total:0};
+            const orig = (row.moeda || 'USD').toUpperCase();
+            statusMap[st].qtd += parseInt(row.qtd) || 0;
+            statusMap[st].subtotal += convertToTarget(row.subtotal||0, orig, moeda, taxa);
+            statusMap[st].servicos += convertToTarget(row.servicos||0, orig, moeda, taxa);
+            statusMap[st].impostos += convertToTarget(row.impostos||0, orig, moeda, taxa);
+            statusMap[st].frete += convertToTarget(row.frete||0, orig, moeda, taxa);
+            statusMap[st].total += convertToTarget(row.total||0, orig, moeda, taxa);
+        });
+        const statusArr = Object.values(statusMap).sort((a,b) => b.total - a.total);
+
+        // Por pagamento unificado
+        const pagMap = {};
+        (DATA.porPagamento || []).forEach(row => {
+            const f = row.forma || 'N/A';
+            if (!pagMap[f]) pagMap[f] = {forma:f, qtd:0, total:0};
+            pagMap[f].qtd += parseInt(row.qtd) || 0;
+            // porPagamento não tem moeda separada, assume moeda mista — converter tudo via BRL
+            pagMap[f].total += parseFloat(row.total) || 0;
+        });
+
+        const qtdPedidos = parseInt(DATA.totais.qtd_pedidos) || 0;
+        const sym = moeda === 'USD' ? '$' : 'R$';
+        const rateLabel = moeda === 'BRL' ? ('1 USD = ' + taxa.toFixed(2) + ' BRL') : ('1 BRL = ' + (1/taxa).toFixed(4) + ' USD');
+
+        let html = '<div class="alert alert-info small mb-3"><i class="fas fa-info-circle me-1"></i>' + t.allConverted + ' <strong>' + moeda + '</strong>. ' + t.rate + ': ' + rateLabel + '</div>';
+
+        // Cards
+        html += '<div class="row g-3 mb-4">';
+        const cardDefs = [
+            {key:'total', label:t.total, color:'primary', icon:'fas fa-dollar-sign'},
+            {key:'subtotal', label:t.subtotal, color:'dark', icon:'fas fa-box'},
+            {key:'servicos', label:t.servicos, color:'info', icon:'fas fa-concierge-bell'},
+            {key:'impostos', label:t.impostos, color:'warning', icon:'fas fa-landmark'},
+            {key:'imposto_local', label:t.imposto_local, color:'danger', icon:'fas fa-flag'},
+            {key:'frete', label:t.frete, color:'success', icon:'fas fa-truck'},
+        ];
+        cardDefs.forEach(c => {
+            const v = totaisUnificados[c.key] || 0;
+            if (c.key === 'imposto_local' && v <= 0) return;
+            html += '<div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-left:4px solid var(--bs-'+c.color+')!important"><div class="card-body">';
+            html += '<div class="text-muted small mb-1"><i class="'+c.icon+' me-1"></i>'+c.label+'</div>';
+            html += '<div class="fs-4 fw-bold">'+fmt(v, moeda)+'</div>';
+            html += '</div></div></div>';
+        });
+        html += '</div>';
+
+        // Pedidos
+        html += '<div class="card border-0 shadow-sm mb-4"><div class="card-body d-flex align-items-center justify-content-between"><div><i class="fas fa-receipt me-2 text-muted"></i><span class="fw-semibold">'+t.orders+'</span></div><span class="fs-4 fw-bold">'+qtdPedidos.toLocaleString()+'</span></div></div>';
+
+        // Tabela status
+        html += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-list-alt me-2"></i>'+t.byStatus+'</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>'+t.status+'</th><th class="text-end">'+t.qty+'</th><th class="text-end">'+t.subtotal+'</th><th class="text-end">'+t.servicos+'</th><th class="text-end">'+t.impostos+'</th><th class="text-end">'+t.frete+'</th><th class="text-end">Total</th></tr></thead><tbody>';
+        if (statusArr.length === 0) {
+            html += '<tr><td colspan="7" class="text-center text-muted py-3">'+t.noData+'</td></tr>';
+        } else {
+            statusArr.forEach(row => {
+                const lbl = labels[row.status] || row.status.replace(/_/g,' ');
+                html += '<tr><td><span class="badge bg-secondary bg-opacity-10 text-dark">'+lbl+'</span></td>';
+                html += '<td class="text-end">'+row.qtd+'</td>';
+                html += '<td class="text-end">'+fmt(row.subtotal, moeda)+'</td>';
+                html += '<td class="text-end">'+fmt(row.servicos, moeda)+'</td>';
+                html += '<td class="text-end">'+fmt(row.impostos, moeda)+'</td>';
+                html += '<td class="text-end">'+fmt(row.frete, moeda)+'</td>';
+                html += '<td class="text-end fw-bold">'+fmt(row.total, moeda)+'</td></tr>';
+            });
+        }
+        html += '</tbody></table></div></div></div>';
+
+        // Tabela pagamento
+        html += '<div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-credit-card me-2"></i>'+t.byPayment+'</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0"><thead class="table-light"><tr><th>'+t.form+'</th><th class="text-end">'+t.qty+'</th><th class="text-end">Total</th></tr></thead><tbody>';
+        const pagArr = Object.values(pagMap).sort((a,b) => b.total - a.total);
+        if (pagArr.length === 0) {
+            html += '<tr><td colspan="3" class="text-center text-muted py-3">'+t.noData+'</td></tr>';
+        } else {
+            pagArr.forEach(row => {
+                html += '<tr><td>'+row.forma.replace(/_/g,' ')+'</td><td class="text-end">'+row.qtd+'</td><td class="text-end fw-bold">'+fmt(row.total, moeda)+'</td></tr>';
+            });
+        }
+        html += '</tbody></table></div></div></div>';
+
+        document.getElementById('regional-content').innerHTML = html;
+
+        // Fechar modal e ativar tab
+        bootstrap.Modal.getInstance(document.getElementById('modalRegional')).hide();
+        const tabEl = document.getElementById('tab-regional');
+        tabEl.setAttribute('data-bs-toggle', 'tab');
+        tabEl.setAttribute('data-bs-target', '#pane-regional');
+        new bootstrap.Tab(tabEl).show();
+    };
+})();
+</script>
