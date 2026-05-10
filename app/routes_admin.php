@@ -149,6 +149,15 @@ $router->post('/admin/despesas/excluir/{id}', 'AdminDespesasController', 'exclui
 $router->get('/admin/dre-completo/dados', 'AdminDreCompletoController', 'dados');
 $router->get('/admin/dre-completo/exportar', 'AdminDreCompletoController', 'exportar');
 
+// Demandas
+$router->get('/admin/demandas/painel', 'AdminDemandasController', 'painel');
+$router->get('/admin/demandas/nova', 'AdminDemandasController', 'nova');
+$router->get('/admin/demandas/concluidos', 'AdminDemandasController', 'concluidos');
+$router->get('/admin/demandas/detalhe/{id}', 'AdminDemandasController', 'detalhe');
+$router->post('/admin/demandas/criar', 'AdminDemandasController', 'criar');
+$router->post('/admin/demandas/mover/{id}', 'AdminDemandasController', 'moverStatus');
+$router->get('/admin/demandas/pdf/{id}', 'AdminDemandasController', 'pdf');
+
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
 $router->post('/admin/oferta-gratuita/toggle-global', 'AdminOfertaGratuitaController', 'toggleGlobal');
