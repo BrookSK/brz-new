@@ -6569,6 +6569,9 @@ HTML;
                 // Void invoice no QuickBooks ao cancelar pedido
                 try { $__qb = new \App\Services\QuickBooksService(); if ($__qb->isConectado()) { $__qb->voidInvoiceDePedido((int) $id); } } catch (\Exception $e) { error_log('[QB] Void erro #' . $id . ': ' . $e->getMessage()); }
 
+                // Cancelar cobranças pendentes no Câmbio Real
+                try { $__ps = new PaymentService(); $__ps->cancelarCobrancasCambioRealPorPedido((int) $id); } catch (\Exception $e) { error_log('[CR_CANCEL] Erro #' . $id . ': ' . $e->getMessage()); }
+
                 if (!empty($temReservas)) {
                     try {
                         $stmtC = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'estoque_reservas' AND column_name = 'pedido_id'");
@@ -6700,6 +6703,9 @@ HTML;
 
                 // Void invoice no QuickBooks ao mover para lixeira
                 try { $__qbLix = new \App\Services\QuickBooksService(); if ($__qbLix->isConectado()) { $__qbLix->voidInvoiceDePedido((int) $id); } } catch (\Exception $e) { error_log('[QB] Void lixeira #' . $id . ': ' . $e->getMessage()); }
+
+                // Cancelar cobranças pendentes no Câmbio Real ao mover para lixeira
+                try { $__psLix = new PaymentService(); $__psLix->cancelarCobrancasCambioRealPorPedido((int) $id); } catch (\Exception $e) { error_log('[CR_CANCEL] Lixeira #' . $id . ': ' . $e->getMessage()); }
 
                 header('Location: /admin/pedidos?success=lixeira');
                 exit;

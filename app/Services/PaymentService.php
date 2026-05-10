@@ -8734,5 +8734,88 @@ class PaymentService {
         
         return $mes >= 1 && $mes <= 12;
     }
+
+    /**
+     * Cancela todas as cobranças pendentes do Câmbio Real para um pedido.
+     * Chamado quando o pedido é cancelado ou movido para lixeira.
+     * POST /service/v1/checkout/cancel/{token}
+     */
+    public function cancelarCobrancasCambioRealPorPedido(int $pedidoId): array {
+        $resultado = ['cancelados' => 0, 'erros' => []];
+        try {
+            $db = \Config\Database::getConnection();
+
+            // Buscar tokens de pagamento do Câmbio Real para este pedido
+            $tokens = [];
+
+            // 1. Tabela pedido_pagamentos
+            try {
+                $st = $db->prepare("SELECT payment_id, gateway_status FROM pedido_pagamentos WHERE pedido_id = ? AND gateway IN ('cambioreal', 'cambio_real', 'cambioreal_taxas') AND payment_id IS NOT NULL AND payment_id != ''");
+                $st->execute([$pedidoId]);
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                    $status = strtoupper(trim((string) ($r['gateway_status'] ?? '')));
+                    // Só cancelar se não está pago
+                    if (!in_array($status, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'ON_HOLD', 'REFUNDED'], true)) {
+                        $tokens[] = (string) $r['payment_id'];
+                    }
+                }
+            } catch (\Exception $e) {}
+
+            // 2. Tabela carne_parcelas (boletos do carnê)
+            try {
+                $st = $db->prepare("SELECT cp.boleto_produtos_id_externo, cp.boleto_taxas_id_externo, cp.status
+                    FROM carne_parcelas cp
+                    JOIN carnes c ON cp.carne_id = c.id
+                    WHERE c.pedido_id = ? AND cp.status NOT IN ('paga')");
+                $st->execute([$pedidoId]);
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                    if (!empty($r['boleto_produtos_id_externo'])) $tokens[] = (string) $r['boleto_produtos_id_externo'];
+                    if (!empty($r['boleto_taxas_id_externo'])) $tokens[] = (string) $r['boleto_taxas_id_externo'];
+                }
+            } catch (\Exception $e) {}
+
+            // 3. Campo payment_id do pedido
+            try {
+                $st = $db->prepare("SELECT payment_id FROM pedidos WHERE id = ? LIMIT 1");
+                $st->execute([$pedidoId]);
+                $pid = trim((string) ($st->fetchColumn() ?: ''));
+                if ($pid !== '' && !in_array($pid, $tokens, true)) {
+                    $tokens[] = $pid;
+                }
+            } catch (\Exception $e) {}
+
+            $tokens = array_unique(array_filter($tokens));
+            if (empty($tokens)) return $resultado;
+
+            // Cancelar cada token no Câmbio Real usando o método existente de request
+            foreach ($tokens as $token) {
+                try {
+                    $resp = $this->cambioRealRequest('POST', '/service/v1/checkout/cancel/' . rawurlencode($token), []);
+                    $status = strtolower(trim((string) ($resp['status'] ?? '')));
+                    if ($status === 'success' || $status === '') {
+                        $resultado['cancelados']++;
+                        error_log("[CR_CANCEL] Token {$token} cancelado com sucesso para pedido #{$pedidoId}");
+                    } else {
+                        $erro = $resp['message'] ?? ($resp['errors'][0] ?? 'Resposta inesperada');
+                        $resultado['erros'][] = "Token {$token}: {$erro}";
+                        error_log("[CR_CANCEL] Falha ao cancelar token {$token} pedido #{$pedidoId}: {$erro}");
+                    }
+                } catch (\Exception $e) {
+                    // Se Câmbio Real não está configurado/habilitado, não é erro crítico
+                    $msg = $e->getMessage();
+                    if (stripos($msg, 'desativado') !== false || stripos($msg, 'não configurado') !== false) {
+                        error_log("[CR_CANCEL] Câmbio Real não configurado, pulando cancelamento para pedido #{$pedidoId}");
+                        return $resultado;
+                    }
+                    $resultado['erros'][] = "Token {$token}: " . $msg;
+                    error_log("[CR_CANCEL] Erro ao cancelar token {$token} pedido #{$pedidoId}: " . $msg);
+                }
+            }
+        } catch (\Exception $e) {
+            $resultado['erros'][] = $e->getMessage();
+            error_log("[CR_CANCEL] Erro geral pedido #{$pedidoId}: " . $e->getMessage());
+        }
+        return $resultado;
+    }
 }
 
