@@ -241,6 +241,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
         </div>
     </div>
     <?php endif; // end comissoes else (todas) ?>
+    <?php endif; // end tab todas||comissoes ?>
 
     <?php if ($tab === 'recorrentes'): ?>
     <!-- RECORRENTES -->
