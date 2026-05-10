@@ -68,17 +68,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                 <span class="small">USD → BRL</span>
                 <span class="fw-bold"><?= fmtNum($taxaUsdBrl) ?></span>
             </div>
-            <div class="border rounded-pill px-2 py-1 d-flex align-items-center gap-1 bg-white">
-                <i class="fas fa-globe text-muted" style="font-size:11px;"></i>
-                <select id="global-view-currency" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 20px 0 4px;" onchange="applyGlobalView()">
-                    <option value="BRL">BRL</option>
-                    <option value="USD">USD</option>
-                </select>
-                <select id="global-view-lang" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 20px 0 4px;" onchange="applyGlobalView()">
-                    <option value="pt">PT</option>
-                    <option value="en">EN</option>
-                </select>
-            </div>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalViewConfig"><i class="fas fa-globe me-1"></i>Moeda / Idioma</button>
             <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i>Exportar</button>
         </div>
     </div>
@@ -447,6 +437,20 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
             <div class="text-center py-5"><i class="fas fa-spinner fa-spin fs-3 text-muted"></i><div class="text-muted mt-2">Carregando DRE Completo...</div></div>
         </div>
     </div><!-- /pane-dre -->
+    </div>
+</div>
+
+<!-- Modal Visualização Moeda/Idioma -->
+<div class="modal fade" id="modalViewConfig" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-globe me-2"></i>Visualização</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label fw-semibold small">Moeda de exibição</label><select id="global-view-currency" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                <div class="mb-0"><label class="form-label fw-semibold small">Idioma</label><select id="global-view-lang" class="form-select"><option value="pt">Português (PT-BR)</option><option value="en">English (EN)</option></select></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary btn-sm" onclick="applyGlobalView();bootstrap.Modal.getInstance(document.getElementById('modalViewConfig')).hide();"><i class="fas fa-check me-1"></i>Aplicar</button></div>
+        </div>
     </div>
 </div>
 

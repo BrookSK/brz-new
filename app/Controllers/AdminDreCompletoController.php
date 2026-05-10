@@ -21,6 +21,8 @@ class AdminDreCompletoController extends Controller {
         $dateStart = $request->getParam('date_start', date('Y-01-01'));
         $dateEnd = $request->getParam('date_end', date('Y-m-d'));
 
+        // Limpar qualquer output buffer anterior
+        while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
 
         $cols = [];
@@ -161,7 +163,7 @@ class AdminDreCompletoController extends Controller {
         $perPage = 10;
         $statusFilterDre = $request->getParam('status_dre', '');
         $entradasDetalhadas = [];
-        $totalEntradas = 0;
+        $totalEntradasCount = 0;
 
         try {
             $whereDet = "p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)"
@@ -177,7 +179,7 @@ class AdminDreCompletoController extends Controller {
             // Count
             $stCount = $this->db->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$whereDet}");
             $stCount->execute($paramsDet);
-            $totalEntradas = (int)$stCount->fetchColumn();
+            $totalEntradasCount = (int)$stCount->fetchColumn();
 
             // Paginated
             $offset = ($page - 1) * $perPage;
@@ -238,7 +240,7 @@ class AdminDreCompletoController extends Controller {
             'despesas_categoria' => $despesasPorCategoria,
             'despesas_favorecido' => $despesasPorFavorecido,
             'entradas_detalhadas' => $entradasDetalhadas,
-            'entradas_paginacao' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalEntradas, 'total_pages' => ceil($totalEntradas / $perPage)],
+            'entradas_paginacao' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalEntradasCount, 'total_pages' => max(1, ceil($totalEntradasCount / $perPage))],
             'status_filter_dre' => $statusFilterDre,
             'operacional' => $operacionalPorPessoa,
             'conciliacao' => $conciliacao,
