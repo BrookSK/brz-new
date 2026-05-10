@@ -13,13 +13,14 @@ function initPlayer() {
 
     var url = PLAYBACK_URL || RECORDING_URL;
     
-    // Se a URL é WHEP (webRTC/play), converter para HLS
+    // Se a URL é WHEP (webRTC/play), usar player WHEP via proxy
     if (url && url.indexOf('/webRTC/play') !== -1) {
-        url = url.replace('/webRTC/play', '/manifest/video.m3u8');
-        console.log('Converted WHEP URL to HLS:', url);
+        console.log('Using WHEP player via proxy for:', url);
+        initWHEPPlayer(video, url);
+        return;
     }
     
-    console.log('Player URL:', url);
+    console.log('Player URL (HLS):', url);
     
     if (!url) {
         console.log('No playback URL available');
