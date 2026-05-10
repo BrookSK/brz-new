@@ -404,8 +404,8 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <div class="col-md-8"><label class="form-label small fw-semibold">Descrição</label><input type="text" name="descricao" class="form-control" required placeholder="Ex: Aluguel sede comercial"></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold">Tipo</label><select name="tipo" class="form-select" id="despesa-tipo" onchange="toggleTipoFields()"><option value="avulsa">Avulsa</option><option value="fixa">Fixa</option><option value="recorrente">Recorrente</option><option value="parcelada">Parcelada</option></select></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold">Categoria</label><select name="categoria_id" class="form-select"><option value="">Selecione</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Valor (R$)</label><input type="number" name="valor" class="form-control" step="0.01" min="0" required></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" class="form-select"><option value="BRL">BRL</option><option value="USD">USD</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" class="form-select" id="despesa-moeda" onchange="updateValorLabel()"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold" id="valor-label">Valor (R$)</label><input type="number" name="valor" class="form-control" step="0.01" min="0" required></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold">Competência</label><input type="month" name="competencia" class="form-control" value="<?= date('Y-m') ?>"></div>
                     <div class="col-md-4" id="field-vencimento"><label class="form-label small fw-semibold">Vencimento</label><input type="date" name="vencimento" class="form-control"></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold">Forma de pagamento</label><select name="forma_pagamento" class="form-select"><option value="">Selecione</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito">Cartão de crédito</option><option value="transferencia">Transferência</option><option value="debito_automatico">Débito automático</option></select></div>
@@ -448,6 +448,10 @@ function toggleTipoFields() {
     const tipo = document.getElementById('despesa-tipo').value;
     document.getElementById('fields-recorrencia').classList.toggle('d-none', tipo !== 'recorrente');
     document.getElementById('fields-parcelamento').classList.toggle('d-none', tipo !== 'parcelada');
+}
+function updateValorLabel() {
+    const moeda = document.getElementById('despesa-moeda').value;
+    document.getElementById('valor-label').textContent = moeda === 'USD' ? 'Valor ($)' : 'Valor (R$)';
 }
 function exportarDespesas() {
     window.location.href = '/admin/despesas?tab=todas&export=csv';
