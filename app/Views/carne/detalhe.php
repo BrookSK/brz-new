@@ -28,7 +28,8 @@ $pedidoCancelado = in_array(strtolower(trim((string) ($carne['pedido_status'] ??
                 <i class="fas fa-ban fs-4"></i>
                 <div>
                     <strong>Pedido cancelado</strong><br>
-                    <span class="small">Este carnê não aceita mais pagamentos. As parcelas já pagas ficam registradas para consulta.</span>
+                    <span class="small">Este carnê não aceita mais pagamentos. As parcelas já pagas ficam registradas para consulta.</span><br>
+                    <span class="small">Se você realizou algum pagamento após o cancelamento ou precisa de auxílio, <a href="/meu-ticket/abrir/pedido/<?= $carne['pedido_id'] ?>" class="fw-bold text-danger">abra um ticket</a>.</span>
                 </div>
             </div>
             <?php endif; ?>
