@@ -68,7 +68,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                 <span class="small">USD → BRL</span>
                 <span class="fw-bold"><?= fmtNum($taxaUsdBrl) ?></span>
             </div>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="fas fa-download me-1"></i>Exportar</button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i>Exportar</button>
         </div>
     </div>
 
@@ -391,4 +391,122 @@ window.gerarRelatorioRegional=function(){
     const el=document.getElementById('tab-regional');el.setAttribute('data-bs-toggle','tab');el.setAttribute('data-bs-target','#pane-regional');new bootstrap.Tab(el).show();
 };
 })();
+</script>
+
+<script>
+// Dados para exportação DRE
+const DRE_DATA = <?= json_encode([
+    'periodo' => $periodoLabel,
+    'dateStart' => $dateStart,
+    'dateEnd' => $dateEnd,
+    'taxaUsdBrl' => $taxaUsdBrl,
+    'totais' => $totais,
+    'usd' => $usd,
+    'brl' => $brl,
+    'porStatus' => $statusConsolidado,
+    'porMoeda' => $porMoeda,
+    'porPagamento' => $porPagamento,
+    'statusLabels' => $statusLabels,
+    'totalQtd' => $totalQtd,
+    'totalSubtotal' => $totalSubtotal,
+    'totalServicos' => $totalServicos,
+    'totalImpostos' => $totalImpostos,
+    'totalFrete' => $totalFrete,
+    'totalTotal' => $totalTotal,
+], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
+
+function exportarDRE() {
+    const d = DRE_DATA;
+    const sep = ';';
+    const nl = '\r\n';
+    let csv = '';
+
+    // BOM para Excel reconhecer UTF-8
+    csv += '\uFEFF';
+
+    // === CABEÇALHO ===
+    csv += 'DEMONSTRATIVO DE RESULTADO - BRAZILIANA SHOP' + nl;
+    csv += 'Período: ' + d.periodo + nl;
+    csv += 'Taxa USD→BRL: ' + (d.taxaUsdBrl || 0).toFixed(2) + nl;
+    csv += 'Gerado em: ' + new Date().toLocaleString('pt-BR') + nl;
+    csv += nl;
+
+    // === RESUMO GERAL ===
+    csv += '=== RESUMO GERAL ===' + nl;
+    csv += 'Descrição' + sep + 'USD' + sep + 'BRL' + sep + 'Total em BRL' + nl;
+
+    const fields = [
+        {key:'total', label:'RECEITA BRUTA TOTAL'},
+        {key:'subtotal', label:'(-) Subtotal Produtos'},
+        {key:'servicos', label:'(-) Taxa de Serviço'},
+        {key:'impostos', label:'(-) Impostos'},
+        {key:'imposto_local', label:'(-) Imposto Local'},
+        {key:'frete', label:'(-) Frete'},
+    ];
+
+    fields.forEach(f => {
+        const vUsd = parseFloat(d.usd[f.key] || 0);
+        const vBrl = parseFloat(d.brl[f.key] || 0);
+        const totalBrl = vBrl + (vUsd * d.taxaUsdBrl);
+        csv += f.label + sep + fmtCSV(vUsd) + sep + fmtCSV(vBrl) + sep + fmtCSV(totalBrl) + nl;
+    });
+    csv += nl;
+
+    // === PEDIDOS ===
+    csv += '=== TOTAL DE PEDIDOS ===' + nl;
+    csv += 'Quantidade' + sep + (d.totais.qtd_pedidos || 0) + nl;
+    csv += nl;
+
+    // === POR STATUS ===
+    csv += '=== RECEITA POR STATUS ===' + nl;
+    csv += 'Status' + sep + 'Qtd' + sep + 'Subtotal' + sep + 'Serviço' + sep + 'Impostos' + sep + 'Frete' + sep + 'Total (R$)' + nl;
+    (d.porStatus || []).forEach(r => {
+        const label = d.statusLabels[r.status] || r.status.replace(/_/g, ' ');
+        csv += label + sep + r.qtd + sep + fmtCSV(r.subtotal) + sep + fmtCSV(r.servicos) + sep + fmtCSV(r.impostos) + sep + fmtCSV(r.frete) + sep + fmtCSV(r.total) + nl;
+    });
+    csv += 'TOTAL' + sep + d.totalQtd + sep + fmtCSV(d.totalSubtotal) + sep + fmtCSV(d.totalServicos) + sep + fmtCSV(d.totalImpostos) + sep + fmtCSV(d.totalFrete) + sep + fmtCSV(d.totalTotal) + nl;
+    csv += nl;
+
+    // === POR MOEDA ===
+    csv += '=== DISTRIBUIÇÃO POR MOEDA ===' + nl;
+    csv += 'Moeda' + sep + 'Qtd' + sep + 'Total' + nl;
+    (d.porMoeda || []).forEach(r => {
+        csv += (r.moeda || 'N/A').toUpperCase() + sep + (r.qtd || 0) + sep + fmtCSV(parseFloat(r.total || 0)) + nl;
+    });
+    csv += nl;
+
+    // === POR FORMA DE PAGAMENTO ===
+    csv += '=== RECEITA POR FORMA DE PAGAMENTO ===' + nl;
+    csv += 'Forma' + sep + 'Qtd' + sep + 'Total' + nl;
+    (d.porPagamento || []).forEach(r => {
+        csv += (r.forma || 'N/A').replace(/_/g, ' ') + sep + (r.qtd || 0) + sep + fmtCSV(parseFloat(r.total || 0)) + nl;
+    });
+    csv += nl;
+
+    // === CONCILIAÇÃO ===
+    csv += '=== CONCILIAÇÃO ===' + nl;
+    csv += 'Descrição' + sep + 'Valor (R$)' + nl;
+    const totalGeralBrl = parseFloat(d.brl.total || 0) + (parseFloat(d.usd.total || 0) * d.taxaUsdBrl);
+    csv += 'Receita Total (convertida BRL)' + sep + fmtCSV(totalGeralBrl) + nl;
+    csv += 'Total Subtotal Produtos' + sep + fmtCSV(d.totalSubtotal) + nl;
+    csv += 'Total Taxa de Serviço' + sep + fmtCSV(d.totalServicos) + nl;
+    csv += 'Total Impostos' + sep + fmtCSV(d.totalImpostos) + nl;
+    csv += 'Total Frete' + sep + fmtCSV(d.totalFrete) + nl;
+    csv += 'Quantidade de Pedidos' + sep + (d.totais.qtd_pedidos || 0) + nl;
+
+    // Download
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'DRE_Braziliana_' + d.dateStart + '_' + d.dateEnd + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function fmtCSV(v) {
+    return (parseFloat(v) || 0).toFixed(2).replace('.', ',');
+}
 </script>
