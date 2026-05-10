@@ -412,6 +412,12 @@ function startPolling() {
                     clearInterval(pollInterval);
                     showToast('A live foi encerrada', 'info');
                 }
+
+                // Se live mudou para 'live' e temos playback, iniciar player
+                if (data.status === 'live' && !IS_ACTIVE) {
+                    IS_ACTIVE = true;
+                    location.reload(); // Recarregar para pegar a URL de playback
+                }
             })
             .catch(function() {});
     }, 2000); // A cada 2 segundos
