@@ -82,6 +82,61 @@ class LiveApiController {
     }
 
     /**
+     * GET /api/live/{id}/poll — Polling para chat + métricas (substitui SSE)
+     */
+    public function poll(Request $request, $id) {
+        $live = $this->liveModel->find($id);
+        if (!$live) {
+            $this->json(['error' => 'Live não encontrada'], 404);
+            return;
+        }
+
+        $sinceId = (int) ($request->getParam('since') ?? 0);
+
+        // Buscar mensagens novas
+        $pdo = \Config\Database::getConnection();
+        $stmt = $pdo->prepare(
+            "SELECT m.id, m.user_id, m.content, m.created_at, 
+                    COALESCE(u.nome, u.name, u.email) AS user_name
+             FROM live_chat_messages m
+             LEFT JOIN usuarios u ON u.id = m.user_id
+             WHERE m.live_id = :lid AND m.id > :since AND m.hidden = 0
+             ORDER BY m.id ASC LIMIT 20"
+        );
+        $stmt->execute([':lid' => (int)$id, ':since' => $sinceId]);
+        $messages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Métricas
+        $metrics = [
+            'viewers' => (int)($live['viewers_current'] ?? 0),
+            'likes' => (int)($live['likes_count'] ?? 0),
+            'shares' => (int)($live['shares_count'] ?? 0),
+        ];
+
+        // Produto em destaque
+        $featured = null;
+        if (!empty($live['current_featured_product_id'])) {
+            $liveProductModel = new \App\Models\LiveProduct();
+            $lp = $liveProductModel->getByLiveAndProduct((int)$id, (int)$live['current_featured_product_id']);
+            if ($lp) {
+                $featured = [
+                    'product_id' => (int)$live['current_featured_product_id'],
+                    'name' => $lp['display_name'] ?? '',
+                    'price' => (float)($lp['display_price'] ?? 0),
+                    'image' => $lp['display_image'] ?? '',
+                ];
+            }
+        }
+
+        $this->json([
+            'status' => $live['status'],
+            'messages' => $messages,
+            'metrics' => $metrics,
+            'featured' => $featured,
+        ]);
+    }
+
+    /**
      * POST /api/live/{id}/like
      */
     public function like(Request $request, $id) {

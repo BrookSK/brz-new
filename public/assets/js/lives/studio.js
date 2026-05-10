@@ -296,7 +296,7 @@ var adminPollInterval = null;
 
 function startAdminPolling() {
     adminPollInterval = setInterval(function() {
-        fetch('/api/live/' + LIVE_ID + '/status')
+        fetch('/api/live/' + LIVE_ID + '/poll?since=' + adminLastMsgId, { credentials: 'same-origin' })
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 // Atualizar métricas
@@ -332,7 +332,8 @@ async function sendAdminChat() {
         await fetch('/api/live/' + LIVE_ID + '/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'content=' + encodeURIComponent(content)
+            body: 'content=' + encodeURIComponent(content),
+            credentials: 'same-origin'
         });
         input.value = '';
     } catch(e) {}
@@ -341,12 +342,12 @@ async function sendAdminChat() {
 }
 
 async function hideMsg(msgId) {
-    await fetch(`/admin/lives/${LIVE_ID}/chat/${msgId}/hide`, { method: 'POST' });
+    await fetch('/admin/lives/' + LIVE_ID + '/chat/' + msgId + '/hide', { method: 'POST', credentials: 'same-origin' });
 }
 
 async function banUserChat(userId) {
     if (!confirm('Banir este usuário da live?')) return;
-    await fetch(`/admin/lives/${LIVE_ID}/ban/${userId}`, { method: 'POST' });
+    await fetch('/admin/lives/' + LIVE_ID + '/ban/' + userId, { method: 'POST', credentials: 'same-origin' });
 }
 
 // ─── Helpers ────────────────────────────────────────────────

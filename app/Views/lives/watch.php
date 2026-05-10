@@ -343,7 +343,7 @@ function startPolling() {
     }
 
     pollInterval = setInterval(function() {
-        fetch('/api/live/' + LIVE_ID + '/status')
+        fetch('/api/live/' + LIVE_ID + '/poll?since=' + lastMsgId, { credentials: 'same-origin' })
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 // Atualizar métricas
