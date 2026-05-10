@@ -255,7 +255,7 @@ class AdminUsuariosHelper {
     }
     
     public function getPedidosUsuario($usuarioId, $limite = 10) {
-        $stmt = $this->pdo->prepare("SELECT * FROM pedidos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT ?");
+        $stmt = $this->pdo->prepare("SELECT * FROM pedidos WHERE usuario_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?");
         $stmt->bindValue(1, $usuarioId);
         $stmt->bindValue(2, (int)$limite, \PDO::PARAM_INT);
         $stmt->execute();
