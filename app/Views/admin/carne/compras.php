@@ -65,17 +65,6 @@
     <?php else: ?>
         <?php $meses = ['01'=>'Jan','02'=>'Fev','03'=>'Mar','04'=>'Abr','05'=>'Mai','06'=>'Jun','07'=>'Jul','08'=>'Ago','09'=>'Set','10'=>'Out','11'=>'Nov','12'=>'Dez']; ?>
 
-        <!-- Tabs -->
-        <div class="d-flex flex-wrap gap-2 mb-4">
-            <?php foreach ($porMes as $mesKey => $itens):
-                $parts = explode('-', $mesKey);
-                $mesLabel = ($meses[$parts[1]] ?? $parts[1]) . '/' . $parts[0];
-                $pendentes = count(array_filter($itens, fn($i) => ($i['status_compra'] ?? '') === 'aguardando_compra'));
-            ?>
-                <a href="#mes_<?= $mesKey ?>" class="btn btn-sm <?= $pendentes > 0 ? 'btn-primary' : 'btn-outline-secondary' ?>"><?= $mesLabel ?> <span class="badge bg-light text-dark ms-1"><?= count($itens) ?></span><?php if ($pendentes > 0): ?> <span class="badge bg-warning text-dark ms-1"><?= $pendentes ?></span><?php endif; ?></a>
-            <?php endforeach; ?>
-        </div>
-
         <!-- Tabelas por mês -->
         <?php foreach ($porMes as $mesKey => $itens):
             $parts = explode('-', $mesKey);
