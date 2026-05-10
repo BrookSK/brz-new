@@ -76,8 +76,23 @@ async function initWHEPPlayer(video, whepUrl) {
             console.log('WHEP: Got track!', event.track.kind);
             if (event.streams && event.streams[0]) {
                 video.srcObject = event.streams[0];
-                video.play().catch(function() { video.muted = true; video.play(); });
+            } else if (event.track) {
+                // Fallback: criar stream manualmente
+                var stream = video.srcObject;
+                if (!stream) {
+                    stream = new MediaStream();
+                    video.srcObject = stream;
+                }
+                stream.addTrack(event.track);
             }
+            video.muted = true; // Necessário para autoplay
+            video.play().then(function() {
+                console.log('WHEP: Video playing!');
+            }).catch(function(e) {
+                console.log('WHEP: Play failed, trying muted:', e.message);
+                video.muted = true;
+                video.play();
+            });
         };
 
         const offer = await pc.createOffer();
