@@ -25,6 +25,8 @@ class AdminDreCompletoController extends Controller {
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
 
+        try {
+
         $cols = [];
         try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
 
@@ -42,6 +44,12 @@ class AdminDreCompletoController extends Controller {
         $colCreatedAt = $pick(['created_at','data_criacao']);
         $deletedFilter = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
 
+        // Guard: se colunas essenciais não existem, retornar vazio
+        if (!$colTotal || !$colCreatedAt || !$colStatus) {
+            echo json_encode(['success' => true, 'taxaUsdBrl' => 5.85, 'periodo' => ['inicio' => $dateStart, 'fim' => $dateEnd], 'resumo' => ['total_entradas' => 0, 'total_entradas_brl' => 0, 'total_entradas_usd' => 0, 'total_despesas' => 0, 'total_despesas_brl' => 0, 'total_despesas_usd' => 0, 'resultado' => 0, 'margem' => 0, 'maior_categoria' => '', 'qtd_pedidos' => 0], 'meses' => [], 'gateways' => [], 'despesas_categoria' => [], 'despesas_favorecido' => [], 'entradas_detalhadas' => [], 'entradas_paginacao' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1], 'status_filter_dre' => '', 'operacional' => [], 'conciliacao' => ['total_creditos' => 0, 'total_debitos' => 0, 'saldo_final' => 0, 'qtd_lancamentos' => 0]], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         // Taxa USD→BRL
         $taxaUsdBrl = 5.85;
         try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
@@ -50,13 +58,13 @@ class AdminDreCompletoController extends Controller {
         $paidStatuses = "('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
         $sqlEntradas = "SELECT 
             DATE_FORMAT(p.{$colCreatedAt}, '%Y-%m') as mes,
-            UPPER(COALESCE(p.{$colMoeda},'BRL')) as moeda,
+            " . ($colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'BRL')) as moeda" : "'BRL' as moeda") . ",
             COUNT(*) as qtd,
             COALESCE(SUM(p.{$colTotal}),0) as total,
-            COALESCE(SUM(p.{$colSubtotal}),0) as subtotal,
-            COALESCE(SUM(p.{$colServicos}),0) as servicos,
-            COALESCE(SUM(p.{$colImpostos}),0) as impostos,
-            COALESCE(SUM(p.{$colFrete}),0) as frete
+            " . ($colSubtotal ? "COALESCE(SUM(p.{$colSubtotal}),0) as subtotal" : "0 as subtotal") . ",
+            " . ($colServicos ? "COALESCE(SUM(p.{$colServicos}),0) as servicos" : "0 as servicos") . ",
+            " . ($colImpostos ? "COALESCE(SUM(p.{$colImpostos}),0) as impostos" : "0 as impostos") . ",
+            " . ($colFrete ? "COALESCE(SUM(p.{$colFrete}),0) as frete" : "0 as frete") . "
             FROM pedidos p
             WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)
             AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
@@ -73,14 +81,14 @@ class AdminDreCompletoController extends Controller {
 
         // === ENTRADAS POR GATEWAY ===
         $sqlGateways = "SELECT 
-            LOWER(COALESCE(p.{$colPayGateway},'sem_gateway')) as gateway,
-            UPPER(COALESCE(p.{$colMoeda},'BRL')) as moeda,
+            " . ($colPayGateway ? "LOWER(COALESCE(p.{$colPayGateway},'sem_gateway')) as gateway" : "'sem_gateway' as gateway") . ",
+            " . ($colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'BRL')) as moeda" : "'BRL' as moeda") . ",
             COUNT(*) as qtd,
             COALESCE(SUM(p.{$colTotal}),0) as total,
-            COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},''))='approved' THEN 1 ELSE 0 END),0) as aprovados,
-            COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},'')) IN ('pending','') OR p.{$colPayStatus} IS NULL THEN 1 ELSE 0 END),0) as pendentes,
-            COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},''))='rejected' THEN 1 ELSE 0 END),0) as rejeitados,
-            COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},''))='refunded' THEN 1 ELSE 0 END),0) as estornados
+            " . ($colPayStatus ? "COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},''))='approved' THEN 1 ELSE 0 END),0) as aprovados" : "0 as aprovados") . ",
+            " . ($colPayStatus ? "COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},'')) IN ('pending','') OR p.{$colPayStatus} IS NULL THEN 1 ELSE 0 END),0) as pendentes" : "COUNT(*) as pendentes") . ",
+            " . ($colPayStatus ? "COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},''))='rejected' THEN 1 ELSE 0 END),0) as rejeitados" : "0 as rejeitados") . ",
+            " . ($colPayStatus ? "COALESCE(SUM(CASE WHEN LOWER(COALESCE(p.{$colPayStatus},''))='refunded' THEN 1 ELSE 0 END),0) as estornados" : "0 as estornados") . "
             FROM pedidos p
             WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)
             AND LOWER(COALESCE(p.{$colStatus},'')) NOT IN ('apagado','deleted','lixeira','trash')
@@ -245,6 +253,9 @@ class AdminDreCompletoController extends Controller {
             'operacional' => $operacionalPorPessoa,
             'conciliacao' => $conciliacao,
         ], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK);
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage(), 'line' => $e->getLine()], JSON_UNESCAPED_UNICODE);
+        }
         exit;
     }
 

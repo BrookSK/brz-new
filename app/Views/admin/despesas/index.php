@@ -27,10 +27,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                 <i class="fas fa-arrow-down text-danger" style="font-size:10px;"></i><span class="text-muted">Saídas hoje</span><span class="fw-bold"><?= fmtD($stats['vencido'] ?? 0) ?></span>
             </div>
             <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i>Exportar</button>
-            <div class="border rounded-pill px-2 py-1 d-flex align-items-center gap-1 bg-white">
-                <select id="desp-view-currency" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 18px 0 4px;" onchange="applyDespView()"><option value="BRL">BRL</option><option value="USD">USD</option></select>
-                <select id="desp-view-lang" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 18px 0 4px;" onchange="applyDespView()"><option value="pt">PT</option><option value="en">EN</option></select>
-            </div>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDespView"><i class="fas fa-globe me-1"></i>Moeda / Idioma</button>
             <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i>Nova despesa</button>
         </div>
     </div>
@@ -395,6 +392,20 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
         </div>
     </div>
     <?php endif; ?>
+</div>
+
+<!-- Modal Visualização Moeda/Idioma -->
+<div class="modal fade" id="modalDespView" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-globe me-2"></i>Visualização</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label fw-semibold small">Moeda de exibição</label><select id="desp-view-currency" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                <div class="mb-0"><label class="form-label fw-semibold small">Idioma</label><select id="desp-view-lang" class="form-select"><option value="pt">Português (PT-BR)</option><option value="en">English (EN)</option></select></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary btn-sm" onclick="applyDespView();bootstrap.Modal.getInstance(document.getElementById('modalDespView')).hide();"><i class="fas fa-check me-1"></i>Aplicar</button></div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Nova Despesa -->
