@@ -248,7 +248,7 @@ class AdminLivesController {
             'cf_rtmps_url' => $cfResult['rtmps_url'],
             'cf_rtmps_key' => $cfResult['rtmps_key'],
             'cf_webrtc_url' => $cfResult['webrtc_url'],
-            'cf_playback_url' => $cfResult['playback_hls'],
+            'cf_playback_url' => $cfResult['webrtc_playback_url'] ?: $cfResult['playback_hls'],
         ]);
 
         $this->liveModel->updateStatus($id, 'live', [

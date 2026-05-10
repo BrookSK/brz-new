@@ -6,7 +6,7 @@ let sseSource = null;
 let heartbeatInterval = null;
 let secondsWatched = 0;
 
-// ─── Inicializar Player HLS ─────────────────────────────────
+// ─── Inicializar Player ──────────────────────────────────────
 function initPlayer() {
     const video = document.getElementById('liveVideo');
     if (!video) return;
@@ -14,6 +14,13 @@ function initPlayer() {
     const url = PLAYBACK_URL || RECORDING_URL;
     if (!url) return;
 
+    // Se URL contém 'webRTC/play' → usar WHEP
+    if (url.indexOf('webRTC/play') !== -1) {
+        initWHEPPlayer(video, url);
+        return;
+    }
+
+    // Senão, usar HLS
     if (Hls.isSupported()) {
         const hls = new Hls({
             enableWorker: true,
@@ -23,23 +30,68 @@ function initPlayer() {
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play().catch(() => {
-                // Autoplay bloqueado — mostrar botão de play
                 video.muted = true;
                 video.play();
             });
         });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari nativo
         video.src = url;
         video.addEventListener('loadedmetadata', () => {
             video.play().catch(() => { video.muted = true; video.play(); });
         });
     }
 
-    // Unmute ao tocar
-    video.addEventListener('click', () => {
-        video.muted = !video.muted;
-    });
+    video.addEventListener('click', () => { video.muted = !video.muted; });
+}
+
+// ─── WHEP Player (WebRTC playback) ──────────────────────────
+async function initWHEPPlayer(video, whepUrl) {
+    try {
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+            bundlePolicy: 'max-bundle'
+        });
+
+        // Receber tracks
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        pc.ontrack = function(event) {
+            if (event.streams && event.streams[0]) {
+                video.srcObject = event.streams[0];
+                video.play().catch(() => { video.muted = true; video.play(); });
+            }
+        };
+
+        // Criar offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Enviar para WHEP endpoint
+        const response = await fetch(whepUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/sdp' },
+            body: pc.localDescription.sdp
+        });
+
+        if (response.status === 201 || response.ok) {
+            const answerSdp = await response.text();
+            await pc.setRemoteDescription(new RTCSessionDescription({
+                type: 'answer',
+                sdp: answerSdp
+            }));
+            console.log('WHEP: Connected! Receiving stream...');
+        } else {
+            console.error('WHEP error:', response.status);
+            // Fallback: tentar novamente em 3s
+            setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 3000);
+        }
+    } catch (e) {
+        console.error('WHEP error:', e);
+        // Retry
+        setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 3000);
+    }
 }
 
 // ─── SSE (Realtime) ─────────────────────────────────────────
