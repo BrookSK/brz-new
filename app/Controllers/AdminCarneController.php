@@ -18,7 +18,7 @@ class AdminCarneController extends Controller {
     }
 
     /**
-     * Listagem de carnês
+     * Listagem de carnês (painel completo)
      */
     public function index(Request $request) {
         $filtros = [
@@ -27,11 +27,144 @@ class AdminCarneController extends Controller {
             'pedido_id' => $request->getParam('pedido_id', ''),
             'com_atraso' => $request->getParam('com_atraso', ''),
             'liberado_compra' => $request->getParam('liberado_compra', ''),
-            'liberado_envio' => $request->getParam('liberado_envio', '')
+            'liberado_envio' => $request->getParam('liberado_envio', ''),
+            'tab' => $request->getParam('tab', 'carnes'),
         ];
 
         $carnes = $this->carneModel->listarAdmin($filtros);
+
+        // Stats para os cards do topo
+        $stats = $this->computeStats($carnes);
+
+        // Compras internas pendentes
+        $comprasPendentes = [];
+        try {
+            $stCp = $this->db->prepare("
+                SELECT ci.*, c.pedido_id, u.nome as cliente_nome
+                FROM carne_compras_internas ci
+                JOIN carnes c ON c.id = ci.carne_id
+                JOIN usuarios u ON u.id = c.cliente_id
+                WHERE ci.status = 'aguardando_compra'
+                ORDER BY ci.created_at DESC LIMIT 50
+            ");
+            $stCp->execute();
+            $comprasPendentes = $stCp->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Envios pendentes
+        $enviosPendentes = [];
+        try {
+            $stEn = $this->db->prepare("
+                SELECT c.*, u.nome as cliente_nome, u.email as cliente_email,
+                    p.status as pedido_status
+                FROM carnes c
+                JOIN usuarios u ON u.id = c.cliente_id
+                LEFT JOIN pedidos p ON p.id = c.pedido_id
+                WHERE c.status IN ('quitado','liberado_envio')
+                AND c.envio_liberado = 1
+                ORDER BY c.updated_at DESC LIMIT 50
+            ");
+            $stEn->execute();
+            $enviosPendentes = $stEn->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Cobranças (parcelas vencidas/em atraso)
+        $cobrancas = [];
+        try {
+            $stCob = $this->db->prepare("
+                SELECT cp.*, c.pedido_id, c.cliente_id, u.nome as cliente_nome, u.email as cliente_email
+                FROM carne_parcelas cp
+                JOIN carnes c ON c.id = cp.carne_id
+                JOIN usuarios u ON u.id = c.cliente_id
+                LEFT JOIN pedidos p ON p.id = c.pedido_id
+                WHERE cp.status IN ('vencida','em_atraso','aguardando_pagamento')
+                AND cp.vencimento <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                AND (p.deleted_at IS NULL)
+                AND p.status NOT IN ('cancelado','cancelled','deleted','lixeira','trash')
+                ORDER BY cp.vencimento ASC LIMIT 50
+            ");
+            $stCob->execute();
+            $cobrancas = $stCob->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        // Atividade recente (histórico)
+        $atividadeRecente = [];
+        try {
+            $stAr = $this->db->prepare("
+                SELECT ch.*, c.pedido_id, u.nome as cliente_nome
+                FROM carne_historico ch
+                JOIN carnes c ON c.id = ch.carne_id
+                JOIN usuarios u ON u.id = c.cliente_id
+                ORDER BY ch.created_at DESC LIMIT 10
+            ");
+            $stAr->execute();
+            $atividadeRecente = $stAr->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        $title = 'Gestão de Carnês';
+        $sidebarActive = 'carnes';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
         require __DIR__ . '/../Views/admin/carne/index.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
+     * Calcula estatísticas dos carnês para os cards do dashboard
+     */
+    private function computeStats(array $carnes): array {
+        $stats = [
+            'total' => count($carnes),
+            'total_financiado' => 0,
+            'total_recebido' => 0,
+            'total_aberto' => 0,
+            'total_atraso' => 0,
+            'aguardando_primeira' => 0,
+            'com_atraso' => 0,
+            'quitados' => 0,
+            'compras_pendentes' => 0,
+            'envios_pendentes' => 0,
+            'vence_7_dias' => 0,
+        ];
+
+        foreach ($carnes as $c) {
+            $stats['total_financiado'] += (float)($c['total_geral'] ?? 0);
+            $status = $c['status'] ?? '';
+            if ($status === 'aguardando_primeira_parcela') $stats['aguardando_primeira']++;
+            if (in_array($status, ['com_atraso', 'inadimplente'])) $stats['com_atraso']++;
+            if ($status === 'quitado') $stats['quitados']++;
+            if (!empty($c['envio_liberado']) && $status !== 'encerrado') $stats['envios_pendentes']++;
+        }
+
+        // Recebido e em aberto
+        try {
+            $stRec = $this->db->query("SELECT COALESCE(SUM(valor_total),0) FROM carne_parcelas WHERE status = 'paga'");
+            $stats['total_recebido'] = (float)($stRec->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+
+        $stats['total_aberto'] = $stats['total_financiado'] - $stats['total_recebido'];
+        if ($stats['total_aberto'] < 0) $stats['total_aberto'] = 0;
+
+        // Atraso
+        try {
+            $stAt = $this->db->query("SELECT COALESCE(SUM(valor_total),0) FROM carne_parcelas WHERE status IN ('vencida','em_atraso')");
+            $stats['total_atraso'] = (float)($stAt->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+
+        // Compras pendentes
+        try {
+            $stCp = $this->db->query("SELECT COUNT(*) FROM carne_compras_internas WHERE status = 'aguardando_compra'");
+            $stats['compras_pendentes'] = (int)($stCp->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+
+        // Vencem em 7 dias
+        try {
+            $stV7 = $this->db->query("SELECT COUNT(*) FROM carne_parcelas WHERE status IN ('pendente','aguardando_pagamento') AND vencimento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
+            $stats['vence_7_dias'] = (int)($stV7->fetchColumn() ?: 0);
+        } catch (\Exception $e) {}
+
+        return $stats;
     }
 
     /**
