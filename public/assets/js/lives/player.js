@@ -14,17 +14,12 @@ function initPlayer() {
     const url = PLAYBACK_URL || RECORDING_URL;
     if (!url) return;
 
-    // Se URL contém 'webRTC/play' → usar WHEP
-    if (url.indexOf('webRTC/play') !== -1) {
-        initWHEPPlayer(video, url);
-        return;
-    }
-
-    // Senão, usar HLS
-    if (Hls.isSupported()) {
+    // Sempre usar HLS (funciona com qualquer stream do Cloudflare)
+    if (typeof Hls !== 'undefined' && Hls.isSupported()) {
         const hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
+            liveSyncDurationCount: 3,
         });
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -34,7 +29,14 @@ function initPlayer() {
                 video.play();
             });
         });
+        hls.on(Hls.Events.ERROR, function(event, data) {
+            if (data.fatal) {
+                console.log('HLS fatal error, retrying in 3s...');
+                setTimeout(function() { hls.loadSource(url); }, 3000);
+            }
+        });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari nativo
         video.src = url;
         video.addEventListener('loadedmetadata', () => {
             video.play().catch(() => { video.muted = true; video.play(); });

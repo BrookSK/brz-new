@@ -244,7 +244,7 @@ class AdminLivesController {
             }
 
             // Atualizar live com dados do CF
-            $playbackUrl = $cfResult['webrtc_playback_url'] ?: ($cfResult['playback_hls'] ?: '');
+            $playbackUrl = $cfResult['playback_hls'] ?: ($cfResult['webrtc_playback_url'] ?: '');
             
             $this->liveModel->update($id, [
                 'cf_live_input_id' => $cfResult['uid'],

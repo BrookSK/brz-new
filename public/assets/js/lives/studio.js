@@ -36,7 +36,7 @@ async function startLive() {
 
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
         
         const res = await fetch('/admin/lives/' + LIVE_ID + '/start', { 
             method: 'POST', 
@@ -70,8 +70,13 @@ async function startLive() {
         location.reload();
 
     } catch (e) {
-        alert('Erro de conexão: ' + e.message);
-        if (btn) btn.disabled = false;
+        if (e.name === 'AbortError') {
+            // Timeout — mas a live pode ter iniciado. Recarregar.
+            location.reload();
+        } else {
+            alert('Erro: ' + e.message);
+            if (btn) btn.disabled = false;
+        }
     }
 }
 
