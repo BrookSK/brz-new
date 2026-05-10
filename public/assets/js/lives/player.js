@@ -96,7 +96,16 @@ async function initWHEPPlayer(video, whepUrl) {
 
         if (response.status === 201 || response.ok) {
             const answerSdp = await response.text();
-            console.log('WHEP answer (first 100 chars):', answerSdp.substring(0, 100));
+            console.log('WHEP response status:', response.status);
+            console.log('WHEP answer length:', answerSdp.length);
+            console.log('WHEP answer starts with:', answerSdp.substring(0, 50));
+            
+            if (!answerSdp.startsWith('v=')) {
+                console.error('WHEP: Invalid SDP response:', answerSdp.substring(0, 200));
+                setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
+                return;
+            }
+            
             await pc.setRemoteDescription(new RTCSessionDescription({
                 type: 'answer',
                 sdp: answerSdp
@@ -104,8 +113,7 @@ async function initWHEPPlayer(video, whepUrl) {
             console.log('WHEP: Connected! Receiving stream...');
         } else {
             const errText = await response.text();
-            console.error('WHEP error:', response.status, errText.substring(0, 200));
-            // Retry em 5s
+            console.error('WHEP error status:', response.status, errText.substring(0, 200));
             setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
         }
     } catch (e) {

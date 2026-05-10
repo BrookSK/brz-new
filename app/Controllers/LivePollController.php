@@ -108,6 +108,7 @@ class LivePollController {
 
             if (empty($playbackUrl)) {
                 http_response_code(404);
+                header('Content-Type: text/plain');
                 echo 'No playback URL';
                 return;
             }
@@ -115,14 +116,22 @@ class LivePollController {
             // Se a URL não é WHEP, não pode usar este proxy
             if (strpos($playbackUrl, 'webRTC/play') === false) {
                 http_response_code(400);
+                header('Content-Type: text/plain');
                 echo 'Not a WHEP URL';
                 return;
             }
 
+            // Ler SDP do body raw
             $sdp = file_get_contents('php://input');
             if (empty($sdp)) {
+                // Tentar de outra forma
+                $sdp = $request->getBody();
+                if (is_array($sdp)) $sdp = '';
+            }
+            if (empty($sdp)) {
                 http_response_code(400);
-                echo 'Empty SDP';
+                header('Content-Type: text/plain');
+                echo 'Empty SDP body';
                 return;
             }
 
@@ -142,6 +151,7 @@ class LivePollController {
 
             if ($body === false || !empty($curlError)) {
                 http_response_code(502);
+                header('Content-Type: text/plain');
                 echo 'Proxy error: ' . $curlError;
                 return;
             }
@@ -149,8 +159,10 @@ class LivePollController {
             http_response_code($httpCode);
             header('Content-Type: application/sdp');
             echo $body;
+            exit;
         } catch (\Exception $e) {
             http_response_code(500);
+            header('Content-Type: text/plain');
             echo $e->getMessage();
         }
     }
