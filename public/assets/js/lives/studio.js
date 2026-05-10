@@ -369,8 +369,9 @@ function escapeHtml(text) {
 }
 
 // ─── Inicialização ──────────────────────────────────────────
+startAdminPolling();
+
 if (IS_LIVE) {
-    startAdminPolling();
     if (IS_WEBRTC) {
         // Tentar iniciar preview da câmera com áudio
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })

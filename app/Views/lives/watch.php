@@ -82,7 +82,7 @@ ob_start();
             <div class="position-absolute bottom-0 start-0 p-3" id="chatOverlay" style="right:70px;z-index:5">
                 <div id="chatMessages" style="overflow-y:auto;max-height:120px;display:flex;flex-direction:column;gap:4px;margin-bottom:8px;scrollbar-width:none;-ms-overflow-style:none">
                     <?php foreach ($chatMessages as $msg): ?>
-                        <div class="chat-msg">
+                        <div class="chat-msg" data-id="<?= (int)$msg['id'] ?>">
                             <span class="chat-user"><?= htmlspecialchars($msg['user_name'] ?? $msg['user_name_alt'] ?? 'Anônimo') ?></span><?= htmlspecialchars($msg['content']) ?>
                         </div>
                     <?php endforeach; ?>
@@ -334,6 +334,14 @@ window.sendChat = function() {
 var lastMsgId = 0;
 var pollInterval = null;
 
+// Inicializar lastMsgId com a última mensagem já renderizada
+(function() {
+    var msgs = document.querySelectorAll('#chatMessages .chat-msg[data-id]');
+    if (msgs.length > 0) {
+        lastMsgId = parseInt(msgs[msgs.length - 1].getAttribute('data-id')) || 0;
+    }
+})();
+
 function startPolling() {
     // Pegar ID da última mensagem carregada
     var msgs = document.querySelectorAll('#chatMessages .chat-msg');
@@ -401,10 +409,8 @@ function startPolling() {
     }, 2000); // A cada 2 segundos
 }
 
-// Iniciar polling quando a live está ativa
-if (IS_ACTIVE) {
-    startPolling();
-}
+// Iniciar polling sempre (chat funciona antes, durante e depois da live)
+startPolling();
 
 // Adicionar ao carrinho via AJAX
 document.addEventListener('DOMContentLoaded', function() {
