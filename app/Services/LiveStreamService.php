@@ -85,8 +85,8 @@ class LiveStreamService {
             'uid' => $result['uid'] ?? null,
             'rtmps_url' => $result['rtmps']['url'] ?? null,
             'rtmps_key' => $result['rtmps']['streamKey'] ?? null,
-            'webrtc_url' => $result['webRTC']['url'] ?? null,
-            'webrtc_playback_url' => $result['webRTCPlayback']['url'] ?? null,
+            'webrtc_url' => $result['webRTC']['url'] ?? ($result['webrtc']['url'] ?? null),
+            'webrtc_playback_url' => $result['webRTCPlayback']['url'] ?? ($result['webrtcPlayback']['url'] ?? null),
             'playback_hls' => $result['playback']['hls'] ?? null,
         ];
     }

@@ -35,8 +35,17 @@ async function startLive() {
     if (btn) btn.disabled = true;
 
     try {
-        const res = await fetch(`/admin/lives/${LIVE_ID}/start`, { method: 'POST' });
-        const data = await res.json();
+        const res = await fetch('/admin/lives/' + LIVE_ID + '/start', { method: 'POST', credentials: 'same-origin' });
+        
+        let data;
+        try {
+            data = await res.json();
+        } catch(e) {
+            const text = await res.text();
+            alert('Erro do servidor: ' + text.substring(0, 300));
+            if (btn) btn.disabled = false;
+            return;
+        }
 
         if (!data.success) {
             alert(data.error || 'Erro ao iniciar');
@@ -49,30 +58,11 @@ async function startLive() {
             await startWebRTC(data.webrtc_url);
         }
 
-        // Atualizar UI
-        document.getElementById('liveIndicator').className = 'live-active';
-        document.getElementById('liveStatusText').textContent = 'AO VIVO';
-        liveStartTime = Math.floor(Date.now() / 1000);
-        durationInterval = setInterval(updateDuration, 1000);
-
-        // Trocar botão
-        const controls = document.querySelector('.studio-controls');
-        controls.innerHTML = `
-            <button id="btnStop" class="btn-live btn-live-stop" onclick="stopLive()">
-                <i class="fas fa-stop me-2"></i> ENCERRAR LIVE
-            </button>
-        `;
-
-        // Se OBS, mostrar credenciais
-        if (!IS_WEBRTC) {
-            location.reload(); // Recarregar para mostrar credenciais RTMPS
-        }
-
-        // Iniciar SSE
-        connectSSE();
+        // Recarregar página para mostrar controles de live ativa
+        location.reload();
 
     } catch (e) {
-        alert('Erro de conexão');
+        alert('Erro de conexão: ' + e.message);
         if (btn) btn.disabled = false;
     }
 }

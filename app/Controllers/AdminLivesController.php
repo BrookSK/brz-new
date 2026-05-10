@@ -217,52 +217,58 @@ class AdminLivesController {
      * Iniciar transmissão
      */
     public function start(Request $request, $id) {
-        $live = $this->liveModel->find($id);
-        if (!$live) {
-            $this->jsonResponse(['error' => 'Live não encontrada'], 404);
-            return;
+        try {
+            $live = $this->liveModel->find($id);
+            if (!$live) {
+                $this->jsonResponse(['error' => 'Live não encontrada'], 404);
+                return;
+            }
+
+            if ($live['status'] === 'live') {
+                $this->jsonResponse(['error' => 'Live já está em andamento'], 422);
+                return;
+            }
+
+            // Verificar cota
+            $quota = $this->shoppingService->checkQuota();
+            if (!$quota['can_stream']) {
+                $this->jsonResponse(['error' => 'Cota mensal de streaming excedida'], 403);
+                return;
+            }
+
+            // Criar live input no Cloudflare
+            $cfResult = $this->streamService->createLiveInput($id, $live['title']);
+            if (!$cfResult || empty($cfResult['uid'])) {
+                $this->jsonResponse(['error' => 'Erro ao criar transmissão no Cloudflare. Verifique as credenciais.'], 500);
+                return;
+            }
+
+            // Atualizar live com dados do CF
+            $playbackUrl = $cfResult['webrtc_playback_url'] ?: ($cfResult['playback_hls'] ?: '');
+            
+            $this->liveModel->update($id, [
+                'cf_live_input_id' => $cfResult['uid'],
+                'cf_rtmps_url' => $cfResult['rtmps_url'],
+                'cf_rtmps_key' => $cfResult['rtmps_key'],
+                'cf_webrtc_url' => $cfResult['webrtc_url'],
+                'cf_playback_url' => $playbackUrl,
+            ]);
+
+            $this->liveModel->updateStatus($id, 'live', [
+                'live_started_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->jsonResponse([
+                'success' => true,
+                'ingest_method' => $live['ingest_method'],
+                'rtmps_url' => $cfResult['rtmps_url'],
+                'rtmps_key' => $cfResult['rtmps_key'],
+                'webrtc_url' => $cfResult['webrtc_url'],
+                'playback_url' => $playbackUrl,
+            ]);
+        } catch (\Exception $e) {
+            $this->jsonResponse(['error' => 'Erro interno: ' . $e->getMessage()], 500);
         }
-
-        if ($live['status'] === 'live') {
-            $this->jsonResponse(['error' => 'Live já está em andamento'], 422);
-            return;
-        }
-
-        // Verificar cota
-        $quota = $this->shoppingService->checkQuota();
-        if (!$quota['can_stream']) {
-            $this->jsonResponse(['error' => 'Cota mensal de streaming excedida'], 403);
-            return;
-        }
-
-        // Criar live input no Cloudflare
-        $cfResult = $this->streamService->createLiveInput($id, $live['title']);
-        if (!$cfResult) {
-            $this->jsonResponse(['error' => 'Erro ao criar transmissão no Cloudflare. Verifique as credenciais.'], 500);
-            return;
-        }
-
-        // Atualizar live com dados do CF
-        $this->liveModel->update($id, [
-            'cf_live_input_id' => $cfResult['uid'],
-            'cf_rtmps_url' => $cfResult['rtmps_url'],
-            'cf_rtmps_key' => $cfResult['rtmps_key'],
-            'cf_webrtc_url' => $cfResult['webrtc_url'],
-            'cf_playback_url' => $cfResult['webrtc_playback_url'] ?: $cfResult['playback_hls'],
-        ]);
-
-        $this->liveModel->updateStatus($id, 'live', [
-            'live_started_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        $this->jsonResponse([
-            'success' => true,
-            'ingest_method' => $live['ingest_method'],
-            'rtmps_url' => $cfResult['rtmps_url'],
-            'rtmps_key' => $cfResult['rtmps_key'],
-            'webrtc_url' => $cfResult['webrtc_url'],
-            'playback_url' => $cfResult['playback_hls'],
-        ]);
     }
 
     /**
