@@ -7,8 +7,39 @@ use App\Services\AuthService;
 class AdminRelatorioGeralController extends Controller {
     private $db;
 
+    /**
+     * Mapa de normalização: status sinônimos → status canônico.
+     * Garante que variações gravadas no banco sejam agrupadas corretamente.
+     */
+    private static array $statusSinonimos = [
+        'consolidado'       => 'produto_consolidado',
+        'caixa_fechada'     => 'produto_consolidado',
+        'pagamento'         => 'processando',
+        'paid'              => 'pago',
+        'approved'          => 'pago',
+        'cancelled'         => 'cancelado',
+    ];
+
     public function __construct() {
         $this->db = \Config\Database::getConnection();
+    }
+
+    /**
+     * Retorna a lista canônica de status (mesma usada em AdminPedidosController).
+     */
+    private static function getStatusList(): array {
+        return \App\Controllers\AdminPedidosController::getStatusList();
+    }
+
+    /**
+     * Gera expressão SQL CASE para normalizar status sinônimos no agrupamento.
+     */
+    private function buildStatusNormalizeExpr(): string {
+        $cases = [];
+        foreach (self::$statusSinonimos as $sinonimo => $canonico) {
+            $cases[] = "WHEN LOWER(p.status) = '{$sinonimo}' THEN '{$canonico}'";
+        }
+        return "CASE " . implode(' ', $cases) . " ELSE LOWER(COALESCE(p.status,'')) END";
     }
 
     public function index(Request $request) {
@@ -17,7 +48,11 @@ class AdminRelatorioGeralController extends Controller {
 
         $dateStart = $request->getParam('date_start', date('Y-m-01'));
         $dateEnd = $request->getParam('date_end', date('Y-m-d'));
-        $statusFilter = $request->getParam('status', '');
+        $statusFilter = $request->getParam('status', []);
+        if (is_string($statusFilter)) {
+            $statusFilter = $statusFilter !== '' ? [$statusFilter] : [];
+        }
+        $statusFilter = array_filter(array_map('trim', (array) $statusFilter));
         $moedaFilter = $request->getParam('moeda', '');
 
         $cols = [];
@@ -36,20 +71,47 @@ class AdminRelatorioGeralController extends Controller {
         $colFormaPagamento = $this->pick($cols, ['forma_pagamento','payment_method']);
         $colOrigemPedido = $this->pick($cols, ['origem_pedido']);
 
-        // WHERE
+        // WHERE — excluir status irrelevantes para relatório financeiro
         $where = ["p.created_at >= :ds", "p.created_at < DATE_ADD(:de, INTERVAL 1 DAY)"];
         $params = [':ds' => $dateStart, ':de' => $dateEnd];
 
-        // Excluir carnê e cancelados
-        $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('carne_pagando','carne_aguardando','cancelado','cancelled','apagado','deleted','lixeira','trash')";
+        $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash')";
         if (in_array('deleted_at', $cols, true)) {
             $where[] = "p.deleted_at IS NULL";
         }
 
-        if ($statusFilter !== '') {
-            $where[] = "p.status = :st";
-            $params[':st'] = $statusFilter;
+        // Filtro por status: considerar sinônimos (suporta múltiplos)
+        if (!empty($statusFilter)) {
+            $sinonimosDoFiltro = [];
+            foreach ($statusFilter as $sf) {
+                $sinonimosDoFiltro[] = $sf;
+                // Incluir sinônimos reversos
+                foreach (self::$statusSinonimos as $sin => $canonico) {
+                    if ($canonico === $sf) {
+                        $sinonimosDoFiltro[] = $sin;
+                    }
+                }
+                // Se o filtro é um sinônimo, incluir o canônico e seus pares
+                if (isset(self::$statusSinonimos[$sf])) {
+                    $canonico = self::$statusSinonimos[$sf];
+                    $sinonimosDoFiltro[] = $canonico;
+                    foreach (self::$statusSinonimos as $sin => $can) {
+                        if ($can === $canonico) {
+                            $sinonimosDoFiltro[] = $sin;
+                        }
+                    }
+                }
+            }
+            $sinonimosDoFiltro = array_unique($sinonimosDoFiltro);
+            $placeholders = [];
+            foreach (array_values($sinonimosDoFiltro) as $i => $s) {
+                $key = ':st' . $i;
+                $placeholders[] = $key;
+                $params[$key] = $s;
+            }
+            $where[] = "LOWER(COALESCE(p.status,'')) IN (" . implode(',', $placeholders) . ")";
         }
+
         if ($moedaFilter !== '' && $colMoeda !== '') {
             $where[] = "p.{$colMoeda} = :moeda";
             $params[':moeda'] = strtoupper($moedaFilter);
@@ -73,23 +135,23 @@ class AdminRelatorioGeralController extends Controller {
         $stmt->execute($params);
         $totais = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-        // Totais por status (agrupado por status + moeda para conversão correta)
+        // Totais por status (agrupado por status NORMALIZADO + moeda para conversão correta)
         $porStatusRaw = [];
+        $statusExpr = $this->buildStatusNormalizeExpr();
         $moedaSelect = ($colMoeda !== '') ? ", UPPER(COALESCE(p.{$colMoeda},'USD')) AS moeda" : ", 'USD' AS moeda";
-        $moedaGroup = ($colMoeda !== '') ? ", p.{$colMoeda}" : '';
-        $sqlStatus = "SELECT p.status{$moedaSelect}, COUNT(*) AS qtd, COALESCE(SUM(p.{$colTotal}), 0) AS total"
+        $moedaGroup = ($colMoeda !== '') ? ", UPPER(COALESCE(p.{$colMoeda},'USD'))" : '';
+        $sqlStatus = "SELECT {$statusExpr} AS status{$moedaSelect}, COUNT(*) AS qtd, COALESCE(SUM(p.{$colTotal}), 0) AS total"
             . ($colSubtotal ? ", COALESCE(SUM(p.{$colSubtotal}), 0) AS subtotal" : '')
             . ($colServicos ? ", COALESCE(SUM(p.{$colServicos}), 0) AS servicos" : '')
             . ($colImpostos ? ", COALESCE(SUM(p.{$colImpostos}), 0) AS impostos" : '')
             . ($colFrete ? ", COALESCE(SUM(p.{$colFrete}), 0) AS frete" : '')
             . ($colImpostoLocal ? ", COALESCE(SUM(p.{$colImpostoLocal}), 0) AS imposto_local" : '')
-            . " FROM pedidos p WHERE {$whereStr} GROUP BY p.status{$moedaGroup} ORDER BY p.status, moeda";
+            . " FROM pedidos p WHERE {$whereStr} GROUP BY {$statusExpr}{$moedaGroup} ORDER BY status, moeda";
         $stmt2 = $this->db->prepare($sqlStatus);
         $stmt2->execute($params);
         $porStatusRaw = $stmt2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        // Consolidar por status (converter USD→BRL usando taxa)
-        // Será feito na view com acesso à $taxaUsdBrl
+        // Consolidar por status (converter USD→BRL usando taxa — feito na view)
         $porStatus = $porStatusRaw;
 
         // Totais por moeda
@@ -117,12 +179,8 @@ class AdminRelatorioGeralController extends Controller {
             $porPagamento = $stmt4->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         }
 
-        // Status disponíveis para filtro
-        $statusList = [];
-        try {
-            $st = $this->db->query("SELECT DISTINCT status FROM pedidos WHERE status IS NOT NULL AND status != '' ORDER BY status");
-            $statusList = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
-        } catch (\Exception $e) {}
+        // Status disponíveis para filtro — usar lista canônica do sistema
+        $statusList = self::getStatusList();
 
         // Taxa de conversão USD→BRL do sistema
         $taxaUsdBrl = 5.85;

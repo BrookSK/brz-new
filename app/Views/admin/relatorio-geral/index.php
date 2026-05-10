@@ -8,7 +8,7 @@ $taxaUsdBrl = (float)($taxaUsdBrl ?? 5.5);
 $statusList = $statusList ?? [];
 $dateStart = $dateStart ?? date('Y-m-01');
 $dateEnd = $dateEnd ?? date('Y-m-d');
-$statusFilter = $statusFilter ?? '';
+$statusFilter = $statusFilter ?? [];
 $moedaFilter = $moedaFilter ?? '';
 
 $usd = $totaisPorMoedaCards['USD'] ?? [];
@@ -42,14 +42,14 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                     <label class="form-label small fw-semibold">Data Fim</label>
                     <input type="date" name="date_end" class="form-control" value="<?= htmlspecialchars($dateEnd) ?>">
                 </div>
-                <div class="col-md-2 col-sm-6">
+                <div class="col-md-3 col-sm-6">
                     <label class="form-label small fw-semibold">Status</label>
-                    <select name="status" class="form-select">
-                        <option value="">Todos</option>
-                        <?php foreach ($statusList as $s): ?>
-                        <option value="<?= htmlspecialchars($s) ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $s))) ?></option>
+                    <select name="status[]" class="form-select" multiple size="4" style="min-height:38px;">
+                        <?php foreach ($statusList as $key => $label): ?>
+                        <option value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $statusFilter) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <div class="form-text" style="font-size:.7rem;">Ctrl+click para selecionar múltiplos</div>
                 </div>
                 <div class="col-md-2 col-sm-6">
                     <label class="form-label small fw-semibold">Moeda</label>
@@ -148,6 +148,8 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                 </div>
                 <div class="card-body p-0">
                     <?php
+                    // Mapa de labels canônicos para exibição na tabela
+                    $statusLabels = $statusList;
                     // Consolidar porStatus (que vem agrupado por status+moeda) em uma linha por status, convertendo USD→BRL
                     $statusConsolidado = [];
                     foreach ($porStatus as $row) {
@@ -187,8 +189,8 @@ function totalEmBrl($usdRow, $brlRow, $campo, $taxa) {
                                 <?php foreach ($statusConsolidado as $row): ?>
                                 <tr>
                                     <td>
-                                        <a href="/admin/relatorio-geral?date_start=<?= $dateStart ?>&date_end=<?= $dateEnd ?>&status=<?= urlencode($row['status'] ?? '') ?>&moeda=<?= urlencode($moedaFilter) ?>" class="text-decoration-none">
-                                            <span class="badge bg-secondary bg-opacity-10 text-dark"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $row['status'] ?? 'N/A'))) ?></span>
+                                        <a href="/admin/relatorio-geral?date_start=<?= $dateStart ?>&date_end=<?= $dateEnd ?>&status[]=<?= urlencode($row['status'] ?? '') ?>&moeda=<?= urlencode($moedaFilter) ?>" class="text-decoration-none">
+                                            <span class="badge bg-secondary bg-opacity-10 text-dark"><?= htmlspecialchars($statusLabels[$row['status']] ?? ucfirst(str_replace('_', ' ', $row['status'] ?? 'N/A'))) ?></span>
                                         </a>
                                     </td>
                                     <td class="text-end"><?= (int)($row['qtd'] ?? 0) ?></td>
