@@ -42,7 +42,7 @@
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
-                                <tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Prod. (Câmbio)</th><th>Taxa (Câmbio Real Taxas)</th><th>Status</th><th>Ações</th></tr>
+                                <tr><th>#</th><th>Vencimento</th><th>Valor</th><th class="d-none d-lg-table-cell">Prod. (Câmbio)</th><th class="d-none d-lg-table-cell">Taxa (CR Taxas)</th><th>Status</th><th>Ações</th></tr>
                             </thead>
                             <tbody>
                             <?php foreach ($carne['parcelas'] as $p): ?>
@@ -50,8 +50,8 @@
                                     <td><?= $p['numero_parcela'] ?></td>
                                     <td><?= date('d/m/Y', strtotime($p['vencimento'])) ?></td>
                                     <td>R$ <?= number_format($p['valor_total'], 2, ',', '.') ?></td>
-                                    <td><span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_produtos'], 2, ',', '.') ?> <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?></span></td>
-                                    <td><span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?> <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?></span></td>
+                                    <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $p['boleto_produtos_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_produtos'], 2, ',', '.') ?> <?= $p['boleto_produtos_pago'] ? '✓' : '⏳' ?></span></td>
+                                    <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $p['boleto_taxas_pago'] ? 'success' : 'warning' ?>">R$ <?= number_format($p['valor_taxas'], 2, ',', '.') ?> <?= $p['boleto_taxas_pago'] ? '✓' : '⏳' ?></span></td>
                                     <td><span class="badge bg-<?= $p['status'] === 'paga' ? 'success' : ($p['status'] === 'em_atraso' ? 'danger' : 'secondary') ?>"><?= ucfirst(str_replace('_', ' ', $p['status'])) ?></span></td>
                                     <td>
                                         <form method="POST" action="/admin/carnes/reemitir-boleto/<?= $p['id'] ?>" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-warning" title="Reemitir"><i class="fas fa-redo"></i></button></form>

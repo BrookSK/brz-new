@@ -32,7 +32,7 @@
             <div class="table-responsive">
                 <table class="table table-hover table-sm mb-0">
                     <thead class="table-light">
-                        <tr><th>Pedido</th><th>Cliente</th><th>Total Carnê</th><th>Parcelas</th><th>Status Carnê</th><th>1ª Parcela</th><th>Status Compra</th><th>Ações</th></tr>
+                        <tr><th>Pedido</th><th class="d-none d-md-table-cell">Cliente</th><th class="d-none d-lg-table-cell">Total Carnê</th><th>Parcelas</th><th class="d-none d-lg-table-cell">Status Carnê</th><th class="d-none d-md-table-cell">1ª Parcela</th><th>Status</th><th>Ações</th></tr>
                     </thead>
                     <tbody>
                         <?php if (empty($compras)): ?>
@@ -41,11 +41,11 @@
                             <?php foreach ($compras as $ci): ?>
                             <tr>
                                 <td><a href="/admin/pedidos/detalhes/<?= $ci['pedido_id'] ?>">#<?= $ci['pedido_id'] ?></a></td>
-                                <td><?= htmlspecialchars($ci['cliente_nome']) ?></td>
-                                <td>R$ <?= number_format($ci['total_geral'], 2, ',', '.') ?></td>
+                                <td class="d-none d-md-table-cell"><?= htmlspecialchars($ci['cliente_nome']) ?></td>
+                                <td class="d-none d-lg-table-cell">R$ <?= number_format($ci['total_geral'], 2, ',', '.') ?></td>
                                 <td><?= $ci['quantidade_parcelas'] ?>x</td>
-                                <td><span class="badge bg-primary"><?= ucfirst(str_replace('_', ' ', $ci['carne_status'])) ?></span></td>
-                                <td><span class="badge bg-<?= ($ci['status_primeira_parcela'] ?? '') === 'paga' ? 'success' : 'warning' ?>"><?= ucfirst(str_replace('_', ' ', $ci['status_primeira_parcela'] ?? 'pendente')) ?></span></td>
+                                <td class="d-none d-lg-table-cell"><span class="badge bg-primary"><?= ucfirst(str_replace('_', ' ', $ci['carne_status'])) ?></span></td>
+                                <td class="d-none d-md-table-cell"><span class="badge bg-<?= ($ci['status_primeira_parcela'] ?? '') === 'paga' ? 'success' : 'warning' ?>"><?= ucfirst(str_replace('_', ' ', $ci['status_primeira_parcela'] ?? 'pendente')) ?></span></td>
                                 <td><span class="badge bg-info"><?= ucfirst(str_replace('_', ' ', $ci['status'])) ?></span></td>
                                 <td>
                                     <a href="/admin/carnes/detalhes/<?= $ci['carne_id'] ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>

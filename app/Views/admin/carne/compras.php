@@ -14,17 +14,17 @@
 
     <!-- Stats -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold"><?= (int) ($stats['total'] ?? 0) ?></div><div class="text-muted small">Total Itens</div></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold text-warning"><?= (int) ($stats['aguardando'] ?? 0) ?></div><div class="text-muted small">Aguardando</div></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold text-success"><?= (int) ($stats['comprado'] ?? 0) ?></div><div class="text-muted small">Comprados</div></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold text-info"><?= (int) ($stats['recebido'] ?? 0) ?></div><div class="text-muted small">Recebidos</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold"><?= (int) ($stats['total'] ?? 0) ?></div><div class="text-muted small">Total Itens</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold text-warning"><?= (int) ($stats['aguardando'] ?? 0) ?></div><div class="text-muted small">Aguardando</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold text-success"><?= (int) ($stats['comprado'] ?? 0) ?></div><div class="text-muted small">Comprados</div></div></div></div>
+        <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-3 text-center"><div class="fs-3 fw-bold text-info"><?= (int) ($stats['recebido'] ?? 0) ?></div><div class="text-muted small">Recebidos</div></div></div></div>
     </div>
 
     <!-- Filtro -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-2">
+                <div class="col-6 col-md-2">
                     <label class="form-label small">Status da Compra</label>
                     <select name="status" class="form-select form-select-sm">
                         <option value="">Todos</option>
@@ -33,7 +33,7 @@
                         <option value="recebido" <?= ($filtroStatus ?? '') === 'recebido' ? 'selected' : '' ?>>Recebido</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-6 col-md-3">
                     <label class="form-label small">Tipo / 1a Parcela</label>
                     <select name="tipo" class="form-select form-select-sm">
                         <option value="">Todos</option>
@@ -43,7 +43,7 @@
                         <option value="com_atraso" <?= ($filtroTipo ?? '') === 'com_atraso' ? 'selected' : '' ?>>Com atraso</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-6 col-md-2">
                     <label class="form-label small">Parcelas</label>
                     <select name="parcelas" class="form-select form-select-sm">
                         <option value="">Todas</option>
@@ -52,7 +52,7 @@
                         <?php endfor; ?>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-6 col-md-2">
                     <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
                     <a href="/admin/carnes/compras" class="btn btn-sm btn-outline-secondary ms-1"><i class="fas fa-times"></i></a>
                 </div>
@@ -78,13 +78,13 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Produto</th>
-                                <th>Cliente</th>
-                                <th>Carnê (Parcelas)</th>
-                                <th>Status Carnê</th>
-                                <th>Início</th>
-                                <th>Fim Estimado</th>
-                                <th>Status Compra</th>
-                                <th class="text-end" style="min-width:100px;">Ações</th>
+                                <th class="d-none d-md-table-cell">Cliente</th>
+                                <th>Carnê</th>
+                                <th class="d-none d-lg-table-cell">Status Carnê</th>
+                                <th class="d-none d-xl-table-cell">Início</th>
+                                <th class="d-none d-xl-table-cell">Fim Estimado</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -112,7 +112,7 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="small"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></td>
+                                <td class="d-none d-md-table-cell small"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></td>
                                 <td>
                                     <span class="badge bg-light text-dark"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span>
                                     <?php
@@ -128,9 +128,9 @@
                                         <div style="font-size:10px;" class="text-danger"><i class="fas fa-times-circle"></i> 1ª pendente</div>
                                     <?php endif; ?>
                                 </td>
-                                <td><span class="badge bg-<?= $carneStatus === 'quitado' ? 'success' : ($carneStatus === 'com_atraso' ? 'danger' : 'primary') ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $carneStatus)) ?></span></td>
-                                <td class="small text-muted"><?= !empty($ci['data_inicio']) ? date('d/m/Y', strtotime($ci['data_inicio'])) : '-' ?></td>
-                                <td class="small text-muted"><?= !empty($ci['data_fim_estimada']) ? date('d/m/Y', strtotime($ci['data_fim_estimada'])) : '-' ?></td>
+                                <td class="d-none d-lg-table-cell"><span class="badge bg-<?= $carneStatus === 'quitado' ? 'success' : ($carneStatus === 'com_atraso' ? 'danger' : 'primary') ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $carneStatus)) ?></span></td>
+                                <td class="d-none d-xl-table-cell small text-muted"><?= !empty($ci['data_inicio']) ? date('d/m/Y', strtotime($ci['data_inicio'])) : '-' ?></td>
+                                <td class="d-none d-xl-table-cell small text-muted"><?= !empty($ci['data_fim_estimada']) ? date('d/m/Y', strtotime($ci['data_fim_estimada'])) : '-' ?></td>
                                 <td><span class="badge bg-<?= $statusCompra === 'comprado' ? 'success' : ($statusCompra === 'recebido' ? 'info' : 'warning') ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $statusCompra)) ?></span></td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
