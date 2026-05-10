@@ -68,6 +68,17 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                 <span class="small">USD → BRL</span>
                 <span class="fw-bold"><?= fmtNum($taxaUsdBrl) ?></span>
             </div>
+            <div class="border rounded-pill px-2 py-1 d-flex align-items-center gap-1 bg-white">
+                <i class="fas fa-globe text-muted" style="font-size:11px;"></i>
+                <select id="global-view-currency" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 20px 0 4px;" onchange="applyGlobalView()">
+                    <option value="BRL">BRL</option>
+                    <option value="USD">USD</option>
+                </select>
+                <select id="global-view-lang" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 20px 0 4px;" onchange="applyGlobalView()">
+                    <option value="pt">PT</option>
+                    <option value="en">EN</option>
+                </select>
+            </div>
             <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i>Exportar</button>
         </div>
     </div>
@@ -210,8 +221,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                     <?php endif; ?>
                     <?php if ($vUsd > 0 || $vBrl > 0): ?>
                     <div class="mt-3 pt-2 border-top d-flex align-items-baseline justify-content-between">
-                        <span class="fw-bold small text-uppercase" style="color:<?= $borderColor ?>;font-size:11px;">Total em BRL</span>
-                        <span class="fw-bold fs-5" style="color:<?= $borderColor ?>;">R$ <?= fmtNum($convertidoBrl) ?></span>
+                        <span class="fw-bold small text-uppercase" style="color:<?= $borderColor ?>;font-size:11px;" data-i18n="total_em_brl">Total em BRL</span>
+                        <span class="fw-bold fs-5 fin-value" style="color:<?= $borderColor ?>;" data-value-brl="<?= $convertidoBrl ?>">R$ <?= fmtNum($convertidoBrl) ?></span>
                     </div>
                     <?php endif; ?>
                 <?php endif; ?>
@@ -248,12 +259,12 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                         <div class="col-lg-5">
                             <table class="table table-sm mb-0" style="font-size:13px;">
                                 <tbody>
-                                    <tr class="border-bottom"><td class="fw-bold text-success"><i class="fas fa-arrow-up me-1"></i>RECEITA BRUTA</td><td class="text-end fw-bold text-success fs-5"><?= fmtNum($receitaBruta) ?></td></tr>
+                                    <tr class="border-bottom"><td class="fw-bold text-success" data-i18n="receita_bruta"><i class="fas fa-arrow-up me-1"></i>RECEITA BRUTA</td><td class="text-end fw-bold text-success fs-5 fin-value" data-value-brl="<?= $receitaBruta ?>"><?= fmtNum($receitaBruta) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Subtotal produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Taxa de serviço</td><td class="text-end"><?= fmtNum($totalServicos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Impostos cobrados</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Frete</td><td class="text-end"><?= fmtNum($totalFrete) ?></td></tr>
-                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5"><?= fmtNum($totalDespesas) ?></td></tr>
+                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger" data-i18n="despesas_totais"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5 fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
                                     <tr><td class="ps-3 text-muted">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
                                     <?php endif; ?>
@@ -262,7 +273,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <?php endif; ?>
                                     <tr><td class="ps-3 text-muted">Pagas no período</td><td class="text-end"><?= fmtNum($despesasResumo['pago']) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Em aberto</td><td class="text-end"><?= fmtNum($despesasResumo['aberto']) ?></td></tr>
-                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;"><i class="fas fa-equals me-1"></i>RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
+                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;" data-i18n="resultado"><i class="fas fa-equals me-1"></i>RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?> fin-value" data-value-brl="<?= $lucroLiquido ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
                                     <tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge <?= $margemLucro >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $margemLucro ?>%</span></td></tr>
                                 </tbody>
                             </table>
@@ -523,6 +534,45 @@ function fmtCSV(v) {
     return (parseFloat(v) || 0).toFixed(2).replace('.', ',');
 }
 
+// === GLOBAL VIEW: Moeda + Idioma ===
+const TAXA_GLOBAL = <?= $taxaUsdBrl ?>;
+const LABELS_PT = {financeiro:'Financeiro',visao:'Visão consolidada de pedidos, receitas e impostos',total_pedidos:'Total de pedidos',periodo:'Período',total_geral:'Total geral',subtotal:'Subtotal produtos',servicos:'Taxa de serviço',impostos:'Impostos',imposto_local:'Imposto local',frete:'Frete',por_status:'Por Status',por_moeda:'Por Moeda',por_pagamento:'Por Pagamento',receita_bruta:'RECEITA BRUTA',despesas_totais:'DESPESAS TOTAIS',resultado:'RESULTADO LÍQUIDO',margem:'Margem',pagas:'Pagas no período',aberto:'Em aberto',despesas_cat:'Despesas por Categoria',ver_despesas:'Ver despesas',sem_valores:'Sem valores no período',total_em_brl:'Total em BRL'};
+const LABELS_EN = {financeiro:'Financial',visao:'Consolidated view of orders, revenue and taxes',total_pedidos:'Total orders',periodo:'Period',total_geral:'Grand total',subtotal:'Products subtotal',servicos:'Service fee',impostos:'Taxes',imposto_local:'Local tax',frete:'Shipping',por_status:'By Status',por_moeda:'By Currency',por_pagamento:'By Payment',receita_bruta:'GROSS REVENUE',despesas_totais:'TOTAL EXPENSES',resultado:'NET RESULT',margem:'Margin',pagas:'Paid in period',aberto:'Outstanding',despesas_cat:'Expenses by Category',ver_despesas:'View expenses',sem_valores:'No values in period',total_em_brl:'Total in BRL'};
+
+function applyGlobalView() {
+    const currency = document.getElementById('global-view-currency').value;
+    const lang = document.getElementById('global-view-lang').value;
+    const labels = lang === 'en' ? LABELS_EN : LABELS_PT;
+
+    // Converter todos os valores monetários na página
+    document.querySelectorAll('[data-value-brl]').forEach(el => {
+        const brl = parseFloat(el.getAttribute('data-value-brl')) || 0;
+        if (currency === 'USD') {
+            el.textContent = '$ ' + (brl / TAXA_GLOBAL).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        } else {
+            el.textContent = 'R$ ' + brl.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+        }
+    });
+
+    // Traduzir labels
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (labels[key]) el.textContent = labels[key];
+    });
+}
+
+// Marcar valores para conversão após o DOM carregar
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar data-value-brl aos elementos de valor que já existem
+    document.querySelectorAll('.fin-value').forEach(el => {
+        if (!el.hasAttribute('data-value-brl')) {
+            const text = el.textContent.replace(/[R$\s.]/g, '').replace(',', '.');
+            const val = parseFloat(text) || 0;
+            el.setAttribute('data-value-brl', val);
+        }
+    });
+});
+
 // === DRE COMPLETO ===
 let dreLoaded = false;
 document.getElementById('tab-dre').addEventListener('shown.bs.tab', function() {
@@ -598,24 +648,25 @@ function renderDreCompleto(d) {
     Object.values(gwMap).sort((a,b)=>b.total-a.total).forEach(g=>{h+='<tr><td><span class="d-inline-block rounded me-1" style="width:10px;height:10px;background:'+(gwColors[g.gateway]||'#6b7280')+';"></span>'+(gwNames[g.gateway]||g.gateway)+'</td><td class="text-end">'+g.qtd+'</td><td class="text-end fw-bold">'+fmtR(g.total)+'</td><td class="text-end"><span class="badge bg-success">'+g.aprovados+'</span></td><td class="text-end"><span class="badge bg-warning text-dark">'+g.pendentes+'</span></td><td class="text-end"><span class="badge bg-danger">'+g.rejeitados+'</span></td><td class="text-end"><span class="badge bg-secondary">'+g.estornados+'</span></td></tr>';});
     h += '</tbody></table></div></div></div>';
 
-    // Entradas de Pedidos (com paginação e filtro)
+    // Entradas de Pedidos (com "Ver mais" incremental)
     const pg = d.entradas_paginacao||{page:1,total:0,total_pages:1};
     const stFilter = d.status_filter_dre||'';
     h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between"><h6 class="fw-bold small mb-0"><i class="fas fa-shopping-cart me-2 text-muted"></i>Entradas de Pedidos <span class="badge bg-secondary ms-1">'+pg.total+'</span></h6>';
     h += '<div class="d-flex align-items-center gap-2"><select id="dre-status-filter" class="form-select form-select-sm" style="width:auto;font-size:11px;" onchange="dreFilterStatus(this.value)"><option value="">Todos os status</option>';
     ['pago','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue'].forEach(s=>{h+='<option value="'+s+'"'+(stFilter===s?' selected':'')+'>'+s.replace(/_/g,' ')+'</option>';});
     h += '</select></div></div>';
-    h += '<div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:11px;"><thead class="table-light"><tr><th>#</th><th>Data</th><th>Status</th><th>Gateway</th><th>Moeda</th><th class="text-end">Subtotal</th><th class="text-end">Taxas</th><th class="text-end">Impostos</th><th class="text-end fw-bold">Total</th></tr></thead><tbody>';
+    h += '<div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:11px;"><thead class="table-light"><tr><th>#</th><th>Data</th><th>Status</th><th>Gateway</th><th>Moeda</th><th class="text-end">Subtotal</th><th class="text-end">Taxas</th><th class="text-end">Impostos</th><th class="text-end fw-bold">Total</th></tr></thead><tbody id="dre-pedidos-tbody">';
     (d.entradas_detalhadas||[]).forEach(p=>{h+='<tr><td class="fw-semibold">#'+p.id+'</td><td>'+(p.data_pedido||'').substring(0,10)+'</td><td><span class="badge bg-light text-dark border" style="font-size:9px;">'+(p.status||'')+'</span></td><td>'+(p.gateway||'-')+'</td><td>'+(p.moeda||'BRL')+'</td><td class="text-end">'+fmtR(p.subtotal)+'</td><td class="text-end">'+fmtR(p.servicos)+'</td><td class="text-end">'+fmtR(p.impostos)+'</td><td class="text-end fw-bold">'+fmtR(p.total)+'</td></tr>';});
     if(!(d.entradas_detalhadas||[]).length)h+='<tr><td colspan="9" class="text-center text-muted py-3">Nenhum pedido no período</td></tr>';
     h += '</tbody></table></div>';
-    // Paginação - botão "Ver mais"
-    if (pg.total_pages > 1 && pg.page < pg.total_pages) {
-        h += '<div class="text-center" style="margin-top:10px;padding-bottom:12px;"><button class="btn btn-sm btn-outline-primary rounded-pill px-4" onclick="dreChangePage('+(pg.page+1)+')"><i class="fas fa-chevron-down me-1"></i>Ver mais pedidos ('+pg.total+' total)</button></div>';
-    } else if (pg.page > 1) {
-        h += '<div class="text-center" style="margin-top:10px;padding-bottom:12px;"><button class="btn btn-sm btn-outline-secondary rounded-pill px-4" onclick="dreChangePage(1)"><i class="fas fa-chevron-up me-1"></i>Voltar ao início</button></div>';
+    // Botão "Ver mais" (append, não substitui)
+    if (pg.total > pg.page * pg.per_page) {
+        h += '<div class="text-center" style="margin-top:10px;padding-bottom:12px;" id="dre-ver-mais-wrap"><button class="btn btn-sm btn-outline-primary rounded-pill px-4" onclick="dreLoadMorePedidos()" id="dre-ver-mais-btn"><i class="fas fa-chevron-down me-1"></i>Ver mais pedidos ('+pg.total+' total)</button></div>';
     }
     h += '</div></div>';
+    window._dreNextPage = (pg.page||1) + 1;
+    window._dreTotalPages = pg.total_pages||1;
+    window._drePgTotal = pg.total||0;
 
     // Operacional por Pessoa/Mês
     h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-users me-2 text-muted"></i>Operacional — Pagamentos por Pessoa/Mês</h6></div><div class="card-body p-0"><div class="table-responsive">';
@@ -661,6 +712,34 @@ function dreFilterStatus(status) {
     dreCurrentStatus = status;
     dreCurrentPage = 1;
     loadDreCompletoWithParams();
+}
+function dreLoadMorePedidos() {
+    const ds = document.getElementById('dre-date-start').value;
+    const de = document.getElementById('dre-date-end').value;
+    const btn = document.getElementById('dre-ver-mais-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Carregando...'; }
+    let url = '/admin/dre-completo/dados?date_start=' + ds + '&date_end=' + de + '&page=' + window._dreNextPage;
+    if (dreCurrentStatus) url += '&status_dre=' + encodeURIComponent(dreCurrentStatus);
+    fetch(url).then(r=>r.json()).then(d=>{
+        if (!d.success) return;
+        const tbody = document.getElementById('dre-pedidos-tbody');
+        if (tbody && d.entradas_detalhadas) {
+            let rows = '';
+            d.entradas_detalhadas.forEach(p=>{rows+='<tr><td class="fw-semibold">#'+p.id+'</td><td>'+(p.data_pedido||'').substring(0,10)+'</td><td><span class="badge bg-light text-dark border" style="font-size:9px;">'+(p.status||'')+'</span></td><td>'+(p.gateway||'-')+'</td><td>'+(p.moeda||'BRL')+'</td><td class="text-end">'+fmtR(p.subtotal)+'</td><td class="text-end">'+fmtR(p.servicos)+'</td><td class="text-end">'+fmtR(p.impostos)+'</td><td class="text-end fw-bold">'+fmtR(p.total)+'</td></tr>';});
+            tbody.insertAdjacentHTML('beforeend', rows);
+        }
+        const pg2 = d.entradas_paginacao||{};
+        window._dreNextPage = (pg2.page||1) + 1;
+        // Esconder ou atualizar botão
+        const wrap = document.getElementById('dre-ver-mais-wrap');
+        if (wrap) {
+            if (window._dreNextPage > (pg2.total_pages||1)) {
+                wrap.innerHTML = '<span class="text-muted small">Todos os pedidos carregados</span>';
+            } else {
+                wrap.innerHTML = '<button class="btn btn-sm btn-outline-primary rounded-pill px-4" onclick="dreLoadMorePedidos()" id="dre-ver-mais-btn"><i class="fas fa-chevron-down me-1"></i>Ver mais pedidos ('+(pg2.total||0)+' total)</button>';
+            }
+        }
+    }).catch(()=>{ if(btn){btn.disabled=false;btn.innerHTML='Erro, tente novamente';} });
 }
 function loadDreCompletoWithParams() {
     const ds = document.getElementById('dre-date-start').value;

@@ -247,11 +247,106 @@ class AdminDreCompletoController extends Controller {
     }
 
     /**
-     * Exporta DRE completo como CSV com TODOS os pedidos e despesas
+     * Exporta DRE Gerencial — 10 blocos fixos
      */
     public function exportar(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin']);
+        $dateStart = $request->getParam('date_start', date('Y-01-01'));
+        $dateEnd = $request->getParam('date_end', date('Y-m-d'));
+        $cols = []; try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+        $pick = function($c) use ($cols) { foreach ($c as $x) { if (in_array($x, $cols, true)) return $x; } return ''; };
+        $colTotal=$pick(['total','valor_total']); $colSubtotal=$pick(['subtotal','subtotal_produtos']); $colServicos=$pick(['servicos','taxa_servico']); $colImpostos=$pick(['impostos','valor_impostos']); $colFrete=$pick(['frete','valor_frete']); $colMoeda=$pick(['moeda','currency']); $colStatus=$pick(['status']); $colPayGateway=$pick(['payment_gateway','gateway']); $colPayStatus=$pick(['payment_status']); $colFormaPgto=$pick(['forma_pagamento','payment_method']); $colCreatedAt=$pick(['created_at','data_criacao']); $colCliente=$pick(['cliente_nome','nome']); $colNumero=$pick(['numero_pedido','codigo_pedido']);
+        $delF = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
+        $taxaUsdBrl = 5.85; try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+        $fV = function($v) { return number_format((float)($v??0), 2, ',', ''); };
+        $toB = function($v, $m) use ($taxaUsdBrl) { return strtoupper(trim($m??'BRL'))==='USD' ? (float)$v*$taxaUsdBrl : (float)$v; };
+        $sep = ';';
+
+        // Buscar pedidos
+        $sql = "SELECT p.id".($colNumero?", p.{$colNumero} as numero":", '' as numero").", p.{$colCreatedAt} as dt".($colCliente?", p.{$colCliente} as cli":", '' as cli").", p.{$colStatus} as st".($colPayStatus?", p.{$colPayStatus} as ps":", '' as ps").($colPayGateway?", p.{$colPayGateway} as gw":", '' as gw").($colFormaPgto?", p.{$colFormaPgto} as fp":", '' as fp").($colMoeda?", p.{$colMoeda} as mo":", 'BRL' as mo").($colSubtotal?", p.{$colSubtotal} as sub":", 0 as sub").($colServicos?", p.{$colServicos} as srv":", 0 as srv").($colImpostos?", p.{$colImpostos} as imp":", 0 as imp").($colFrete?", p.{$colFrete} as frt":", 0 as frt").", p.{$colTotal} as tot FROM pedidos p WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY) AND LOWER(COALESCE(p.{$colStatus},'')) NOT IN ('apagado','deleted','lixeira','trash') {$delF} ORDER BY p.{$colCreatedAt} DESC";
+        $allP = []; try { $st = $this->db->prepare($sql); $st->execute([':ds'=>$dateStart,':de'=>$dateEnd]); $allP = $st->fetchAll(\PDO::FETCH_ASSOC)?:[]; } catch (\Exception $e) {}
+
+        $pDre=[]; $pFora=[];
+        foreach ($allP as $p) { $s=strtolower(trim($p['st']??'')); $ps=strtolower(trim($p['ps']??'')); if ($s==='pago' && in_array($ps,['approved','succeeded'],true)) $pDre[]=$p; else $pFora[]=$p; }
+
+        // Buscar despesas
+        $allD=[]; try { $st=$this->db->prepare("SELECT d.*,c.nome as cn FROM despesas d LEFT JOIN despesa_categorias c ON c.id=d.categoria_id WHERE d.competencia>=? AND d.competencia<=? AND d.deleted_at IS NULL ORDER BY d.vencimento"); $st->execute([$dateStart,$dateEnd]); $allD=$st->fetchAll(\PDO::FETCH_ASSOC)?:[]; } catch (\Exception $e) {}
+        $dDre=[]; $dFora=[];
+        foreach ($allD as $d) { if (strtolower(trim($d['status']??''))==='paga') $dDre[]=$d; else $dFora[]=$d; }
+
+        // Totais
+        $rec=0;$subT=0;$srvT=0;$impT=0;$frtT=0;
+        foreach ($pDre as $p) { $m=$p['mo']??'BRL'; $rec+=$toB($p['tot'],$m); $subT+=$toB($p['sub'],$m); $srvT+=$toB($p['srv'],$m); $impT+=$toB($p['imp'],$m); $frtT+=$toB($p['frt'],$m); }
+        $despR=0; $dCat=[];
+        foreach ($dDre as $d) { $v=$toB($d['valor'],$d['moeda']??'BRL'); $despR+=$v; $c=$d['cn']??'Sem categoria'; $dCat[$c]=($dCat[$c]??0)+$v; }
+        arsort($dCat);
+        $res=$rec-$despR; $mrg=$rec>0?round($res/$rec*100,2):0;
+
+        $fBS=[]; foreach ($pFora as $p) { $s=$p['st']??'?'; if(!isset($fBS[$s]))$fBS[$s]=['q'=>0,'v'=>0]; $fBS[$s]['q']++; $fBS[$s]['v']+=$toB($p['tot'],$p['mo']??'BRL'); }
+        $dBS=[]; foreach ($dFora as $d) { $s=$d['status']??'?'; if(!isset($dBS[$s]))$dBS[$s]=['q'=>0,'v'=>0]; $dBS[$s]['q']++; $dBS[$s]['v']+=$toB($d['valor'],$d['moeda']??'BRL'); }
+        $tfP=0;$tqP=0; foreach($fBS as $v){$tfP+=$v['v'];$tqP+=$v['q'];}
+        $tfD=0;$tqD=0; foreach($dBS as $v){$tfD+=$v['v'];$tqD+=$v['q'];}
+
+        $motP=function($p){$s=strtolower(trim($p['st']??''));$ps=strtolower(trim($p['ps']??''));if($s==='pagamento')return'Pagamento ainda nao confirmado';if($s==='carne_pagando')return'Carne em andamento';if($s==='pendente')return'Pedido pendente';if($s==='cancelado'||$s==='cancelled')return'Pedido cancelado';if($s==='processando')return'Em processamento';if($ps==='pending')return'Pagamento pendente';return'Status nao confirmado ('.$s.')';};
+        $motD=function($d){$s=strtolower(trim($d['status']??''));if($s==='prevista')return'Despesa prevista, ainda nao paga';if($s==='a_vencer')return'Despesa a vencer';if($s==='vencida')return'Despesa vencida, nao paga';if(empty($d['data_pagamento']))return'Sem pagamento realizado';return'Status: '.$s;};
+
+        // CSV
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="DRE_Gerencial_'.$dateStart.'_'.$dateEnd.'.csv"');
+        $o=fopen('php://output','w'); fprintf($o,chr(0xEF).chr(0xBB).chr(0xBF));
+        $w=function($l)use($o){fwrite($o,$l."\r\n");};
+
+        $w("DEMONSTRATIVO DE RESULTADO GERENCIAL - BRAZILIANA SHOP");
+        $w("Período{$sep}{$dateStart} a {$dateEnd}"); $w("Moeda do relatório{$sep}BRL"); $w("Taxa USD→BRL{$sep}".$fV($taxaUsdBrl)); $w("Gerado em{$sep}".date('d/m/Y H:i:s')); $w("");
+
+        $w("=== 1. RESUMO DA DRE REALIZADA ==="); $w("Descrição{$sep}Valor BRL");
+        $w("Receita realizada{$sep}".$fV($rec)); $w("(-) Despesas realizadas{$sep}".$fV($despR)); $w("(=) Resultado realizado{$sep}".$fV($res)); $w("Margem realizada{$sep}".$fV($mrg)."%"); $w("");
+
+        $w("=== 2. COMPOSIÇÃO DA RECEITA REALIZADA ==="); $w("Descrição{$sep}Valor BRL");
+        $w("Produtos{$sep}".$fV($subT)); $w("Serviços{$sep}".$fV($srvT)); $w("Impostos cobrados{$sep}".$fV($impT)); $w("Frete cobrado{$sep}".$fV($frtT)); $w("Total da receita realizada{$sep}".$fV($rec)); $w("Quantidade de pedidos pagos{$sep}".count($pDre)); $w("");
+
+        $w("=== 3. COMPOSIÇÃO DAS DESPESAS REALIZADAS ==="); $w("Categoria{$sep}Valor BRL");
+        foreach($dCat as $c=>$v)$w(str_replace($sep,' ',$c).$sep.$fV($v));
+        $w("TOTAL DESPESAS REALIZADAS{$sep}".$fV($despR)); $w("Quantidade de despesas pagas{$sep}".count($dDre)); $w("");
+
+        $w("=== 4. PEDIDOS CONSIDERADOS NA RECEITA REALIZADA ===");
+        $w("ID{$sep}Numero{$sep}Data{$sep}Cliente{$sep}Status{$sep}Status Pgto{$sep}Gateway{$sep}Forma Pgto{$sep}Moeda{$sep}Subtotal{$sep}Servicos{$sep}Impostos{$sep}Frete{$sep}Total{$sep}Total BRL");
+        foreach($pDre as $p){$m=strtoupper(trim($p['mo']??'BRL'));$w($p['id'].$sep.str_replace($sep,' ',$p['numero']??'').$sep.substr($p['dt']??'',0,10).$sep.str_replace($sep,' ',$p['cli']??'').$sep.($p['st']??'').$sep.($p['ps']??'').$sep.($p['gw']??'').$sep.($p['fp']??'').$sep.$m.$sep.$fV($p['sub']).$sep.$fV($p['srv']).$sep.$fV($p['imp']).$sep.$fV($p['frt']).$sep.$fV($p['tot']).$sep.$fV($toB($p['tot'],$m)));}
+        $w("TOTAL PEDIDOS CONSIDERADOS{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}".$fV($rec)); $w("");
+
+        $w("=== 5. DESPESAS CONSIDERADAS NO RESULTADO REALIZADO ===");
+        $w("ID{$sep}Descrição{$sep}Categoria{$sep}Tipo{$sep}Favorecido{$sep}Competência{$sep}Vencimento{$sep}Pagamento{$sep}Moeda{$sep}Valor{$sep}Valor BRL{$sep}Status{$sep}Origem");
+        foreach($dDre as $d){$m=strtoupper(trim($d['moeda']??'BRL'));$w($d['id'].$sep.str_replace($sep,' ',$d['descricao']??'').$sep.str_replace($sep,' ',$d['cn']??'').$sep.($d['tipo']??'').$sep.str_replace($sep,' ',$d['favorecido']??'').$sep.($d['competencia']?date('m/Y',strtotime($d['competencia'])):'').$sep.($d['vencimento']?date('d/m/Y',strtotime($d['vencimento'])):'').$sep.($d['data_pagamento']?date('d/m/Y',strtotime($d['data_pagamento'])):'').$sep.$m.$sep.$fV($d['valor']).$sep.$fV($toB($d['valor'],$m)).$sep.($d['status']??'').$sep.($d['origem']??''));}
+        $w("TOTAL DESPESAS CONSIDERADAS{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}".$fV($despR).$sep.$fV($despR)."{$sep}{$sep}"); $w("");
+
+        $w("=== 6. PEDIDOS FORA DA RECEITA REALIZADA ==="); $w("Status{$sep}Quantidade{$sep}Valor BRL");
+        foreach($fBS as $s=>$v)$w(str_replace($sep,' ',$s).$sep.$v['q'].$sep.$fV($v['v']));
+        $w("TOTAL FORA DA RECEITA REALIZADA{$sep}{$tqP}{$sep}".$fV($tfP)); $w("");
+
+        $w("=== 7. DESPESAS FORA DO RESULTADO REALIZADO ==="); $w("Status{$sep}Quantidade{$sep}Valor BRL");
+        foreach($dBS as $s=>$v)$w(str_replace($sep,' ',$s).$sep.$v['q'].$sep.$fV($v['v']));
+        $w("TOTAL FORA DO RESULTADO REALIZADO{$sep}{$tqD}{$sep}".$fV($tfD)); $w("");
+
+        $w("=== 8. DETALHAMENTO DOS PEDIDOS EXCLUÍDOS DA DRE ===");
+        $w("ID{$sep}Numero{$sep}Data{$sep}Cliente{$sep}Status{$sep}Status Pgto{$sep}Gateway{$sep}Forma Pgto{$sep}Moeda{$sep}Subtotal{$sep}Servicos{$sep}Impostos{$sep}Frete{$sep}Total{$sep}Total BRL{$sep}Motivo da exclusão");
+        foreach($pFora as $p){$m=strtoupper(trim($p['mo']??'BRL'));$w($p['id'].$sep.str_replace($sep,' ',$p['numero']??'').$sep.substr($p['dt']??'',0,10).$sep.str_replace($sep,' ',$p['cli']??'').$sep.($p['st']??'').$sep.($p['ps']??'').$sep.($p['gw']??'').$sep.($p['fp']??'').$sep.$m.$sep.$fV($p['sub']).$sep.$fV($p['srv']).$sep.$fV($p['imp']).$sep.$fV($p['frt']).$sep.$fV($p['tot']).$sep.$fV($toB($p['tot'],$m)).$sep.$motP($p));}
+        $w("");
+
+        $w("=== 9. DETALHAMENTO DAS DESPESAS EXCLUÍDAS DA DRE ===");
+        $w("ID{$sep}Descrição{$sep}Categoria{$sep}Tipo{$sep}Favorecido{$sep}Competência{$sep}Vencimento{$sep}Pagamento{$sep}Moeda{$sep}Valor{$sep}Valor BRL{$sep}Status{$sep}Origem{$sep}Motivo da exclusão");
+        foreach($dFora as $d){$m=strtoupper(trim($d['moeda']??'BRL'));$w($d['id'].$sep.str_replace($sep,' ',$d['descricao']??'').$sep.str_replace($sep,' ',$d['cn']??'').$sep.($d['tipo']??'').$sep.str_replace($sep,' ',$d['favorecido']??'').$sep.($d['competencia']?date('m/Y',strtotime($d['competencia'])):'').$sep.($d['vencimento']?date('d/m/Y',strtotime($d['vencimento'])):'').$sep.($d['data_pagamento']?date('d/m/Y',strtotime($d['data_pagamento'])):'').$sep.$m.$sep.$fV($d['valor']).$sep.$fV($toB($d['valor'],$m)).$sep.($d['status']??'').$sep.($d['origem']??'').$sep.$motD($d));}
+        $w("");
+
+        $w("=== 10. CONCILIAÇÃO DO PERÍODO ==="); $w("Descrição{$sep}Valor BRL");
+        $w("Entradas realizadas{$sep}".$fV($rec)); $w("Saídas realizadas{$sep}".$fV($despR)); $w("Saldo realizado do período{$sep}".$fV($res));
+        $w("Pedidos ainda não realizados{$sep}".$fV($tfP)); $w("Despesas ainda não realizadas{$sep}".$fV($tfD));
+        $w("Quantidade de pedidos pagos{$sep}".count($pDre)); $w("Quantidade de pedidos fora da DRE{$sep}{$tqP}");
+        $w("Quantidade de despesas pagas{$sep}".count($dDre)); $w("Quantidade de despesas fora da DRE{$sep}{$tqD}");
+
+        fclose($o); exit;
+    }
+}
 
         $dateStart = $request->getParam('date_start', date('Y-01-01'));
         $dateEnd = $request->getParam('date_end', date('Y-m-d'));

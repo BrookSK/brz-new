@@ -27,6 +27,10 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                 <i class="fas fa-arrow-down text-danger" style="font-size:10px;"></i><span class="text-muted">Saídas hoje</span><span class="fw-bold"><?= fmtD($stats['vencido'] ?? 0) ?></span>
             </div>
             <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i>Exportar</button>
+            <div class="border rounded-pill px-2 py-1 d-flex align-items-center gap-1 bg-white">
+                <select id="desp-view-currency" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 18px 0 4px;" onchange="applyDespView()"><option value="BRL">BRL</option><option value="USD">USD</option></select>
+                <select id="desp-view-lang" class="form-select form-select-sm border-0 bg-transparent" style="width:auto;font-size:11px;padding:0 18px 0 4px;" onchange="applyDespView()"><option value="pt">PT</option><option value="en">EN</option></select>
+            </div>
             <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i>Nova despesa</button>
         </div>
     </div>
@@ -49,12 +53,12 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <?php if ($tab === 'visao-geral'): ?>
     <!-- VISÃO GERAL -->
     <div class="row g-3 mb-4">
-        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #3b82f6;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-chart-pie text-primary"></i><span class="small fw-semibold">Despesas do mês</span></div><div class="fs-4 fw-bold"><?= fmtD($stats['total_mes']) ?></div></div></div></div>
-        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #10b981;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-check-circle text-success"></i><span class="small fw-semibold">Pago no mês</span></div><div class="fs-4 fw-bold text-success"><?= fmtD($stats['pago_mes']) ?></div><div class="text-muted small"><?= ($stats['total_mes'] > 0) ? round($stats['pago_mes'] / $stats['total_mes'] * 100, 1) : 0 ?>% do total quitado</div></div></div></div>
-        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #f59e0b;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-clock text-warning"></i><span class="small fw-semibold">Em aberto</span></div><div class="fs-4 fw-bold text-warning"><?= fmtD($stats['aberto']) ?></div><div class="text-muted small"><?= $stats['qtd_aberto'] ?> lançamentos a vencer</div></div></div></div>
-        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #ef4444;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-exclamation-triangle text-danger"></i><span class="small fw-semibold">Vencido</span></div><div class="fs-4 fw-bold text-danger"><?= fmtD($stats['vencido']) ?></div><div class="text-muted small"><?= $stats['qtd_vencido'] ?> lançamentos em atraso</div></div></div></div>
-        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #6366f1;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-calendar-alt text-indigo"></i><span class="small fw-semibold">Próximos 30 dias</span></div><div class="fs-4 fw-bold"><?= fmtD($stats['proximos_30']) ?></div><div class="text-muted small"><?= $stats['qtd_proximos'] ?> compromissos previstos</div></div></div></div>
-        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #8b5cf6;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-hand-holding-usd text-purple"></i><span class="small fw-semibold">Comissões a pagar</span></div><div class="fs-4 fw-bold"><?= fmtD($stats['comissoes']) ?></div><div class="text-muted small"><?= $stats['qtd_comissoes'] ?> pendentes</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #3b82f6;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-chart-pie text-primary"></i><span class="small fw-semibold" data-desp-i18n="desp_mes">Despesas do mês</span></div><div class="fs-4 fw-bold desp-val" data-brl="<?= (float)$stats['total_mes'] ?>"><?= fmtD($stats['total_mes']) ?></div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #10b981;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-check-circle text-success"></i><span class="small fw-semibold" data-desp-i18n="pago_mes">Pago no mês</span></div><div class="fs-4 fw-bold text-success desp-val" data-brl="<?= (float)$stats['pago_mes'] ?>"><?= fmtD($stats['pago_mes']) ?></div><div class="text-muted small"><?= ($stats['total_mes'] > 0) ? round($stats['pago_mes'] / $stats['total_mes'] * 100, 1) : 0 ?>% do total quitado</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #f59e0b;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-clock text-warning"></i><span class="small fw-semibold" data-desp-i18n="aberto">Em aberto</span></div><div class="fs-4 fw-bold text-warning desp-val" data-brl="<?= (float)$stats['aberto'] ?>"><?= fmtD($stats['aberto']) ?></div><div class="text-muted small"><?= $stats['qtd_aberto'] ?> lançamentos a vencer</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #ef4444;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-exclamation-triangle text-danger"></i><span class="small fw-semibold" data-desp-i18n="vencido">Vencido</span></div><div class="fs-4 fw-bold text-danger desp-val" data-brl="<?= (float)$stats['vencido'] ?>"><?= fmtD($stats['vencido']) ?></div><div class="text-muted small"><?= $stats['qtd_vencido'] ?> lançamentos em atraso</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #6366f1;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-calendar-alt text-indigo"></i><span class="small fw-semibold" data-desp-i18n="prox30">Próximos 30 dias</span></div><div class="fs-4 fw-bold desp-val" data-brl="<?= (float)$stats['proximos_30'] ?>"><?= fmtD($stats['proximos_30']) ?></div><div class="text-muted small"><?= $stats['qtd_proximos'] ?> compromissos previstos</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #8b5cf6;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-hand-holding-usd text-purple"></i><span class="small fw-semibold" data-desp-i18n="comissoes">Comissões a pagar</span></div><div class="fs-4 fw-bold desp-val" data-brl="<?= (float)$stats['comissoes'] ?>"><?= fmtD($stats['comissoes']) ?></div><div class="text-muted small"><?= $stats['qtd_comissoes'] ?> pendentes</div></div></div></div>
     </div>
 
     <!-- Recorrências e Parcelamentos lado a lado -->
@@ -455,5 +459,19 @@ function updateValorLabel() {
 }
 function exportarDespesas() {
     window.location.href = '/admin/despesas?tab=todas&export=csv';
+}
+
+// Visualização moeda/idioma (apenas visual, não altera dados)
+const DESP_TAXA = <?= (float)($taxaUsdBrl ?? 5.85) ?>;
+function applyDespView() {
+    const cur = document.getElementById('desp-view-currency').value;
+    const lang = document.getElementById('desp-view-lang').value;
+    document.querySelectorAll('.desp-val').forEach(el => {
+        const brl = parseFloat(el.getAttribute('data-brl')) || 0;
+        if (cur === 'USD') el.textContent = '$ ' + (brl / DESP_TAXA).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+        else el.textContent = 'R$ ' + brl.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    });
+    const labels = lang === 'en' ? {desp_mes:'Month expenses',pago_mes:'Paid this month',aberto:'Outstanding',vencido:'Overdue',prox30:'Next 30 days',comissoes:'Commissions due'} : {desp_mes:'Despesas do mês',pago_mes:'Pago no mês',aberto:'Em aberto',vencido:'Vencido',prox30:'Próximos 30 dias',comissoes:'Comissões a pagar'};
+    document.querySelectorAll('[data-desp-i18n]').forEach(el => { const k = el.getAttribute('data-desp-i18n'); if (labels[k]) el.textContent = labels[k]; });
 }
 </script>

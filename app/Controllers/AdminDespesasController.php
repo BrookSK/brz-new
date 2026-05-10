@@ -58,6 +58,11 @@ class AdminDespesasController extends Controller {
 
         $data = compact('tab', 'filtros', 'categorias', 'stats', 'despesas', 'recorrencias', 'parcelamentos', 'comissoes');
 
+        // Taxa para conversão visual
+        $taxaUsdBrl = 5.85;
+        try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+        $data['taxaUsdBrl'] = $taxaUsdBrl;
+
         $title = 'Despesas';
         $sidebarActive = 'despesas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
