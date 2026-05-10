@@ -11,39 +11,46 @@ function initPlayer() {
     const video = document.getElementById('liveVideo');
     if (!video) return;
 
-    const url = PLAYBACK_URL || RECORDING_URL;
-    if (!url) return;
+    var url = PLAYBACK_URL || RECORDING_URL;
+    console.log('Player URL:', url);
+    
+    if (!url) {
+        console.log('No playback URL available');
+        return;
+    }
 
     // Sempre usar HLS (funciona com qualquer stream do Cloudflare)
     if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-        const hls = new Hls({
+        var hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
             liveSyncDurationCount: 3,
         });
         hls.loadSource(url);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.play().catch(() => {
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            console.log('HLS: Manifest parsed, playing...');
+            video.play().catch(function() {
                 video.muted = true;
                 video.play();
             });
         });
         hls.on(Hls.Events.ERROR, function(event, data) {
+            console.log('HLS error:', data.type, data.details);
             if (data.fatal) {
-                console.log('HLS fatal error, retrying in 3s...');
-                setTimeout(function() { hls.loadSource(url); }, 3000);
+                console.log('HLS fatal error, retrying in 5s...');
+                hls.destroy();
+                setTimeout(function() { initPlayer(); }, 5000);
             }
         });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari nativo
         video.src = url;
-        video.addEventListener('loadedmetadata', () => {
-            video.play().catch(() => { video.muted = true; video.play(); });
+        video.addEventListener('loadedmetadata', function() {
+            video.play().catch(function() { video.muted = true; video.play(); });
         });
     }
 
-    video.addEventListener('click', () => { video.muted = !video.muted; });
+    video.addEventListener('click', function() { video.muted = !video.muted; });
 }
 
 // ─── WHEP Player (WebRTC playback) ──────────────────────────
