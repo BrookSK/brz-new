@@ -59,7 +59,7 @@ class AdminBrindesController extends Controller {
                     . " LEFT JOIN produtos p ON p.id = i.produto_id"
                     . " LEFT JOIN pedidos ped ON ped.id = i.pedido_id"
                     . " LEFT JOIN usuarios u ON u.id = ped.usuario_id"
-                    . " WHERE i.is_brinde = 1"
+                    . " WHERE (i.is_brinde = 1 OR (COALESCE(i.preco_unitario, i.valor_unitario, 999) <= 0.02 AND i.produto_id IN (SELECT brinde_produto_id FROM produto_brindes)))"
                     . " ORDER BY i.id DESC LIMIT 200";
                 $st = $this->db->query($sql);
                 $vendasBrinde = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
