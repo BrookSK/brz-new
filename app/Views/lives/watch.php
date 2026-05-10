@@ -385,6 +385,14 @@ function startPolling() {
                     });
                 }
 
+                // Remover mensagens ocultas pelo admin
+                if (data.hidden_ids && data.hidden_ids.length > 0) {
+                    data.hidden_ids.forEach(function(hiddenId) {
+                        var el = document.querySelector('#chatMessages .chat-msg[data-id="' + hiddenId + '"]');
+                        if (el) el.remove();
+                    });
+                }
+
                 // Produto em destaque
                 if (data.featured) {
                     var pill = document.getElementById('featuredPill');

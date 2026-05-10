@@ -93,7 +93,7 @@ class LiveApiController {
 
         $sinceId = (int) ($request->getParam('since') ?? 0);
 
-        // Buscar mensagens novas
+        // Buscar mensagens novas (não ocultas)
         $pdo = \Config\Database::getConnection();
         $stmt = $pdo->prepare(
             "SELECT m.id, m.user_id, m.content, m.created_at, 
@@ -105,6 +105,15 @@ class LiveApiController {
         );
         $stmt->execute([':lid' => (int)$id, ':since' => $sinceId]);
         $messages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Buscar IDs de mensagens que foram ocultadas recentemente (para remover do cliente)
+        $stmtHidden = $pdo->prepare(
+            "SELECT id FROM live_chat_messages 
+             WHERE live_id = :lid AND hidden = 1 AND id > 0
+             ORDER BY id DESC LIMIT 50"
+        );
+        $stmtHidden->execute([':lid' => (int)$id]);
+        $hiddenIds = $stmtHidden->fetchAll(\PDO::FETCH_COLUMN);
 
         // Métricas
         $metrics = [
@@ -131,6 +140,7 @@ class LiveApiController {
         $this->json([
             'status' => $live['status'],
             'messages' => $messages,
+            'hidden_ids' => $hiddenIds,
             'metrics' => $metrics,
             'featured' => $featured,
         ]);
