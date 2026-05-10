@@ -23,7 +23,7 @@
 
             <!-- BLOCO 1 (ambos) -->
             <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">1. Identificação</h6></div><div class="card-body">
-                <div class="mb-3"><label class="form-label fw-semibold small">Nome do solicitante</label><input type="text" name="bloco1_solicitante" class="form-control req-field" placeholder="Seu nome completo"></div>
+                <div class="mb-3"><label class="form-label fw-semibold small">Solicitante</label><input type="text" name="bloco1_solicitante" class="form-control req-field" value="<?= htmlspecialchars($nomeUsuario ?? '') ?>" readonly style="background:#f8fafc;"></div>
                 <div class="mb-0"><label class="form-label fw-semibold small">Título da demanda</label><input type="text" name="bloco1_titulo" class="form-control req-field" placeholder="Ex: Produto grátis na primeira compra"></div>
             </div></div>
 

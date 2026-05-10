@@ -23,6 +23,12 @@ class AdminDemandasController extends Controller {
 
     public function nova(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
+        // Pegar nome do usuário logado
+        $nomeUsuario = '';
+        try {
+            $uid = $_SESSION['usuario_id'] ?? 0;
+            if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: ''); }
+        } catch (\Exception $e) {}
         $title = 'Nova Solicitação'; $sidebarActive = 'demandas-nova';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/nova.php'; $content = ob_get_clean();
