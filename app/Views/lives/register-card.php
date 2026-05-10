@@ -83,7 +83,7 @@ document.getElementById('cardForm').addEventListener('submit', function(e) {
     fetch('/api/me/payment-methods', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'gateway=development&token=tok_dev_' + Date.now() + '&brand=' + brand + '&last_four=' + lastFour + '&holder_name=' + encodeURIComponent(holderName) + '&expiry_month=' + (expiry[0] || '') + '&expiry_year=20' + (expiry[1] || '')
+        body: 'gateway=live_<?= $liveId ?>&token=tok_dev_' + Date.now() + '&brand=' + brand + '&last_four=' + lastFour + '&holder_name=' + encodeURIComponent(holderName) + '&expiry_month=' + (expiry[0] || '') + '&expiry_year=20' + (expiry[1] || '')
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {

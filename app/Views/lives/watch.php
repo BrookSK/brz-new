@@ -133,9 +133,11 @@ ob_start();
                                         <div class="card-body p-2">
                                             <small class="d-block text-dark mb-1" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= htmlspecialchars($p['display_name'] ?? '') ?></small>
                                             <strong class="text-danger d-block mb-2">R$ <?= number_format((float)($p['display_price'] ?? 0), 2, ',', '.') ?></strong>
-                                            <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-add-cart" data-id="<?= $p['product_id'] ?>" style="border-radius:8px;font-size:12px">
-                                                <i class="fas fa-cart-plus me-1"></i>Adicionar
-                                            </button>
+                                            <?php if (!$isActive): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-add-cart" data-id="<?= $p['product_id'] ?>" style="border-radius:8px;font-size:12px">
+                                                    <i class="fas fa-cart-plus me-1"></i>Adicionar
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>

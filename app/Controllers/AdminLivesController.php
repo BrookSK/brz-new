@@ -184,6 +184,15 @@ class AdminLivesController {
             return;
         }
 
+        // Deletar live input no Cloudflare
+        if (!empty($live['cf_live_input_id'])) {
+            try {
+                $this->streamService->deleteLiveInput($live['cf_live_input_id']);
+            } catch (\Exception $e) {
+                // Não bloquear exclusão se CF falhar
+            }
+        }
+
         $this->liveModel->delete($id);
         $this->jsonResponse(['success' => true]);
     }

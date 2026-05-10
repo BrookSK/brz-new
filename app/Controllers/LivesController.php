@@ -99,12 +99,16 @@ class LivesController {
         $perfil = $_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? 'cliente';
         $isAdmin = ($perfil === 'admin');
 
-        // Verificar se tem cartão cadastrado (obrigatório para clientes)
+        // Verificar se tem cartão cadastrado PARA ESTA LIVE
         $hasCard = false;
         $defaultCard = null;
         if ($isLoggedIn) {
             $paymentMethod = new \App\Models\CustomerPaymentMethod();
-            $defaultCard = $paymentMethod->getDefault($userId);
+            // Buscar cartão vinculado a esta live específica
+            $pdo = \Config\Database::getConnection();
+            $stCard = $pdo->prepare("SELECT * FROM customer_payment_methods WHERE user_id = ? AND gateway = ? ORDER BY id DESC LIMIT 1");
+            $stCard->execute([$userId, 'live_' . $id]);
+            $defaultCard = $stCard->fetch(\PDO::FETCH_ASSOC);
             $hasCard = !empty($defaultCard);
         }
 
@@ -114,7 +118,7 @@ class LivesController {
             exit;
         }
 
-        // Se é cliente (não admin) e não tem cartão → mostrar página de cadastro de cartão
+        // Se é cliente (não admin) e não tem cartão PARA ESTA LIVE → mostrar página de cadastro
         if (!$isAdmin && !$hasCard) {
             $title = 'Cadastrar Cartão - ' . $live['title'];
             $liveId = $id;
