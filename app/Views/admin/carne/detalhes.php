@@ -80,6 +80,42 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Produtos do Pedido -->
+            <?php if (!empty($itensPedido)): ?>
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header"><h6 class="mb-0"><i class="fas fa-box-open me-2"></i>Produtos do Pedido</h6></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr><th>Produto</th><th class="text-center">Qtd</th><th class="text-end">Preço Unit.</th><th class="text-end">Subtotal</th></tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($itensPedido as $item): ?>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <?php if (!empty($item['produto_imagem'])): ?>
+                                                <img src="<?= htmlspecialchars($item['produto_imagem']) ?>" class="rounded border" style="width:40px;height:40px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                                <div class="rounded bg-light align-items-center justify-content-center" style="width:40px;height:40px;display:none;"><i class="fas fa-image text-muted"></i></div>
+                                            <?php else: ?>
+                                                <div class="rounded bg-light d-flex align-items-center justify-content-center" style="width:40px;height:40px;"><i class="fas fa-image text-muted"></i></div>
+                                            <?php endif; ?>
+                                            <span class="fw-semibold small"><?= htmlspecialchars($item['nome_display'] ?? 'Produto') ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center"><?= (int)($item['quantidade'] ?? 1) ?></td>
+                                    <td class="text-end"><?= isset($item['preco_unitario']) ? 'R$ ' . number_format((float)$item['preco_unitario'], 2, ',', '.') : '-' ?></td>
+                                    <td class="text-end"><?= isset($item['subtotal']) ? 'R$ ' . number_format((float)$item['subtotal'], 2, ',', '.') : '-' ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- Sidebar Ações -->

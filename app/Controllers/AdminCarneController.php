@@ -185,6 +185,64 @@ class AdminCarneController extends Controller {
         $stmt->execute([':cid' => $id]);
         $compraInterna = $stmt->fetch(\PDO::FETCH_ASSOC);
 
+        // Carregar itens do pedido com foto do produto
+        $itensPedido = [];
+        $pedidoId = (int)($carne['pedido_id'] ?? 0);
+        if ($pedidoId > 0) {
+            try {
+                $itensTable = 'pedido_itens';
+                $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT->execute(['pedido_itens']);
+                if ((int)$stT->fetchColumn() === 0) {
+                    $stT->execute(['pedido_items']);
+                    if ((int)$stT->fetchColumn() > 0) $itensTable = 'pedido_items';
+                }
+
+                $colsItens = [];
+                try { $st = $this->db->query("DESCRIBE {$itensTable}"); $colsItens = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $colProdId = in_array('produto_id', $colsItens, true) ? 'produto_id' : 'product_id';
+                $colQtd = in_array('quantidade', $colsItens, true) ? 'quantidade' : 'qty';
+                $colNome = in_array('nome_produto', $colsItens, true) ? 'nome_produto' : (in_array('product_name', $colsItens, true) ? 'product_name' : '');
+                $colPreco = in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : (in_array('price', $colsItens, true) ? 'price' : '');
+                $colSubtotal = in_array('subtotal', $colsItens, true) ? 'subtotal' : '';
+
+                $colsProd = [];
+                try { $st = $this->db->query("DESCRIBE produtos"); $colsProd = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $colProdNome = in_array('name', $colsProd, true) ? 'name' : (in_array('nome', $colsProd, true) ? 'nome' : 'name');
+                $colProdFoto = in_array('foto_principal', $colsProd, true) ? 'foto_principal' : (in_array('imagem', $colsProd, true) ? 'imagem' : '');
+
+                $selectCols = "it.{$colProdId} as produto_id, it.{$colQtd} as quantidade";
+                if ($colNome) $selectCols .= ", it.{$colNome} as nome_item";
+                if ($colPreco) $selectCols .= ", it.{$colPreco} as preco_unitario";
+                if ($colSubtotal) $selectCols .= ", it.{$colSubtotal} as subtotal";
+                $selectCols .= ", p.{$colProdNome} as produto_nome";
+                if ($colProdFoto) $selectCols .= ", p.{$colProdFoto} as produto_imagem";
+
+                $sql = "SELECT {$selectCols} FROM {$itensTable} it LEFT JOIN produtos p ON p.id = it.{$colProdId} WHERE it.pedido_id = :pid";
+                $stIt = $this->db->prepare($sql);
+                $stIt->execute([':pid' => $pedidoId]);
+                $itensPedido = $stIt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                // Fallback: buscar foto de produto_fotos se não tem
+                foreach ($itensPedido as &$item) {
+                    $img = trim((string)($item['produto_imagem'] ?? ''));
+                    if ($img === '' && !empty($item['produto_id'])) {
+                        try {
+                            $stF = $this->db->prepare('SELECT nome_arquivo FROM produto_fotos WHERE produto_id = ? ORDER BY principal DESC, ordem ASC LIMIT 1');
+                            $stF->execute([(int)$item['produto_id']]);
+                            $img = trim((string)($stF->fetchColumn() ?: ''));
+                        } catch (\Exception $e) {}
+                    }
+                    if ($img !== '' && !preg_match('#^https?://#i', $img) && $img[0] !== '/') {
+                        $img = '/uploads/produtos/' . $img;
+                    }
+                    $item['produto_imagem'] = $img;
+                    $item['nome_display'] = (string)($item['nome_item'] ?? ($item['produto_nome'] ?? 'Produto'));
+                }
+                unset($item);
+            } catch (\Exception $e) {}
+        }
+
         require __DIR__ . '/../Views/admin/carne/detalhes.php';
     }
 
@@ -684,6 +742,9 @@ class AdminCarneController extends Controller {
 
         $deletedFilter = $temDeletedAt ? 'AND ped.deleted_at IS NULL' : '';
 
+        // REGRA: Mostrar APENAS carnês com pelo menos 1 parcela paga
+        $parcelaPagaFilter = "AND (SELECT COUNT(*) FROM carne_parcelas cpf WHERE cpf.carne_id = c.id AND cpf.status = 'paga') > 0";
+
         if ($temComprasInternas) {
             $sql = "
                 SELECT 
@@ -708,6 +769,7 @@ class AdminCarneController extends Controller {
                 LEFT JOIN produtos p ON p.id = it.{$colProdutoId}
                 WHERE 1=1 {$statusFilter} {$tipoFilter} {$parcelasFilter}
                 {$deletedFilter}
+                {$parcelaPagaFilter}
                 AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
                 GROUP BY ci.carne_id, it.{$colProdutoId}
                 ORDER BY c.quantidade_parcelas ASC, ci.created_at DESC
@@ -736,6 +798,7 @@ class AdminCarneController extends Controller {
                 LEFT JOIN produtos p ON p.id = it.{$colProdutoId}
                 WHERE 1=1 {$tipoFilter} {$parcelasFilter}
                 {$deletedFilter}
+                {$parcelaPagaFilter}
                 AND LOWER(COALESCE(ped.status,'')) NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
                 GROUP BY c.id, it.{$colProdutoId}
                 ORDER BY c.quantidade_parcelas ASC, c.created_at DESC
