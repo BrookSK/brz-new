@@ -432,6 +432,32 @@ class CarneService {
             return false;
         }
 
+        // Verificar se a parcela está cancelada ou se o pedido está cancelado/lixeira
+        $parcelaStatus = strtolower(trim((string) ($parcela['status'] ?? '')));
+        if ($parcelaStatus === 'cancelada') {
+            error_log('[CARNE processarPagamentoBoleto] Parcela #' . $parcela['id'] . ' está cancelada, ignorando webhook');
+            return false;
+        }
+        try {
+            $stCarne = $this->db->prepare("SELECT c.pedido_id FROM carnes c WHERE c.id = ? LIMIT 1");
+            $stCarne->execute([$parcela['carne_id']]);
+            $carneRow = $stCarne->fetch(\PDO::FETCH_ASSOC);
+            if ($carneRow && !empty($carneRow['pedido_id'])) {
+                $stPed = $this->db->prepare("SELECT status, deleted_at FROM pedidos WHERE id = ? LIMIT 1");
+                $stPed->execute([$carneRow['pedido_id']]);
+                $pedRow = $stPed->fetch(\PDO::FETCH_ASSOC);
+                if ($pedRow) {
+                    $pedStatus = strtolower(trim((string) ($pedRow['status'] ?? '')));
+                    if ($pedStatus === 'cancelado' || !empty($pedRow['deleted_at'])) {
+                        error_log('[CARNE processarPagamentoBoleto] Pedido #' . $carneRow['pedido_id'] . ' está cancelado/lixeira, ignorando webhook para parcela #' . $parcela['id']);
+                        $this->carneModel->registrarLog($parcela['carne_id'] ?? null, null, $parcela['id'] ?? null, 'pagamento_ignorado', "Pagamento ignorado - pedido cancelado/lixeira", json_encode(['parcela_id' => $parcela['id'], 'pedido_id' => $carneRow['pedido_id']]));
+                        return false;
+                    }
+                }
+            }
+        } catch (\Exception $e) {}
+
+
         error_log('[CARNE processarPagamentoBoleto] Parcela encontrada: id=' . $parcela['id'] . ' carne_id=' . $parcela['carne_id']);
         $this->carneModel->registrarLog($parcela['carne_id'] ?? null, null, $parcela['id'] ?? null, 'pagamento_confirmado', "Pagamento confirmado para parcela #{$parcela['id']} ({$tipo})", json_encode(['parcela_id' => $parcela['id'], 'carne_id' => $parcela['carne_id'], 'tipo' => $tipo, 'id_externo' => $idExterno]));
         $this->carneModel->registrarPagamentoBoleto($parcela['id'], $tipo);

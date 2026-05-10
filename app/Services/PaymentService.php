@@ -2614,6 +2614,25 @@ class PaymentService {
             return ['success' => false, 'error' => 'Câmbio Real: token ausente no webhook'];
         }
 
+        // Verificar se o pedido associado a este token está cancelado ou na lixeira
+        try {
+            $db = \Config\Database::getConnection();
+            $stCheck = $db->prepare("SELECT p.id, p.status, p.deleted_at FROM pedidos p
+                JOIN pedido_pagamentos pp ON pp.pedido_id = p.id
+                WHERE pp.payment_id = ? AND pp.gateway IN ('cambioreal','cambio_real')
+                LIMIT 1");
+            $stCheck->execute([$token]);
+            $pedidoCheck = $stCheck->fetch(\PDO::FETCH_ASSOC);
+            if ($pedidoCheck) {
+                $pedidoStatus = strtolower(trim((string) ($pedidoCheck['status'] ?? '')));
+                $deletedAt = $pedidoCheck['deleted_at'] ?? null;
+                if ($pedidoStatus === 'cancelado' || $deletedAt !== null) {
+                    error_log("[WEBHOOK_CR] Ignorando webhook para token {$token} - pedido #{$pedidoCheck['id']} está cancelado/lixeira");
+                    return ['success' => true, 'ignored' => true, 'reason' => 'Pedido cancelado ou na lixeira'];
+                }
+            }
+        } catch (\Exception $e) {}
+
         // 1) Tentar carnê PRIMEIRO (busca direta no banco, sem API call)
         try {
             $carneService = new \App\Services\CarneService();
@@ -2708,6 +2727,28 @@ class PaymentService {
             error_log('[WEBHOOK_CR_TAXAS] Nenhum identificador no payload');
             return ['success' => false, 'error' => 'Câmbio Real Taxas: identificador ausente no webhook'];
         }
+
+        // Verificar se o pedido associado a este token está cancelado ou na lixeira
+        try {
+            $db = \Config\Database::getConnection();
+            foreach ($candidates as $c) {
+                $stCheck = $db->prepare("SELECT p.id, p.status, p.deleted_at FROM pedidos p
+                    JOIN pedido_pagamentos pp ON pp.pedido_id = p.id
+                    WHERE pp.payment_id = ? AND pp.gateway = 'cambioreal_taxas'
+                    LIMIT 1");
+                $stCheck->execute([$c]);
+                $pedidoCheck = $stCheck->fetch(\PDO::FETCH_ASSOC);
+                if ($pedidoCheck) {
+                    $pedidoStatus = strtolower(trim((string) ($pedidoCheck['status'] ?? '')));
+                    $deletedAt = $pedidoCheck['deleted_at'] ?? null;
+                    if ($pedidoStatus === 'cancelado' || $deletedAt !== null) {
+                        error_log("[WEBHOOK_CR_TAXAS] Ignorando webhook para token {$c} - pedido #{$pedidoCheck['id']} está cancelado/lixeira");
+                        return ['success' => true, 'ignored' => true, 'reason' => 'Pedido cancelado ou na lixeira'];
+                    }
+                    break;
+                }
+            }
+        } catch (\Exception $e) {}
 
         error_log('[WEBHOOK_CR_TAXAS] Candidatos: ' . implode(', ', $candidates));
 
@@ -8811,6 +8852,36 @@ class PaymentService {
                     error_log("[CR_CANCEL] Erro ao cancelar token {$token} pedido #{$pedidoId}: " . $msg);
                 }
             }
+
+            // Mesmo que a API recuse o cancelamento (ex: boleto já gerado),
+            // marcar localmente como cancelado para ignorar webhooks futuros
+            try {
+                $placeholders = implode(',', array_fill(0, count($tokens), '?'));
+                $db->prepare("UPDATE pedido_pagamentos SET gateway_status = 'SOLICITACAO_CANCELADA', updated_at = NOW() WHERE pedido_id = ? AND payment_id IN ({$placeholders}) AND gateway_status NOT IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA')")
+                   ->execute(array_merge([$pedidoId], $tokens));
+            } catch (\Exception $e) {
+                error_log("[CR_CANCEL] Erro ao marcar pagamentos localmente pedido #{$pedidoId}: " . $e->getMessage());
+            }
+
+            // Marcar parcelas do carnê como canceladas
+            try {
+                $db->prepare("UPDATE carne_parcelas cp
+                    JOIN carnes c ON cp.carne_id = c.id
+                    SET cp.status = 'cancelada'
+                    WHERE c.pedido_id = ? AND cp.status NOT IN ('paga')")
+                   ->execute([$pedidoId]);
+            } catch (\Exception $e) {
+                error_log("[CR_CANCEL] Erro ao cancelar parcelas carnê pedido #{$pedidoId}: " . $e->getMessage());
+            }
+
+            // Marcar carnê como cancelado
+            try {
+                $db->prepare("UPDATE carnes SET status = 'cancelado' WHERE pedido_id = ? AND status NOT IN ('quitado')")
+                   ->execute([$pedidoId]);
+            } catch (\Exception $e) {
+                error_log("[CR_CANCEL] Erro ao cancelar carnê pedido #{$pedidoId}: " . $e->getMessage());
+            }
+
         } catch (\Exception $e) {
             $resultado['erros'][] = $e->getMessage();
             error_log("[CR_CANCEL] Erro geral pedido #{$pedidoId}: " . $e->getMessage());
