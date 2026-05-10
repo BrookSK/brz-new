@@ -156,9 +156,31 @@ class AdminDreCompletoController extends Controller {
             'qtd_lancamentos' => array_sum(array_column(array_values($meses), 'qtd_pedidos')) + array_sum(array_column(array_values($meses), 'qtd_despesas')),
         ];
 
-        // === ENTRADAS DE PEDIDOS DETALHADAS (últimos 50) ===
+        // === ENTRADAS DE PEDIDOS DETALHADAS (com paginação) ===
+        $page = max(1, (int)$request->getParam('page', 1));
+        $perPage = 25;
+        $statusFilterDre = $request->getParam('status_dre', '');
         $entradasDetalhadas = [];
+        $totalEntradas = 0;
+
         try {
+            $whereDet = "p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)"
+                . " AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}"
+                . " {$deletedFilter}";
+            $paramsDet = [':ds' => $dateStart, ':de' => $dateEnd];
+
+            if ($statusFilterDre !== '') {
+                $whereDet .= " AND LOWER(COALESCE(p.{$colStatus},'')) = :st_dre";
+                $paramsDet[':st_dre'] = strtolower($statusFilterDre);
+            }
+
+            // Count
+            $stCount = $this->db->prepare("SELECT COUNT(*) FROM pedidos p WHERE {$whereDet}");
+            $stCount->execute($paramsDet);
+            $totalEntradas = (int)$stCount->fetchColumn();
+
+            // Paginated
+            $offset = ($page - 1) * $perPage;
             $sqlDet = "SELECT p.id, p.{$colCreatedAt} as data_pedido, p.{$colTotal} as total, p.{$colStatus} as status"
                 . ($colMoeda ? ", p.{$colMoeda} as moeda" : ", 'BRL' as moeda")
                 . ($colPayGateway ? ", p.{$colPayGateway} as gateway" : ", '' as gateway")
@@ -166,11 +188,10 @@ class AdminDreCompletoController extends Controller {
                 . ($colSubtotal ? ", p.{$colSubtotal} as subtotal" : ", 0 as subtotal")
                 . ($colServicos ? ", p.{$colServicos} as servicos" : ", 0 as servicos")
                 . ($colImpostos ? ", p.{$colImpostos} as impostos" : ", 0 as impostos")
-                . " FROM pedidos p WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)"
-                . " AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}"
-                . " {$deletedFilter} ORDER BY p.{$colCreatedAt} DESC LIMIT 50";
+                . " FROM pedidos p WHERE {$whereDet}"
+                . " ORDER BY p.{$colCreatedAt} DESC LIMIT {$perPage} OFFSET {$offset}";
             $stDet = $this->db->prepare($sqlDet);
-            $stDet->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+            $stDet->execute($paramsDet);
             $entradasDetalhadas = $stDet->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
@@ -217,9 +238,152 @@ class AdminDreCompletoController extends Controller {
             'despesas_categoria' => $despesasPorCategoria,
             'despesas_favorecido' => $despesasPorFavorecido,
             'entradas_detalhadas' => $entradasDetalhadas,
+            'entradas_paginacao' => ['page' => $page, 'per_page' => $perPage, 'total' => $totalEntradas, 'total_pages' => ceil($totalEntradas / $perPage)],
+            'status_filter_dre' => $statusFilterDre,
             'operacional' => $operacionalPorPessoa,
             'conciliacao' => $conciliacao,
         ], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK);
+        exit;
+    }
+
+    /**
+     * Exporta DRE completo como CSV com TODOS os pedidos e despesas
+     */
+    public function exportar(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $dateStart = $request->getParam('date_start', date('Y-01-01'));
+        $dateEnd = $request->getParam('date_end', date('Y-m-d'));
+
+        $cols = [];
+        try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+        $pick = function($candidates) use ($cols) { foreach ($candidates as $c) { if (in_array($c, $cols, true)) return $c; } return ''; };
+        $colTotal = $pick(['total','valor_total']);
+        $colSubtotal = $pick(['subtotal','subtotal_produtos']);
+        $colServicos = $pick(['servicos','taxa_servico']);
+        $colImpostos = $pick(['impostos','valor_impostos']);
+        $colFrete = $pick(['frete','valor_frete']);
+        $colMoeda = $pick(['moeda','currency']);
+        $colStatus = $pick(['status']);
+        $colPayGateway = $pick(['payment_gateway','gateway']);
+        $colPayStatus = $pick(['payment_status']);
+        $colFormaPgto = $pick(['forma_pagamento','payment_method']);
+        $colCreatedAt = $pick(['created_at','data_criacao']);
+        $colCliente = $pick(['cliente_nome','nome']);
+        $colNumero = $pick(['numero_pedido','codigo_pedido']);
+        $deletedFilter = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
+
+        $taxaUsdBrl = 5.85;
+        try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+
+        $filename = 'DRE_Completo_' . $dateStart . '_' . $dateEnd . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+        $sep = ';';
+        $fmtV = function($v) { return number_format((float)($v ?? 0), 2, ',', ''); };
+
+        // CABEÇALHO
+        fwrite($out, "DEMONSTRATIVO DE RESULTADO COMPLETO - BRAZILIANA SHOP{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}\r\n");
+        fwrite($out, "Período: {$dateStart} a {$dateEnd}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}\r\n");
+        fwrite($out, "Taxa USD→BRL: " . number_format($taxaUsdBrl, 4, ',', '') . "{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}\r\n");
+        fwrite($out, "Gerado em: " . date('d/m/Y H:i:s') . "{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}\r\n");
+        fwrite($out, "\r\n");
+
+        // === TODOS OS PEDIDOS ===
+        fwrite($out, "=== PEDIDOS DO PERÍODO ==={$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}\r\n");
+        fwrite($out, "ID{$sep}Numero{$sep}Data{$sep}Cliente{$sep}Status{$sep}Status Pgto{$sep}Gateway{$sep}Forma Pgto{$sep}Moeda{$sep}Subtotal{$sep}Servicos{$sep}Impostos{$sep}Frete{$sep}Total{$sep}Total BRL\r\n");
+
+        $paidStatuses = "('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue','processando')";
+        $sqlAll = "SELECT p.id"
+            . ($colNumero ? ", p.{$colNumero} as numero" : ", '' as numero")
+            . ", p.{$colCreatedAt} as data_pedido"
+            . ($colCliente ? ", p.{$colCliente} as cliente" : ", '' as cliente")
+            . ", p.{$colStatus} as status"
+            . ($colPayStatus ? ", p.{$colPayStatus} as pay_status" : ", '' as pay_status")
+            . ($colPayGateway ? ", p.{$colPayGateway} as gateway" : ", '' as gateway")
+            . ($colFormaPgto ? ", p.{$colFormaPgto} as forma_pgto" : ", '' as forma_pgto")
+            . ($colMoeda ? ", p.{$colMoeda} as moeda" : ", 'BRL' as moeda")
+            . ($colSubtotal ? ", p.{$colSubtotal} as subtotal" : ", 0 as subtotal")
+            . ($colServicos ? ", p.{$colServicos} as servicos" : ", 0 as servicos")
+            . ($colImpostos ? ", p.{$colImpostos} as impostos" : ", 0 as impostos")
+            . ($colFrete ? ", p.{$colFrete} as frete" : ", 0 as frete")
+            . ", p.{$colTotal} as total"
+            . " FROM pedidos p WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)"
+            . " AND LOWER(COALESCE(p.{$colStatus},'')) NOT IN ('apagado','deleted','lixeira','trash')"
+            . " {$deletedFilter} ORDER BY p.{$colCreatedAt} DESC";
+
+        $totalPedBrl = 0; $totalPedUsd = 0; $qtdPed = 0;
+        try {
+            $st = $this->db->prepare($sqlAll);
+            $st->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+            while ($row = $st->fetch(\PDO::FETCH_ASSOC)) {
+                $moeda = strtoupper(trim($row['moeda'] ?? 'BRL'));
+                $total = (float)($row['total'] ?? 0);
+                $totalBrl = $moeda === 'USD' ? $total * $taxaUsdBrl : $total;
+                if ($moeda === 'USD') $totalPedUsd += $total; else $totalPedBrl += $total;
+                $qtdPed++;
+                fwrite($out, $row['id'] . $sep . ($row['numero'] ?? '') . $sep . substr($row['data_pedido'] ?? '', 0, 10) . $sep . str_replace($sep, ' ', $row['cliente'] ?? '') . $sep . ($row['status'] ?? '') . $sep . ($row['pay_status'] ?? '') . $sep . ($row['gateway'] ?? '') . $sep . ($row['forma_pgto'] ?? '') . $sep . $moeda . $sep . $fmtV($row['subtotal']) . $sep . $fmtV($row['servicos']) . $sep . $fmtV($row['impostos']) . $sep . $fmtV($row['frete']) . $sep . $fmtV($total) . $sep . $fmtV($totalBrl) . "\r\n");
+            }
+        } catch (\Exception $e) {}
+
+        fwrite($out, "TOTAL PEDIDOS{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$fmtV($totalPedBrl + $totalPedUsd)}{$sep}" . $fmtV($totalPedBrl + ($totalPedUsd * $taxaUsdBrl)) . "\r\n");
+        fwrite($out, "Qtd: {$qtdPed}{$sep}USD: " . $fmtV($totalPedUsd) . "{$sep}BRL: " . $fmtV($totalPedBrl) . "\r\n");
+        fwrite($out, "\r\n");
+
+        // === DESPESAS ===
+        fwrite($out, "=== DESPESAS DO PERÍODO ==={$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}\r\n");
+        fwrite($out, "ID{$sep}Descrição{$sep}Categoria{$sep}Tipo{$sep}Favorecido{$sep}Competência{$sep}Vencimento{$sep}Pagamento{$sep}Moeda{$sep}Valor{$sep}Valor BRL{$sep}Status{$sep}Origem\r\n");
+
+        $totalDespBrl = 0; $totalDespUsd = 0; $qtdDesp = 0;
+        try {
+            $stD = $this->db->prepare("SELECT d.*, c.nome as cat_nome FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE d.competencia >= ? AND d.competencia <= ? AND d.status != 'cancelada' AND d.deleted_at IS NULL ORDER BY d.vencimento ASC");
+            $stD->execute([$dateStart, $dateEnd]);
+            while ($row = $stD->fetch(\PDO::FETCH_ASSOC)) {
+                $moeda = strtoupper(trim($row['moeda'] ?? 'BRL'));
+                $valor = (float)($row['valor'] ?? 0);
+                $valorBrl = $moeda === 'USD' ? $valor * $taxaUsdBrl : $valor;
+                if ($moeda === 'USD') $totalDespUsd += $valor; else $totalDespBrl += $valor;
+                $qtdDesp++;
+                fwrite($out, ($row['id'] ?? '') . $sep . str_replace($sep, ' ', $row['descricao'] ?? '') . $sep . str_replace($sep, ' ', $row['cat_nome'] ?? '') . $sep . ($row['tipo'] ?? '') . $sep . str_replace($sep, ' ', $row['favorecido'] ?? '') . $sep . ($row['competencia'] ? date('m/Y', strtotime($row['competencia'])) : '') . $sep . ($row['vencimento'] ? date('d/m/Y', strtotime($row['vencimento'])) : '') . $sep . ($row['data_pagamento'] ? date('d/m/Y', strtotime($row['data_pagamento'])) : '') . $sep . $moeda . $sep . $fmtV($valor) . $sep . $fmtV($valorBrl) . $sep . ($row['status'] ?? '') . $sep . ($row['origem'] ?? '') . "\r\n");
+            }
+        } catch (\Exception $e) {}
+
+        fwrite($out, "TOTAL DESPESAS{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}{$sep}" . $fmtV($totalDespBrl + $totalDespUsd) . $sep . $fmtV($totalDespBrl + ($totalDespUsd * $taxaUsdBrl)) . "\r\n");
+        fwrite($out, "Qtd: {$qtdDesp}{$sep}USD: " . $fmtV($totalDespUsd) . "{$sep}BRL: " . $fmtV($totalDespBrl) . "\r\n");
+        fwrite($out, "\r\n");
+
+        // === DRE RESULTADO ===
+        $receitaBrl = $totalPedBrl + ($totalPedUsd * $taxaUsdBrl);
+        $despesaBrl = $totalDespBrl + ($totalDespUsd * $taxaUsdBrl);
+        $resultado = $receitaBrl - $despesaBrl;
+        $margem = $receitaBrl > 0 ? round($resultado / $receitaBrl * 100, 1) : 0;
+
+        fwrite($out, "=== DRE - RESULTADO ==={$sep}{$sep}\r\n");
+        fwrite($out, "Descrição{$sep}Valor (R\$)\r\n");
+        fwrite($out, "RECEITA BRUTA (pedidos){$sep}" . $fmtV($receitaBrl) . "\r\n");
+        fwrite($out, "  Pedidos em BRL{$sep}" . $fmtV($totalPedBrl) . "\r\n");
+        fwrite($out, "  Pedidos em USD (×{$taxaUsdBrl}){$sep}" . $fmtV($totalPedUsd * $taxaUsdBrl) . "\r\n");
+        fwrite($out, "(-) DESPESAS TOTAIS{$sep}" . $fmtV($despesaBrl) . "\r\n");
+        fwrite($out, "  Despesas em BRL{$sep}" . $fmtV($totalDespBrl) . "\r\n");
+        if ($totalDespUsd > 0) fwrite($out, "  Despesas em USD (×{$taxaUsdBrl}){$sep}" . $fmtV($totalDespUsd * $taxaUsdBrl) . "\r\n");
+        fwrite($out, "(=) RESULTADO LÍQUIDO{$sep}" . $fmtV($resultado) . "\r\n");
+        fwrite($out, "Margem (%){$sep}{$margem}%\r\n");
+        fwrite($out, "\r\n");
+
+        // === CONCILIAÇÃO ===
+        fwrite($out, "=== CONCILIAÇÃO ==={$sep}{$sep}\r\n");
+        fwrite($out, "Total de créditos (entradas){$sep}" . $fmtV($receitaBrl) . "\r\n");
+        fwrite($out, "Total de débitos (despesas){$sep}" . $fmtV($despesaBrl) . "\r\n");
+        fwrite($out, "Saldo final{$sep}" . $fmtV($resultado) . "\r\n");
+        fwrite($out, "Qtd pedidos{$sep}{$qtdPed}\r\n");
+        fwrite($out, "Qtd despesas{$sep}{$qtdDesp}\r\n");
+        fwrite($out, "Total lançamentos{$sep}" . ($qtdPed + $qtdDesp) . "\r\n");
+
+        fclose($out);
         exit;
     }
 }

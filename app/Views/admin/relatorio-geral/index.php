@@ -505,125 +505,9 @@ const DRE_DATA = <?= json_encode([
 ], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
 
 function exportarDRE() {
-    const d = DRE_DATA;
-    const sep = ';';
-    const nl = '\r\n';
-    let csv = '';
-
-    // BOM para Excel reconhecer UTF-8
-    csv += '\uFEFF';
-
-    // === CABEÇALHO ===
-    csv += 'DEMONSTRATIVO DE RESULTADO - BRAZILIANA SHOP' + nl;
-    csv += 'Período: ' + d.periodo + nl;
-    csv += 'Taxa USD→BRL: ' + (d.taxaUsdBrl || 0).toFixed(2) + nl;
-    csv += 'Gerado em: ' + new Date().toLocaleString('pt-BR') + nl;
-    csv += nl;
-
-    // === RESUMO GERAL ===
-    csv += '=== RESUMO GERAL ===' + nl;
-    csv += 'Descrição' + sep + 'USD' + sep + 'BRL' + sep + 'Total em BRL' + nl;
-
-    const fields = [
-        {key:'total', label:'RECEITA BRUTA TOTAL'},
-        {key:'subtotal', label:'(-) Subtotal Produtos'},
-        {key:'servicos', label:'(-) Taxa de Serviço'},
-        {key:'impostos', label:'(-) Impostos'},
-        {key:'imposto_local', label:'(-) Imposto Local'},
-        {key:'frete', label:'(-) Frete'},
-    ];
-
-    fields.forEach(f => {
-        const vUsd = parseFloat(d.usd[f.key] || 0);
-        const vBrl = parseFloat(d.brl[f.key] || 0);
-        const totalBrl = vBrl + (vUsd * d.taxaUsdBrl);
-        csv += f.label + sep + fmtCSV(vUsd) + sep + fmtCSV(vBrl) + sep + fmtCSV(totalBrl) + nl;
-    });
-    csv += nl;
-
-    // === PEDIDOS ===
-    csv += '=== TOTAL DE PEDIDOS ===' + nl;
-    csv += 'Quantidade' + sep + (d.totais.qtd_pedidos || 0) + nl;
-    csv += nl;
-
-    // === POR STATUS ===
-    csv += '=== RECEITA POR STATUS ===' + nl;
-    csv += 'Status' + sep + 'Qtd' + sep + 'Subtotal' + sep + 'Serviço' + sep + 'Impostos' + sep + 'Frete' + sep + 'Total (R$)' + nl;
-    (d.porStatus || []).forEach(r => {
-        const label = d.statusLabels[r.status] || r.status.replace(/_/g, ' ');
-        csv += label + sep + r.qtd + sep + fmtCSV(r.subtotal) + sep + fmtCSV(r.servicos) + sep + fmtCSV(r.impostos) + sep + fmtCSV(r.frete) + sep + fmtCSV(r.total) + nl;
-    });
-    csv += 'TOTAL' + sep + d.totalQtd + sep + fmtCSV(d.totalSubtotal) + sep + fmtCSV(d.totalServicos) + sep + fmtCSV(d.totalImpostos) + sep + fmtCSV(d.totalFrete) + sep + fmtCSV(d.totalTotal) + nl;
-    csv += nl;
-
-    // === POR MOEDA ===
-    csv += '=== DISTRIBUIÇÃO POR MOEDA ===' + nl;
-    csv += 'Moeda' + sep + 'Qtd' + sep + 'Total' + nl;
-    (d.porMoeda || []).forEach(r => {
-        csv += (r.moeda || 'N/A').toUpperCase() + sep + (r.qtd || 0) + sep + fmtCSV(parseFloat(r.total || 0)) + nl;
-    });
-    csv += nl;
-
-    // === POR FORMA DE PAGAMENTO ===
-    csv += '=== RECEITA POR FORMA DE PAGAMENTO ===' + nl;
-    csv += 'Forma' + sep + 'Qtd' + sep + 'Total' + nl;
-    (d.porPagamento || []).forEach(r => {
-        csv += (r.forma || 'N/A').replace(/_/g, ' ') + sep + (r.qtd || 0) + sep + fmtCSV(parseFloat(r.total || 0)) + nl;
-    });
-    csv += nl;
-
-    // === DESPESAS ===
-    csv += '=== DESPESAS DO PERÍODO ===' + nl;
-    csv += 'Descrição' + sep + 'Valor (R$)' + nl;
-    const desp = d.despesas || {};
-    csv += 'Total Despesas' + sep + fmtCSV(desp.total || 0) + nl;
-    csv += 'Despesas Pagas' + sep + fmtCSV(desp.pago || 0) + nl;
-    csv += 'Despesas em Aberto' + sep + fmtCSV(desp.aberto || 0) + nl;
-    csv += nl;
-    if (desp.por_categoria && desp.por_categoria.length > 0) {
-        csv += 'Categoria' + sep + 'Grupo' + sep + 'Qtd' + sep + 'Total (R$)' + nl;
-        desp.por_categoria.forEach(c => {
-            csv += (c.categoria || 'Sem categoria') + sep + (c.grupo || '').replace(/_/g,' ') + sep + (c.qtd || 0) + sep + fmtCSV(parseFloat(c.total || 0)) + nl;
-        });
-        csv += nl;
-    }
-
-    // === DRE - RESULTADO ===
-    csv += '=== DRE - RESULTADO ===' + nl;
-    csv += 'Descrição' + sep + 'Valor (R$)' + nl;
-    const receitaBruta = d.totalTotal || 0;
-    const totalDesp = desp.total || 0;
-    const lucro = receitaBruta - totalDesp;
-    const margem = receitaBruta > 0 ? (lucro / receitaBruta * 100).toFixed(1) : '0.0';
-    csv += 'RECEITA BRUTA' + sep + fmtCSV(receitaBruta) + nl;
-    csv += '(-) DESPESAS TOTAIS' + sep + fmtCSV(totalDesp) + nl;
-    csv += '(=) RESULTADO LÍQUIDO' + sep + fmtCSV(lucro) + nl;
-    csv += 'Margem (%)' + sep + margem.replace('.', ',') + '%' + nl;
-    csv += nl;
-
-    // === CONCILIAÇÃO ===
-    csv += '=== CONCILIAÇÃO ===' + nl;
-    csv += 'Descrição' + sep + 'Valor (R$)' + nl;
-    const totalGeralBrl = parseFloat(d.brl.total || 0) + (parseFloat(d.usd.total || 0) * d.taxaUsdBrl);
-    csv += 'Receita Total (convertida BRL)' + sep + fmtCSV(totalGeralBrl) + nl;
-    csv += 'Total Subtotal Produtos' + sep + fmtCSV(d.totalSubtotal) + nl;
-    csv += 'Total Taxa de Serviço' + sep + fmtCSV(d.totalServicos) + nl;
-    csv += 'Total Impostos' + sep + fmtCSV(d.totalImpostos) + nl;
-    csv += 'Total Frete' + sep + fmtCSV(d.totalFrete) + nl;
-    csv += 'Total Despesas' + sep + fmtCSV(totalDesp) + nl;
-    csv += 'Resultado Líquido' + sep + fmtCSV(lucro) + nl;
-    csv += 'Quantidade de Pedidos' + sep + (d.totais.qtd_pedidos || 0) + nl;
-
-    // Download
-    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'DRE_Braziliana_' + d.dateStart + '_' + d.dateEnd + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const ds = '<?= $dateStart ?>';
+    const de = '<?= $dateEnd ?>';
+    window.location.href = '/admin/dre-completo/exportar?date_start=' + ds + '&date_end=' + de;
 }
 
 function fmtCSV(v) {
@@ -692,11 +576,27 @@ function renderDreCompleto(d) {
     Object.values(gwMap).sort((a,b)=>b.total-a.total).forEach(g=>{h+='<tr><td><span class="d-inline-block rounded me-1" style="width:10px;height:10px;background:'+(gwColors[g.gateway]||'#6b7280')+';"></span>'+(gwNames[g.gateway]||g.gateway)+'</td><td class="text-end">'+g.qtd+'</td><td class="text-end fw-bold">'+fmtR(g.total)+'</td><td class="text-end"><span class="badge bg-success">'+g.aprovados+'</span></td><td class="text-end"><span class="badge bg-warning text-dark">'+g.pendentes+'</span></td><td class="text-end"><span class="badge bg-danger">'+g.rejeitados+'</span></td><td class="text-end"><span class="badge bg-secondary">'+g.estornados+'</span></td></tr>';});
     h += '</tbody></table></div></div></div>';
 
-    // Entradas de Pedidos
-    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-shopping-cart me-2 text-muted"></i>Entradas de Pedidos (últimos 50 pagos)</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:11px;"><thead class="table-light"><tr><th>#</th><th>Data</th><th>Status</th><th>Gateway</th><th>Moeda</th><th class="text-end">Subtotal</th><th class="text-end">Taxas</th><th class="text-end">Impostos</th><th class="text-end fw-bold">Total</th></tr></thead><tbody>';
+    // Entradas de Pedidos (com paginação e filtro)
+    const pg = d.entradas_paginacao||{page:1,total:0,total_pages:1};
+    const stFilter = d.status_filter_dre||'';
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between"><h6 class="fw-bold small mb-0"><i class="fas fa-shopping-cart me-2 text-muted"></i>Entradas de Pedidos <span class="badge bg-secondary ms-1">'+pg.total+'</span></h6>';
+    h += '<div class="d-flex align-items-center gap-2"><select id="dre-status-filter" class="form-select form-select-sm" style="width:auto;font-size:11px;" onchange="dreFilterStatus(this.value)"><option value="">Todos os status</option>';
+    ['pago','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue'].forEach(s=>{h+='<option value="'+s+'"'+(stFilter===s?' selected':'')+'>'+s.replace(/_/g,' ')+'</option>';});
+    h += '</select></div></div>';
+    h += '<div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:11px;"><thead class="table-light"><tr><th>#</th><th>Data</th><th>Status</th><th>Gateway</th><th>Moeda</th><th class="text-end">Subtotal</th><th class="text-end">Taxas</th><th class="text-end">Impostos</th><th class="text-end fw-bold">Total</th></tr></thead><tbody>';
     (d.entradas_detalhadas||[]).forEach(p=>{h+='<tr><td class="fw-semibold">#'+p.id+'</td><td>'+(p.data_pedido||'').substring(0,10)+'</td><td><span class="badge bg-light text-dark border" style="font-size:9px;">'+(p.status||'')+'</span></td><td>'+(p.gateway||'-')+'</td><td>'+(p.moeda||'BRL')+'</td><td class="text-end">'+fmtR(p.subtotal)+'</td><td class="text-end">'+fmtR(p.servicos)+'</td><td class="text-end">'+fmtR(p.impostos)+'</td><td class="text-end fw-bold">'+fmtR(p.total)+'</td></tr>';});
-    if(!(d.entradas_detalhadas||[]).length)h+='<tr><td colspan="9" class="text-center text-muted py-3">Nenhum pedido pago no período</td></tr>';
-    h += '</tbody></table></div></div></div>';
+    if(!(d.entradas_detalhadas||[]).length)h+='<tr><td colspan="9" class="text-center text-muted py-3">Nenhum pedido no período</td></tr>';
+    h += '</tbody></table></div>';
+    // Paginação
+    if (pg.total_pages > 1) {
+        h += '<div class="d-flex align-items-center justify-content-between px-3 py-2 border-top"><span class="text-muted small">Mostrando '+(((pg.page-1)*pg.per_page)+1)+'–'+Math.min(pg.page*pg.per_page,pg.total)+' de '+pg.total+'</span><div class="d-flex gap-1">';
+        if (pg.page > 1) h += '<button class="btn btn-sm btn-outline-secondary" onclick="dreChangePage('+(pg.page-1)+')">← Anterior</button>';
+        for (let i=1;i<=Math.min(pg.total_pages,7);i++){h+='<button class="btn btn-sm '+(i===pg.page?'btn-dark':'btn-outline-secondary')+'" onclick="dreChangePage('+i+')">'+i+'</button>';}
+        if (pg.total_pages > 7) h += '<span class="align-self-center text-muted">...</span><button class="btn btn-sm btn-outline-secondary" onclick="dreChangePage('+pg.total_pages+')">'+pg.total_pages+'</button>';
+        if (pg.page < pg.total_pages) h += '<button class="btn btn-sm btn-outline-secondary" onclick="dreChangePage('+(pg.page+1)+')">Próxima →</button>';
+        h += '</div></div>';
+    }
+    h += '</div></div>';
 
     // Operacional por Pessoa/Mês
     h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-users me-2 text-muted"></i>Operacional — Pagamentos por Pessoa/Mês</h6></div><div class="card-body p-0"><div class="table-responsive">';
@@ -729,5 +629,28 @@ function card(label,icon,color,value) {
 }
 function dreRow(label,value,cls,valCls) {
     return '<tr><td class="'+(cls||'')+'">'+(label.startsWith('  ')?label:''+label)+'</td><td class="text-end '+(valCls||'')+'">'+value+'</td></tr>';
+}
+
+let dreCurrentPage = 1;
+let dreCurrentStatus = '';
+
+function dreChangePage(page) {
+    dreCurrentPage = page;
+    dreLoaded = false;
+    loadDreCompletoWithParams();
+}
+function dreFilterStatus(status) {
+    dreCurrentStatus = status;
+    dreCurrentPage = 1;
+    dreLoaded = false;
+    loadDreCompletoWithParams();
+}
+function loadDreCompletoWithParams() {
+    const ds = '<?= $dateStart ?>';
+    const de = '<?= $dateEnd ?>';
+    let url = '/admin/dre-completo/dados?date_start=' + ds + '&date_end=' + de + '&page=' + dreCurrentPage;
+    if (dreCurrentStatus) url += '&status_dre=' + encodeURIComponent(dreCurrentStatus);
+    document.getElementById('dre-completo-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
+    fetch(url).then(r=>r.json()).then(d=>{if(d.success)renderDreCompleto(d);}).catch(()=>{});
 }
 </script>

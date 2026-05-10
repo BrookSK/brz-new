@@ -147,6 +147,7 @@ $router->post('/admin/despesas/excluir/{id}', 'AdminDespesasController', 'exclui
 
 // DRE Completo (API JSON)
 $router->get('/admin/dre-completo/dados', 'AdminDreCompletoController', 'dados');
+$router->get('/admin/dre-completo/exportar', 'AdminDreCompletoController', 'exportar');
 
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
