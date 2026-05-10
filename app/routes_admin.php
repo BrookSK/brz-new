@@ -145,6 +145,9 @@ $router->post('/admin/despesas/pagar/{id}', 'AdminDespesasController', 'marcarPa
 $router->post('/admin/despesas/cancelar/{id}', 'AdminDespesasController', 'cancelar');
 $router->post('/admin/despesas/excluir/{id}', 'AdminDespesasController', 'excluir');
 
+// DRE Completo (API JSON)
+$router->get('/admin/dre-completo/dados', 'AdminDreCompletoController', 'dados');
+
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
 $router->post('/admin/oferta-gratuita/toggle-global', 'AdminOfertaGratuitaController', 'toggleGlobal');

@@ -421,91 +421,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
 
     <!-- DRE COMPLETO -->
     <div class="tab-pane fade" id="pane-dre" role="tabpanel">
-        <?php
-        $dreGateways = $dreGateways ?? [];
-        $totalGwQtd = 0; $totalGwBrl = 0; $totalGwUsd = 0; $totalGwAprov = 0; $totalGwPend = 0; $totalGwRej = 0; $totalGwEst = 0;
-        foreach ($dreGateways as $gw) { $totalGwQtd += (int)$gw['qtd']; $totalGwBrl += (float)$gw['total_brl']; $totalGwUsd += (float)$gw['total_usd']; $totalGwAprov += (int)$gw['aprovados']; $totalGwPend += (int)$gw['pendentes']; $totalGwRej += (int)$gw['rejeitados']; $totalGwEst += (int)$gw['estornados']; }
-        $totalGwConvertido = $totalGwBrl + ($totalGwUsd * $taxaUsdBrl);
-        $gwNames = ['stripe'=>'Stripe','cambioreal'=>'Câmbio Real','cambioreal_taxas'=>'Câmbio Real (Taxas)','mercadopago'=>'Mercado Pago','asaas'=>'Asaas','appmax'=>'AppMax','pagdev'=>'PagDev','n/a'=>'Sem gateway'];
-        $gwColors = ['stripe'=>'#635bff','cambioreal'=>'#00a86b','cambioreal_taxas'=>'#00a86b','mercadopago'=>'#009ee3','asaas'=>'#1a1a2e','appmax'=>'#ff6b35','pagdev'=>'#6366f1','n/a'=>'#94a3b8'];
-        ?>
-
-        <!-- Header DRE -->
-        <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #1e293b;">
-            <div class="card-header bg-white border-0 pt-3">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="fas fa-university text-dark" style="font-size:12px;"></i></div>
-                        <div><h6 class="fw-bold mb-0">DRE Completo — Conciliação Bancária</h6><span class="text-muted" style="font-size:10px;">Entradas e saídas por gateway · Período: <?= $periodoLabel ?></span></div>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                <!-- DRE Profissional -->
-                <div class="table-responsive mb-4">
-                    <table class="table table-sm mb-0" style="font-size:13px;">
-                        <tbody>
-                            <tr class="table-light fw-bold"><td colspan="2" class="text-uppercase small">DEMONSTRATIVO DE RESULTADO DO EXERCÍCIO</td></tr>
-                            <tr class="border-bottom"><td class="fw-bold text-success"><i class="fas fa-plus-circle me-1"></i>RECEITA OPERACIONAL BRUTA</td><td class="text-end fw-bold text-success fs-5">R$ <?= fmtNum($totalGwConvertido) ?></td></tr>
-                            <tr><td class="ps-3 text-muted">Receitas em BRL</td><td class="text-end">R$ <?= fmtNum($totalGwBrl) ?></td></tr>
-                            <tr><td class="ps-3 text-muted">Receitas em USD ($ <?= fmtNum($totalGwUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($totalGwUsd * $taxaUsdBrl) ?></td></tr>
-                            <tr><td class="ps-3 text-muted">(-) Impostos sobre receita</td><td class="text-end text-danger">- R$ <?= fmtNum($totalImpostos) ?></td></tr>
-                            <tr class="border-top"><td class="fw-semibold">= RECEITA OPERACIONAL LÍQUIDA</td><td class="text-end fw-bold">R$ <?= fmtNum($totalGwConvertido - $totalImpostos) ?></td></tr>
-                            <tr><td class="ps-3 text-muted">(-) Custo dos produtos (subtotal)</td><td class="text-end text-danger">- R$ <?= fmtNum($totalSubtotal) ?></td></tr>
-                            <tr class="border-top"><td class="fw-semibold">= LUCRO BRUTO</td><td class="text-end fw-bold">R$ <?= fmtNum($totalGwConvertido - $totalImpostos - $totalSubtotal) ?></td></tr>
-                            <tr><td class="ps-3 text-muted">(-) Despesas operacionais</td><td class="text-end text-danger">- R$ <?= fmtNum($totalDespesas) ?></td></tr>
-                            <tr><td class="ps-3 text-muted">(-) Frete</td><td class="text-end text-danger">- R$ <?= fmtNum($totalFrete) ?></td></tr>
-                            <?php $lucroOperacional = $totalGwConvertido - $totalImpostos - $totalSubtotal - $totalDespesas - $totalFrete; ?>
-                            <tr class="border-top table-light"><td class="fw-bold" style="font-size:14px;">= RESULTADO OPERACIONAL (EBITDA)</td><td class="text-end fw-bold fs-4 <?= $lucroOperacional >= 0 ? 'text-success' : 'text-danger' ?>">R$ <?= fmtNum($lucroOperacional) ?></td></tr>
-                            <tr><td class="text-muted small">Margem operacional</td><td class="text-end"><span class="badge <?= $lucroOperacional >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $totalGwConvertido > 0 ? round($lucroOperacional / $totalGwConvertido * 100, 1) : 0 ?>%</span></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Conciliação por Gateway -->
-                <h6 class="fw-bold small mb-3"><i class="fas fa-credit-card me-2 text-muted"></i>Processamento por Gateway de Pagamento</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0" style="font-size:12px;">
-                        <thead class="table-light">
-                            <tr><th>Gateway</th><th class="text-end">Pedidos</th><th class="text-end">Total BRL</th><th class="text-end">Total USD</th><th class="text-end">Total (R$)</th><th class="text-end">Aprovados</th><th class="text-end">Pendentes</th><th class="text-end">Rejeitados</th><th class="text-end">Estornados</th></tr>
-                        </thead>
-                        <tbody>
-                        <?php if (empty($dreGateways)): ?>
-                            <tr><td colspan="9" class="text-center text-muted py-3">Nenhum dado no período</td></tr>
-                        <?php else: foreach ($dreGateways as $gw):
-                            $gwKey = strtolower($gw['gateway'] ?? 'n/a');
-                            $gwLabel = $gwNames[$gwKey] ?? ucfirst(str_replace('_', ' ', $gwKey));
-                            $gwColor = $gwColors[$gwKey] ?? '#6b7280';
-                            $gwTotalConv = (float)$gw['total_brl'] + ((float)$gw['total_usd'] * $taxaUsdBrl);
-                        ?>
-                        <tr>
-                            <td><span class="d-inline-block rounded me-1" style="width:10px;height:10px;background:<?= $gwColor ?>;"></span><span class="fw-semibold"><?= htmlspecialchars($gwLabel) ?></span></td>
-                            <td class="text-end"><?= (int)$gw['qtd'] ?></td>
-                            <td class="text-end">R$ <?= fmtNum($gw['total_brl']) ?></td>
-                            <td class="text-end">$ <?= fmtNum($gw['total_usd']) ?></td>
-                            <td class="text-end fw-bold">R$ <?= fmtNum($gwTotalConv) ?></td>
-                            <td class="text-end"><span class="badge bg-success"><?= (int)$gw['aprovados'] ?></span></td>
-                            <td class="text-end"><span class="badge bg-warning text-dark"><?= (int)$gw['pendentes'] ?></span></td>
-                            <td class="text-end"><span class="badge bg-danger"><?= (int)$gw['rejeitados'] ?></span></td>
-                            <td class="text-end"><span class="badge bg-secondary"><?= (int)$gw['estornados'] ?></span></td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <tr class="fw-bold border-top table-light">
-                            <td>TOTAL</td>
-                            <td class="text-end"><?= $totalGwQtd ?></td>
-                            <td class="text-end">R$ <?= fmtNum($totalGwBrl) ?></td>
-                            <td class="text-end">$ <?= fmtNum($totalGwUsd) ?></td>
-                            <td class="text-end">R$ <?= fmtNum($totalGwConvertido) ?></td>
-                            <td class="text-end"><?= $totalGwAprov ?></td>
-                            <td class="text-end"><?= $totalGwPend ?></td>
-                            <td class="text-end"><?= $totalGwRej ?></td>
-                            <td class="text-end"><?= $totalGwEst ?></td>
-                        </tr>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div id="dre-completo-container">
+            <div class="text-center py-5"><i class="fas fa-spinner fa-spin fs-3 text-muted"></i><div class="text-muted mt-2">Carregando DRE Completo...</div></div>
         </div>
     </div><!-- /pane-dre -->
     </div>
@@ -711,5 +628,106 @@ function exportarDRE() {
 
 function fmtCSV(v) {
     return (parseFloat(v) || 0).toFixed(2).replace('.', ',');
+}
+
+// === DRE COMPLETO ===
+let dreLoaded = false;
+document.getElementById('tab-dre').addEventListener('shown.bs.tab', function() {
+    if (dreLoaded) return;
+    dreLoaded = true;
+    loadDreCompleto();
+});
+
+function loadDreCompleto() {
+    const ds = '<?= $dateStart ?>';
+    const de = '<?= $dateEnd ?>';
+    fetch('/admin/dre-completo/dados?date_start=' + ds + '&date_end=' + de)
+        .then(r => r.json())
+        .then(d => { if (d.success) renderDreCompleto(d); else document.getElementById('dre-completo-container').innerHTML = '<div class="alert alert-danger">Erro ao carregar dados</div>'; })
+        .catch(e => { document.getElementById('dre-completo-container').innerHTML = '<div class="alert alert-danger">Erro: ' + e.message + '</div>'; });
+}
+
+function fmtR(v) { const n = parseFloat(v)||0; return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function renderDreCompleto(d) {
+    const r = d.resumo;
+    const taxa = d.taxaUsdBrl;
+    const gwNames = {'stripe':'Stripe','cambioreal':'Câmbio Real','cambioreal_taxas':'CR Taxas','mercadopago':'Mercado Pago','asaas':'Asaas','appmax':'AppMax','pagdev':'PagDev','sem_gateway':'Sem gateway','n/a':'N/A'};
+    const gwColors = {'stripe':'#635bff','cambioreal':'#00a86b','cambioreal_taxas':'#00a86b','mercadopago':'#009ee3','asaas':'#1a1a2e','appmax':'#ff6b35','pagdev':'#6366f1','sem_gateway':'#94a3b8','n/a':'#94a3b8'};
+    let h = '';
+
+    // Cards resumo (8 cards)
+    h += '<div class="row g-3 mb-4">';
+    h += card('Total Entradas','fas fa-arrow-up','#10b981',fmtR(r.total_entradas));
+    h += card('Entradas Pedidos','fas fa-shopping-cart','#3b82f6',(r.qtd_pedidos||0)+' pedidos');
+    h += card('Total Despesas','fas fa-arrow-down','#ef4444',fmtR(r.total_despesas));
+    h += card('Resultado Líquido','fas fa-equals',r.resultado>=0?'#10b981':'#ef4444',fmtR(r.resultado));
+    h += card('Margem','fas fa-percentage',r.margem>=0?'#3b82f6':'#ef4444',r.margem+'%');
+    h += card('Entradas USD','fas fa-dollar-sign','#6366f1','$ '+(r.total_entradas_usd||0).toLocaleString('en-US',{minimumFractionDigits:2}));
+    h += card('Despesas USD','fas fa-dollar-sign','#f59e0b','$ '+(r.total_despesas_usd||0).toLocaleString('en-US',{minimumFractionDigits:2}));
+    h += card('Maior Gasto','fas fa-fire','#dc2626',r.maior_categoria||'N/A');
+    h += '</div>';
+
+    // DRE Profissional
+    h += '<div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><div class="d-flex align-items-center gap-2"><div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:28px;height:28px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:11px;"></i></div><div><h6 class="fw-bold mb-0">DRE — Balanço Financeiro</h6><span class="text-muted" style="font-size:10px;">Período: '+d.periodo.inicio+' a '+d.periodo.fim+'</span></div></div></div><div class="card-body"><table class="table table-sm mb-0" style="font-size:13px;"><tbody>';
+    h += dreRow('RECEITA OPERACIONAL BRUTA',fmtR(r.total_entradas),'fw-bold text-success','fs-5');
+    h += dreRow('  Entradas em BRL',fmtR(r.total_entradas_brl),'ps-3 text-muted');
+    h += dreRow('  Entradas em USD (×'+taxa.toFixed(2)+')',fmtR(r.total_entradas_usd*taxa),'ps-3 text-muted');
+    h += dreRow('(-) DESPESAS TOTAIS',fmtR(r.total_despesas),'fw-bold text-danger border-top','fs-5');
+    h += dreRow('  Despesas em BRL',fmtR(r.total_despesas_brl),'ps-3 text-muted');
+    if (r.total_despesas_usd > 0) h += dreRow('  Despesas em USD (×'+taxa.toFixed(2)+')',fmtR(r.total_despesas_usd*taxa),'ps-3 text-muted');
+    h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;">(=) RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td></tr>';
+    h += '<tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge '+(r.margem>=0?'bg-success':'bg-danger')+'">'+r.margem+'%</span></td></tr>';
+    h += '</tbody></table></div></div>';
+
+    // Resumo Mensal
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-calendar-alt me-2 text-muted"></i>Resumo Mensal</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>Mês</th><th class="text-end">Entradas</th><th class="text-end">Despesas</th><th class="text-end">Resultado</th><th class="text-end">Pedidos</th><th class="text-end">Desp.</th></tr></thead><tbody>';
+    d.meses.forEach(m => { h += '<tr><td class="fw-semibold">'+m.mes+'</td><td class="text-end text-success">'+fmtR(m.entradas_total)+'</td><td class="text-end text-danger">'+fmtR(m.despesas_total)+'</td><td class="text-end fw-bold '+(m.resultado>=0?'text-success':'text-danger')+'">'+fmtR(m.resultado)+'</td><td class="text-end">'+m.qtd_pedidos+'</td><td class="text-end">'+m.qtd_despesas+'</td></tr>'; });
+    h += '<tr class="fw-bold border-top table-light"><td>ACUMULADO</td><td class="text-end">'+fmtR(r.total_entradas)+'</td><td class="text-end">'+fmtR(r.total_despesas)+'</td><td class="text-end '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td><td></td><td></td></tr>';
+    h += '</tbody></table></div></div></div>';
+
+    // Gateways
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-credit-card me-2 text-muted"></i>Processamento por Gateway</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>Gateway</th><th class="text-end">Qtd</th><th class="text-end">Total (R$)</th><th class="text-end">✓</th><th class="text-end">⏳</th><th class="text-end">✗</th><th class="text-end">↩</th></tr></thead><tbody>';
+    const gwMap={};d.gateways.forEach(g=>{const k=g.gateway;if(!gwMap[k])gwMap[k]={gateway:k,qtd:0,total:0,aprovados:0,pendentes:0,rejeitados:0,estornados:0};gwMap[k].total+=(g.moeda==='USD'?(parseFloat(g.total)||0)*taxa:(parseFloat(g.total)||0));gwMap[k].qtd+=parseInt(g.qtd)||0;gwMap[k].aprovados+=parseInt(g.aprovados)||0;gwMap[k].pendentes+=parseInt(g.pendentes)||0;gwMap[k].rejeitados+=parseInt(g.rejeitados)||0;gwMap[k].estornados+=parseInt(g.estornados)||0;});
+    Object.values(gwMap).sort((a,b)=>b.total-a.total).forEach(g=>{h+='<tr><td><span class="d-inline-block rounded me-1" style="width:10px;height:10px;background:'+(gwColors[g.gateway]||'#6b7280')+';"></span>'+(gwNames[g.gateway]||g.gateway)+'</td><td class="text-end">'+g.qtd+'</td><td class="text-end fw-bold">'+fmtR(g.total)+'</td><td class="text-end"><span class="badge bg-success">'+g.aprovados+'</span></td><td class="text-end"><span class="badge bg-warning text-dark">'+g.pendentes+'</span></td><td class="text-end"><span class="badge bg-danger">'+g.rejeitados+'</span></td><td class="text-end"><span class="badge bg-secondary">'+g.estornados+'</span></td></tr>';});
+    h += '</tbody></table></div></div></div>';
+
+    // Entradas de Pedidos
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-shopping-cart me-2 text-muted"></i>Entradas de Pedidos (últimos 50 pagos)</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:11px;"><thead class="table-light"><tr><th>#</th><th>Data</th><th>Status</th><th>Gateway</th><th>Moeda</th><th class="text-end">Subtotal</th><th class="text-end">Taxas</th><th class="text-end">Impostos</th><th class="text-end fw-bold">Total</th></tr></thead><tbody>';
+    (d.entradas_detalhadas||[]).forEach(p=>{h+='<tr><td class="fw-semibold">#'+p.id+'</td><td>'+(p.data_pedido||'').substring(0,10)+'</td><td><span class="badge bg-light text-dark border" style="font-size:9px;">'+(p.status||'')+'</span></td><td>'+(p.gateway||'-')+'</td><td>'+(p.moeda||'BRL')+'</td><td class="text-end">'+fmtR(p.subtotal)+'</td><td class="text-end">'+fmtR(p.servicos)+'</td><td class="text-end">'+fmtR(p.impostos)+'</td><td class="text-end fw-bold">'+fmtR(p.total)+'</td></tr>';});
+    if(!(d.entradas_detalhadas||[]).length)h+='<tr><td colspan="9" class="text-center text-muted py-3">Nenhum pedido pago no período</td></tr>';
+    h += '</tbody></table></div></div></div>';
+
+    // Operacional por Pessoa/Mês
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-users me-2 text-muted"></i>Operacional — Pagamentos por Pessoa/Mês</h6></div><div class="card-body p-0"><div class="table-responsive">';
+    const opData=d.operacional||[];
+    if(!opData.length){h+='<div class="text-center text-muted py-4 small">Cadastre despesas com favorecido para visualizar.</div>';}
+    else{const pessoas={},mesesOp=new Set();opData.forEach(r=>{pessoas[r.pessoa]=pessoas[r.pessoa]||{};pessoas[r.pessoa][r.mes]=(pessoas[r.pessoa][r.mes]||0)+parseFloat(r.total);mesesOp.add(r.mes);});const mesesArr=[...mesesOp].sort();h+='<table class="table table-sm table-hover mb-0" style="font-size:11px;"><thead class="table-light"><tr><th>Pessoa</th>';mesesArr.forEach(m=>{h+='<th class="text-end">'+m+'</th>';});h+='<th class="text-end fw-bold">Total</th></tr></thead><tbody>';const pArr=Object.entries(pessoas).map(([n,ms])=>({nome:n,meses:ms,total:Object.values(ms).reduce((s,v)=>s+v,0)})).sort((a,b)=>b.total-a.total);pArr.forEach(p=>{h+='<tr><td class="fw-semibold">'+p.nome+'</td>';mesesArr.forEach(m=>{h+='<td class="text-end">'+(p.meses[m]?fmtR(p.meses[m]):'-')+'</td>';});h+='<td class="text-end fw-bold">'+fmtR(p.total)+'</td></tr>';});h+='</tbody></table>';}
+    h += '</div></div></div>';
+
+    // Despesas por Categoria + Favorecido
+    h += '<div class="row g-4 mb-4"><div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-tags me-2 text-muted"></i>Despesas por Categoria</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>Categoria</th><th>Grupo</th><th class="text-end">Total</th><th class="text-end">%</th></tr></thead><tbody>';
+    const catMap={};(d.despesas_categoria||[]).forEach(c=>{const k=c.categoria||'Sem categoria';if(!catMap[k])catMap[k]={categoria:k,grupo:c.grupo||'',cor:c.cor||'#6b7280',total:0};catMap[k].total+=(c.moeda==='USD'?(parseFloat(c.total)||0)*taxa:(parseFloat(c.total)||0));});const catArr=Object.values(catMap).sort((a,b)=>b.total-a.total);const catTotal=catArr.reduce((s,c)=>s+c.total,0);
+    catArr.forEach(c=>{const pct=catTotal>0?(c.total/catTotal*100).toFixed(1):'0.0';h+='<tr><td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:'+c.cor+';"></span>'+c.categoria+'</td><td class="text-muted small">'+c.grupo.replace(/_/g,' ')+'</td><td class="text-end fw-bold">'+fmtR(c.total)+'</td><td class="text-end small text-muted">'+pct+'%</td></tr>';});
+    h += '</tbody></table></div></div></div></div><div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-user me-2 text-muted"></i>Maiores Favorecidos</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>Favorecido</th><th class="text-end">Qtd</th><th class="text-end">Total</th></tr></thead><tbody>';
+    const favMap={};(d.despesas_favorecido||[]).forEach(f=>{const k=f.favorecido;if(!favMap[k])favMap[k]={favorecido:k,total:0,qtd:0};favMap[k].total+=(f.moeda==='USD'?(parseFloat(f.total)||0)*taxa:(parseFloat(f.total)||0));favMap[k].qtd+=parseInt(f.qtd)||0;});Object.values(favMap).sort((a,b)=>b.total-a.total).slice(0,15).forEach(f=>{h+='<tr><td>'+f.favorecido+'</td><td class="text-end">'+f.qtd+'</td><td class="text-end fw-bold">'+fmtR(f.total)+'</td></tr>';});
+    h += '</tbody></table></div></div></div></div>';
+
+    // Conciliação
+    h += '<div class="card border-0 shadow-sm" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Conciliação Financeira</h6></div><div class="card-body"><table class="table table-sm mb-0" style="font-size:13px;"><tbody>';
+    h += '<tr><td>Total de créditos (entradas)</td><td class="text-end fw-bold text-success">'+fmtR(d.conciliacao.total_creditos)+'</td></tr>';
+    h += '<tr><td>Total de débitos (despesas)</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';
+    h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold">Saldo final</td><td class="text-end fw-bold fs-5 '+(d.conciliacao.saldo_final>=0?'text-success':'text-danger')+'">'+fmtR(d.conciliacao.saldo_final)+'</td></tr>';
+    h += '<tr><td class="text-muted small">Quantidade de lançamentos</td><td class="text-end">'+d.conciliacao.qtd_lancamentos+'</td></tr>';
+    h += '</tbody></table></div></div>';
+
+    document.getElementById('dre-completo-container').innerHTML = h;
+}
+
+function card(label,icon,color,value) {
+    return '<div class="col-lg-3 col-md-6"><div class="card border-0 shadow-sm" style="border-top:3px solid '+color+';"><div class="card-body py-3"><div class="d-flex align-items-center gap-2 mb-1"><i class="'+icon+'" style="color:'+color+';font-size:12px;"></i><span class="text-muted small">'+label+'</span></div><div class="fs-5 fw-bold">'+value+'</div></div></div></div>';
+}
+function dreRow(label,value,cls,valCls) {
+    return '<tr><td class="'+(cls||'')+'">'+(label.startsWith('  ')?label:''+label)+'</td><td class="text-end '+(valCls||'')+'">'+value+'</td></tr>';
 }
 </script>
