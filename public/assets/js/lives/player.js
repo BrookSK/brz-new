@@ -67,10 +67,12 @@ async function initWHEPPlayer(video, whepUrl) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Enviar para WHEP endpoint
-        const response = await fetch(whepUrl, {
+        // Usar proxy local (evita CORS)
+        const proxyUrl = '/api/live/' + LIVE_ID + '/whep';
+
+        const response = await fetch(proxyUrl, {
             method: 'POST',
-            mode: 'cors',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/sdp' },
             body: pc.localDescription.sdp
         });
@@ -84,13 +86,12 @@ async function initWHEPPlayer(video, whepUrl) {
             console.log('WHEP: Connected! Receiving stream...');
         } else {
             console.error('WHEP error:', response.status);
-            // Fallback: tentar novamente em 3s
-            setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 3000);
+            // Retry em 5s
+            setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
         }
     } catch (e) {
         console.error('WHEP error:', e);
-        // Retry
-        setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 3000);
+        setTimeout(function() { initWHEPPlayer(video, whepUrl); }, 5000);
     }
 }
 

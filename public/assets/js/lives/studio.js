@@ -120,28 +120,26 @@ async function startWebRTC(whipUrl) {
         const placeholder = document.getElementById('cameraPlaceholder');
         if (placeholder) placeholder.classList.add('d-none');
 
-        // WHIP Client para Cloudflare Stream
+        // WHIP via proxy do backend (evita CORS)
         peerConnection = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
             bundlePolicy: 'max-bundle'
         });
 
-        // Adicionar tracks como sendonly
         localStream.getTracks().forEach(track => {
             peerConnection.addTransceiver(track, { direction: 'sendonly' });
         });
 
-        // Criar offer
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        // Enviar offer para WHIP endpoint (não esperar ICE gathering - usar trickle ICE)
-        const response = await fetch(whipUrl, {
+        // Usar proxy local ao invés da URL direta do CF
+        const proxyUrl = '/api/live/' + LIVE_ID + '/whip';
+
+        const response = await fetch(proxyUrl, {
             method: 'POST',
-            mode: 'cors',
-            headers: {
-                'Content-Type': 'application/sdp'
-            },
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/sdp' },
             body: peerConnection.localDescription.sdp
         });
 
@@ -151,16 +149,14 @@ async function startWebRTC(whipUrl) {
                 type: 'answer',
                 sdp: answerSdp
             }));
-            console.log('WHIP: Connected to Cloudflare Stream!');
+            console.log('WHIP: Connected via proxy!');
         } else {
             const errText = await response.text();
-            console.error('WHIP error:', response.status, errText);
-            alert('Erro WHIP (' + response.status + '): ' + errText.substring(0, 200));
+            console.error('WHIP proxy error:', response.status, errText);
         }
 
     } catch (e) {
-        console.error('WebRTC error:', e);
-        alert('Erro WebRTC: ' + e.message);
+        console.error('WebRTC/WHIP error:', e);
     }
 }
 

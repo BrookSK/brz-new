@@ -264,6 +264,7 @@ class AdminLivesController {
                 'rtmps_url' => $cfResult['rtmps_url'],
                 'rtmps_key' => $cfResult['rtmps_key'],
                 'webrtc_url' => $cfResult['webrtc_url'],
+                'whip_proxy_url' => '/api/live/' . $id . '/whip',
                 'playback_url' => $playbackUrl,
             ]);
         } catch (\Exception $e) {
@@ -488,6 +489,54 @@ class AdminLivesController {
         }, $rows);
 
         $this->jsonResponse(['products' => $products]);
+    }
+
+    /**
+     * POST /api/live/{id}/whip — Proxy WHIP para Cloudflare (evita CORS)
+     */
+    public function whipProxy(Request $request, $id) {
+        $live = $this->liveModel->find($id);
+        if (!$live || empty($live['cf_webrtc_url'])) {
+            http_response_code(404);
+            echo 'Live not found or no WHIP URL';
+            return;
+        }
+
+        // Ler SDP do body
+        $sdp = file_get_contents('php://input');
+        if (empty($sdp)) {
+            http_response_code(400);
+            echo 'Empty SDP';
+            return;
+        }
+
+        // Repassar para o Cloudflare WHIP endpoint
+        $whipUrl = $live['cf_webrtc_url'];
+        
+        $ch = curl_init($whipUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $sdp,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/sdp',
+            ],
+            CURLOPT_HEADER => true,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        $body = substr($response, $headerSize);
+
+        // Retornar a resposta do CF para o navegador
+        http_response_code($httpCode ?: 502);
+        header('Content-Type: application/sdp');
+        header('Access-Control-Allow-Origin: *');
+        echo $body;
     }
 
     // ─── Helpers ────────────────────────────────────────────────────

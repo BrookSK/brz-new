@@ -95,3 +95,52 @@ class LivePollController {
         echo json_encode($data, JSON_UNESCAPED_UNICODE);
     }
 }
+
+    /**
+     * POST /api/live/{id}/whep — Proxy WHEP para Cloudflare (evita CORS)
+     */
+    public function whepProxy(Request $request, $id) {
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare("SELECT cf_playback_url FROM lives WHERE id = ? LIMIT 1");
+            $st->execute([(int)$id]);
+            $playbackUrl = $st->fetchColumn();
+
+            if (empty($playbackUrl)) {
+                http_response_code(404);
+                echo 'No playback URL';
+                return;
+            }
+
+            $sdp = file_get_contents('php://input');
+            if (empty($sdp)) {
+                http_response_code(400);
+                echo 'Empty SDP';
+                return;
+            }
+
+            $ch = curl_init($playbackUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $sdp,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/sdp'],
+                CURLOPT_HEADER => true,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            curl_close($ch);
+
+            $body = substr($response, $headerSize);
+
+            http_response_code($httpCode ?: 502);
+            header('Content-Type: application/sdp');
+            echo $body;
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo $e->getMessage();
+        }
+    }

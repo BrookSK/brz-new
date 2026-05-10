@@ -313,6 +313,7 @@ $router->get('/admin/lives/{id}/studio', 'AdminLivesController', 'studio');
 $router->post('/admin/lives/{id}/start', 'AdminLivesController', 'start');
 $router->post('/admin/lives/{id}/stop', 'AdminLivesController', 'stop');
 $router->post('/admin/lives/{id}/feature', 'AdminLivesController', 'feature');
+$router->post('/api/live/{id}/whip', 'AdminLivesController', 'whipProxy');
 
 // Admin — Produtos da Live
 $router->get('/admin/lives/buscar-produtos', 'AdminLivesController', 'searchProducts');
@@ -339,6 +340,7 @@ $router->get('/api/lives/status', 'LivesController', 'checkLiveStatus');
 
 // Cliente — API REST
 $router->get('/api/live/{id}/poll', 'LivePollController', 'poll');
+$router->post('/api/live/{id}/whep', 'LivePollController', 'whepProxy');
 $router->post('/api/live/{id}/heartbeat', 'LiveApiController', 'heartbeat');
 $router->post('/api/live/{id}/chat', 'LiveApiController', 'chat');
 $router->post('/api/live/{id}/like', 'LiveApiController', 'like');
