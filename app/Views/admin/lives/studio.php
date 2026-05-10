@@ -148,7 +148,7 @@ $isWebRTC = $live['ingest_method'] === 'webrtc';
             <div id="chatMessages" class="chat-messages">
                 <?php if (!empty($chatMessages)): ?>
                     <?php foreach ($chatMessages as $msg): ?>
-                        <div class="chat-msg-studio">
+                        <div class="chat-msg-studio" data-msg-id="<?= (int)$msg['id'] ?>">
                             <span class="user"><?= htmlspecialchars($msg['user_name'] ?? $msg['user_name_alt'] ?? 'Anônimo') ?></span>
                             <span class="text"><?= htmlspecialchars($msg['content']) ?></span>
                             <span class="actions">
@@ -178,6 +178,13 @@ let currentFeaturedId = <?= $live['current_featured_product_id'] ?? 'null' ?>;
 let liveStartTime = <?= $isLive && $live['live_started_at'] ? strtotime($live['live_started_at']) : 'null' ?>;
 let sseSource = null;
 let durationInterval = null;
+
+// Inicializar adminLastMsgId com a última mensagem já carregada
+var _initMsgs = document.querySelectorAll('.chat-msg-studio[data-msg-id]');
+var adminLastMsgId = 0;
+if (_initMsgs.length > 0) {
+    adminLastMsgId = parseInt(_initMsgs[_initMsgs.length - 1].getAttribute('data-msg-id')) || 0;
+}
 </script>
 <script src="/assets/js/lives/studio.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>

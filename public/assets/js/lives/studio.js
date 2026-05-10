@@ -291,8 +291,8 @@ function renderStudioChatMsg(msg) {
 }
 
 // ─── Polling para chat e métricas (substitui SSE) ───────────
-var adminLastMsgId = 0;
 var adminPollInterval = null;
+if (typeof adminLastMsgId === 'undefined') var adminLastMsgId = 0;
 
 function startAdminPolling() {
     adminPollInterval = setInterval(function() {
