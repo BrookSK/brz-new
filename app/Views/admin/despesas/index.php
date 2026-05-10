@@ -1,0 +1,386 @@
+<?php
+$tab = $tab ?? 'visao-geral';
+$stats = $stats ?? [];
+$despesas = $despesas ?? [];
+$categorias = $categorias ?? [];
+$recorrencias = $recorrencias ?? [];
+$parcelamentos = $parcelamentos ?? [];
+$comissoes = $comissoes ?? [];
+$filtros = $filtros ?? [];
+function fmtD($v) { return 'R$ ' . number_format((float)($v ?? 0), 2, ',', '.'); }
+
+$countAll = count($despesas);
+$countVencidas = count(array_filter($despesas, fn($d) => ($d['status'] ?? '') === 'vencida'));
+$countHoje = count(array_filter($despesas, fn($d) => ($d['vencimento'] ?? '') === date('Y-m-d') && ($d['status'] ?? '') !== 'paga'));
+$countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') === 'comissao'));
+?>
+
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="fas fa-wallet text-danger"></i></div>
+            <div><h4 class="fw-bold mb-0">Despesas</h4><p class="text-muted small mb-0">Centro de controle de saídas, recorrências, parcelas e comissões</p></div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="border rounded-pill px-3 py-1 d-flex align-items-center gap-2 bg-white small">
+                <i class="fas fa-arrow-down text-danger" style="font-size:10px;"></i><span class="text-muted">Saídas hoje</span><span class="fw-bold"><?= fmtD($stats['vencido'] ?? 0) ?></span>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i>Exportar</button>
+            <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i>Nova despesa</button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral">Visão Geral</a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas">Todas as despesas <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes">Recorrentes <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas">Parceladas <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes">Comissões <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias">Categorias</a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios">Relatórios</a></li>
+    </ul>
+
+    <?php if (!empty($_SESSION['message'])): ?>
+    <div class="alert alert-<?= $_SESSION['message_type'] ?? 'info' ?> alert-dismissible fade show"><i class="fas fa-check-circle me-1"></i><?= htmlspecialchars($_SESSION['message']) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <?php unset($_SESSION['message'], $_SESSION['message_type']); endif; ?>
+
+    <?php if ($tab === 'visao-geral'): ?>
+    <!-- VISÃO GERAL -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #3b82f6;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-chart-pie text-primary"></i><span class="small fw-semibold">Despesas do mês</span></div><div class="fs-4 fw-bold"><?= fmtD($stats['total_mes']) ?></div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #10b981;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-check-circle text-success"></i><span class="small fw-semibold">Pago no mês</span></div><div class="fs-4 fw-bold text-success"><?= fmtD($stats['pago_mes']) ?></div><div class="text-muted small"><?= ($stats['total_mes'] > 0) ? round($stats['pago_mes'] / $stats['total_mes'] * 100, 1) : 0 ?>% do total quitado</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #f59e0b;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-clock text-warning"></i><span class="small fw-semibold">Em aberto</span></div><div class="fs-4 fw-bold text-warning"><?= fmtD($stats['aberto']) ?></div><div class="text-muted small"><?= $stats['qtd_aberto'] ?> lançamentos a vencer</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #ef4444;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-exclamation-triangle text-danger"></i><span class="small fw-semibold">Vencido</span></div><div class="fs-4 fw-bold text-danger"><?= fmtD($stats['vencido']) ?></div><div class="text-muted small"><?= $stats['qtd_vencido'] ?> lançamentos em atraso</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #6366f1;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-calendar-alt text-indigo"></i><span class="small fw-semibold">Próximos 30 dias</span></div><div class="fs-4 fw-bold"><?= fmtD($stats['proximos_30']) ?></div><div class="text-muted small"><?= $stats['qtd_proximos'] ?> compromissos previstos</div></div></div></div>
+        <div class="col-lg-4 col-md-6"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid #8b5cf6;"><div class="card-body"><div class="d-flex align-items-center gap-2 mb-2"><i class="fas fa-hand-holding-usd text-purple"></i><span class="small fw-semibold">Comissões a pagar</span></div><div class="fs-4 fw-bold"><?= fmtD($stats['comissoes']) ?></div><div class="text-muted small"><?= $stats['qtd_comissoes'] ?> pendentes</div></div></div></div>
+    </div>
+
+    <!-- Recorrências e Parcelamentos lado a lado -->
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-muted"></i>Recorrências ativas</h6><a href="/admin/despesas?tab=recorrentes" class="btn btn-sm btn-outline-primary">Ver todas</a></div>
+                <div class="card-body p-0">
+                    <?php if (empty($recorrencias)): ?>
+                    <div class="text-center text-muted py-4 small">Nenhuma recorrência ativa</div>
+                    <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach (array_slice($recorrencias, 0, 5) as $r): ?>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= ucfirst($r['frequencia']) ?> · dia <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· até ' . date('m/Y', strtotime($r['data_fim'])) : '· sem fim' ?></div></div>
+                            <span class="fw-bold small"><?= fmtD($r['valor']) ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0"><i class="fas fa-layer-group me-2 text-muted"></i>Parcelas em andamento</h6><a href="/admin/despesas?tab=parceladas" class="btn btn-sm btn-outline-primary">Ver todas</a></div>
+                <div class="card-body p-0">
+                    <?php if (empty($parcelamentos)): ?>
+                    <div class="text-center text-muted py-4 small">Nenhum parcelamento ativo</div>
+                    <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach (array_slice($parcelamentos, 0, 5) as $p): $pct = $p['quantidade_parcelas'] > 0 ? round($p['parcelas_pagas'] / $p['quantidade_parcelas'] * 100) : 0; ?>
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div><div class="fw-semibold small"><?= htmlspecialchars($p['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= $p['parcelas_pagas'] ?>/<?= $p['quantidade_parcelas'] ?> · pago <?= fmtD($p['valor_total'] - $p['saldo_restante']) ?> / <?= fmtD($p['valor_total']) ?></div></div>
+                                <span class="fw-bold small"><?= fmtD($p['valor_parcela']) ?><span class="text-muted fw-normal">/parcela</span></span>
+                            </div>
+                            <div class="progress mt-1" style="height:4px;"><div class="progress-bar bg-primary" style="width:<?= $pct ?>%"></div></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($tab === 'todas' || $tab === 'comissoes'): ?>
+    <!-- FILTROS + TABELA -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <a href="/admin/despesas?tab=todas" class="btn btn-sm <?= empty($filtros['rapido'])?'btn-dark':'btn-outline-secondary' ?> rounded-pill">Todas <?= $countAll ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=vencidas" class="btn btn-sm <?= ($filtros['rapido']??'')==='vencidas'?'btn-danger':'btn-outline-danger' ?> rounded-pill">Vencidas <?= $countVencidas ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=hoje" class="btn btn-sm <?= ($filtros['rapido']??'')==='hoje'?'btn-warning':'btn-outline-warning' ?> rounded-pill">Vencem hoje <?= $countHoje ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=7dias" class="btn btn-sm <?= ($filtros['rapido']??'')==='7dias'?'btn-info':'btn-outline-info' ?> rounded-pill">Próx. 7 dias</a>
+                <a href="/admin/despesas?tab=todas&rapido=pagas" class="btn btn-sm <?= ($filtros['rapido']??'')==='pagas'?'btn-success':'btn-outline-success' ?> rounded-pill">Pagas</a>
+                <a href="/admin/despesas?tab=todas&rapido=fixas" class="btn btn-sm <?= ($filtros['rapido']??'')==='fixas'?'btn-primary':'btn-outline-primary' ?> rounded-pill">Fixas</a>
+                <a href="/admin/despesas?tab=todas&rapido=parcelas" class="btn btn-sm <?= ($filtros['rapido']??'')==='parcelas'?'btn-secondary':'btn-outline-secondary' ?> rounded-pill">Parcelas em aberto</a>
+                <a href="/admin/despesas?tab=todas&rapido=comissoes" class="btn btn-sm <?= ($filtros['rapido']??'')==='comissoes'?'btn-purple':'btn-outline-secondary' ?> rounded-pill">Comissões</a>
+            </div>
+            <form method="GET" action="/admin/despesas" class="row g-2 align-items-end">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                <div class="col-md-2"><label class="form-label small text-muted">Competência de</label><input type="month" name="competencia_de" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_de'] ?? '', 0, 7)) ?>"></div>
+                <div class="col-md-2"><label class="form-label small text-muted">Até</label><input type="month" name="competencia_ate" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_ate'] ?? '', 0, 7)) ?>"></div>
+                <div class="col-md-2"><label class="form-label small text-muted">Categoria</label><select name="categoria" class="form-select form-select-sm"><option value="">Todas</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>" <?= ($filtros['categoria']??'')==$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">Status</label><select name="status" class="form-select form-select-sm"><option value="">Todos</option><option value="prevista" <?= ($filtros['status']??'')==='prevista'?'selected':'' ?>>Prevista</option><option value="a_vencer" <?= ($filtros['status']??'')==='a_vencer'?'selected':'' ?>>A vencer</option><option value="vencida" <?= ($filtros['status']??'')==='vencida'?'selected':'' ?>>Vencida</option><option value="paga" <?= ($filtros['status']??'')==='paga'?'selected':'' ?>>Paga</option><option value="cancelada" <?= ($filtros['status']??'')==='cancelada'?'selected':'' ?>>Cancelada</option></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">Tipo</label><select name="tipo" class="form-select form-select-sm"><option value="">Todos</option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>>Avulsa</option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>>Fixa</option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>>Recorrente</option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>>Parcelada</option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>>Comissão</option></select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size:12px;">
+                    <thead class="table-light"><tr><th></th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Competência</th><th>Vencimento</th><th class="text-end">Valor</th><th>Status</th><th>Origem</th><th>Ações</th></tr></thead>
+                    <tbody>
+                    <?php if (empty($despesas)): ?>
+                    <tr><td colspan="10" class="text-center text-muted py-4">Nenhuma despesa encontrada.</td></tr>
+                    <?php else: ?>
+                    <?php
+                    $statusBadge = ['prevista'=>'bg-secondary','a_vencer'=>'bg-warning text-dark','vencida'=>'bg-danger','paga'=>'bg-success','parcialmente_paga'=>'bg-info','cancelada'=>'bg-dark bg-opacity-50'];
+                    $tipoBadge = ['avulsa'=>'Avulsa','fixa'=>'Fixa','recorrente'=>'Recorrente','parcelada'=>'Parcelada','comissao'=>'Comissão'];
+                    foreach ($despesas as $d):
+                        $stClass = $statusBadge[$d['status'] ?? ''] ?? 'bg-secondary';
+                    ?>
+                    <tr>
+                        <td><input type="checkbox" class="form-check-input" value="<?= $d['id'] ?>"></td>
+                        <td>
+                            <div class="fw-semibold"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
+                            <?php if ($d['favorecido']): ?><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($d['favorecido']) ?></div><?php endif; ?>
+                        </td>
+                        <td><?php if ($d['categoria_nome']): ?><span class="badge" style="background:<?= $d['categoria_cor'] ?? '#6b7280' ?>;font-size:10px;"><?= htmlspecialchars($d['categoria_nome']) ?></span><?php else: ?>-<?php endif; ?></td>
+                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= $tipoBadge[$d['tipo'] ?? ''] ?? $d['tipo'] ?></span></td>
+                        <td><?= $d['competencia'] ? date('m/Y', strtotime($d['competencia'])) : '-' ?></td>
+                        <td><?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></td>
+                        <td class="text-end fw-bold"><?= fmtD($d['valor']) ?></td>
+                        <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
+                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
+                        <td>
+                            <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
+                            <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-sm btn-outline-success" title="Pagar"><i class="fas fa-check"></i></button></form>
+                            <form method="POST" action="/admin/despesas/cancelar/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Cancelar?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar"><i class="fas fa-times"></i></button></form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($tab === 'recorrentes'): ?>
+    <!-- RECORRENTES -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-info"></i>Recorrências Ativas</h6>
+            <button class="btn btn-sm btn-dark rounded-pill" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa" onclick="setTimeout(function(){document.getElementById('despesa-tipo').value='recorrente';toggleTipoFields();},300)"><i class="fas fa-plus me-1"></i>Nova</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size:12px;">
+                    <thead class="table-light"><tr><th>Descrição</th><th>Categoria</th><th>Frequência</th><th>Dia</th><th class="text-end">Valor</th><th>Próxima</th><th>Fim</th></tr></thead>
+                    <tbody>
+                    <?php if (empty($recorrencias)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma recorrência cadastrada.</td></tr>
+                    <?php else: foreach ($recorrencias as $r): ?>
+                    <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars($r['descricao']) ?></td>
+                        <td><?= !empty($r['categoria_nome']) ? '<span class="badge" style="background:'.($r['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($r['categoria_nome']).'</span>' : '-' ?></td>
+                        <td><?= ucfirst($r['frequencia'] ?? '') ?></td>
+                        <td><?= $r['dia_vencimento'] ?? '-' ?></td>
+                        <td class="text-end fw-bold"><?= fmtD($r['valor']) ?></td>
+                        <td><?= $r['proxima_geracao'] ? date('d/m/Y', strtotime($r['proxima_geracao'])) : '-' ?></td>
+                        <td><?= $r['data_fim'] ? date('m/Y', strtotime($r['data_fim'])) : 'Sem fim' ?></td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($tab === 'parceladas'): ?>
+    <!-- PARCELADAS -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0"><i class="fas fa-layer-group me-2 text-warning"></i>Parcelamentos em Andamento</h6>
+            <button class="btn btn-sm btn-dark rounded-pill" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa" onclick="setTimeout(function(){document.getElementById('despesa-tipo').value='parcelada';toggleTipoFields();},300)"><i class="fas fa-plus me-1"></i>Novo</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size:12px;">
+                    <thead class="table-light"><tr><th>Descrição</th><th>Categoria</th><th class="text-end">Total</th><th>Parcelas</th><th class="text-end">Valor/Parc.</th><th class="text-end">Pago</th><th class="text-end">Saldo</th><th>Progresso</th></tr></thead>
+                    <tbody>
+                    <?php if (empty($parcelamentos)): ?>
+                    <tr><td colspan="8" class="text-center text-muted py-4">Nenhum parcelamento ativo.</td></tr>
+                    <?php else: foreach ($parcelamentos as $p): $pct = $p['quantidade_parcelas'] > 0 ? round($p['parcelas_pagas'] / $p['quantidade_parcelas'] * 100) : 0; ?>
+                    <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars($p['descricao']) ?></td>
+                        <td><?= !empty($p['categoria_nome']) ? '<span class="badge" style="background:'.($p['categoria_cor']??'#6b7280').';font-size:10px;">'.htmlspecialchars($p['categoria_nome']).'</span>' : '-' ?></td>
+                        <td class="text-end fw-bold"><?= fmtD($p['valor_total']) ?></td>
+                        <td><span class="badge bg-light text-dark border"><?= $p['parcelas_pagas'] ?>/<?= $p['quantidade_parcelas'] ?></span></td>
+                        <td class="text-end"><?= fmtD($p['valor_parcela']) ?></td>
+                        <td class="text-end text-success"><?= fmtD($p['valor_total'] - $p['saldo_restante']) ?></td>
+                        <td class="text-end text-danger"><?= fmtD($p['saldo_restante']) ?></td>
+                        <td style="min-width:80px;"><div class="progress" style="height:5px;"><div class="progress-bar bg-primary" style="width:<?= $pct ?>%"></div></div><div class="text-muted text-center" style="font-size:9px;"><?= $pct ?>%</div></td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($tab === 'categorias'): ?>
+    <!-- CATEGORIAS -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-tags me-2"></i>Categorias de Despesas</h6></div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light"><tr><th>Cor</th><th>Nome</th><th>Grupo</th><th>Status</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($categorias as $cat): ?>
+                    <tr>
+                        <td><span class="d-inline-block rounded-circle" style="width:12px;height:12px;background:<?= $cat['cor'] ?? '#6b7280' ?>;"></span></td>
+                        <td class="fw-semibold"><?= htmlspecialchars($cat['nome']) ?></td>
+                        <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $cat['grupo'] ?? '')) ?></span></td>
+                        <td><?= $cat['ativa'] ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>' ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($tab === 'relatorios'): ?>
+    <!-- RELATÓRIOS -->
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1"><i class="fas fa-chart-bar me-2 text-primary"></i>Relatório por Categoria</h6>
+                    <p class="text-muted small">Quanto foi gasto por tipo de despesa no período.</p>
+                    <a href="/admin/relatorio-geral" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i>Ver no Financeiro</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 text-info"></i>Relatório por Período</h6>
+                    <p class="text-muted small">Despesas por mês com comparativo.</p>
+                    <a href="/admin/despesas?tab=todas" class="btn btn-sm btn-outline-info"><i class="fas fa-filter me-1"></i>Filtrar por período</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1"><i class="fas fa-sync-alt me-2 text-warning"></i>Relatório de Recorrências</h6>
+                    <p class="text-muted small">Despesas fixas e previsão de custos futuros.</p>
+                    <a href="/admin/despesas?tab=recorrentes" class="btn btn-sm btn-outline-warning"><i class="fas fa-list me-1"></i>Ver recorrências</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1"><i class="fas fa-layer-group me-2 text-danger"></i>Relatório de Parcelamentos</h6>
+                    <p class="text-muted small">Parcelas futuras, saldo total a pagar, compromissos.</p>
+                    <a href="/admin/despesas?tab=parceladas" class="btn btn-sm btn-outline-danger"><i class="fas fa-list me-1"></i>Ver parcelamentos</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1"><i class="fas fa-hand-holding-usd me-2 text-purple"></i>Relatório de Comissões</h6>
+                    <p class="text-muted small">Comissão por pessoa, gerada, a pagar, paga.</p>
+                    <a href="/admin/despesas?tab=comissoes" class="btn btn-sm btn-outline-secondary"><i class="fas fa-list me-1"></i>Ver comissões</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1"><i class="fas fa-chart-line me-2 text-success"></i>Fluxo de Caixa Previsto</h6>
+                    <p class="text-muted small">Entradas previstas vs saídas previstas = saldo projetado.</p>
+                    <a href="/admin/relatorio-geral" class="btn btn-sm btn-outline-success"><i class="fas fa-external-link-alt me-1"></i>Ver DRE no Financeiro</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+</div>
+
+<!-- Modal Nova Despesa -->
+<div class="modal fade" id="modalNovaDespesa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="/admin/despesas/criar">
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Nova Despesa</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-8"><label class="form-label small fw-semibold">Descrição</label><input type="text" name="descricao" class="form-control" required placeholder="Ex: Aluguel sede comercial"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Tipo</label><select name="tipo" class="form-select" id="despesa-tipo" onchange="toggleTipoFields()"><option value="avulsa">Avulsa</option><option value="fixa">Fixa</option><option value="recorrente">Recorrente</option><option value="parcelada">Parcelada</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Categoria</label><select name="categoria_id" class="form-select"><option value="">Selecione</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Valor (R$)</label><input type="number" name="valor" class="form-control" step="0.01" min="0" required></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" class="form-select"><option value="BRL">BRL</option><option value="USD">USD</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Competência</label><input type="month" name="competencia" class="form-control" value="<?= date('Y-m') ?>"></div>
+                    <div class="col-md-4" id="field-vencimento"><label class="form-label small fw-semibold">Vencimento</label><input type="date" name="vencimento" class="form-control"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Forma de pagamento</label><select name="forma_pagamento" class="form-select"><option value="">Selecione</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito">Cartão de crédito</option><option value="transferencia">Transferência</option><option value="debito_automatico">Débito automático</option></select></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold">Favorecido</label><input type="text" name="favorecido" class="form-control" placeholder="Nome do fornecedor/beneficiário"></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold">Status</label><select name="status" class="form-select"><option value="prevista">Prevista</option><option value="a_vencer">A vencer</option><option value="paga">Paga</option></select></div>
+                    <!-- Campos recorrência -->
+                    <div class="col-12 d-none" id="fields-recorrencia">
+                        <div class="card border-info"><div class="card-body">
+                            <h6 class="fw-bold small text-info mb-2"><i class="fas fa-sync-alt me-1"></i>Configuração da Recorrência</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4"><label class="form-label small">Frequência</label><select name="frequencia" class="form-select form-select-sm"><option value="mensal">Mensal</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="anual">Anual</option></select></div>
+                                <div class="col-md-4"><label class="form-label small">Dia do vencimento</label><input type="number" name="dia_vencimento" class="form-control form-control-sm" min="1" max="31" value="1"></div>
+                                <div class="col-md-4"><label class="form-label small">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
+                                <div class="col-md-4"><label class="form-label small">Data fim (opcional)</label><input type="date" name="data_fim" class="form-control form-control-sm"></div>
+                            </div>
+                        </div></div>
+                    </div>
+                    <!-- Campos parcelamento -->
+                    <div class="col-12 d-none" id="fields-parcelamento">
+                        <div class="card border-warning"><div class="card-body">
+                            <h6 class="fw-bold small text-warning mb-2"><i class="fas fa-layer-group me-1"></i>Configuração do Parcelamento</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4"><label class="form-label small">Valor total</label><input type="number" name="valor_total" class="form-control form-control-sm" step="0.01" min="0"></div>
+                                <div class="col-md-4"><label class="form-label small">Quantidade de parcelas</label><input type="number" name="quantidade_parcelas" class="form-control form-control-sm" min="2" max="60" value="10"></div>
+                                <div class="col-md-4"><label class="form-label small">Data 1ª parcela</label><input type="date" name="data_primeira_parcela" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
+                            </div>
+                        </div></div>
+                    </div>
+                    <div class="col-12"><label class="form-label small fw-semibold">Observações</label><textarea name="observacoes" class="form-control" rows="2"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-dark btn-sm px-4"><i class="fas fa-save me-1"></i>Salvar</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTipoFields() {
+    const tipo = document.getElementById('despesa-tipo').value;
+    document.getElementById('fields-recorrencia').classList.toggle('d-none', tipo !== 'recorrente');
+    document.getElementById('fields-parcelamento').classList.toggle('d-none', tipo !== 'parcelada');
+}
+function exportarDespesas() {
+    window.location.href = '/admin/despesas?tab=todas&export=csv';
+}
+</script>

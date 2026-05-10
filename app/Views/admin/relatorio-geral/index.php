@@ -337,6 +337,76 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
         </div>
     </div>
 
+    <!-- DRE - Demonstrativo de Resultado -->
+    <?php
+    $despesasResumo = $despesasResumo ?? ['total' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
+    $receitaBruta = $totalTotal; // Total de receitas convertido em BRL
+    $totalDespesas = (float)($despesasResumo['total'] ?? 0);
+    $lucroLiquido = $receitaBruta - $totalDespesas;
+    $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
+    ?>
+    <div class="row g-4 mt-2">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-top:3px solid #1e293b;">
+                <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:12px;"></i></div>
+                        <div><h6 class="fw-bold mb-0">DRE — Demonstrativo de Resultado</h6><span class="text-muted" style="font-size:10px;">Receitas vs Despesas no período</span></div>
+                    </div>
+                    <a href="/admin/despesas" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i>Ver despesas</a>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <!-- Resumo DRE -->
+                        <div class="col-lg-5">
+                            <table class="table table-sm mb-0" style="font-size:13px;">
+                                <tbody>
+                                    <tr class="border-bottom"><td class="fw-bold text-success"><i class="fas fa-arrow-up me-1"></i>RECEITA BRUTA</td><td class="text-end fw-bold text-success fs-5"><?= fmtNum($receitaBruta) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Subtotal produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Taxa de serviço</td><td class="text-end"><?= fmtNum($totalServicos) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Impostos cobrados</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Frete</td><td class="text-end"><?= fmtNum($totalFrete) ?></td></tr>
+                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5"><?= fmtNum($totalDespesas) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Pagas no período</td><td class="text-end"><?= fmtNum($despesasResumo['pago']) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Em aberto</td><td class="text-end"><?= fmtNum($despesasResumo['aberto']) ?></td></tr>
+                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;"><i class="fas fa-equals me-1"></i>RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
+                                    <tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge <?= $margemLucro >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $margemLucro ?>%</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Despesas por categoria -->
+                        <div class="col-lg-7">
+                            <h6 class="fw-bold small mb-2"><i class="fas fa-chart-pie me-1 text-muted"></i>Despesas por Categoria</h6>
+                            <?php if (empty($despesasResumo['por_categoria'])): ?>
+                            <div class="text-center text-muted py-4 small"><i class="fas fa-inbox d-block mb-2" style="font-size:24px;opacity:.4;"></i>Nenhuma despesa registrada no período.<br><a href="/admin/despesas" class="mt-2 d-inline-block">Cadastrar despesas →</a></div>
+                            <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0" style="font-size:12px;">
+                                    <thead class="table-light"><tr><th>Categoria</th><th>Grupo</th><th class="text-end">Qtd</th><th class="text-end">Total (R$)</th><th>%</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($despesasResumo['por_categoria'] as $dc):
+                                        $pctCat = $totalDespesas > 0 ? round((float)$dc['total'] / $totalDespesas * 100, 1) : 0;
+                                    ?>
+                                    <tr>
+                                        <td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:<?= $dc['cor'] ?? '#6b7280' ?>;"></span><?= htmlspecialchars($dc['categoria'] ?? 'Sem categoria') ?></td>
+                                        <td><span class="text-muted" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $dc['grupo'] ?? '')) ?></span></td>
+                                        <td class="text-end"><?= (int)($dc['qtd'] ?? 0) ?></td>
+                                        <td class="text-end fw-bold"><?= fmtNum($dc['total'] ?? 0) ?></td>
+                                        <td><div class="d-flex align-items-center gap-1"><div class="progress flex-grow-1" style="height:4px;width:60px;"><div class="progress-bar bg-danger" style="width:<?= $pctCat ?>%"></div></div><span class="text-muted" style="font-size:10px;"><?= $pctCat ?>%</span></div></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                    <tr class="fw-bold border-top"><td>Total</td><td></td><td class="text-end"><?= array_sum(array_column($despesasResumo['por_categoria'], 'qtd')) ?></td><td class="text-end"><?= fmtNum($totalDespesas) ?></td><td></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     </div><!-- /pane-geral -->
     <div class="tab-pane fade" id="pane-regional" role="tabpanel"><div id="regional-content"></div></div>
     </div>
@@ -413,6 +483,9 @@ const DRE_DATA = <?= json_encode([
     'totalImpostos' => $totalImpostos,
     'totalFrete' => $totalFrete,
     'totalTotal' => $totalTotal,
+    'despesas' => $despesasResumo,
+    'lucroLiquido' => $lucroLiquido ?? 0,
+    'margemLucro' => $margemLucro ?? 0,
 ], JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
 
 function exportarDRE() {
@@ -483,6 +556,35 @@ function exportarDRE() {
     });
     csv += nl;
 
+    // === DESPESAS ===
+    csv += '=== DESPESAS DO PERÍODO ===' + nl;
+    csv += 'Descrição' + sep + 'Valor (R$)' + nl;
+    const desp = d.despesas || {};
+    csv += 'Total Despesas' + sep + fmtCSV(desp.total || 0) + nl;
+    csv += 'Despesas Pagas' + sep + fmtCSV(desp.pago || 0) + nl;
+    csv += 'Despesas em Aberto' + sep + fmtCSV(desp.aberto || 0) + nl;
+    csv += nl;
+    if (desp.por_categoria && desp.por_categoria.length > 0) {
+        csv += 'Categoria' + sep + 'Grupo' + sep + 'Qtd' + sep + 'Total (R$)' + nl;
+        desp.por_categoria.forEach(c => {
+            csv += (c.categoria || 'Sem categoria') + sep + (c.grupo || '').replace(/_/g,' ') + sep + (c.qtd || 0) + sep + fmtCSV(parseFloat(c.total || 0)) + nl;
+        });
+        csv += nl;
+    }
+
+    // === DRE - RESULTADO ===
+    csv += '=== DRE - RESULTADO ===' + nl;
+    csv += 'Descrição' + sep + 'Valor (R$)' + nl;
+    const receitaBruta = d.totalTotal || 0;
+    const totalDesp = desp.total || 0;
+    const lucro = receitaBruta - totalDesp;
+    const margem = receitaBruta > 0 ? (lucro / receitaBruta * 100).toFixed(1) : '0.0';
+    csv += 'RECEITA BRUTA' + sep + fmtCSV(receitaBruta) + nl;
+    csv += '(-) DESPESAS TOTAIS' + sep + fmtCSV(totalDesp) + nl;
+    csv += '(=) RESULTADO LÍQUIDO' + sep + fmtCSV(lucro) + nl;
+    csv += 'Margem (%)' + sep + margem.replace('.', ',') + '%' + nl;
+    csv += nl;
+
     // === CONCILIAÇÃO ===
     csv += '=== CONCILIAÇÃO ===' + nl;
     csv += 'Descrição' + sep + 'Valor (R$)' + nl;
@@ -492,6 +594,8 @@ function exportarDRE() {
     csv += 'Total Taxa de Serviço' + sep + fmtCSV(d.totalServicos) + nl;
     csv += 'Total Impostos' + sep + fmtCSV(d.totalImpostos) + nl;
     csv += 'Total Frete' + sep + fmtCSV(d.totalFrete) + nl;
+    csv += 'Total Despesas' + sep + fmtCSV(totalDesp) + nl;
+    csv += 'Resultado Líquido' + sep + fmtCSV(lucro) + nl;
     csv += 'Quantidade de Pedidos' + sep + (d.totais.qtd_pedidos || 0) + nl;
 
     // Download

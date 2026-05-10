@@ -138,6 +138,13 @@ $router->post('/admin/pagamentos/comissoes-gerais/deletar/{id}', 'AdminPagamento
 $router->get('/admin/comissoes-global', 'AdminComissoesGlobalController', 'comissoesTodas');
 $router->get('/admin/resumo-financeiro', 'AdminComissoesGlobalController', 'resumoFinanceiro');
 
+// Despesas
+$router->get('/admin/despesas', 'AdminDespesasController', 'index');
+$router->post('/admin/despesas/criar', 'AdminDespesasController', 'criar');
+$router->post('/admin/despesas/pagar/{id}', 'AdminDespesasController', 'marcarPaga');
+$router->post('/admin/despesas/cancelar/{id}', 'AdminDespesasController', 'cancelar');
+$router->post('/admin/despesas/excluir/{id}', 'AdminDespesasController', 'excluir');
+
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
 $router->post('/admin/oferta-gratuita/toggle-global', 'AdminOfertaGratuitaController', 'toggleGlobal');

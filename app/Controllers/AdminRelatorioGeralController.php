@@ -222,6 +222,35 @@ class AdminRelatorioGeralController extends Controller {
         }
 
         $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'totaisPorMoedaCards', 'taxaUsdBrl', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList');
+
+        // === INTEGRAÇÃO DESPESAS ===
+        $despesasResumo = ['total' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
+        try {
+            $stDespExists = $this->db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'despesas'");
+            if ((int)$stDespExists->fetchColumn() > 0) {
+                // Total despesas no período (por competência)
+                $stD = $this->db->prepare("SELECT COALESCE(SUM(valor),0) FROM despesas WHERE competencia >= ? AND competencia <= ? AND status != 'cancelada' AND deleted_at IS NULL");
+                $stD->execute([$dateStart, $dateEnd]);
+                $despesasResumo['total'] = (float)$stD->fetchColumn();
+
+                // Pago no período
+                $stDP = $this->db->prepare("SELECT COALESCE(SUM(valor),0) FROM despesas WHERE status = 'paga' AND data_pagamento >= ? AND data_pagamento <= ? AND deleted_at IS NULL");
+                $stDP->execute([$dateStart, $dateEnd]);
+                $despesasResumo['pago'] = (float)$stDP->fetchColumn();
+
+                // Em aberto
+                $despesasResumo['aberto'] = $despesasResumo['total'] - $despesasResumo['pago'];
+                if ($despesasResumo['aberto'] < 0) $despesasResumo['aberto'] = 0;
+
+                // Por categoria
+                $stDC = $this->db->prepare("SELECT c.nome as categoria, c.cor, c.grupo, COALESCE(SUM(d.valor),0) as total, COUNT(*) as qtd FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE d.competencia >= ? AND d.competencia <= ? AND d.status != 'cancelada' AND d.deleted_at IS NULL GROUP BY d.categoria_id ORDER BY total DESC");
+                $stDC->execute([$dateStart, $dateEnd]);
+                $despesasResumo['por_categoria'] = $stDC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {}
+
+        $data['despesasResumo'] = $despesasResumo;
+
         extract($data);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
