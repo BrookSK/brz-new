@@ -31,6 +31,10 @@ class AdminMarketingCalendarController extends Controller {
         if (!is_dir($cacheDir)) {
             @mkdir($cacheDir, 0755, true);
         }
+        // Fallback para /tmp se não tiver permissão de escrita
+        if (!is_writable($cacheDir)) {
+            $cacheDir = sys_get_temp_dir();
+        }
         $month = date('Y-m');
         return $cacheDir . '/marketing_calendar_' . $month . '.json';
     }
