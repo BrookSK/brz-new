@@ -232,25 +232,28 @@ const PRODUCTS = <?= json_encode(array_map(function($p) {
 <script src="/assets/js/lives/shopping.js"></script>
 <script>
 // Override para garantir que contadores funcionam
+var _userLiked = <?= (!empty($userLiked)) ? 'true' : 'false' ?>;
+
 window.sendLike = function() {
     if (!IS_LOGGED_IN) return;
     var btn = document.getElementById('btnLike');
     var icon = btn.querySelector('i');
     var countEl = document.getElementById('likeCount');
     var currentCount = parseInt(countEl.textContent || 0);
-    var isLiked = icon.style.color === 'rgb(255, 45, 85)';
 
-    if (isLiked) {
+    if (_userLiked) {
         // Descurtir
+        _userLiked = false;
         icon.style.color = '';
         countEl.textContent = Math.max(0, currentCount - 1);
-        fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'unlike'}) });
+        fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: 'action=unlike' });
     } else {
         // Curtir
+        _userLiked = true;
         icon.style.color = '#ff2d55';
         countEl.textContent = currentCount + 1;
         spawnHeart();
-        fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST' });
+        fetch('/api/live/' + LIVE_ID + '/like', { method: 'POST', credentials: 'same-origin' });
     }
 };
 
