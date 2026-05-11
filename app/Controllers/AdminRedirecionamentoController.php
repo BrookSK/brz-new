@@ -567,11 +567,36 @@ class AdminRedirecionamentoController extends Controller {
     private function enviarEmailNotificacao(string $para, string $assunto, string $corpo): void {
         if (empty($para) || !filter_var($para, FILTER_VALIDATE_EMAIL)) return;
         try {
+            $html = $this->montarEmailHtml($assunto, $corpo);
             $emailService = new \App\Services\EmailService();
-            $emailService->send($para, $assunto, $corpo);
+            $emailService->send($para, $assunto, $html);
         } catch (\Exception $e) {
             error_log('[REDIR_EMAIL] Erro ao enviar para ' . $para . ': ' . $e->getMessage());
         }
+    }
+
+    private function montarEmailHtml(string $titulo, string $conteudo): string {
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:40px 20px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+    <tr><td style="background:#0b1f3a;padding:24px 32px;text-align:center">
+        <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600">🚚 Braziliana Redirecionamento</h1>
+    </td></tr>
+    <tr><td style="padding:32px">
+        <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:18px;font-weight:600">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h2>
+        <div style="color:#4a4a4a;font-size:15px;line-height:1.6">' . $conteudo . '</div>
+    </td></tr>
+    <tr><td style="padding:0 32px 24px">
+        <a href="https://brazilianashop.com.br/admin/redirecionamento/coletas" style="display:inline-block;background:#0b1f3a;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:500">Acessar painel</a>
+    </td></tr>
+    <tr><td style="background:#f8fafc;padding:16px 32px;border-top:1px solid #e5e7eb">
+        <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center">Braziliana Shop — Serviço de Redirecionamento de Pacotes</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>';
     }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -1210,8 +1235,19 @@ class AdminRedirecionamentoController extends Controller {
         // Notificar emails configurados (admin)
         $stR=$db->prepare("SELECT r.nome,r.email FROM redirecionadores r WHERE r.id=? LIMIT 1"); $stR->execute([$envio['redirecionador_id']]);
         $red=$stR->fetch(\PDO::FETCH_ASSOC);
-        $assunto="Nova coleta agendada - Envio #$envioId";
-        $corpo="<p>O redirecionador <b>".htmlspecialchars($red['nome']??'')."</b> agendou coleta para <b>$data às $hora</b>.<br>Envio: #$envioId</p>";
+        $assunto="📅 Nova coleta agendada - Envio #{$envioId}";
+        $corpo='<table style="width:100%;border-collapse:collapse;margin:8px 0">
+            <tr><td style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px">
+                <strong style="color:#166534">✓ Coleta agendada com sucesso</strong>
+            </td></tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Redirecionador</td><td style="padding:6px 0;font-weight:600">'.htmlspecialchars($red['nome']??'').'</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#'.$envioId.'</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Data</td><td style="padding:6px 0;font-weight:600">'.date('d/m/Y', strtotime($data)).'</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Horário</td><td style="padding:6px 0;font-weight:600">'.$hora.'</td></tr>
+        </table>
+        <p style="color:#6b7280;font-size:13px;margin-top:16px">Acesse o painel para confirmar ou reagendar.</p>';
 
         $emailsConfig = $this->getEmailsColetaConfig($db);
         foreach ($emailsConfig as $email) {
@@ -1265,8 +1301,17 @@ class AdminRedirecionamentoController extends Controller {
             $coleta = $st->fetch(\PDO::FETCH_ASSOC);
             if ($coleta) {
                 $emailsConfig = $this->getEmailsColetaConfig($db);
-                $assunto = "Coleta cancelada - Envio #{$coleta['envio_id']}";
-                $corpo = "<p>O redirecionador <b>" . htmlspecialchars($coleta['red_nome'] ?? '') . "</b> cancelou a coleta do envio #{$coleta['envio_id']}.</p>";
+                $assunto = "❌ Coleta cancelada - Envio #{$coleta['envio_id']}";
+                $corpo = '<table style="width:100%;border-collapse:collapse;margin:8px 0">
+                    <tr><td style="padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px">
+                        <strong style="color:#991b1b">✗ Coleta cancelada pelo redirecionador</strong>
+                    </td></tr>
+                </table>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Redirecionador</td><td style="padding:6px 0;font-weight:600">' . htmlspecialchars($coleta['red_nome'] ?? '') . '</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#' . $coleta['envio_id'] . '</td></tr>
+                </table>
+                <p style="color:#6b7280;font-size:13px;margin-top:16px">O redirecionador cancelou esta coleta. Ele pode reagendar uma nova data.</p>';
                 foreach ($emailsConfig as $email) {
                     $this->enviarEmailNotificacao($email, $assunto, $corpo);
                 }
@@ -1296,8 +1341,18 @@ class AdminRedirecionamentoController extends Controller {
             $st->execute([$id]);
             $coleta = $st->fetch(\PDO::FETCH_ASSOC);
             if ($coleta && !empty($coleta['red_email'])) {
-                $assunto = "Coleta reagendada - Envio #{$coleta['envio_id']}";
-                $corpo = "<p>Sua coleta foi reagendada para <b>{$data} às {$hora}</b>.<br>Envio: #{$coleta['envio_id']}<br>Tenha o pacote pronto na nova data.</p>";
+                $assunto = "🔄 Coleta reagendada - Envio #{$coleta['envio_id']}";
+                $corpo = '<table style="width:100%;border-collapse:collapse;margin:8px 0">
+                    <tr><td style="padding:8px 12px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px">
+                        <strong style="color:#92400e">⚠️ Sua coleta foi reagendada</strong>
+                    </td></tr>
+                </table>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Envio</td><td style="padding:6px 0;font-weight:600">#' . $coleta['envio_id'] . '</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Nova data</td><td style="padding:6px 0;font-weight:600">' . date('d/m/Y', strtotime($data)) . '</td></tr>
+                    <tr><td style="padding:6px 0;color:#6b7280;font-size:13px">Novo horário</td><td style="padding:6px 0;font-weight:600">' . $hora . '</td></tr>
+                </table>
+                <p style="color:#6b7280;font-size:13px;margin-top:16px">Tenha o pacote pronto na nova data e horário.</p>';
                 $this->enviarEmailNotificacao($coleta['red_email'], $assunto, $corpo);
             }
         } catch (\Exception $e) {
