@@ -143,6 +143,18 @@ ksort($ncmOpcoes);
                         <div class="col-md-3"><label class="form-label">Data de nascimento</label><input class="form-control bg-light" type="date" name="destinatario_data_nascimento" id="destNasc" readonly></div>
                         <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control bg-light" type="email" name="destinatario_email" id="destEmail" readonly></div>
                         <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control bg-light" type="text" name="destinatario_telefone" id="destTel" readonly></div>
+                        <div class="col-12">
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted fw-semibold">Endereço de entrega</small>
+                                <button type="button" class="btn btn-sm btn-outline-warning" id="btnAlterarEndereco">
+                                    <i class="fas fa-map-marker-alt me-1"></i>Usar outro endereço
+                                </button>
+                            </div>
+                            <div id="alertEnderecoAlterado" class="alert alert-warning small py-1 px-2 mt-2 d-none">
+                                <i class="fas fa-exclamation-triangle me-1"></i>Endereço alterado manualmente (diferente do cadastro do cliente).
+                            </div>
+                        </div>
                         <div class="col-md-8"><label class="form-label">Logradouro</label><input class="form-control bg-light" type="text" name="dest_logradouro" id="destLogr" readonly></div>
                         <div class="col-md-2"><label class="form-label">Número</label><input class="form-control bg-light" type="text" name="dest_numero" id="destNum" readonly></div>
                         <div class="col-md-2"><label class="form-label">Complemento</label><input class="form-control bg-light" type="text" name="dest_complemento" id="destComp" readonly></div>
@@ -150,8 +162,12 @@ ksort($ncmOpcoes);
                         <div class="col-md-4"><label class="form-label">Cidade</label><input class="form-control bg-light" type="text" name="dest_cidade" id="destCidade" readonly></div>
                         <div class="col-md-2"><label class="form-label">Estado</label><input class="form-control bg-light" type="text" name="dest_estado" id="destEstado" readonly></div>
                         <div class="col-md-2"><label class="form-label">CEP</label><input class="form-control bg-light" type="text" name="dest_cep" id="destCep" readonly></div>
+                        <div class="col-12" id="destPaisContainer" style="display:none">
+                            <label class="form-label">País</label>
+                            <input class="form-control" type="text" name="dest_pais" id="destPais" placeholder="Ex: Estados Unidos, Brasil...">
+                        </div>
                     </div>
-                    <div class="mt-3 small text-muted"><i class="fas fa-info-circle me-1"></i>Para alterar os dados, clique em "Editar cliente".</div>
+                    <div class="mt-3 small text-muted" id="destInfoReadonly"><i class="fas fa-info-circle me-1"></i>Para alterar o endereço deste envio, clique em "Usar outro endereço".</div>
                 </div>
             </div>
         </div>
@@ -571,6 +587,45 @@ document.getElementById('btnSalvarCliente')?.addEventListener('click', async () 
         document.getElementById('selCliente').value=j.id;
         document.getElementById('selCliente').dispatchEvent(new Event('change'));
     } else { if(msgEl) msgEl.innerHTML='<div class="alert alert-danger py-1 small">'+(j.msg||'Erro ao salvar')+'</div>'; }
+});
+
+// ── Alterar endereço de entrega ──────────────────────────────────────────────
+let enderecoEditavel = false;
+document.getElementById('btnAlterarEndereco')?.addEventListener('click', function() {
+    enderecoEditavel = !enderecoEditavel;
+    const campos = ['destLogr','destNum','destComp','destBairro','destCidade','destEstado','destCep'];
+    campos.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (enderecoEditavel) {
+            el.removeAttribute('readonly');
+            el.classList.remove('bg-light');
+        } else {
+            el.setAttribute('readonly', true);
+            el.classList.add('bg-light');
+        }
+    });
+    const paisContainer = document.getElementById('destPaisContainer');
+    const alertEl = document.getElementById('alertEnderecoAlterado');
+    const infoEl = document.getElementById('destInfoReadonly');
+    if (enderecoEditavel) {
+        this.innerHTML = '<i class="fas fa-undo me-1"></i>Restaurar endereço do cadastro';
+        this.classList.remove('btn-outline-warning');
+        this.classList.add('btn-outline-secondary');
+        if (paisContainer) paisContainer.style.display = '';
+        if (alertEl) alertEl.classList.remove('d-none');
+        if (infoEl) infoEl.style.display = 'none';
+    } else {
+        this.innerHTML = '<i class="fas fa-map-marker-alt me-1"></i>Usar outro endereço';
+        this.classList.remove('btn-outline-secondary');
+        this.classList.add('btn-outline-warning');
+        if (paisContainer) paisContainer.style.display = 'none';
+        if (alertEl) alertEl.classList.add('d-none');
+        if (infoEl) infoEl.style.display = '';
+        // Restaurar dados originais do cliente
+        const sel = document.getElementById('selCliente');
+        if (sel && sel.value) sel.dispatchEvent(new Event('change'));
+    }
 });
 
 showStep(1);
