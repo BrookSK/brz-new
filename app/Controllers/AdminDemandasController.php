@@ -491,33 +491,46 @@ class AdminDemandasController extends Controller {
      */
     private function enviarEmailSimples(string $to, string $subject, string $body): void {
         try {
-            // Tentar usar PHPMailer se disponível
-            if (class_exists('\PHPMailer\PHPMailer\PHPMailer')) {
-                $cfg = [];
-                try {
-                    $st = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE grupo = 'email'");
-                    $st->execute();
-                    foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) $cfg[$r['chave']] = $r['valor'];
-                } catch (\Exception $e) {}
+            $cfg = [];
+            try {
+                $st = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave LIKE 'email_%'");
+                $st->execute();
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) $cfg[$r['chave']] = $r['valor'];
+            } catch (\Exception $e) {}
 
+            $host = $cfg['email_host'] ?? '';
+            $port = (int)($cfg['email_port'] ?? 465);
+            $username = $cfg['email_username'] ?? '';
+            $password = $cfg['email_password'] ?? '';
+            $encryption = $cfg['email_encryption'] ?? 'ssl';
+            $from = $cfg['email_from'] ?? $username;
+            $fromName = $cfg['email_from_name'] ?? 'Braziliana Shop';
+
+            if ($host === '' || $username === '') {
+                error_log('[DEMANDAS] Email não configurado (host/username vazio)');
+                return;
+            }
+
+            if (class_exists('\PHPMailer\PHPMailer\PHPMailer')) {
                 $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
                 $mail->isSMTP();
-                $mail->Host = $cfg['host'] ?? '';
-                $mail->Port = (int)($cfg['port'] ?? 587);
+                $mail->Host = $host;
+                $mail->Port = $port;
                 $mail->SMTPAuth = true;
-                $mail->Username = $cfg['username'] ?? '';
-                $mail->Password = $cfg['password'] ?? '';
-                $mail->SMTPSecure = $cfg['encryption'] ?? 'tls';
-                $mail->setFrom($cfg['from'] ?? $cfg['username'] ?? 'noreply@brazilianashop.com.br', $cfg['from_name'] ?? 'Braziliana Shop');
+                $mail->Username = $username;
+                $mail->Password = $password;
+                $mail->SMTPSecure = $encryption;
+                $mail->setFrom($from, $fromName);
                 $mail->addAddress($to);
                 $mail->Subject = $subject;
                 $mail->Body = $body;
                 $mail->CharSet = 'UTF-8';
                 $mail->send();
+                error_log('[DEMANDAS] Email enviado para ' . $to . ': ' . $subject);
             } else {
-                // Fallback: mail() nativo
-                $headers = "From: Braziliana Shop <noreply@brazilianashop.com.br>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+                $headers = "From: {$fromName} <{$from}>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
                 mail($to, $subject, $body, $headers);
+                error_log('[DEMANDAS] Email enviado (mail nativo) para ' . $to);
             }
         } catch (\Exception $e) {
             error_log('[DEMANDAS] Falha ao enviar email para ' . $to . ': ' . $e->getMessage());
