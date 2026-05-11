@@ -706,7 +706,7 @@ class AdminRemessaConferenciaController extends Controller {
     <strong><i class="fas fa-pills me-1"></i>Medicamento</strong>
     <div class="form-check form-switch mb-0">
         <input class="form-check-input" type="checkbox" id="switchMedicamento" ' . ($medicamentoFlag ? 'checked' : '') . ' onchange="salvarMedicamento(this.checked)">
-        <label class="form-check-label" for="switchMedicamento">Ã‰ medicamento</label>
+        <label class="form-check-label" for="switchMedicamento">É medicamento</label>
     </div>
 </div>
 <div class="card-body" id="medicamentoBlock" ' . (!$medicamentoFlag ? 'style="display:none"' : '') . '>
