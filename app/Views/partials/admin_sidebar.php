@@ -889,30 +889,46 @@ function renderAdminSidebarStyles() {
 function renderAdminScripts() {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
     // Notificações push de demandas
-    echo '<div id="admin-notif-container" style="position:fixed;top:16px;right:16px;z-index:9999;max-width:350px;"></div>';
+    echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99999;max-width:400px;"></div>';
+    echo '<style>
+@keyframes notifSlideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes notifPulse{0%,100%{box-shadow:0 4px 20px rgba(0,0,0,0.15)}50%{box-shadow:0 4px 30px rgba(59,130,246,0.4)}}
+.admin-notif{animation:notifSlideIn .4s ease,notifPulse 2s ease-in-out 3;border-left:5px solid #3b82f6;border-radius:12px;background:#fff;padding:16px 20px;margin-bottom:12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);position:relative;font-size:14px;}
+.admin-notif .notif-title{font-weight:700;font-size:16px;margin-bottom:4px;color:#1e293b;}
+.admin-notif .notif-msg{color:#64748b;font-size:13px;margin-bottom:8px;}
+.admin-notif .notif-link{color:#3b82f6;font-weight:600;text-decoration:none;font-size:13px;}
+.admin-notif .notif-link:hover{text-decoration:underline;}
+.admin-notif .notif-close{position:absolute;top:8px;right:12px;background:none;border:none;font-size:18px;color:#94a3b8;cursor:pointer;line-height:1;}
+.admin-notif .notif-close:hover{color:#ef4444;}
+</style>';
     echo '<script>
 (function(){
-    var lastCheck = 0;
-    function checkNotifs() {
+    function playNotifSound(){try{var a=new AudioContext();var o=a.createOscillator();var g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;o.type="sine";g.gain.value=0.3;o.start();g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.3);o.stop(a.currentTime+0.3);}catch(e){}}
+    function checkNotifs(){
         fetch("/admin/demandas/api/notificacoes").then(function(r){return r.json()}).then(function(d){
             if(!d.notificacoes||!d.notificacoes.length)return;
             var container=document.getElementById("admin-notif-container");
+            var newCount=0;
             d.notificacoes.forEach(function(n){
                 if(document.getElementById("notif-"+n.id))return;
+                newCount++;
                 var el=document.createElement("div");
                 el.id="notif-"+n.id;
-                el.className="alert alert-info alert-dismissible fade show shadow-sm mb-2";
-                el.style.cssText="font-size:12px;animation:slideIn .3s ease;";
-                el.innerHTML="<strong>"+n.titulo+"</strong><br><span class=\'text-muted\' style=\'font-size:10px;\'>"+n.mensagem+"</span>"
-                    +(n.link?"<br><a href=\'"+n.link+"\' class=\'small\'>Ver demanda →</a>":"")
-                    +"<button type=\'button\' class=\'btn-close\' style=\'font-size:9px;\' onclick=\'dismissNotif("+n.id+",this)\'></button>";
+                el.className="admin-notif";
+                el.innerHTML="<button class=\"notif-close\" onclick=\"dismissNotif("+n.id+",this)\">&times;</button>"
+                    +"<div class=\"notif-title\">"+n.titulo+"</div>"
+                    +"<div class=\"notif-msg\">"+n.mensagem+"</div>"
+                    +(n.link?"<a href=\""+n.link+"\" class=\"notif-link\">Ver demanda &rarr;</a>":"");
                 container.appendChild(el);
             });
+            if(newCount>0)playNotifSound();
         }).catch(function(){});
     }
     window.dismissNotif=function(id,btn){
         fetch("/admin/demandas/api/notificacao/"+id+"/lida",{method:"POST"});
-        btn.closest(".alert").remove();
+        var el=btn.closest(".admin-notif");
+        el.style.transition="all .3s ease";el.style.transform="translateX(100%)";el.style.opacity="0";
+        setTimeout(function(){el.remove()},300);
     };
     setInterval(checkNotifs,30000);
     setTimeout(checkNotifs,2000);
