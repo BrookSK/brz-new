@@ -514,32 +514,40 @@ class AdminDreCompletoController extends Controller {
         $ate = $dateEnd ?: date('Y-m-d');
 
         try {
-            // DEBUG: Verificar o que existe na tabela pedido_pagamentos
-            // Buscar SEM filtro de data para ver se há registros
-            $stDebug = $this->db->prepare("SELECT pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
-                pp.created_at, pp.updated_at,
-                COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref,
-                p.created_at as pedido_created_at
+            // ENTRADAS: buscar TODOS os registros da pedido_pagamentos (sem filtro de data)
+            // e filtrar por data em PHP usando a data do pedido associado
+            $st = $this->db->query("SELECT pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
+                pp.created_at as pp_created, pp.updated_at as pp_updated,
+                p.created_at as p_created,
+                COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                WHERE (pp.status = 'approved' OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','SUCCEEDED','paid','succeeded'))
                 ORDER BY pp.id DESC LIMIT 500");
-            $stDebug->execute();
-            $allRows = $stDebug->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $allRows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             foreach ($allRows as $r) {
-                // Determinar a data a usar
-                $data = $r['updated_at'] ?? $r['created_at'] ?? $r['pedido_created_at'] ?? null;
-                if (!$data) continue;
+                // Determinar data: preferir updated_at > created_at > pedido.created_at
+                $data = $r['pp_updated'] ?? $r['pp_created'] ?? $r['p_created'] ?? null;
+                if (!$data || $data === '0000-00-00 00:00:00') {
+                    $data = $r['p_created'] ?? date('Y-m-d');
+                }
 
-                // Verificar se está no período
-                $dataDate = date('Y-m-d', strtotime($data));
+                // Filtrar por período
+                $dataDate = substr($data, 0, 10);
                 if ($dataDate < $desde || $dataDate > $ate) continue;
+
+                // Filtrar por status (approved ou gateway_status pago)
+                $ppStatus = strtolower(trim($r['pp_status'] ?? ''));
+                $gwStatus = strtoupper(trim($r['gateway_status'] ?? ''));
+                $isPago = ($ppStatus === 'approved')
+                    || in_array($gwStatus, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'SUCCEEDED', 'PAID']);
+                if (!$isPago) continue;
 
                 $gw = $r['gateway'] ?? 'outro';
                 $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : (in_array($gw, ['cambioreal','cambio_real']) ? 'CR Produtos' : ucfirst($gw)));
                 $moeda = strtoupper(trim($r['moeda'] ?? 'USD'));
                 if ($moeda === '' || $moeda === 'NULL') $moeda = 'USD';
+
                 $movimentos[] = [
                     'data' => date('d/m/Y', strtotime($data)),
                     'data_sort' => $data,
@@ -549,52 +557,6 @@ class AdminDreCompletoController extends Controller {
                     'valor' => (float)($r['valor'] ?? 0),
                     'moeda' => $moeda,
                 ];
-            }
-
-            // Se ainda não tem movimentos, tentar sem filtro de status também
-            if (empty($movimentos)) {
-                $stAll = $this->db->prepare("SELECT pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
-                    pp.created_at, pp.updated_at,
-                    COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref,
-                    p.created_at as pedido_created_at
-                    FROM pedido_pagamentos pp
-                    LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                    ORDER BY pp.id DESC LIMIT 100");
-                $stAll->execute();
-                $debugRows = $stAll->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-
-                // Log para debug - incluir info sobre os registros encontrados
-                if (!empty($debugRows)) {
-                    $sample = $debugRows[0];
-                    error_log('[FLUXO_CAIXA_DEBUG] Total registros sem filtro: ' . count($debugRows)
-                        . ' | Primeiro: status=' . ($sample['pp_status'] ?? 'NULL')
-                        . ' gateway_status=' . ($sample['gateway_status'] ?? 'NULL')
-                        . ' created_at=' . ($sample['created_at'] ?? 'NULL')
-                        . ' updated_at=' . ($sample['updated_at'] ?? 'NULL')
-                        . ' pedido_created_at=' . ($sample['pedido_created_at'] ?? 'NULL')
-                        . ' gateway=' . ($sample['gateway'] ?? 'NULL')
-                        . ' valor=' . ($sample['valor'] ?? 'NULL')
-                        . ' | Período: ' . $desde . ' a ' . $ate);
-
-                    // Incluir TODOS os registros sem filtro de data/status como movimentação
-                    foreach ($debugRows as $r) {
-                        $data = $r['updated_at'] ?? $r['created_at'] ?? $r['pedido_created_at'] ?? date('Y-m-d');
-                        $gw = $r['gateway'] ?? 'outro';
-                        $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : (in_array($gw, ['cambioreal','cambio_real']) ? 'CR Produtos' : ucfirst($gw)));
-                        $moeda = strtoupper(trim($r['moeda'] ?? 'USD'));
-                        if ($moeda === '' || $moeda === 'NULL') $moeda = 'USD';
-                        $statusLabel = ($r['pp_status'] ?? '') . '/' . ($r['gateway_status'] ?? '');
-                        $movimentos[] = [
-                            'data' => date('d/m/Y', strtotime($data)),
-                            'data_sort' => $data,
-                            'descricao' => 'Pedido ' . ($r['ref'] ?? '#' . $r['pedido_id']) . ' — ' . ucfirst($r['metodo'] ?? $gw) . ' [' . $statusLabel . ']',
-                            'gateway' => $gwLabel,
-                            'tipo' => 'entrada',
-                            'valor' => (float)($r['valor'] ?? 0),
-                            'moeda' => $moeda,
-                        ];
-                    }
-                }
             }
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 $gw = $r['gateway'] ?? 'outro';
@@ -640,6 +602,17 @@ class AdminDreCompletoController extends Controller {
 
         } catch (\Exception $e) {
             error_log('[FLUXO_CAIXA] Erro: ' . $e->getMessage());
+            // Retornar erro como movimentação para debug
+            $movimentos[] = [
+                'data' => date('d/m/Y'),
+                'descricao' => 'ERRO: ' . $e->getMessage(),
+                'gateway' => 'Sistema',
+                'tipo' => 'entrada',
+                'valor' => 0,
+                'moeda' => 'BRL',
+                'saldo_acumulado' => 0,
+            ];
+            return $movimentos;
         }
 
         // Ordenar por data (mais recente primeiro)
@@ -857,8 +830,9 @@ class AdminDreCompletoController extends Controller {
             }
 
             // 2. Somar da pedido_pagamentos (para referência e divergências)
-            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, moeda, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND COALESCE(created_at, updated_at) >= ? AND COALESCE(created_at, updated_at) < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY COALESCE(created_at, updated_at) DESC");
-            $st->execute([$gateway, $desde, $ate]);
+            // Não filtrar por data pois created_at/updated_at podem ser NULL
+            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, moeda, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' ORDER BY id DESC LIMIT 200");
+            $st->execute([$gateway]);
             $todosRegistros = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             // Somar valores locais da pedido_pagamentos (para referência)
