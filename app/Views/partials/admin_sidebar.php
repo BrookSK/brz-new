@@ -225,7 +225,7 @@ function renderAdminSidebar($activePage = '') {
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => __('admin.menu.purchases', 'Compras'), 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
         // 'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
         'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Wexpress', 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
-        'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
+        // 'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
         'remessa-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Conferência de Remessa', 'url' => '/admin/remessa-conferencia', 'roles' => ['admin','vendedor','suporte','conferente']],
         'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Correio Brasil', 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
         'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correio Internacional', 'url' => '/admin/correios-mundial', 'roles' => ['admin','vendedor','suporte','redirecionador']],
