@@ -1727,9 +1727,6 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                                 <div class="col-md-6"></div>
                                             </div>
-                                                    
-                                    </div>
-                                </div>
 
                                 <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
 
