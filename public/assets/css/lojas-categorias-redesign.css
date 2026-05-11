@@ -83,11 +83,25 @@ table.table tbody tr:hover { background: #FAFBFC !important; }
    ACTION BUTTONS - aligned and styled
    ========================================================== */
 
-/* Action buttons in table */
+/* Action buttons in table - force horizontal alignment */
+table.table td:last-child {
+    white-space: nowrap !important;
+}
+
+table.table td:last-child,
+table.table td:last-child > div,
+table.table td:last-child .btn-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+}
+
 table.table td .btn,
 table.table td a.btn {
     width: 30px !important;
     height: 30px !important;
+    min-width: 30px !important;
     padding: 0 !important;
     border-radius: 7px !important;
     border: 1px solid #E2E8F0 !important;
@@ -97,7 +111,8 @@ table.table td a.btn {
     justify-content: center !important;
     font-size: 13px !important;
     transition: .18s ease !important;
-    margin: 0 3px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
 }
 
 table.table td .btn:hover,
