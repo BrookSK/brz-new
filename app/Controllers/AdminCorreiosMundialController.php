@@ -568,7 +568,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function index(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $u = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
@@ -587,7 +587,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function balance(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $r = $this->svc->getBalance();
         if (empty($r['success'])) {
@@ -610,7 +610,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function pedido(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $u = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
@@ -742,7 +742,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function gerarEtiqueta(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $u = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($u['perfil'] ?? '')));
@@ -1177,7 +1177,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function containers(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $this->ensurePacketContainersTable();
         $containers = [];
@@ -1212,7 +1212,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function faturas(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $this->ensurePacketBillsTable();
         $bills = [];
@@ -1236,7 +1236,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function faturaNova(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $this->ensurePacketContainersTable();
         $this->ensurePacketBillsTable();
@@ -1277,7 +1277,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function faturaCriar(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $this->ensurePacketContainersTable();
         $this->ensurePacketBillsTable();
@@ -1494,7 +1494,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function faturaPdf(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
@@ -1664,7 +1664,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function containerCancelar(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $id = (int) ($request->getParam('id') ?? 0);
         if ($id <= 0) {
@@ -1816,7 +1816,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function containerDeletar(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $id = (int) ($request->getParam('id') ?? 0);
         if ($id <= 0) {
@@ -1874,7 +1874,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function containerNovo(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $bulk = (string) ($request->getParam('bulk') ?? '');
         $preselected = [];
@@ -1979,7 +1979,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function containerCriar(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $this->ensurePacketContainersTable();
         $this->ensureEtiquetasHasContainerIdColumn();
@@ -2201,7 +2201,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function containerPdf(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
@@ -2377,7 +2377,7 @@ class AdminCorreiosMundialController extends Controller {
 
     public function etiquetaPdf(Request $request) {
         $auth = new AuthService();
-        $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
         $tracking = (string) $request->getParam('tracking');
         $tracking = trim($tracking);
