@@ -888,6 +888,36 @@ function renderAdminSidebarStyles() {
 // Scripts JavaScript comuns
 function renderAdminScripts() {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+    // Notificações push de demandas
+    echo '<div id="admin-notif-container" style="position:fixed;top:16px;right:16px;z-index:9999;max-width:350px;"></div>';
+    echo '<script>
+(function(){
+    var lastCheck = 0;
+    function checkNotifs() {
+        fetch("/admin/demandas/api/notificacoes").then(function(r){return r.json()}).then(function(d){
+            if(!d.notificacoes||!d.notificacoes.length)return;
+            var container=document.getElementById("admin-notif-container");
+            d.notificacoes.forEach(function(n){
+                if(document.getElementById("notif-"+n.id))return;
+                var el=document.createElement("div");
+                el.id="notif-"+n.id;
+                el.className="alert alert-info alert-dismissible fade show shadow-sm mb-2";
+                el.style.cssText="font-size:12px;animation:slideIn .3s ease;";
+                el.innerHTML="<strong>"+n.titulo+"</strong><br><span class=\'text-muted\' style=\'font-size:10px;\'>"+n.mensagem+"</span>"
+                    +(n.link?"<br><a href=\'"+n.link+"\' class=\'small\'>Ver demanda →</a>":"")
+                    +"<button type=\'button\' class=\'btn-close\' style=\'font-size:9px;\' onclick=\'dismissNotif("+n.id+",this)\'></button>";
+                container.appendChild(el);
+            });
+        }).catch(function(){});
+    }
+    window.dismissNotif=function(id,btn){
+        fetch("/admin/demandas/api/notificacao/"+id+"/lida",{method:"POST"});
+        btn.closest(".alert").remove();
+    };
+    setInterval(checkNotifs,30000);
+    setTimeout(checkNotifs,2000);
+})();
+</script>';
 }
 
 // Widget Co-Piloto Admin — injeta automaticamente em todas as páginas admin

@@ -14,6 +14,10 @@ class AdminDemandasController extends Controller {
 
     public function painel(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
+
+        // Verificar senha do painel
+        if (!$this->verificarSenhaPainel()) return;
+
         // Verificar testes expirados ao carregar o painel
         $this->verificarTestesExpirados();
         $demandas = $this->listar();
@@ -117,6 +121,9 @@ class AdminDemandasController extends Controller {
 
         // Processar arquivos anexados (prints de bug, etc)
         $this->processarArquivosDemanda($id);
+
+        // Notificar devs (email + webhook + push)
+        $this->notificarNovaDemanda($id, ($tipo === 'bug' ? '[BUG] ' : '') . ($body['bloco1_titulo'] ?? ''), $body['bloco1_solicitante'] ?? '', $tipo);
 
         $_SESSION['message'] = $tipo === 'bug'
             ? 'Bug reportado com prioridade ' . strtoupper($body['bug_prioridade'] ?? 'media') . '! Já aparece no Painel.'
@@ -514,6 +521,169 @@ class AdminDemandasController extends Controller {
             }
         } catch (\Exception $e) {
             error_log('[DEMANDAS] Falha ao enviar email para ' . $to . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * API: Retorna notificações não lidas para o usuário logado (chamado via AJAX)
+     */
+    public function notificacoes(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $uid = $_SESSION['usuario_id'] ?? 0;
+        if (!$uid) { echo json_encode(['notificacoes' => []]); exit; }
+
+        try {
+            $this->ensureNotificacoesTable();
+            $st = $this->db->prepare("SELECT * FROM admin_notificacoes WHERE usuario_id = ? AND lida = 0 ORDER BY created_at DESC LIMIT 20");
+            $st->execute([$uid]);
+            $notifs = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            echo json_encode(['notificacoes' => $notifs]);
+        } catch (\Exception $e) {
+            echo json_encode(['notificacoes' => []]);
+        }
+        exit;
+    }
+
+    /**
+     * API: Marcar notificação como lida
+     */
+    public function marcarLida(Request $request, $id) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $uid = $_SESSION['usuario_id'] ?? 0;
+        try {
+            $this->db->prepare("UPDATE admin_notificacoes SET lida = 1 WHERE id = ? AND usuario_id = ?")->execute([(int)$id, $uid]);
+        } catch (\Exception $e) {}
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    /**
+     * Verificar senha do painel de demandas
+     */
+    private function verificarSenhaPainel(): bool {
+        $senhaConfig = $this->getConfig('demandas_senha_painel');
+        if ($senhaConfig === '' || $senhaConfig === null) return true; // Sem senha configurada
+
+        // Verificar se já autenticou nesta sessão
+        if (!empty($_SESSION['demandas_painel_auth']) && $_SESSION['demandas_painel_auth'] === true) return true;
+
+        // Se veio POST com senha, validar
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['senha_painel'])) {
+            if ($_POST['senha_painel'] === $senhaConfig) {
+                $_SESSION['demandas_painel_auth'] = true;
+                return true;
+            } else {
+                $_SESSION['message'] = 'Senha incorreta.';
+                $_SESSION['message_type'] = 'danger';
+            }
+        }
+
+        // Mostrar tela de senha
+        $title = 'Painel de Demandas - Acesso Restrito'; $sidebarActive = 'demandas-painel';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        echo '<div class="container-fluid py-5"><div class="row justify-content-center"><div class="col-md-4">';
+        echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5">';
+        echo '<i class="fas fa-lock fs-1 text-muted mb-3 d-block"></i>';
+        echo '<h5 class="fw-bold mb-3">Acesso Restrito</h5>';
+        echo '<p class="text-muted small mb-4">O painel de demandas requer autenticação adicional.</p>';
+        if (!empty($_SESSION['message'])) {
+            echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' small">' . htmlspecialchars($_SESSION['message']) . '</div>';
+            unset($_SESSION['message'], $_SESSION['message_type']);
+        }
+        echo '<form method="POST" action="/admin/demandas/painel">';
+        echo '<div class="mb-3"><input type="password" name="senha_painel" class="form-control text-center" placeholder="Digite a senha" autofocus required></div>';
+        echo '<button type="submit" class="btn btn-dark w-100"><i class="fas fa-unlock me-1"></i>Acessar</button>';
+        echo '</form>';
+        echo '</div></div></div></div></div>';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+        return false;
+    }
+
+    /**
+     * Notificar devs sobre nova demanda (email + webhook + push)
+     */
+    private function notificarNovaDemanda(int $demandaId, string $titulo, string $solicitante, string $tipo): void {
+        // 1. Email para devs configurados
+        $emails = $this->getConfig('demandas_emails_notificacao');
+        if ($emails !== '') {
+            $listaEmails = array_filter(array_map('trim', explode(',', $emails)));
+            $assunto = ($tipo === 'bug' ? '🐛 ' : '🚀 ') . 'Nova Solicitação: ' . $titulo;
+            $corpo = "Nova solicitação de demanda registrada:\n\n";
+            $corpo .= "Título: {$titulo}\n";
+            $corpo .= "Solicitante: {$solicitante}\n";
+            $corpo .= "Tipo: " . ($tipo === 'bug' ? 'Bug/Erro' : 'Nova Função') . "\n\n";
+            $corpo .= "Acesse o painel: https://brazilianashop.com.br/admin/demandas/painel\n";
+            $corpo .= "Detalhe: https://brazilianashop.com.br/admin/demandas/detalhe/{$demandaId}\n";
+
+            foreach ($listaEmails as $email) {
+                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    try { $this->enviarEmailSimples($email, $assunto, $corpo); } catch (\Exception $e) {}
+                }
+            }
+        }
+
+        // 2. Webhook
+        $webhookUrl = $this->getConfig('demandas_webhook_url');
+        if ($webhookUrl !== '') {
+            try {
+                $payload = json_encode([
+                    'event' => 'nova_demanda',
+                    'id' => $demandaId,
+                    'titulo' => $titulo,
+                    'solicitante' => $solicitante,
+                    'tipo' => $tipo,
+                    'url' => 'https://brazilianashop.com.br/admin/demandas/detalhe/' . $demandaId,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ], JSON_UNESCAPED_UNICODE);
+
+                $ch = curl_init($webhookUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $payload,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 5,
+                ]);
+                curl_exec($ch);
+                curl_close($ch);
+            } catch (\Exception $e) {
+                error_log('[DEMANDAS] Webhook erro: ' . $e->getMessage());
+            }
+        }
+
+        // 3. Notificação push (salvar no banco para usuários configurados)
+        $usuariosNotif = $this->getConfig('demandas_usuarios_notificacao');
+        if ($usuariosNotif !== '') {
+            $this->ensureNotificacoesTable();
+            $ids = array_filter(array_map('intval', explode(',', $usuariosNotif)));
+            $tituloNotif = ($tipo === 'bug' ? '🐛 Bug: ' : '🚀 Nova: ') . $titulo;
+            $msgNotif = 'Solicitante: ' . $solicitante;
+            $link = '/admin/demandas/detalhe/' . $demandaId;
+
+            foreach ($ids as $uid) {
+                if ($uid > 0) {
+                    try {
+                        $this->db->prepare("INSERT INTO admin_notificacoes (usuario_id, tipo, titulo, mensagem, link) VALUES (?,?,?,?,?)")
+                            ->execute([$uid, 'demanda', $tituloNotif, $msgNotif, $link]);
+                    } catch (\Exception $e) {}
+                }
+            }
+        }
+    }
+
+    private function getConfig(string $chave): string {
+        try {
+            $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+            $st->execute([$chave]);
+            return trim((string)($st->fetchColumn() ?: ''));
+        } catch (\Exception $e) { return ''; }
+    }
+
+    private function ensureNotificacoesTable(): void {
+        try { $this->db->query("SELECT 1 FROM admin_notificacoes LIMIT 1"); } catch (\Exception $e) {
+            try { $this->db->exec("CREATE TABLE IF NOT EXISTS admin_notificacoes (id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL, tipo VARCHAR(50) NOT NULL DEFAULT 'demanda', titulo VARCHAR(500) NOT NULL, mensagem TEXT NULL, link VARCHAR(1000) NULL, lida TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_usuario_lida (usuario_id, lida))"); } catch (\Exception $ex) {}
         }
     }
 
