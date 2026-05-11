@@ -367,4 +367,284 @@ class AdminDreCompletoController extends Controller {
 
         fclose($o); exit;
     }
+
+    /**
+     * Conciliação Financeira — consulta APIs dos gateways e compara com dados locais
+     * Se tem cache recente (< 12h), usa o cache. Senão consulta ao vivo.
+     * Parâmetro ?force=1 força consulta ao vivo.
+     */
+    public function conciliacao(Request $request) {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            $auth = new AuthService();
+            if (!isset($_SESSION['usuario_id'])) { echo json_encode(['error' => 'Não autenticado']); exit; }
+        } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage()]); exit; }
+
+        $force = ($_GET['force'] ?? '0') === '1';
+
+        // Tentar cache
+        if (!$force) {
+            try {
+                $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'conciliacao_cache' LIMIT 1");
+                $st->execute();
+                $cached = $st->fetchColumn();
+                if ($cached) {
+                    $data = json_decode($cached, true);
+                    if ($data && !empty($data['_timestamp']) && (time() - $data['_timestamp']) < 43200) { // 12h
+                        $data['_from_cache'] = true;
+                        $data['_cache_age'] = date('d/m/Y H:i', $data['_timestamp']);
+                        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                }
+            } catch (\Exception $e) {}
+        }
+
+        // Consultar ao vivo
+        $resultado = $this->executarConciliacao();
+        $resultado['_from_cache'] = false;
+
+        // Salvar cache
+        $this->salvarCacheConciliacao($resultado);
+
+        echo json_encode($resultado, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
+     * Endpoint de cron — roda a conciliação e salva no cache
+     * Chamar via: curl https://brazilianashop.com.br/admin/dre-completo/cron-conciliacao?secret=SEU_CRON_SECRET
+     */
+    public function cronConciliacao(Request $request) {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json; charset=utf-8');
+
+        // Validar secret do cron
+        $secret = $_GET['secret'] ?? '';
+        $cronSecret = '';
+        try {
+            $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'cron_secret' LIMIT 1");
+            $st->execute();
+            $cronSecret = trim((string)($st->fetchColumn() ?: ''));
+        } catch (\Exception $e) {}
+
+        if ($cronSecret === '' || $secret !== $cronSecret) {
+            echo json_encode(['error' => 'Secret inválido']);
+            exit;
+        }
+
+        $resultado = $this->executarConciliacao();
+        $this->salvarCacheConciliacao($resultado);
+
+        echo json_encode(['success' => true, 'divergencias' => $resultado['resumo']['divergencias_total'] ?? 0, 'timestamp' => date('Y-m-d H:i:s')]);
+        exit;
+    }
+
+    private function executarConciliacao(): array {
+        $resultado = [
+            'stripe' => $this->conciliacaoStripe(),
+            'cambioreal' => $this->conciliacaoCambioReal('cambioreal'),
+            'cambioreal_taxas' => $this->conciliacaoCambioReal('cambioreal_taxas'),
+            'resumo' => [],
+            '_timestamp' => time(),
+        ];
+
+        $resultado['resumo'] = [
+            'stripe_saldo' => $resultado['stripe']['saldo'] ?? [],
+            'cr_total_recebido' => ($resultado['cambioreal']['total_recebido_usd'] ?? 0) + ($resultado['cambioreal_taxas']['total_recebido_usd'] ?? 0),
+            'divergencias_total' => count($resultado['stripe']['divergencias'] ?? []) + count($resultado['cambioreal']['divergencias'] ?? []) + count($resultado['cambioreal_taxas']['divergencias'] ?? []),
+        ];
+
+        return $resultado;
+    }
+
+    private function salvarCacheConciliacao(array $data): void {
+        try {
+            $json = json_encode($data, JSON_UNESCAPED_UNICODE);
+            $st = $this->db->prepare("SELECT COUNT(*) FROM configuracoes_sistema WHERE chave = 'conciliacao_cache'");
+            $st->execute();
+            if ((int)$st->fetchColumn() > 0) {
+                $this->db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'conciliacao_cache'")->execute([$json]);
+            } else {
+                $this->db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('conciliacao_cache', ?)")->execute([$json]);
+            }
+        } catch (\Exception $e) {
+            error_log('[CONCILIACAO] Erro ao salvar cache: ' . $e->getMessage());
+        }
+    }
+
+    private function conciliacaoStripe(): array {
+        $result = ['saldo' => [], 'transacoes' => [], 'divergencias' => [], 'erro' => null];
+
+        try {
+            // Buscar chave Stripe
+            $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('pagamentos_stripe_secret_key','stripe_secret_key') AND valor != '' LIMIT 1");
+            $st->execute();
+            $stripeKey = trim((string)($st->fetchColumn() ?: ''));
+            if ($stripeKey === '') { $result['erro'] = 'Stripe não configurado'; return $result; }
+
+            // 1. Saldo atual
+            $saldoResp = $this->stripeRequest($stripeKey, 'GET', '/v1/balance');
+            if (!empty($saldoResp['available'])) {
+                foreach ($saldoResp['available'] as $b) {
+                    $result['saldo'][] = ['moeda' => strtoupper($b['currency']), 'disponivel' => $b['amount'] / 100, 'pendente' => 0];
+                }
+            }
+            if (!empty($saldoResp['pending'])) {
+                foreach ($saldoResp['pending'] as $b) {
+                    foreach ($result['saldo'] as &$s) {
+                        if ($s['moeda'] === strtoupper($b['currency'])) { $s['pendente'] = $b['amount'] / 100; break; }
+                    }
+                }
+            }
+
+            // 2. Últimas transações (últimos 30 dias)
+            $desde = strtotime('-30 days');
+            $txResp = $this->stripeRequest($stripeKey, 'GET', '/v1/balance_transactions?limit=100&created[gte]=' . $desde . '&type=charge');
+            $transacoes = $txResp['data'] ?? [];
+
+            foreach ($transacoes as $tx) {
+                $result['transacoes'][] = [
+                    'id' => $tx['id'],
+                    'valor' => ($tx['amount'] ?? 0) / 100,
+                    'moeda' => strtoupper($tx['currency'] ?? 'USD'),
+                    'taxa' => ($tx['fee'] ?? 0) / 100,
+                    'liquido' => ($tx['net'] ?? 0) / 100,
+                    'descricao' => $tx['description'] ?? '',
+                    'data' => date('Y-m-d H:i', $tx['created'] ?? time()),
+                    'source' => $tx['source'] ?? '',
+                ];
+            }
+
+            // 3. Comparar com pedido_pagamentos local
+            $stLocal = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status FROM pedido_pagamentos WHERE gateway = 'stripe' AND created_at >= ? ORDER BY created_at DESC LIMIT 200");
+            $stLocal->execute([date('Y-m-d', $desde)]);
+            $locais = $stLocal->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $localMap = [];
+            foreach ($locais as $l) { $localMap[$l['payment_id']] = $l; }
+
+            // Transações no Stripe que não estão no sistema
+            foreach ($result['transacoes'] as $tx) {
+                $source = $tx['source'];
+                if ($source && !isset($localMap[$source])) {
+                    $result['divergencias'][] = ['tipo' => 'no_gateway_sem_local', 'gateway' => 'stripe', 'id' => $source, 'valor' => $tx['valor'], 'data' => $tx['data'], 'msg' => 'Recebido no Stripe mas sem registro local'];
+                }
+            }
+
+            // Pagamentos locais marcados como pagos mas sem correspondência no Stripe
+            $stripeIds = array_column($result['transacoes'], 'source');
+            foreach ($locais as $l) {
+                if (in_array($l['gateway_status'], ['paid','succeeded','approved']) && $l['payment_id'] && !in_array($l['payment_id'], $stripeIds)) {
+                    $result['divergencias'][] = ['tipo' => 'local_sem_gateway', 'gateway' => 'stripe', 'id' => $l['payment_id'], 'pedido_id' => $l['pedido_id'], 'valor' => $l['valor'], 'msg' => 'Marcado como pago localmente mas não encontrado no Stripe'];
+                }
+            }
+
+        } catch (\Exception $e) {
+            $result['erro'] = $e->getMessage();
+        }
+
+        return $result;
+    }
+
+    private function conciliacaoCambioReal(string $gateway): array {
+        $result = ['total_recebido_usd' => 0, 'total_recebido_brl' => 0, 'transacoes' => [], 'divergencias' => [], 'erro' => null];
+
+        try {
+            // Buscar tokens de pagamento dos últimos 30 dias
+            $desde = date('Y-m-d', strtotime('-30 days'));
+            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status, metodo, created_at FROM pedido_pagamentos WHERE gateway = ? AND created_at >= ? AND payment_id IS NOT NULL AND payment_id != '' ORDER BY created_at DESC LIMIT 200");
+            $st->execute([$gateway, $desde]);
+            $locais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Também buscar parcelas do carnê
+            if ($gateway === 'cambioreal') {
+                $stCarne = $this->db->prepare("SELECT cp.boleto_produtos_id_externo as payment_id, c.pedido_id, cp.valor_produtos as valor, cp.status as gateway_status, cp.created_at FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.boleto_produtos_id_externo IS NOT NULL AND cp.boleto_produtos_id_externo != '' AND cp.created_at >= ? ORDER BY cp.created_at DESC LIMIT 100");
+                $stCarne->execute([$desde]);
+                $carneParcelas = $stCarne->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $locais = array_merge($locais, $carneParcelas);
+            } elseif ($gateway === 'cambioreal_taxas') {
+                $stCarne = $this->db->prepare("SELECT cp.boleto_taxas_id_externo as payment_id, c.pedido_id, cp.valor_taxas as valor, cp.status as gateway_status, cp.created_at FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.boleto_taxas_id_externo IS NOT NULL AND cp.boleto_taxas_id_externo != '' AND cp.created_at >= ? ORDER BY cp.created_at DESC LIMIT 100");
+                $stCarne->execute([$desde]);
+                $carneParcelas = $stCarne->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $locais = array_merge($locais, $carneParcelas);
+            }
+
+            // Consultar status de cada token na API do Câmbio Real
+            $paymentService = new \App\Services\PaymentService();
+            $consultados = 0;
+            $maxConsultas = 50; // Limitar para não travar
+
+            foreach ($locais as $l) {
+                $token = $l['payment_id'];
+                $statusLocal = strtoupper(trim((string)($l['gateway_status'] ?? '')));
+
+                $tx = ['token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'valor_local' => (float)($l['valor'] ?? 0), 'status_local' => $statusLocal, 'status_gateway' => null, 'valor_gateway' => null, 'data' => $l['created_at'] ?? ''];
+
+                // Consultar API (com limite)
+                if ($consultados < $maxConsultas) {
+                    try {
+                        $resp = $paymentService->obterTransacaoCambioReal($token);
+                        $data = $resp['data'] ?? [];
+                        $tx['status_gateway'] = strtoupper(trim((string)($data['status'] ?? '')));
+                        $tx['valor_gateway'] = (float)($data['amount'] ?? 0);
+                        $tx['moeda'] = strtoupper($data['currency'] ?? 'USD');
+                        $tx['beneficiary'] = (float)($data['beneficiary'] ?? 0);
+                        $consultados++;
+
+                        // Somar recebidos
+                        if (in_array($tx['status_gateway'], ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA'])) {
+                            $result['total_recebido_usd'] += $tx['beneficiary'] ?: $tx['valor_gateway'];
+                        }
+                    } catch (\Exception $e) {
+                        $tx['status_gateway'] = 'ERRO: ' . $e->getMessage();
+                    }
+                }
+
+                $result['transacoes'][] = $tx;
+
+                // Detectar divergências
+                if ($tx['status_gateway'] !== null) {
+                    $pagoGateway = in_array($tx['status_gateway'], ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','ON_HOLD']);
+                    $pagoLocal = in_array($statusLocal, ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','PAGA','PAID','APPROVED']);
+
+                    if ($pagoGateway && !$pagoLocal) {
+                        $result['divergencias'][] = ['tipo' => 'pago_gateway_nao_local', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $tx['status_gateway'], 'status_local' => $statusLocal, 'msg' => 'Pago no Câmbio Real mas NÃO marcado como pago no sistema'];
+                    } elseif (!$pagoGateway && $pagoLocal) {
+                        $result['divergencias'][] = ['tipo' => 'pago_local_nao_gateway', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $tx['status_gateway'], 'status_local' => $statusLocal, 'msg' => 'Marcado como pago no sistema mas NÃO pago no Câmbio Real'];
+                    }
+                }
+            }
+
+            $result['total_consultados'] = $consultados;
+            $result['total_registros'] = count($locais);
+
+        } catch (\Exception $e) {
+            $result['erro'] = $e->getMessage();
+        }
+
+        return $result;
+    }
+
+    private function stripeRequest(string $key, string $method, string $path): array {
+        $url = 'https://api.stripe.com' . $path;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key],
+            CURLOPT_CUSTOMREQUEST => $method,
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $data = json_decode((string)$resp, true) ?: [];
+        if ($code < 200 || $code >= 300) {
+            throw new \Exception('Stripe HTTP ' . $code . ': ' . ($data['error']['message'] ?? 'Erro desconhecido'));
+        }
+        return $data;
+    }
 }

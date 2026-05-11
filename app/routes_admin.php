@@ -148,6 +148,8 @@ $router->post('/admin/despesas/excluir/{id}', 'AdminDespesasController', 'exclui
 // DRE Completo (API JSON)
 $router->get('/admin/dre-completo/dados', 'AdminDreCompletoController', 'dados');
 $router->get('/admin/dre-completo/exportar', 'AdminDreCompletoController', 'exportar');
+$router->get('/admin/dre-completo/conciliacao', 'AdminDreCompletoController', 'conciliacao');
+$router->get('/admin/dre-completo/cron-conciliacao', 'AdminDreCompletoController', 'cronConciliacao');
 
 // Demandas
 $router->get('/admin/demandas/painel', 'AdminDemandasController', 'painel');

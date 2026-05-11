@@ -693,7 +693,11 @@ function renderDreCompleto(d) {
     h += '<tr><td>Total de débitos (despesas)</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';
     h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold">Saldo final</td><td class="text-end fw-bold fs-5 '+(d.conciliacao.saldo_final>=0?'text-success':'text-danger')+'">'+fmtR(d.conciliacao.saldo_final)+'</td></tr>';
     h += '<tr><td class="text-muted small">Quantidade de lançamentos</td><td class="text-end">'+d.conciliacao.qtd_lancamentos+'</td></tr>';
-    h += '</tbody></table></div></div>';
+    h += '</tbody></table>';
+    h += '<hr class="my-3">';
+    h += '<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold small mb-0"><i class="fas fa-plug me-2"></i>Conciliação com Gateways (últimos 30 dias)</h6><div><button class="btn btn-sm btn-outline-dark me-1" onclick="carregarConciliacaoGateways(this,false)"><i class="fas fa-eye me-1"></i>Ver</button><button class="btn btn-sm btn-outline-primary" onclick="carregarConciliacaoGateways(this,true)"><i class="fas fa-sync me-1"></i>Forçar Atualização</button></div></div>';
+    h += '<div id="conciliacao-gateways-container"><div class="text-muted small">Clique em "Ver" para carregar dados do cache ou "Forçar Atualização" para consultar as APIs em tempo real.</div></div>';
+    h += '</div></div>';
 
     document.getElementById('dre-completo-container').innerHTML = h;
 }
@@ -752,5 +756,84 @@ function loadDreCompletoWithParams() {
     if (dreCurrentStatus) url += '&status_dre=' + encodeURIComponent(dreCurrentStatus);
     document.getElementById('dre-completo-container').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-muted"></i></div>';
     fetch(url).then(r=>r.json()).then(d=>{if(d.success)renderDreCompleto(d);}).catch(()=>{});
+}
+
+function carregarConciliacaoGateways(btn, force) {
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Carregando...';
+    var container = document.getElementById('conciliacao-gateways-container');
+    container.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-muted"></i><div class="text-muted small mt-1">'+(force?'Consultando APIs dos gateways...':'Carregando dados do cache...')+'</div></div>';
+
+    fetch('/admin/dre-completo/conciliacao' + (force ? '?force=1' : ''))
+        .then(function(r){return r.json()})
+        .then(function(d){
+            btn.disabled = false; btn.innerHTML = force ? '<i class="fas fa-sync me-1"></i>Forçar Atualização' : '<i class="fas fa-eye me-1"></i>Ver';
+            var h = '';
+
+            // Info do cache
+            if (d._from_cache) {
+                h += '<div class="alert alert-light small py-1 px-2 mb-3 border"><i class="fas fa-database me-1"></i>Dados do cache (atualizado em: <strong>'+(d._cache_age||'?')+'</strong>). Use "Forçar Atualização" para consultar ao vivo.</div>';
+            } else {
+                h += '<div class="alert alert-success small py-1 px-2 mb-3"><i class="fas fa-check-circle me-1"></i>Dados consultados em tempo real agora.</div>';
+            }
+
+            // Stripe
+            var s = d.stripe || {};
+            h += '<div class="border rounded p-3 mb-3">';
+            h += '<div class="fw-bold small mb-2"><i class="fab fa-stripe me-1" style="color:#635bff;"></i>Stripe</div>';
+            if (s.erro) { h += '<div class="text-danger small">'+s.erro+'</div>'; }
+            else {
+                if (s.saldo && s.saldo.length) {
+                    h += '<div class="d-flex gap-3 mb-2">';
+                    s.saldo.forEach(function(b){ h += '<div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">'+b.moeda+'</div><div class="fw-bold text-success">'+b.disponivel.toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div><div class="text-muted" style="font-size:10px;">Pendente: '+b.pendente.toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div>'; });
+                    h += '</div>';
+                }
+                h += '<div class="small text-muted">'+((s.transacoes||[]).length)+' transações nos últimos 30 dias</div>';
+                if ((s.divergencias||[]).length > 0) {
+                    h += '<div class="alert alert-warning small mt-2 mb-0 py-1 px-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+(s.divergencias.length)+' divergência(s)</strong></div>';
+                    h += '<div class="table-responsive mt-1"><table class="table table-sm mb-0" style="font-size:11px;"><thead><tr><th>Tipo</th><th>ID</th><th>Pedido</th><th>Msg</th></tr></thead><tbody>';
+                    s.divergencias.forEach(function(dv){ h += '<tr><td><span class="badge bg-warning text-dark" style="font-size:9px;">'+dv.tipo+'</span></td><td class="text-truncate" style="max-width:100px;">'+dv.id+'</td><td>'+(dv.pedido_id||'-')+'</td><td class="small">'+dv.msg+'</td></tr>'; });
+                    h += '</tbody></table></div>';
+                } else { h += '<div class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Sem divergências</div>'; }
+            }
+            h += '</div>';
+
+            // Câmbio Real Produtos
+            var cr = d.cambioreal || {};
+            h += '<div class="border rounded p-3 mb-3">';
+            h += '<div class="fw-bold small mb-2"><i class="fas fa-dollar-sign me-1" style="color:#0ea5e9;"></i>Câmbio Real (Produtos)</div>';
+            if (cr.erro) { h += '<div class="text-danger small">'+cr.erro+'</div>'; }
+            else {
+                h += '<div class="d-flex gap-3 mb-2"><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Recebido (USD)</div><div class="fw-bold text-success">'+(cr.total_recebido_usd||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Registros</div><div class="fw-bold">'+(cr.total_registros||0)+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Consultados</div><div class="fw-bold">'+(cr.total_consultados||0)+'</div></div></div>';
+                if ((cr.divergencias||[]).length > 0) {
+                    h += '<div class="alert alert-warning small mt-2 mb-0 py-1 px-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+(cr.divergencias.length)+' divergência(s)</strong></div>';
+                    h += '<div class="table-responsive mt-1"><table class="table table-sm mb-0" style="font-size:11px;"><thead><tr><th>Tipo</th><th>Token</th><th>Pedido</th><th>Status GW</th><th>Status Local</th></tr></thead><tbody>';
+                    cr.divergencias.forEach(function(dv){ h += '<tr><td><span class="badge bg-danger" style="font-size:9px;">'+dv.tipo+'</span></td><td class="text-truncate" style="max-width:80px;">'+(dv.token||'')+'</td><td>'+(dv.pedido_id||'-')+'</td><td>'+(dv.status_gateway||'-')+'</td><td>'+(dv.status_local||'-')+'</td></tr>'; });
+                    h += '</tbody></table></div>';
+                } else { h += '<div class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Sem divergências</div>'; }
+            }
+            h += '</div>';
+
+            // Câmbio Real Taxas
+            var crt = d.cambioreal_taxas || {};
+            h += '<div class="border rounded p-3">';
+            h += '<div class="fw-bold small mb-2"><i class="fas fa-receipt me-1" style="color:#f59e0b;"></i>Câmbio Real (Taxas)</div>';
+            if (crt.erro) { h += '<div class="text-danger small">'+crt.erro+'</div>'; }
+            else {
+                h += '<div class="d-flex gap-3 mb-2"><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Recebido (USD)</div><div class="fw-bold text-success">'+(crt.total_recebido_usd||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Registros</div><div class="fw-bold">'+(crt.total_registros||0)+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Consultados</div><div class="fw-bold">'+(crt.total_consultados||0)+'</div></div></div>';
+                if ((crt.divergencias||[]).length > 0) {
+                    h += '<div class="alert alert-warning small mt-2 mb-0 py-1 px-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+(crt.divergencias.length)+' divergência(s)</strong></div>';
+                    h += '<div class="table-responsive mt-1"><table class="table table-sm mb-0" style="font-size:11px;"><thead><tr><th>Tipo</th><th>Token</th><th>Pedido</th><th>Status GW</th><th>Status Local</th></tr></thead><tbody>';
+                    crt.divergencias.forEach(function(dv){ h += '<tr><td><span class="badge bg-danger" style="font-size:9px;">'+dv.tipo+'</span></td><td class="text-truncate" style="max-width:80px;">'+(dv.token||'')+'</td><td>'+(dv.pedido_id||'-')+'</td><td>'+(dv.status_gateway||'-')+'</td><td>'+(dv.status_local||'-')+'</td></tr>'; });
+                    h += '</tbody></table></div>';
+                } else { h += '<div class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Sem divergências</div>'; }
+            }
+            h += '</div>';
+
+            container.innerHTML = h;
+        })
+        .catch(function(e){
+            btn.disabled = false; btn.innerHTML = force ? '<i class="fas fa-sync me-1"></i>Forçar Atualização' : '<i class="fas fa-eye me-1"></i>Ver';
+            container.innerHTML = '<div class="alert alert-danger small">Erro: '+e.message+'</div>';
+        });
 }
 </script>
