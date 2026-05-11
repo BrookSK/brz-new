@@ -873,6 +873,14 @@ function renderAdminSidebarStyles() {
             main .row > [class*="col-lg-4"] { flex: 0 0 50%; max-width: 50%; }
             main form .row > [class*="col-md"] { flex: 0 0 100%; max-width: 100%; margin-bottom: 0.5rem; }
             main .alert { font-size: 0.8rem; padding: 0.5rem 0.75rem; }
+            /* Cards de pedido na listagem */
+            main .card { font-size: 12px; margin-bottom: 0.75rem !important; }
+            main .card .d-flex { flex-wrap: wrap; gap: 4px; }
+            main .card img, main .card .rounded-circle { width: 32px !important; height: 32px !important; }
+            main .card .badge { font-size: 9px !important; padding: 2px 5px; }
+            main .card select.form-select { font-size: 11px; padding: 2px 24px 2px 6px; height: auto; }
+            /* Código do pedido longo */
+            main .card .text-muted { word-break: break-all; }
         }
     </style>';
 }
