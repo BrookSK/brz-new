@@ -1242,6 +1242,7 @@ class AdminRedirecionamentoController extends Controller {
         $id=(int)$request->getParam('id',0);
         $data=trim((string)$request->getParam('data_agendada',''));
         $hora=trim((string)$request->getParam('horario',''));
+        if (!$id || !$data || !$hora) { $this->json(['ok'=>false,'msg'=>'Dados incompletos']); return; }
         $db = $this->pdo();
         $db->prepare("UPDATE redirecionamento_coletas SET data_agendada=?,horario=?,status='agendado' WHERE id=?")->execute([$data,$hora,$id]);
 
@@ -1255,10 +1256,12 @@ class AdminRedirecionamentoController extends Controller {
             $coleta = $st->fetch(\PDO::FETCH_ASSOC);
             if ($coleta && !empty($coleta['red_email'])) {
                 $assunto = "Coleta reagendada - Envio #{$coleta['envio_id']}";
-                $corpo = "<p>Sua coleta foi reagendada pelo admin para <b>{$data} às {$hora}</b>.<br>Envio: #{$coleta['envio_id']}<br>Tenha o pacote pronto na nova data.</p>";
+                $corpo = "<p>Sua coleta foi reagendada para <b>{$data} às {$hora}</b>.<br>Envio: #{$coleta['envio_id']}<br>Tenha o pacote pronto na nova data.</p>";
                 $this->enviarEmailNotificacao($coleta['red_email'], $assunto, $corpo);
             }
-        } catch (\Exception $e) {}
+        } catch (\Exception $e) {
+            error_log('[REDIR] Erro email reagendar: ' . $e->getMessage());
+        }
 
         $this->json(['ok'=>true]);
     }

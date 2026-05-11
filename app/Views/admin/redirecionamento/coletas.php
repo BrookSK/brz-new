@@ -5,6 +5,8 @@ $coletas = is_array($coletas ?? null) ? $coletas : [];
 $enviosDisponiveis = is_array($enviosDisponiveis ?? null) ? $enviosDisponiveis : [];
 $statusColors = ['agendado'=>'warning','confirmado'=>'info','coletado'=>'success','cancelado'=>'secondary'];
 $statusLabels = ['agendado'=>'Agendado','confirmado'=>'Confirmado','coletado'=>'Coletado','cancelado'=>'Cancelado'];
+$_perfilColeta = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+$_isAdminColeta = in_array($_perfilColeta, ['admin', 'suporte'], true);
 
 // Agrupar por mês para o calendário
 $porDia = [];
@@ -77,11 +79,11 @@ ksort($porDia);
                             <td><?= date('H:i', strtotime($c['horario']??'00:00')) ?></td>
                             <td><span class="badge bg-<?= $sc ?> bg-opacity-10 text-<?= $sc ?> border border-<?= $sc ?> border-opacity-25"><?= $sl ?></span></td>
                             <td class="pe-3 text-end d-flex gap-1 justify-content-end">
-                                <?php if (($c['status']??'agendado') === 'agendado'): ?>
+                                <?php if ($_isAdminColeta && ($c['status']??'agendado') === 'agendado'): ?>
                                 <button type="button" class="btn btn-xs btn-outline-info btn-confirmar" data-id="<?= (int)$c['id'] ?>" style="font-size:.75rem;padding:2px 8px">Confirmar</button>
                                 <button type="button" class="btn btn-xs btn-outline-secondary btn-reagendar" data-id="<?= (int)$c['id'] ?>" style="font-size:.75rem;padding:2px 8px">Reagendar</button>
                                 <?php endif; ?>
-                                <?php if (in_array($c['status']??'agendado',['agendado','confirmado'])): ?>
+                                <?php if ($_isAdminColeta && in_array($c['status']??'agendado',['agendado','confirmado'])): ?>
                                 <button type="button" class="btn btn-xs btn-outline-success btn-coletado" data-id="<?= (int)$c['id'] ?>" style="font-size:.75rem;padding:2px 8px">Coletado</button>
                                 <?php endif; ?>
                             </td>
