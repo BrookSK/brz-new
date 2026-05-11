@@ -104,6 +104,8 @@ class AdminDashboardController extends Controller {
                     }
                 }
                 $stats['faturamento_total'] = $fatBrlAdmin + $fatUsdAdmin;
+                $stats['faturamento_brl'] = $fatBrlAdmin;
+                $stats['faturamento_usd'] = $fatUsdAdmin;
                 $partsAdmin = [];
                 if ($fatBrlAdmin > 0) $partsAdmin[] = 'R$ ' . number_format($fatBrlAdmin, 2, ',', '.');
                 if ($fatUsdAdmin > 0) $partsAdmin[] = 'US$ ' . number_format($fatUsdAdmin, 2, ',', '.');
@@ -202,6 +204,8 @@ class AdminDashboardController extends Controller {
                 }
 
                 $stats['faturamento_total'] = $fatBrl + $fatUsd;
+                $stats['faturamento_brl'] = $fatBrl;
+                $stats['faturamento_usd'] = $fatUsd;
                 $parts = [];
                 if ($fatBrl > 0) $parts[] = 'R$ ' . number_format($fatBrl, 2, ',', '.');
                 if ($fatUsd > 0) $parts[] = 'US$ ' . number_format($fatUsd, 2, ',', '.');
@@ -706,8 +710,16 @@ class AdminDashboardController extends Controller {
                 </article>
                 <article class="kpi-card is-featured">
                     <div>
-                        <div class="kpi-label">Faturamento</div>
-                        <div class="kpi-value">' . ($stats['faturamento_display'] ?: 'R$ 0,00') . '</div>
+                        <div class="kpi-label">Faturamento BRL</div>
+                        <div class="kpi-value">R$ ' . number_format((float)($stats['faturamento_brl'] ?? 0), 2, ',', '.') . '</div>
+                        <div class="kpi-subtext">Pedidos pagos</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                </article>
+                <article class="kpi-card is-featured">
+                    <div>
+                        <div class="kpi-label">Faturamento USD</div>
+                        <div class="kpi-value">US$ ' . number_format((float)($stats['faturamento_usd'] ?? 0), 2, ',', '.') . '</div>
                         <div class="kpi-subtext">Pedidos pagos</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
