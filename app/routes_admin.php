@@ -391,3 +391,13 @@ $router->get('/api/me/payment-methods', 'LiveApiController', 'paymentMethods');
 $router->post('/api/me/payment-methods', 'LiveApiController', 'storePaymentMethod');
 $router->post('/api/me/payment-methods/{id}/default', 'LiveApiController', 'setDefaultPaymentMethod');
 $router->post('/api/me/payment-methods/{id}/delete', 'LiveApiController', 'deletePaymentMethod');
+
+// Descrição de Produtos (IA)
+$router->get('/admin/descricao-produtos', 'AdminDescricaoProdutosController', 'index');
+$router->post('/admin/descricao-produtos/gerar', 'AdminDescricaoProdutosController', 'gerarDescricao');
+$router->post('/admin/descricao-produtos/gerar-lote', 'AdminDescricaoProdutosController', 'gerarLote');
+$router->get('/admin/descricao-produtos/revisar/{id}', 'AdminDescricaoProdutosController', 'revisar');
+$router->post('/admin/descricao-produtos/aprovar', 'AdminDescricaoProdutosController', 'aprovar');
+$router->post('/admin/descricao-produtos/reprovar', 'AdminDescricaoProdutosController', 'reprovar');
+$router->post('/admin/descricao-produtos/aprovar-lote', 'AdminDescricaoProdutosController', 'aprovarLote');
+$router->post('/admin/descricao-produtos/reprovar-lote', 'AdminDescricaoProdutosController', 'reprovarLote');

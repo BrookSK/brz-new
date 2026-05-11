@@ -250,6 +250,7 @@ function renderAdminSidebar($activePage = '') {
         'email-logs' => ['icon' => 'fas fa-envelope', 'label' => 'Log de Emails', 'url' => '/admin/emails', 'roles' => ['admin']],
         'descontos' => ['icon' => 'fas fa-tag', 'label' => 'Autorizações Desconto', 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
         'promocoes-auditoria' => ['icon' => 'fas fa-percent', 'label' => 'Auditoria Promoções', 'url' => '/admin/promocoes-auditoria', 'roles' => ['admin']],
+        'descricao-produtos' => ['icon' => 'fas fa-pen-fancy', 'label' => 'Descrição de Produtos', 'url' => '/admin/descricao-produtos', 'roles' => ['admin','vendedor']],
         'promocoes-agendadas' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Promoções Agendadas', 'url' => '/admin/promocoes-agendadas', 'roles' => ['admin', 'vendedor']],
         'faq' => ['icon' => 'fas fa-question-circle', 'label' => 'FAQ / Termos', 'url' => '/admin/faq', 'roles' => ['admin']],
         'comissoes-global' => ['icon' => 'fas fa-users-cog', 'label' => 'Comissões Global', 'url' => '/admin/comissoes-global', 'roles' => ['admin']],
@@ -426,7 +427,7 @@ function renderAdminSidebar($activePage = '') {
             $menuGroups = [
                 '_solo_dashboard' => ['items' => ['dashboard']],
                 'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pedidos-conferencia', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
-                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
+                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
                 'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
                 'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'remessa-shipstation']],
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
