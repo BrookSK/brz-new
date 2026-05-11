@@ -279,7 +279,7 @@ class AdminConfiguracoesController extends Controller {
                             <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
                                 <i class="fas fa-plug"></i> WooCommerce
                             </button>
-                            <button class="nav-link" id="v-pills-demandas-tab" data-bs-toggle="pill" data-bs-target="#v-pills-demandas" type="button" onclick="window.location.href='/admin/demandas/configuracoes'">
+                            <button class="nav-link" id="v-pills-demandas-tab" type="button" onclick="window.location.href=\'/admin/demandas/configuracoes\'">
                                 <i class="fas fa-tasks"></i> Demandas (TI)
                             </button>
                         </div>
