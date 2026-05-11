@@ -94,22 +94,20 @@
                         <?php else: ?>
                             <div class="rounded bg-light d-flex align-items-center justify-content-center flex-shrink-0" style="width:40px;height:40px;"><i class="fas fa-box text-muted"></i></div>
                         <?php endif; ?>
-                        <div class="flex-grow-1 min-width-0">
-                            <div class="fw-semibold small text-truncate"><?= htmlspecialchars($prodNome) ?></div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size:11px;">
-                                <span class="text-muted"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></span>
-                                <span class="badge bg-light text-dark border"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span>
+                        <div class="flex-grow-1" style="min-width:0;overflow:hidden;">
+                            <div class="fw-semibold text-truncate" style="font-size:12px;"><?= htmlspecialchars($prodNome) ?></div>
+                            <div class="d-flex align-items-center gap-1 flex-wrap" style="font-size:10px;">
+                                <span class="text-muted text-truncate" style="max-width:100px;"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></span>
+                                <span class="badge bg-light text-dark border" style="font-size:9px;"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span>
                                 <?php if ($stP1 === 'paga'): ?><span class="text-success"><i class="fas fa-check-circle"></i></span><?php else: ?><span class="text-danger"><i class="fas fa-times-circle"></i></span><?php endif; ?>
+                                <span class="badge bg-<?= $statusCompra === 'comprado' ? 'success' : ($statusCompra === 'recebido' ? 'info' : 'warning') ?>" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $statusCompra)) ?></span>
                             </div>
                         </div>
-                        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
-                            <span class="badge bg-<?= $statusCompra === 'comprado' ? 'success' : ($statusCompra === 'recebido' ? 'info' : 'warning') ?>" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $statusCompra)) ?></span>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-1" data-bs-toggle="modal" data-bs-target="#<?= $modalId ?>"><i class="fas fa-eye"></i></button>
-                                <?php if ($statusCompra === 'aguardando_compra'): ?>
-                                <button type="button" class="btn btn-outline-success btn-sm py-0 px-1" data-bs-toggle="modal" data-bs-target="#comprar_<?= $modalId ?>"><i class="fas fa-check"></i></button>
-                                <?php endif; ?>
-                            </div>
+                        <div class="d-flex flex-shrink-0 gap-1">
+                            <button type="button" class="btn btn-outline-primary btn-sm py-0 px-1" data-bs-toggle="modal" data-bs-target="#<?= $modalId ?>"><i class="fas fa-eye"></i></button>
+                            <?php if ($statusCompra === 'aguardando_compra'): ?>
+                            <button type="button" class="btn btn-outline-success btn-sm py-0 px-1" data-bs-toggle="modal" data-bs-target="#comprar_<?= $modalId ?>"><i class="fas fa-check"></i></button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <?php

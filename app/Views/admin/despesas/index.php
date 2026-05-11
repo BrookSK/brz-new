@@ -212,7 +212,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         $stClassMobile = $statusBadgeMobile[$d['status'] ?? ''] ?? 'bg-secondary';
                     ?>
                     <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
-                        <div class="flex-grow-1 min-width-0">
+                        <div class="flex-grow-1" style="min-width:0;overflow:hidden;">
                             <div class="fw-semibold text-truncate" style="font-size:12px;"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
                             <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                                 <span class="fw-bold" style="font-size:11px;"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></span>

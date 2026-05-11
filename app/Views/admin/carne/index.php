@@ -226,7 +226,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                             $totalParcelas = (int)($c['quantidade_parcelas'] ?? 1);
                         ?>
                         <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
-                            <div class="flex-grow-1 min-width-0">
+                            <div class="flex-grow-1" style="min-width:0;overflow:hidden;">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="fw-bold" style="font-size:11px;">#<?= $c['id'] ?></span>
                                     <a href="/admin/pedidos/detalhes/<?= $c['pedido_id'] ?>" class="text-decoration-none fw-semibold" style="font-size:11px;">Ped #<?= $c['pedido_id'] ?></a>

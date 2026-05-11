@@ -36,7 +36,7 @@
                 <?php else: ?>
                     <?php foreach ($compras as $ci): ?>
                     <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
-                        <div class="flex-grow-1 min-width-0">
+                        <div class="flex-grow-1" style="min-width:0;overflow:hidden;">
                             <div class="d-flex align-items-center gap-2">
                                 <a href="/admin/pedidos/detalhes/<?= $ci['pedido_id'] ?>" class="fw-semibold text-decoration-none" style="font-size:12px;">#<?= $ci['pedido_id'] ?></a>
                                 <span class="badge bg-light text-dark border" style="font-size:10px;"><?= $ci['quantidade_parcelas'] ?>x</span>
