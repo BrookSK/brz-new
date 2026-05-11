@@ -10,6 +10,35 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
         <button class="btn btn-primary btn-sm" id="btnNovoGrupo"><i class="fas fa-plus me-1"></i>Novo grupo</button>
     </div>
 
+    <!-- Busca e Filtros -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <input type="text" id="gruposBusca" class="form-control form-control-sm" placeholder="Buscar grupo por nome..." oninput="filtrarGrupos()">
+                </div>
+                <div class="col-md-3">
+                    <select id="gruposFiltro" class="form-select form-select-sm" onchange="filtrarGrupos()">
+                        <option value="">Todos os grupos</option>
+                        <?php foreach ($grupos as $g): ?>
+                        <option value="<?= (int)$g['id'] ?>"><?= htmlspecialchars($g['nome'] ?? '', ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select id="gruposStatus" class="form-select form-select-sm" onchange="filtrarGrupos()">
+                        <option value="">Todos status</option>
+                        <option value="1">Ativos</option>
+                        <option value="0">Inativos</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary btn-sm w-100" onclick="document.getElementById('gruposBusca').value='';document.getElementById('gruposFiltro').value='';document.getElementById('gruposStatus').value='';filtrarGrupos();">Limpar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="listaGrupos" class="row g-3">
         <?php if (empty($grupos)): ?>
         <div class="col-12 text-center text-muted py-5" id="emptyState">
@@ -368,4 +397,20 @@ document.querySelectorAll('.btn-produtos').forEach(btn => {
         });
     });
 });
+
+function filtrarGrupos() {
+    const busca = (document.getElementById('gruposBusca').value || '').toLowerCase();
+    const filtroId = document.getElementById('gruposFiltro').value;
+    const filtroStatus = document.getElementById('gruposStatus').value;
+    document.querySelectorAll('#listaGrupos .grupo-card').forEach(card => {
+        const nome = (card.querySelector('.fw-bold')?.textContent || '').toLowerCase();
+        const id = card.getAttribute('data-id') || '';
+        const ativo = card.querySelector('.badge.bg-success') ? '1' : '0';
+        let show = true;
+        if (busca && !nome.includes(busca)) show = false;
+        if (filtroId && id !== filtroId) show = false;
+        if (filtroStatus && ativo !== filtroStatus) show = false;
+        card.style.display = show ? '' : 'none';
+    });
+}
 </script>

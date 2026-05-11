@@ -219,3 +219,29 @@
         height: 72px !important;
     }
 }
+
+/* =========================================================
+   HIDE VARIATIONS SECTION
+   All products are simple - variations hidden via CSS
+   ========================================================== */
+
+/* Hide variations tab/section in product forms */
+[data-bs-target*="variac"],
+[href*="variac"],
+#variacoes,
+#tab-variacoes,
+.variacoes-section,
+[id*="variacao"],
+[id*="variacoes"],
+.card-header:has(+ .card-body [id*="variacao"]),
+a[href*="variacoes"],
+button[data-bs-target*="variacoes"] {
+    display: none !important;
+}
+
+/* Hide any nav-link that mentions variações */
+.nav-link[data-bs-target="#variacoes"],
+.nav-item:has(.nav-link[data-bs-target="#variacoes"]),
+.nav-item:has(.nav-link[href*="variacoes"]) {
+    display: none !important;
+}

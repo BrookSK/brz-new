@@ -214,7 +214,6 @@ function renderAdminSidebar($activePage = '') {
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.dashboard', 'Dashboard'), 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'produtos' => ['icon' => 'fas fa-box', 'label' => __('admin.menu.products', 'Produtos'), 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
         'grupos-compras' => ['icon' => 'fas fa-store', 'label' => 'Grupos de Compras', 'url' => '/admin/grupos-compras', 'roles' => ['admin','vendedor','suporte']],
-        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => __('admin.menu.variations', 'Variações'), 'url' => '/admin/variacoes', 'roles' => ['admin','vendedor','suporte']],
         'lojas' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.stores', 'Lojas'), 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.categories', 'Categorias'), 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
@@ -427,7 +426,7 @@ function renderAdminSidebar($activePage = '') {
             $menuGroups = [
                 '_solo_dashboard' => ['items' => ['dashboard']],
                 'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pedidos-conferencia', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
-                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'variacoes', 'lojas', 'categorias', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
+                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
                 'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
                 'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'remessa-shipstation']],
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
