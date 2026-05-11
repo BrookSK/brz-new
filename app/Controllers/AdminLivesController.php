@@ -390,6 +390,15 @@ class AdminLivesController {
     }
 
     /**
+     * Listagem geral de relatórios (redireciona para listagem de lives com foco em métricas)
+     */
+    public function reports(Request $request) {
+        // Redirecionar para a listagem de lives — os relatórios são acessados individualmente por live
+        header('Location: /admin/lives');
+        exit;
+    }
+
+    /**
      * Relatório de conversão
      */
     public function report(Request $request, $id) {

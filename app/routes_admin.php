@@ -372,6 +372,11 @@ $router->post('/admin/lives/{id}/ban/{userId}', 'AdminLivesController', 'banUser
 $router->get('/admin/lives/{id}/report', 'AdminLivesController', 'report');
 $router->get('/admin/live-shop/orders', 'AdminLivesController', 'orders');
 
+// Aliases para o menu lateral (live-shop → lives)
+$router->get('/admin/live-shop', 'AdminLivesController', 'index');
+$router->get('/admin/live-shop/create', 'AdminLivesController', 'create');
+$router->get('/admin/live-shop/reports', 'AdminLivesController', 'reports');
+
 // Admin — Configurações Lives
 $router->get('/admin/configuracoes/lives', 'AdminLivesConfigController', 'index');
 $router->post('/admin/configuracoes/lives', 'AdminLivesConfigController', 'store');
