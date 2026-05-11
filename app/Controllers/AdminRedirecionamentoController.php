@@ -674,6 +674,38 @@ class AdminRedirecionamentoController extends Controller {
         $this->json($row ?: []);
     }
 
+    public function clienteAtualizar(Request $request) {
+        $this->auth(); $this->migrar();
+        $id = (int)$request->getParam('id',0);
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        $nome = trim((string)$request->getParam('nome',''));
+        $cpf = trim((string)$request->getParam('cpf',''));
+        $email = trim((string)$request->getParam('email',''));
+        $tel = trim((string)$request->getParam('telefone',''));
+        $nasc = trim((string)$request->getParam('data_nascimento','')) ?: null;
+        if ($nome === '') { $this->json(['ok'=>false,'msg'=>'Nome obrigatório']); return; }
+        $this->pdo()->prepare("UPDATE redirecionamento_clientes SET nome=?,cpf=?,email=?,telefone=?,data_nascimento=? WHERE id=?")
+            ->execute([$nome,$cpf,$email,$tel,$nasc,$id]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function clienteExcluir(Request $request) {
+        $this->auth(); $this->migrar();
+        $id = (int)$request->getParam('id',0);
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        $db = $this->pdo();
+        // Verificar se tem envios vinculados
+        $st = $db->prepare("SELECT COUNT(*) FROM redirecionamento_envios WHERE cliente_id=?");
+        $st->execute([$id]);
+        if ((int)$st->fetchColumn() > 0) {
+            $this->json(['ok'=>false,'msg'=>'Não é possível excluir: cliente tem envios vinculados.']);
+            return;
+        }
+        $db->prepare("DELETE FROM redirecionamento_enderecos WHERE cliente_id=?")->execute([$id]);
+        $db->prepare("DELETE FROM redirecionamento_clientes WHERE id=?")->execute([$id]);
+        $this->json(['ok'=>true]);
+    }
+
     public function clientesLista(Request $request) {
         $this->auth();
         $redId = (int)$request->getParam('redirecionador_id', 0);

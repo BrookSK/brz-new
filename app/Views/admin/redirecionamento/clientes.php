@@ -40,11 +40,12 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
                             <th>E-mail</th>
                             <?php if (!$redirecionadorFixo): ?><th>Redirecionador</th><?php endif; ?>
                             <th>Endereços</th>
+                            <th class="pe-3">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($clientes)): ?>
-                        <tr><td colspan="<?= $redirecionadorFixo ? 5 : 6 ?>" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
+                        <tr><td colspan="<?= $redirecionadorFixo ? 6 : 7 ?>" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td></tr>
                         <?php else: foreach ($clientes as $c): ?>
                         <tr>
                             <td class="ps-3"><?= (int)$c['id'] ?></td>
@@ -53,6 +54,22 @@ $redirecionadorFixo = $redirecionadorFixo ?? null;
                             <td><?= htmlspecialchars($c['email']??'',ENT_QUOTES,'UTF-8') ?></td>
                             <?php if (!$redirecionadorFixo): ?><td><?= htmlspecialchars($c['redirecionador_nome']??'',ENT_QUOTES,'UTF-8') ?></td><?php endif; ?>
                             <td><?= (int)($c['enderecos_count']??0) ?></td>
+                            <td class="pe-3">
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary js-editar-cliente"
+                                        data-id="<?= (int)$c['id'] ?>"
+                                        data-nome="<?= htmlspecialchars($c['nome']??'',ENT_QUOTES,'UTF-8') ?>"
+                                        data-cpf="<?= htmlspecialchars($c['cpf']??'',ENT_QUOTES,'UTF-8') ?>"
+                                        data-email="<?= htmlspecialchars($c['email']??'',ENT_QUOTES,'UTF-8') ?>"
+                                        data-telefone="<?= htmlspecialchars($c['telefone']??'',ENT_QUOTES,'UTF-8') ?>"
+                                        data-nascimento="<?= htmlspecialchars($c['data_nascimento']??'',ENT_QUOTES,'UTF-8') ?>"
+                                        title="Editar"><i class="fas fa-pen"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger js-excluir-cliente"
+                                        data-id="<?= (int)$c['id'] ?>"
+                                        data-nome="<?= htmlspecialchars($c['nome']??'',ENT_QUOTES,'UTF-8') ?>"
+                                        title="Excluir"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -209,5 +226,75 @@ document.getElementById('btnSalvarCliente')?.addEventListener('click', async () 
     if (j.ok) { location.reload(); }
     else { document.getElementById('msgCliente').innerHTML='<div class="alert alert-danger py-1 small">'+(j.msg||'Erro')+'</div>'; }
 });
+
+// ── Editar cliente ──
+document.querySelectorAll('.js-editar-cliente').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const id = this.dataset.id;
+        document.getElementById('editClienteId').value = id;
+        document.getElementById('editNome').value = this.dataset.nome || '';
+        document.getElementById('editCpf').value = this.dataset.cpf || '';
+        document.getElementById('editEmail').value = this.dataset.email || '';
+        document.getElementById('editTelefone').value = this.dataset.telefone || '';
+        document.getElementById('editNasc').value = this.dataset.nascimento || '';
+        document.getElementById('editMsg').innerHTML = '';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarCliente')).show();
+    });
+});
+
+document.getElementById('btnSalvarEdicao')?.addEventListener('click', async () => {
+    const id = document.getElementById('editClienteId').value;
+    const fd = new FormData();
+    fd.append('id', id);
+    fd.append('nome', document.getElementById('editNome').value);
+    fd.append('cpf', document.getElementById('editCpf').value);
+    fd.append('email', document.getElementById('editEmail').value);
+    fd.append('telefone', document.getElementById('editTelefone').value);
+    fd.append('data_nascimento', document.getElementById('editNasc').value);
+    const r = await fetch('/admin/redirecionamento/clientes/atualizar', {method:'POST', body:fd});
+    const j = await r.json();
+    if (j.ok) { location.reload(); }
+    else { document.getElementById('editMsg').innerHTML = '<div class="alert alert-danger py-1 small">'+(j.msg||'Erro')+'</div>'; }
+});
+
+// ── Excluir cliente ──
+document.querySelectorAll('.js-excluir-cliente').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const id = this.dataset.id;
+        const nome = this.dataset.nome;
+        if (!confirm('Excluir o cliente "' + nome + '"? Esta ação não pode ser desfeita.')) return;
+        const fd = new FormData();
+        fd.append('id', id);
+        const r = await fetch('/admin/redirecionamento/clientes/excluir', {method:'POST', body:fd});
+        const j = await r.json();
+        if (j.ok) { location.reload(); }
+        else { alert(j.msg || 'Erro ao excluir'); }
+    });
+});
 </script>
+
+<!-- Modal editar cliente -->
+<div class="modal fade" id="modalEditarCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Editar cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="editClienteId">
+                <div class="row g-3">
+                    <div class="col-12"><label class="form-label">Nome</label><input class="form-control" type="text" id="editNome"></div>
+                    <div class="col-md-6"><label class="form-label">CPF</label><input class="form-control" type="text" id="editCpf"></div>
+                    <div class="col-md-6"><label class="form-label">Data nascimento</label><input class="form-control" type="date" id="editNasc"></div>
+                    <div class="col-md-6"><label class="form-label">E-mail</label><input class="form-control" type="email" id="editEmail"></div>
+                    <div class="col-md-6"><label class="form-label">Telefone</label><input class="form-control" type="text" id="editTelefone"></div>
+                </div>
+                <div id="editMsg" class="mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarEdicao">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>

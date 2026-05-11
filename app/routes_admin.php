@@ -230,6 +230,8 @@ $router->post('/admin/redirecionamento/divergencias/gerar-link',        'AdminRe
 $router->post('/admin/redirecionamento/divergencias/marcar-pago',       'AdminRedirecionamentoController', 'divergenciaMarcarPago');
 $router->get('/admin/redirecionamento/clientes',                        'AdminRedirecionamentoController', 'clientes');
 $router->post('/admin/redirecionamento/clientes/salvar',                'AdminRedirecionamentoController', 'clienteSalvar');
+$router->post('/admin/redirecionamento/clientes/atualizar',             'AdminRedirecionamentoController', 'clienteAtualizar');
+$router->post('/admin/redirecionamento/clientes/excluir',               'AdminRedirecionamentoController', 'clienteExcluir');
 $router->get('/admin/redirecionamento/clientes/get',                    'AdminRedirecionamentoController', 'clienteGet');
 $router->get('/admin/redirecionamento/clientes/lista',                  'AdminRedirecionamentoController', 'clientesLista');
 $router->get('/admin/redirecionamento/tabela-pesos',                    'AdminRedirecionamentoController', 'tabelaPesos');
