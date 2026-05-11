@@ -151,6 +151,7 @@ $router->get('/admin/dre-completo/exportar', 'AdminDreCompletoController', 'expo
 
 // Demandas
 $router->get('/admin/demandas/painel', 'AdminDemandasController', 'painel');
+$router->post('/admin/demandas/painel', 'AdminDemandasController', 'painel');
 $router->get('/admin/demandas/nova', 'AdminDemandasController', 'nova');
 $router->get('/admin/demandas/concluidos', 'AdminDemandasController', 'concluidos');
 $router->get('/admin/demandas/detalhe/{id}', 'AdminDemandasController', 'detalhe');
