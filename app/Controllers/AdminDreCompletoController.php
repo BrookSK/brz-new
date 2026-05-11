@@ -514,18 +514,22 @@ class AdminDreCompletoController extends Controller {
         $ate = $dateEnd ?: date('Y-m-d');
 
         try {
-            // ENTRADAS: pagamentos confirmados — buscar por status do pedido + gateway_status
-            // Usar COALESCE com updated_at caso created_at seja NULL
+            // ENTRADAS: pagamentos confirmados
+            // Usar data do PEDIDO (mesma fonte do DRE) em vez da data do pagamento
+            // pois muitos registros em pedido_pagamentos não têm created_at preenchido
             $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
-                COALESCE(pp.created_at, pp.updated_at) as data,
+                COALESCE(pp.updated_at, pp.created_at, p.created_at) as data,
                 COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                WHERE COALESCE(pp.created_at, pp.updated_at) >= ?
-                AND COALESCE(pp.created_at, pp.updated_at) < DATE_ADD(?, INTERVAL 1 DAY)
-                AND (pp.status = 'approved' OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','SUCCEEDED','paid','succeeded'))
-                ORDER BY COALESCE(pp.created_at, pp.updated_at) DESC LIMIT 500");
-            $st->execute([$desde, $ate]);
+                WHERE (pp.status = 'approved' OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','SUCCEEDED','paid','succeeded'))
+                AND (
+                    (pp.created_at IS NOT NULL AND pp.created_at >= ? AND pp.created_at < DATE_ADD(?, INTERVAL 1 DAY))
+                    OR (pp.created_at IS NULL AND pp.updated_at IS NOT NULL AND pp.updated_at >= ? AND pp.updated_at < DATE_ADD(?, INTERVAL 1 DAY))
+                    OR (pp.created_at IS NULL AND pp.updated_at IS NULL AND p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY))
+                )
+                ORDER BY COALESCE(pp.updated_at, pp.created_at, p.created_at) DESC LIMIT 500");
+            $st->execute([$desde, $ate, $desde, $ate, $desde, $ate]);
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 $gw = $r['gateway'] ?? 'outro';
                 $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : (in_array($gw, ['cambioreal','cambio_real']) ? 'CR Produtos' : ucfirst($gw)));
