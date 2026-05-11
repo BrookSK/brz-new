@@ -240,7 +240,7 @@ class AdminConfiguracoesController extends Controller {
     .settings-mobile-nav-wrap { display: none; }
     .settings-mobile-nav { width: 100%; height: 42px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: var(--text-main); padding: 0 12px; font-size: 13px; outline: none; }
     .settings-mobile-nav:focus { border-color: #94A3B8; box-shadow: 0 0 0 3px rgba(100,116,139,.1); }
-    .settings-content-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .settings-content-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
     .settings-content-card .card { border: none; box-shadow: none; margin: 0; }
     .settings-content-card .card-header { padding: 16px 18px; border-bottom: 1px solid var(--border); background: var(--surface-soft); }
     .settings-content-card .card-header h5 { margin: 0; color: var(--navy); font-size: 15px; font-weight: 700; }
@@ -2885,7 +2885,7 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                        </div>
                             
                             <div class="d-flex justify-content-end mt-4" id="admin-config-salvar-geral">
                                 <button type="submit" class="btn btn-primary">
