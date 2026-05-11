@@ -166,6 +166,11 @@ function renderAdminSidebar($activePage = '') {
                 'label' => __('admin.menu.redirecionamento.coletas', 'Coletas'),
                 'url' => '/admin/redirecionamento/coletas',
             ],
+            'redirecionamento-ajuda' => [
+                'icon' => 'fas fa-question-circle',
+                'label' => __('admin.menu.redirecionamento.ajuda', 'Como Funciona'),
+                'url' => '/admin/redirecionamento/ajuda',
+            ],
         ];
 
         echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">

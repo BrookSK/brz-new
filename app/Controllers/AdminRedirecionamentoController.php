@@ -1116,6 +1116,14 @@ class AdminRedirecionamentoController extends Controller {
     // ─── ETIQUETAS ────────────────────────────────────────────────────────────
 
     /**
+     * Página de ajuda/tutorial para redirecionadores
+     */
+    public function ajuda(Request $request) {
+        $this->auth();
+        $this->view('admin/redirecionamento/ajuda');
+    }
+
+    /**
      * Gera etiqueta para um envio (W Express ou Correios, conforme config)
      */
     public function gerarEtiqueta(Request $request) {
