@@ -94,7 +94,7 @@ class AdminPromocoesAuditoriaController extends Controller {
         } catch (\Exception $e) {}
 
         $title = 'Auditoria de Promoções';
-        $sidebarActive = 'configuracoes';
+        $sidebarActive = 'promocoes-auditoria';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         include __DIR__ . '/../Views/admin/promocoes-auditoria.php';
