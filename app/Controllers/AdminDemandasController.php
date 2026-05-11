@@ -716,7 +716,7 @@ class AdminDemandasController extends Controller {
             $port = (int)($cfg['email_port'] ?? 465);
             $username = $cfg['email_username'] ?? '';
             $password = $cfg['email_password'] ?? '';
-            $encryption = $cfg['email_encryption'] ?? 'ssl';
+            $encryption = strtolower($cfg['email_encryption'] ?? 'ssl');
             $from = $cfg['email_from'] ?? $username;
             $fromName = $cfg['email_from_name'] ?? 'Braziliana Shop';
 
@@ -725,30 +725,59 @@ class AdminDemandasController extends Controller {
                 return;
             }
 
-            if (class_exists('\PHPMailer\PHPMailer\PHPMailer')) {
-                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-                $mail->isSMTP();
-                $mail->Host = $host;
-                $mail->Port = $port;
-                $mail->SMTPAuth = true;
-                $mail->Username = $username;
-                $mail->Password = $password;
-                $mail->SMTPSecure = $encryption;
-                $mail->setFrom($from, $fromName);
-                $mail->addAddress($to);
-                $mail->Subject = $subject;
-                $mail->Body = $body;
-                $mail->CharSet = 'UTF-8';
-                $mail->send();
-                error_log('[DEMANDAS] Email enviado para ' . $to . ': ' . $subject);
-            } else {
-                $headers = "From: {$fromName} <{$from}>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
-                mail($to, $subject, $body, $headers);
-                error_log('[DEMANDAS] Email enviado (mail nativo) para ' . $to);
+            // Enviar via SMTP direto (sem PHPMailer)
+            $prefix = ($encryption === 'ssl') ? 'ssl://' : '';
+            $smtp = @fsockopen($prefix . $host, $port, $errno, $errstr, 10);
+            if (!$smtp) {
+                error_log("[DEMANDAS] SMTP conexão falhou: {$errstr} ({$errno})");
+                return;
             }
+
+            $this->smtpRead($smtp);
+            $this->smtpCmd($smtp, "EHLO brazilianashop.com.br");
+            if ($encryption === 'tls') {
+                $this->smtpCmd($smtp, "STARTTLS");
+                stream_socket_enable_crypto($smtp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                $this->smtpCmd($smtp, "EHLO brazilianashop.com.br");
+            }
+            $this->smtpCmd($smtp, "AUTH LOGIN");
+            $this->smtpCmd($smtp, base64_encode($username));
+            $this->smtpCmd($smtp, base64_encode($password));
+            $this->smtpCmd($smtp, "MAIL FROM:<{$from}>");
+            $this->smtpCmd($smtp, "RCPT TO:<{$to}>");
+            $this->smtpCmd($smtp, "DATA");
+
+            $headers = "From: {$fromName} <{$from}>\r\n";
+            $headers .= "To: {$to}\r\n";
+            $headers .= "Subject: {$subject}\r\n";
+            $headers .= "MIME-Version: 1.0\r\n";
+            $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            $headers .= "Date: " . date('r') . "\r\n";
+            $headers .= "\r\n";
+
+            fwrite($smtp, $headers . $body . "\r\n.\r\n");
+            $this->smtpRead($smtp);
+            $this->smtpCmd($smtp, "QUIT");
+            fclose($smtp);
+
+            error_log('[DEMANDAS] Email SMTP enviado para ' . $to . ': ' . $subject);
         } catch (\Exception $e) {
             error_log('[DEMANDAS] Falha ao enviar email para ' . $to . ': ' . $e->getMessage());
         }
+    }
+
+    private function smtpCmd($smtp, string $cmd): string {
+        fwrite($smtp, $cmd . "\r\n");
+        return $this->smtpRead($smtp);
+    }
+
+    private function smtpRead($smtp): string {
+        $response = '';
+        while ($line = fgets($smtp, 515)) {
+            $response .= $line;
+            if (substr($line, 3, 1) === ' ') break;
+        }
+        return $response;
     }
 
     /**
