@@ -1513,7 +1513,16 @@ class AdminComprasController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Compras - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+    @media (max-width: 767.98px) {
+        #lojaDropdownWrapper { width: 100%; }
+        #lojaDropdownWrapper .dropdown-toggle { width: 100%; text-align: left; }
+        #lojaDropdownWrapper .dropdown-menu { width: 100% !important; min-width: 100% !important; }
+        .card-body.d-flex { flex-direction: column !important; align-items: stretch !important; }
+        .card-body.d-flex > div { width: 100%; }
+    }
+    </style>';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
