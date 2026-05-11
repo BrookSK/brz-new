@@ -159,6 +159,34 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
         </div>
 
         <!-- Pagamentos -->
+        <?php if (strtolower($envio['status_pagamento'] ?? '') === 'pendente' && strtolower($envio['status'] ?? '') === 'aguardando_pagamento'): ?>
+        <div class="col-12">
+            <div class="card border-0 shadow-sm border-warning">
+                <div class="card-body">
+                    <h5 class="mb-3"><i class="fas fa-credit-card me-2 text-warning"></i>Pagamento Pendente</h5>
+                    <div class="alert alert-warning py-2 mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Este envio aguarda pagamento de <strong>US$ <?= number_format((float)($envio['valor_cobrado_usd']??0),2,',','.') ?></strong>
+                    </div>
+                    <?php if (!empty($stripePublicKey)): ?>
+                    <div id="stripePayContainer">
+                        <div id="cardElementDetalhe" class="form-control p-3 mb-3"></div>
+                        <button type="button" class="btn btn-success w-100" id="btnPagarDetalhe">
+                            <i class="fas fa-lock me-2"></i>Pagar US$ <?= number_format((float)($envio['valor_cobrado_usd']??0),2,',','.') ?>
+                        </button>
+                        <div id="msgPagDetalhe" class="mt-2"></div>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-info py-2">Pagamento via Stripe não configurado. Envie o comprovante abaixo.</div>
+                    <?php endif; ?>
+                    <div class="mt-3">
+                        <label class="form-label small">Upload do comprovante de pagamento</label>
+                        <input type="file" class="form-control form-control-sm" id="inputComprovanteDetalhe" accept=".jpg,.jpeg,.png,.pdf">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if (!empty($pagamentos)): ?>
         <div class="col-12">
             <div class="card border-0 shadow-sm">
@@ -188,6 +216,10 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
         <?php endif; ?>
     </div>
 </div>
+
+<?php if (!empty($stripePublicKey) && strtolower($envio['status_pagamento'] ?? '') === 'pendente'): ?>
+<script src="https://js.stripe.com/v3/"></script>
+<?php endif; ?>
 
 <script>
 const ENVIO_ID = <?= (int)($envio['id']??0) ?>;
@@ -259,6 +291,75 @@ document.getElementById('btnMarcarEntregue')?.addEventListener('click', async ()
     const fd = new FormData();
     await fetch(`/admin/redirecionamento/envios/${ENVIO_ID}/entregue`,{method:'POST',body:fd});
     location.reload();
+});
+
+// ── Pagamento Stripe na tela de detalhe ──
+<?php if (!empty($stripePublicKey) && strtolower($envio['status_pagamento'] ?? '') === 'pendente'): ?>
+(function(){
+    const stripeDet = Stripe(<?= json_encode($stripePublicKey) ?>);
+    const elementsDet = stripeDet.elements();
+    const cardDet = elementsDet.create('card', {style:{base:{fontSize:'16px'}}});
+    const container = document.getElementById('cardElementDetalhe');
+    if (container) cardDet.mount('#cardElementDetalhe');
+
+    document.getElementById('btnPagarDetalhe')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnPagarDetalhe');
+        const msg = document.getElementById('msgPagDetalhe');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processando...';
+        msg.innerHTML = '';
+
+        // Criar payment intent
+        const fd = new FormData();
+        fd.append('envio_id', ENVIO_ID);
+        const r = await fetch('/admin/redirecionamento/pagamento/criar-intent', {method:'POST', body:fd});
+        const j = await r.json();
+        if (!j.ok) {
+            msg.innerHTML = '<div class="alert alert-danger py-2">' + (j.msg||'Erro') + '</div>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-lock me-2"></i>Pagar';
+            return;
+        }
+
+        // Confirmar pagamento
+        const {paymentIntent, error} = await stripeDet.confirmCardPayment(j.client_secret, {payment_method:{card:cardDet}});
+        if (error) {
+            msg.innerHTML = '<div class="alert alert-danger py-2">' + error.message + '</div>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-lock me-2"></i>Pagar';
+            return;
+        }
+
+        // Confirmar no backend
+        const fd2 = new FormData();
+        fd2.append('envio_id', ENVIO_ID);
+        fd2.append('payment_intent_id', paymentIntent.id);
+        const r2 = await fetch('/admin/redirecionamento/pagamento/confirmar', {method:'POST', body:fd2});
+        const j2 = await r2.json();
+        msg.innerHTML = j2.ok
+            ? '<div class="alert alert-success py-2"><i class="fas fa-check me-2"></i>Pagamento confirmado!</div>'
+            : '<div class="alert alert-warning py-2">Pagamento processado, aguardando confirmação.</div>';
+        btn.style.display = 'none';
+        setTimeout(() => location.reload(), 2000);
+    });
+})();
+<?php endif; ?>
+
+// Upload comprovante na tela de detalhe
+document.getElementById('inputComprovanteDetalhe')?.addEventListener('change', async function() {
+    if (!this.files[0]) return;
+    const fd = new FormData();
+    fd.append('comprovante', this.files[0]);
+    fd.append('envio_id', ENVIO_ID);
+    fd.append('tipo', 'envio');
+    const r = await fetch('/admin/redirecionamento/comprovantes/upload', {method:'POST', body:fd});
+    const j = await r.json();
+    if (j.ok) {
+        const el = document.createElement('div');
+        el.className = 'alert alert-success mt-2 py-1 small';
+        el.innerHTML = '<i class="fas fa-check me-2"></i>Comprovante enviado.';
+        this.parentNode.appendChild(el);
+    }
 });
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>
