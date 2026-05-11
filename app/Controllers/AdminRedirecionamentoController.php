@@ -430,6 +430,19 @@ class AdminRedirecionamentoController extends Controller {
             'suite'      => 'VARCHAR(50) DEFAULT NULL',
         ]);
 
+        $this->migrarColunas($db, 'redirecionamento_envios', [
+            'etiqueta_provedor' => "VARCHAR(30) DEFAULT NULL",
+            'wexpress_shipping_id' => "VARCHAR(100) DEFAULT NULL",
+            'wexpress_tracking_number' => "VARCHAR(100) DEFAULT NULL",
+            'courier_tracking_number' => "VARCHAR(100) DEFAULT NULL",
+            'wexpress_status' => "VARCHAR(50) DEFAULT NULL",
+            'wexpress_label_url' => "TEXT DEFAULT NULL",
+            'etiqueta_request_json' => "LONGTEXT DEFAULT NULL",
+            'etiqueta_response_json' => "LONGTEXT DEFAULT NULL",
+            'etiqueta_gerada_em' => "DATETIME DEFAULT NULL",
+            'etiqueta_gerada_por' => "INT DEFAULT NULL",
+        ]);
+
         // Seed da tabela de pesos se vazia
         try {
             $count = (int) $db->query("SELECT COUNT(*) FROM redirecionamento_tabela_pesos")->fetchColumn();
@@ -1098,5 +1111,345 @@ class AdminRedirecionamentoController extends Controller {
         $hora=trim((string)$request->getParam('horario',''));
         $this->pdo()->prepare("UPDATE redirecionamento_coletas SET data_agendada=?,horario=?,status='agendado' WHERE id=?")->execute([$data,$hora,$id]);
         $this->json(['ok'=>true]);
+    }
+
+    // ─── ETIQUETAS ────────────────────────────────────────────────────────────
+
+    /**
+     * Gera etiqueta para um envio (W Express ou Correios, conforme config)
+     */
+    public function gerarEtiqueta(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId = (int) $request->getParam('envio_id', 0);
+        if ($envioId <= 0) { $this->json(['ok' => false, 'msg' => 'Envio inválido']); return; }
+
+        $db = $this->pdo();
+
+        // Buscar envio
+        $st = $db->prepare("SELECT e.*, c.nome AS cliente_nome, c.cpf AS cliente_cpf, c.email AS cliente_email, c.telefone AS cliente_telefone
+            FROM redirecionamento_envios e
+            LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id
+            WHERE e.id = ? LIMIT 1");
+        $st->execute([$envioId]);
+        $envio = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->json(['ok' => false, 'msg' => 'Envio não encontrado']); return; }
+
+        // Verificar se pagamento foi feito
+        if (strtolower(trim($envio['status_pagamento'] ?? '')) !== 'pago') {
+            $this->json(['ok' => false, 'msg' => 'Pagamento ainda não confirmado. Pague antes de gerar a etiqueta.']); return;
+        }
+
+        // Verificar se já tem etiqueta
+        if (!empty($envio['wexpress_shipping_id']) || !empty($envio['tracking_code'])) {
+            $this->json(['ok' => false, 'msg' => 'Etiqueta já foi gerada para este envio.']); return;
+        }
+
+        // Buscar produtos do envio
+        $stP = $db->prepare("SELECT * FROM redirecionamento_produtos_envio WHERE envio_id = ?");
+        $stP->execute([$envioId]);
+        $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Determinar provedor
+        $provedor = 'wexpress';
+        try {
+            $stCfg = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'redirecionamento_provedor_etiqueta' LIMIT 1");
+            $stCfg->execute();
+            $cfgVal = strtolower(trim((string) ($stCfg->fetchColumn() ?: 'wexpress')));
+            if (in_array($cfgVal, ['wexpress', 'correios'], true)) $provedor = $cfgVal;
+        } catch (\Exception $e) {}
+
+        if ($provedor === 'wexpress') {
+            $result = $this->gerarEtiquetaWExpress($db, $envio, $produtos, $envioId);
+        } else {
+            $result = $this->gerarEtiquetaCorreios($db, $envio, $produtos, $envioId);
+        }
+
+        $this->json($result);
+    }
+
+    private function gerarEtiquetaWExpress(\PDO $db, array $envio, array $produtos, int $envioId): array {
+        $svc = new \App\Services\WExpressService();
+        $sender = $svc->getSender();
+        if (!is_array($sender) || empty($sender)) {
+            return ['ok' => false, 'msg' => 'W-Express: Sender não configurado. Peça ao admin para configurar em Configurações > Entrega.'];
+        }
+
+        // Montar dados do destinatário
+        $nome = trim((string) ($envio['destinatario_nome'] ?? ''));
+        $partes = preg_split('/\s+/', $nome) ?: [];
+        $firstName = $partes[0] ?? $nome;
+        $lastName = count($partes) > 1 ? implode(' ', array_slice($partes, 1)) : '';
+
+        $doc = trim((string) ($envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? '')));
+        $docDigits = preg_replace('/\D+/', '', $doc);
+        $taxType = strlen($docDigits) > 11 ? 'CNPJ' : 'CPF';
+        $recipientType = ($taxType === 'CPF') ? 'individual' : 'business';
+
+        // Montar itens
+        $items = [];
+        $declaredValue = 0.0;
+        foreach ($produtos as $p) {
+            $qtd = (int) ($p['quantidade'] ?? 1);
+            if ($qtd <= 0) $qtd = 1;
+            $unitValue = (float) ($p['preco_usd'] ?? 0);
+            if ($unitValue <= 0) $unitValue = 1.0;
+
+            $ncm = preg_replace('/\D+/', '', (string) ($p['ncm'] ?? ''));
+            if ($ncm === '') {
+                return ['ok' => false, 'msg' => 'Produto "' . ($p['descricao'] ?? '') . '" não tem NCM cadastrado. Adicione o NCM antes de gerar a etiqueta.'];
+            }
+
+            $items[] = [
+                'description' => (string) ($p['descricao'] ?? 'item'),
+                'quantity' => $qtd,
+                'unit_value' => round($unitValue, 2),
+                'tariff_code' => (int) $ncm,
+            ];
+            $declaredValue += ($unitValue * $qtd);
+        }
+
+        if (empty($items)) {
+            return ['ok' => false, 'msg' => 'Nenhum produto no envio. Adicione produtos antes de gerar a etiqueta.'];
+        }
+
+        $pesoKg = (float) ($envio['peso_kg'] ?? 0);
+        if ($pesoKg <= 0) $pesoKg = 1.0;
+
+        $packages = [[
+            'weight' => round($pesoKg * 1000, 2), // gramas
+            'width'  => (float) ($envio['largura_cm'] ?? 10),
+            'length' => (float) ($envio['comprimento_cm'] ?? 15),
+            'height' => (float) ($envio['altura_cm'] ?? 10),
+        ]];
+
+        $cep = preg_replace('/\D+/', '', (string) ($envio['dest_cep'] ?? ''));
+        $addr1 = trim((string) ($envio['dest_logradouro'] ?? ''));
+        $numero = trim((string) ($envio['dest_numero'] ?? ''));
+        $compl = trim((string) ($envio['dest_complemento'] ?? ''));
+        $bairro = trim((string) ($envio['dest_bairro'] ?? ''));
+        $cidade = trim((string) ($envio['dest_cidade'] ?? ''));
+        $estado = trim((string) ($envio['dest_estado'] ?? ''));
+
+        $addr2Parts = [];
+        if ($compl !== '') $addr2Parts[] = $compl;
+        if ($bairro !== '') $addr2Parts[] = $bairro;
+
+        $externalId = 'REDIR-' . $envioId . '-' . date('YmdHis');
+        $freteDeclarado = round(max(0.01, $pesoKg * 1.80), 2);
+
+        $payload = [
+            'shipment_purpose' => 'personal',
+            'external_shipping_id' => $externalId,
+            'external_shipping_reference' => 'redirecionamento-' . $envioId,
+            'service_code' => $svc->getServiceCode(),
+            'incoterms' => 'DDU',
+            'dimensions_unit' => 'cm',
+            'weight_unit' => 'g',
+            'currency' => 'USD',
+            'declared_value' => round($declaredValue, 2),
+            'freight_value' => $freteDeclarado,
+            'insurance_value' => 0,
+            'invoice_number' => (string) $envioId,
+            'packages' => $packages,
+            'sender' => $sender,
+            'recipient' => [
+                'type' => $recipientType,
+                'business_name' => $recipientType === 'business' ? $nome : ' ',
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'tax_id_type' => $taxType,
+                'tax_id' => $docDigits,
+                'email' => trim((string) ($envio['destinatario_email'] ?? ($envio['cliente_email'] ?? ''))),
+                'phone' => trim((string) ($envio['destinatario_telefone'] ?? ($envio['cliente_telefone'] ?? ''))),
+                'address' => [
+                    'address_number' => $numero,
+                    'address_line_1' => $addr1,
+                    'address_line_2' => implode(', ', $addr2Parts),
+                    'postal_code' => $cep,
+                    'city' => $cidade,
+                    'state' => $estado,
+                    'country' => 'BR',
+                ],
+            ],
+            'items' => $items,
+        ];
+
+        try {
+            $resp = $svc->createShipping($payload);
+            $httpCode = $svc->getLastHttpCode();
+        } catch (\Exception $e) {
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='wexpress', etiqueta_request_json=?, etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($payload), json_encode(['error' => $e->getMessage()]), $envioId]);
+            return ['ok' => false, 'msg' => 'Erro W-Express: ' . $e->getMessage()];
+        }
+
+        $wxStatus = is_array($resp) ? (string) ($resp['shipping_status'] ?? '') : '';
+        $wxShipId = is_array($resp) ? (string) ($resp['shipping_id'] ?? '') : '';
+        $wxTrack = is_array($resp) ? (string) ($resp['wexpress_tracking_number'] ?? '') : '';
+        $wxCourier = is_array($resp) ? (string) ($resp['courier_tracking_number'] ?? '') : '';
+        $labelUrl = $wxShipId !== '' ? 'https://label.wexpress.me/wexpress-premium/?shipping_id=' . rawurlencode($wxShipId) : '';
+
+        $trackingFinal = $wxCourier !== '' ? $wxCourier : $wxTrack;
+        $etiquetaGerada = ($wxStatus === 'LABEL_CREATED');
+
+        $db->prepare("UPDATE redirecionamento_envios SET
+            etiqueta_provedor = 'wexpress',
+            wexpress_shipping_id = ?,
+            wexpress_tracking_number = ?,
+            courier_tracking_number = ?,
+            wexpress_status = ?,
+            wexpress_label_url = ?,
+            tracking_code = ?,
+            etiqueta_url = ?,
+            etiqueta_request_json = ?,
+            etiqueta_response_json = ?,
+            etiqueta_gerada_em = NOW(),
+            etiqueta_gerada_por = ?,
+            status = ?
+            WHERE id = ?")
+            ->execute([
+                $wxShipId ?: null,
+                $wxTrack ?: null,
+                $wxCourier ?: null,
+                $wxStatus ?: null,
+                $labelUrl ?: null,
+                $trackingFinal ?: null,
+                $labelUrl ?: null,
+                json_encode($payload),
+                json_encode($resp),
+                (int) ($_SESSION['usuario_id'] ?? 0),
+                $etiquetaGerada ? 'etiqueta_gerada' : ($envio['status'] ?? 'pago'),
+                $envioId,
+            ]);
+
+        if (!$etiquetaGerada) {
+            return ['ok' => false, 'msg' => 'W-Express retornou status: ' . ($wxStatus ?: 'desconhecido') . '. Verifique os dados e tente novamente.'];
+        }
+
+        return [
+            'ok' => true,
+            'tracking' => $trackingFinal,
+            'label_url' => $labelUrl,
+            'shipping_id' => $wxShipId,
+            'msg' => 'Etiqueta gerada com sucesso!',
+        ];
+    }
+
+    private function gerarEtiquetaCorreios(\PDO $db, array $envio, array $produtos, int $envioId): array {
+        // Buscar configuração dos Correios
+        try {
+            $ambiente = 'homologacao';
+            $token = '';
+            try {
+                $stCfg = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('correios_prepostagem_token','sigep_ambiente') LIMIT 10");
+                $stCfg->execute();
+                $cfgs = $stCfg->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
+                $token = (string) ($cfgs['correios_prepostagem_token'] ?? '');
+                $ambiente = (string) ($cfgs['sigep_ambiente'] ?? 'homologacao');
+            } catch (\Exception $e) {}
+
+            if ($token === '') {
+                return ['ok' => false, 'msg' => 'Correios Pré-Postagem não configurado (token ausente).'];
+            }
+
+            $baseUrl = ($ambiente === 'producao' || $ambiente === 'production')
+                ? 'https://api.correios.com.br/prepostagem'
+                : 'https://apihom.correios.com.br/prepostagem';
+
+            $svc = new \App\Services\CorreiosPrepostagemService($baseUrl, $token);
+        } catch (\Exception $e) {
+            return ['ok' => false, 'msg' => 'Correios não configurado: ' . $e->getMessage()];
+        }
+
+        // Montar dados para Correios (simplificado — reutiliza a mesma lógica do admin)
+        $nome = trim((string) ($envio['destinatario_nome'] ?? ''));
+        $cep = preg_replace('/\D+/', '', (string) ($envio['dest_cep'] ?? ''));
+        $endereco = trim((string) ($envio['dest_logradouro'] ?? ''));
+        $numero = trim((string) ($envio['dest_numero'] ?? ''));
+        $complemento = trim((string) ($envio['dest_complemento'] ?? ''));
+        $bairro = trim((string) ($envio['dest_bairro'] ?? ''));
+        $cidade = trim((string) ($envio['dest_cidade'] ?? ''));
+        $estado = trim((string) ($envio['dest_estado'] ?? ''));
+        $cpf = preg_replace('/\D+/', '', (string) ($envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? '')));
+
+        $pesoGramas = (int) (((float) ($envio['peso_kg'] ?? 1)) * 1000);
+        if ($pesoGramas <= 0) $pesoGramas = 1000;
+
+        try {
+            $result = $svc->criarPrePostagem([
+                'destinatario' => [
+                    'nome' => $nome,
+                    'cpf' => $cpf,
+                    'endereco' => $endereco,
+                    'numero' => $numero,
+                    'complemento' => $complemento,
+                    'bairro' => $bairro,
+                    'cidade' => $cidade,
+                    'uf' => $estado,
+                    'cep' => $cep,
+                ],
+                'peso' => $pesoGramas,
+                'largura' => (int) (((float) ($envio['largura_cm'] ?? 10)) * 10), // mm
+                'altura' => (int) (((float) ($envio['altura_cm'] ?? 10)) * 10),
+                'comprimento' => (int) (((float) ($envio['comprimento_cm'] ?? 15)) * 10),
+            ]);
+        } catch (\Exception $e) {
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios', etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode(['error' => $e->getMessage()]), $envioId]);
+            return ['ok' => false, 'msg' => 'Erro Correios: ' . $e->getMessage()];
+        }
+
+        $tracking = (string) ($result['codigo_rastreio'] ?? ($result['tracking'] ?? ''));
+        $labelUrl = (string) ($result['label_url'] ?? ($result['etiqueta_url'] ?? ''));
+
+        if ($tracking === '') {
+            return ['ok' => false, 'msg' => 'Correios não retornou código de rastreio.'];
+        }
+
+        $db->prepare("UPDATE redirecionamento_envios SET
+            etiqueta_provedor = 'correios',
+            tracking_code = ?,
+            etiqueta_url = ?,
+            etiqueta_request_json = ?,
+            etiqueta_response_json = ?,
+            etiqueta_gerada_em = NOW(),
+            etiqueta_gerada_por = ?,
+            status = 'etiqueta_gerada'
+            WHERE id = ?")
+            ->execute([
+                $tracking,
+                $labelUrl ?: null,
+                json_encode($result['request'] ?? []),
+                json_encode($result),
+                (int) ($_SESSION['usuario_id'] ?? 0),
+                $envioId,
+            ]);
+
+        return [
+            'ok' => true,
+            'tracking' => $tracking,
+            'label_url' => $labelUrl,
+            'msg' => 'Etiqueta gerada com sucesso!',
+        ];
+    }
+
+    /**
+     * Baixar/visualizar etiqueta de um envio
+     */
+    public function baixarEtiqueta(Request $request) {
+        $this->auth(); $this->migrar();
+        $envioId = (int) $request->getParam('envio_id', 0);
+        $db = $this->pdo();
+        $st = $db->prepare("SELECT etiqueta_provedor, wexpress_shipping_id, wexpress_label_url, etiqueta_url, tracking_code FROM redirecionamento_envios WHERE id = ? LIMIT 1");
+        $st->execute([$envioId]);
+        $envio = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$envio) { $this->json(['ok' => false, 'msg' => 'Envio não encontrado']); return; }
+
+        $url = trim((string) ($envio['wexpress_label_url'] ?? ($envio['etiqueta_url'] ?? '')));
+        if ($url === '') {
+            $this->json(['ok' => false, 'msg' => 'Etiqueta não disponível. Gere a etiqueta primeiro.']); return;
+        }
+
+        $this->json(['ok' => true, 'url' => $url, 'provedor' => $envio['etiqueta_provedor'] ?? '']);
     }
 }

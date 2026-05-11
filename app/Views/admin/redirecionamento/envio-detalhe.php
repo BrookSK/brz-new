@@ -107,15 +107,42 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h5 class="mb-3"><i class="fas fa-tag me-2 text-primary"></i>Etiqueta e rastreio</h5>
+
+                    <?php if (empty($envio['tracking_code']) && strtolower($envio['status_pagamento'] ?? '') === 'pago'): ?>
+                    <!-- Botão gerar etiqueta (disponível após pagamento) -->
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-success w-100" id="btnGerarEtiqueta">
+                            <i class="fas fa-shipping-fast me-2"></i>Gerar Etiqueta
+                        </button>
+                        <div id="msgGerarEtiqueta" class="mt-2"></div>
+                    </div>
+                    <hr>
+                    <?php endif; ?>
+
+                    <?php if (!empty($envio['tracking_code'])): ?>
+                    <div class="alert alert-success py-2 mb-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Rastreio:</strong> <?= htmlspecialchars($envio['tracking_code'], ENT_QUOTES, 'UTF-8') ?>
+                        <?php if (!empty($envio['etiqueta_provedor'])): ?>
+                        <span class="badge bg-info ms-2"><?= strtoupper($envio['etiqueta_provedor']) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($envio['etiqueta_url']) || !empty($envio['wexpress_label_url'])): ?>
+                    <div class="mb-3">
+                        <a href="<?= htmlspecialchars($envio['wexpress_label_url'] ?? $envio['etiqueta_url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-print me-2"></i>Imprimir / Baixar Etiqueta
+                        </a>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="row g-2">
                         <div class="col-12"><label class="form-label small">Código de rastreio</label><input class="form-control form-control-sm" type="text" id="trackingCode" value="<?= htmlspecialchars($envio['tracking_code']??'',ENT_QUOTES,'UTF-8') ?>"></div>
                         <div class="col-12"><label class="form-label small">URL da etiqueta</label><input class="form-control form-control-sm" type="text" id="etiquetaUrl" value="<?= htmlspecialchars($envio['etiqueta_url']??'',ENT_QUOTES,'UTF-8') ?>"></div>
                         <div class="col-12"><button type="button" class="btn btn-info btn-sm w-100" id="btnSalvarTracking">Salvar e notificar</button></div>
                         <div id="msgTracking" class="col-12"></div>
                     </div>
-                    <?php if (!empty($envio['etiqueta_url'])): ?>
-                    <div class="mt-3"><a href="<?= htmlspecialchars($envio['etiqueta_url'],ENT_QUOTES,'UTF-8') ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100"><i class="fas fa-print me-2"></i>Imprimir etiqueta</a></div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -190,6 +217,34 @@ document.getElementById('btnSalvarTracking')?.addEventListener('click', async ()
     const j = await r.json();
     document.getElementById('msgTracking').innerHTML = j.ok ? '<div class="alert alert-success py-1 small mt-2">Salvo e notificações enviadas.</div>' : '<div class="alert alert-danger py-1 small mt-2">'+(j.msg||'Erro')+'</div>';
     if (j.ok) setTimeout(()=>location.reload(),1500);
+});
+
+// Gerar etiqueta via API
+document.getElementById('btnGerarEtiqueta')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnGerarEtiqueta');
+    const msg = document.getElementById('msgGerarEtiqueta');
+    if (!confirm('Gerar etiqueta para este envio? Após gerar, imprima e cole na caixa.')) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Gerando etiqueta...';
+    msg.innerHTML = '';
+    try {
+        const fd = new FormData();
+        fd.append('envio_id', ENVIO_ID);
+        const r = await fetch('/admin/redirecionamento/envios/gerar-etiqueta', {method:'POST', body:fd});
+        const j = await r.json();
+        if (j.ok) {
+            msg.innerHTML = '<div class="alert alert-success py-2"><i class="fas fa-check-circle me-2"></i>' + (j.msg||'Etiqueta gerada!') + (j.tracking ? '<br><strong>Rastreio:</strong> '+j.tracking : '') + '</div>';
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            msg.innerHTML = '<div class="alert alert-danger py-2"><i class="fas fa-exclamation-circle me-2"></i>' + (j.msg||'Erro ao gerar etiqueta') + '</div>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-shipping-fast me-2"></i>Gerar Etiqueta';
+        }
+    } catch (e) {
+        msg.innerHTML = '<div class="alert alert-danger py-2">Erro de rede. Tente novamente.</div>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-shipping-fast me-2"></i>Gerar Etiqueta';
+    }
 });
 
 document.getElementById('btnMarcarColetado')?.addEventListener('click', async () => {

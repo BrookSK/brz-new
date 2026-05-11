@@ -246,6 +246,8 @@ $router->post('/admin/redirecionamento/coletas/coletado',               'AdminRe
 $router->post('/admin/redirecionamento/coletas/reagendar',              'AdminRedirecionamentoController', 'coletaReagendar');
 $router->post('/admin/redirecionamento/pagamento/criar-intent',         'AdminRedirecionamentoController', 'criarIntentPagamento');
 $router->post('/admin/redirecionamento/pagamento/confirmar',            'AdminRedirecionamentoController', 'confirmarPagamento');
+$router->post('/admin/redirecionamento/envios/gerar-etiqueta',          'AdminRedirecionamentoController', 'gerarEtiqueta');
+$router->get('/admin/redirecionamento/envios/baixar-etiqueta',          'AdminRedirecionamentoController', 'baixarEtiqueta');
 
 // Migração de Produtos (exportar/importar entre servidores)
 $router->get('/admin/migracao', 'AdminMigracaoController', 'index');
