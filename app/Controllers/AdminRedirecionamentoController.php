@@ -526,6 +526,19 @@ class AdminRedirecionamentoController extends Controller {
         return ['secret'=>'','public'=>''];
     }
 
+    private function getEmailsColetaConfig(\PDO $db): array {
+        try {
+            $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'redirecionamento_emails_coleta' LIMIT 1");
+            $st->execute();
+            $val = trim((string) ($st->fetchColumn() ?: ''));
+            if ($val === '') return [];
+            $emails = array_filter(array_map('trim', explode(',', $val)), fn($e) => $e !== '' && strpos($e, '@') !== false);
+            return $emails;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
     private function getEmailsNotificacao(): array {
         try {
             $db = $this->pdo();
@@ -1079,13 +1092,15 @@ class AdminRedirecionamentoController extends Controller {
         $db = $this->pdo();
         $tabela=$db->query("SELECT * FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
         $provedorEtiqueta = 'wexpress';
+        $emailsColeta = '';
         try {
-            $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'redirecionamento_provedor_etiqueta' LIMIT 1");
+            $st = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('redirecionamento_provedor_etiqueta','redirecionamento_emails_coleta')");
             $st->execute();
-            $v = trim((string) ($st->fetchColumn() ?: ''));
-            if ($v !== '') $provedorEtiqueta = $v;
+            $cfgs = $st->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
+            $provedorEtiqueta = trim((string) ($cfgs['redirecionamento_provedor_etiqueta'] ?? 'wexpress'));
+            $emailsColeta = trim((string) ($cfgs['redirecionamento_emails_coleta'] ?? ''));
         } catch (\Exception $e) {}
-        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela,'provedorEtiqueta'=>$provedorEtiqueta]);
+        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela,'provedorEtiqueta'=>$provedorEtiqueta,'emailsColeta'=>$emailsColeta]);
     }
 
     public function tabelaPesosSalvar(Request $request) {
@@ -1101,7 +1116,7 @@ class AdminRedirecionamentoController extends Controller {
         $this->adminOnly(); $this->migrar();
         $chave = trim((string) $request->getParam('chave', ''));
         $valor = trim((string) $request->getParam('valor', ''));
-        $chavesPermitidas = ['redirecionamento_provedor_etiqueta'];
+        $chavesPermitidas = ['redirecionamento_provedor_etiqueta', 'redirecionamento_emails_coleta'];
         if (!in_array($chave, $chavesPermitidas, true)) { $this->json(['ok'=>false,'msg'=>'Chave não permitida']); return; }
         $db = $this->pdo();
         $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)")
@@ -1186,13 +1201,21 @@ class AdminRedirecionamentoController extends Controller {
         $envio=$stE->fetch(\PDO::FETCH_ASSOC);
         if (!$envio) { $this->json(['ok'=>false,'msg'=>'Envio não encontrado']); return; }
         $db->prepare("INSERT INTO redirecionamento_coletas (envio_id,redirecionador_id,data_agendada,horario,observacoes) VALUES (?,?,?,?,?)")->execute([$envioId,$envio['redirecionador_id'],$data,$hora,$obs]);
-        // Notificar Fabiana
-        $emails=$this->getEmailsNotificacao();
+
+        // Notificar emails configurados (admin)
         $stR=$db->prepare("SELECT r.nome,r.email FROM redirecionadores r WHERE r.id=? LIMIT 1"); $stR->execute([$envio['redirecionador_id']]);
         $red=$stR->fetch(\PDO::FETCH_ASSOC);
         $assunto="Nova coleta agendada - Envio #$envioId";
         $corpo="<p>O redirecionador <b>".htmlspecialchars($red['nome']??'')."</b> agendou coleta para <b>$data às $hora</b>.<br>Envio: #$envioId</p>";
+
+        $emailsConfig = $this->getEmailsColetaConfig($db);
+        foreach ($emailsConfig as $email) {
+            $this->enviarEmailNotificacao($email, $assunto, $corpo);
+        }
+        // Fallback: notificar emails padrão também
+        $emails=$this->getEmailsNotificacao();
         $this->enviarEmailNotificacao($emails['fabiana'],$assunto,$corpo);
+
         $this->json(['ok'=>true]);
     }
 
@@ -1219,7 +1242,24 @@ class AdminRedirecionamentoController extends Controller {
         $id=(int)$request->getParam('id',0);
         $data=trim((string)$request->getParam('data_agendada',''));
         $hora=trim((string)$request->getParam('horario',''));
-        $this->pdo()->prepare("UPDATE redirecionamento_coletas SET data_agendada=?,horario=?,status='agendado' WHERE id=?")->execute([$data,$hora,$id]);
+        $db = $this->pdo();
+        $db->prepare("UPDATE redirecionamento_coletas SET data_agendada=?,horario=?,status='agendado' WHERE id=?")->execute([$data,$hora,$id]);
+
+        // Notificar redirecionador sobre reagendamento
+        try {
+            $st = $db->prepare("SELECT c.envio_id, c.redirecionador_id, r.nome AS red_nome, r.email AS red_email
+                FROM redirecionamento_coletas c
+                LEFT JOIN redirecionadores r ON r.id = c.redirecionador_id
+                WHERE c.id = ? LIMIT 1");
+            $st->execute([$id]);
+            $coleta = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($coleta && !empty($coleta['red_email'])) {
+                $assunto = "Coleta reagendada - Envio #{$coleta['envio_id']}";
+                $corpo = "<p>Sua coleta foi reagendada pelo admin para <b>{$data} às {$hora}</b>.<br>Envio: #{$coleta['envio_id']}<br>Tenha o pacote pronto na nova data.</p>";
+                $this->enviarEmailNotificacao($coleta['red_email'], $assunto, $corpo);
+            }
+        } catch (\Exception $e) {}
+
         $this->json(['ok'=>true]);
     }
 

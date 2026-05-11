@@ -102,20 +102,25 @@ $_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
     <!-- Configuração do provedor de etiqueta -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
-            <h5 class="mb-3"><i class="fas fa-cog me-2 text-primary"></i>Configuração de Etiqueta</h5>
-            <div class="row g-3 align-items-end">
+            <h5 class="mb-3"><i class="fas fa-cog me-2 text-primary"></i>Configurações do Redirecionamento</h5>
+            <div class="row g-3">
                 <div class="col-md-4">
-                    <label class="form-label">Provedor de etiqueta para redirecionamento</label>
+                    <label class="form-label">Provedor de etiqueta</label>
                     <select class="form-select" id="cfgProvedorEtiqueta">
                         <option value="wexpress" <?= ($provedorEtiqueta ?? 'wexpress') === 'wexpress' ? 'selected' : '' ?>>W Express</option>
                         <option value="correios" <?= ($provedorEtiqueta ?? 'wexpress') === 'correios' ? 'selected' : '' ?>>Correios (Pré-Postagem)</option>
                     </select>
-                    <div class="form-text">Define qual API será usada quando o redirecionador gerar a etiqueta.</div>
+                    <div class="form-text">API usada quando o redirecionador gera a etiqueta.</div>
                 </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-primary" id="btnSalvarProvedor">Salvar</button>
+                <div class="col-md-6">
+                    <label class="form-label">Emails de notificação de coletas</label>
+                    <input type="text" class="form-control" id="cfgEmailsColeta" value="<?= htmlspecialchars($emailsColeta ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="email1@exemplo.com, email2@exemplo.com">
+                    <div class="form-text">Separados por vírgula. Recebem aviso quando um redirecionador agenda coleta.</div>
                 </div>
-                <div class="col-md-6" id="msgProvedor"></div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary w-100" id="btnSalvarProvedor">Salvar</button>
+                </div>
+                <div class="col-12" id="msgProvedor"></div>
             </div>
         </div>
     </div>
@@ -141,14 +146,24 @@ document.getElementById('btnSimular').addEventListener('click', async () => {
 
 <?php if ($_isAdmin): ?>
 document.getElementById('btnSalvarProvedor')?.addEventListener('click', async () => {
-    const valor = document.getElementById('cfgProvedorEtiqueta').value;
-    const fd = new FormData();
-    fd.append('chave', 'redirecionamento_provedor_etiqueta');
-    fd.append('valor', valor);
-    const r = await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd});
+    const provedor = document.getElementById('cfgProvedorEtiqueta').value;
+    const emails = document.getElementById('cfgEmailsColeta').value;
+
+    // Salvar provedor
+    const fd1 = new FormData();
+    fd1.append('chave', 'redirecionamento_provedor_etiqueta');
+    fd1.append('valor', provedor);
+    await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd1});
+
+    // Salvar emails
+    const fd2 = new FormData();
+    fd2.append('chave', 'redirecionamento_emails_coleta');
+    fd2.append('valor', emails);
+    const r = await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd2});
     const j = await r.json();
+
     document.getElementById('msgProvedor').innerHTML = j.ok
-        ? '<div class="alert alert-success py-1 small">Salvo!</div>'
+        ? '<div class="alert alert-success py-1 small">Configurações salvas!</div>'
         : '<div class="alert alert-danger py-1 small">'+(j.msg||'Erro')+'</div>';
 });
 
