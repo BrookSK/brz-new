@@ -3881,14 +3881,14 @@ CUSTOSCRIPT;
                         . '<div class="col-md-6"><label class="form-label">E-mail</label><input type="email" class="form-control" id="editClienteEmail" value="' . htmlspecialchars($clienteEmail, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-4"><label class="form-label">Telefone</label><input type="text" class="form-control" id="editClienteTelefone" value="' . htmlspecialchars($clienteTelefone, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-4"><label class="form-label">CPF/CNPJ</label><input type="text" class="form-control" id="editClienteDocumento" value="' . htmlspecialchars($clienteDoc, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">País</label><select class="form-select" id="editClientePais"><option value="BR"' . (strtoupper(trim($pais)) === 'BR' || $pais === '' ? ' selected' : '') . '>Brasil</option><option value="US"' . (strtoupper(trim($pais)) === 'US' ? ' selected' : '') . '>Estados Unidos</option><option value="PT"' . (strtoupper(trim($pais)) === 'PT' ? ' selected' : '') . '>Portugal</option><option value="JP"' . (strtoupper(trim($pais)) === 'JP' ? ' selected' : '') . '>Japão</option><option value="GB"' . (strtoupper(trim($pais)) === 'GB' ? ' selected' : '') . '>Reino Unido</option><option value="DE"' . (strtoupper(trim($pais)) === 'DE' ? ' selected' : '') . '>Alemanha</option><option value="FR"' . (strtoupper(trim($pais)) === 'FR' ? ' selected' : '') . '>França</option><option value="ES"' . (strtoupper(trim($pais)) === 'ES' ? ' selected' : '') . '>Espanha</option><option value="IT"' . (strtoupper(trim($pais)) === 'IT' ? ' selected' : '') . '>Itália</option><option value="CA"' . (strtoupper(trim($pais)) === 'CA' ? ' selected' : '') . '>Canadá</option><option value="AU"' . (strtoupper(trim($pais)) === 'AU' ? ' selected' : '') . '>Austrália</option><option value="AR"' . (strtoupper(trim($pais)) === 'AR' ? ' selected' : '') . '>Argentina</option><option value="CL"' . (strtoupper(trim($pais)) === 'CL' ? ' selected' : '') . '>Chile</option><option value="CO"' . (strtoupper(trim($pais)) === 'CO' ? ' selected' : '') . '>Colômbia</option><option value="MX"' . (strtoupper(trim($pais)) === 'MX' ? ' selected' : '') . '>México</option><option value="OTHER"' . (!in_array(strtoupper(trim($pais)), ['','BR','US','PT','JP','GB','DE','FR','ES','IT','CA','AU','AR','CL','CO','MX'], true) ? ' selected' : '') . '>Outro</option></select></div>'
-                        . '<div class="col-md-3"><label class="form-label">CEP</label><input type="text" class="form-control" id="editClienteCep" value="' . htmlspecialchars($cep, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-6"><label class="form-label">Endereço</label><input type="text" class="form-control" id="editClienteEndereco" value="' . htmlspecialchars($endereco, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-3"><label class="form-label">Número</label><input type="text" class="form-control" id="editClienteNumero" value="' . htmlspecialchars($numero, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">Complemento</label><input type="text" class="form-control" id="editClienteComplemento" value="' . htmlspecialchars($complemento, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">Bairro</label><input type="text" class="form-control" id="editClienteBairro" value="' . htmlspecialchars($bairro, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">Cidade</label><input type="text" class="form-control" id="editClienteCidade" value="' . htmlspecialchars($cidade, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">Estado</label><input type="text" class="form-control" id="editClienteEstado" value="' . htmlspecialchars($estado, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">País</label><select class="form-select" id="editClientePais" onchange="onEditPaisChange()"><option value="BR"' . (strtoupper(trim($pais)) === 'BR' || $pais === '' ? ' selected' : '') . '>Brasil</option><option value="US"' . (strtoupper(trim($pais)) === 'US' ? ' selected' : '') . '>Estados Unidos</option><option value="PT"' . (strtoupper(trim($pais)) === 'PT' ? ' selected' : '') . '>Portugal</option><option value="JP"' . (strtoupper(trim($pais)) === 'JP' ? ' selected' : '') . '>Japão</option><option value="GB"' . (strtoupper(trim($pais)) === 'GB' ? ' selected' : '') . '>Reino Unido</option><option value="DE"' . (strtoupper(trim($pais)) === 'DE' ? ' selected' : '') . '>Alemanha</option><option value="FR"' . (strtoupper(trim($pais)) === 'FR' ? ' selected' : '') . '>França</option><option value="ES"' . (strtoupper(trim($pais)) === 'ES' ? ' selected' : '') . '>Espanha</option><option value="IT"' . (strtoupper(trim($pais)) === 'IT' ? ' selected' : '') . '>Itália</option><option value="CA"' . (strtoupper(trim($pais)) === 'CA' ? ' selected' : '') . '>Canadá</option><option value="AU"' . (strtoupper(trim($pais)) === 'AU' ? ' selected' : '') . '>Austrália</option><option value="AR"' . (strtoupper(trim($pais)) === 'AR' ? ' selected' : '') . '>Argentina</option><option value="CL"' . (strtoupper(trim($pais)) === 'CL' ? ' selected' : '') . '>Chile</option><option value="CO"' . (strtoupper(trim($pais)) === 'CO' ? ' selected' : '') . '>Colômbia</option><option value="MX"' . (strtoupper(trim($pais)) === 'MX' ? ' selected' : '') . '>México</option><option value="OTHER"' . (!in_array(strtoupper(trim($pais)), ['','BR','US','PT','JP','GB','DE','FR','ES','IT','CA','AU','AR','CL','CO','MX'], true) ? ' selected' : '') . '>Outro</option></select></div>'
+                        . '<div class="col-md-3" id="editWrapCep"><label class="form-label" id="editLabelCep">CEP</label><input type="text" class="form-control" id="editClienteCep" value="' . htmlspecialchars($cep, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-6"><label class="form-label" id="editLabelEndereco">Endereço</label><input type="text" class="form-control" id="editClienteEndereco" value="' . htmlspecialchars($endereco, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-3" id="editWrapNumero"><label class="form-label" id="editLabelNumero">Número</label><input type="text" class="form-control" id="editClienteNumero" value="' . htmlspecialchars($numero, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label" id="editLabelComplemento">Complemento</label><input type="text" class="form-control" id="editClienteComplemento" value="' . htmlspecialchars($complemento, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4" id="editWrapBairro"><label class="form-label" id="editLabelBairro">Bairro</label><input type="text" class="form-control" id="editClienteBairro" value="' . htmlspecialchars($bairro, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label" id="editLabelCidade">Cidade</label><input type="text" class="form-control" id="editClienteCidade" value="' . htmlspecialchars($cidade, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label" id="editLabelEstado">Estado</label><input type="text" class="form-control" id="editClienteEstado" value="' . htmlspecialchars($estado, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '</div>'
                         . '<hr class="mt-3 mb-2"><h6 class="mb-2"><i class="fas fa-user-friends me-1"></i>Destinatário (entrega para outra pessoa)</h6>'
                         . '<div class="row g-3">'
@@ -3906,6 +3906,36 @@ CUSTOSCRIPT;
                         . '</div>';
 
                     echo <<<HTML
+<script>
+function onEditPaisChange() {
+    var pais = (document.getElementById('editClientePais') || {}).value || 'BR';
+    pais = pais.toUpperCase().trim();
+    var isBR = (pais === 'BR');
+
+    var lCep = document.getElementById('editLabelCep');
+    var lEnd = document.getElementById('editLabelEndereco');
+    var lNum = document.getElementById('editLabelNumero');
+    var lComp = document.getElementById('editLabelComplemento');
+    var lBairro = document.getElementById('editLabelBairro');
+    var lCidade = document.getElementById('editLabelCidade');
+    var lEstado = document.getElementById('editLabelEstado');
+
+    if (lCep) lCep.textContent = isBR ? 'CEP' : 'ZIP / Postal Code';
+    if (lEnd) lEnd.textContent = isBR ? 'Endereço' : 'Address line 1';
+    if (lNum) lNum.textContent = isBR ? 'Número' : 'Number';
+    if (lComp) lComp.textContent = isBR ? 'Complemento' : 'Address line 2';
+    if (lBairro) lBairro.textContent = isBR ? 'Bairro' : 'District';
+    if (lCidade) lCidade.textContent = isBR ? 'Cidade' : 'City';
+    if (lEstado) lEstado.textContent = isBR ? 'Estado' : 'State / Province';
+
+    var wBairro = document.getElementById('editWrapBairro');
+    var wNumero = document.getElementById('editWrapNumero');
+    if (wBairro) wBairro.style.display = isBR ? '' : 'none';
+    if (wNumero) wNumero.style.display = isBR ? '' : 'none';
+}
+// Executar ao carregar para adaptar se já vier com país != BR
+document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); });
+</script>
 <script>(function(){
     function qs(sel, root){ return (root||document).querySelector(sel); }
     function setAlert(msg, cls){
