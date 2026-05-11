@@ -225,23 +225,17 @@
    All products are simple - variations hidden via CSS
    ========================================================== */
 
-/* Hide variations tab/section in product forms */
-[data-bs-target*="variac"],
-[href*="variac"],
-#variacoes,
-#tab-variacoes,
-.variacoes-section,
-[id*="variacao"],
-[id*="variacoes"],
-.card-header:has(+ .card-body [id*="variacao"]),
-a[href*="variacoes"],
-button[data-bs-target*="variacoes"] {
+/* Hide any element containing "Variações" or "variacao" in id/class/href */
+[id*="variaco"], [id*="Variaco"],
+[id*="variacao"], [id*="Variacao"],
+[data-bs-target*="variaco"], [data-bs-target*="variacao"],
+[href*="variaco"], [href*="variacao"],
+.nav-link[data-bs-target*="variaco"],
+.nav-item:has([data-bs-target*="variaco"]) {
     display: none !important;
 }
 
-/* Hide any nav-link that mentions variações */
-.nav-link[data-bs-target="#variacoes"],
-.nav-item:has(.nav-link[data-bs-target="#variacoes"]),
-.nav-item:has(.nav-link[href*="variacoes"]) {
+/* Also hide the alert about variations in the new product page */
+.alert-info:has(strong) {
     display: none !important;
 }

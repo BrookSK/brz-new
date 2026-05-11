@@ -277,5 +277,19 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/produtos') !== false): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded',function(){
+        // Hide variations sections
+        document.querySelectorAll('[id*="variaco"],[id*="variacao"],[data-bs-target*="variaco"],[data-bs-target*="variacao"],[href*="variaco"],[href*="variacao"]').forEach(function(el){el.style.display='none';if(el.closest('.nav-item'))el.closest('.nav-item').style.display='none';});
+        // Hide the tab pane for variations
+        document.querySelectorAll('.tab-pane').forEach(function(el){if(el.id&&(el.id.indexOf('variaco')>-1||el.id.indexOf('variacao')>-1))el.style.display='none';});
+        // Hide alert about variations
+        document.querySelectorAll('.alert-info').forEach(function(el){if(el.textContent.indexOf('variações')>-1||el.textContent.indexOf('Variações')>-1)el.style.display='none';});
+        // Hide cards with "Variações" in header
+        document.querySelectorAll('.card-header,.card-title,h5,h4,h3').forEach(function(el){if(el.textContent.trim().indexOf('Variações')>-1||el.textContent.trim().indexOf('variações')>-1){var card=el.closest('.card')||el.closest('.mb-4');if(card)card.style.display='none';}});
+    });
+    </script>
+    <?php endif; ?>
 </body>
 </html>
