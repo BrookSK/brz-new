@@ -2940,40 +2940,40 @@ class CheckoutController extends Controller {
                             }
                             if ($taxaConv <= 1.01) $taxaConv = 5.85;
 
-                            // Buscar valores do carrinho (fonte mais confiável, em USD)
+                            // Fonte primária: valores do PEDIDO já salvo (mais confiável)
                             $subUsd = 0; $svcUsd = 0; $impUsd = 0; $freUsd = 0;
-                            $uid = (int) ($usuario['id'] ?? 0);
-                            if ($uid > 0) {
-                                try {
-                                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-                                    if ($cartId > 0) {
-                                        $stCart = $dbCarneSep->prepare('SELECT subtotal_produtos, taxa_servico, valor_impostos, frete_manual FROM carrinhos WHERE id = ? LIMIT 1');
-                                        $stCart->execute([$cartId]);
-                                        $cartRow = $stCart->fetch(\PDO::FETCH_ASSOC) ?: [];
-                                        $subUsd = (float) ($cartRow['subtotal_produtos'] ?? 0);
-                                        $svcUsd = (float) ($cartRow['taxa_servico'] ?? 0);
-                                        $impUsd = (float) ($cartRow['valor_impostos'] ?? 0);
-                                        $freUsd = (float) ($cartRow['frete_manual'] ?? 0);
-                                    }
-                                } catch (\Exception $e) {}
+                            $colsPedSep = [];
+                            try { $stColsSep = $dbCarneSep->query('DESCRIBE pedidos'); $colsPedSep = $stColsSep ? ($stColsSep->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+                            $selCols = ['id'];
+                            foreach (['subtotal' => ['subtotal','subtotal_produtos'], 'servicos' => ['servicos','taxa_servico'], 'impostos' => ['impostos','valor_impostos'], 'frete' => ['frete','valor_frete']] as $alias => $candidates) {
+                                foreach ($candidates as $c) { if (in_array($c, $colsPedSep, true)) { $selCols[] = $c . ' AS ' . $alias; break; } }
                             }
+                            $stPedSep = $dbCarneSep->prepare('SELECT ' . implode(', ', $selCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                            $stPedSep->execute([(int) $pedidoId]);
+                            $pedSep = $stPedSep->fetch(\PDO::FETCH_ASSOC) ?: [];
+                            $subUsd = (float) ($pedSep['subtotal'] ?? 0);
+                            $svcUsd = (float) ($pedSep['servicos'] ?? 0);
+                            $impUsd = (float) ($pedSep['impostos'] ?? 0);
+                            $freUsd = (float) ($pedSep['frete'] ?? 0);
 
-                            // Fallback: buscar do pedido se carrinho não tem valores
+                            // Fallback: se o pedido não tem valores, tentar do carrinho
                             if ($subUsd <= 0) {
-                                $colsPedSep = [];
-                                try { $stColsSep = $dbCarneSep->query('DESCRIBE pedidos'); $colsPedSep = $stColsSep ? ($stColsSep->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
-                                $selCols = ['id'];
-                                foreach (['subtotal' => ['subtotal','subtotal_produtos'], 'servicos' => ['servicos','taxa_servico'], 'impostos' => ['impostos','valor_impostos'], 'frete' => ['frete','valor_frete']] as $alias => $candidates) {
-                                    foreach ($candidates as $c) { if (in_array($c, $colsPedSep, true)) { $selCols[] = $c . ' AS ' . $alias; break; } }
+                                $uid = (int) ($usuario['id'] ?? 0);
+                                if ($uid > 0) {
+                                    try {
+                                        $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                                        $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                                        if ($cartId > 0) {
+                                            $stCart = $dbCarneSep->prepare('SELECT subtotal_produtos, taxa_servico, valor_impostos, frete_manual FROM carrinhos WHERE id = ? LIMIT 1');
+                                            $stCart->execute([$cartId]);
+                                            $cartRow = $stCart->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                            $subUsd = (float) ($cartRow['subtotal_produtos'] ?? 0);
+                                            $svcUsd = (float) ($cartRow['taxa_servico'] ?? 0);
+                                            $impUsd = (float) ($cartRow['valor_impostos'] ?? 0);
+                                            $freUsd = (float) ($cartRow['frete_manual'] ?? 0);
+                                        }
+                                    } catch (\Exception $e) {}
                                 }
-                                $stPedSep = $dbCarneSep->prepare('SELECT ' . implode(', ', $selCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
-                                $stPedSep->execute([(int) $pedidoId]);
-                                $pedSep = $stPedSep->fetch(\PDO::FETCH_ASSOC) ?: [];
-                                $subUsd = (float) ($pedSep['subtotal'] ?? 0);
-                                $svcUsd = (float) ($pedSep['servicos'] ?? 0);
-                                $impUsd = (float) ($pedSep['impostos'] ?? 0);
-                                $freUsd = (float) ($pedSep['frete'] ?? 0);
                             }
 
                             // Converter USD -> BRL
