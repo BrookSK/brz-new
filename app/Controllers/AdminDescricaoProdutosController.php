@@ -12,7 +12,9 @@ class AdminDescricaoProdutosController extends Controller {
             id INT AUTO_INCREMENT PRIMARY KEY,
             produto_id INT NOT NULL,
             descricao_gerada TEXT,
+            descricao_gerada_en TEXT,
             descricao_editada TEXT,
+            descricao_editada_en TEXT,
             status_revisao ENUM('sem_descricao','gerando','pendente_revisao','aprovado','reprovado','erro') DEFAULT 'sem_descricao',
             erro_geracao TEXT,
             aprovado_por INT DEFAULT NULL,
@@ -23,6 +25,9 @@ class AdminDescricaoProdutosController extends Controller {
             INDEX idx_produto_id (produto_id),
             INDEX idx_status (status_revisao)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Ensure EN columns exist (for upgrades)
+        try { $pdo->exec("ALTER TABLE produto_descricoes_ia ADD COLUMN descricao_gerada_en TEXT AFTER descricao_gerada"); } catch (\Exception $e) {}
+        try { $pdo->exec("ALTER TABLE produto_descricoes_ia ADD COLUMN descricao_editada_en TEXT AFTER descricao_editada"); } catch (\Exception $e) {}
     }
 
     private function getChatGPTApiKey(\PDO $pdo): ?string {
@@ -59,14 +64,18 @@ class AdminDescricaoProdutosController extends Controller {
         return compact('cols', 'nameCol', 'descCol', 'hasCategoria', 'hasAtivo', 'hasFoto');
     }
 
-    private function callChatGPT(\PDO $pdo, string $userMessage): array {
+    private function callChatGPT(\PDO $pdo, string $userMessage, string $lang = 'pt'): array {
         $apiKey = $this->getChatGPTApiKey($pdo);
         if (!$apiKey) {
             return ['error' => 'API Key do ChatGPT não configurada. Vá em Configurações > IA.'];
         }
         $model = $this->getChatGPTModel($pdo);
 
-        $systemPrompt = "Crie uma descrição curta, clara e comercial para o produto abaixo. Use apenas as informações fornecidas. Não invente marca, medidas, composição, garantia, origem, material ou especificações técnicas que não estejam presentes. A descrição deve ser adequada para e-commerce, com linguagem natural, objetiva e profissional. Retorne apenas o texto da descrição, sem título, sem tópicos e sem explicações.";
+        if ($lang === 'en') {
+            $systemPrompt = "Create a short, clear and commercial product description for the product below. Use only the information provided. Do not invent brand, measurements, composition, warranty, origin, material or technical specifications that are not present. The description should be suitable for e-commerce, with natural, objective and professional language. Return only the description text, without title, without bullet points and without explanations.";
+        } else {
+            $systemPrompt = "Crie uma descrição curta, clara e comercial para o produto abaixo. Use apenas as informações fornecidas. Não invente marca, medidas, composição, garantia, origem, material ou especificações técnicas que não estejam presentes. A descrição deve ser adequada para e-commerce, com linguagem natural, objetiva e profissional. Retorne apenas o texto da descrição, sem título, sem tópicos e sem explicações.";
+        }
 
         $payload = json_encode([
             'model' => $model,
@@ -146,7 +155,17 @@ class AdminDescricaoProdutosController extends Controller {
         }
 
         $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_gerada=?, status_revisao='pendente_revisao', erro_geracao=NULL, data_geracao=NOW() WHERE produto_id=?")->execute([$result['text'], $produtoId]);
-        echo json_encode(['success' => true, 'descricao' => $result['text'], 'produto_id' => $produtoId]);
+
+        // Generate English version
+        $msgEn = "Product name: " . ($produto['nome'] ?? '');
+        if (!empty($produto['categoria'])) $msgEn .= "\nCategory: " . $produto['categoria'];
+        $resultEn = $this->callChatGPT($pdo, $msgEn, 'en');
+        $descEn = $resultEn['text'] ?? '';
+        if ($descEn !== '') {
+            $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_gerada_en=? WHERE produto_id=?")->execute([$descEn, $produtoId]);
+        }
+
+        echo json_encode(['success' => true, 'descricao' => $result['text'], 'descricao_en' => $descEn, 'produto_id' => $produtoId]);
     }
 
     public function gerarLote(Request $request) {
