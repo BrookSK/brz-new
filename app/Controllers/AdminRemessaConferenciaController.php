@@ -47,6 +47,99 @@ class AdminRemessaConferenciaController extends Controller {
         return 5.80;
     }
 
+    /**
+     * Converte um envio de redirecionamento para o formato de "pedido" esperado pela view de conferência
+     */
+    private function getEnvioRedirecionamentoComoPedido(int $envioId): ?array {
+        try {
+            $st = $this->connection->prepare("
+                SELECT e.*, r.nome AS redirecionador_nome, r.email AS redirecionador_email,
+                    c.nome AS cliente_nome, c.cpf AS cliente_cpf, c.email AS cliente_email, c.telefone AS cliente_telefone
+                FROM redirecionamento_envios e
+                LEFT JOIN redirecionadores r ON r.id = e.redirecionador_id
+                LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id
+                WHERE e.id = ? LIMIT 1
+            ");
+            $st->execute([$envioId]);
+            $envio = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$envio) return null;
+
+            // Buscar produtos
+            $stP = $this->connection->prepare("SELECT * FROM redirecionamento_produtos_envio WHERE envio_id = ?");
+            $stP->execute([$envioId]);
+            $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Montar no formato esperado pela view
+            $itens = [];
+            foreach ($produtos as $p) {
+                $itens[] = [
+                    'produto_id' => 0,
+                    'nome_produto' => $p['descricao'] ?? 'Produto',
+                    'quantidade' => (int)($p['quantidade'] ?? 1),
+                    'preco_unitario' => (float)($p['preco_usd'] ?? 0),
+                    'subtotal' => (float)($p['preco_usd'] ?? 0) * (int)($p['quantidade'] ?? 1),
+                    'ncm' => $p['ncm'] ?? '',
+                    'peso_kg' => (float)($p['peso_kg'] ?? 0),
+                    'imagem' => 'placeholder.jpg',
+                ];
+            }
+
+            $totalProdutos = array_sum(array_column($itens, 'subtotal'));
+
+            return [
+                'id' => 900000 + $envioId,
+                'codigo_pedido' => 'REDIR-' . $envioId,
+                'created_at' => $envio['created_at'] ?? date('Y-m-d H:i:s'),
+                'status' => $envio['status'] ?? 'pago',
+                'moeda' => 'USD',
+                'currency' => 'USD',
+                'total' => (float)($envio['valor_cobrado_usd'] ?? 0),
+                'subtotal_produtos' => $totalProdutos,
+                'valor_frete' => (float)($envio['valor_frete_usd'] ?? 0),
+                'taxa_servico' => 0,
+                'valor_impostos' => 0,
+                'cliente_nome' => $envio['destinatario_nome'] ?? ($envio['cliente_nome'] ?? ''),
+                'cliente_email' => $envio['destinatario_email'] ?? ($envio['cliente_email'] ?? ''),
+                'cliente_telefone' => $envio['destinatario_telefone'] ?? ($envio['cliente_telefone'] ?? ''),
+                'cliente_cpf_cnpj' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
+                'cliente_documento' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
+                'endereco' => $envio['dest_logradouro'] ?? '',
+                'numero' => $envio['dest_numero'] ?? '',
+                'complemento' => $envio['dest_complemento'] ?? '',
+                'bairro' => $envio['dest_bairro'] ?? '',
+                'cidade' => $envio['dest_cidade'] ?? '',
+                'estado' => $envio['dest_estado'] ?? '',
+                'cep' => $envio['dest_cep'] ?? '',
+                'peso_total' => (float)($envio['peso_kg'] ?? 0),
+                'items' => $itens,
+                'forma_pagamento' => 'stripe',
+                'payment_gateway' => 'stripe',
+                'pagamento_status' => $envio['status_pagamento'] ?? 'pago',
+                'observacoes' => 'Envio de Redirecionamento #' . $envioId . ' — Redirecionador: ' . ($envio['redirecionador_nome'] ?? ''),
+                '_is_redirecionamento' => true,
+                '_envio_id' => $envioId,
+                '_redirecionador_nome' => $envio['redirecionador_nome'] ?? '',
+                '_redirecionador_email' => $envio['redirecionador_email'] ?? '',
+                '_stripe_payment_intent' => $envio['stripe_payment_intent'] ?? '',
+                'pagamentos' => [
+                    [
+                        'gateway' => 'stripe',
+                        'componente' => 'Envio Redirecionamento',
+                        'metodo' => 'card',
+                        'moeda' => 'USD',
+                        'valor' => (float)($envio['valor_cobrado_usd'] ?? 0),
+                        'status' => ($envio['status_pagamento'] ?? '') === 'pago' ? 'paid' : 'pending',
+                        'gateway_status' => ($envio['status_pagamento'] ?? ''),
+                        'payment_id' => $envio['stripe_payment_intent'] ?? '',
+                    ],
+                ],
+            ];
+        } catch (\Exception $e) {
+            error_log('[CONFERENCIA] Erro ao buscar envio redirecionamento #' . $envioId . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
     private function getPedidoCompleto(int $pedidoId): ?array {
         // Detectar colunas disponíveis
         $colsPedidos = [];
@@ -316,10 +409,30 @@ class AdminRemessaConferenciaController extends Controller {
                 $cep = (string)($p['cep_entrega'] ?? '');
                 $qtd = $p['qtd_itens'] !== null ? (int)$p['qtd_itens'] : '-';
 
+                // Detectar envio de redirecionamento
+                $isRedir = ($pid >= 900000);
+                $clienteNome = (string)($p['cliente_nome'] ?? 'N/A');
+                $pedidoLabel = '#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT);
+
+                if ($isRedir) {
+                    $envioRedirId = $pid - 900000;
+                    $pedidoLabel = 'REDIR-' . $envioRedirId;
+                    // Buscar nome do destinatário
+                    try {
+                        $stR = $this->connection->prepare("SELECT e.destinatario_nome, e.dest_cep, c.nome AS cli_nome FROM redirecionamento_envios e LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id WHERE e.id = ? LIMIT 1");
+                        $stR->execute([$envioRedirId]);
+                        $redir = $stR->fetch(\PDO::FETCH_ASSOC);
+                        if ($redir) {
+                            $clienteNome = ($redir['destinatario_nome'] ?: $redir['cli_nome']) ?: 'Redirecionamento';
+                            if (empty($cep)) $cep = (string)($redir['dest_cep'] ?? '');
+                        }
+                    } catch (\Exception $e) {}
+                }
+
                 echo '<tr>
-                    <td><strong>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</strong></td>
+                    <td><strong>' . $pedidoLabel . '</strong>' . ($isRedir ? ' <span class="badge bg-info" style="font-size:.6rem">REDIR</span>' : '') . '</td>
                     <td>' . $dt . '</td>
-                    <td>' . htmlspecialchars((string)($p['cliente_nome'] ?? 'N/A')) . '</td>
+                    <td>' . htmlspecialchars($clienteNome) . '</td>
                     <td>' . htmlspecialchars($cep !== '' ? $cep : '-') . '</td>
                     <td>' . $qtd . '</td>
                     <td>' . ($et === 1 ? '<span class="badge bg-success">Gerada</span>' : '<span class="badge bg-warning text-dark">Pendente</span>');
@@ -390,7 +503,15 @@ class AdminRemessaConferenciaController extends Controller {
         $stChk->execute([$jid, $pid]);
         $rel = $stChk->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-        $pedido = $this->getPedidoCompleto($pid);
+        // Detectar se é envio de redirecionamento (pedido_id >= 900000)
+        $isRedirecionamento = ($pid >= 900000);
+        $envioRedirId = $isRedirecionamento ? ($pid - 900000) : 0;
+
+        if ($isRedirecionamento) {
+            $pedido = $this->getEnvioRedirecionamentoComoPedido($envioRedirId);
+        } else {
+            $pedido = $this->getPedidoCompleto($pid);
+        }
         if (!$pedido) { header('Location: /admin/remessa-conferencia/janela/' . $jid); exit; }
 
         $usdToBrl = $this->getUsdToBrlRate();
@@ -516,6 +637,7 @@ class AdminRemessaConferenciaController extends Controller {
         if ($labelUrl !== '') echo '<a class="btn btn-outline-primary" href="' . $h($labelUrl) . '" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>';
         echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/appmax" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante AppMax</a>';
         echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante Câmbio Real</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/stripe" target="_blank"><i class="fas fa-credit-card me-1"></i>Comprovante Stripe</a>';
         echo '<a class="btn btn-outline-dark" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/invoice" target="_blank"><i class="fas fa-file-alt me-1"></i>Invoice</a>';
         if ($hasMedDoc) {
             echo '<a class="btn btn-outline-warning" href="' . $h($docs['medicamento']['file_path']) . '" target="_blank"><i class="fas fa-pills me-1"></i>Doc. Medicamento</a>';
@@ -835,7 +957,13 @@ function confirmarRecebimento() {
         $jid = (int)$janelaId; $pid = (int)$pedidoId;
         $gateway = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string)$gateway));
 
-        $pedido = $this->getPedidoCompleto($pid);
+        // Detectar envio de redirecionamento
+        $isRedir = ($pid >= 900000);
+        if ($isRedir) {
+            $pedido = $this->getEnvioRedirecionamentoComoPedido($pid - 900000);
+        } else {
+            $pedido = $this->getPedidoCompleto($pid);
+        }
         if (!$pedido) { echo '<p>Pedido não encontrado.</p>'; exit; }
 
         $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');

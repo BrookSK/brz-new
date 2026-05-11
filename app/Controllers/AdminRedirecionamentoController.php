@@ -1643,6 +1643,22 @@ class AdminRedirecionamentoController extends Controller {
             return ['ok' => false, 'msg' => 'W-Express retornou status: ' . ($wxStatus ?: 'desconhecido') . '. Verifique os dados e tente novamente.'];
         }
 
+        // Inserir na janela ativa de remessa (para aparecer na conferência)
+        try {
+            $stJanela = $db->prepare("SELECT id FROM remessa_janelas WHERE status IN ('aberta','atraso') ORDER BY data_inicio DESC LIMIT 1");
+            $stJanela->execute();
+            $janelaAtiva = (int) ($stJanela->fetchColumn() ?: 0);
+            if ($janelaAtiva > 0) {
+                // Usar envio_id negativo como convenção para diferenciar de pedidos normais
+                // Ou melhor: criar um pedido_id virtual = envio_id + offset grande
+                $virtualPedidoId = 900000 + $envioId; // offset para não conflitar com pedidos reais
+                $db->prepare("INSERT IGNORE INTO remessa_janela_pedidos (janela_id, pedido_id, etiqueta_gerada, etiqueta_gerada_em, wexpress_shipping_id, wexpress_tracking_number, courier_tracking_number, wexpress_status, created_at) VALUES (?, ?, 1, NOW(), ?, ?, ?, ?, NOW())")
+                    ->execute([$janelaAtiva, $virtualPedidoId, $wxShipId, $wxTrack, $wxCourier, $wxStatus]);
+            }
+        } catch (\Exception $e) {
+            error_log('[REDIR] Erro ao inserir na janela de remessa: ' . $e->getMessage());
+        }
+
         return [
             'ok' => true,
             'tracking' => $trackingFinal,
