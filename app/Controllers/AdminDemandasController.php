@@ -260,7 +260,7 @@ class AdminDemandasController extends Controller {
 
         // Upload de arquivos
         if (!empty($_FILES['arquivos']['name'][0])) {
-            $uploadDir = __DIR__ . '/../../storage/demandas/' . $id . '/';
+            $uploadDir = __DIR__ . '/../../public/uploads/demandas/' . $id . '/';
             if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
 
             foreach ($_FILES['arquivos']['name'] as $i => $nome) {
@@ -271,7 +271,7 @@ class AdminDemandasController extends Controller {
                 $destino = $uploadDir . $nomeArquivo;
 
                 if (move_uploaded_file($_FILES['arquivos']['tmp_name'][$i], $destino)) {
-                    $caminho = '/storage/demandas/' . $id . '/' . $nomeArquivo;
+                    $caminho = '/uploads/demandas/' . $id . '/' . $nomeArquivo;
                     $tipo = $_FILES['arquivos']['type'][$i] ?? '';
                     $tamanho = (int)($_FILES['arquivos']['size'][$i] ?? 0);
                     $this->db->prepare("INSERT INTO demanda_arquivos (demanda_id, mensagem_id, usuario_id, nome_original, caminho, tipo, tamanho) VALUES (?,?,?,?,?,?,?)")
@@ -292,7 +292,7 @@ class AdminDemandasController extends Controller {
         if (empty($_FILES['arquivos_bug']['name'][0])) return;
 
         $this->ensureChatTables();
-        $uploadDir = __DIR__ . '/../../storage/demandas/' . $demandaId . '/';
+        $uploadDir = __DIR__ . '/../../public/uploads/demandas/' . $demandaId . '/';
         if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
 
         foreach ($_FILES['arquivos_bug']['name'] as $i => $nome) {
@@ -302,7 +302,7 @@ class AdminDemandasController extends Controller {
             $destino = $uploadDir . $nomeArquivo;
 
             if (move_uploaded_file($_FILES['arquivos_bug']['tmp_name'][$i], $destino)) {
-                $caminho = '/storage/demandas/' . $demandaId . '/' . $nomeArquivo;
+                $caminho = '/uploads/demandas/' . $demandaId . '/' . $nomeArquivo;
                 $tipo = $_FILES['arquivos_bug']['type'][$i] ?? '';
                 $tamanho = (int)($_FILES['arquivos_bug']['size'][$i] ?? 0);
                 $this->db->prepare("INSERT INTO demanda_arquivos (demanda_id, mensagem_id, usuario_id, nome_original, caminho, tipo, tamanho) VALUES (?,?,?,?,?,?,?)")
