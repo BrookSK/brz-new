@@ -270,3 +270,194 @@
         order: -1 !important;
     }
 }
+
+/* =========================================================
+   PEDIDO DETALHE PAGE
+   ========================================================== */
+
+/* Prevent horizontal scroll globally */
+body {
+    overflow-x: hidden !important;
+}
+
+.container-fluid {
+    overflow-x: hidden !important;
+}
+
+/* Tables in detail page - prevent horizontal scroll */
+.table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* On mobile, transform tables to stacked cards */
+@media (max-width: 768px) {
+    /* Prevent ANY horizontal scroll */
+    html, body, .container-fluid, .row {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    .container-fluid > .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .container-fluid > .row > [class*="col-"] {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    /* Cards */
+    .card {
+        border-radius: 12px !important;
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 12px 14px !important;
+    }
+
+    .card-body {
+        padding: 14px !important;
+    }
+
+    /* Tables - make them responsive without horizontal scroll */
+    .table {
+        font-size: 12px !important;
+    }
+
+    .table th, .table td {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        max-width: 150px !important;
+        padding: 8px 6px !important;
+        vertical-align: top !important;
+    }
+
+    /* Product names - allow wrapping */
+    .table td:first-child,
+    .table td:nth-child(2) {
+        max-width: 120px !important;
+        word-break: break-word !important;
+    }
+
+    /* Hide less important columns on very small screens */
+    .table .d-none-mobile {
+        display: none !important;
+    }
+
+    /* Form controls */
+    .form-control, .form-select {
+        font-size: 14px !important;
+    }
+
+    /* Buttons */
+    .btn {
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+    }
+
+    .btn-group {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+
+    /* Status badges */
+    .badge {
+        white-space: normal !important;
+        word-break: break-word !important;
+        text-align: left !important;
+    }
+
+    /* Two-column layout to single column */
+    .col-lg-8, .col-lg-4, .col-md-8, .col-md-4,
+    .col-lg-6, .col-md-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Input groups */
+    .input-group {
+        flex-wrap: wrap !important;
+    }
+
+    .input-group .form-control,
+    .input-group .form-select {
+        min-width: 0 !important;
+    }
+
+    /* Flex items that might overflow */
+    .d-flex {
+        flex-wrap: wrap !important;
+    }
+
+    /* Long text fields */
+    textarea.form-control {
+        min-height: 80px !important;
+    }
+
+    /* Action buttons row */
+    .d-flex.gap-2,
+    .d-flex.flex-wrap {
+        gap: 6px !important;
+    }
+
+    /* Prevent text overflow */
+    h1, h2, h3, h4, h5, h6, p, span, a, td, th, label {
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+
+    /* Sidebar collapse on mobile */
+    .admin-sidebar {
+        position: fixed !important;
+        z-index: 1050 !important;
+        transform: translateX(-100%) !important;
+        transition: transform .3s ease !important;
+    }
+
+    .admin-sidebar.show {
+        transform: translateX(0) !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    /* Stack all grid items */
+    .row > [class*="col-"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Table cells even smaller */
+    .table th, .table td {
+        font-size: 11px !important;
+        padding: 6px 4px !important;
+        max-width: 100px !important;
+    }
+
+    /* Product image in table */
+    .table img {
+        max-width: 30px !important;
+        height: auto !important;
+    }
+
+    /* Header actions */
+    .d-flex.justify-content-between {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .d-flex.justify-content-end {
+        justify-content: flex-start !important;
+        flex-wrap: wrap !important;
+    }
+}
