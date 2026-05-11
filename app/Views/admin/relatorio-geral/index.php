@@ -695,8 +695,8 @@ function renderDreCompleto(d) {
     h += '<tr><td class="text-muted small">Quantidade de lançamentos</td><td class="text-end">'+d.conciliacao.qtd_lancamentos+'</td></tr>';
     h += '</tbody></table>';
     h += '<hr class="my-3">';
-    h += '<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold small mb-0"><i class="fas fa-plug me-2"></i>Conciliação com Gateways (últimos 30 dias)</h6><div><button class="btn btn-sm btn-outline-dark me-1" onclick="carregarConciliacaoGateways(this,false)"><i class="fas fa-eye me-1"></i>Ver</button><button class="btn btn-sm btn-outline-primary" onclick="carregarConciliacaoGateways(this,true)"><i class="fas fa-sync me-1"></i>Forçar Atualização</button></div></div>';
-    h += '<div id="conciliacao-gateways-container"><div class="text-muted small">Clique em "Ver" para carregar dados do cache ou "Forçar Atualização" para consultar as APIs em tempo real.</div></div>';
+    h += '<div class="d-flex justify-content-between align-items-center mb-3"><h6 class="fw-bold mb-0"><i class="fas fa-money-bill-wave me-2"></i>Fluxo de Caixa</h6><div><button class="btn btn-sm btn-outline-dark me-1" onclick="carregarFluxoCaixa(this,false)"><i class="fas fa-eye me-1"></i>Carregar</button><button class="btn btn-sm btn-outline-primary" onclick="carregarFluxoCaixa(this,true)"><i class="fas fa-sync me-1"></i>Atualizar APIs</button></div></div>';
+    h += '<div id="conciliacao-gateways-container"><div class="text-muted small text-center py-3"><i class="fas fa-chart-line d-block fs-3 mb-2 opacity-50"></i>Clique em "Carregar" para ver o fluxo de caixa com saldos dos gateways.</div></div>';
     h += '</div></div>';
 
     document.getElementById('dre-completo-container').innerHTML = h;
@@ -758,82 +758,105 @@ function loadDreCompletoWithParams() {
     fetch(url).then(r=>r.json()).then(d=>{if(d.success)renderDreCompleto(d);}).catch(()=>{});
 }
 
-function carregarConciliacaoGateways(btn, force) {
+function carregarFluxoCaixa(btn, force) {
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Carregando...';
     var container = document.getElementById('conciliacao-gateways-container');
-    container.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-muted"></i><div class="text-muted small mt-1">'+(force?'Consultando APIs dos gateways...':'Carregando dados do cache...')+'</div></div>';
+    container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin fs-3 text-muted"></i><div class="text-muted small mt-2">Carregando fluxo de caixa...</div></div>';
 
     fetch('/admin/dre-completo/conciliacao' + (force ? '?force=1' : ''))
         .then(function(r){return r.json()})
         .then(function(d){
-            btn.disabled = false; btn.innerHTML = force ? '<i class="fas fa-sync me-1"></i>Forçar Atualização' : '<i class="fas fa-eye me-1"></i>Ver';
-            var h = '';
-
-            // Info do cache
-            if (d._from_cache) {
-                h += '<div class="alert alert-light small py-1 px-2 mb-3 border"><i class="fas fa-database me-1"></i>Dados do cache (atualizado em: <strong>'+(d._cache_age||'?')+'</strong>). Use "Forçar Atualização" para consultar ao vivo.</div>';
-            } else {
-                h += '<div class="alert alert-success small py-1 px-2 mb-3"><i class="fas fa-check-circle me-1"></i>Dados consultados em tempo real agora.</div>';
-            }
-
-            // Stripe
-            var s = d.stripe || {};
-            h += '<div class="border rounded p-3 mb-3">';
-            h += '<div class="fw-bold small mb-2"><i class="fab fa-stripe me-1" style="color:#635bff;"></i>Stripe</div>';
-            if (s.erro) { h += '<div class="text-danger small">'+s.erro+'</div>'; }
-            else {
-                if (s.saldo && s.saldo.length) {
-                    h += '<div class="d-flex gap-3 mb-2">';
-                    s.saldo.forEach(function(b){ h += '<div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">'+b.moeda+'</div><div class="fw-bold text-success">'+b.disponivel.toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div><div class="text-muted" style="font-size:10px;">Pendente: '+b.pendente.toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div>'; });
-                    h += '</div>';
-                }
-                h += '<div class="small text-muted">'+((s.transacoes||[]).length)+' transações nos últimos 30 dias</div>';
-                if ((s.divergencias||[]).length > 0) {
-                    h += '<div class="alert alert-warning small mt-2 mb-0 py-1 px-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+(s.divergencias.length)+' divergência(s)</strong></div>';
-                    h += '<div class="table-responsive mt-1"><table class="table table-sm mb-0" style="font-size:11px;"><thead><tr><th>Tipo</th><th>ID</th><th>Pedido</th><th>Msg</th></tr></thead><tbody>';
-                    s.divergencias.forEach(function(dv){ h += '<tr><td><span class="badge bg-warning text-dark" style="font-size:9px;">'+dv.tipo+'</span></td><td class="text-truncate" style="max-width:100px;">'+dv.id+'</td><td>'+(dv.pedido_id||'-')+'</td><td class="small">'+dv.msg+'</td></tr>'; });
-                    h += '</tbody></table></div>';
-                } else { h += '<div class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Sem divergências</div>'; }
-            }
-            h += '</div>';
-
-            // Câmbio Real Produtos
-            var cr = d.cambioreal || {};
-            h += '<div class="border rounded p-3 mb-3">';
-            h += '<div class="fw-bold small mb-2"><i class="fas fa-dollar-sign me-1" style="color:#0ea5e9;"></i>Câmbio Real (Produtos)</div>';
-            if (cr.erro) { h += '<div class="text-danger small">'+cr.erro+'</div>'; }
-            else {
-                h += '<div class="d-flex gap-3 mb-2"><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Recebido (USD)</div><div class="fw-bold text-success">'+(cr.total_recebido_usd||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Registros</div><div class="fw-bold">'+(cr.total_registros||0)+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Consultados</div><div class="fw-bold">'+(cr.total_consultados||0)+'</div></div></div>';
-                if ((cr.divergencias||[]).length > 0) {
-                    h += '<div class="alert alert-warning small mt-2 mb-0 py-1 px-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+(cr.divergencias.length)+' divergência(s)</strong></div>';
-                    h += '<div class="table-responsive mt-1"><table class="table table-sm mb-0" style="font-size:11px;"><thead><tr><th>Tipo</th><th>Token</th><th>Pedido</th><th>Status GW</th><th>Status Local</th></tr></thead><tbody>';
-                    cr.divergencias.forEach(function(dv){ h += '<tr><td><span class="badge bg-danger" style="font-size:9px;">'+dv.tipo+'</span></td><td class="text-truncate" style="max-width:80px;">'+(dv.token||'')+'</td><td>'+(dv.pedido_id||'-')+'</td><td>'+(dv.status_gateway||'-')+'</td><td>'+(dv.status_local||'-')+'</td></tr>'; });
-                    h += '</tbody></table></div>';
-                } else { h += '<div class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Sem divergências</div>'; }
-            }
-            h += '</div>';
-
-            // Câmbio Real Taxas
-            var crt = d.cambioreal_taxas || {};
-            h += '<div class="border rounded p-3">';
-            h += '<div class="fw-bold small mb-2"><i class="fas fa-receipt me-1" style="color:#f59e0b;"></i>Câmbio Real (Taxas)</div>';
-            if (crt.erro) { h += '<div class="text-danger small">'+crt.erro+'</div>'; }
-            else {
-                h += '<div class="d-flex gap-3 mb-2"><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Recebido (USD)</div><div class="fw-bold text-success">'+(crt.total_recebido_usd||0).toLocaleString("pt-BR",{minimumFractionDigits:2})+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Registros</div><div class="fw-bold">'+(crt.total_registros||0)+'</div></div><div class="border rounded px-3 py-2 text-center"><div class="text-muted" style="font-size:10px;">Consultados</div><div class="fw-bold">'+(crt.total_consultados||0)+'</div></div></div>';
-                if ((crt.divergencias||[]).length > 0) {
-                    h += '<div class="alert alert-warning small mt-2 mb-0 py-1 px-2"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+(crt.divergencias.length)+' divergência(s)</strong></div>';
-                    h += '<div class="table-responsive mt-1"><table class="table table-sm mb-0" style="font-size:11px;"><thead><tr><th>Tipo</th><th>Token</th><th>Pedido</th><th>Status GW</th><th>Status Local</th></tr></thead><tbody>';
-                    crt.divergencias.forEach(function(dv){ h += '<tr><td><span class="badge bg-danger" style="font-size:9px;">'+dv.tipo+'</span></td><td class="text-truncate" style="max-width:80px;">'+(dv.token||'')+'</td><td>'+(dv.pedido_id||'-')+'</td><td>'+(dv.status_gateway||'-')+'</td><td>'+(dv.status_local||'-')+'</td></tr>'; });
-                    h += '</tbody></table></div>';
-                } else { h += '<div class="text-success small mt-1"><i class="fas fa-check-circle me-1"></i>Sem divergências</div>'; }
-            }
-            h += '</div>';
-
-            container.innerHTML = h;
+            btn.disabled = false; btn.innerHTML = force ? '<i class="fas fa-sync me-1"></i>Atualizar APIs' : '<i class="fas fa-eye me-1"></i>Carregar';
+            renderFluxoCaixa(d, container);
         })
         .catch(function(e){
-            btn.disabled = false; btn.innerHTML = force ? '<i class="fas fa-sync me-1"></i>Forçar Atualização' : '<i class="fas fa-eye me-1"></i>Ver';
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-eye me-1"></i>Carregar';
             container.innerHTML = '<div class="alert alert-danger small">Erro: '+e.message+'</div>';
         });
+}
+
+function renderFluxoCaixa(d, container) {
+    var h = '';
+    var fmtV = function(v,moeda){ moeda=moeda||'USD'; return (moeda==='BRL'?'R$ ':'$ ')+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+
+    // Cache info
+    if (d._from_cache) h += '<div class="small text-muted mb-3"><i class="fas fa-database me-1"></i>Cache de '+(d._cache_age||'?')+' · Use "Atualizar APIs" para dados em tempo real</div>';
+
+    // === SALDOS DOS GATEWAYS (como contas bancárias) ===
+    h += '<div class="row g-3 mb-4">';
+
+    // Stripe
+    var s = d.stripe || {};
+    if (!s.erro && s.saldo && s.saldo.length) {
+        s.saldo.forEach(function(b){
+            h += '<div class="col-md-4"><div class="border rounded p-3 d-flex align-items-center gap-3">';
+            h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#635bff20;"><i class="fab fa-stripe-s" style="color:#635bff;font-size:18px;"></i></div>';
+            h += '<div><div class="small text-muted">Stripe ('+b.moeda+')</div><div class="fs-5 fw-bold text-success">'+fmtV(b.disponivel,b.moeda)+'</div>';
+            if(b.pendente>0) h += '<div class="text-muted" style="font-size:10px;">Pendente: '+fmtV(b.pendente,b.moeda)+'</div>';
+            h += '</div></div></div>';
+        });
+    } else if (s.erro) {
+        h += '<div class="col-md-4"><div class="border rounded p-3 text-center"><div class="small text-muted">Stripe</div><div class="text-danger small">'+s.erro+'</div></div></div>';
+    }
+
+    // Câmbio Real Produtos
+    var cr = d.cambioreal || {};
+    h += '<div class="col-md-4"><div class="border rounded p-3 d-flex align-items-center gap-3">';
+    h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#0ea5e920;"><i class="fas fa-dollar-sign" style="color:#0ea5e9;font-size:18px;"></i></div>';
+    h += '<div><div class="small text-muted">Câmbio Real (Produtos)</div>';
+    if (cr.erro) h += '<div class="text-danger small">'+cr.erro+'</div>';
+    else h += '<div class="fs-5 fw-bold text-success">'+fmtV(cr.total_recebido_usd,'USD')+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+cr.total_registros+' transações</div>';
+    h += '</div></div></div>';
+
+    // Câmbio Real Taxas
+    var crt = d.cambioreal_taxas || {};
+    h += '<div class="col-md-4"><div class="border rounded p-3 d-flex align-items-center gap-3">';
+    h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#f59e0b20;"><i class="fas fa-receipt" style="color:#f59e0b;font-size:18px;"></i></div>';
+    h += '<div><div class="small text-muted">Câmbio Real (Taxas)</div>';
+    if (crt.erro) h += '<div class="text-danger small">'+crt.erro+'</div>';
+    else h += '<div class="fs-5 fw-bold text-success">'+fmtV(crt.total_recebido_usd,'USD')+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+crt.total_registros+' transações</div>';
+    h += '</div></div></div>';
+    h += '</div>';
+
+    // === EXTRATO / MOVIMENTAÇÃO ===
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-list me-2"></i>Movimentação (últimos 30 dias)</h6><span class="badge bg-secondary">'+(d.fluxo_caixa?d.fluxo_caixa.length:0)+' lançamentos</span></div>';
+    h += '<div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:12px;">';
+    h += '<thead class="table-light"><tr><th>Data</th><th>Descrição</th><th>Gateway</th><th class="text-end">Entrada</th><th class="text-end">Saída</th><th class="text-end">Saldo</th></tr></thead><tbody>';
+
+    if (d.fluxo_caixa && d.fluxo_caixa.length) {
+        d.fluxo_caixa.forEach(function(mov){
+            var isEntrada = mov.tipo === 'entrada';
+            h += '<tr>';
+            h += '<td class="text-nowrap">'+(mov.data||'')+'</td>';
+            h += '<td class="text-truncate" style="max-width:200px;">'+mov.descricao+'</td>';
+            h += '<td><span class="badge bg-light text-dark border" style="font-size:9px;">'+(mov.gateway||'-')+'</span></td>';
+            h += '<td class="text-end '+(isEntrada?'text-success fw-semibold':'')+'">'+( isEntrada ? '+'+fmtV(mov.valor,mov.moeda) : '')+'</td>';
+            h += '<td class="text-end '+(!isEntrada?'text-danger fw-semibold':'')+'">'+(!isEntrada ? '-'+fmtV(mov.valor,mov.moeda) : '')+'</td>';
+            h += '<td class="text-end fw-bold">'+fmtV(mov.saldo_acumulado,mov.moeda)+'</td>';
+            h += '</tr>';
+        });
+    } else {
+        h += '<tr><td colspan="6" class="text-center text-muted py-3">Nenhuma movimentação no período</td></tr>';
+    }
+    h += '</tbody></table></div></div></div>';
+
+    // === AGENDAMENTOS FUTUROS ===
+    if (d.agendamentos_futuros && d.agendamentos_futuros.length) {
+        h += '<div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-calendar-alt me-2"></i>Agendamentos Futuros</h6></div>';
+        h += '<div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0" style="font-size:12px;">';
+        h += '<thead class="table-light"><tr><th>Vencimento</th><th>Descrição</th><th>Tipo</th><th class="text-end">Valor</th></tr></thead><tbody>';
+        d.agendamentos_futuros.forEach(function(ag){
+            h += '<tr><td class="text-nowrap">'+(ag.vencimento||'')+'</td><td>'+ag.descricao+'</td><td><span class="badge bg-'+(ag.tipo==='entrada'?'success':'danger')+'" style="font-size:9px;">'+(ag.tipo==='entrada'?'Entrada':'Saída')+'</span></td><td class="text-end fw-semibold '+(ag.tipo==='entrada'?'text-success':'text-danger')+'">'+(ag.tipo==='entrada'?'+':'-')+fmtV(ag.valor,ag.moeda)+'</td></tr>';
+        });
+        h += '</tbody></table></div></div></div>';
+    }
+
+    // === DIVERGÊNCIAS (se houver) ===
+    var divTotal = (d.resumo||{}).divergencias_total || 0;
+    if (divTotal > 0) {
+        h += '<div class="alert alert-warning mt-4 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+divTotal+' divergência(s) encontrada(s)</strong> entre o sistema e os gateways. Verifique os pagamentos que não batem.</div>';
+    }
+
+    container.innerHTML = h;
 }
 </script>

@@ -447,6 +447,8 @@ class AdminDreCompletoController extends Controller {
             'stripe' => $this->conciliacaoStripe(),
             'cambioreal' => $this->conciliacaoCambioReal('cambioreal'),
             'cambioreal_taxas' => $this->conciliacaoCambioReal('cambioreal_taxas'),
+            'fluxo_caixa' => [],
+            'agendamentos_futuros' => [],
             'resumo' => [],
             '_timestamp' => time(),
         ];
@@ -457,7 +459,120 @@ class AdminDreCompletoController extends Controller {
             'divergencias_total' => count($resultado['stripe']['divergencias'] ?? []) + count($resultado['cambioreal']['divergencias'] ?? []) + count($resultado['cambioreal_taxas']['divergencias'] ?? []),
         ];
 
+        // Montar fluxo de caixa (extrato) — entradas e saídas dos últimos 30 dias
+        $resultado['fluxo_caixa'] = $this->montarFluxoCaixa();
+        $resultado['agendamentos_futuros'] = $this->montarAgendamentosFuturos();
+
         return $resultado;
+    }
+
+    /**
+     * Monta o extrato de movimentação (entradas e saídas) dos últimos 30 dias
+     */
+    private function montarFluxoCaixa(): array {
+        $movimentos = [];
+        $desde = date('Y-m-d', strtotime('-30 days'));
+
+        try {
+            // ENTRADAS: pagamentos recebidos (pedido_pagamentos com status pago)
+            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status, pp.updated_at as data,
+                COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
+                FROM pedido_pagamentos pp
+                LEFT JOIN pedidos p ON p.id = pp.pedido_id
+                WHERE pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','paid','succeeded','approved','confirmed')
+                AND pp.updated_at >= ?
+                ORDER BY pp.updated_at DESC LIMIT 200");
+            $st->execute([$desde]);
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                $gw = $r['gateway'] ?? 'outro';
+                $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : ($gw === 'cambioreal' ? 'CR Produtos' : ucfirst($gw)));
+                $movimentos[] = [
+                    'data' => date('d/m/Y', strtotime($r['data'])),
+                    'data_sort' => $r['data'],
+                    'descricao' => 'Pedido ' . ($r['ref'] ?? '#' . $r['pedido_id']) . ' — ' . ucfirst($r['metodo'] ?? $gw),
+                    'gateway' => $gwLabel,
+                    'tipo' => 'entrada',
+                    'valor' => (float)($r['valor'] ?? 0),
+                    'moeda' => 'USD',
+                ];
+            }
+
+            // ENTRADAS: parcelas de carnê pagas
+            $st = $this->db->prepare("SELECT cp.valor_produtos, cp.valor_taxas, cp.boleto_produtos_pago_em, cp.boleto_taxas_pago_em, c.pedido_id, cp.numero_parcela
+                FROM carne_parcelas cp
+                JOIN carnes c ON cp.carne_id = c.id
+                WHERE cp.status = 'paga' AND (cp.boleto_produtos_pago_em >= ? OR cp.boleto_taxas_pago_em >= ?)
+                ORDER BY COALESCE(cp.boleto_produtos_pago_em, cp.boleto_taxas_pago_em) DESC LIMIT 100");
+            $st->execute([$desde, $desde]);
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                if ((float)$r['valor_produtos'] > 0 && $r['boleto_produtos_pago_em']) {
+                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['boleto_produtos_pago_em'])), 'data_sort' => $r['boleto_produtos_pago_em'], 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' Parc ' . $r['numero_parcela'] . ' (Produtos)', 'gateway' => 'CR Produtos', 'tipo' => 'entrada', 'valor' => (float)$r['valor_produtos'], 'moeda' => 'BRL'];
+                }
+                if ((float)$r['valor_taxas'] > 0 && $r['boleto_taxas_pago_em']) {
+                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['boleto_taxas_pago_em'])), 'data_sort' => $r['boleto_taxas_pago_em'], 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' Parc ' . $r['numero_parcela'] . ' (Taxas)', 'gateway' => 'CR Taxas', 'tipo' => 'entrada', 'valor' => (float)$r['valor_taxas'], 'moeda' => 'BRL'];
+                }
+            }
+
+            // SAÍDAS: despesas pagas
+            try {
+                $st = $this->db->prepare("SELECT descricao, valor, moeda, pago_em, categoria FROM despesas WHERE status = 'paga' AND pago_em >= ? ORDER BY pago_em DESC LIMIT 200");
+                $st->execute([$desde]);
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['pago_em'])), 'data_sort' => $r['pago_em'], 'descricao' => ($r['descricao'] ?? 'Despesa') . ($r['categoria'] ? ' (' . $r['categoria'] . ')' : ''), 'gateway' => 'Saída', 'tipo' => 'saida', 'valor' => (float)($r['valor'] ?? 0), 'moeda' => $r['moeda'] ?? 'BRL'];
+                }
+            } catch (\Exception $e) {} // tabela pode não existir
+
+        } catch (\Exception $e) {
+            error_log('[FLUXO_CAIXA] Erro: ' . $e->getMessage());
+        }
+
+        // Ordenar por data (mais recente primeiro)
+        usort($movimentos, function($a, $b) { return strcmp($b['data_sort'], $a['data_sort']); });
+
+        // Calcular saldo acumulado (de baixo pra cima)
+        $saldo = 0;
+        $movimentos = array_reverse($movimentos);
+        foreach ($movimentos as &$m) {
+            if ($m['tipo'] === 'entrada') $saldo += $m['valor'];
+            else $saldo -= $m['valor'];
+            $m['saldo_acumulado'] = round($saldo, 2);
+            unset($m['data_sort']);
+        }
+        return array_reverse($movimentos);
+    }
+
+    /**
+     * Monta agendamentos futuros (parcelas a vencer, despesas futuras)
+     */
+    private function montarAgendamentosFuturos(): array {
+        $agendamentos = [];
+        $hoje = date('Y-m-d');
+        $limite = date('Y-m-d', strtotime('+60 days'));
+
+        try {
+            // Parcelas de carnê a vencer (entradas futuras)
+            $st = $this->db->prepare("SELECT cp.vencimento, cp.valor_total, c.pedido_id, cp.numero_parcela
+                FROM carne_parcelas cp
+                JOIN carnes c ON cp.carne_id = c.id
+                WHERE cp.status IN ('pendente','aguardando_pagamento') AND cp.vencimento BETWEEN ? AND ?
+                ORDER BY cp.vencimento ASC LIMIT 50");
+            $st->execute([$hoje, $limite]);
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                $agendamentos[] = ['vencimento' => date('d/m/Y', strtotime($r['vencimento'])), 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' — Parcela ' . $r['numero_parcela'], 'tipo' => 'entrada', 'valor' => (float)$r['valor_total'], 'moeda' => 'BRL'];
+            }
+
+            // Despesas futuras (saídas)
+            try {
+                $st = $this->db->prepare("SELECT vencimento, descricao, valor, moeda FROM despesas WHERE status IN ('prevista','a_vencer') AND vencimento BETWEEN ? AND ? ORDER BY vencimento ASC LIMIT 50");
+                $st->execute([$hoje, $limite]);
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    $agendamentos[] = ['vencimento' => date('d/m/Y', strtotime($r['vencimento'])), 'descricao' => $r['descricao'] ?? 'Despesa', 'tipo' => 'saida', 'valor' => (float)($r['valor'] ?? 0), 'moeda' => $r['moeda'] ?? 'BRL'];
+                }
+            } catch (\Exception $e) {}
+
+        } catch (\Exception $e) {}
+
+        return $agendamentos;
     }
 
     private function salvarCacheConciliacao(array $data): void {
