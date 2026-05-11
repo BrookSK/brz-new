@@ -104,30 +104,55 @@
     font-size: 13px !important;
 }
 
-/* Tabs */
-.nav-tabs .nav-link {
+/* Tabs / Pills */
+.nav-tabs .nav-link,
+.nav-pills .nav-link {
     border: none !important;
     border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
     color: #6B7280 !important;
     font-size: 13px !important;
     font-weight: 500 !important;
-    padding: 8px 0 12px !important;
+    padding: 8px 4px 12px !important;
     margin-right: 22px !important;
+    background: transparent !important;
 }
 
-.nav-tabs .nav-link.active {
+.nav-tabs .nav-link:hover,
+.nav-pills .nav-link:hover {
+    color: #374151 !important;
+}
+
+.nav-tabs .nav-link.active,
+.nav-pills .nav-link.active {
     color: var(--navy) !important;
     border-bottom-color: var(--navy) !important;
     font-weight: 600 !important;
     background: transparent !important;
 }
 
-.nav-tabs .nav-link .badge {
+.nav-tabs .nav-link .badge,
+.nav-pills .nav-link .badge {
     min-width: 20px;
     height: 20px;
     padding: 0 6px !important;
     border-radius: 999px !important;
     font-size: 11px !important;
+}
+
+.nav-tabs,
+.nav-pills {
+    border-bottom: 1px solid var(--border) !important;
+    margin-bottom: 16px !important;
+    gap: 0 !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+}
+
+.nav-tabs::-webkit-scrollbar,
+.nav-pills::-webkit-scrollbar {
+    display: none !important;
 }
 
 /* =========================================================
