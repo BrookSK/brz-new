@@ -471,16 +471,14 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         </div></div>
                     </div>
                     <!-- Campos por hora -->
-                    <div class="col-12 d-none" id="fields-por-hora">
-                        <div class="card border-success"><div class="card-body">
-                            <h6 class="fw-bold small text-success mb-2"><i class="fas fa-clock me-1"></i>Despesa por Hora Trabalhada</h6>
-                            <div class="row g-2">
-                                <div class="col-md-4"><label class="form-label small">Nome da pessoa</label><input type="text" name="pessoa_nome" class="form-control form-control-sm" placeholder="Ex: João Silva"></div>
-                                <div class="col-md-4"><label class="form-label small">Horas trabalhadas</label><input type="number" name="horas_trabalhadas" class="form-control form-control-sm" step="0.5" min="0.5" placeholder="Ex: 8"></div>
-                                <div class="col-md-4"><label class="form-label small">Valor por hora (R$)</label><input type="number" name="valor_hora" class="form-control form-control-sm" step="0.01" min="0" placeholder="Ex: 50.00"></div>
-                            </div>
-                            <div class="mt-2 small text-muted"><i class="fas fa-info-circle me-1"></i>O valor total será calculado automaticamente: horas × valor/hora</div>
-                        </div></div>
+                    <div class="col-md-4 d-none" id="fields-por-hora">
+                        <label class="form-label small fw-semibold">Nome da pessoa</label><input type="text" name="pessoa_nome" class="form-control" placeholder="Ex: João Silva">
+                    </div>
+                    <div class="col-md-4 d-none" id="fields-por-hora-horas">
+                        <label class="form-label small fw-semibold">Horas trabalhadas</label><input type="number" name="horas_trabalhadas" class="form-control" step="0.5" min="0.5" placeholder="Ex: 8">
+                    </div>
+                    <div class="col-md-4 d-none" id="fields-por-hora-valor">
+                        <label class="form-label small fw-semibold" id="valor-hora-label">Valor por hora (R$)</label><input type="number" name="valor_hora" class="form-control" step="0.01" min="0" placeholder="Ex: 50.00">
                     </div>
                     <!-- Campos parcelamento -->
                     <div class="col-12 d-none" id="fields-parcelamento">
@@ -508,6 +506,8 @@ function toggleTipoFields() {
     document.getElementById('fields-recorrencia').classList.toggle('d-none', tipo !== 'recorrente');
     document.getElementById('fields-parcelamento').classList.toggle('d-none', tipo !== 'parcelada');
     document.getElementById('fields-por-hora').classList.toggle('d-none', tipo !== 'por_hora');
+    document.getElementById('fields-por-hora-horas').classList.toggle('d-none', tipo !== 'por_hora');
+    document.getElementById('fields-por-hora-valor').classList.toggle('d-none', tipo !== 'por_hora');
     // Auto-calcular valor quando tipo é por_hora
     if (tipo === 'por_hora') {
         calcularValorHora();
@@ -521,6 +521,11 @@ function calcularValorHora() {
         document.querySelector('input[name="valor"]').value = total.toFixed(2);
     }
 }
+function updateValorLabel() {
+    const moeda = document.getElementById('despesa-moeda').value;
+    document.getElementById('valor-label').textContent = moeda === 'USD' ? 'Valor ($)' : 'Valor (R$)';
+    document.getElementById('valor-hora-label').textContent = moeda === 'USD' ? 'Valor por hora ($)' : 'Valor por hora (R$)';
+}
 document.addEventListener('DOMContentLoaded', function() {
     const horasInput = document.querySelector('input[name="horas_trabalhadas"]');
     const valorHoraInput = document.querySelector('input[name="valor_hora"]');
@@ -529,10 +534,6 @@ document.addEventListener('DOMContentLoaded', function() {
         valorHoraInput.addEventListener('input', calcularValorHora);
     }
 });
-function updateValorLabel() {
-    const moeda = document.getElementById('despesa-moeda').value;
-    document.getElementById('valor-label').textContent = moeda === 'USD' ? 'Valor ($)' : 'Valor (R$)';
-}
 function exportarDespesas() {
     window.location.href = '/admin/despesas?tab=todas&export=csv';
 }
