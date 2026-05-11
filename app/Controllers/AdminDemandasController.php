@@ -558,6 +558,102 @@ class AdminDemandasController extends Controller {
     }
 
     /**
+     * Tela de configurações de demandas (só admin)
+     */
+    public function configuracoes(Request $request) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $config = [
+            'demandas_senha_painel' => $this->getConfig('demandas_senha_painel'),
+            'demandas_emails_notificacao' => $this->getConfig('demandas_emails_notificacao'),
+            'demandas_webhook_url' => $this->getConfig('demandas_webhook_url'),
+            'demandas_usuarios_notificacao' => $this->getConfig('demandas_usuarios_notificacao'),
+        ];
+
+        // Buscar lista de usuários admin/suporte para o select
+        $usuarios = [];
+        try {
+            $st = $this->db->query("SELECT id, nome, email FROM usuarios WHERE perfil IN ('admin','suporte') ORDER BY nome");
+            $usuarios = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        $title = 'Configurações de Demandas'; $sidebarActive = 'configuracoes';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        echo '<div class="container-fluid py-3"><div class="row justify-content-center"><div class="col-lg-8">';
+        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h4 class="fw-bold"><i class="fas fa-cog me-2"></i>Configurações de Demandas</h4><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
+
+        if (!empty($_SESSION['message'])) {
+            echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' alert-dismissible fade show">' . htmlspecialchars($_SESSION['message']) . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+            unset($_SESSION['message'], $_SESSION['message_type']);
+        }
+
+        echo '<form method="POST" action="/admin/demandas/configuracoes">';
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-lock me-2"></i>Acesso ao Painel</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">Senha do Painel de Demandas</label><input type="text" name="demandas_senha_painel" class="form-control" value="' . htmlspecialchars($config['demandas_senha_painel']) . '" placeholder="Deixe vazio para desativar"><small class="text-muted">Se preenchida, será exigida ao acessar o painel de demandas.</small></div>';
+        echo '</div></div>';
+
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-envelope me-2"></i>Notificações por Email</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">Emails que recebem novas solicitações</label><textarea name="demandas_emails_notificacao" class="form-control" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com">' . htmlspecialchars($config['demandas_emails_notificacao']) . '</textarea><small class="text-muted">Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.</small></div>';
+        echo '</div></div>';
+
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-plug me-2"></i>Webhook</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">URL do Webhook</label><input type="url" name="demandas_webhook_url" class="form-control" value="' . htmlspecialchars($config['demandas_webhook_url']) . '" placeholder="https://hooks.slack.com/..."><small class="text-muted">Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.</small></div>';
+        echo '</div></div>';
+
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-bell me-2"></i>Notificações Push (no Admin)</h6></div><div class="card-body">';
+        echo '<div class="mb-3"><label class="form-label fw-semibold small">Usuários que recebem notificações</label><select name="demandas_usuarios_notificacao[]" class="form-select" multiple size="6">';
+        $idsNotif = array_filter(array_map('intval', explode(',', $config['demandas_usuarios_notificacao'])));
+        foreach ($usuarios as $u) {
+            $sel = in_array((int)$u['id'], $idsNotif) ? ' selected' : '';
+            echo '<option value="' . (int)$u['id'] . '"' . $sel . '>' . htmlspecialchars($u['nome']) . ' (' . htmlspecialchars($u['email']) . ')</option>';
+        }
+        echo '</select><small class="text-muted">Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.</small></div>';
+        echo '</div></div>';
+
+        echo '<button type="submit" class="btn btn-dark w-100 mb-4"><i class="fas fa-save me-1"></i>Salvar Configurações</button>';
+        echo '</form></div></div></div>';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
+     * Salvar configurações de demandas
+     */
+    public function salvarConfiguracoes(Request $request) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+
+        $campos = ['demandas_senha_painel', 'demandas_emails_notificacao', 'demandas_webhook_url'];
+        foreach ($campos as $campo) {
+            $valor = trim($_POST[$campo] ?? '');
+            $this->setConfig($campo, $valor);
+        }
+
+        // Usuários notificação (vem como array)
+        $usuarios = $_POST['demandas_usuarios_notificacao'] ?? [];
+        if (is_array($usuarios)) {
+            $this->setConfig('demandas_usuarios_notificacao', implode(',', array_filter(array_map('intval', $usuarios))));
+        }
+
+        $_SESSION['message'] = 'Configurações salvas com sucesso!';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/demandas/configuracoes');
+    }
+
+    private function setConfig(string $chave, string $valor): void {
+        try {
+            $st = $this->db->prepare("SELECT COUNT(*) FROM configuracoes_sistema WHERE chave = ?");
+            $st->execute([$chave]);
+            if ((int)$st->fetchColumn() > 0) {
+                $this->db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = ?")->execute([$valor, $chave]);
+            } else {
+                $this->db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?)")->execute([$chave, $valor]);
+            }
+        } catch (\Exception $e) {
+            error_log('[DEMANDAS] Erro ao salvar config ' . $chave . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Verificar senha do painel de demandas
      */
     private function verificarSenhaPainel(): bool {

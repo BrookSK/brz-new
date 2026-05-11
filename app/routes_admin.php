@@ -160,6 +160,8 @@ $router->get('/admin/demandas/pdf/{id}', 'AdminDemandasController', 'pdf');
 $router->post('/admin/demandas/{id}/mensagem', 'AdminDemandasController', 'enviarMensagem');
 $router->get('/admin/demandas/api/notificacoes', 'AdminDemandasController', 'notificacoes');
 $router->post('/admin/demandas/api/notificacao/{id}/lida', 'AdminDemandasController', 'marcarLida');
+$router->get('/admin/demandas/configuracoes', 'AdminDemandasController', 'configuracoes');
+$router->post('/admin/demandas/configuracoes', 'AdminDemandasController', 'salvarConfiguracoes');
 
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');
