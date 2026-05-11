@@ -18,7 +18,7 @@
                 </div>
             </div></div>
 
-            <form method="POST" action="/admin/demandas/criar" id="formDemanda" novalidate>
+            <form method="POST" action="/admin/demandas/criar" id="formDemanda" novalidate enctype="multipart/form-data">
             <input type="hidden" name="tipo_solicitacao" id="hidden-tipo" value="funcao">
 
             <!-- BLOCO 1 (ambos) -->
@@ -76,6 +76,7 @@
                 <div class="mb-3"><label class="form-label fw-semibold small">Quando aconteceu?</label><p class="text-muted small mb-2">Data, hora aproximada e frequência (sempre acontece? às vezes? só uma vez?).</p><textarea name="bug_quando" class="form-control req-bug" rows="3" placeholder="Aconteceu hoje às 14h. Testei 3 vezes e sempre dá o mesmo erro."></textarea></div>
                 <div class="mb-3"><label class="form-label fw-semibold small">Onde aconteceu? (URL ou tela)</label><p class="text-muted small mb-2">Cole a URL da página ou descreva qual tela/seção do sistema.</p><textarea name="bug_onde" class="form-control req-bug" rows="2" placeholder="https://novosite.brazilianashop.com.br/admin/pedidos/detalhes/732"></textarea></div>
                 <div class="mb-3"><label class="form-label fw-semibold small">Prints / Evidências</label><p class="text-muted small mb-2">Descreva o que aparece na tela. Se possível, tire print e cole aqui a descrição do que mostra.</p><textarea name="bug_prints" class="form-control req-bug" rows="3" placeholder="Print mostra mensagem 'Error 500' na tela. Console do navegador mostra 'Unexpected token...'"></textarea></div>
+                <div class="mb-3"><label class="form-label fw-semibold small"><i class="fas fa-paperclip me-1"></i>Anexar Arquivos (prints, vídeos, etc)</label><p class="text-muted small mb-2">Fotos, vídeos ou qualquer arquivo que ajude a entender o problema.</p><input type="file" name="arquivos_bug[]" multiple class="form-control form-control-sm" accept="image/*,video/*,.pdf,.doc,.docx,.zip"></div>
                 <div class="mb-0"><label class="form-label fw-semibold small">Explicação detalhada</label><p class="text-muted small mb-2">Qualquer informação adicional que ajude a entender e reproduzir o problema.</p><textarea name="bug_detalhes" class="form-control req-bug" rows="4" placeholder="Só acontece com pedidos em USD. Pedidos em BRL funcionam normalmente."></textarea></div>
             </div></div>
 

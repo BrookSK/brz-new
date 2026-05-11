@@ -157,6 +157,7 @@ $router->get('/admin/demandas/detalhe/{id}', 'AdminDemandasController', 'detalhe
 $router->post('/admin/demandas/criar', 'AdminDemandasController', 'criar');
 $router->post('/admin/demandas/mover/{id}', 'AdminDemandasController', 'moverStatus');
 $router->get('/admin/demandas/pdf/{id}', 'AdminDemandasController', 'pdf');
+$router->post('/admin/demandas/{id}/mensagem', 'AdminDemandasController', 'enviarMensagem');
 
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');

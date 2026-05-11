@@ -14,6 +14,8 @@ class AdminDemandasController extends Controller {
 
     public function painel(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
+        // Verificar testes expirados ao carregar o painel
+        $this->verificarTestesExpirados();
         $demandas = $this->listar();
         $title = 'Painel de Demandas'; $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -77,10 +79,19 @@ class AdminDemandasController extends Controller {
             $bloco3_detalhes = "DETALHES: " . $bugData['detalhes'];
         }
 
-        $stmt = $this->db->prepare("INSERT INTO demandas (titulo, solicitante, bloco1_solicitante, bloco1_titulo, bloco2_problema, bloco2_melhoria, bloco2_consequencia, bloco3_financeiro, bloco3_capital_giro, bloco3_custos_operacionais, bloco3_jornada_cliente, bloco3_equipe, bloco3_conflitos, bloco4_etapas, bloco5_novo_ou_existente, bloco5_ferramentas, bloco5_regras, bloco5_usuarios, criado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt = $this->db->prepare("INSERT INTO demandas (titulo, solicitante, solicitante_email, bloco1_solicitante, bloco1_titulo, bloco2_problema, bloco2_melhoria, bloco2_consequencia, bloco3_financeiro, bloco3_capital_giro, bloco3_custos_operacionais, bloco3_jornada_cliente, bloco3_equipe, bloco3_conflitos, bloco4_etapas, bloco5_novo_ou_existente, bloco5_ferramentas, bloco5_regras, bloco5_usuarios, criado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+
+        // Buscar email do solicitante
+        $emailSolicitante = '';
+        try {
+            $uid = $_SESSION['usuario_id'] ?? 0;
+            if ($uid) { $stE = $this->db->prepare("SELECT email FROM usuarios WHERE id = ? LIMIT 1"); $stE->execute([$uid]); $emailSolicitante = (string)($stE->fetchColumn() ?: ''); }
+        } catch (\Exception $e) {}
+
         $stmt->execute([
             ($tipo === 'bug' ? '[BUG] ' : '') . ($body['bloco1_titulo'] ?? ''),
             $body['bloco1_solicitante'] ?? '',
+            $emailSolicitante,
             $body['bloco1_solicitante'] ?? '',
             ($tipo === 'bug' ? '[BUG] ' : '') . ($body['bloco1_titulo'] ?? ''),
             $tipo === 'bug' ? $bloco2_problema : ($body['bloco2_problema'] ?? ''),
@@ -104,6 +115,9 @@ class AdminDemandasController extends Controller {
         $obs = $tipo === 'bug' ? 'Bug reportado - Prioridade: ' . strtoupper($body['bug_prioridade'] ?? 'media') : 'Demanda criada';
         $this->registrarHistorico($id, null, 'pendente', $obs);
 
+        // Processar arquivos anexados (prints de bug, etc)
+        $this->processarArquivosDemanda($id);
+
         $_SESSION['message'] = $tipo === 'bug'
             ? 'Bug reportado com prioridade ' . strtoupper($body['bug_prioridade'] ?? 'media') . '! Já aparece no Painel.'
             : 'Demanda registrada com sucesso! Ela já aparece no Painel de Demandas.';
@@ -117,7 +131,7 @@ class AdminDemandasController extends Controller {
         $nota = $_POST['nota'] ?? '';
         $id = (int)$id;
 
-        $validStatuses = ['pendente','em_analise','em_execucao','em_teste','bloqueado','concluido'];
+        $validStatuses = ['pendente','em_analise','em_execucao','em_teste','recusado','concluido'];
         if (!in_array($novoStatus, $validStatuses)) { $this->redirect('/admin/demandas/painel'); return; }
 
         // Regra: só 1 em execução por vez
@@ -130,8 +144,9 @@ class AdminDemandasController extends Controller {
             }
         }
 
-        $atual = $this->db->prepare("SELECT status FROM demandas WHERE id = ?"); $atual->execute([$id]);
-        $statusAnterior = $atual->fetchColumn();
+        $atual = $this->db->prepare("SELECT * FROM demandas WHERE id = ?"); $atual->execute([$id]);
+        $demanda = $atual->fetch(\PDO::FETCH_ASSOC);
+        $statusAnterior = $demanda['status'] ?? '';
 
         $set = ['status = :st', 'updated_at = NOW()'];
         $params = [':st' => $novoStatus, ':id' => $id];
@@ -145,12 +160,29 @@ class AdminDemandasController extends Controller {
             $set[] = 'prazo_entrega = :prazo';
             $params[':prazo'] = $prazo->format('Y-m-d');
         }
-        if ($novoStatus === 'em_teste') { $set[] = 'inicio_teste = NOW()'; }
+        if ($novoStatus === 'em_teste') {
+            $set[] = 'inicio_teste = NOW()';
+            $set[] = 'teste_expirado = 0';
+        }
         if ($novoStatus === 'concluido') { $set[] = 'concluido_em = NOW()'; }
+        if ($novoStatus === 'recusado') {
+            $set[] = 'motivo_recusa = :motivo';
+            $params[':motivo'] = $nota;
+        }
         if ($nota !== '') { $set[] = 'nota_admin = :nota'; $params[':nota'] = $nota; }
 
         $this->db->prepare("UPDATE demandas SET " . implode(', ', $set) . " WHERE id = :id")->execute($params);
         $this->registrarHistorico($id, $statusAnterior, $novoStatus, $nota ?: null);
+
+        // Enviar email ao solicitante quando recusado
+        if ($novoStatus === 'recusado') {
+            $this->enviarEmailRecusa($demanda, $nota);
+        }
+
+        // Enviar email ao solicitante quando movido para teste (avisar do prazo de 24h úteis)
+        if ($novoStatus === 'em_teste') {
+            $this->enviarEmailTeste($demanda);
+        }
 
         $_SESSION['message'] = 'Status atualizado para: ' . ucfirst(str_replace('_', ' ', $novoStatus));
         $_SESSION['message_type'] = 'success';
@@ -162,6 +194,8 @@ class AdminDemandasController extends Controller {
         $demanda = $this->getById((int)$id);
         if (!$demanda) { $_SESSION['message'] = 'Demanda não encontrada.'; $_SESSION['message_type'] = 'danger'; $this->redirect('/admin/demandas/painel'); return; }
         $historico = $this->getHistorico((int)$id);
+        $mensagens = $this->getMensagens((int)$id);
+        $arquivosBug = $this->getArquivosDemanda((int)$id);
         $title = 'Demanda #' . $id; $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/detalhe.php'; $content = ob_get_clean();
@@ -189,6 +223,298 @@ class AdminDemandasController extends Controller {
         echo '<div class="footer">Documento gerado em ' . date('d/m/Y H:i:s') . ' — Braziliana Shop</div>';
         echo '<script>window.print();</script></body></html>';
         exit;
+    }
+
+    /**
+     * Enviar mensagem no chat da demanda (com suporte a arquivos)
+     */
+    public function enviarMensagem(Request $request, $id) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
+        $id = (int)$id;
+        $mensagem = trim($_POST['mensagem'] ?? '');
+        $uid = $_SESSION['usuario_id'] ?? 0;
+
+        // Buscar nome do usuário
+        $nomeUsuario = 'Sistema';
+        try {
+            if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: 'Usuário'); }
+        } catch (\Exception $e) {}
+
+        // Garantir tabelas
+        $this->ensureChatTables();
+
+        // Inserir mensagem (pode ser vazia se só tem arquivo)
+        $msgId = null;
+        if ($mensagem !== '' || !empty($_FILES['arquivos']['name'][0])) {
+            $st = $this->db->prepare("INSERT INTO demanda_mensagens (demanda_id, usuario_id, usuario_nome, mensagem) VALUES (?, ?, ?, ?)");
+            $st->execute([$id, $uid, $nomeUsuario, $mensagem ?: null]);
+            $msgId = (int)$this->db->lastInsertId();
+        }
+
+        // Upload de arquivos
+        if (!empty($_FILES['arquivos']['name'][0])) {
+            $uploadDir = __DIR__ . '/../../storage/demandas/' . $id . '/';
+            if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+
+            foreach ($_FILES['arquivos']['name'] as $i => $nome) {
+                if ($_FILES['arquivos']['error'][$i] !== UPLOAD_ERR_OK) continue;
+                $nomeOriginal = basename($nome);
+                $ext = strtolower(pathinfo($nomeOriginal, PATHINFO_EXTENSION));
+                $nomeArquivo = time() . '_' . $i . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $nomeOriginal);
+                $destino = $uploadDir . $nomeArquivo;
+
+                if (move_uploaded_file($_FILES['arquivos']['tmp_name'][$i], $destino)) {
+                    $caminho = '/storage/demandas/' . $id . '/' . $nomeArquivo;
+                    $tipo = $_FILES['arquivos']['type'][$i] ?? '';
+                    $tamanho = (int)($_FILES['arquivos']['size'][$i] ?? 0);
+                    $this->db->prepare("INSERT INTO demanda_arquivos (demanda_id, mensagem_id, usuario_id, nome_original, caminho, tipo, tamanho) VALUES (?,?,?,?,?,?,?)")
+                        ->execute([$id, $msgId, $uid, $nomeOriginal, $caminho, $tipo, $tamanho]);
+                }
+            }
+        }
+
+        $_SESSION['message'] = 'Mensagem enviada!';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/demandas/detalhe/' . $id . '#chat');
+    }
+
+    /**
+     * Upload de arquivos no formulário de criação (bug prints)
+     */
+    private function processarArquivosDemanda(int $demandaId): void {
+        if (empty($_FILES['arquivos_bug']['name'][0])) return;
+
+        $this->ensureChatTables();
+        $uploadDir = __DIR__ . '/../../storage/demandas/' . $demandaId . '/';
+        if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+
+        foreach ($_FILES['arquivos_bug']['name'] as $i => $nome) {
+            if ($_FILES['arquivos_bug']['error'][$i] !== UPLOAD_ERR_OK) continue;
+            $nomeOriginal = basename($nome);
+            $nomeArquivo = time() . '_' . $i . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $nomeOriginal);
+            $destino = $uploadDir . $nomeArquivo;
+
+            if (move_uploaded_file($_FILES['arquivos_bug']['tmp_name'][$i], $destino)) {
+                $caminho = '/storage/demandas/' . $demandaId . '/' . $nomeArquivo;
+                $tipo = $_FILES['arquivos_bug']['type'][$i] ?? '';
+                $tamanho = (int)($_FILES['arquivos_bug']['size'][$i] ?? 0);
+                $this->db->prepare("INSERT INTO demanda_arquivos (demanda_id, mensagem_id, usuario_id, nome_original, caminho, tipo, tamanho) VALUES (?,?,?,?,?,?,?)")
+                    ->execute([$demandaId, null, $_SESSION['usuario_id'] ?? null, $nomeOriginal, $caminho, $tipo, $tamanho]);
+            }
+        }
+    }
+
+    private function getMensagens(int $demandaId): array {
+        $this->ensureChatTables();
+        try {
+            $st = $this->db->prepare("SELECT m.*, GROUP_CONCAT(a.id) as arquivo_ids FROM demanda_mensagens m LEFT JOIN demanda_arquivos a ON a.mensagem_id = m.id WHERE m.demanda_id = ? GROUP BY m.id ORDER BY m.created_at ASC");
+            $st->execute([$demandaId]);
+            $msgs = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Buscar arquivos para cada mensagem
+            foreach ($msgs as &$msg) {
+                $msg['arquivos'] = [];
+                if (!empty($msg['arquivo_ids'])) {
+                    $ids = explode(',', $msg['arquivo_ids']);
+                    $ph = implode(',', array_fill(0, count($ids), '?'));
+                    $stA = $this->db->prepare("SELECT * FROM demanda_arquivos WHERE id IN ({$ph})");
+                    $stA->execute($ids);
+                    $msg['arquivos'] = $stA->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+            }
+            return $msgs;
+        } catch (\Exception $e) { return []; }
+    }
+
+    private function getArquivosDemanda(int $demandaId): array {
+        $this->ensureChatTables();
+        try {
+            $st = $this->db->prepare("SELECT * FROM demanda_arquivos WHERE demanda_id = ? AND mensagem_id IS NULL ORDER BY created_at ASC");
+            $st->execute([$demandaId]);
+            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) { return []; }
+    }
+
+    private function ensureChatTables(): void {
+        try { $this->db->query("SELECT 1 FROM demanda_mensagens LIMIT 1"); } catch (\Exception $e) {
+            $f = __DIR__ . '/../../database/migrations/167_add_chat_arquivos_demandas.sql';
+            if (file_exists($f)) { foreach (array_filter(array_map('trim', explode(';', file_get_contents($f)))) as $s) { if ($s && stripos($s,'--')!==0) try { $this->db->exec($s); } catch (\Exception $ex) {} } }
+        }
+    }
+
+    /**
+     * Verifica demandas em teste que expiraram (24h úteis) e fecha automaticamente.
+     * Chamado via cron ou ao carregar o painel.
+     */
+    public function verificarTestesExpirados(): int {
+        $fechados = 0;
+        try {
+            $st = $this->db->query("SELECT id, inicio_teste, solicitante, solicitante_email, bloco1_titulo FROM demandas WHERE status = 'em_teste' AND inicio_teste IS NOT NULL AND teste_expirado = 0");
+            $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($demandas as $d) {
+                $inicio = new \DateTime($d['inicio_teste']);
+                $agora = new \DateTime('now', new \DateTimeZone('America/Sao_Paulo'));
+
+                // Calcular horas úteis decorridas (seg-sex, 8h-18h)
+                $horasUteis = $this->calcularHorasUteis($inicio, $agora);
+
+                if ($horasUteis >= 24) {
+                    // Expirou — fechar demanda
+                    $this->db->prepare("UPDATE demandas SET status = 'concluido', teste_expirado = 1, concluido_em = NOW(), nota_admin = CONCAT(COALESCE(nota_admin,''), '\n[AUTO] Teste expirado após 24h úteis sem parecer do solicitante.') WHERE id = ?")->execute([$d['id']]);
+                    $this->registrarHistorico((int)$d['id'], 'em_teste', 'concluido', 'Teste expirado (24h úteis). Fechado automaticamente.');
+                    $fechados++;
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[DEMANDAS] Erro ao verificar testes expirados: ' . $e->getMessage());
+        }
+        return $fechados;
+    }
+
+    /**
+     * Calcula horas úteis entre duas datas (seg-sex, horário comercial 8h-18h)
+     */
+    private function calcularHorasUteis(\DateTime $inicio, \DateTime $fim): float {
+        $horas = 0;
+        $cursor = clone $inicio;
+
+        while ($cursor < $fim) {
+            $diaSemana = (int)$cursor->format('N'); // 1=seg, 7=dom
+            $hora = (int)$cursor->format('G');
+
+            // Só conta seg-sex
+            if ($diaSemana <= 5) {
+                // Conta a hora inteira se estiver no horário comercial (8h-18h)
+                if ($hora >= 8 && $hora < 18) {
+                    $horas++;
+                }
+            }
+
+            $cursor->modify('+1 hour');
+        }
+
+        return $horas;
+    }
+
+    /**
+     * Envia email ao solicitante quando demanda é recusada
+     */
+    private function enviarEmailRecusa(array $demanda, string $motivo): void {
+        try {
+            $email = $this->getEmailSolicitante($demanda);
+            if (!$email) return;
+
+            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? 'Demanda';
+            $solicitante = $demanda['solicitante'] ?? '';
+
+            $assunto = 'Demanda Recusada: ' . $titulo;
+            $corpo = "Olá {$solicitante},\n\n";
+            $corpo .= "Sua demanda \"{$titulo}\" foi analisada e infelizmente foi recusada.\n\n";
+            $corpo .= "Motivo: " . ($motivo ?: 'Não informado') . "\n\n";
+            $corpo .= "Se discordar da decisão ou tiver novas informações, você pode abrir uma nova solicitação com os ajustes necessários.\n\n";
+            $corpo .= "Atenciosamente,\nEquipe Braziliana";
+
+            $this->enviarEmailSimples($email, $assunto, $corpo);
+        } catch (\Exception $e) {
+            error_log('[DEMANDAS] Erro ao enviar email de recusa: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Envia email ao solicitante quando demanda vai para teste (aviso de 24h úteis)
+     */
+    private function enviarEmailTeste(array $demanda): void {
+        try {
+            $email = $this->getEmailSolicitante($demanda);
+            if (!$email) return;
+
+            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? 'Demanda';
+            $solicitante = $demanda['solicitante'] ?? '';
+
+            $assunto = 'Demanda Pronta para Teste: ' . $titulo;
+            $corpo = "Olá {$solicitante},\n\n";
+            $corpo .= "Sua demanda \"{$titulo}\" foi concluída pelo TI e está pronta para teste!\n\n";
+            $corpo .= "⚠️ IMPORTANTE: Você tem 24 horas úteis (dias úteis, horário comercial) para testar e dar seu parecer.\n\n";
+            $corpo .= "Se não testar dentro do prazo, a demanda será automaticamente fechada como concluída e você precisará abrir uma nova solicitação caso encontre problemas.\n\n";
+            $corpo .= "Acesse o painel de demandas para testar: https://brazilianashop.com.br/admin/demandas/painel\n\n";
+            $corpo .= "Atenciosamente,\nEquipe TI Braziliana";
+
+            $this->enviarEmailSimples($email, $assunto, $corpo);
+        } catch (\Exception $e) {
+            error_log('[DEMANDAS] Erro ao enviar email de teste: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Busca email do solicitante
+     */
+    private function getEmailSolicitante(array $demanda): ?string {
+        // Primeiro tenta campo direto
+        $email = trim((string)($demanda['solicitante_email'] ?? ''));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) return $email;
+
+        // Tenta buscar pelo criado_por
+        $uid = (int)($demanda['criado_por'] ?? 0);
+        if ($uid > 0) {
+            try {
+                $st = $this->db->prepare("SELECT email FROM usuarios WHERE id = ? LIMIT 1");
+                $st->execute([$uid]);
+                $e = trim((string)($st->fetchColumn() ?: ''));
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) return $e;
+            } catch (\Exception $e) {}
+        }
+
+        // Tenta buscar pelo nome do solicitante
+        $nome = trim((string)($demanda['solicitante'] ?? ''));
+        if ($nome !== '') {
+            try {
+                $st = $this->db->prepare("SELECT email FROM usuarios WHERE nome = ? LIMIT 1");
+                $st->execute([$nome]);
+                $e = trim((string)($st->fetchColumn() ?: ''));
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) return $e;
+            } catch (\Exception $e) {}
+        }
+
+        return null;
+    }
+
+    /**
+     * Envia email simples usando o mailer do sistema
+     */
+    private function enviarEmailSimples(string $to, string $subject, string $body): void {
+        try {
+            // Tentar usar PHPMailer se disponível
+            if (class_exists('\PHPMailer\PHPMailer\PHPMailer')) {
+                $cfg = [];
+                try {
+                    $st = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE grupo = 'email'");
+                    $st->execute();
+                    foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) $cfg[$r['chave']] = $r['valor'];
+                } catch (\Exception $e) {}
+
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host = $cfg['host'] ?? '';
+                $mail->Port = (int)($cfg['port'] ?? 587);
+                $mail->SMTPAuth = true;
+                $mail->Username = $cfg['username'] ?? '';
+                $mail->Password = $cfg['password'] ?? '';
+                $mail->SMTPSecure = $cfg['encryption'] ?? 'tls';
+                $mail->setFrom($cfg['from'] ?? $cfg['username'] ?? 'noreply@brazilianashop.com.br', $cfg['from_name'] ?? 'Braziliana Shop');
+                $mail->addAddress($to);
+                $mail->Subject = $subject;
+                $mail->Body = $body;
+                $mail->CharSet = 'UTF-8';
+                $mail->send();
+            } else {
+                // Fallback: mail() nativo
+                $headers = "From: Braziliana Shop <noreply@brazilianashop.com.br>\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+                mail($to, $subject, $body, $headers);
+            }
+        } catch (\Exception $e) {
+            error_log('[DEMANDAS] Falha ao enviar email para ' . $to . ': ' . $e->getMessage());
+        }
     }
 
     // === PRIVATE ===

@@ -1,4 +1,4 @@
-<?php $d = $demanda; $etapas = json_decode($d['bloco4_etapas'] ?? '[]', true) ?: []; $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','bloqueado'=>'Bloqueado','concluido'=>'Concluído']; ?>
+<?php $d = $demanda; $etapas = json_decode($d['bloco4_etapas'] ?? '[]', true) ?: []; $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído']; ?>
 <div class="container-fluid py-3">
     <a href="/admin/demandas/painel" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
     <?php if ($d['status'] === 'concluido'): ?><a href="/admin/demandas/pdf/<?= $d['id'] ?>" class="btn btn-sm btn-outline-dark mb-3 ms-2" target="_blank"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</a><?php endif; ?>
@@ -62,6 +62,99 @@
                 <?php endforeach; ?>
                 </ul>
             </div></div>
+        </div>
+    </div>
+
+    <!-- Arquivos anexados (prints do bug) -->
+    <?php if (!empty($arquivosBug)): ?>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>Arquivos Anexados</h6></div>
+        <div class="card-body">
+            <div class="row g-2">
+                <?php foreach ($arquivosBug as $arq):
+                    $isImg = str_starts_with($arq['tipo'] ?? '', 'image/');
+                    $isVideo = str_starts_with($arq['tipo'] ?? '', 'video/');
+                ?>
+                <div class="col-md-3 col-6">
+                    <div class="border rounded p-2 text-center">
+                        <?php if ($isImg): ?>
+                            <a href="<?= htmlspecialchars($arq['caminho']) ?>" target="_blank"><img src="<?= htmlspecialchars($arq['caminho']) ?>" class="img-fluid rounded mb-1" style="max-height:120px;object-fit:cover;"></a>
+                        <?php elseif ($isVideo): ?>
+                            <video src="<?= htmlspecialchars($arq['caminho']) ?>" controls class="w-100 rounded mb-1" style="max-height:120px;"></video>
+                        <?php else: ?>
+                            <a href="<?= htmlspecialchars($arq['caminho']) ?>" target="_blank" class="d-block py-3"><i class="fas fa-file fs-2 text-muted"></i></a>
+                        <?php endif; ?>
+                        <div class="text-truncate small text-muted"><?= htmlspecialchars($arq['nome_original']) ?></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Chat / Comunicação -->
+    <div class="card border-0 shadow-sm mb-4" id="chat">
+        <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>Comunicação</h6>
+            <span class="badge bg-secondary"><?= count($mensagens ?? []) ?></span>
+        </div>
+        <div class="card-body" style="max-height:400px;overflow-y:auto;" id="chat-body">
+            <?php if (empty($mensagens)): ?>
+                <div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>Nenhuma mensagem ainda. Use o campo abaixo para se comunicar.</div>
+            <?php else: ?>
+                <?php $meuId = $_SESSION['usuario_id'] ?? 0; ?>
+                <?php foreach ($mensagens as $msg):
+                    $isMeu = ((int)($msg['usuario_id'] ?? 0) === $meuId);
+                ?>
+                <div class="mb-3 d-flex <?= $isMeu ? 'justify-content-end' : 'justify-content-start' ?>">
+                    <div class="<?= $isMeu ? 'bg-primary bg-opacity-10 border-primary' : 'bg-light' ?> border rounded p-2" style="max-width:80%;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-semibold" style="font-size:11px;"><?= htmlspecialchars($msg['usuario_nome']) ?></span>
+                            <span class="text-muted" style="font-size:10px;"><?= date('d/m H:i', strtotime($msg['created_at'])) ?></span>
+                        </div>
+                        <?php if (!empty($msg['mensagem'])): ?>
+                            <div class="small"><?= nl2br(htmlspecialchars($msg['mensagem'])) ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($msg['arquivos'])): ?>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <?php foreach ($msg['arquivos'] as $arq):
+                                    $isImg = str_starts_with($arq['tipo'] ?? '', 'image/');
+                                    $isVideo = str_starts_with($arq['tipo'] ?? '', 'video/');
+                                ?>
+                                    <?php if ($isImg): ?>
+                                        <a href="<?= htmlspecialchars($arq['caminho']) ?>" target="_blank"><img src="<?= htmlspecialchars($arq['caminho']) ?>" class="rounded border" style="max-height:80px;max-width:120px;object-fit:cover;"></a>
+                                    <?php elseif ($isVideo): ?>
+                                        <video src="<?= htmlspecialchars($arq['caminho']) ?>" controls class="rounded border" style="max-height:80px;max-width:150px;"></video>
+                                    <?php else: ?>
+                                        <a href="<?= htmlspecialchars($arq['caminho']) ?>" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2"><i class="fas fa-download me-1"></i><?= htmlspecialchars($arq['nome_original']) ?></a>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        <div class="card-footer bg-white border-top">
+            <form method="POST" action="/admin/demandas/<?= $d['id'] ?>/mensagem" enctype="multipart/form-data">
+                <div class="d-flex gap-2">
+                    <div class="flex-grow-1">
+                        <textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="Escreva uma mensagem..."></textarea>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div>
+                        <label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;">
+                            <i class="fas fa-paperclip me-1"></i>Anexar
+                            <input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip" onchange="this.closest('label').querySelector('span')&&this.closest('label').querySelector('span').remove();var s=document.createElement('span');s.className='ms-1 badge bg-primary';s.textContent=this.files.length+' arquivo(s)';this.closest('label').appendChild(s);">
+                        </label>
+                        <span class="text-muted small ms-2">Imagens, vídeos, PDF, DOC, ZIP</span>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Enviar</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

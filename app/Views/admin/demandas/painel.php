@@ -1,7 +1,7 @@
 <?php
 $demandas = $demandas ?? [];
-$colunas = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','bloqueado'=>'Bloqueado','concluido'=>'Concluído'];
-$cores = ['pendente'=>'#94a3b8','em_analise'=>'#3b82f6','em_execucao'=>'#f59e0b','em_teste'=>'#8b5cf6','bloqueado'=>'#ef4444','concluido'=>'#10b981'];
+$colunas = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+$cores = ['pendente'=>'#94a3b8','em_analise'=>'#3b82f6','em_execucao'=>'#f59e0b','em_teste'=>'#8b5cf6','recusado'=>'#ef4444','concluido'=>'#10b981'];
 $porStatus = [];
 foreach ($colunas as $k => $v) $porStatus[$k] = [];
 foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatus[$s])) $porStatus[$s][] = $d; }
@@ -27,7 +27,14 @@ foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatu
                     <?php else: foreach ($cards as $card):
                         $prazo = $card['prazo_entrega'] ?? '';
                         $teste = $card['inicio_teste'] ?? '';
-                        $testeExpired = $teste && (time() - strtotime($teste)) > 86400;
+                        $testeExpired = false;
+                        if ($teste && $statusKey === 'em_teste') {
+                            $inicioT = new \DateTime($teste);
+                            $agoraT = new \DateTime('now', new \DateTimeZone('America/Sao_Paulo'));
+                            $huT = 0; $curT = clone $inicioT;
+                            while ($curT < $agoraT) { $dsT = (int)$curT->format('N'); $hT = (int)$curT->format('G'); if ($dsT <= 5 && $hT >= 8 && $hT < 18) $huT++; $curT->modify('+1 hour'); }
+                            $testeExpired = ($huT >= 24);
+                        }
                     ?>
                     <a href="/admin/demandas/detalhe/<?= $card['id'] ?>" class="card mb-2 border-0 shadow-sm text-decoration-none <?= $testeExpired ? 'border-danger border-2' : '' ?>" style="<?= $testeExpired ? 'border:2px solid #ef4444!important;' : '' ?>">
                         <div class="card-body p-2">
@@ -35,9 +42,20 @@ foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatu
                             <div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($card['solicitante'] ?? '') ?> · <?= date('d/m', strtotime($card['created_at'])) ?></div>
                             <?php if ($prazo && $statusKey === 'em_execucao'): ?><div class="mt-1"><span class="badge bg-warning text-dark" style="font-size:9px;"><i class="fas fa-clock me-1"></i>Prazo: <?= date('d/m/Y', strtotime($prazo)) ?></span></div><?php endif; ?>
                             <?php if ($teste && $statusKey === 'em_teste'):
-                                $restante = max(0, 86400 - (time() - strtotime($teste)));
-                                $horas = floor($restante / 3600); $min = floor(($restante % 3600) / 60);
-                            ?><div class="mt-1"><span class="badge <?= $testeExpired ? 'bg-danger' : 'bg-purple' ?>" style="font-size:9px;"><i class="fas fa-stopwatch me-1"></i><?= $testeExpired ? 'EXPIRADO' : $horas.'h '.$min.'m restantes' ?></span></div><?php endif; ?>
+                                // Calcular horas úteis restantes (seg-sex, 8h-18h)
+                                $inicioTeste = new \DateTime($teste);
+                                $agora = new \DateTime('now', new \DateTimeZone('America/Sao_Paulo'));
+                                $horasUteis = 0;
+                                $cursor = clone $inicioTeste;
+                                while ($cursor < $agora) {
+                                    $ds = (int)$cursor->format('N');
+                                    $h = (int)$cursor->format('G');
+                                    if ($ds <= 5 && $h >= 8 && $h < 18) $horasUteis++;
+                                    $cursor->modify('+1 hour');
+                                }
+                                $restanteHoras = max(0, 24 - $horasUteis);
+                                $testeExpiredUtil = ($restanteHoras <= 0);
+                            ?><div class="mt-1"><span class="badge <?= $testeExpiredUtil ? 'bg-danger' : 'bg-purple' ?>" style="font-size:9px;"><i class="fas fa-stopwatch me-1"></i><?= $testeExpiredUtil ? 'EXPIRADO' : $restanteHoras.'h úteis restantes' ?></span></div><?php endif; ?>
                         </div>
                     </a>
                     <?php endforeach; endif; ?>
