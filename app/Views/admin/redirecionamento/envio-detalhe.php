@@ -167,6 +167,19 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
                     <div class="alert alert-warning py-2 mb-3">
                         <i class="fas fa-exclamation-triangle me-2"></i>Este envio aguarda pagamento de <strong>US$ <?= number_format((float)($envio['valor_cobrado_usd']??0),2,',','.') ?></strong>
                     </div>
+
+                    <?php
+                    $perfilLogado = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+                    $isAdmin = in_array($perfilLogado, ['admin','suporte'], true);
+                    ?>
+                    <?php if ($isAdmin): ?>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-success btn-sm" id="btnMarcarPagoAdmin">
+                            <i class="fas fa-check-circle me-2"></i>Marcar como Pago (admin)
+                        </button>
+                    </div>
+                    <?php endif; ?>
+
                     <?php if (!empty($stripePublicKey)): ?>
                     <div id="stripePayContainer">
                         <div id="cardElementDetalhe" class="form-control p-3 mb-3"></div>
@@ -360,6 +373,17 @@ document.getElementById('inputComprovanteDetalhe')?.addEventListener('change', a
         el.innerHTML = '<i class="fas fa-check me-2"></i>Comprovante enviado.';
         this.parentNode.appendChild(el);
     }
+});
+
+// Marcar como pago (admin)
+document.getElementById('btnMarcarPagoAdmin')?.addEventListener('click', async () => {
+    if (!confirm('Marcar este envio como PAGO manualmente? Use apenas se o pagamento foi confirmado por outro meio.')) return;
+    const fd = new FormData();
+    fd.append('envio_id', ENVIO_ID);
+    const r = await fetch('/admin/redirecionamento/envios/marcar-pago', {method:'POST', body:fd});
+    const j = await r.json();
+    if (j.ok) { location.reload(); }
+    else { alert(j.msg || 'Erro'); }
 });
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>

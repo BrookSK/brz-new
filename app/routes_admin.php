@@ -224,6 +224,7 @@ $router->get('/admin/redirecionamento/envios/{id}',                     'AdminRe
 $router->post('/admin/redirecionamento/envios/{id}/peso-real',          'AdminRedirecionamentoController', 'envioAtualizarPeso');
 $router->post('/admin/redirecionamento/envios/{id}/tracking',           'AdminRedirecionamentoController', 'envioSalvarTracking');
 $router->post('/admin/redirecionamento/envios/{id}/coletado',           'AdminRedirecionamentoController', 'envioMarcarColetado');
+$router->post('/admin/redirecionamento/envios/marcar-pago',             'AdminRedirecionamentoController', 'envioMarcarPago');
 $router->post('/admin/redirecionamento/envios/{id}/entregue',           'AdminRedirecionamentoController', 'envioMarcarEntregue');
 $router->get('/admin/redirecionamento/divergencias',                    'AdminRedirecionamentoController', 'divergencias');
 $router->post('/admin/redirecionamento/divergencias/gerar-link',        'AdminRedirecionamentoController', 'divergenciaGerarLink');

@@ -876,6 +876,17 @@ class AdminRedirecionamentoController extends Controller {
         $this->json(['ok'=>true]);
     }
 
+    public function envioMarcarPago(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $envioId = (int) $request->getParam('envio_id', 0);
+        if ($envioId <= 0) { $this->json(['ok'=>false,'msg'=>'Envio inválido']); return; }
+        $db = $this->pdo();
+        $db->prepare("UPDATE redirecionamento_envios SET status_pagamento='pago', status='pago' WHERE id=?")->execute([$envioId]);
+        $db->prepare("INSERT INTO redirecionamento_pagamentos (envio_id, tipo, valor_usd, status, pago_em) SELECT id, 'envio', valor_cobrado_usd, 'pago', NOW() FROM redirecionamento_envios WHERE id=?")
+            ->execute([$envioId]);
+        $this->json(['ok'=>true]);
+    }
+
     public function envioMarcarEntregue(Request $request) {
         $this->adminOnly(); $this->migrar();
         $id=(int)$request->getParam('id',0);
