@@ -747,21 +747,84 @@ function renderAdminSidebarStyles() {
 
         .sidebar { 
             min-height: 100vh; 
-            background: #0b1f3a;
+            background: #ffffff;
+            border-right: 1px solid #EBF0F6;
+            padding: 16px;
+        }
+        .sidebar .position-sticky {
+            padding-top: 0 !important;
         }
         .sidebar .nav-link { 
-            color: rgba(255, 255, 255, 0.8); 
-            border-radius: 0.35rem; 
-            margin: 0.2rem 0; 
+            color: #334155; 
+            border-radius: 9px; 
+            margin: 2px 0;
+            padding: 9px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: .18s ease;
         }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { 
+        .sidebar .nav-link i {
+            color: #94A3B8;
+            width: 18px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .sidebar .nav-link:hover { 
+            color: #18253D; 
+            background: #F8FAFC; 
+        }
+        .sidebar .nav-link:hover i {
+            color: #18253D;
+        }
+        .sidebar .nav-link.active { 
             color: #fff; 
-            background-color: rgba(255, 255, 255, 0.1); 
+            background: #18253D;
+            box-shadow: 0 4px 14px rgba(24, 37, 61, .16);
+        }
+        .sidebar .nav-link.active i {
+            color: #fff;
+        }
+        .sidebar .sidebar-group-toggle {
+            font-weight: 600;
+            color: #1F2937;
+        }
+        .sidebar .sidebar-group-toggle:hover {
+            background: #F8FAFC;
+            color: #18253D;
+        }
+        .sidebar .sidebar-group-toggle.active {
+            background: rgba(24, 37, 61, 0.06);
+            color: #18253D;
+            box-shadow: none;
+        }
+        .sidebar .sidebar-group-toggle.active i {
+            color: #18253D;
         }
         .sidebar .sidebar-brand { 
-            color: #fff; 
+            color: #18253D; 
             font-weight: bold; 
-            padding: 1rem; 
+            padding: 10px 10px 16px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #EBF0F6;
+        }
+        .sidebar .sidebar-brand .sidebar-brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #18253D;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .sidebar .sidebar-brand .sidebar-brand-text {
+            font-size: 15px;
+            font-weight: 700;
+            color: #18253D;
         }
 
         .sidebar .sidebar-brand .admin-sidebar-logo {
@@ -770,6 +833,18 @@ function renderAdminSidebarStyles() {
             max-width: 100%;
             object-fit: contain;
             display: inline-block;
+        }
+        .sidebar .sidebar-divider {
+            border-color: #EBF0F6;
+            margin: 12px 0;
+        }
+        .sidebar .collapse .nav-link {
+            padding: 6px 12px;
+            font-size: 12.5px;
+            margin: 1px 0;
+        }
+        .sidebar .collapse .nav-link i {
+            font-size: 11px;
         }
         .card-stats { 
             transition: none;
@@ -792,6 +867,8 @@ function renderAdminSidebarStyles() {
                 box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
                 border-top-right-radius: 18px;
                 border-bottom-right-radius: 18px;
+                background: #ffffff;
+                border-right: none;
             }
 
             /* Quando aberto, precisa ficar acima */
