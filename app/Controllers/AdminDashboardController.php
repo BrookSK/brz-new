@@ -514,23 +514,23 @@ class AdminDashboardController extends Controller {
                         <h3 class="h5 mb-3">Ações Rápidas</h3>
                         <div class="row">
                             <div class="col-lg-4 col-md-6 mb-3">
-                                <a href="/admin/correios-mundial" class="text-decoration-none">
+                                <a href="/admin/redirecionamento/envios/novo" class="text-decoration-none">
                                     <div class="card quick-action-card bg-primary text-white h-100">
                                         <div class="card-body text-center">
-                                            <i class="fas fa-globe fa-3x mb-3"></i>
-                                            <h5 class="card-title">Correios Mundial</h5>
-                                            <p class="card-text small">Gerar etiquetas PACKET</p>
+                                            <i class="fas fa-plus fa-3x mb-3"></i>
+                                            <h5 class="card-title">Novo Envio</h5>
+                                            <p class="card-text small">Criar envio e gerar etiqueta</p>
                                         </div>
                                     </div>
                                 </a>
                             </div>
                             <div class="col-lg-4 col-md-6 mb-3">
-                                <a href="/meus-pedidos" class="text-decoration-none">
+                                <a href="/admin/redirecionamento/envios" class="text-decoration-none">
                                     <div class="card quick-action-card bg-success text-white h-100">
                                         <div class="card-body text-center">
-                                            <i class="fas fa-shopping-bag fa-3x mb-3"></i>
-                                            <h5 class="card-title">Meus Pedidos</h5>
-                                            <p class="card-text small">Acompanhar pedidos</p>
+                                            <i class="fas fa-truck-fast fa-3x mb-3"></i>
+                                            <h5 class="card-title">Meus Envios</h5>
+                                            <p class="card-text small">Acompanhar envios</p>
                                         </div>
                                     </div>
                                 </a>
@@ -555,7 +555,7 @@ class AdminDashboardController extends Controller {
                         <div class="card shadow">
                             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                                 <h6 class="m-0 font-weight-bold text-primary">Pedidos Recentes</h6>
-                                <a href="/admin/correios-mundial" class="btn btn-sm btn-outline-primary">Correios Mundial</a>
+                                <a href="/admin/redirecionamento/envios" class="btn btn-sm btn-outline-primary">Ver todos</a>
                             </div>
                             <div class="card-body">';
 
@@ -571,7 +571,7 @@ class AdminDashboardController extends Controller {
                     }
 
                     $pid = (int) ($pedido['id'] ?? 0);
-                    $hrefPedido = $pid > 0 ? ('/admin/correios-mundial/pedido/' . $pid) : '#';
+                    $hrefPedido = $pid > 0 ? ('/admin/pedidos/detalhes/' . $pid) : '#';
                     $moedaPed = strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL')));
                     $simboloPed = ($moedaPed === 'USD') ? 'US$ ' : 'R$ ';
 
