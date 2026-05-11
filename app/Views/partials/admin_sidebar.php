@@ -217,7 +217,7 @@ function renderAdminSidebar($activePage = '') {
         'lojas' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.stores', 'Lojas'), 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.categories', 'Categorias'), 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
-        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => __('admin.menu.orders_audit', 'Pedidos para conferência'), 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
+        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Em Conferência', 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
         'wp-estatisticas' => ['icon' => 'fas fa-chart-pie', 'label' => __('admin.menu.wp_orders_stats', 'Estatísticas (WP)'), 'url' => '/admin/pedidos-wp/estatisticas', 'roles' => ['admin']],
         'tickets' => ['icon' => 'fas fa-life-ring', 'label' => __('admin.menu.tickets', 'Tickets'), 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => __('admin.menu.my_commissions', 'Minhas Comissões'), 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
@@ -484,10 +484,10 @@ function renderAdminSidebar($activePage = '') {
                     // Remover prefixo (RED) dos labels dentro do grupo
                     $label = preg_replace('/^\(RED\)\s*/i', '', $label);
                     if ($key === 'tickets' && $unreadTickets > 0) {
-                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $unreadTickets . '</span>';
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $unreadTickets . '</span>';
                     }
                     if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
-                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $pendentesConferencia . '</span>';
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $pendentesConferencia . '</span>';
                     }
                     echo '<li class="nav-item">
                         <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '" style="padding:4px 12px;font-size:13px;">
