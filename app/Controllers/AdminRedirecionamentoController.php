@@ -496,14 +496,30 @@ class AdminRedirecionamentoController extends Controller {
                 $keyCol = in_array('chave',$cols,true)?'chave':(in_array('key',$cols,true)?'key':'');
                 $valCol = in_array('valor',$cols,true)?'valor':(in_array('value',$cols,true)?'value':'');
                 if (!$keyCol || !$valCol) continue;
-                $st2 = $db->prepare("SELECT $keyCol, $valCol FROM $t WHERE $keyCol IN ('stripe_secret_key','stripe_public_key','stripe_publishable_key')");
-                $st2->execute();
-                $rows = $st2->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+                // Buscar com e sem prefixo de categoria
+                $keysToSearch = ['stripe_secret_key','stripe_public_key','stripe_publishable_key','pagamentos_stripe_secret_key','pagamentos_stripe_publishable_key','stripe_api_key'];
+                $placeholders = implode(',', array_fill(0, count($keysToSearch), '?'));
+
+                // Formato 1: chave simples (sem categoria)
+                $st2 = $db->prepare("SELECT $keyCol, $valCol FROM $t WHERE $keyCol IN ($placeholders)");
+                $st2->execute($keysToSearch);
+                $rows = $st2->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
+
+                // Formato 2: com coluna categoria
+                if (in_array('categoria', $cols, true)) {
+                    $st3 = $db->prepare("SELECT $keyCol, $valCol FROM $t WHERE categoria = 'pagamentos' AND $keyCol IN ('stripe_secret_key','stripe_publishable_key','stripe_public_key','stripe_api_key')");
+                    $st3->execute();
+                    $rowsCat = $st3->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
+                    $rows = array_merge($rowsCat, $rows); // prioridade para formato sem prefixo
+                }
+
                 if (!empty($rows)) {
-                    return [
-                        'secret' => $rows['stripe_secret_key'] ?? '',
-                        'public' => $rows['stripe_public_key'] ?? ($rows['stripe_publishable_key'] ?? ''),
-                    ];
+                    $secret = $rows['stripe_secret_key'] ?? ($rows['pagamentos_stripe_secret_key'] ?? ($rows['stripe_api_key'] ?? ''));
+                    $public = $rows['stripe_public_key'] ?? ($rows['stripe_publishable_key'] ?? ($rows['pagamentos_stripe_publishable_key'] ?? ''));
+                    if ($secret !== '' || $public !== '') {
+                        return ['secret' => $secret, 'public' => $public];
+                    }
                 }
             }
         } catch (\Exception $e) {}
