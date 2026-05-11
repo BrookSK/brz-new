@@ -5247,6 +5247,19 @@ LINKSCRIPT;
         return $html;
     }
 
+    private function buildUsuarioOptions(string $currentId): string {
+        $html = '';
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->query("SELECT id, nome, email FROM usuarios WHERE perfil IN ('admin','vendedor','suporte') ORDER BY nome ASC");
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $u) {
+                $sel = ((string)$u['id'] === $currentId) ? ' selected' : '';
+                $html .= '<option value="' . (int)$u['id'] . '"' . $sel . '>' . htmlspecialchars(($u['nome'] ?? '') . ' (' . ($u['email'] ?? '') . ')') . '</option>';
+            }
+        } catch (\Exception $e) {}
+        return $html;
+    }
+
     public function comissoes(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
@@ -5257,6 +5270,12 @@ LINKSCRIPT;
         if ($escopo !== 'todos') {
             $escopo = 'me';
         }
+
+        // Filtros
+        $filtroDataInicio = $request->getParam('data_inicio', '');
+        $filtroDataFim = $request->getParam('data_fim', '');
+        $filtroUsuario = $request->getParam('usuario_id', '');
+        $filtroStatus = $request->getParam('status_pedido', '');
 
         $pedidoModel = new PedidoEcommerce();
         $resumo = [
@@ -5571,6 +5590,19 @@ LINKSCRIPT;
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
                     </div>
                 </div>
+
+                <!-- Filtros -->
+                <div class="card border-0 shadow-sm mb-4"><div class="card-body py-3">
+                    <form method="GET" class="row g-2 align-items-end">
+                        <input type="hidden" name="escopo" value="' . htmlspecialchars($escopo) . '">
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data fim</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
+                        ' . ($perfil === 'admin' && $escopo === 'todos' ? '<div class="col-md-3"><label class="form-label small text-muted mb-1">Vendedor/Admin</label><select name="usuario_id" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildUsuarioOptions($filtroUsuario) . '</select></div>' : '') . '
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Status pedido</label><select name="status_pedido" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
+                        <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
+                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes?escopo=' . htmlspecialchars($escopo) . '" class="btn btn-outline-secondary btn-sm">Limpar</a></div>
+                    </form>
+                </div></div>
 
                 <div class="row g-3 mb-4">';
 
