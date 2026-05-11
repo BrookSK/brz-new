@@ -201,6 +201,37 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <!-- Tabela -->
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
+            <!-- Mobile: Cards -->
+            <div class="d-md-none p-3">
+                <?php if (empty($despesas)): ?>
+                    <div class="text-center text-muted py-4 small">Nenhuma despesa encontrada.</div>
+                <?php else: ?>
+                    <?php
+                    $statusBadgeMobile = ['prevista'=>'bg-secondary','a_vencer'=>'bg-warning text-dark','vencida'=>'bg-danger','paga'=>'bg-success','parcialmente_paga'=>'bg-info','cancelada'=>'bg-dark bg-opacity-50'];
+                    foreach ($despesas as $d):
+                        $stClassMobile = $statusBadgeMobile[$d['status'] ?? ''] ?? 'bg-secondary';
+                    ?>
+                    <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="fw-semibold text-truncate" style="font-size:12px;"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
+                            <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                                <span class="fw-bold" style="font-size:11px;"><?= ($d['moeda'] ?? 'BRL') === 'USD' ? '$ ' : 'R$ ' ?><?= number_format((float)($d['valor'] ?? 0), 2, ',', '.') ?></span>
+                                <span class="badge <?= $stClassMobile ?>" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span>
+                            </div>
+                            <div class="text-muted" style="font-size:10px;">Venc: <?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                            <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
+                            <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-outline-success py-0 px-1" style="font-size:11px;"><i class="fas fa-check"></i></button></form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <!-- Desktop: Table -->
+            <div class="d-none d-md-block">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0" style="font-size:12px;">
                     <thead class="table-light"><tr><th></th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Competência</th><th>Vencimento</th><th class="text-end">Valor</th><th>Status</th><th>Origem</th><th>Ações</th></tr></thead>
@@ -238,6 +269,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
             </div>
         </div>
     </div>

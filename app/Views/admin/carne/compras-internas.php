@@ -29,6 +29,46 @@
 
     <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
+            <!-- Mobile: Cards -->
+            <div class="d-md-none p-3">
+                <?php if (empty($compras)): ?>
+                    <div class="text-center text-muted py-4 small">Nenhuma compra interna pendente.</div>
+                <?php else: ?>
+                    <?php foreach ($compras as $ci): ?>
+                    <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="d-flex align-items-center gap-2">
+                                <a href="/admin/pedidos/detalhes/<?= $ci['pedido_id'] ?>" class="fw-semibold text-decoration-none" style="font-size:12px;">#<?= $ci['pedido_id'] ?></a>
+                                <span class="badge bg-light text-dark border" style="font-size:10px;"><?= $ci['quantidade_parcelas'] ?>x</span>
+                            </div>
+                            <div class="text-truncate text-muted" style="font-size:11px;"><?= htmlspecialchars($ci['cliente_nome']) ?></div>
+                            <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                <span class="badge bg-info" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $ci['status'])) ?></span>
+                                <span class="badge bg-<?= ($ci['status_primeira_parcela'] ?? '') === 'paga' ? 'success' : 'warning' ?>" style="font-size:9px;">1ª <?= ucfirst(str_replace('_', ' ', $ci['status_primeira_parcela'] ?? 'pendente')) ?></span>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/admin/carnes/detalhes/<?= $ci['carne_id'] ?>" class="btn btn-outline-primary py-0 px-1"><i class="fas fa-eye"></i></a>
+                                <?php if ($ci['status'] === 'aguardando_compra'): ?>
+                                <form method="POST" action="/admin/carnes/marcar-comprado/<?= $ci['id'] ?>" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-success py-0 px-1"><i class="fas fa-check"></i></button>
+                                </form>
+                                <?php endif; ?>
+                                <?php if ($ci['status'] !== 'aguardando_compra'): ?>
+                                <form method="POST" action="/admin/carnes/desfazer-compra/<?= $ci['id'] ?>" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-warning py-0 px-1" onclick="return confirm('Reverter para aguardando compra?')"><i class="fas fa-undo"></i></button>
+                                </form>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <!-- Desktop: Table -->
+            <div class="d-none d-md-block">
             <div class="table-responsive">
                 <table class="table table-hover table-sm mb-0">
                     <thead class="table-light">
@@ -65,6 +105,7 @@
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
             </div>
         </div>
     </div>

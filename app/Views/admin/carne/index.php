@@ -214,6 +214,40 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                 </div>
 
                 <!-- Tabela de Carnês -->
+
+                <!-- Mobile: Cards -->
+                <div class="d-md-none p-3">
+                    <?php if (empty($carnes)): ?>
+                        <div class="text-center text-muted py-4 small">Nenhum carnê encontrado.</div>
+                    <?php else: ?>
+                        <?php foreach ($carnes as $c):
+                            $st = $statusLabels[$c['status']] ?? ['label' => $c['status'], 'cor' => 'secondary'];
+                            $pagas = (int)($c['parcelas_pagas'] ?? 0);
+                            $totalParcelas = (int)($c['quantidade_parcelas'] ?? 1);
+                        ?>
+                        <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
+                            <div class="flex-grow-1 min-width-0">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-bold" style="font-size:11px;">#<?= $c['id'] ?></span>
+                                    <a href="/admin/pedidos/detalhes/<?= $c['pedido_id'] ?>" class="text-decoration-none fw-semibold" style="font-size:11px;">Ped #<?= $c['pedido_id'] ?></a>
+                                </div>
+                                <div class="text-truncate text-muted" style="font-size:11px;"><?= htmlspecialchars($c['cliente_nome'] ?? '') ?></div>
+                                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                                    <span class="badge bg-light text-dark border" style="font-size:10px;"><?= $pagas ?>/<?= $totalParcelas ?></span>
+                                    <?php if (($c['parcelas_atrasadas'] ?? 0) > 0): ?>
+                                    <span class="badge bg-danger" style="font-size:9px;"><?= $c['parcelas_atrasadas'] ?> atraso</span>
+                                    <?php endif; ?>
+                                    <span class="badge bg-<?= $st['cor'] ?>" style="font-size:9px;"><?= $st['label'] ?></span>
+                                </div>
+                            </div>
+                            <a href="/admin/carnes/detalhes/<?= $c['id'] ?>" class="btn btn-sm btn-outline-primary flex-shrink-0 py-0 px-1"><i class="fas fa-eye"></i></a>
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Desktop: Table -->
+                <div class="d-none d-md-block">
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
@@ -262,6 +296,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                             <?php endif; ?>
                         </tbody>
                     </table>
+                </div>
                 </div>
             </div>
         </div>

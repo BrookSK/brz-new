@@ -73,12 +73,58 @@
         <div class="card border-0 shadow-sm mb-4" id="mes_<?= $mesKey ?>">
             <div class="card-header bg-white fw-semibold"><i class="fas fa-calendar me-2"></i><?= $mesLabel ?> <span class="badge bg-light text-dark ms-2"><?= count($itens) ?> itens</span></div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <!-- Mobile: Cards -->
+                <div class="d-md-none p-3">
+                    <?php foreach ($itens as $ci):
+                        $img = trim((string) ($ci['produto_imagem'] ?? ''));
+                        if ($img !== '' && !preg_match('#^https?://#i', $img) && $img[0] !== '/') {
+                            $img = '/uploads/produtos/' . $img;
+                        }
+                        $prodNome = (string) ($ci['produto_nome'] ?? ($ci['item_nome'] ?? 'Produto'));
+                        $statusCompra = (string) ($ci['status_compra'] ?? 'aguardando_compra');
+                        $carneStatus = (string) ($ci['carne_status'] ?? '');
+                        $modalId = 'modal_' . (int) ($ci['id'] ?? 0) . '_' . (int) ($ci['produto_id'] ?? 0);
+                        $stP1 = strtolower(trim((string) ($ci['status_primeira_parcela'] ?? '')));
+                        $p1ProdPago = (int) ($ci['primeira_parcela_produtos_pago'] ?? 0);
+                        $p1TaxaPago = (int) ($ci['primeira_parcela_taxas_pago'] ?? 0);
+                    ?>
+                    <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">
+                        <?php if ($img): ?>
+                            <img src="<?= htmlspecialchars($img) ?>" class="rounded border flex-shrink-0" style="width:40px;height:40px;object-fit:cover;" onerror="this.style.display='none'">
+                        <?php else: ?>
+                            <div class="rounded bg-light d-flex align-items-center justify-content-center flex-shrink-0" style="width:40px;height:40px;"><i class="fas fa-box text-muted"></i></div>
+                        <?php endif; ?>
+                        <div class="flex-grow-1 min-width-0">
+                            <div class="fw-semibold small text-truncate"><?= htmlspecialchars($prodNome) ?></div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size:11px;">
+                                <span class="text-muted"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></span>
+                                <span class="badge bg-light text-dark border"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span>
+                                <?php if ($stP1 === 'paga'): ?><span class="text-success"><i class="fas fa-check-circle"></i></span><?php else: ?><span class="text-danger"><i class="fas fa-times-circle"></i></span><?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                            <span class="badge bg-<?= $statusCompra === 'comprado' ? 'success' : ($statusCompra === 'recebido' ? 'info' : 'warning') ?>" style="font-size:9px;"><?= ucfirst(str_replace('_', ' ', $statusCompra)) ?></span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-1" data-bs-toggle="modal" data-bs-target="#<?= $modalId ?>"><i class="fas fa-eye"></i></button>
+                                <?php if ($statusCompra === 'aguardando_compra'): ?>
+                                <button type="button" class="btn btn-outline-success btn-sm py-0 px-1" data-bs-toggle="modal" data-bs-target="#comprar_<?= $modalId ?>"><i class="fas fa-check"></i></button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php
+                    $allModals[] = ['id' => $modalId, 'ci' => $ci, 'prodNome' => $prodNome, 'carneStatus' => $carneStatus, 'statusCompra' => $statusCompra];
+                    ?>
+                    <?php endforeach; ?>
+                </div>
+
+                <!-- Desktop: Table -->
+                <div class="d-none d-md-block table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
                                 <th>Produto</th>
-                                <th class="d-none d-md-table-cell">Cliente</th>
+                                <th>Cliente</th>
                                 <th>Carnê</th>
                                 <th class="d-none d-lg-table-cell">Status Carnê</th>
                                 <th class="d-none d-xl-table-cell">Início</th>
@@ -112,7 +158,7 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="d-none d-md-table-cell small"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></td>
+                                <td class="small"><?= htmlspecialchars($ci['cliente_nome'] ?? '') ?></td>
                                 <td>
                                     <span class="badge bg-light text-dark"><?= (int) ($ci['parcelas_pagas'] ?? 0) ?>/<?= (int) ($ci['quantidade_parcelas'] ?? 0) ?></span>
                                     <?php
@@ -123,7 +169,7 @@
                                     <?php if ($stP1 === 'paga'): ?>
                                         <div style="font-size:10px;" class="text-success"><i class="fas fa-check-circle"></i> 1ª paga</div>
                                     <?php elseif ($p1ProdPago || $p1TaxaPago): ?>
-                                        <div style="font-size:10px;" class="text-warning"><i class="fas fa-exclamation-circle"></i> 1ª parcial (<?= $p1ProdPago ? 'prod' : '' ?><?= ($p1ProdPago && $p1TaxaPago) ? '+' : '' ?><?= $p1TaxaPago ? 'taxa' : '' ?>)</div>
+                                        <div style="font-size:10px;" class="text-warning"><i class="fas fa-exclamation-circle"></i> 1ª parcial</div>
                                     <?php else: ?>
                                         <div style="font-size:10px;" class="text-danger"><i class="fas fa-times-circle"></i> 1ª pendente</div>
                                     <?php endif; ?>
@@ -142,7 +188,6 @@
                                 </td>
                             </tr>
                             <?php
-                            // Guardar modal pra renderizar fora da tabela
                             $allModals[] = ['id' => $modalId, 'ci' => $ci, 'prodNome' => $prodNome, 'carneStatus' => $carneStatus, 'statusCompra' => $statusCompra];
                             ?>
                             <?php endforeach; ?>
