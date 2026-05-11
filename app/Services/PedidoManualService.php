@@ -149,6 +149,8 @@ class PedidoManualService {
         $cidade = trim((string) ($enderecoEntrega['cidade'] ?? ''));
         $estado = trim((string) ($enderecoEntrega['estado'] ?? ''));
         $complemento = trim((string) ($enderecoEntrega['complemento'] ?? ''));
+        $pais = trim((string) ($enderecoEntrega['pais'] ?? 'BR'));
+        if ($pais === '') $pais = 'BR';
 
         // Precisa ter pelo menos CEP ou endereço+cidade
         if ($cep === '' && ($endereco === '' || $cidade === '')) {
@@ -204,8 +206,8 @@ class PedidoManualService {
                 'state' => $estado,
                 'tipo' => 'entrega',
                 'type' => 'entrega',
-                'pais' => 'BR',
-                'country' => 'BR',
+                'pais' => $pais,
+                'country' => $pais,
                 'nome' => $nomeCliente,
                 'name' => $nomeCliente,
                 'principal' => 1,
@@ -1284,8 +1286,15 @@ class PedidoManualService {
 
         // Endereço: em pedidos manuais, preferir o endereço principal do cliente quando existir.
         // Se não houver endereço cadastrado, permitir que o admin informe os dados de entrega para criar o endereço.
+        // IMPORTANTE: Se o admin informou um endereço diferente no formulário, criar um novo registro
+        // para não sobrescrever o endereço principal do cliente.
         $enderecoEntregaId = 0;
         if (in_array('endereco_entrega_id', $colsPedidos, true) && $this->tableExists('enderecos')) {
+            $enderecoFormularioPreenchido = is_array($enderecoEntrega) && (
+                trim((string) ($enderecoEntrega['cep'] ?? '')) !== '' ||
+                (trim((string) ($enderecoEntrega['endereco'] ?? '')) !== '' && trim((string) ($enderecoEntrega['cidade'] ?? '')) !== '')
+            );
+
             try {
                 $colsEnd = $this->getCols('enderecos');
                 if (!empty($colsEnd) && in_array('usuario_id', $colsEnd, true) && in_array('id', $colsEnd, true)) {
@@ -1295,7 +1304,56 @@ class PedidoManualService {
                     }
                     $stE = $this->db->prepare('SELECT id FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
                     $stE->execute([(int) $clienteId]);
-                    $enderecoEntregaId = (int) ($stE->fetchColumn() ?: 0);
+                    $enderecoExistenteId = (int) ($stE->fetchColumn() ?: 0);
+
+                    if ($enderecoExistenteId > 0 && $enderecoFormularioPreenchido) {
+                        // Comparar endereço existente com o que veio do formulário
+                        $selectCols = ['id'];
+                        $cepCol = in_array('cep', $colsEnd, true) ? 'cep' : '';
+                        $endCol = in_array('endereco', $colsEnd, true) ? 'endereco' : (in_array('logradouro', $colsEnd, true) ? 'logradouro' : '');
+                        $numCol = in_array('numero', $colsEnd, true) ? 'numero' : '';
+                        $cidadeCol = in_array('cidade', $colsEnd, true) ? 'cidade' : '';
+                        $estadoCol = in_array('estado', $colsEnd, true) ? 'estado' : (in_array('uf', $colsEnd, true) ? 'uf' : '');
+                        if ($cepCol !== '') $selectCols[] = $cepCol . ' AS cep';
+                        if ($endCol !== '') $selectCols[] = $endCol . ' AS endereco';
+                        if ($numCol !== '') $selectCols[] = $numCol . ' AS numero';
+                        if ($cidadeCol !== '') $selectCols[] = $cidadeCol . ' AS cidade';
+                        if ($estadoCol !== '') $selectCols[] = $estadoCol . ' AS estado';
+
+                        $stComp = $this->db->prepare('SELECT ' . implode(', ', $selectCols) . ' FROM enderecos WHERE id = ? LIMIT 1');
+                        $stComp->execute([$enderecoExistenteId]);
+                        $endExistente = $stComp->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                        // Verificar se o endereço do formulário é diferente do cadastrado
+                        $formCep = trim((string) ($enderecoEntrega['cep'] ?? ''));
+                        $formEnd = trim((string) ($enderecoEntrega['endereco'] ?? ''));
+                        $formNum = trim((string) ($enderecoEntrega['numero'] ?? ''));
+                        $formCid = trim((string) ($enderecoEntrega['cidade'] ?? ''));
+                        $formEst = trim((string) ($enderecoEntrega['estado'] ?? ''));
+
+                        $dbCep = trim((string) ($endExistente['cep'] ?? ''));
+                        $dbEnd = trim((string) ($endExistente['endereco'] ?? ''));
+                        $dbNum = trim((string) ($endExistente['numero'] ?? ''));
+                        $dbCid = trim((string) ($endExistente['cidade'] ?? ''));
+                        $dbEst = trim((string) ($endExistente['estado'] ?? ''));
+
+                        $enderecoMudou = (
+                            $formCep !== $dbCep ||
+                            $formEnd !== $dbEnd ||
+                            $formNum !== $dbNum ||
+                            $formCid !== $dbCid ||
+                            $formEst !== $dbEst
+                        );
+
+                        if ($enderecoMudou) {
+                            // Criar novo endereço com os dados do formulário (não alterar o cadastro do cliente)
+                            $enderecoEntregaId = $this->criarEnderecoEntregaParaCliente($clienteId, $enderecoEntrega);
+                        } else {
+                            $enderecoEntregaId = $enderecoExistenteId;
+                        }
+                    } elseif ($enderecoExistenteId > 0) {
+                        $enderecoEntregaId = $enderecoExistenteId;
+                    }
                 }
             } catch (\Exception $e) {
                 $enderecoEntregaId = 0;

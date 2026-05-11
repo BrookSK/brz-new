@@ -430,10 +430,6 @@ class AdminRedirecionamentoController extends Controller {
             'suite'      => 'VARCHAR(50) DEFAULT NULL',
         ]);
 
-        $this->migrarColunas($db, 'redirecionamento_envios', [
-            'dest_pais' => "VARCHAR(100) DEFAULT NULL AFTER `dest_cep`",
-        ]);
-
         // Seed da tabela de pesos se vazia
         try {
             $count = (int) $db->query("SELECT COUNT(*) FROM redirecionamento_tabela_pesos")->fetchColumn();
@@ -740,7 +736,6 @@ class AdminRedirecionamentoController extends Controller {
             'dest_cidade'=>trim((string)$request->getParam('dest_cidade','')),
             'dest_estado'=>trim((string)$request->getParam('dest_estado','')),
             'dest_cep'=>trim((string)$request->getParam('dest_cep','')),
-            'dest_pais'=>trim((string)$request->getParam('dest_pais',''))?:null,
             'moeda'=>'USD','valor_frete_usd'=>$valFrete,
             'peso_kg'=>$pesoKg,'largura_cm'=>$largura,'altura_cm'=>$altura,'comprimento_cm'=>$compr,
             'valor_cobrado_usd'=>$valorCobrado,'status'=>'aguardando_pagamento','status_pagamento'=>'pendente',

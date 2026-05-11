@@ -2649,6 +2649,7 @@ JS;
                 'bairro' => (string) $request->getParam('endereco_entrega_bairro', ''),
                 'cidade' => (string) $request->getParam('endereco_entrega_cidade', ''),
                 'estado' => (string) $request->getParam('endereco_entrega_estado', ''),
+                'pais' => (string) $request->getParam('endereco_entrega_pais', 'BR'),
             ];
 
             $resumo = [
@@ -2754,6 +2755,7 @@ JS;
                 'bairro' => (string) $request->getParam('endereco_entrega_bairro', ''),
                 'cidade' => (string) $request->getParam('endereco_entrega_cidade', ''),
                 'estado' => (string) $request->getParam('endereco_entrega_estado', ''),
+                'pais' => (string) $request->getParam('endereco_entrega_pais', 'BR'),
             ];
 
             $resumo = [
