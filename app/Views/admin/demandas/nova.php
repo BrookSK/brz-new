@@ -30,22 +30,66 @@
             <!-- === FLUXO NOVA FUNÇÃO === -->
             <div id="blocos-funcao">
 
+            <!-- Aviso sobre "Não se aplica" -->
+            <div class="alert alert-secondary small mb-4 d-flex align-items-start gap-2" style="border-radius:10px;">
+                <i class="fas fa-info-circle mt-1 text-secondary"></i>
+                <div>
+                    <strong>Sobre o "Não se aplica":</strong> Alguns campos possuem a opção de marcar como "Não se aplica" para casos simples (ex: um botão novo que não impacta financeiramente). <strong>Use com moderação.</strong> Se identificarmos uso excessivo ou inadequado, essa opção será removida e todos os campos voltarão a ser obrigatórios.
+                </div>
+            </div>
+
             <!-- BLOCO 2 -->
             <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">2. Por que você quer isso?</h6></div><div class="card-body">
-                <div class="mb-3"><label class="form-label fw-semibold small">O que está acontecendo hoje que te incomoda ou te prejudica?</label><p class="text-muted small mb-2">Descreva o problema atual de forma direta. Não escreva soluções ainda, apenas o problema.</p><textarea name="bloco2_problema" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">O que vai melhorar se essa demanda for executada?</label><p class="text-muted small mb-2">Descreva o resultado esperado.</p><textarea name="bloco2_melhoria" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-0"><label class="form-label fw-semibold small">O que acontece se essa demanda não for executada?</label><p class="text-muted small mb-2">Descreva as consequências de não fazer.</p><textarea name="bloco2_consequencia" class="form-control req-funcao" rows="4"></textarea></div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">O que está acontecendo hoje que te incomoda ou te prejudica?</label></div>
+                    <p class="text-muted small mb-2">Descreva o problema atual de forma direta. Não escreva soluções ainda, apenas o problema.</p>
+                    <textarea name="bloco2_problema" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">O que vai melhorar se essa demanda for executada?</label></div>
+                    <p class="text-muted small mb-2">Descreva o resultado esperado.</p>
+                    <textarea name="bloco2_melhoria" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-0">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">O que acontece se essa demanda não for executada?</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco2_consequencia">N/A</label></div>
+                    <p class="text-muted small mb-2">Descreva as consequências de não fazer.</p>
+                    <textarea name="bloco2_consequencia" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
             </div></div>
 
             <!-- BLOCO 3 -->
             <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">3. Quais são os impactos?</h6></div><div class="card-body">
                 <div class="alert alert-warning small mb-4"><i class="fas fa-exclamation-triangle me-1"></i><strong>Você é responsável por entender e analisar cada impacto abaixo antes de enviar.</strong> Campos genéricos como "não sei", "barato" ou "rápido" não são aceitos e farão a demanda ser devolvida.</div>
-                <div class="mb-3"><label class="form-label fw-semibold small">3.1 — Impacto financeiro direto</label><p class="text-muted small mb-2">Quanto custa ou deixa de gerar? Seja específico com valores.</p><textarea name="bloco3_financeiro" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">3.2 — Impacto no capital de giro</label><p class="text-muted small mb-2">O negócio tem dinheiro disponível para financiar isso agora?</p><textarea name="bloco3_capital_giro" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">3.3 — Impacto nos custos operacionais</label><p class="text-muted small mb-2">Comissão, embalagem, frete, atendimento, estoque — detalhe cada um.</p><textarea name="bloco3_custos_operacionais" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">3.4 — Impacto na jornada do cliente</label><p class="text-muted small mb-2">Descreva passo a passo o que o cliente faz.</p><textarea name="bloco3_jornada_cliente" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">3.5 — Impacto na equipe</label><p class="text-muted small mb-2">Alguém precisa fazer algo diferente? Quem? O que muda?</p><textarea name="bloco3_equipe" class="form-control req-funcao" rows="4"></textarea></div>
-                <div class="mb-0"><label class="form-label fw-semibold small">3.6 — Conflito com regras existentes</label><p class="text-muted small mb-2">Essa solicitação entra em conflito com algo que já existe?</p><textarea name="bloco3_conflitos" class="form-control req-funcao" rows="4"></textarea></div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">3.1 — Impacto financeiro direto</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco3_financeiro">N/A</label></div>
+                    <p class="text-muted small mb-2">Quanto custa ou deixa de gerar? Seja específico com valores.</p>
+                    <textarea name="bloco3_financeiro" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">3.2 — Impacto no capital de giro</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco3_capital_giro">N/A</label></div>
+                    <p class="text-muted small mb-2">O negócio tem dinheiro disponível para financiar isso agora?</p>
+                    <textarea name="bloco3_capital_giro" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">3.3 — Impacto nos custos operacionais</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco3_custos_operacionais">N/A</label></div>
+                    <p class="text-muted small mb-2">Comissão, embalagem, frete, atendimento, estoque — detalhe cada um.</p>
+                    <textarea name="bloco3_custos_operacionais" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">3.4 — Impacto na jornada do cliente</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco3_jornada_cliente">N/A</label></div>
+                    <p class="text-muted small mb-2">Descreva passo a passo o que o cliente faz.</p>
+                    <textarea name="bloco3_jornada_cliente" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">3.5 — Impacto na equipe</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco3_equipe">N/A</label></div>
+                    <p class="text-muted small mb-2">Alguém precisa fazer algo diferente? Quem? O que muda?</p>
+                    <textarea name="bloco3_equipe" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
+                <div class="mb-0">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">3.6 — Conflito com regras existentes</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco3_conflitos">N/A</label></div>
+                    <p class="text-muted small mb-2">Essa solicitação entra em conflito com algo que já existe?</p>
+                    <textarea name="bloco3_conflitos" class="form-control req-funcao na-field" rows="4"></textarea>
+                </div>
             </div></div>
 
             <!-- BLOCO 4 -->
@@ -59,10 +103,22 @@
 
             <!-- BLOCO 5 -->
             <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">5. O que precisa ser feito?</h6></div><div class="card-body">
-                <div class="mb-3"><label class="form-label fw-semibold small">5.1 — Isso cria algo novo ou muda algo que já existe?</label><textarea name="bloco5_novo_ou_existente" class="form-control req-funcao" rows="3"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">5.2 — Tem alguma ferramenta, sistema ou aplicativo envolvido?</label><textarea name="bloco5_ferramentas" class="form-control req-funcao" rows="3"></textarea></div>
-                <div class="mb-3"><label class="form-label fw-semibold small">5.3 — Tem alguma regra que a equipe precisa seguir?</label><textarea name="bloco5_regras" class="form-control req-funcao" rows="3"></textarea></div>
-                <div class="mb-0"><label class="form-label fw-semibold small">5.4 — Quem vai usar isso no dia a dia?</label><textarea name="bloco5_usuarios" class="form-control req-funcao" rows="3"></textarea></div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">5.1 — Isso cria algo novo ou muda algo que já existe?</label></div>
+                    <textarea name="bloco5_novo_ou_existente" class="form-control req-funcao na-field" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">5.2 — Tem alguma ferramenta, sistema ou aplicativo envolvido?</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco5_ferramentas">N/A</label></div>
+                    <textarea name="bloco5_ferramentas" class="form-control req-funcao na-field" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">5.3 — Tem alguma regra que a equipe precisa seguir?</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco5_regras">N/A</label></div>
+                    <textarea name="bloco5_regras" class="form-control req-funcao na-field" rows="3"></textarea>
+                </div>
+                <div class="mb-0">
+                    <div class="d-flex justify-content-between align-items-center"><label class="form-label fw-semibold small mb-0">5.4 — Quem vai usar isso no dia a dia?</label><label class="form-check-label small text-muted ms-2 flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input na-check me-1" data-target="bloco5_usuarios">N/A</label></div>
+                    <textarea name="bloco5_usuarios" class="form-control req-funcao na-field" rows="3"></textarea>
+                </div>
             </div></div>
 
             </div><!-- /blocos-funcao -->
@@ -124,8 +180,8 @@ document.getElementById('formDemanda').addEventListener('submit', function(e) {
     // Validar campos obrigatórios comuns
     document.querySelectorAll('.req-field').forEach(f => { if (!f.value.trim()) { valid = false; f.classList.add('is-invalid'); f.insertAdjacentHTML('afterend', '<div class="invalid-feedback">Este campo é obrigatório. Preencha antes de continuar.</div>'); } });
 
-    // Validar campos do tipo selecionado
-    document.querySelectorAll(reqClass).forEach(f => { if (!f.value.trim()) { valid = false; f.classList.add('is-invalid'); f.insertAdjacentHTML('afterend', '<div class="invalid-feedback">Este campo é obrigatório. Preencha antes de continuar.</div>'); } });
+    // Validar campos do tipo selecionado (pular os marcados como N/A)
+    document.querySelectorAll(reqClass).forEach(f => { if (f.disabled) return; if (!f.value.trim()) { valid = false; f.classList.add('is-invalid'); f.insertAdjacentHTML('afterend', '<div class="invalid-feedback">Este campo é obrigatório. Preencha antes de continuar.</div>'); } });
 
     // Validar etapas (só para função)
     if (tipo === 'funcao') {
@@ -136,4 +192,33 @@ document.getElementById('formDemanda').addEventListener('submit', function(e) {
 
     if (!valid) { e.preventDefault(); window.scrollTo({top: document.querySelector('.is-invalid').offsetTop - 100, behavior: 'smooth'}); }
 });
+
+// "Não se aplica" checkbox handler
+document.querySelectorAll('.na-check').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        var target = this.getAttribute('data-target');
+        var textarea = document.querySelector('textarea[name="' + target + '"]');
+        if (!textarea) return;
+        if (this.checked) {
+            textarea._originalValue = textarea.value;
+            textarea.value = 'Não se aplica';
+            textarea.disabled = true;
+            textarea.style.opacity = '0.5';
+            textarea.style.background = '#f1f5f9';
+            textarea.classList.remove('is-invalid');
+            var fb = textarea.nextElementSibling;
+            if (fb && fb.classList.contains('invalid-feedback')) fb.remove();
+        } else {
+            textarea.value = textarea._originalValue || '';
+            textarea.disabled = false;
+            textarea.style.opacity = '1';
+            textarea.style.background = '';
+        }
+    });
+});
+
+// Antes de submit, habilitar campos N/A para enviar o valor
+document.getElementById('formDemanda').addEventListener('submit', function() {
+    document.querySelectorAll('textarea[disabled]').forEach(function(t) { t.disabled = false; });
+}, true);
 </script>
