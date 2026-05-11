@@ -234,6 +234,15 @@
         .text-gray-300 {
             color: #dddfeb !important;
         }
+        /* Mobile responsivo global admin */
+        @media (max-width: 767.98px) {
+            main .table th, main .table td { font-size: 11px; padding: 3px 5px; }
+            main h2 { font-size: 1rem !important; word-break: break-all; }
+            main .card-header h5 { font-size: 0.9rem; }
+            main .card-body .row > [class*="col-md-4"],
+            main .card-body .row > [class*="col-md-3"] { flex: 0 0 50%; max-width: 50%; }
+            .table-responsive { font-size: 11px; }
+        }
     </style>
 </head>
 <body>

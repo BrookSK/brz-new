@@ -2967,34 +2967,34 @@ HTML;
         renderAdminSidebar('pedidos');
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
-                <div>
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+                <h2 class="fs-5 fw-bold"><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
+                <div class="d-flex flex-wrap gap-1">
                     ' . (((string) ($pedido['origem_pedido'] ?? '') === 'manual')
-                        ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary me-2">'
-                            . '<i class="fas fa-pen-to-square me-1"></i>Editar Pedido Manual</a>')
+                        ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary btn-sm">'
+                            . '<i class="fas fa-pen-to-square me-1"></i><span class="d-none d-lg-inline">Editar Pedido Manual</span></a>')
                         : '') . '
-                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/criar-ticket" style="display:inline-block" class="me-2">
-                        <button type="submit" class="btn btn-outline-primary">
-                            <i class="fas fa-headset me-1"></i>Criar ticket
+                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/criar-ticket" style="display:inline-block">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-headset me-1"></i><span class="d-none d-md-inline">Criar ticket</span>
                         </button>
                     </form>
-                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" class="me-2" onsubmit="return confirm(' . "'" . 'Sincronizar status de pagamento (Câmbio Real + AppMax + Stripe) agora?' . "'" . ');">
-                        <button type="submit" class="btn btn-outline-success">
-                            <i class="fas fa-rotate me-1"></i>Sincronizar pagamentos
+                    <form method="POST" action="/admin/pedidos/sincronizar-pagamentos/' . (int) $id . '" style="display:inline-block" onsubmit="return confirm(' . "'" . 'Sincronizar status de pagamento (Câmbio Real + AppMax + Stripe) agora?' . "'" . ');">
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-rotate me-1"></i><span class="d-none d-lg-inline">Sincronizar pagamentos</span>
                         </button>
                     </form>
-                    <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark me-2" target="_blank" rel="noopener">
-                        <i class="fas fa-file-pdf me-1"></i>Exportar PDF
+                    <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener">
+                        <i class="fas fa-file-pdf me-1"></i><span class="d-none d-md-inline">PDF</span>
                     </a>
-                    <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning me-2">
-                        <i class="fas fa-edit me-1"></i>Editar Pedido
+                    <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning btn-sm">
+                        <i class="fas fa-edit me-1"></i><span class="d-none d-md-inline">Editar</span>
                     </a>
-                    <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
-                        <i class="fas fa-trash me-1"></i>Enviar para Lixeira
+                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
+                        <i class="fas fa-trash me-1"></i><span class="d-none d-md-inline">Lixeira</span>
                     </button>
-                    <a href="/admin/pedidos" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left me-1"></i>Voltar
+                    <a href="/admin/pedidos" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">Voltar</span>
                     </a>
                 </div>
             </div>';
