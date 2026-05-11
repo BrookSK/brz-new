@@ -236,12 +236,26 @@
         }
         /* Mobile responsivo global admin */
         @media (max-width: 767.98px) {
-            main .table th, main .table td { font-size: 11px; padding: 3px 5px; }
-            main h2 { font-size: 1rem !important; word-break: break-all; }
-            main .card-header h5 { font-size: 0.9rem; }
-            main .card-body .row > [class*="col-md-4"],
-            main .card-body .row > [class*="col-md-3"] { flex: 0 0 50%; max-width: 50%; }
-            .table-responsive { font-size: 11px; }
+            main { padding-left: 8px !important; padding-right: 8px !important; }
+            main h1, main h2, main h3 { font-size: 1.1rem !important; word-break: break-word; }
+            main .card-header h5, main .card-header h6 { font-size: 0.85rem; }
+            main .card-body { padding: 0.75rem; }
+            /* Forçar scroll horizontal em TODAS as tabelas */
+            main table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; font-size: 11px; }
+            main table th, main table td { padding: 4px 6px; font-size: 11px; }
+            main .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            /* Botões menores */
+            main .btn:not(.btn-sm):not(.btn-lg) { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+            /* Cards em grid: 2 colunas */
+            main .row > [class*="col-md-4"],
+            main .row > [class*="col-md-3"],
+            main .row > [class*="col-lg-3"],
+            main .row > [class*="col-lg-4"] { flex: 0 0 50%; max-width: 50%; }
+            /* Formulários empilham */
+            main .row.g-2 > [class*="col-md"], main .row.g-3 > [class*="col-md"] { flex: 0 0 100%; max-width: 100%; }
+            main form .row > [class*="col-md"] { flex: 0 0 100%; max-width: 100%; margin-bottom: 0.5rem; }
+            /* Alertas */
+            main .alert { font-size: 0.8rem; padding: 0.5rem 0.75rem; }
         }
     </style>
 </head>
