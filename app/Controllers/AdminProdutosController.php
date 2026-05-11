@@ -5483,7 +5483,7 @@ HTML;
                 // Esconder apenas este elemento e seus irmãos até o próximo card-header
                 var parent=el.parentElement;
                 // Se está dentro de um card-body, esconder apenas a partir deste ponto
-                var section=el.closest("section")||el.closest("[id*='variaco']")||el.closest("[id*='variacao']");
+                var section=el.closest("section")||el.closest("[id*=\\"variaco\\"]")||el.closest("[id*=\\"variacao\\"]");
                 if(section){section.style.display="none";found=true;return;}
                 // Se é um título solto, esconder ele e tudo depois dele até o fim do container
                 var sibling=el;
