@@ -107,7 +107,7 @@ class AdminDashboardController extends Controller {
                 $partsAdmin = [];
                 if ($fatBrlAdmin > 0) $partsAdmin[] = 'R$ ' . number_format($fatBrlAdmin, 2, ',', '.');
                 if ($fatUsdAdmin > 0) $partsAdmin[] = 'US$ ' . number_format($fatUsdAdmin, 2, ',', '.');
-                $stats['faturamento_display'] = !empty($partsAdmin) ? implode(' / ', $partsAdmin) : 'R$ 0,00';
+                $stats['faturamento_display'] = !empty($partsAdmin) ? implode('<br>', $partsAdmin) : 'R$ 0,00';
             } else {
                 $colAdminCriador = null;
                 foreach (['admin_criador_id', 'admin_creator_id', 'created_by_admin_id', 'criador_admin_id', 'admin_id'] as $c) {
@@ -205,7 +205,7 @@ class AdminDashboardController extends Controller {
                 $parts = [];
                 if ($fatBrl > 0) $parts[] = 'R$ ' . number_format($fatBrl, 2, ',', '.');
                 if ($fatUsd > 0) $parts[] = 'US$ ' . number_format($fatUsd, 2, ',', '.');
-                $stats['faturamento_display'] = !empty($parts) ? implode(' / ', $parts) : 'R$ 0,00';
+                $stats['faturamento_display'] = !empty($parts) ? implode('<br>', $parts) : 'R$ 0,00';
             }
             
             // Pedidos recentes
@@ -707,7 +707,7 @@ class AdminDashboardController extends Controller {
                 <article class="kpi-card is-featured">
                     <div>
                         <div class="kpi-label">Faturamento</div>
-                        <div class="kpi-value">' . htmlspecialchars((string)($stats['faturamento_display'] ?: 'R$ 0,00')) . '</div>
+                        <div class="kpi-value">' . ($stats['faturamento_display'] ?: 'R$ 0,00') . '</div>
                         <div class="kpi-subtext">Pedidos pagos</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
@@ -724,7 +724,7 @@ class AdminDashboardController extends Controller {
                         <div class="summary-list">
                             <div class="summary-item">
                                 <div class="summary-label">Faturamento total</div>
-                                <div class="summary-value">' . htmlspecialchars((string)($stats['faturamento_display'] ?: 'R$ 0,00')) . '</div>
+                                <div class="summary-value">' . ($stats['faturamento_display'] ?: 'R$ 0,00') . '</div>
                                 <div class="summary-note">Pedidos pagos e processados</div>
                             </div>
                             <div class="summary-item">
@@ -934,4 +934,4 @@ class AdminDashboardController extends Controller {
     echo '</body></html>';
         exit;
     }
-}
+}
