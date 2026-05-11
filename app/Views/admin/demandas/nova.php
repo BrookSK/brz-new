@@ -93,7 +93,7 @@
             </div></div>
 
             <!-- BLOCO 4 -->
-            <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">4. Custo por etapa de execução</h6></div><div class="card-body">
+            <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><div class="d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0">4. Custo por etapa de execução</h6><label class="form-check-label small text-muted flex-shrink-0" style="cursor:pointer;"><input type="checkbox" class="form-check-input me-1" id="na-etapas" onchange="toggleNaEtapas(this)">N/A</label></div></div><div class="card-body" id="etapas-body">
                 <p class="text-muted small mb-3">Não escreva "barato", "rápido" ou "não sei". Se não souber o valor, pesquise antes de enviar.</p>
                 <div id="etapas-container">
                     <div class="row g-2 mb-2 etapa-row"><div class="col-md-8"><input type="text" name="etapa_desc[]" class="form-control form-control-sm" placeholder="Descrição da etapa"></div><div class="col-md-4"><input type="text" name="etapa_custo[]" class="form-control form-control-sm" placeholder="Custo estimado (R$)"></div></div>
@@ -156,6 +156,19 @@
 <script>
 function addEtapa() { document.getElementById('etapas-container').insertAdjacentHTML('beforeend', '<div class="row g-2 mb-2 etapa-row"><div class="col-md-8"><input type="text" name="etapa_desc[]" class="form-control form-control-sm" placeholder="Descrição da etapa"></div><div class="col-md-4"><input type="text" name="etapa_custo[]" class="form-control form-control-sm" placeholder="Custo estimado (R$)"></div></div>'); }
 
+function toggleNaEtapas(cb) {
+    var body = document.getElementById('etapas-body');
+    var inputs = body.querySelectorAll('input[type="text"]');
+    var btn = body.querySelector('button');
+    if (cb.checked) {
+        inputs.forEach(function(i) { i._origVal = i.value; i.value = 'Não se aplica'; i.disabled = true; i.style.opacity = '0.5'; i.style.background = '#f1f5f9'; });
+        if (btn) btn.style.display = 'none';
+    } else {
+        inputs.forEach(function(i) { i.value = i._origVal || ''; i.disabled = false; i.style.opacity = '1'; i.style.background = ''; });
+        if (btn) btn.style.display = '';
+    }
+}
+
 function toggleTipo() {
     const tipo = document.querySelector('input[name="tipo_solicitacao"]:checked').value;
     document.getElementById('hidden-tipo').value = tipo;
@@ -183,8 +196,8 @@ document.getElementById('formDemanda').addEventListener('submit', function(e) {
     // Validar campos do tipo selecionado (pular os marcados como N/A)
     document.querySelectorAll(reqClass).forEach(f => { if (f.disabled) return; if (!f.value.trim()) { valid = false; f.classList.add('is-invalid'); f.insertAdjacentHTML('afterend', '<div class="invalid-feedback">Este campo é obrigatório. Preencha antes de continuar.</div>'); } });
 
-    // Validar etapas (só para função)
-    if (tipo === 'funcao') {
+    // Validar etapas (só para função, pular se N/A)
+    if (tipo === 'funcao' && !document.getElementById('na-etapas').checked) {
         const descs = document.querySelectorAll('input[name="etapa_desc[]"]'); const custos = document.querySelectorAll('input[name="etapa_custo[]"]');
         let temEtapa = false; for (let i = 0; i < descs.length; i++) { if (descs[i].value.trim() && custos[i].value.trim()) { temEtapa = true; break; } }
         if (!temEtapa) { valid = false; descs[0].classList.add('is-invalid'); descs[0].insertAdjacentHTML('afterend', '<div class="invalid-feedback">Preencha ao menos uma etapa completa.</div>'); }
@@ -219,6 +232,6 @@ document.querySelectorAll('.na-check').forEach(function(cb) {
 
 // Antes de submit, habilitar campos N/A para enviar o valor
 document.getElementById('formDemanda').addEventListener('submit', function() {
-    document.querySelectorAll('textarea[disabled]').forEach(function(t) { t.disabled = false; });
+    document.querySelectorAll('textarea[disabled], input[disabled]').forEach(function(t) { t.disabled = false; });
 }, true);
 </script>
