@@ -824,17 +824,11 @@ function renderFluxoCaixa(d, container) {
     h += '<div><div class="small text-muted">Câmbio Real (Produtos)</div>';
     if (cr.erro) h += '<div class="text-danger small">'+cr.erro+'</div>';
     else {
-        // Usar total_gateway_usd (valor real da API) se disponível
-        var crGatewayUsd = cr.total_gateway_usd || 0;
-        var crBrlDireto = cr.total_recebido_brl || 0;
-        var crTotalBrl = (crGatewayUsd * taxaConv) + crBrlDireto;
-        if (crGatewayUsd > 0) {
-            h += '<div class="fs-5 fw-bold text-success">'+fmtUSD(crGatewayUsd)+'</div>';
-            h += '<div class="text-muted" style="font-size:10px;">'+cr.total_consultados+'/'+cr.total_registros+' consultados · = '+fmtBRL(crGatewayUsd * taxaConv)+'</div>';
-        } else {
-            h += '<div class="fs-5 fw-bold text-success">'+fmtBRL(crBrlDireto)+'</div>';
-            h += '<div class="text-muted" style="font-size:10px;">'+cr.total_registros+' transações (dados locais)</div>';
-        }
+        var crPedidosBrl = cr.total_pedidos_brl || 0;
+        var crUsd = cr.total_recebido_usd || 0;
+        var crDisplay = crPedidosBrl > 0 ? crPedidosBrl : (cr.total_recebido_brl || 0);
+        h += '<div class="fs-5 fw-bold text-success">'+fmtBRL(crDisplay)+'</div>';
+        h += '<div class="text-muted" style="font-size:10px;">'+cr.total_registros+' pedidos'+(crUsd > 0 ? ' · USD '+fmtUSD(crUsd) : '')+'</div>';
     }
     h += '</div></div></div>';
 
@@ -845,16 +839,11 @@ function renderFluxoCaixa(d, container) {
     h += '<div><div class="small text-muted">Câmbio Real (Taxas)</div>';
     if (crt.erro) h += '<div class="text-danger small">'+crt.erro+'</div>';
     else {
-        var crtGatewayUsd = crt.total_gateway_usd || 0;
-        var crtBrlDireto = crt.total_recebido_brl || 0;
-        var crtTotalBrl = (crtGatewayUsd * taxaConv) + crtBrlDireto;
-        if (crtGatewayUsd > 0) {
-            h += '<div class="fs-5 fw-bold text-success">'+fmtUSD(crtGatewayUsd)+'</div>';
-            h += '<div class="text-muted" style="font-size:10px;">'+crt.total_consultados+'/'+crt.total_registros+' consultados · = '+fmtBRL(crtGatewayUsd * taxaConv)+'</div>';
-        } else {
-            h += '<div class="fs-5 fw-bold text-success">'+fmtBRL(crtBrlDireto)+'</div>';
-            h += '<div class="text-muted" style="font-size:10px;">'+crt.total_registros+' transações (dados locais)</div>';
-        }
+        var crtPedidosBrl = crt.total_pedidos_brl || 0;
+        var crtUsd = crt.total_recebido_usd || 0;
+        var crtDisplay = crtPedidosBrl > 0 ? crtPedidosBrl : (crt.total_recebido_brl || 0);
+        h += '<div class="fs-5 fw-bold text-success">'+fmtBRL(crtDisplay)+'</div>';
+        h += '<div class="text-muted" style="font-size:10px;">'+crt.total_registros+' pedidos'+(crtUsd > 0 ? ' · USD '+fmtUSD(crtUsd) : '')+'</div>';
     }
     h += '</div></div></div>';
     h += '</div>';
@@ -913,46 +902,49 @@ function renderFluxoCaixa(d, container) {
         });
     }
 
-    // Total nos Gateways (convertido para BRL)
-    // Stripe: usar total de transações do período (não saldo da conta)
-    var stripeUsd = s.total_recebido_usd || 0;
-    // Fallback: se não tem transações, usar saldo
-    if (stripeUsd === 0 && s.saldo && s.saldo.length) {
+    // Total nos Gateways: usar dados REAIS das APIs
+    // Stripe: saldo real da conta (disponível + pendente) — é o que está no gateway agora
+    var stripeUsd = 0;
+    if (s.saldo && s.saldo.length) {
         s.saldo.forEach(function(b){ stripeUsd += (b.disponivel||0) + (b.pendente||0); });
     }
     var stripeBrl = stripeUsd * taxaConv;
 
-    // CR Produtos: usar total_gateway_usd (valor real da API) se disponível
+    // CR: usar total_pedidos_brl (da tabela pedidos, mesma fonte do DRE)
     var crProdGatewayUsd = cr.total_gateway_usd || 0;
-    var crProdBrlDireto = cr.total_recebido_brl || 0;
-    var crProdBrl = crProdGatewayUsd > 0 ? (crProdGatewayUsd * taxaConv) : crProdBrlDireto;
+    var crProdPedidosBrl = cr.total_pedidos_brl || 0;
+    var crProdBrlLocal = cr.total_recebido_brl || 0;
+    // Prioridade: total_pedidos_brl (mesma fonte do DRE) > total_gateway_usd (API) > local
+    var crProdBrl = crProdPedidosBrl > 0 ? crProdPedidosBrl : (crProdGatewayUsd > 0 ? (crProdGatewayUsd * taxaConv) : crProdBrlLocal);
 
-    // CR Taxas: usar total_gateway_usd (valor real da API) se disponível
     var crTaxGatewayUsd = crt.total_gateway_usd || 0;
-    var crTaxBrlDireto = crt.total_recebido_brl || 0;
-    var crTaxBrl = crTaxGatewayUsd > 0 ? (crTaxGatewayUsd * taxaConv) : crTaxBrlDireto;
+    var crTaxPedidosBrl = crt.total_pedidos_brl || 0;
+    var crTaxBrlLocal = crt.total_recebido_brl || 0;
+    var crTaxBrl = crTaxPedidosBrl > 0 ? crTaxPedidosBrl : (crTaxGatewayUsd > 0 ? (crTaxGatewayUsd * taxaConv) : crTaxBrlLocal);
 
-    // Total CR combinado
-    var crTotalUsd = crProdGatewayUsd + crTaxGatewayUsd;
     var crTotalBrl = crProdBrl + crTaxBrl;
     var totalGatewaysBrl = stripeBrl + crTotalBrl;
 
+    // Fonte dos dados do CR
+    var crFonte = (crProdGatewayUsd > 0 || crTaxGatewayUsd > 0) ? 'API' : 'local';
+
     h += '<div class="card border-0 shadow-sm mt-4 mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Comparativo: Sistema vs Gateways (BRL, taxa '+taxaConv+')</h6></div><div class="card-body">';
     h += '<div class="row g-3 text-center">';
-    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total Entradas (Sistema)</div><div class="fs-4 fw-bold text-success">'+fmtBRL(totalSiteBrl)+'</div></div></div>';
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total Entradas (Sistema)</div><div class="fs-4 fw-bold text-success">'+fmtBRL(totalSiteBrl)+'</div><div class="text-muted" style="font-size:10px;">Pedidos pagos no período</div></div></div>';
     h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total nos Gateways</div><div class="fs-4 fw-bold text-primary">'+fmtBRL(totalGatewaysBrl)+'</div>';
-    h += '<div class="text-muted" style="font-size:10px;">Stripe: '+fmtUSD(stripeUsd)+' · CR: '+fmtUSD(crTotalUsd)+'</div>';
+    h += '<div class="text-muted" style="font-size:10px;">Stripe: '+fmtUSD(stripeUsd)+' · CR: '+fmtBRL(crTotalBrl)+' ('+crFonte+')</div>';
     h += '</div></div>';
     var diff = totalSiteBrl - totalGatewaysBrl;
-    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Diferença</div><div class="fs-4 fw-bold '+(Math.abs(diff)<100?'text-success':'text-danger')+'">'+fmtBRL(diff)+'</div>'+(Math.abs(diff)<100?'<div class="text-success small"><i class="fas fa-check-circle"></i> Conciliado</div>':'<div class="text-danger small"><i class="fas fa-exclamation-triangle"></i> Verificar</div>')+'</div></div>';
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Diferença</div><div class="fs-4 fw-bold '+(Math.abs(diff)<500?'text-success':'text-danger')+'">'+fmtBRL(diff)+'</div>'+(Math.abs(diff)<500?'<div class="text-success small"><i class="fas fa-check-circle"></i> Conciliado</div>':'<div class="text-danger small"><i class="fas fa-exclamation-triangle"></i> Verificar</div>')+'</div></div>';
     h += '</div>';
     // Detalhamento
     h += '<div class="mt-3 small text-muted border-top pt-2">';
-    h += '<div class="row"><div class="col-md-12"><strong>Composição:</strong> ';
-    h += 'Stripe '+fmtUSD(stripeUsd)+' × '+taxaConv+' = '+fmtBRL(stripeBrl)+' · ';
-    h += 'CR Produtos '+(crProdGatewayUsd>0 ? fmtUSD(crProdGatewayUsd)+' × '+taxaConv+' = '+fmtBRL(crProdBrl) : fmtBRL(crProdBrlDireto)+' (local)')+' · ';
-    h += 'CR Taxas '+(crTaxGatewayUsd>0 ? fmtUSD(crTaxGatewayUsd)+' × '+taxaConv+' = '+fmtBRL(crTaxBrl) : fmtBRL(crTaxBrlDireto)+' (local)');
-    h += '</div></div></div>';
+    h += '<strong>Composição:</strong> Stripe '+fmtUSD(stripeUsd)+' × '+taxaConv+' = '+fmtBRL(stripeBrl);
+    h += ' · CR Produtos '+fmtBRL(crProdBrl)+' · CR Taxas '+fmtBRL(crTaxBrl);
+    if (crFonte === 'local') {
+        h += '<br><i class="fas fa-info-circle me-1"></i>Valores do CR baseados nos registros locais (pedido_pagamentos + carnê). Clique "Atualizar APIs" para consultar valores reais.';
+    }
+    h += '</div>';
     h += '</div></div>';
 
     // === MOVIMENTAÇÕES POR GATEWAY (3 blocos) ===

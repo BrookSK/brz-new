@@ -693,7 +693,8 @@ class AdminDreCompletoController extends Controller {
         $result = [
             'total_recebido_usd' => 0,
             'total_recebido_brl' => 0,
-            'total_gateway_usd' => 0, // Total real confirmado na API do CR
+            'total_gateway_usd' => 0,
+            'total_pedidos_brl' => 0, // Total da tabela pedidos (mesma fonte do DRE)
             'total_sistema' => 0,
             'moeda_principal' => 'USD',
             'total_registros' => 0,
@@ -707,13 +708,54 @@ class AdminDreCompletoController extends Controller {
             $desde = $dateStart ?: date('Y-m-d', strtotime('-30 days'));
             $ate = $dateEnd ?: date('Y-m-d');
 
-            // Buscar TODOS os tokens do período para consultar na API
+            // Taxa de conversão
+            $taxaUsdBrl = 5.85;
+            try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+
+            // 1. Total da tabela PEDIDOS por gateway (mesma fonte do DRE "Total Entradas")
+            // Isso garante consistência com o "Total Entradas (Sistema)"
+            $gwFilter = $gateway === 'cambioreal_taxas' ? "IN ('cambioreal_taxas')" : "IN ('cambioreal','cambio_real')";
+            $paidStatuses = "('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
+
+            // Detectar colunas
+            $cols = [];
+            try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $colTotal = in_array('total', $cols) ? 'total' : (in_array('valor_total', $cols) ? 'valor_total' : '');
+            $colMoeda = in_array('moeda', $cols) ? 'moeda' : (in_array('currency', $cols) ? 'currency' : '');
+            $colStatus = in_array('status', $cols) ? 'status' : '';
+            $colPayGateway = in_array('payment_gateway', $cols) ? 'payment_gateway' : (in_array('gateway', $cols) ? 'gateway' : '');
+            $colCreatedAt = in_array('created_at', $cols) ? 'created_at' : (in_array('data_criacao', $cols) ? 'data_criacao' : '');
+            $deletedFilter = in_array('deleted_at', $cols) ? "AND p.deleted_at IS NULL" : "";
+
+            if ($colTotal && $colStatus && $colPayGateway && $colCreatedAt) {
+                $st = $this->db->prepare("SELECT COALESCE(SUM(p.{$colTotal}), 0) as total, COUNT(*) as qtd, " . ($colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'USD'))" : "'USD'") . " as moeda
+                    FROM pedidos p
+                    WHERE p.{$colCreatedAt} >= ? AND p.{$colCreatedAt} < DATE_ADD(?, INTERVAL 1 DAY)
+                    AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
+                    AND LOWER(COALESCE(p.{$colPayGateway},'')) {$gwFilter}
+                    {$deletedFilter}
+                    GROUP BY moeda");
+                $st->execute([$desde, $ate]);
+                $pedidosTotais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($pedidosTotais as $pt) {
+                    $val = (float)($pt['total'] ?? 0);
+                    $moeda = strtoupper(trim($pt['moeda'] ?? 'USD'));
+                    if ($moeda === 'BRL') {
+                        $result['total_pedidos_brl'] += $val;
+                    } else {
+                        $result['total_pedidos_brl'] += $val * $taxaUsdBrl;
+                        $result['total_recebido_usd'] += $val;
+                    }
+                    $result['total_registros'] += (int)($pt['qtd'] ?? 0);
+                }
+            }
+
+            // 2. Somar da pedido_pagamentos (para referência e divergências)
             $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, moeda, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at DESC");
             $st->execute([$gateway, $desde, $ate]);
             $todosRegistros = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            $result['total_registros'] = count($todosRegistros);
 
-            // Somar valores locais (para referência)
+            // Somar valores locais da pedido_pagamentos (para referência)
             foreach ($todosRegistros as $reg) {
                 $val = (float)($reg['valor'] ?? 0);
                 $moeda = strtoupper(trim($reg['moeda'] ?? 'USD'));
@@ -721,19 +763,17 @@ class AdminDreCompletoController extends Controller {
                 if ($moeda === 'BRL') {
                     $result['total_recebido_brl'] += $val;
                     $result['moeda_principal'] = 'BRL';
-                } else {
-                    $result['total_recebido_usd'] += $val;
                 }
             }
 
-            // Também somar parcelas de carnê pagas (valores locais)
+            // 3. Somar parcelas de carnê pagas
             if ($gateway === 'cambioreal') {
                 $stC = $this->db->prepare("SELECT SUM(cp.valor_produtos) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_produtos_pago_em >= ? AND cp.boleto_produtos_pago_em <= DATE_ADD(?, INTERVAL 1 DAY)");
                 $stC->execute([$desde, $ate]);
                 $r = $stC->fetch(\PDO::FETCH_ASSOC);
                 if ($r && (float)($r['total'] ?? 0) > 0) {
                     $result['total_recebido_brl'] += (float)$r['total'];
-                    $result['total_registros'] += (int)($r['qtd'] ?? 0);
+                    $result['total_pedidos_brl'] += (float)$r['total']; // Carnê também conta
                 }
             } elseif ($gateway === 'cambioreal_taxas') {
                 $stC = $this->db->prepare("SELECT SUM(cp.valor_taxas) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_taxas_pago_em >= ? AND cp.boleto_taxas_pago_em <= DATE_ADD(?, INTERVAL 1 DAY)");
@@ -741,28 +781,21 @@ class AdminDreCompletoController extends Controller {
                 $r = $stC->fetch(\PDO::FETCH_ASSOC);
                 if ($r && (float)($r['total'] ?? 0) > 0) {
                     $result['total_recebido_brl'] += (float)$r['total'];
-                    $result['total_registros'] += (int)($r['qtd'] ?? 0);
+                    $result['total_pedidos_brl'] += (float)$r['total']; // Carnê também conta
                 }
             }
 
-            // Consultar TODOS os tokens na API do CR para obter o valor real
-            // Limitar a 150 para não travar (se tiver mais, usar cache/cron)
+            // 4. Consultar tokens na API do CR para divergências (amostra de 30)
             $paymentService = new \App\Services\PaymentService();
             $totalGatewayUsd = 0;
             $consultados = 0;
 
-            // Buscar taxa de conversão para converter BRL→USD
-            $taxaUsdBrl = 5.85;
-            try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
-
-            foreach ($todosRegistros as $l) {
+            $amostra = array_slice($todosRegistros, 0, 30);
+            foreach ($amostra as $l) {
                 $token = $l['payment_id'];
                 $statusLocal = strtoupper(trim((string)($l['gateway_status'] ?? $l['status'] ?? '')));
 
-                if ($consultados >= 150) break; // Safety limit
-
                 try {
-                    // Usar método correto dependendo do gateway (contas separadas no CR)
                     if ($gateway === 'cambioreal_taxas') {
                         $resp = $paymentService->obterTransacaoCambioRealTaxas($token);
                     } else {
@@ -772,36 +805,27 @@ class AdminDreCompletoController extends Controller {
                     $statusGw = strtoupper(trim((string)($data['status'] ?? '')));
                     $consultados++;
 
-                    // Status que indicam pagamento confirmado (Finalizadas + Compensadas)
                     $pagoGateway = in_array($statusGw, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'ON_HOLD']);
                     $pagoLocal = in_array($statusLocal, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'APPROVED']);
 
-                    // Somar valor real do gateway
-                    // A API retorna 'amount' em BRL (moeda do checkout). Converter para USD.
                     if ($pagoGateway) {
                         $valorGw = 0;
-                        // Tentar pegar amount da transação
                         if (isset($data['transaction']['amount'])) {
                             $valorGw = (float)$data['transaction']['amount'];
                         } elseif (isset($data['amount'])) {
                             $valorGw = (float)$data['amount'];
                         } else {
-                            // Fallback: usar valor local
                             $valorGw = (float)($l['valor'] ?? 0);
                         }
-                        // O valor vem em BRL, converter para USD
-                        $valorUsd = $valorGw / $taxaUsdBrl;
-                        $totalGatewayUsd += $valorUsd;
+                        $totalGatewayUsd += $valorGw / $taxaUsdBrl;
                     }
 
-                    // Divergências
                     if ($pagoGateway && !$pagoLocal) {
                         $result['divergencias'][] = ['tipo' => 'pago_gateway_nao_local', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $statusGw, 'status_local' => $statusLocal, 'msg' => 'Pago no CR mas não no sistema'];
                     } elseif (!$pagoGateway && $pagoLocal) {
                         $result['divergencias'][] = ['tipo' => 'pago_local_nao_gateway', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $statusGw, 'status_local' => $statusLocal, 'msg' => 'Pago no sistema mas não no CR'];
                     }
                 } catch (\Exception $e) {
-                    // Se falhar a consulta, continuar com os próximos
                     continue;
                 }
             }
