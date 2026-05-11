@@ -97,6 +97,14 @@ table.table td:last-child .btn-group {
     flex-wrap: nowrap !important;
 }
 
+/* Form inside btn-group must be inline */
+table.table td:last-child form,
+table.table td .btn-group form {
+    display: inline-flex !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 table.table td .btn,
 table.table td a.btn {
     width: 30px !important;
