@@ -896,7 +896,20 @@ class AdminDashboardController extends Controller {
                 $moedaPedido = strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL')));
                 $statusPedido = strtolower(trim((string)($pedido['status'] ?? '')));
                 $statusBadge = 'badge-yellow';
-                if (in_array($statusPedido, ['pago','paid','approved'])) $statusBadge = 'badge-green';
+                if (in_array($statusPedido, ['pago','paid','approved','entregue'])) $statusBadge = 'badge-green';
+                $statusLabels = [
+                    'pago' => 'Pago', 'paid' => 'Pago', 'approved' => 'Aprovado',
+                    'pendente' => 'Pendente', 'pending' => 'Pendente',
+                    'pagamento' => 'Pagamento', 'processando' => 'Processando',
+                    'enviado' => 'Enviado', 'entregue' => 'Entregue',
+                    'cancelado' => 'Cancelado', 'cancelled' => 'Cancelado',
+                    'carne_pagando' => 'Carnê Pagando', 'carne_braziliana' => 'Carnê',
+                    'produto_consolidado' => 'Consolidado', 'consolidado' => 'Consolidado',
+                    'rascunho_etiqueta' => 'Etiqueta Rascunho', 'etiqueta_efetivada' => 'Etiqueta Efetivada',
+                    'aguardando_lib_alfandegaria' => 'Alfândega', 'finalizacao_embalagem' => 'Embalagem',
+                    'entrega_finalizada' => 'Entrega Finalizada',
+                ];
+                $statusLabel = $statusLabels[$statusPedido] ?? ucfirst(str_replace('_', ' ', $statusPedido));
 
                 echo '<div class="recent-order">
                     <div>
@@ -904,7 +917,7 @@ class AdminDashboardController extends Controller {
                         <div class="item-subtext">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</div>
                     </div>
                     <div class="order-side">
-                        <span class="' . $statusBadge . '" style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;">' . ucfirst($statusPedido) . '</span>
+                        <span class="' . $statusBadge . '" style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;">' . htmlspecialchars($statusLabel) . '</span>
                         <span class="item-value">' . ($moedaPedido === 'USD' ? 'US$ ' : 'R$ ') . number_format($valorTotalPedido, 2, ',', '.') . '</span>
                     </div>
                 </div>';
