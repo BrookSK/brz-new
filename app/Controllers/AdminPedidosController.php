@@ -2935,7 +2935,8 @@ HTML;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedido #' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
@@ -2953,6 +2954,19 @@ HTML;
         .status-cancelado { background-color: #dc3545; }
         .status-enviado { background-color: #17a2b8; }
         .status-entregue { background-color: #6f42c1; }
+        @media(max-width:768px){
+            .table-responsive{overflow-x:hidden!important;overflow:visible!important;}
+            table.table{display:block!important;width:100%!important;}
+            table.table thead{display:none!important;}
+            table.table tbody{display:block!important;width:100%!important;}
+            table.table tbody tr{display:block!important;width:100%!important;margin-bottom:12px!important;padding:12px!important;border:1px solid #e2e8f0!important;border-radius:10px!important;background:#fff!important;}
+            table.table tbody tr td{display:block!important;width:100%!important;max-width:100%!important;padding:6px 0!important;border:none!important;border-bottom:1px solid #f1f5f9!important;white-space:normal!important;word-break:break-word!important;overflow-wrap:break-word!important;text-align:left!important;}
+            table.table tbody tr td:last-child{border-bottom:none!important;}
+            table.table img{max-width:50px!important;height:auto!important;}
+            .col-lg-8,.col-lg-4,.col-md-8,.col-md-4,.col-lg-6,.col-md-6{flex:0 0 100%!important;max-width:100%!important;}
+            .card-body{padding:12px!important;}
+            html,body,.container-fluid{overflow-x:hidden!important;max-width:100vw!important;}
+        }
     </style>
 </head>
 <body>
