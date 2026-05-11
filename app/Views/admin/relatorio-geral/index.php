@@ -769,11 +769,11 @@ function carregarFluxoCaixa(btn, force) {
     fetch('/admin/dre-completo/conciliacao' + (force ? '?force=1' : ''))
         .then(function(r){return r.json()})
         .then(function(d){
-            btn.disabled = false; btn.innerHTML = force ? '<i class="fas fa-sync me-1"></i>Atualizar APIs' : '<i class="fas fa-eye me-1"></i>Carregar';
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync me-1"></i>Atualizar APIs';
             renderFluxoCaixa(d, container);
         })
         .catch(function(e){
-            btn.disabled = false; btn.innerHTML = '<i class="fas fa-eye me-1"></i>Carregar';
+            btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync me-1"></i>Atualizar APIs';
             container.innerHTML = '<div class="alert alert-danger small">Erro: '+e.message+'</div>';
         });
 }
@@ -792,10 +792,11 @@ function renderFluxoCaixa(d, container) {
     var s = d.stripe || {};
     if (!s.erro && s.saldo && s.saldo.length) {
         s.saldo.forEach(function(b){
+            var total = (b.disponivel||0) + (b.pendente||0);
             h += '<div class="col-md-4"><div class="border rounded p-3 d-flex align-items-center gap-3">';
             h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#635bff20;"><i class="fab fa-stripe-s" style="color:#635bff;font-size:18px;"></i></div>';
-            h += '<div><div class="small text-muted">Stripe ('+b.moeda+')</div><div class="fs-5 fw-bold text-success">'+fmtV(b.disponivel,b.moeda)+'</div>';
-            if(b.pendente>0) h += '<div class="text-muted" style="font-size:10px;">Pendente: '+fmtV(b.pendente,b.moeda)+'</div>';
+            h += '<div><div class="small text-muted">Stripe ('+b.moeda+')</div><div class="fs-5 fw-bold text-success">'+fmtV(total,b.moeda)+'</div>';
+            h += '<div class="text-muted" style="font-size:10px;">Disponível: '+fmtV(b.disponivel,b.moeda)+' · Pendente: '+fmtV(b.pendente,b.moeda)+'</div>';
             h += '</div></div></div>';
         });
     } else if (s.erro) {
@@ -863,7 +864,7 @@ function renderFluxoCaixa(d, container) {
     // === COMPARAÇÃO: SITE vs GATEWAYS ===
     var totalSite = 0; var totalGateways = 0;
     if (d.fluxo_caixa) d.fluxo_caixa.forEach(function(m){ if(m.tipo==='entrada') totalSite += m.valor; });
-    if (s.saldo) s.saldo.forEach(function(b){ totalGateways += b.disponivel + b.pendente; });
+    if (s.saldo) s.saldo.forEach(function(b){ totalGateways += (b.disponivel||0) + (b.pendente||0); });
     totalGateways += (cr.total_recebido_usd||0) + (crt.total_recebido_usd||0);
 
     h += '<div class="card border-0 shadow-sm mt-4 mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Comparativo: Sistema vs Gateways (30 dias)</h6></div><div class="card-body">';

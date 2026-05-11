@@ -475,12 +475,13 @@ class AdminDreCompletoController extends Controller {
 
         try {
             // ENTRADAS: pagamentos recebidos (pedido_pagamentos com status pago)
-            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status,
+            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status, pp.status,
                 COALESCE(pp.updated_at, pp.created_at) as data,
                 COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                WHERE (pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','paid','succeeded','approved','confirmed','ON_HOLD')
+                WHERE (pp.status IN ('paid','approved','confirmed','succeeded')
+                    OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','paid','succeeded','approved','confirmed','ON_HOLD')
                     OR UPPER(pp.gateway_status) LIKE '%PAGO%' OR UPPER(pp.gateway_status) LIKE '%PAID%' OR UPPER(pp.gateway_status) LIKE '%FINALIZADA%')
                 AND COALESCE(pp.updated_at, pp.created_at) >= ?
                 ORDER BY COALESCE(pp.updated_at, pp.created_at) DESC LIMIT 300");
