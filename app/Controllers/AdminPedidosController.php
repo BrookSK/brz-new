@@ -2337,6 +2337,43 @@ JS;
         }
         
         // Incluir o partial do menu lateral
+        // Helper para resolver país do pedido (com fallback para tabela enderecos)
+        $__paisEndCache = [];
+        $paisNomes = ['BR'=>'Brazil','US'=>'United States','PT'=>'Portugal','JP'=>'Japan','GB'=>'United Kingdom','DE'=>'Germany','FR'=>'France','ES'=>'Spain','IT'=>'Italy','CA'=>'Canada','AU'=>'Australia','AR'=>'Argentina','CL'=>'Chile','CO'=>'Colombia','MX'=>'Mexico'];
+        $resolverPaisPedido = function($pedido) use ($colPais, $pdo, &$__paisEndCache, $paisNomes) {
+            $paisTxt = '';
+            if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
+                $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
+            }
+            if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
+                $paisTxt = trim((string) ($pedido['pais'] ?? ''));
+            }
+            if ($paisTxt === '' && !empty($pedido['endereco_entrega_id'])) {
+                $endId = (int) $pedido['endereco_entrega_id'];
+                if ($endId > 0) {
+                    if (!isset($__paisEndCache[$endId])) {
+                        try {
+                            $stPE = $pdo->prepare("SELECT pais FROM enderecos WHERE id = ? LIMIT 1");
+                            $stPE->execute([$endId]);
+                            $__paisEndCache[$endId] = trim((string) ($stPE->fetchColumn() ?: ''));
+                        } catch (\Exception $e) { $__paisEndCache[$endId] = ''; }
+                    }
+                    if ($__paisEndCache[$endId] !== '') {
+                        $paisTxt = $__paisEndCache[$endId];
+                    }
+                }
+            }
+            if ($paisTxt === '') {
+                $paisTxt = 'Brazil';
+            }
+            // Converter código ISO para nome legível
+            $paisUp = strtoupper(trim($paisTxt));
+            if (isset($paisNomes[$paisUp])) {
+                $paisTxt = $paisNomes[$paisUp];
+            }
+            return $paisTxt;
+        };
+
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
 
         echo '<!DOCTYPE html>
@@ -2487,16 +2524,7 @@ JS;
                         $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
                     }
                     
-                    $paisTxt = '';
-                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
-                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
-                    }
-                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
-                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
-                    }
-                    if ($paisTxt === '') {
-                        $paisTxt = 'Brazil';
-                    }
+                    $paisTxt = $resolverPaisPedido($pedido);
 
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
@@ -2617,16 +2645,7 @@ JS;
                         $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
                     }
 
-                    $paisTxt = '';
-                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
-                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
-                    }
-                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
-                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
-                    }
-                    if ($paisTxt === '') {
-                        $paisTxt = 'Brazil';
-                    }
+                    $paisTxt = $resolverPaisPedido($pedido);
 
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
@@ -2746,16 +2765,7 @@ JS;
                         $reviewBadges .= '<span class="badge bg-info text-dark ms-2"><i class="fas fa-file-upload me-1"></i>Aguardando comprovante</span>';
                     }
 
-                    $paisTxt = '';
-                    if (!empty($colPais) && array_key_exists($colPais, $pedido)) {
-                        $paisTxt = trim((string) ($pedido[$colPais] ?? ''));
-                    }
-                    if ($paisTxt === '' && array_key_exists('pais', $pedido)) {
-                        $paisTxt = trim((string) ($pedido['pais'] ?? ''));
-                    }
-                    if ($paisTxt === '') {
-                        $paisTxt = 'Brazil';
-                    }
+                    $paisTxt = $resolverPaisPedido($pedido);
 
                     $paisLower = strtolower($paisTxt);
                     $paisIsBrazil = ($paisLower === 'brazil' || $paisLower === 'brasil');
