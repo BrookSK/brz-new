@@ -515,7 +515,24 @@ function renderAdminSidebar($activePage = '') {
                 </a>
             </div>
         </div>
-    </nav>';
+    </nav>
+    <script>
+    function toggleSidebarGroup(el){
+        var content=el.nextElementSibling;
+        var chevron=el.querySelector(".sidebar-chevron");
+        if(!content)return;
+        var isVisible=(content.style.display!=="none");
+        if(isVisible){
+            content.style.display="none";
+            if(chevron)chevron.style.transform="rotate(0deg)";
+            el.setAttribute("aria-expanded","false");
+        } else {
+            content.style.display="block";
+            if(chevron)chevron.style.transform="rotate(180deg)";
+            el.setAttribute("aria-expanded","true");
+        }
+    }
+    </script>';
 }
 
 // Estilos CSS comuns para o menu lateral
@@ -977,23 +994,6 @@ function renderAdminSidebarStyles() {
 // Scripts JavaScript comuns
 function renderAdminScripts() {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
-    echo '<script>
-function toggleSidebarGroup(el){
-    var content=el.nextElementSibling;
-    var chevron=el.querySelector(".sidebar-chevron");
-    if(!content)return;
-    var isVisible=(content.style.display!=="none");
-    if(isVisible){
-        content.style.display="none";
-        if(chevron)chevron.style.transform="rotate(0deg)";
-        el.setAttribute("aria-expanded","false");
-    } else {
-        content.style.display="block";
-        if(chevron)chevron.style.transform="rotate(180deg)";
-        el.setAttribute("aria-expanded","true");
-    }
-}
-</script>';
     // Notificações push de demandas
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99999;max-width:400px;"></div>';
     echo '<style>
