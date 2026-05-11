@@ -200,6 +200,21 @@ class AdminConfiguracoesController extends Controller {
             $clubeFaixas = [];
         }
 
+        // Demandas config
+        $demandasConfig = ['demandas_senha_painel' => '', 'demandas_emails_notificacao' => '', 'demandas_webhook_url' => '', 'demandas_usuarios_notificacao' => ''];
+        $demandasUsuarios = [];
+        try {
+            if (isset($pdo) && $pdo instanceof \PDO) {
+                $st = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('demandas_senha_painel','demandas_emails_notificacao','demandas_webhook_url','demandas_usuarios_notificacao')");
+                $st->execute();
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                    $demandasConfig[$r['chave']] = $r['valor'] ?? '';
+                }
+                $st2 = $pdo->query("SELECT id, nome, email FROM usuarios WHERE perfil IN ('admin','suporte') ORDER BY nome");
+                $demandasUsuarios = $st2 ? ($st2->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Exception $e) {}
+
         echo "<!-- DEBUG_ADMIN_CONFIG controller=" . basename(__FILE__) . " ts=" . date('c') . " -->\n";
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
@@ -346,7 +361,7 @@ class AdminConfiguracoesController extends Controller {
                         <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
                             <i class="bi bi-bag-check-fill"></i> WooCommerce
                         </button>
-                        <button class="nav-link" id="v-pills-demandas-tab" type="button" onclick="window.location.href=\'/admin/demandas/configuracoes\'">
+                        <button class="nav-link" id="v-pills-demandas-tab" data-bs-toggle="pill" data-bs-target="#v-pills-demandas" type="button">
                             <i class="bi bi-list-check"></i> Demandas (TI)
                         </button>
                     </div>
@@ -2882,6 +2897,56 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Configurações de Demandas (TI) -->
+                                <div class="tab-pane fade" id="v-pills-demandas" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Configurações de Demandas (TI)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-lock me-2"></i>Acesso ao Painel</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">Senha do Painel de Demandas</label>
+                                                <input type="text" class="form-control" name="demandas_senha_painel" value="' . htmlspecialchars($demandasConfig['demandas_senha_painel'], ENT_QUOTES, 'UTF-8') . '" placeholder="Deixe vazio para desativar">
+                                                <small class="text-muted">Se preenchida, será exigida ao acessar o painel de demandas.</small>
+                                            </div>
+
+                                            <hr>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-envelope me-2"></i>Notificações por Email</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">Emails que recebem novas solicitações</label>
+                                                <textarea class="form-control" name="demandas_emails_notificacao" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com">' . htmlspecialchars($demandasConfig['demandas_emails_notificacao'], ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.</small>
+                                            </div>
+
+                                            <hr>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-plug me-2"></i>Webhook</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">URL do Webhook</label>
+                                                <input type="url" class="form-control" name="demandas_webhook_url" value="' . htmlspecialchars($demandasConfig['demandas_webhook_url'], ENT_QUOTES, 'UTF-8') . '" placeholder="https://hooks.slack.com/...">
+                                                <small class="text-muted">Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.</small>
+                                            </div>
+
+                                            <hr>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-bell me-2"></i>Notificações Push (no Admin)</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">Usuários que recebem notificações</label>
+                                                <select class="form-select" name="demandas_usuarios_notificacao[]" multiple size="6">';
+
+        $idsNotifDemandas = array_filter(array_map('intval', explode(',', $demandasConfig['demandas_usuarios_notificacao'])));
+        foreach ($demandasUsuarios as $u) {
+            $sel = in_array((int)$u['id'], $idsNotifDemandas) ? ' selected' : '';
+            echo '<option value="' . (int)$u['id'] . '"' . $sel . '>' . htmlspecialchars($u['nome']) . ' (' . htmlspecialchars($u['email']) . ')</option>';
+        }
+
+        echo '                                </select>
+                                                <small class="text-muted">Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                         </div>
                             
                             <div class="d-flex justify-content-end mt-4" id="admin-config-salvar-geral">
@@ -2909,10 +2974,6 @@ class AdminConfiguracoesController extends Controller {
         if (mobileSelect) {
             mobileSelect.addEventListener("change", function() {
                 var val = this.value;
-                if (val === "v-pills-demandas") {
-                    window.location.href = "/admin/demandas/configuracoes";
-                    return;
-                }
                 var tabBtn = document.getElementById(val + "-tab");
                 if (tabBtn) tabBtn.click();
             });
