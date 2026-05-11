@@ -5470,7 +5470,12 @@ HTML;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Editar Produto - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+    [id*="variaco"],[id*="variacao"]{display:none!important;}
+    .card:has(.card-header h5:is([id*="variaco"])){display:none!important;}
+    </style>
+    <script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("h5,h4,h3,.card-header,label").forEach(function(el){if((el.textContent||"").indexOf("Variações")>-1||(el.textContent||"").indexOf("variações")>-1){var c=el.closest(".card")||el.closest(".mb-4")||el.closest("section");if(c)c.style.display="none";else el.style.display="none";}});document.querySelectorAll(".alert-info").forEach(function(el){if((el.textContent||"").indexOf("variações")>-1)el.style.display="none";});});</script>';
 
         renderAdminSidebarStyles();
 
