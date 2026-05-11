@@ -1057,7 +1057,7 @@ function confirmarRecebimento() {
     public function gerarComprovante($request, $janelaId, $pedidoId, $gateway) {
         $this->requireAccess();
         $jid = (int)$janelaId; $pid = (int)$pedidoId;
-        $gateway = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string)$gateway));
+        $gateway = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', (string)$gateway));
 
         // Detectar envio de redirecionamento
         $isRedir = ($pid >= 900000);
