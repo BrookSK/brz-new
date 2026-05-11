@@ -898,8 +898,30 @@ class AdminRedirecionamentoController extends Controller {
         $this->adminOnly(); $this->migrar();
         $id=(int)$request->getParam('id',0);
         $tracking=trim((string)$request->getParam('tracking_code',''));
-        $etiqueta=trim((string)$request->getParam('etiqueta_url',''));
-        $this->pdo()->prepare("UPDATE redirecionamento_envios SET tracking_code=?,etiqueta_url=?,status='etiqueta_gerada' WHERE id=?")->execute([$tracking,$etiqueta,$id]);
+        $etiqueta='';
+
+        // Upload de etiqueta (arquivo)
+        if (!empty($_FILES['etiqueta_file']['tmp_name']) && $_FILES['etiqueta_file']['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = __DIR__ . '/../../public/uploads/etiquetas/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+            $ext = strtolower(pathinfo($_FILES['etiqueta_file']['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['pdf','jpg','jpeg','png'], true)) {
+                $this->json(['ok'=>false,'msg'=>'Formato inválido. Use PDF, JPG ou PNG.']); return;
+            }
+            $filename = 'etiqueta_' . $id . '_' . time() . '.' . $ext;
+            move_uploaded_file($_FILES['etiqueta_file']['tmp_name'], $uploadDir . $filename);
+            $etiqueta = '/uploads/etiquetas/' . $filename;
+        }
+
+        $set = "tracking_code=?, status='etiqueta_gerada'";
+        $params = [$tracking];
+        if ($etiqueta !== '') {
+            $set = "tracking_code=?, etiqueta_url=?, status='etiqueta_gerada'";
+            $params = [$tracking, $etiqueta];
+        }
+        $params[] = $id;
+        $this->pdo()->prepare("UPDATE redirecionamento_envios SET $set WHERE id=?")->execute($params);
+
         // Notificar por e-mail
         $stE=$this->pdo()->prepare("SELECT e.*,r.nome AS red_nome,r.email AS red_email FROM redirecionamento_envios e LEFT JOIN redirecionadores r ON r.id=e.redirecionador_id WHERE e.id=? LIMIT 1");
         $stE->execute([$id]); $envio=$stE->fetch(\PDO::FETCH_ASSOC);
@@ -1054,8 +1076,16 @@ class AdminRedirecionamentoController extends Controller {
 
     public function tabelaPesos(Request $request) {
         $this->auth(); $this->migrar();
-        $tabela=$this->pdo()->query("SELECT * FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
-        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela]);
+        $db = $this->pdo();
+        $tabela=$db->query("SELECT * FROM redirecionamento_tabela_pesos ORDER BY peso_ate_kg ASC")->fetchAll(\PDO::FETCH_ASSOC)?:[];
+        $provedorEtiqueta = 'wexpress';
+        try {
+            $st = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'redirecionamento_provedor_etiqueta' LIMIT 1");
+            $st->execute();
+            $v = trim((string) ($st->fetchColumn() ?: ''));
+            if ($v !== '') $provedorEtiqueta = $v;
+        } catch (\Exception $e) {}
+        $this->view('admin/redirecionamento/tabela-pesos',['tabela'=>$tabela,'provedorEtiqueta'=>$provedorEtiqueta]);
     }
 
     public function tabelaPesosSalvar(Request $request) {
@@ -1064,6 +1094,18 @@ class AdminRedirecionamentoController extends Controller {
         $valor=(float)str_replace(',','.',$request->getParam('valor_usd','0'));
         if ($peso<=0||$valor<=0) { $this->json(['ok'=>false,'msg'=>'Valores inválidos']); return; }
         $this->pdo()->prepare("INSERT INTO redirecionamento_tabela_pesos (peso_ate_kg,valor_usd) VALUES (?,?) ON DUPLICATE KEY UPDATE valor_usd=VALUES(valor_usd)")->execute([$peso,$valor]);
+        $this->json(['ok'=>true]);
+    }
+
+    public function configuracaoSalvar(Request $request) {
+        $this->adminOnly(); $this->migrar();
+        $chave = trim((string) $request->getParam('chave', ''));
+        $valor = trim((string) $request->getParam('valor', ''));
+        $chavesPermitidas = ['redirecionamento_provedor_etiqueta'];
+        if (!in_array($chave, $chavesPermitidas, true)) { $this->json(['ok'=>false,'msg'=>'Chave não permitida']); return; }
+        $db = $this->pdo();
+        $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)")
+            ->execute([$chave, $valor]);
         $this->json(['ok'=>true]);
     }
 

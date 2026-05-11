@@ -137,12 +137,26 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
                     </div>
                     <?php endif; ?>
 
+                    <?php
+                    $__perfilLogado = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+                    $__isAdminEtiqueta = in_array($__perfilLogado, ['admin','suporte'], true);
+                    ?>
+                    <?php if ($__isAdminEtiqueta): ?>
+                    <hr class="my-3">
+                    <div class="small text-muted mb-2">Preenchimento manual (admin)</div>
                     <div class="row g-2">
                         <div class="col-12"><label class="form-label small">Código de rastreio</label><input class="form-control form-control-sm" type="text" id="trackingCode" value="<?= htmlspecialchars($envio['tracking_code']??'',ENT_QUOTES,'UTF-8') ?>"></div>
-                        <div class="col-12"><label class="form-label small">URL da etiqueta</label><input class="form-control form-control-sm" type="text" id="etiquetaUrl" value="<?= htmlspecialchars($envio['etiqueta_url']??'',ENT_QUOTES,'UTF-8') ?>"></div>
+                        <div class="col-12">
+                            <label class="form-label small">Etiqueta (upload PDF/imagem)</label>
+                            <input class="form-control form-control-sm" type="file" id="inputEtiquetaUpload" accept=".pdf,.jpg,.jpeg,.png">
+                            <?php if (!empty($envio['etiqueta_url'])): ?>
+                            <div class="form-text">Atual: <a href="<?= htmlspecialchars($envio['etiqueta_url'],ENT_QUOTES,'UTF-8') ?>" target="_blank">Ver etiqueta</a></div>
+                            <?php endif; ?>
+                        </div>
                         <div class="col-12"><button type="button" class="btn btn-info btn-sm w-100" id="btnSalvarTracking">Salvar e notificar</button></div>
                         <div id="msgTracking" class="col-12"></div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -257,7 +271,10 @@ document.getElementById('btnSalvarPeso')?.addEventListener('click', async () => 
 document.getElementById('btnSalvarTracking')?.addEventListener('click', async () => {
     const fd = new FormData();
     fd.append('tracking_code', document.getElementById('trackingCode').value);
-    fd.append('etiqueta_url', document.getElementById('etiquetaUrl').value);
+    const fileInput = document.getElementById('inputEtiquetaUpload');
+    if (fileInput && fileInput.files[0]) {
+        fd.append('etiqueta_file', fileInput.files[0]);
+    }
     const r = await fetch(`/admin/redirecionamento/envios/${ENVIO_ID}/tracking`,{method:'POST',body:fd});
     const j = await r.json();
     document.getElementById('msgTracking').innerHTML = j.ok ? '<div class="alert alert-success py-1 small mt-2">Salvo e notificações enviadas.</div>' : '<div class="alert alert-danger py-1 small mt-2">'+(j.msg||'Erro')+'</div>';

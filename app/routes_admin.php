@@ -238,6 +238,7 @@ $router->get('/admin/redirecionamento/clientes/lista',                  'AdminRe
 $router->get('/admin/redirecionamento/tabela-pesos',                    'AdminRedirecionamentoController', 'tabelaPesos');
 $router->post('/admin/redirecionamento/tabela-pesos/salvar',            'AdminRedirecionamentoController', 'tabelaPesosSalvar');
 $router->post('/admin/redirecionamento/tabela-pesos/excluir',           'AdminRedirecionamentoController', 'tabelaPesosExcluir');
+$router->post('/admin/redirecionamento/configuracao/salvar',            'AdminRedirecionamentoController', 'configuracaoSalvar');
 $router->get('/admin/redirecionamento/tabela-pesos/calcular',           'AdminRedirecionamentoController', 'calcularSimulador');
 $router->get('/admin/redirecionamento/pagamentos',                      'AdminRedirecionamentoController', 'pagamentos');
 $router->get('/admin/redirecionamento/comprovantes',                    'AdminRedirecionamentoController', 'comprovantes');

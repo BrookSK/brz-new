@@ -97,6 +97,29 @@ $_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
             </div>
         </div>
     </div>
+
+    <?php if ($_isAdmin): ?>
+    <!-- Configuração do provedor de etiqueta -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="mb-3"><i class="fas fa-cog me-2 text-primary"></i>Configuração de Etiqueta</h5>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Provedor de etiqueta para redirecionamento</label>
+                    <select class="form-select" id="cfgProvedorEtiqueta">
+                        <option value="wexpress" <?= ($provedorEtiqueta ?? 'wexpress') === 'wexpress' ? 'selected' : '' ?>>W Express</option>
+                        <option value="correios" <?= ($provedorEtiqueta ?? 'wexpress') === 'correios' ? 'selected' : '' ?>>Correios (Pré-Postagem)</option>
+                    </select>
+                    <div class="form-text">Define qual API será usada quando o redirecionador gerar a etiqueta.</div>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-primary" id="btnSalvarProvedor">Salvar</button>
+                </div>
+                <div class="col-md-6" id="msgProvedor"></div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <script>
@@ -117,6 +140,18 @@ document.getElementById('btnSimular').addEventListener('click', async () => {
 });
 
 <?php if ($_isAdmin): ?>
+document.getElementById('btnSalvarProvedor')?.addEventListener('click', async () => {
+    const valor = document.getElementById('cfgProvedorEtiqueta').value;
+    const fd = new FormData();
+    fd.append('chave', 'redirecionamento_provedor_etiqueta');
+    fd.append('valor', valor);
+    const r = await fetch('/admin/redirecionamento/configuracao/salvar', {method:'POST', body:fd});
+    const j = await r.json();
+    document.getElementById('msgProvedor').innerHTML = j.ok
+        ? '<div class="alert alert-success py-1 small">Salvo!</div>'
+        : '<div class="alert alert-danger py-1 small">'+(j.msg||'Erro')+'</div>';
+});
+
 document.getElementById('btnSalvarFaixa').addEventListener('click', async () => {
     const peso = document.getElementById('novoPeso').value;
     const valor = document.getElementById('novoValor').value;
