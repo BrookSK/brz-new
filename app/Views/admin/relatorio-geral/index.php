@@ -701,6 +701,9 @@ function renderDreCompleto(d) {
 
     document.getElementById('dre-completo-container').innerHTML = h;
 
+    // Salvar dados do DRE para uso no fluxo de caixa
+    window._dreData = d;
+
     // Auto-carregar fluxo de caixa
     setTimeout(function(){ carregarFluxoCaixa(document.querySelector('#conciliacao-gateways-container')&&document.querySelector('[onclick*="carregarFluxoCaixa"]')||document.createElement('button'), false); }, 500);
 }
@@ -863,7 +866,10 @@ function renderFluxoCaixa(d, container) {
 
     // === COMPARAÇÃO: SITE vs GATEWAYS ===
     var totalSite = 0; var totalGateways = 0;
-    if (d.fluxo_caixa) d.fluxo_caixa.forEach(function(m){ if(m.tipo==='entrada') totalSite += m.valor; });
+    // Total do site = usar o total_creditos da conciliação financeira do DRE (que já está calculado corretamente)
+    if (d.fluxo_caixa && d.fluxo_caixa.length) d.fluxo_caixa.forEach(function(m){ if(m.tipo==='entrada') totalSite += m.valor; });
+    // Se fluxo_caixa vazio, usar o total dos gateways como referência
+    if (totalSite === 0 && window._dreData && window._dreData.conciliacao) totalSite = window._dreData.conciliacao.total_creditos || 0;
     if (s.saldo) s.saldo.forEach(function(b){ totalGateways += (b.disponivel||0) + (b.pendente||0); });
     totalGateways += (cr.total_recebido_usd||0) + (crt.total_recebido_usd||0);
 

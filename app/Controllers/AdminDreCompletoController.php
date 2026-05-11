@@ -474,17 +474,15 @@ class AdminDreCompletoController extends Controller {
         $desde = date('Y-m-d', strtotime('-30 days'));
 
         try {
-            // ENTRADAS: pagamentos recebidos (pedido_pagamentos com status pago)
-            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status, pp.status,
-                COALESCE(pp.updated_at, pp.created_at) as data,
+            // ENTRADAS: pagamentos confirmados — buscar por status do pedido + gateway_status
+            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status, pp.status as pp_status,
+                pp.created_at as data,
                 COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                WHERE (pp.status IN ('paid','approved','confirmed','succeeded')
-                    OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','paid','succeeded','approved','confirmed','ON_HOLD')
-                    OR UPPER(pp.gateway_status) LIKE '%PAGO%' OR UPPER(pp.gateway_status) LIKE '%PAID%' OR UPPER(pp.gateway_status) LIKE '%FINALIZADA%')
-                AND COALESCE(pp.updated_at, pp.created_at) >= ?
-                ORDER BY COALESCE(pp.updated_at, pp.created_at) DESC LIMIT 300");
+                WHERE pp.created_at >= ?
+                AND (pp.status = 'approved' OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','SUCCEEDED','paid','succeeded'))
+                ORDER BY pp.created_at DESC LIMIT 500");
             $st->execute([$desde]);
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 $gw = $r['gateway'] ?? 'outro';
