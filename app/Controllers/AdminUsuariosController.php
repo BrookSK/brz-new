@@ -672,11 +672,57 @@ class AdminUsuariosController extends Controller {
                     error_log('[ADMIN_EDITAR_USUARIO] Erro ao salvar endereço: ' . $e->getMessage());
                 }
 
+                // Auto-criar registro na tabela redirecionadores quando perfil = redirecionador
+                try {
+                    $perfilSalvo = strtolower(trim((string) ($dados['perfil'] ?? '')));
+                    if ($perfilSalvo === 'redirecionador') {
+                        $dbRed = \Config\Database::getConnection();
+                        // Verificar se já existe
+                        $stCheck = $dbRed->prepare("SELECT id FROM redirecionadores WHERE usuario_id = ? LIMIT 1");
+                        $stCheck->execute([(int) $id]);
+                        if (!$stCheck->fetchColumn()) {
+                            // Verificar por email também
+                            $emailUser = trim((string) ($dados['email'] ?? ''));
+                            $stCheck2 = $dbRed->prepare("SELECT id FROM redirecionadores WHERE email = ? LIMIT 1");
+                            $stCheck2->execute([$emailUser]);
+                            $existeId = (int) $stCheck2->fetchColumn();
+                            if ($existeId > 0) {
+                                // Vincular usuario_id ao registro existente
+                                $dbRed->prepare("UPDATE redirecionadores SET usuario_id = ? WHERE id = ?")->execute([(int) $id, $existeId]);
+                            } else {
+                                // Criar novo registro
+                                $nomeUser = trim((string) ($dados['nome'] ?? 'Redirecionador'));
+                                $suite = 'BR-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
+                                $dbRed->prepare("INSERT INTO redirecionadores (usuario_id, nome, email, suite, status) VALUES (?, ?, ?, ?, 'ativo')")
+                                    ->execute([(int) $id, $nomeUser, $emailUser, $suite]);
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('[ADMIN_EDITAR_USUARIO] Erro ao criar redirecionador: ' . $e->getMessage());
+                }
+
                 header('Location: /admin/usuarios/detalhes/' . (int)$id . '?success=1');
                 exit;
             }
 
             $novoId = $helper->criarUsuario($dados);
+
+            // Auto-criar registro na tabela redirecionadores quando perfil = redirecionador
+            try {
+                $perfilSalvo = strtolower(trim((string) ($dados['perfil'] ?? '')));
+                if ($perfilSalvo === 'redirecionador' && $novoId > 0) {
+                    $dbRed = \Config\Database::getConnection();
+                    $emailUser = trim((string) ($dados['email'] ?? ''));
+                    $nomeUser = trim((string) ($dados['nome'] ?? 'Redirecionador'));
+                    $suite = 'BR-' . str_pad((string) $novoId, 5, '0', STR_PAD_LEFT);
+                    $dbRed->prepare("INSERT INTO redirecionadores (usuario_id, nome, email, suite, status) VALUES (?, ?, ?, ?, 'ativo')")
+                        ->execute([(int) $novoId, $nomeUser, $emailUser, $suite]);
+                }
+            } catch (\Exception $e) {
+                error_log('[ADMIN_CRIAR_USUARIO] Erro ao criar redirecionador: ' . $e->getMessage());
+            }
+
             header('Location: /admin/usuarios/detalhes/' . (int)$novoId . '?success=1');
             exit;
         } catch (\Exception $e) {
