@@ -471,11 +471,11 @@ function renderAdminSidebar($activePage = '') {
                 $collapseClass = $groupActive ? 'show' : '';
 
                 echo '<li class="nav-item">
-                    <a class="nav-link sidebar-group-toggle' . ($groupActive ? ' active' : '') . '" href="javascript:void(0)" data-bs-toggle="collapse" data-bs-target="#' . $groupId . '" role="button" aria-expanded="' . ($groupActive ? 'true' : 'false') . '" aria-controls="' . $groupId . '" style="display:flex;justify-content:space-between;align-items:center;">
+                    <a class="nav-link sidebar-group-toggle' . ($groupActive ? ' active' : '') . '" href="javascript:void(0)" onclick="toggleSidebarGroup(this)" aria-expanded="' . ($groupActive ? 'true' : 'false') . '" style="display:flex;justify-content:space-between;align-items:center;">
                         <span><i class="fas fa-fw ' . ($group['icon'] ?? 'fas fa-folder') . '"></i> ' . htmlspecialchars($groupName) . '</span>
-                        <i class="fas fa-chevron-down" style="font-size:10px;transition:transform .2s;' . ($groupActive ? 'transform:rotate(180deg);' : '') . '"></i>
+                        <i class="fas fa-chevron-down sidebar-chevron" style="font-size:10px;transition:transform .2s;' . ($groupActive ? 'transform:rotate(180deg);' : '') . '"></i>
                     </a>
-                    <div class="collapse ' . $collapseClass . '" id="' . $groupId . '">
+                    <div class="sidebar-group-content" style="' . ($groupActive ? '' : 'display:none;') . '">
                         <ul class="nav flex-column" style="padding-left:12px;">';
 
                 foreach ($groupItems as $key => $item) {
@@ -967,20 +967,21 @@ function renderAdminSidebarStyles() {
 function renderAdminScripts() {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
     echo '<script>
-document.addEventListener("DOMContentLoaded",function(){
-    document.querySelectorAll(".sidebar-group-toggle").forEach(function(btn){
-        var target=document.querySelector(btn.getAttribute("data-bs-target"));
-        if(!target)return;
-        target.addEventListener("shown.bs.collapse",function(){
-            var icon=btn.querySelector(".fa-chevron-down");
-            if(icon)icon.style.transform="rotate(180deg)";
-        });
-        target.addEventListener("hidden.bs.collapse",function(){
-            var icon=btn.querySelector(".fa-chevron-down");
-            if(icon)icon.style.transform="rotate(0deg)";
-        });
-    });
-});
+function toggleSidebarGroup(el){
+    var content=el.nextElementSibling;
+    var chevron=el.querySelector(".sidebar-chevron");
+    if(!content)return;
+    var isVisible=(content.style.display!=="none");
+    if(isVisible){
+        content.style.display="none";
+        if(chevron)chevron.style.transform="rotate(0deg)";
+        el.setAttribute("aria-expanded","false");
+    } else {
+        content.style.display="block";
+        if(chevron)chevron.style.transform="rotate(180deg)";
+        el.setAttribute("aria-expanded","true");
+    }
+}
 </script>';
     // Notificações push de demandas
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99999;max-width:400px;"></div>';
