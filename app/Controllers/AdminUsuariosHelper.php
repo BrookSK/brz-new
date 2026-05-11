@@ -89,8 +89,12 @@ class AdminUsuariosHelper {
             $sql .= " ORDER BY (COALESCE(w.saldo_usd, 0) + COALESCE(w.saldo_brl, 0)) DESC";
         } elseif ($ordem === 'carteira_asc') {
             $sql .= " ORDER BY (COALESCE(w.saldo_usd, 0) + COALESCE(w.saldo_brl, 0)) ASC";
+        } elseif ($ordem === 'nome_asc') {
+            $sql .= " ORDER BY LOWER(u.nome) ASC";
+        } elseif ($ordem === 'nome_desc') {
+            $sql .= " ORDER BY LOWER(u.nome) DESC";
         } else {
-            $sql .= " ORDER BY u.created_at DESC";
+            $sql .= " ORDER BY LOWER(u.nome) ASC";
         }
 
         $sql .= " LIMIT :limite OFFSET :offset";
