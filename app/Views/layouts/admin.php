@@ -190,28 +190,7 @@
             min-height: 0;
         }
 
-        .sidebar {
-            min-height: 100vh;
-            background: #0b1f3a;
-        }
-        
-        .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.8);
-            border-radius: 0.35rem;
-            margin: 0.2rem 0;
-        }
-        
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            color: #fff;
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .sidebar .sidebar-brand {
-            color: #fff;
-            font-weight: bold;
-            padding: 1rem;
-        }
+        /* Sidebar styles are handled by renderAdminSidebarStyles() */
         
         .border-left-primary {
             border-left: 0.25rem solid #1d4ed8 !important;

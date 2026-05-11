@@ -530,9 +530,13 @@ function renderAdminSidebarStyles() {
         }
 
         /* Hide icons in page titles globally */
-        main h1 > i, main h1 > .fas, main h1 > .far, main h1 > .fab, main h1 > .bi,
-        main h2 > i, main h2 > .fas, main h2 > .far, main h2 > .fab, main h2 > .bi,
-        main .h2 > i, main .h2 > .fas, main .h2 > .far, main .h2 > .fab, main .h2 > .bi {
+        main h1 i.fas, main h1 i.far, main h1 i.fab, main h1 i.bi,
+        main h2 i.fas, main h2 i.far, main h2 i.fab, main h2 i.bi,
+        main h3 i.fas, main h3 i.far, main h3 i.fab, main h3 i.bi,
+        main .h2 i.fas, main .h2 i.far, main .h2 i.fab, main .h2 i.bi,
+        main .h3 i.fas, main .h3 i.far, main .h3 i.fab, main .h3 i.bi,
+        main .page-title i, main .page-title-icon,
+        main .border-bottom h1 i, main .border-bottom h2 i {
             display: none !important;
         }
 
