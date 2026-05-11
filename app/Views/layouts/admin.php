@@ -87,6 +87,9 @@
     <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/pedidos') !== false && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/pedidos/') === false): ?>
     <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">
     <?php endif; ?>
+    <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/produtos') !== false): ?>
+    <link href="/assets/css/produtos-redesign.css" rel="stylesheet">
+    <?php endif; ?>
     <?php
     include_once __DIR__ . '/../partials/admin_sidebar.php';
     if (function_exists('renderAdminSidebarStyles')) {
