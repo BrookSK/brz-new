@@ -677,6 +677,15 @@ class AdminRedirecionamentoController extends Controller {
     public function clientesLista(Request $request) {
         $this->auth();
         $redId = (int)$request->getParam('redirecionador_id', 0);
+
+        // Se redirecionador_id=0 e o usuário é redirecionador, tentar resolver
+        if (!$redId) {
+            $redFixo = $this->getRedirecionadorFixo();
+            if ($redFixo && (int)($redFixo['id'] ?? 0) > 0) {
+                $redId = (int)$redFixo['id'];
+            }
+        }
+
         if (!$redId) { $this->json(['ok'=>false,'clientes'=>[]]); return; }
         $st = $this->pdo()->prepare("SELECT id, nome FROM redirecionamento_clientes WHERE redirecionador_id=? ORDER BY nome ASC");
         $st->execute([$redId]);

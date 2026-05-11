@@ -518,7 +518,9 @@ document.getElementById('inputComprovante')?.addEventListener('change', async fu
 // ── Clientes ────────────────────────────────────────────────────────────────
 <?php if ($redirecionadorFixo): ?>
 (async()=>{
-    const r=await fetch('/admin/redirecionamento/clientes/lista?redirecionador_id=<?= (int)$redirecionadorFixo['id'] ?>');
+    const redId = <?= (int)$redirecionadorFixo['id'] ?>;
+    const url = '/admin/redirecionamento/clientes/lista' + (redId > 0 ? '?redirecionador_id=' + redId : '');
+    const r=await fetch(url);
     const j=await r.json();
     if(j.ok&&j.clientes){ const sel=document.getElementById('selCliente'); j.clientes.forEach(c=>sel.appendChild(new Option(c.nome,c.id))); }
 })();
