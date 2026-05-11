@@ -640,16 +640,14 @@ class AdminDashboardController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/public/assets/css/dashboard-redesign.css" rel="stylesheet">';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
         
-        echo '<style>
-        .stat-card { transition: none; }
-        .quick-action-card { transition: none; cursor: pointer; }
-    </style>
-</head>
+        echo '</head>
 <body>
     <div class="container-fluid">
         <div class="row">';
@@ -658,46 +656,285 @@ class AdminDashboardController extends Controller {
         renderAdminSidebar('dashboard');
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <button type="button" class="btn btn-sm btn-primary">
-                            <i class="fas fa-sync"></i> Atualizar
-                        </button>
-                    </div>
-                </div>';
+            <div class="dashboard-page">';
 
-        // Calendário de Marketing (acima dos cards)
-        echo '<div class="row mb-4"><div class="col-12">';
+        // === HEADER ===
+        echo '<header class="page-header">
+                <div>
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Resumo operacional, financeiro e comercial da empresa</p>
+                </div>
+                <button class="btn-dash-primary" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                </button>
+            </header>';
+
+        // === CALENDÁRIO DE MARKETING ===
+        echo '<section class="section-card">
+                <header class="section-card-header">
+                    <h2 class="section-title"><i class="bi bi-calendar-event"></i> Calendário de Marketing</h2>
+                </header>
+                <div class="section-body">';
         include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
-        echo '</div></div>';
+        echo '</div></section>';
 
-        echo '<div class="row mb-4">
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card stat-card border-left-primary shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Produtos</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . $stats['produtos_total'] . '</div>
-                                        <div class="text-xs text-muted">' . $stats['produtos_ativos'] . ' ativos</div>
-                                    </div>
-                                    <div class="col-auto"><i class="fas fa-box fa-2x text-gray-300"></i></div>
+        // === KPI GRID ===
+        echo '<section class="kpi-grid">
+                <article class="kpi-card">
+                    <div>
+                        <div class="kpi-label">Produtos</div>
+                        <div class="kpi-value">' . (int)$stats['produtos_total'] . '</div>
+                        <div class="kpi-subtext">' . (int)$stats['produtos_ativos'] . ' ativos</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-box-seam-fill"></i></div>
+                </article>
+                <article class="kpi-card">
+                    <div>
+                        <div class="kpi-label">Pedidos</div>
+                        <div class="kpi-value">' . (int)$stats['pedidos_total'] . '</div>
+                        <div class="kpi-subtext">Total</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-cart-fill"></i></div>
+                </article>
+                <article class="kpi-card">
+                    <div>
+                        <div class="kpi-label">Usuários</div>
+                        <div class="kpi-value">' . number_format((int)$stats['usuarios_total']) . '</div>
+                        <div class="kpi-subtext">Cadastrados</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+                </article>
+                <article class="kpi-card is-featured">
+                    <div>
+                        <div class="kpi-label">Faturamento</div>
+                        <div class="kpi-value">' . htmlspecialchars((string)($stats['faturamento_display'] ?: 'R$ 0,00')) . '</div>
+                        <div class="kpi-subtext">Pedidos pagos</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                </article>
+            </section>';
+
+        // === RESUMO GERENCIAL ===
+        echo '<section class="executive-grid">
+                <article class="section-card">
+                    <header class="section-card-header">
+                        <h2 class="section-title"><i class="bi bi-bar-chart-fill"></i> Resumo Gerencial</h2>
+                    </header>
+                    <div class="section-body">
+                        <div class="summary-list">
+                            <div class="summary-item">
+                                <div class="summary-label">Faturamento total</div>
+                                <div class="summary-value">' . htmlspecialchars((string)($stats['faturamento_display'] ?: 'R$ 0,00')) . '</div>
+                                <div class="summary-note">Pedidos pagos e processados</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Pedidos totais</div>
+                                <div class="summary-value">' . (int)$stats['pedidos_total'] . '</div>
+                                <div class="summary-note">Todos os status</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Produtos ativos</div>
+                                <div class="summary-value">' . (int)$stats['produtos_ativos'] . '</div>
+                                <div class="summary-note">Disponíveis para venda</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Usuários cadastrados</div>
+                                <div class="summary-value">' . number_format((int)$stats['usuarios_total']) . '</div>
+                                <div class="summary-note">Total na plataforma</div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+                <article class="section-card">
+                    <header class="section-card-header">
+                        <h2 class="section-title"><i class="bi bi-lightbulb-fill"></i> Pontos de Atenção</h2>
+                    </header>
+                    <div class="section-body">
+                        <div class="insight-list">
+                            <div class="insight-item">
+                                <div class="insight-icon"><i class="bi bi-cash-stack"></i></div>
+                                <div>
+                                    <div class="insight-title">Validar pedidos não pagos</div>
+                                    <div class="insight-text">Pedidos pendentes não devem entrar no total financeiro realizado.</div>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon"><i class="bi bi-box-seam"></i></div>
+                                <div>
+                                    <div class="insight-title">Acompanhar estoque e validade</div>
+                                    <div class="insight-text">Produtos próximos do vencimento precisam continuar destacados no painel.</div>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                                <div>
+                                    <div class="insight-title">Monitorar produtos campeões</div>
+                                    <div class="insight-text">Use os mais vendidos para direcionar lives, campanhas e reposição.</div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card stat-card border-left-success shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Pedidos</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . $stats['pedidos_total'] . '</div>
-                                        <div class="text-xs text-muted">Total</div>
-                                    </div>
-                                    <div class="col-auto"><i class="fas fa-shopping-cart fa-2x text-gray-300"></i></div>
-                                </div>
+                </article>
+            </section>';
+
+        // === PENDÊNCIAS DE PAGAMENTO ===
+        if ($pendencias_pagamento_total > 0) {
+            echo '<section class="section-card" style="border-color:var(--red-bg);">
+                <header class="section-card-header">
+                    <h2 class="section-title"><i class="bi bi-exclamation-circle-fill" style="color:var(--red-text)"></i> Pendências de pagamento</h2>
+                    <a href="/admin/pedidos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver pedidos</a>
+                </header>
+                <div class="section-body">
+                    <div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Pedido</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>';
+            foreach ($pendencias_pagamento as $pp) {
+                $pid = (int)($pp['id'] ?? 0);
+                $codigo = (string)($pp['codigo_pedido'] ?? $pid);
+                $valor = (float)($pp['payment_diferenca_valor'] ?? 0);
+                $st = (string)($pp['payment_diferenca_status'] ?? '');
+                $link = (string)($pp['payment_diferenca_bank_slip_url'] ?? '');
+                if ($link === '') $link = (string)($pp['payment_diferenca_invoice_url'] ?? '');
+                echo '<tr><td><a href="/admin/pedidos/detalhes/' . $pid . '">#' . htmlspecialchars($codigo) . '</a></td>'
+                    . '<td><strong>R$ ' . number_format($valor, 2, ',', '.') . '</strong></td>'
+                    . '<td>' . ($st !== '' ? '<span class="badge-yellow" style="padding:2px 8px;border-radius:4px;">' . htmlspecialchars($st) . '</span>' : '-') . '</td>'
+                    . '<td><a href="/admin/pedidos/detalhes/' . $pid . '">Detalhes</a>'
+                    . ($link !== '' ? ' <a href="' . htmlspecialchars($link) . '" target="_blank">Cobrança</a>' : '')
+                    . '</td></tr>';
+            }
+            echo '</tbody></table></div></div></section>';
+        }
+
+        // === VALIDADE ===
+        echo '<section class="validity-card">
+                <header class="validity-header">
+                    <div class="validity-title"><i class="bi bi-exclamation-triangle-fill"></i> Validade (próximos 30 dias)</div>
+                    <a href="/admin/estoque" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver Estoque</a>
+                </header>
+                <div class="validity-body">';
+
+        if (empty($validade_alertas)) {
+            echo 'Nenhum produto com validade a vencer nos próximos 30 dias.';
+        } else {
+            echo '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Produto</th><th>Validade</th><th>Qtd</th></tr></thead><tbody>';
+            foreach ($validade_alertas as $va) {
+                $produtoNomeV = (string)($va['produto_nome'] ?? '');
+                $validadeV = (string)($va['validade_mais_proxima'] ?? '');
+                $qtdV = (int)($va['quantidade_total'] ?? 0);
+                $diasV = $validadeV !== '' ? (int)floor((strtotime($validadeV) - strtotime(date('Y-m-d'))) / 86400) : null;
+                $badgeClass = 'badge-navy';
+                if ($diasV !== null && $diasV <= 7) $badgeClass = 'badge-yellow';
+                elseif ($diasV !== null && $diasV <= 15) $badgeClass = 'badge-yellow';
+                echo '<tr><td>' . htmlspecialchars($produtoNomeV) . '</td>'
+                    . '<td><span class="' . $badgeClass . '" style="padding:2px 8px;border-radius:4px;">' . ($validadeV !== '' ? date('d/m/Y', strtotime($validadeV)) : '-') . '</span>'
+                    . ($diasV !== null ? ' <small>(' . $diasV . ' dias)</small>' : '') . '</td>'
+                    . '<td>' . $qtdV . '</td></tr>';
+            }
+            echo '</tbody></table></div>';
+        }
+
+        echo '</div></section>';
+
+        // === AÇÕES RÁPIDAS ===
+        echo '<h2 class="quick-title">Ações Rápidas</h2>
+            <section class="quick-grid">
+                <a href="/admin/produtos/novo" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-plus-lg"></i></div>
+                        <div class="quick-label">Novo Produto</div>
+                        <div class="quick-subtext">Adicionar produto</div>
+                    </div>
+                </a>
+                <a href="/admin/pedidos" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-cart-fill"></i></div>
+                        <div class="quick-label">Pedidos</div>
+                        <div class="quick-subtext">Gerenciar pedidos</div>
+                    </div>
+                </a>
+                <a href="/admin/usuarios" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-people-fill"></i></div>
+                        <div class="quick-label">Usuários</div>
+                        <div class="quick-subtext">Gerenciar clientes</div>
+                    </div>
+                </a>
+                <a href="/admin/configuracoes" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-gear-fill"></i></div>
+                        <div class="quick-label">Configurações</div>
+                        <div class="quick-subtext">Configurar loja</div>
+                    </div>
+                </a>
+            </section>';
+
+        // === PEDIDOS RECENTES + PRODUTOS MAIS VENDIDOS ===
+        echo '<section class="bottom-grid">
+                <article class="list-card">
+                    <header class="list-card-header">
+                        <div class="list-card-title">Pedidos Recentes</div>
+                        <a href="/admin/pedidos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver Todos</a>
+                    </header>
+                    <div class="list-card-body">';
+
+        if (!empty($pedidos_recentes)) {
+            foreach ($pedidos_recentes as $pedido) {
+                $valorTotalPedido = 0;
+                if (isset($pedido['valor_total'])) $valorTotalPedido = floatval($pedido['valor_total']);
+                elseif (isset($pedido['total'])) $valorTotalPedido = floatval($pedido['total']);
+                elseif (isset($pedido['valor'])) $valorTotalPedido = floatval($pedido['valor']);
+                $moedaPedido = strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL')));
+                $statusPedido = strtolower(trim((string)($pedido['status'] ?? '')));
+                $statusBadge = 'badge-yellow';
+                if (in_array($statusPedido, ['pago','paid','approved'])) $statusBadge = 'badge-green';
+
+                echo '<div class="recent-order">
+                    <div>
+                        <div class="item-title">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . ' - ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</div>
+                        <div class="item-subtext">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</div>
+                    </div>
+                    <div class="order-side">
+                        <span class="' . $statusBadge . '" style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;">' . ucfirst($statusPedido) . '</span>
+                        <span class="item-value">' . ($moedaPedido === 'USD' ? 'US$ ' : 'R$ ') . number_format($valorTotalPedido, 2, ',', '.') . '</span>
+                    </div>
+                </div>';
+            }
+        } else {
+            echo '<p style="color:var(--text-muted);text-align:center;padding:20px 0;">Nenhum pedido encontrado</p>';
+        }
+
+        echo '</div></article>
+                <article class="list-card">
+                    <header class="list-card-header">
+                        <div class="list-card-title">Produtos Mais Vendidos</div>
+                        <a href="/admin/produtos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver Todos</a>
+                    </header>
+                    <div class="list-card-body">';
+
+        if (!empty($produtos_mais_vendidos)) {
+            foreach ($produtos_mais_vendidos as $produto) {
+                echo '<div class="top-product">
+                    <div>
+                        <div class="item-title">' . htmlspecialchars($produto['nome']) . '</div>
+                        <div class="item-subtext">' . (int)$produto['vendas'] . ' vendas</div>
+                    </div>
+                    <span class="badge-navy" style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;">' . (int)$produto['quantidade'] . ' unidades</span>
+                </div>';
+            }
+        } else {
+            echo '<p style="color:var(--text-muted);text-align:center;padding:20px 0;">Nenhuma venda encontrada</p>';
+        }
+
+        echo '</div></article>
+            </section>';
+
+        echo '</div></main></div></div>';
+
+    // Renderizar scripts
+    renderAdminScripts();
+    
+    echo '</body></html>';
+        exit;
+    }
+}
                             </div>
                         </div>
                     </div>
