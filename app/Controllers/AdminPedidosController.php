@@ -105,6 +105,50 @@ class AdminPedidosController extends Controller {
             $st = $pdo->prepare($sql);
             $st->execute($params);
 
+            // Se o pedido usa endereco_entrega_id (endereço em tabela separada), atualizar lá também
+            $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
+            if ($endEntregaIdCol !== '' && !empty($oldRow[$endEntregaIdCol])) {
+                $enderecoId = (int) $oldRow[$endEntregaIdCol];
+                if ($enderecoId > 0) {
+                    try {
+                        $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
+                        $pickEnd = function(array $candidates) use ($colsEnd): string {
+                            foreach ($candidates as $c) {
+                                if (is_array($colsEnd) && in_array($c, $colsEnd, true)) return $c;
+                            }
+                            return '';
+                        };
+
+                        $setEnd = [];
+                        $paramsEnd = [];
+                        $addSetEnd = function(string $col, $val) use (&$setEnd, &$paramsEnd): void {
+                            if ($col === '') return;
+                            $setEnd[] = $col . ' = ?';
+                            $paramsEnd[] = $val;
+                        };
+
+                        $addSetEnd($pickEnd(['pais', 'country', 'country_code', 'pais_code']), trim((string) $request->getParam('pais')));
+                        $addSetEnd($pickEnd(['cep', 'zip_code', 'zipcode']), trim((string) $request->getParam('cep')));
+                        $addSetEnd($pickEnd(['endereco', 'logradouro', 'address']), trim((string) $request->getParam('endereco')));
+                        $addSetEnd($pickEnd(['numero', 'number']), trim((string) $request->getParam('numero')));
+                        $addSetEnd($pickEnd(['complemento']), trim((string) $request->getParam('complemento')));
+                        $addSetEnd($pickEnd(['bairro', 'neighborhood']), trim((string) $request->getParam('bairro')));
+                        $addSetEnd($pickEnd(['cidade', 'city']), trim((string) $request->getParam('cidade')));
+                        $addSetEnd($pickEnd(['estado', 'uf', 'state']), trim((string) $request->getParam('estado')));
+
+                        $setEnd = array_values(array_filter($setEnd, static function($x){ return is_string($x) && trim($x) !== ''; }));
+                        if (!empty($setEnd)) {
+                            $paramsEnd[] = $enderecoId;
+                            $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
+                            $stEnd = $pdo->prepare($sqlEnd);
+                            $stEnd->execute($paramsEnd);
+                        }
+                    } catch (\Throwable $e) {
+                        // Silenciar erro na tabela enderecos — o update principal já foi feito
+                    }
+                }
+            }
+
             try {
                 $newRow = [];
                 try {
@@ -3837,7 +3881,7 @@ CUSTOSCRIPT;
                         . '<div class="col-md-6"><label class="form-label">E-mail</label><input type="email" class="form-control" id="editClienteEmail" value="' . htmlspecialchars($clienteEmail, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-4"><label class="form-label">Telefone</label><input type="text" class="form-control" id="editClienteTelefone" value="' . htmlspecialchars($clienteTelefone, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-4"><label class="form-label">CPF/CNPJ</label><input type="text" class="form-control" id="editClienteDocumento" value="' . htmlspecialchars($clienteDoc, ENT_QUOTES, 'UTF-8') . '"></div>'
-                        . '<div class="col-md-4"><label class="form-label">País</label><input type="text" class="form-control" id="editClientePais" value="' . htmlspecialchars($pais, ENT_QUOTES, 'UTF-8') . '"></div>'
+                        . '<div class="col-md-4"><label class="form-label">País</label><select class="form-select" id="editClientePais"><option value="BR"' . (strtoupper(trim($pais)) === 'BR' || $pais === '' ? ' selected' : '') . '>Brasil</option><option value="US"' . (strtoupper(trim($pais)) === 'US' ? ' selected' : '') . '>Estados Unidos</option><option value="PT"' . (strtoupper(trim($pais)) === 'PT' ? ' selected' : '') . '>Portugal</option><option value="JP"' . (strtoupper(trim($pais)) === 'JP' ? ' selected' : '') . '>Japão</option><option value="GB"' . (strtoupper(trim($pais)) === 'GB' ? ' selected' : '') . '>Reino Unido</option><option value="DE"' . (strtoupper(trim($pais)) === 'DE' ? ' selected' : '') . '>Alemanha</option><option value="FR"' . (strtoupper(trim($pais)) === 'FR' ? ' selected' : '') . '>França</option><option value="ES"' . (strtoupper(trim($pais)) === 'ES' ? ' selected' : '') . '>Espanha</option><option value="IT"' . (strtoupper(trim($pais)) === 'IT' ? ' selected' : '') . '>Itália</option><option value="CA"' . (strtoupper(trim($pais)) === 'CA' ? ' selected' : '') . '>Canadá</option><option value="AU"' . (strtoupper(trim($pais)) === 'AU' ? ' selected' : '') . '>Austrália</option><option value="AR"' . (strtoupper(trim($pais)) === 'AR' ? ' selected' : '') . '>Argentina</option><option value="CL"' . (strtoupper(trim($pais)) === 'CL' ? ' selected' : '') . '>Chile</option><option value="CO"' . (strtoupper(trim($pais)) === 'CO' ? ' selected' : '') . '>Colômbia</option><option value="MX"' . (strtoupper(trim($pais)) === 'MX' ? ' selected' : '') . '>México</option><option value="OTHER"' . (!in_array(strtoupper(trim($pais)), ['','BR','US','PT','JP','GB','DE','FR','ES','IT','CA','AU','AR','CL','CO','MX'], true) ? ' selected' : '') . '>Outro</option></select></div>'
                         . '<div class="col-md-3"><label class="form-label">CEP</label><input type="text" class="form-control" id="editClienteCep" value="' . htmlspecialchars($cep, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-6"><label class="form-label">Endereço</label><input type="text" class="form-control" id="editClienteEndereco" value="' . htmlspecialchars($endereco, ENT_QUOTES, 'UTF-8') . '"></div>'
                         . '<div class="col-md-3"><label class="form-label">Número</label><input type="text" class="form-control" id="editClienteNumero" value="' . htmlspecialchars($numero, ENT_QUOTES, 'UTF-8') . '"></div>'
