@@ -655,6 +655,7 @@ class CarneService {
             } catch (\Exception $e) {}
 
             // Buscar parcelas vencidas (não pagas, não canceladas, vencimento já passou)
+            // ANISTIA: para parcelas antigas (sem dias_atraso registrado), contar a partir de hoje
             $stVencidas = $this->db->prepare("
                 SELECT cp.*, c.pedido_id, c.id AS carne_id_ref
                 FROM carne_parcelas cp
@@ -670,8 +671,23 @@ class CarneService {
             foreach ($parcelasVencidas as $pv) {
                 $pvId = (int) $pv['id'];
                 $vencimento = $pv['vencimento'];
-                $diasAtraso = (int) ((strtotime($hoje) - strtotime($vencimento)) / 86400);
-                if ($diasAtraso < 1) $diasAtraso = 1;
+                $diasAtrasoReal = (int) ((strtotime($hoje) - strtotime($vencimento)) / 86400);
+                if ($diasAtrasoReal < 1) $diasAtrasoReal = 1;
+
+                // Anistia: se a parcela nunca teve dias_atraso registrado (campo = 0 ou NULL),
+                // significa que é anterior ao deploy. Começar a contar do 1.
+                $diasAtrasoAnterior = (int) ($pv['dias_atraso'] ?? 0);
+                if ($diasAtrasoAnterior === 0) {
+                    // Primeira vez que o cron processa esta parcela com a nova regra
+                    $diasAtraso = 1;
+                } else {
+                    // Já estava sendo contado — incrementar +1 por dia
+                    $diasAtraso = $diasAtrasoAnterior + 1;
+                    // Mas nunca ultrapassar o atraso real
+                    if ($diasAtraso > $diasAtrasoReal) {
+                        $diasAtraso = $diasAtrasoReal;
+                    }
+                }
 
                 // Calcular juros
                 $valorProdOriginal = (float) ($pv['valor_produtos_original'] ?: $pv['valor_produtos']);
