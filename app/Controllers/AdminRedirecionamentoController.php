@@ -1353,7 +1353,10 @@ class AdminRedirecionamentoController extends Controller {
         if ($bairro !== '') $addr2Parts[] = $bairro;
 
         $externalId = 'REDIR-' . $envioId . '-' . date('YmdHis');
-        $freteDeclarado = round(max(0.01, $pesoKg * 1.80), 2);
+        $freteDeclarado = (float) ($envio['valor_frete_usd'] ?? 0);
+        if ($freteDeclarado <= 0) {
+            $freteDeclarado = round(max(0.01, $pesoKg * 1.80), 2);
+        }
 
         $payload = [
             'shipment_purpose' => 'personal',
