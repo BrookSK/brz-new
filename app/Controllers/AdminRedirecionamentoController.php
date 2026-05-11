@@ -565,8 +565,13 @@ class AdminRedirecionamentoController extends Controller {
     }
 
     private function enviarEmailNotificacao(string $para, string $assunto, string $corpo): void {
-        if (empty($para)) return;
-        try { mail($para, $assunto, $corpo, "Content-Type: text/html; charset=UTF-8\r\nFrom: noreply@braziliana.com"); } catch (\Exception $e) {}
+        if (empty($para) || !filter_var($para, FILTER_VALIDATE_EMAIL)) return;
+        try {
+            $emailService = new \App\Services\EmailService();
+            $emailService->send($para, $assunto, $corpo);
+        } catch (\Exception $e) {
+            error_log('[REDIR_EMAIL] Erro ao enviar para ' . $para . ': ' . $e->getMessage());
+        }
     }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
