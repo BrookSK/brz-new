@@ -1252,6 +1252,49 @@ class AdminComprasController extends Controller {
                 }
             }
 
+            // Build loja WHERE clause for inside the subquery
+            $params = [];
+            $lojasMultiFilter = isset($_GET['lojas']) ? array_filter(explode(',', $_GET['lojas'])) : [];
+            $whereLojaInner = '';
+            if ($temLojaIdEmLista) {
+                if (!empty($lojasMultiFilter)) {
+                    $lojaConditions = [];
+                    foreach ($lojasMultiFilter as $idx => $lval) {
+                        if ($lval === 'sem_loja') {
+                            if ($temLojaIdEmProdutos) {
+                                $lojaConditions[] = '(COALESCE(lc.loja_id,0) = 0 AND COALESCE(p_inner.loja_id,0) = 0)';
+                            } else {
+                                $lojaConditions[] = 'COALESCE(lc.loja_id,0) = 0';
+                            }
+                        } else {
+                            $pkey = ':loja_multi_' . $idx;
+                            if ($temLojaIdEmProdutos) {
+                                $lojaConditions[] = '(lc.loja_id = ' . $pkey . ' OR (COALESCE(lc.loja_id,0) = 0 AND p_inner.loja_id = ' . $pkey . '))';
+                            } else {
+                                $lojaConditions[] = 'lc.loja_id = ' . $pkey;
+                            }
+                            $params[$pkey] = (int) $lval;
+                        }
+                    }
+                    if (!empty($lojaConditions)) {
+                        $whereLojaInner = ' AND (' . implode(' OR ', $lojaConditions) . ')';
+                    }
+                } elseif ($semLoja) {
+                    if ($temLojaIdEmProdutos) {
+                        $whereLojaInner = ' AND COALESCE(lc.loja_id,0) = 0 AND COALESCE(p_inner.loja_id,0) = 0';
+                    } else {
+                        $whereLojaInner = ' AND COALESCE(lc.loja_id,0) = 0';
+                    }
+                } elseif ($lojaIdFilter > 0) {
+                    if ($temLojaIdEmProdutos) {
+                        $whereLojaInner = ' AND (lc.loja_id = :loja_id OR (COALESCE(lc.loja_id,0) = 0 AND p_inner.loja_id = :loja_id))';
+                    } else {
+                        $whereLojaInner = ' AND lc.loja_id = :loja_id';
+                    }
+                    $params[':loja_id'] = $lojaIdFilter;
+                }
+            }
+
             $selectCols = [
                 'p.id as produto_id',
                 'p.sku as sku',
@@ -1318,6 +1361,7 @@ class AdminComprasController extends Controller {
                             return (int) ($x['produto_id'] ?? 0);
                         }, (array) $reabertos['items'])))) . ')'))
                     : '')
+                . $whereLojaInner
                 . '   GROUP BY lc.produto_id, '
                 . ($this->columnExists('lista_compras', 'nome_produto') ? 'COALESCE(lc.nome_produto, \'\'), ' : '')
                 . ($temTipoCompraEmLista ? "COALESCE(lc.tipo_compra, ''), " : '')
@@ -1327,31 +1371,6 @@ class AdminComprasController extends Controller {
                 . ' ) agg'
                 . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
 
-            $params = [];
-            // Support multi-select lojas filter
-            $lojasMultiFilter = isset($_GET['lojas']) ? array_filter(explode(',', $_GET['lojas'])) : [];
-            if ($temLojaIdEmLista) {
-                if (!empty($lojasMultiFilter)) {
-                    $conditions = [];
-                    foreach ($lojasMultiFilter as $idx => $lval) {
-                        if ($lval === 'sem_loja') {
-                            $conditions[] = 'agg.loja_id = 0';
-                        } else {
-                            $pkey = ':loja_multi_' . $idx;
-                            $conditions[] = 'agg.loja_id = ' . $pkey;
-                            $params[$pkey] = (int) $lval;
-                        }
-                    }
-                    if (!empty($conditions)) {
-                        $sql .= ' WHERE (' . implode(' OR ', $conditions) . ')';
-                    }
-                } elseif ($semLoja) {
-                    $sql .= ' WHERE agg.loja_id = 0';
-                } elseif ($lojaIdFilter > 0) {
-                    $sql .= ' WHERE agg.loja_id = :loja_id';
-                    $params[':loja_id'] = $lojaIdFilter;
-                }
-            }
             if ($tipoCompraView === 'carne') {
                 $sql .= ' ORDER BY agg.data_solicitacao ASC, agg.prioridade DESC';
             } else {
