@@ -612,8 +612,8 @@ class AdminRemessaConferenciaController extends Controller {
             if ($gw === 'appmax') $appmaxPagamentos[] = $pg;
             if ($gw === 'cambioreal') $cambioRealPagamentos[] = $pg;
             if (strpos($comp, 'produto') !== false || strpos($comp, 'product') !== false) $produtosValor += $v;
-            if (strpos($comp, 'taxa') !== false || strpos($comp, 'servico') !== false || strpos($comp, 'service') !== false) $taxaServico += $v;
-            if (strpos($comp, 'imposto') !== false || strpos($comp, 'tax') !== false) $impostoValor += $v;
+            if (strpos($comp, 'taxa_servico') !== false || strpos($comp, 'taxa servico') !== false || $comp === 'servico' || strpos($comp, 'service') !== false) $taxaServico += $v;
+            if (strpos($comp, 'imposto') !== false || $comp === 'tax' || $comp === 'taxes') $impostoValor += $v;
             if (strpos($comp, 'local') !== false) $impostoLocal += $v;
             if ($metodoPagamento === '' && isset($pg['metodo'])) $metodoPagamento = (string)$pg['metodo'];
         }
@@ -754,7 +754,7 @@ class AdminRemessaConferenciaController extends Controller {
     <div class="col-md-2"><div class="text-muted small">País</div><div>' . $h($pais) . '</div></div>
 </div></div></div>';
 
-        // Itens â€” sem SKU e NCM
+        // Itens - sem SKU e NCM
         $itens = $pedido['itens'] ?? [];
         echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-box me-1"></i>Itens do Pedido</strong></div><div class="card-body">
 <div class="table-responsive"><table class="table table-sm align-middle">
@@ -785,7 +785,7 @@ class AdminRemessaConferenciaController extends Controller {
         }
         echo '</tbody></table></div></div></div>';
 
-        // Pagamento â€” bloco principal + dois cards AppMax / Câmbio Real
+        // Pagamento - bloco principal + dois cards AppMax / Câmbio Real
         echo '<div class="row"><div class="col-md-6">
 <div class="card mb-3"><div class="card-header"><strong><i class="fas fa-credit-card me-1"></i>Pagamento</strong></div><div class="card-body">
 <table class="table table-sm mb-0">';
@@ -875,7 +875,7 @@ class AdminRemessaConferenciaController extends Controller {
                 foreach ($fields as $f) {
                     if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
                     $val = (string)$pg[$f];
-                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . 'â€¦';
+                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '...';
                     if ($f === 'invoice_url' || $f === 'bank_slip_url') {
                         $val = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
                     } else {
@@ -909,7 +909,7 @@ class AdminRemessaConferenciaController extends Controller {
             echo '</div>'; // end row AppMax/CambioReal
         }
 
-        // Split detalhado â€” sem coluna Link, status em português
+        // Split detalhado - sem coluna Link, status em português
         if (!empty($pagamentos)) {
             echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-code-branch me-1"></i>Split de Pagamento</strong></div><div class="card-body">
 <div class="table-responsive"><table class="table table-sm">
@@ -947,7 +947,7 @@ class AdminRemessaConferenciaController extends Controller {
 </div></div></div>';
         }
 
-        // Informações Ãšteis â€” inclui todos os dados de pedido_pagamentos agrupados por gateway
+        // Informações Ãšteis - inclui todos os dados de pedido_pagamentos agrupados por gateway
         echo '<div class="card mb-3"><div class="card-header"><strong><i class="fas fa-info me-1"></i>Informações Ãšteis</strong></div><div class="card-body">';
         $useful = [
             'Código do pedido'   => $pedido['codigo_pedido'] ?? $pedido['codigo'] ?? '',
@@ -983,7 +983,7 @@ class AdminRemessaConferenciaController extends Controller {
                 foreach ($allFields as $f) {
                     if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
                     $val = (string)$pg[$f];
-                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . 'â€¦';
+                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '...';
                     if ($f === 'invoice_url' || $f === 'bank_slip_url') {
                         $display = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
                     } else {
@@ -1125,7 +1125,7 @@ th{background:#f5f5f5;width:160px}
 <tr><th>Cliente</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
 <tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
 </table>
-<h2>Dados do Pagamento â€” ' . $h($gwLabel) . '</h2>';
+<h2>Dados do Pagamento - ' . $h($gwLabel) . '</h2>';
 
         $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
         foreach ($pagamentos as $i => $pg) {
@@ -1134,7 +1134,7 @@ th{background:#f5f5f5;width:160px}
             foreach ($allFields as $f) {
                 if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
                 $val = (string)$pg[$f];
-                if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . 'â€¦';
+                if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '...';
                 echo '<tr><th>' . $h($f) . '</th><td>' . $h($val) . '</td></tr>';
             }
             echo '</table>';
