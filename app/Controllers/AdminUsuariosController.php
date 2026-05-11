@@ -138,9 +138,9 @@ class AdminUsuariosController extends Controller {
         }
 
         // === KPI GRID ===
-        $totalCarteiras = '$' . number_format((float)($stats['total_carteiras'] ?? 0), 2, '.', ',');
+        $totalCarteiras = '$' . number_format((float)($stats['total_carteira_usd'] ?? 0), 2, '.', ',');
         $usuariosAtivos = (int)($stats['usuarios_ativos'] ?? $total);
-        $novosHoje = (int)($stats['novos_hoje'] ?? 0);
+        $novosHoje = (int)($stats['usuarios_hoje'] ?? 0);
 
         echo '<div class="kpi-grid">
                 <div class="kpi-card">
