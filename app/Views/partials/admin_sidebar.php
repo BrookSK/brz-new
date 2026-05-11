@@ -257,7 +257,8 @@ function renderAdminSidebar($activePage = '') {
         'comissoes-global' => ['icon' => 'fas fa-users-cog', 'label' => 'Comissões Global', 'url' => '/admin/comissoes-global', 'roles' => ['admin']],
         'despesas' => ['icon' => 'fas fa-wallet', 'label' => 'Despesas', 'url' => '/admin/despesas', 'roles' => ['admin']],
         'demandas-painel' => ['icon' => 'fas fa-columns', 'label' => 'Painel de Demandas', 'url' => '/admin/demandas/painel', 'roles' => ['admin', 'suporte']],
-        'demandas-nova' => ['icon' => 'fas fa-file-alt', 'label' => 'Nova Solicitação', 'url' => '/admin/demandas/nova', 'roles' => ['admin', 'suporte']],
+        'demandas-minhas' => ['icon' => 'fas fa-user-clock', 'label' => 'Minhas Solicitações', 'url' => '/admin/demandas/minhas', 'roles' => ['admin', 'suporte', 'vendedor']],
+        'demandas-nova' => ['icon' => 'fas fa-file-alt', 'label' => 'Nova Solicitação', 'url' => '/admin/demandas/nova', 'roles' => ['admin', 'suporte', 'vendedor']],
         'demandas-concluidos' => ['icon' => 'fas fa-check-circle', 'label' => 'Concluídos', 'url' => '/admin/demandas/concluidos', 'roles' => ['admin', 'suporte']],
 
         // Módulo Redirecionamento (visível no admin/suporte)
@@ -431,7 +432,7 @@ function renderAdminSidebar($activePage = '') {
                 'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
                 'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'remessa-shipstation']],
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
-                'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-painel', 'demandas-nova', 'demandas-concluidos']],
+                'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos']],
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
                 'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup']],

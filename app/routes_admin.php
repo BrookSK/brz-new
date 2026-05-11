@@ -152,6 +152,9 @@ $router->get('/admin/dre-completo/exportar', 'AdminDreCompletoController', 'expo
 // Demandas
 $router->get('/admin/demandas/painel', 'AdminDemandasController', 'painel');
 $router->post('/admin/demandas/painel', 'AdminDemandasController', 'painel');
+$router->get('/admin/demandas/minhas', 'AdminDemandasController', 'minhasSolicitacoes');
+$router->get('/admin/demandas/minha/{id}', 'AdminDemandasController', 'minhaDetalhe');
+$router->post('/admin/demandas/minha/{id}/mensagem', 'AdminDemandasController', 'enviarMensagemSolicitante');
 $router->get('/admin/demandas/nova', 'AdminDemandasController', 'nova');
 $router->get('/admin/demandas/concluidos', 'AdminDemandasController', 'concluidos');
 $router->get('/admin/demandas/detalhe/{id}', 'AdminDemandasController', 'detalhe');

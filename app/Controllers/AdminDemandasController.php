@@ -50,6 +50,217 @@ class AdminDemandasController extends Controller {
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
+    /**
+     * Minhas Solicitações — lista demandas do usuário logado
+     */
+    public function minhasSolicitacoes(Request $request) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin','suporte','vendedor']);
+        $uid = $_SESSION['usuario_id'] ?? 0;
+
+        $demandas = [];
+        try {
+            $st = $this->db->prepare("SELECT * FROM demandas WHERE criado_por = ? ORDER BY created_at DESC");
+            $st->execute([$uid]);
+            $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+
+        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
+
+        $title = 'Minhas Solicitações'; $sidebarActive = 'demandas-minhas';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        echo '<div class="container-fluid py-3">';
+        echo '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">';
+        echo '<h4 class="fw-bold mb-0"><i class="fas fa-file-alt me-2"></i>Minhas Solicitações</h4>';
+        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>';
+        echo '</div>';
+
+        if (empty($demandas)) {
+            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">Nenhuma solicitação ainda</h5><p class="text-muted small">Clique em "Nova Solicitação" para registrar uma demanda.</p></div></div>';
+        } else {
+            foreach ($demandas as $d) {
+                $st = $statusLabels[$d['status']] ?? $d['status'];
+                $cor = $statusCores[$d['status']] ?? 'secondary';
+                $data = date('d/m/Y H:i', strtotime($d['created_at']));
+                $titulo = htmlspecialchars($d['bloco1_titulo'] ?? $d['titulo'] ?? '');
+                echo '<a href="/admin/demandas/minha/' . (int)$d['id'] . '" class="card border-0 shadow-sm mb-3 text-decoration-none" style="transition:transform .2s;" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">';
+                echo '<div class="card-body d-flex align-items-center gap-3">';
+                echo '<div class="flex-grow-1" style="min-width:0;">';
+                echo '<div class="fw-bold text-dark text-truncate">' . $titulo . '</div>';
+                echo '<div class="text-muted small">' . $data . '</div>';
+                echo '</div>';
+                echo '<span class="badge bg-' . $cor . ' flex-shrink-0">' . $st . '</span>';
+                echo '</div></a>';
+            }
+        }
+        echo '</div>';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
+     * Detalhe da minha solicitação (com chat)
+     */
+    public function minhaDetalhe(Request $request, $id) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin','suporte','vendedor']);
+        $uid = $_SESSION['usuario_id'] ?? 0;
+        $id = (int)$id;
+
+        // Buscar demanda (só se é do usuário logado)
+        $demanda = null;
+        try {
+            $st = $this->db->prepare("SELECT * FROM demandas WHERE id = ? AND criado_por = ?");
+            $st->execute([$id, $uid]);
+            $demanda = $st->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {}
+
+        if (!$demanda) {
+            $_SESSION['message'] = 'Solicitação não encontrada.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/demandas/minhas');
+            return;
+        }
+
+        $mensagens = $this->getMensagens($id);
+        $arquivosBug = $this->getArquivosDemanda($id);
+        $historico = $this->getHistorico($id);
+
+        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
+
+        $title = 'Solicitação #' . $id; $sidebarActive = 'demandas-minhas';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        echo '<div class="container-fluid py-3">';
+        echo '<a href="/admin/demandas/minhas" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Voltar</a>';
+
+        // Header
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-body">';
+        echo '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">';
+        echo '<div><h5 class="fw-bold mb-1">' . htmlspecialchars($demanda['bloco1_titulo']) . '</h5>';
+        echo '<div class="text-muted small">Criada em ' . date('d/m/Y H:i', strtotime($demanda['created_at'])) . '</div></div>';
+        echo '<span class="badge bg-' . ($statusCores[$demanda['status']] ?? 'secondary') . ' fs-6">' . ($statusLabels[$demanda['status']] ?? $demanda['status']) . '</span>';
+        echo '</div>';
+
+        // Motivo recusa
+        if ($demanda['status'] === 'recusado' && !empty($demanda['motivo_recusa'])) {
+            echo '<div class="alert alert-danger mt-3 mb-0 small"><i class="fas fa-ban me-1"></i><strong>Motivo da recusa:</strong> ' . nl2br(htmlspecialchars($demanda['motivo_recusa'])) . '</div>';
+        }
+
+        // Aviso teste
+        if ($demanda['status'] === 'em_teste') {
+            echo '<div class="alert alert-warning mt-3 mb-0 small"><i class="fas fa-stopwatch me-1"></i><strong>Em teste!</strong> Você tem 24h úteis para testar e dar seu parecer. Caso contrário, será fechada automaticamente.</div>';
+        }
+
+        echo '</div></div>';
+
+        // Arquivos
+        if (!empty($arquivosBug)) {
+            echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>Arquivos Anexados</h6></div><div class="card-body"><div class="row g-2">';
+            foreach ($arquivosBug as $arq) {
+                $isImg = str_starts_with($arq['tipo'] ?? '', 'image/');
+                echo '<div class="col-md-3 col-6"><div class="border rounded p-2 text-center">';
+                if ($isImg) echo '<a href="' . htmlspecialchars($arq['caminho']) . '" target="_blank"><img src="' . htmlspecialchars($arq['caminho']) . '" class="img-fluid rounded mb-1" style="max-height:100px;object-fit:cover;"></a>';
+                else echo '<a href="' . htmlspecialchars($arq['caminho']) . '" target="_blank" class="d-block py-2"><i class="fas fa-file fs-3 text-muted"></i></a>';
+                echo '<div class="text-truncate small text-muted">' . htmlspecialchars($arq['nome_original']) . '</div>';
+                echo '</div></div>';
+            }
+            echo '</div></div></div>';
+        }
+
+        // Histórico resumido
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-history me-1"></i>Histórico</h6></div><div class="card-body p-0"><ul class="list-group list-group-flush">';
+        foreach ($historico as $h) {
+            echo '<li class="list-group-item small"><strong>' . date('d/m H:i', strtotime($h['created_at'])) . '</strong> — ' . ucfirst(str_replace('_', ' ', $h['status_novo']));
+            if ($h['observacao']) echo '<br><span class="text-muted">' . htmlspecialchars($h['observacao']) . '</span>';
+            echo '</li>';
+        }
+        echo '</ul></div></div>';
+
+        // Chat
+        echo '<div class="card border-0 shadow-sm mb-4" id="chat"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>Comunicação com o TI</h6><span class="badge bg-secondary">' . count($mensagens) . '</span></div>';
+        echo '<div class="card-body" style="max-height:400px;overflow-y:auto;">';
+        if (empty($mensagens)) {
+            echo '<div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>Nenhuma mensagem ainda.</div>';
+        } else {
+            foreach ($mensagens as $msg) {
+                $isMeu = ((int)($msg['usuario_id'] ?? 0) === $uid);
+                echo '<div class="mb-3 d-flex ' . ($isMeu ? 'justify-content-end' : 'justify-content-start') . '">';
+                echo '<div class="' . ($isMeu ? 'bg-primary bg-opacity-10 border-primary' : 'bg-light') . ' border rounded p-2" style="max-width:80%;">';
+                echo '<div class="d-flex justify-content-between align-items-center mb-1"><span class="fw-semibold" style="font-size:11px;">' . htmlspecialchars($msg['usuario_nome']) . '</span><span class="text-muted" style="font-size:10px;">' . date('d/m H:i', strtotime($msg['created_at'])) . '</span></div>';
+                if (!empty($msg['mensagem'])) echo '<div class="small">' . nl2br(htmlspecialchars($msg['mensagem'])) . '</div>';
+                if (!empty($msg['arquivos'])) {
+                    echo '<div class="d-flex flex-wrap gap-2 mt-2">';
+                    foreach ($msg['arquivos'] as $arq) {
+                        if (str_starts_with($arq['tipo'] ?? '', 'image/')) echo '<a href="' . htmlspecialchars($arq['caminho']) . '" target="_blank"><img src="' . htmlspecialchars($arq['caminho']) . '" class="rounded border" style="max-height:60px;"></a>';
+                        else echo '<a href="' . htmlspecialchars($arq['caminho']) . '" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2"><i class="fas fa-download me-1"></i>' . htmlspecialchars($arq['nome_original']) . '</a>';
+                    }
+                    echo '</div>';
+                }
+                echo '</div></div>';
+            }
+        }
+        echo '</div>';
+
+        // Form enviar mensagem
+        echo '<div class="card-footer bg-white border-top"><form method="POST" action="/admin/demandas/minha/' . $id . '/mensagem" enctype="multipart/form-data">';
+        echo '<div class="d-flex gap-2"><div class="flex-grow-1"><textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="Escreva uma mensagem..."></textarea></div></div>';
+        echo '<div class="d-flex justify-content-between align-items-center mt-2"><div><label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;"><i class="fas fa-paperclip me-1"></i>Anexar<input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip"></label></div>';
+        echo '<button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Enviar</button></div>';
+        echo '</form></div></div>';
+
+        echo '</div>';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
+    /**
+     * Enviar mensagem como solicitante
+     */
+    public function enviarMensagemSolicitante(Request $request, $id) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin','suporte','vendedor']);
+        $id = (int)$id;
+        $uid = $_SESSION['usuario_id'] ?? 0;
+
+        // Verificar se a demanda é do usuário
+        try {
+            $st = $this->db->prepare("SELECT id FROM demandas WHERE id = ? AND criado_por = ?");
+            $st->execute([$id, $uid]);
+            if (!$st->fetchColumn()) { $this->redirect('/admin/demandas/minhas'); return; }
+        } catch (\Exception $e) { $this->redirect('/admin/demandas/minhas'); return; }
+
+        $mensagem = trim($_POST['mensagem'] ?? '');
+        $nomeUsuario = 'Usuário';
+        try { if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: 'Usuário'); } } catch (\Exception $e) {}
+
+        $this->ensureChatTables();
+        $msgId = null;
+        if ($mensagem !== '' || !empty($_FILES['arquivos']['name'][0])) {
+            $st = $this->db->prepare("INSERT INTO demanda_mensagens (demanda_id, usuario_id, usuario_nome, mensagem) VALUES (?, ?, ?, ?)");
+            $st->execute([$id, $uid, $nomeUsuario, $mensagem ?: null]);
+            $msgId = (int)$this->db->lastInsertId();
+        }
+
+        if (!empty($_FILES['arquivos']['name'][0])) {
+            $uploadDir = __DIR__ . '/../../public/uploads/demandas/' . $id . '/';
+            if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+            foreach ($_FILES['arquivos']['name'] as $i => $nome) {
+                if ($_FILES['arquivos']['error'][$i] !== UPLOAD_ERR_OK) continue;
+                $nomeOriginal = basename($nome);
+                $nomeArquivo = time() . '_' . $i . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $nomeOriginal);
+                $destino = $uploadDir . $nomeArquivo;
+                if (move_uploaded_file($_FILES['arquivos']['tmp_name'][$i], $destino)) {
+                    $caminho = '/uploads/demandas/' . $id . '/' . $nomeArquivo;
+                    $this->db->prepare("INSERT INTO demanda_arquivos (demanda_id, mensagem_id, usuario_id, nome_original, caminho, tipo, tamanho) VALUES (?,?,?,?,?,?,?)")
+                        ->execute([$id, $msgId, $uid, $nomeOriginal, $caminho, $_FILES['arquivos']['type'][$i] ?? '', (int)($_FILES['arquivos']['size'][$i] ?? 0)]);
+                }
+            }
+        }
+
+        $this->redirect('/admin/demandas/minha/' . $id . '#chat');
+    }
+
     public function criar(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
         $body = $_POST;
@@ -457,9 +668,11 @@ class AdminDemandasController extends Controller {
      * Busca email do solicitante
      */
     private function getEmailSolicitante(array $demanda): ?string {
+        error_log('[DEMANDAS] getEmailSolicitante: solicitante_email=' . ($demanda['solicitante_email'] ?? 'NULL') . ' criado_por=' . ($demanda['criado_por'] ?? 'NULL') . ' solicitante=' . ($demanda['solicitante'] ?? 'NULL'));
+
         // Primeiro tenta campo direto
         $email = trim((string)($demanda['solicitante_email'] ?? ''));
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) return $email;
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) { error_log('[DEMANDAS] Email encontrado via campo direto: ' . $email); return $email; }
 
         // Tenta buscar pelo criado_por
         $uid = (int)($demanda['criado_por'] ?? 0);
@@ -468,21 +681,22 @@ class AdminDemandasController extends Controller {
                 $st = $this->db->prepare("SELECT email FROM usuarios WHERE id = ? LIMIT 1");
                 $st->execute([$uid]);
                 $e = trim((string)($st->fetchColumn() ?: ''));
-                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) return $e;
-            } catch (\Exception $e) {}
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) { error_log('[DEMANDAS] Email encontrado via criado_por: ' . $e); return $e; }
+            } catch (\Exception $e) { error_log('[DEMANDAS] Erro busca por criado_por: ' . $e->getMessage()); }
         }
 
-        // Tenta buscar pelo nome do solicitante
+        // Tenta buscar pelo nome do solicitante (exato ou LIKE)
         $nome = trim((string)($demanda['solicitante'] ?? ''));
         if ($nome !== '') {
             try {
-                $st = $this->db->prepare("SELECT email FROM usuarios WHERE nome = ? LIMIT 1");
-                $st->execute([$nome]);
+                $st = $this->db->prepare("SELECT email FROM usuarios WHERE nome = ? OR nome LIKE ? LIMIT 1");
+                $st->execute([$nome, '%' . $nome . '%']);
                 $e = trim((string)($st->fetchColumn() ?: ''));
-                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) return $e;
-            } catch (\Exception $e) {}
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) { error_log('[DEMANDAS] Email encontrado via nome: ' . $e); return $e; }
+            } catch (\Exception $e) { error_log('[DEMANDAS] Erro busca por nome: ' . $e->getMessage()); }
         }
 
+        error_log('[DEMANDAS] Email do solicitante NÃO encontrado para demanda #' . ($demanda['id'] ?? '?'));
         return null;
     }
 
