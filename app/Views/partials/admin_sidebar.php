@@ -322,8 +322,8 @@ function renderAdminSidebar($activePage = '') {
         $pendentesConferencia = 0;
     }
 
-    // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
-    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
+    // Toggle mobile - custom JS (não usa collapse do Bootstrap para evitar conflito com grupos internos)
+    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" onclick="document.getElementById(\'adminSidebar\').classList.toggle(\'sidebar-open\')" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
             <i class="fas fa-bars"></i>
           </button>';
 
@@ -412,7 +412,7 @@ function renderAdminSidebar($activePage = '') {
         }
     }
 
-    echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+    echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar">
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                 ' . (!empty($adminLogo)
@@ -869,11 +869,13 @@ function renderAdminSidebarStyles() {
                 border-bottom-right-radius: 18px;
                 background: #ffffff;
                 border-right: none;
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                display: block !important;
             }
 
-            /* Quando aberto, precisa ficar acima */
-            #adminSidebar.sidebar.show {
-                display: block;
+            #adminSidebar.sidebar.sidebar-open {
+                transform: translateX(0);
             }
 
             /* Dar espaço no conteúdo pra não ficar atrás do botão */
