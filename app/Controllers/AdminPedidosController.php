@@ -5524,13 +5524,31 @@ LINKSCRIPT;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minhas Comissões - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">';
 
         renderAdminSidebarStyles();
 
         echo '<style>
-        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
-        .comm-card{flex:0 0 240px;min-height:92px;background:#fff}
+        .comm-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding-bottom:6px;}
+        .comm-card{min-height:108px;background:#fff;border:1px solid #EBF0F6;border-radius:12px;padding:16px;transition:.18s ease;}
+        .comm-card:hover{box-shadow:0 4px 16px rgba(24,37,61,.07);transform:translateY(-1px);}
+        .comm-card .text-muted{font-size:12px;margin-bottom:7px;}
+        .comm-card .fw-bold,.comm-card h5{color:#18253D;font-size:20px;font-weight:700;}
+        @media(max-width:1100px){.comm-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
+        @media(max-width:768px){.comm-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.comm-card{min-height:auto;padding:14px;}.comm-card .fw-bold,.comm-card h5{font-size:18px;}}
+        @media(max-width:480px){.comm-cards{grid-template-columns:1fr;}}
+        .table-responsive{overflow-x:hidden!important;}
+        @media(max-width:768px){
+            table.table{display:block!important;width:100%!important;}
+            table.table thead{display:none!important;}
+            table.table tbody{display:block!important;}
+            table.table tbody tr{display:block!important;margin-bottom:12px!important;padding:12px!important;border:1px solid #e2e8f0!important;border-radius:10px!important;background:#fff!important;}
+            table.table tbody tr td{display:block!important;width:100%!important;padding:6px 0!important;border:none!important;border-bottom:1px solid #f1f5f9!important;white-space:normal!important;word-break:break-word!important;}
+            table.table tbody tr td:last-child{border-bottom:none!important;}
+            .col-lg-8,.col-lg-4,.col-md-8,.col-md-4,.col-md-9,.col-lg-10{flex:0 0 100%!important;max-width:100%!important;}
+            html,body,.container-fluid{overflow-x:hidden!important;max-width:100vw!important;}
+        }
         </style></head>
 <body>
     <div class="container-fluid">
