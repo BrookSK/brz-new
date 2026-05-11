@@ -475,17 +475,19 @@ class AdminDreCompletoController extends Controller {
 
         try {
             // ENTRADAS: pagamentos recebidos (pedido_pagamentos com status pago)
-            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status, pp.updated_at as data,
+            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status,
+                COALESCE(pp.updated_at, pp.created_at) as data,
                 COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                WHERE pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','paid','succeeded','approved','confirmed')
-                AND pp.updated_at >= ?
-                ORDER BY pp.updated_at DESC LIMIT 200");
+                WHERE (pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','paid','succeeded','approved','confirmed','ON_HOLD')
+                    OR UPPER(pp.gateway_status) LIKE '%PAGO%' OR UPPER(pp.gateway_status) LIKE '%PAID%' OR UPPER(pp.gateway_status) LIKE '%FINALIZADA%')
+                AND COALESCE(pp.updated_at, pp.created_at) >= ?
+                ORDER BY COALESCE(pp.updated_at, pp.created_at) DESC LIMIT 300");
             $st->execute([$desde]);
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 $gw = $r['gateway'] ?? 'outro';
-                $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : ($gw === 'cambioreal' ? 'CR Produtos' : ucfirst($gw)));
+                $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : (in_array($gw, ['cambioreal','cambio_real']) ? 'CR Produtos' : ucfirst($gw)));
                 $movimentos[] = [
                     'data' => date('d/m/Y', strtotime($r['data'])),
                     'data_sort' => $r['data'],
@@ -520,7 +522,7 @@ class AdminDreCompletoController extends Controller {
                 foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                     $movimentos[] = ['data' => date('d/m/Y', strtotime($r['pago_em'])), 'data_sort' => $r['pago_em'], 'descricao' => ($r['descricao'] ?? 'Despesa') . ($r['categoria'] ? ' (' . $r['categoria'] . ')' : ''), 'gateway' => 'Saída', 'tipo' => 'saida', 'valor' => (float)($r['valor'] ?? 0), 'moeda' => $r['moeda'] ?? 'BRL'];
                 }
-            } catch (\Exception $e) {} // tabela pode não existir
+            } catch (\Exception $e) {}
 
         } catch (\Exception $e) {
             error_log('[FLUXO_CAIXA] Erro: ' . $e->getMessage());

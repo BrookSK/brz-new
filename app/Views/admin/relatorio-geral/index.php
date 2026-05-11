@@ -695,11 +695,14 @@ function renderDreCompleto(d) {
     h += '<tr><td class="text-muted small">Quantidade de lançamentos</td><td class="text-end">'+d.conciliacao.qtd_lancamentos+'</td></tr>';
     h += '</tbody></table>';
     h += '<hr class="my-3">';
-    h += '<div class="d-flex justify-content-between align-items-center mb-3"><h6 class="fw-bold mb-0"><i class="fas fa-money-bill-wave me-2"></i>Fluxo de Caixa</h6><div><button class="btn btn-sm btn-outline-dark me-1" onclick="carregarFluxoCaixa(this,false)"><i class="fas fa-eye me-1"></i>Carregar</button><button class="btn btn-sm btn-outline-primary" onclick="carregarFluxoCaixa(this,true)"><i class="fas fa-sync me-1"></i>Atualizar APIs</button></div></div>';
-    h += '<div id="conciliacao-gateways-container"><div class="text-muted small text-center py-3"><i class="fas fa-chart-line d-block fs-3 mb-2 opacity-50"></i>Clique em "Carregar" para ver o fluxo de caixa com saldos dos gateways.</div></div>';
+    h += '<div class="d-flex justify-content-between align-items-center mb-3"><h6 class="fw-bold mb-0"><i class="fas fa-money-bill-wave me-2"></i>Fluxo de Caixa</h6><button class="btn btn-sm btn-outline-primary" onclick="carregarFluxoCaixa(this,true)"><i class="fas fa-sync me-1"></i>Atualizar APIs</button></div>';
+    h += '<div id="conciliacao-gateways-container"><div class="text-center py-3"><i class="fas fa-spinner fa-spin text-muted"></i><div class="text-muted small mt-1">Carregando fluxo de caixa...</div></div></div>';
     h += '</div></div>';
 
     document.getElementById('dre-completo-container').innerHTML = h;
+
+    // Auto-carregar fluxo de caixa
+    setTimeout(function(){ carregarFluxoCaixa(document.querySelector('#conciliacao-gateways-container')&&document.querySelector('[onclick*="carregarFluxoCaixa"]')||document.createElement('button'), false); }, 500);
 }
 
 function card(label,icon,color,value) {
@@ -856,6 +859,43 @@ function renderFluxoCaixa(d, container) {
     if (divTotal > 0) {
         h += '<div class="alert alert-warning mt-4 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+divTotal+' divergência(s) encontrada(s)</strong> entre o sistema e os gateways. Verifique os pagamentos que não batem.</div>';
     }
+
+    // === COMPARAÇÃO: SITE vs GATEWAYS ===
+    var totalSite = 0; var totalGateways = 0;
+    if (d.fluxo_caixa) d.fluxo_caixa.forEach(function(m){ if(m.tipo==='entrada') totalSite += m.valor; });
+    if (s.saldo) s.saldo.forEach(function(b){ totalGateways += b.disponivel + b.pendente; });
+    totalGateways += (cr.total_recebido_usd||0) + (crt.total_recebido_usd||0);
+
+    h += '<div class="card border-0 shadow-sm mt-4 mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Comparativo: Sistema vs Gateways (30 dias)</h6></div><div class="card-body">';
+    h += '<div class="row g-3 text-center">';
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total Entradas (Sistema)</div><div class="fs-4 fw-bold text-success">'+fmtV(totalSite,'USD')+'</div></div></div>';
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total nos Gateways</div><div class="fs-4 fw-bold text-primary">'+fmtV(totalGateways,'USD')+'</div></div></div>';
+    var diff = totalSite - totalGateways;
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Diferença</div><div class="fs-4 fw-bold '+(Math.abs(diff)<1?'text-success':'text-danger')+'">'+fmtV(diff,'USD')+'</div>'+(Math.abs(diff)<1?'<div class="text-success small"><i class="fas fa-check-circle"></i> Conciliado</div>':'<div class="text-danger small"><i class="fas fa-exclamation-triangle"></i> Verificar</div>')+'</div></div>';
+    h += '</div></div></div>';
+
+    // === MOVIMENTAÇÕES POR GATEWAY (3 blocos) ===
+    h += '<div class="row g-3 mb-4">';
+    var gateways = [
+        {key:'Stripe', cor:'#635bff', icon:'fab fa-stripe-s'},
+        {key:'CR Produtos', cor:'#0ea5e9', icon:'fas fa-dollar-sign'},
+        {key:'CR Taxas', cor:'#f59e0b', icon:'fas fa-receipt'}
+    ];
+    gateways.forEach(function(gw){
+        var movs = (d.fluxo_caixa||[]).filter(function(m){ return m.gateway === gw.key; });
+        var total = movs.reduce(function(s,m){ return s + (m.tipo==='entrada'?m.valor:-m.valor); }, 0);
+        h += '<div class="col-md-4"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid '+gw.cor+';">';
+        h += '<div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><span class="fw-bold small"><i class="'+gw.icon+' me-1" style="color:'+gw.cor+';"></i>'+gw.key+'</span><span class="badge bg-light text-dark border">'+movs.length+'</span></div>';
+        h += '<div class="card-body p-0" style="max-height:250px;overflow-y:auto;"><table class="table table-sm mb-0" style="font-size:11px;"><tbody>';
+        if (movs.length === 0) h += '<tr><td class="text-center text-muted py-3">Sem movimentação</td></tr>';
+        else movs.slice(0,20).forEach(function(m){
+            h += '<tr><td class="text-nowrap">'+m.data+'</td><td class="text-truncate" style="max-width:120px;">'+m.descricao+'</td><td class="text-end '+(m.tipo==='entrada'?'text-success':'text-danger')+' fw-semibold">'+(m.tipo==='entrada'?'+':'-')+fmtV(m.valor,m.moeda)+'</td></tr>';
+        });
+        h += '</tbody></table></div>';
+        h += '<div class="card-footer bg-white border-top text-end"><span class="fw-bold small">Total: <span class="'+(total>=0?'text-success':'text-danger')+'">'+fmtV(total,'USD')+'</span></span></div>';
+        h += '</div></div>';
+    });
+    h += '</div>';
 
     container.innerHTML = h;
 }
