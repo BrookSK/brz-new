@@ -5266,10 +5266,7 @@ LINKSCRIPT;
         $admin = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
 
-        $escopo = strtolower(trim((string) $request->getParam('escopo', '')));
-        if ($escopo !== 'todos') {
-            $escopo = 'me';
-        }
+        $escopo = 'me'; // Sempre mostrar apenas do usuário logado
 
         // Filtros
         $filtroDataInicio = $request->getParam('data_inicio', '');
@@ -5579,13 +5576,6 @@ LINKSCRIPT;
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Minhas Comissões</h1>
                     <div>
-                        ' . ($perfil === 'admin'
-                            ? (
-                                $escopo === 'todos'
-                                    ? '<a href="/admin/pedidos/comissoes" class="btn btn-outline-dark me-2"><i class="fas fa-user"></i> Ver minhas</a>'
-                                    : '<a href="/admin/pedidos/comissoes?escopo=todos" class="btn btn-outline-dark me-2"><i class="fas fa-users"></i> Ver todos</a>'
-                            )
-                            : '') . '
                         <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
                     </div>
@@ -5597,10 +5587,9 @@ LINKSCRIPT;
                         <input type="hidden" name="escopo" value="' . htmlspecialchars($escopo) . '">
                         <div class="col-md-2"><label class="form-label small text-muted mb-1">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
                         <div class="col-md-2"><label class="form-label small text-muted mb-1">Data fim</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
-                        ' . ($perfil === 'admin' && $escopo === 'todos' ? '<div class="col-md-3"><label class="form-label small text-muted mb-1">Vendedor/Admin</label><select name="usuario_id" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildUsuarioOptions($filtroUsuario) . '</select></div>' : '') . '
                         <div class="col-md-2"><label class="form-label small text-muted mb-1">Status pedido</label><select name="status_pedido" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
                         <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
-                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes?escopo=' . htmlspecialchars($escopo) . '" class="btn btn-outline-secondary btn-sm">Limpar</a></div>
+                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes" class="btn btn-outline-secondary btn-sm">Limpar</a></div>
                     </form>
                 </div></div>
 
