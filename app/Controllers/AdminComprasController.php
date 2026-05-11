@@ -1328,8 +1328,24 @@ class AdminComprasController extends Controller {
                 . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
 
             $params = [];
+            // Support multi-select lojas filter
+            $lojasMultiFilter = isset($_GET['lojas']) ? array_filter(explode(',', $_GET['lojas'])) : [];
             if ($temLojaIdEmLista) {
-                if ($semLoja) {
+                if (!empty($lojasMultiFilter)) {
+                    $conditions = [];
+                    foreach ($lojasMultiFilter as $idx => $lval) {
+                        if ($lval === 'sem_loja') {
+                            $conditions[] = 'agg.loja_id = 0';
+                        } else {
+                            $pkey = ':loja_multi_' . $idx;
+                            $conditions[] = 'agg.loja_id = ' . $pkey;
+                            $params[$pkey] = (int) $lval;
+                        }
+                    }
+                    if (!empty($conditions)) {
+                        $sql .= ' WHERE (' . implode(' OR ', $conditions) . ')';
+                    }
+                } elseif ($semLoja) {
                     $sql .= ' WHERE agg.loja_id = 0';
                 } elseif ($lojaIdFilter > 0) {
                     $sql .= ' WHERE agg.loja_id = :loja_id';
@@ -1465,6 +1481,7 @@ class AdminComprasController extends Controller {
             $valorTotalPendente = 0.0;
             $produtosSelect = [];
             $pedidosSelect = [];
+            $lojasMultiFilter = [];
         }
 
         // Incluir o partial do menu lateral
@@ -1523,7 +1540,9 @@ class AdminComprasController extends Controller {
                     . '</div>';
 
                 $qsLoja = '';
-                if ($semLoja) {
+                if (!empty($lojasMultiFilter)) {
+                    $qsLoja = '&lojas=' . htmlspecialchars(implode(',', $lojasMultiFilter));
+                } elseif ($semLoja) {
                     $qsLoja = '&sem_loja=1';
                 } elseif ($lojaIdFilter > 0) {
                     $qsLoja = '&loja_id=' . (int) $lojaIdFilter;
@@ -1534,28 +1553,140 @@ class AdminComprasController extends Controller {
                     . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">Concluídas</a>'
                     . '</div>';
 
+                // Build active lojas array from query string (supports multi-select)
+                $lojasAtivas = [];
+                if ($semLoja) {
+                    $lojasAtivas[] = 'sem_loja';
+                } elseif ($lojaIdFilter > 0) {
+                    $lojasAtivas[] = (string) $lojaIdFilter;
+                }
+                // Check for multi-select param
+                $lojasMulti = isset($_GET['lojas']) ? array_filter(explode(',', $_GET['lojas'])) : [];
+                if (!empty($lojasMulti)) {
+                    $lojasAtivas = $lojasMulti;
+                }
+
+                $dropdownLabel = 'Todas as lojas';
+                if (in_array('sem_loja', $lojasAtivas)) {
+                    $dropdownLabel = 'Sem loja';
+                    if (count($lojasAtivas) > 1) {
+                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                    }
+                } elseif (!empty($lojasAtivas)) {
+                    if (count($lojasAtivas) === 1) {
+                        foreach ($lojas as $l) {
+                            if ((string)($l['id'] ?? '') === $lojasAtivas[0]) {
+                                $dropdownLabel = htmlspecialchars($l['nome'] ?? '');
+                                break;
+                            }
+                        }
+                    } else {
+                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                    }
+                }
+
                 echo '<div class="card mb-4">
                     <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
                         <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <a class="btn btn-sm ' . (!$semLoja && $lojaIdFilter === 0 ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '">Todas</a>';
+                            <div class="dropdown" id="lojaDropdownWrapper">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="lojaDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                    <i class="fas fa-store me-1"></i>' . $dropdownLabel . '
+                                </button>
+                                <div class="dropdown-menu p-3" style="min-width:250px;max-height:320px;overflow-y:auto;" aria-labelledby="lojaDropdownBtn">
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="Buscar loja...">
+                                    </div>
+                                    <div class="form-check mb-1">
+                                        <input class="form-check-input loja-check" type="checkbox" value="todas" id="lojaCheck_todas" ' . (empty($lojasAtivas) ? 'checked' : '') . '>
+                                        <label class="form-check-label" for="lojaCheck_todas">Todas</label>
+                                    </div>
+                                    <hr class="my-1">';
 
                 foreach ($lojas as $l) {
                     $lid = (int) ($l['id'] ?? 0);
-                    $lname = (string) ($l['nome'] ?? '');
-                    $active = (!$semLoja && $lojaIdFilter === $lid);
-                    echo '<a class="btn btn-sm ' . ($active ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '&loja_id=' . $lid . '">' . htmlspecialchars($lname) . '</a>';
+                    $lname = htmlspecialchars($l['nome'] ?? '');
+                    $checked = in_array((string)$lid, $lojasAtivas) ? 'checked' : '';
+                    echo '<div class="form-check mb-1 loja-item">
+                                        <input class="form-check-input loja-check" type="checkbox" value="' . $lid . '" id="lojaCheck_' . $lid . '" ' . $checked . '>
+                                        <label class="form-check-label" for="lojaCheck_' . $lid . '">' . $lname . '</label>
+                                    </div>';
                 }
 
-                echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1">Sem loja</a>'
-                    . '</div>'
+                echo '<hr class="my-1">
+                                    <div class="form-check mb-1 loja-item">
+                                        <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
+                                        <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
+                                    </div>
+                                    <hr class="my-1">
+                                    <button type="button" class="btn btn-sm btn-primary w-100" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar filtro</button>
+                                </div>
+                            </div>
+                        </div>'
                     . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">Tipo:</small>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Online</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Offline</a>'
-                    . '<!-- Carnê oculto - tela separada em /admin/carnes/compras-mensal -->'
                     . '</div>'
                     . '</div>'
                     . '</div>';
+
+                // JavaScript for multi-select dropdown
+                echo '<script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    var todasCheck = document.getElementById("lojaCheck_todas");
+                    var lojaChecks = document.querySelectorAll(".loja-check:not(#lojaCheck_todas)");
+                    var searchInput = document.getElementById("lojaSearchInput");
+                    var applyBtn = document.getElementById("lojaApplyBtn");
+
+                    // "Todas" unchecks others
+                    todasCheck.addEventListener("change", function() {
+                        if (this.checked) {
+                            lojaChecks.forEach(function(cb) { cb.checked = false; });
+                        }
+                    });
+
+                    // Any other check unchecks "Todas"
+                    lojaChecks.forEach(function(cb) {
+                        cb.addEventListener("change", function() {
+                            if (this.checked) {
+                                todasCheck.checked = false;
+                            }
+                            // If none selected, re-check "Todas"
+                            var anyChecked = Array.from(lojaChecks).some(function(c) { return c.checked; });
+                            if (!anyChecked) todasCheck.checked = true;
+                        });
+                    });
+
+                    // Search filter
+                    searchInput.addEventListener("input", function() {
+                        var term = this.value.toLowerCase();
+                        document.querySelectorAll(".loja-item").forEach(function(item) {
+                            var label = item.querySelector("label");
+                            if (label) {
+                                item.style.display = label.textContent.toLowerCase().indexOf(term) >= 0 ? "" : "none";
+                            }
+                        });
+                    });
+
+                    // Apply button
+                    applyBtn.addEventListener("click", function() {
+                        var selected = [];
+                        lojaChecks.forEach(function(cb) {
+                            if (cb.checked) selected.push(cb.value);
+                        });
+                        var status = "' . $statusView . '";
+                        var tipo = "' . $tipoCompraView . '";
+                        var url = "/admin/estoque/compras?status=" + status;
+                        if (selected.length > 0 && !todasCheck.checked) {
+                            url += "&lojas=" + selected.join(",");
+                        }
+                        if (tipo !== "todos") {
+                            url += "&tipo_compra=" + tipo;
+                        }
+                        window.location.href = url;
+                    });
+                });
+                </script>';
 
                 // Cards de Estatísticas
                 echo '<div class="row mb-4">
