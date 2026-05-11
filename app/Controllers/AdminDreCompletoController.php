@@ -519,7 +519,7 @@ class AdminDreCompletoController extends Controller {
             $st = $this->db->query("SELECT pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
                 pp.created_at as pp_created, pp.updated_at as pp_updated,
                 p.created_at as p_created,
-                COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
+                CONCAT('#', pp.pedido_id) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
                 ORDER BY pp.id DESC LIMIT 500");
