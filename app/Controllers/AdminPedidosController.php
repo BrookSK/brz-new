@@ -787,6 +787,34 @@ class AdminPedidosController extends Controller {
             $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $st->execute([(int) $id]);
 
+            // Restaurar carnê associado ao pedido (se existir)
+            try {
+                // Restaurar status do carnê (cancelado -> ativo)
+                $pdo->prepare("UPDATE carnes SET status = 'ativo', cancelado_em = NULL, motivo_cancelamento = NULL WHERE pedido_id = ? AND status = 'cancelado'")
+                    ->execute([(int) $id]);
+
+                // Restaurar parcelas canceladas que não foram pagas (cancelada -> pendente)
+                $pdo->prepare("UPDATE carne_parcelas cp
+                    JOIN carnes c ON cp.carne_id = c.id
+                    SET cp.status = 'pendente'
+                    WHERE c.pedido_id = ? AND cp.status = 'cancelada'")
+                    ->execute([(int) $id]);
+
+                // Registrar no histórico do carnê
+                $stCarne = $pdo->prepare("SELECT id FROM carnes WHERE pedido_id = ? LIMIT 1");
+                $stCarne->execute([(int) $id]);
+                $carneId = (int) ($stCarne->fetchColumn() ?: 0);
+                if ($carneId > 0) {
+                    try {
+                        $pdo->prepare("INSERT INTO carne_historico (carne_id, evento, descricao, created_at) VALUES (?, 'carne_restaurado', 'Carnê restaurado junto com o pedido (retirado da lixeira)', NOW())")
+                            ->execute([$carneId]);
+                    } catch (\Exception $e) {}
+                    error_log("[CARNE] Carnê #{$carneId} restaurado junto com pedido #{$id}");
+                }
+            } catch (\Exception $e) {
+                error_log('[CARNE] Erro ao restaurar carnê do pedido #' . $id . ': ' . $e->getMessage());
+            }
+
             // Re-sincronizar com QuickBooks ao restaurar pedido
             try {
                 $qbR = new \App\Services\QuickBooksService();
