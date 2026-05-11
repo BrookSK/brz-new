@@ -440,10 +440,10 @@ document.getElementById('btnAddProduto').addEventListener('click', () => {
     div.className = 'row g-2 mb-2 align-items-end produto-row border-bottom pb-2';
     div.innerHTML = `
         <div class="col-md-3"><label class="form-label small">NCM</label>
-            <div class="position-relative">
-                <input class="form-control form-control-sm ncm-input" type="text" name="produtos[${i}][ncm]" placeholder="Código ou descrição..." autocomplete="off">
-                <div class="ncm-dropdown list-group position-absolute w-100 shadow-sm" style="z-index:1000;max-height:200px;overflow-y:auto;display:none"></div>
-            </div></div>
+            <select class="form-select form-select-sm ncm-select" name="produtos[${i}][ncm]">
+                <option value="">Selecione o NCM...</option>
+                ${NCM_LIST.map(n => `<option value="${n.cod}">${n.cod} — ${n.desc}</option>`).join('')}
+            </select></div>
         <div class="col-md-4"><label class="form-label small">Descrição <span class="text-danger">*</span></label>
             <input class="form-control form-control-sm" type="text" name="produtos[${i}][descricao]" required></div>
         <div class="col-md-2"><label class="form-label small">Preço (USD)</label>
@@ -454,23 +454,19 @@ document.getElementById('btnAddProduto').addEventListener('click', () => {
             <input class="form-control form-control-sm" type="number" min="1" name="produtos[${i}][quantidade]" value="1"></div>
         <div class="col-md-1 text-end pt-3"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.produto-row').remove()"><i class="fas fa-trash"></i></button></div>`;
     document.getElementById('listaProdutos').appendChild(div);
-    initNcmInput(div.querySelector('.ncm-input'), div.querySelector('.ncm-dropdown'));
+    // Auto-preencher descrição ao selecionar NCM
+    const sel = div.querySelector('.ncm-select');
+    sel.addEventListener('change', function() {
+        const cod = this.value;
+        const match = NCM_LIST.find(n => n.cod === cod);
+        if (match) {
+            const descInput = this.closest('.produto-row')?.querySelector('[name*="[descricao]"]');
+            if (descInput && !descInput.value) descInput.value = match.desc;
+        }
+    });
 });
 
 const NCM_LIST = <?= json_encode(array_map(fn($cod,$desc)=>['cod'=>$cod,'desc'=>$desc], array_keys($ncmOpcoes), array_values($ncmOpcoes))) ?>;
-function initNcmInput(input, dropdown) {
-    input.addEventListener('input', function() {
-        const q=this.value.toLowerCase().trim(); dropdown.innerHTML='';
-        if(!q){ dropdown.style.display='none'; return; }
-        const matches=NCM_LIST.filter(n=>n.cod.includes(q)||n.desc.toLowerCase().includes(q)).slice(0,15);
-        if(!matches.length){ dropdown.style.display='none'; return; }
-        matches.forEach(n=>{ const a=document.createElement('button'); a.type='button'; a.className='list-group-item list-group-item-action py-1 px-2 small'; a.textContent=n.cod+' — '+n.desc;
-            a.addEventListener('click',()=>{ input.value=n.cod; const row=input.closest('.produto-row'); const d=row?.querySelector('[name*="[descricao]"]'); if(d&&!d.value) d.value=n.desc; dropdown.style.display='none'; }); dropdown.appendChild(a); });
-        dropdown.style.display='block';
-    });
-    document.addEventListener('click', e=>{ if(!input.contains(e.target)&&!dropdown.contains(e.target)) dropdown.style.display='none'; });
-}
-
 // ── Gerar envio ─────────────────────────────────────────────────────────────
 document.getElementById('btnGerarEnvio').addEventListener('click', async () => {
     if (!validarStep(4)) return;
