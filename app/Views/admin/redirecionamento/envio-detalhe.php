@@ -108,7 +108,8 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
                 <div class="card-body">
                     <h5 class="mb-3"><i class="fas fa-tag me-2 text-primary"></i>Etiqueta e rastreio</h5>
 
-                    <?php if (empty($envio['tracking_code']) && strtolower($envio['status_pagamento'] ?? '') === 'pago'): ?>
+                    <?php $__pagamentoConfirmado = (strtolower($envio['status_pagamento'] ?? '') === 'pago'); ?>
+                    <?php if ($__pagamentoConfirmado && empty($envio['tracking_code'])): ?>
                     <!-- Botão gerar etiqueta (disponível após pagamento) -->
                     <div class="mb-3">
                         <button type="button" class="btn btn-success w-100" id="btnGerarEtiqueta">
@@ -117,6 +118,14 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
                         <div id="msgGerarEtiqueta" class="mt-2"></div>
                     </div>
                     <hr>
+                    <?php elseif ($__pagamentoConfirmado && !empty($envio['tracking_code'])): ?>
+                    <!-- Botão regerar etiqueta -->
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="btnGerarEtiqueta">
+                            <i class="fas fa-redo me-2"></i>Regerar Etiqueta (dados corrigidos)
+                        </button>
+                        <div id="msgGerarEtiqueta" class="mt-2"></div>
+                    </div>
                     <?php endif; ?>
 
                     <?php if (!empty($envio['tracking_code'])): ?>
@@ -285,7 +294,11 @@ document.getElementById('btnSalvarTracking')?.addEventListener('click', async ()
 document.getElementById('btnGerarEtiqueta')?.addEventListener('click', async () => {
     const btn = document.getElementById('btnGerarEtiqueta');
     const msg = document.getElementById('msgGerarEtiqueta');
-    if (!confirm('Gerar etiqueta para este envio? Após gerar, imprima e cole na caixa.')) return;
+    const isRegen = btn.textContent.includes('Regerar');
+    const confirmMsg = isRegen
+        ? 'Regerar etiqueta? A etiqueta anterior será substituída por uma nova com os dados atuais.'
+        : 'Gerar etiqueta para este envio? Após gerar, imprima e cole na caixa.';
+    if (!confirm(confirmMsg)) return;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Gerando etiqueta...';
     msg.innerHTML = '';

@@ -1257,9 +1257,10 @@ class AdminRedirecionamentoController extends Controller {
             $this->json(['ok' => false, 'msg' => 'Pagamento ainda não confirmado. Pague antes de gerar a etiqueta.']); return;
         }
 
-        // Verificar se já tem etiqueta
+        // Verificar se já tem etiqueta — permitir regerar
+        $reGerar = false;
         if (!empty($envio['wexpress_shipping_id']) || !empty($envio['tracking_code'])) {
-            $this->json(['ok' => false, 'msg' => 'Etiqueta já foi gerada para este envio.']); return;
+            $reGerar = true;
         }
 
         // Buscar produtos do envio
