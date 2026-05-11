@@ -681,6 +681,7 @@ class AdminRemessaConferenciaController extends Controller {
         if ($labelUrl !== '') echo '<a class="btn btn-outline-primary" href="' . $h($labelUrl) . '" target="_blank"><i class="fas fa-download"></i> Baixar etiqueta</a>';
         echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/appmax" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante AppMax</a>';
         echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante Câmbio Real</a>';
+        echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/cambioreal_taxas" target="_blank"><i class="fas fa-file-invoice me-1"></i>Comprovante CR Taxas</a>';
         echo '<a class="btn btn-outline-info" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/comprovante/stripe" target="_blank"><i class="fas fa-credit-card me-1"></i>Comprovante Stripe</a>';
         echo '<a class="btn btn-outline-dark" href="/admin/remessa-conferencia/janela/' . $jid . '/pedido/' . $pid . '/invoice" target="_blank"><i class="fas fa-file-alt me-1"></i>Invoice</a>';
         if ($hasMedDoc) {
@@ -806,14 +807,16 @@ class AdminRemessaConferenciaController extends Controller {
         echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impostoLocal > 0 ? $impostoLocal : null, $moeda) . '</td></tr>';
         echo '</table></div></div></div>';
 
-        // Cards AppMax e Câmbio Real lado a lado
+        // Cards de pagamento lado a lado
         echo '<div class="row mb-3">';
 
-        // AppMax card
-        echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-primary text-white"><strong><i class="fas fa-credit-card me-1"></i>AppMax</strong></div><div class="card-body">';
-        if (empty($appmaxPagamentos)) {
-            echo '<div class="text-muted">Nenhum pagamento AppMax encontrado.</div>';
-        } else {
+        // Determinar se é pedido antigo (AppMax) ou novo (Câmbio Real Taxas)
+        $cambioRealTaxasPagamentos = array_filter($pagamentos, fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === 'cambioreal_taxas');
+        $usaAppmax = !empty($appmaxPagamentos);
+
+        if ($usaAppmax) {
+            // Pedido antigo com AppMax
+            echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-primary text-white"><strong><i class="fas fa-credit-card me-1"></i>AppMax</strong></div><div class="card-body">';
             echo '<div class="mb-2"><strong>Valor AppMax (BRL):</strong> ' . $fmtBrl($appmaxValorTotal > 0 ? $appmaxValorTotal : null) . '</div>';
             foreach ($appmaxPagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
@@ -821,7 +824,7 @@ class AdminRemessaConferenciaController extends Controller {
                 foreach ($fields as $f) {
                     if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
                     $val = (string)$pg[$f];
-                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . 'â€¦';
+                    if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '...';
                     if ($f === 'invoice_url' || $f === 'bank_slip_url') {
                         $val = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
                     } else {
@@ -831,8 +834,34 @@ class AdminRemessaConferenciaController extends Controller {
                 }
                 echo '</table>';
             }
+            echo '</div></div></div>';
+        } else {
+            // Pedido novo: Câmbio Real Taxas
+            $crTaxasValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $cambioRealTaxasPagamentos));
+            echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-warning text-dark"><strong><i class="fas fa-receipt me-1"></i>Câmbio Real Taxas</strong></div><div class="card-body">';
+            if (empty($cambioRealTaxasPagamentos)) {
+                echo '<div class="text-muted">Nenhum pagamento Câmbio Real Taxas encontrado.</div>';
+            } else {
+                echo '<div class="mb-2"><strong>Valor CR Taxas (BRL):</strong> ' . $fmtBrl($crTaxasValorTotal > 0 ? $crTaxasValorTotal : null) . '</div>';
+                foreach ($cambioRealTaxasPagamentos as $pg) {
+                    echo '<hr class="my-2"><table class="table table-sm mb-0">';
+                    $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
+                    foreach ($fields as $f) {
+                        if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                        $val = (string)$pg[$f];
+                        if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '...';
+                        if ($f === 'invoice_url' || $f === 'bank_slip_url') {
+                            $val = '<a href="' . $h($val) . '" target="_blank">' . $h($val) . '</a>';
+                        } else {
+                            $val = $h($val);
+                        }
+                        echo '<tr><td class="text-muted" style="width:140px">' . $h($f) . '</td><td>' . $val . '</td></tr>';
+                    }
+                    echo '</table>';
+                }
+            }
+            echo '</div></div></div>';
         }
-        echo '</div></div></div>';
 
         // Câmbio Real card
         echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-success text-white"><strong><i class="fas fa-exchange-alt me-1"></i>Câmbio Real</strong></div><div class="card-body">';
@@ -946,7 +975,7 @@ class AdminRemessaConferenciaController extends Controller {
         }
         $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
         foreach ($gwGroups as $gwKey => $pgList) {
-            $gwLabel = $gwKey === 'appmax' ? 'AppMax' : ($gwKey === 'cambioreal' ? 'Câmbio Real' : strtoupper($gwKey));
+            $gwLabel = match($gwKey) { 'appmax' => 'AppMax', 'cambioreal' => 'Câmbio Real', 'cambioreal_taxas' => 'Câmbio Real Taxas', 'stripe' => 'Stripe', default => strtoupper($gwKey) };
             echo '<h6 class="mt-3 mb-2 text-secondary border-bottom pb-1">' . $h($gwLabel) . '</h6>';
             foreach ($pgList as $i => $pg) {
                 if (count($pgList) > 1) echo '<div class="text-muted small mb-1">Registro #' . ($i + 1) . '</div>';
@@ -1063,7 +1092,7 @@ function confirmarRecebimento() {
         }
 
         $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
-        $gwLabel = $gateway === 'appmax' ? 'AppMax' : ($gateway === 'cambioreal' ? 'Câmbio Real' : strtoupper($gateway));
+        $gwLabel = match($gateway) { 'appmax' => 'AppMax', 'cambioreal' => 'Câmbio Real', 'cambioreal_taxas' => 'Câmbio Real Taxas', 'stripe' => 'Stripe', default => strtoupper($gateway) };
         $totalGw = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $pagamentos));
         $itens = $pedido['itens'] ?? [];
         $dataHoje = date('d/m/Y H:i');
