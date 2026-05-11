@@ -5474,7 +5474,35 @@ HTML;
     <style>
     #secao-variacoes,.variacoes-wrap{display:none!important;}
     </style>
-    <script>document.addEventListener("DOMContentLoaded",function(){var ti=document.querySelector("input[name=\\"tipo_ids[]\\"]");if(ti){var c=ti.closest(".card");if(c)c.style.display="none";}document.querySelectorAll("h5,h4,h3,h6").forEach(function(el){var t=(el.textContent||"").trim();if(t==="Variações"||t==="Variações do Produto"){el.style.display="none";var s=el.nextElementSibling;while(s){if(s.tagName==="H5"||s.tagName==="H4"||s.tagName==="H3")break;s.style.display="none";s=s.nextElementSibling;}}});document.querySelectorAll(".alert-info").forEach(function(el){if((el.textContent||"").indexOf("cadastrar varia")>-1)el.style.display="none";});});</script>';
+    <script>document.addEventListener("DOMContentLoaded",function(){
+        // Esconder o div.mb-3 que contém label "Variações"
+        document.querySelectorAll("label.form-label").forEach(function(el){
+            if((el.textContent||"").trim()==="Variações"){
+                var parent=el.closest(".mb-3");
+                if(parent)parent.style.display="none";
+            }
+        });
+        // Esconder card com tipo_ids[] (fallback)
+        var ti=document.querySelector("input[name=\\"tipo_ids[]\\"]");
+        if(ti){var c=ti.closest(".card")||ti.closest(".mb-3");if(c)c.style.display="none";}
+        // Esconder botões de gerar/apagar variações
+        document.querySelectorAll("button[formaction*=\\"variacoes\\"]").forEach(function(el){
+            var p=el.closest(".d-flex")||el.closest(".mb-3");
+            if(p)p.style.display="none";
+        });
+        // Esconder cards "Variações cadastradas" e "Galeria por variação"
+        document.querySelectorAll(".card-header strong").forEach(function(el){
+            var t=(el.textContent||"").trim();
+            if(t.indexOf("Variações")>-1||t.indexOf("variação")>-1||t.indexOf("Galeria por variação")>-1){
+                var card=el.closest(".card");
+                if(card)card.style.display="none";
+            }
+        });
+        // Esconder alert sobre variações
+        document.querySelectorAll(".alert-info").forEach(function(el){
+            if((el.textContent||"").indexOf("atributos e opções para gerar variações")>-1||(el.textContent||"").indexOf("cadastrar variações")>-1)el.style.display="none";
+        });
+    });</script>';
 
         renderAdminSidebarStyles();
 
