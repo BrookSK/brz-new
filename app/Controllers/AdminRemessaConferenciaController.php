@@ -859,11 +859,12 @@ class AdminRemessaConferenciaController extends Controller {
         }
         echo '</div></div></div>';
 
-        // Stripe card
+        // Stripe card (em row separada se existir)
         $stripePagamentos = array_filter($pagamentos, fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === 'stripe');
         if (!empty($stripePagamentos)) {
             $stripeValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $stripePagamentos));
-            echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-info text-white"><strong><i class="fas fa-credit-card me-1"></i>Stripe</strong></div><div class="card-body">';
+            echo '</div>'; // end row AppMax/CambioReal
+            echo '<div class="row mb-3"><div class="col-md-6"><div class="card h-100"><div class="card-header bg-info text-white"><strong><i class="fas fa-credit-card me-1"></i>Stripe</strong></div><div class="card-body">';
             echo '<div class="mb-2"><strong>Valor Stripe (USD):</strong> ' . $fmtMoeda($stripeValorTotal, 'USD') . '</div>';
             foreach ($stripePagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
@@ -874,10 +875,10 @@ class AdminRemessaConferenciaController extends Controller {
                 }
                 echo '</table>';
             }
-            echo '</div></div></div>';
+            echo '</div></div></div></div>'; // end card + col + row
+        } else {
+            echo '</div>'; // end row AppMax/CambioReal
         }
-
-        echo '</div>'; // end row cards
 
         // Split detalhado â€” sem coluna Link, status em português
         if (!empty($pagamentos)) {
