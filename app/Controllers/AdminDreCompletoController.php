@@ -515,15 +515,16 @@ class AdminDreCompletoController extends Controller {
 
         try {
             // ENTRADAS: pagamentos confirmados — buscar por status do pedido + gateway_status
+            // Usar COALESCE com updated_at caso created_at seja NULL
             $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
-                pp.created_at as data,
+                COALESCE(pp.created_at, pp.updated_at) as data,
                 COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
-                WHERE pp.created_at >= ?
-                AND pp.created_at < DATE_ADD(?, INTERVAL 1 DAY)
+                WHERE COALESCE(pp.created_at, pp.updated_at) >= ?
+                AND COALESCE(pp.created_at, pp.updated_at) < DATE_ADD(?, INTERVAL 1 DAY)
                 AND (pp.status = 'approved' OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','SUCCEEDED','paid','succeeded'))
-                ORDER BY pp.created_at DESC LIMIT 500");
+                ORDER BY COALESCE(pp.created_at, pp.updated_at) DESC LIMIT 500");
             $st->execute([$desde, $ate]);
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 $gw = $r['gateway'] ?? 'outro';
@@ -786,7 +787,7 @@ class AdminDreCompletoController extends Controller {
             }
 
             // 2. Somar da pedido_pagamentos (para referência e divergências)
-            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, moeda, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at DESC");
+            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, moeda, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND COALESCE(created_at, updated_at) >= ? AND COALESCE(created_at, updated_at) < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY COALESCE(created_at, updated_at) DESC");
             $st->execute([$gateway, $desde, $ate]);
             $todosRegistros = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
