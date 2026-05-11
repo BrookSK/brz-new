@@ -383,9 +383,11 @@ class AdminDreCompletoController extends Controller {
         } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage()]); exit; }
 
         $force = ($_GET['force'] ?? '0') === '1';
+        $dateStart = $_GET['date_start'] ?? null;
+        $dateEnd = $_GET['date_end'] ?? null;
 
-        // Tentar cache
-        if (!$force) {
+        // Tentar cache (só se não tiver filtro de datas customizado)
+        if (!$force && !$dateStart && !$dateEnd) {
             try {
                 $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'conciliacao_cache' LIMIT 1");
                 $st->execute();
@@ -403,11 +405,13 @@ class AdminDreCompletoController extends Controller {
         }
 
         // Consultar ao vivo
-        $resultado = $this->executarConciliacao();
+        $resultado = $this->executarConciliacao($dateStart, $dateEnd);
         $resultado['_from_cache'] = false;
 
-        // Salvar cache
-        $this->salvarCacheConciliacao($resultado);
+        // Salvar cache (só se não tiver filtro customizado)
+        if (!$dateStart && !$dateEnd) {
+            $this->salvarCacheConciliacao($resultado);
+        }
 
         echo json_encode($resultado, JSON_UNESCAPED_UNICODE);
         exit;
@@ -435,23 +439,31 @@ class AdminDreCompletoController extends Controller {
             exit;
         }
 
-        $resultado = $this->executarConciliacao();
+        $resultado = $this->executarConciliacao(null, null);
         $this->salvarCacheConciliacao($resultado);
 
         echo json_encode(['success' => true, 'divergencias' => $resultado['resumo']['divergencias_total'] ?? 0, 'timestamp' => date('Y-m-d H:i:s')]);
         exit;
     }
 
-    private function executarConciliacao(): array {
+    private function executarConciliacao(?string $dateStart = null, ?string $dateEnd = null): array {
+        // Usar datas do DRE se fornecidas, senão usar período padrão
+        $desde = $dateStart ?: date('Y-01-01');
+        $ate = $dateEnd ?: date('Y-m-d');
+
         $resultado = [
-            'stripe' => $this->conciliacaoStripe(),
-            'cambioreal' => $this->conciliacaoCambioReal('cambioreal'),
-            'cambioreal_taxas' => $this->conciliacaoCambioReal('cambioreal_taxas'),
+            'stripe' => $this->conciliacaoStripe($desde, $ate),
+            'cambioreal' => $this->conciliacaoCambioReal('cambioreal', $desde, $ate),
+            'cambioreal_taxas' => $this->conciliacaoCambioReal('cambioreal_taxas', $desde, $ate),
             'fluxo_caixa' => [],
             'agendamentos_futuros' => [],
             'resumo' => [],
+            'taxa_conversao' => 5.85,
             '_timestamp' => time(),
         ];
+
+        // Buscar taxa de conversão
+        try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $resultado['taxa_conversao'] = $r; } catch (\Exception $e) {}
 
         $resultado['resumo'] = [
             'stripe_saldo' => $resultado['stripe']['saldo'] ?? [],
@@ -459,34 +471,38 @@ class AdminDreCompletoController extends Controller {
             'divergencias_total' => count($resultado['stripe']['divergencias'] ?? []) + count($resultado['cambioreal']['divergencias'] ?? []) + count($resultado['cambioreal_taxas']['divergencias'] ?? []),
         ];
 
-        // Montar fluxo de caixa (extrato) — entradas e saídas dos últimos 30 dias
-        $resultado['fluxo_caixa'] = $this->montarFluxoCaixa();
+        // Montar fluxo de caixa (extrato) — usando período do DRE
+        $resultado['fluxo_caixa'] = $this->montarFluxoCaixa($desde, $ate);
         $resultado['agendamentos_futuros'] = $this->montarAgendamentosFuturos();
 
         return $resultado;
     }
 
     /**
-     * Monta o extrato de movimentação (entradas e saídas) dos últimos 30 dias
+     * Monta o extrato de movimentação (entradas e saídas) no período do DRE
      */
-    private function montarFluxoCaixa(): array {
+    private function montarFluxoCaixa(?string $dateStart = null, ?string $dateEnd = null): array {
         $movimentos = [];
-        $desde = date('Y-m-d', strtotime('-30 days'));
+        $desde = $dateStart ?: date('Y-m-d', strtotime('-30 days'));
+        $ate = $dateEnd ?: date('Y-m-d');
 
         try {
             // ENTRADAS: pagamentos confirmados — buscar por status do pedido + gateway_status
-            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.gateway_status, pp.status as pp_status,
+            $st = $this->db->prepare("SELECT pp.payment_id, pp.pedido_id, pp.valor, pp.gateway, pp.metodo, pp.moeda, pp.gateway_status, pp.status as pp_status,
                 pp.created_at as data,
                 COALESCE(p.codigo_pedido, CONCAT('#', pp.pedido_id)) as ref
                 FROM pedido_pagamentos pp
                 LEFT JOIN pedidos p ON p.id = pp.pedido_id
                 WHERE pp.created_at >= ?
+                AND pp.created_at < DATE_ADD(?, INTERVAL 1 DAY)
                 AND (pp.status = 'approved' OR pp.gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','SUCCEEDED','paid','succeeded'))
                 ORDER BY pp.created_at DESC LIMIT 500");
-            $st->execute([$desde]);
+            $st->execute([$desde, $ate]);
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 $gw = $r['gateway'] ?? 'outro';
                 $gwLabel = $gw === 'stripe' ? 'Stripe' : ($gw === 'cambioreal_taxas' ? 'CR Taxas' : (in_array($gw, ['cambioreal','cambio_real']) ? 'CR Produtos' : ucfirst($gw)));
+                $moeda = strtoupper(trim($r['moeda'] ?? 'USD'));
+                if ($moeda === '' || $moeda === 'NULL') $moeda = 'USD';
                 $movimentos[] = [
                     'data' => date('d/m/Y', strtotime($r['data'])),
                     'data_sort' => $r['data'],
@@ -494,7 +510,7 @@ class AdminDreCompletoController extends Controller {
                     'gateway' => $gwLabel,
                     'tipo' => 'entrada',
                     'valor' => (float)($r['valor'] ?? 0),
-                    'moeda' => 'USD',
+                    'moeda' => $moeda,
                 ];
             }
 
@@ -503,21 +519,22 @@ class AdminDreCompletoController extends Controller {
                 FROM carne_parcelas cp
                 JOIN carnes c ON cp.carne_id = c.id
                 WHERE cp.status = 'paga' AND (cp.boleto_produtos_pago_em >= ? OR cp.boleto_taxas_pago_em >= ?)
-                ORDER BY COALESCE(cp.boleto_produtos_pago_em, cp.boleto_taxas_pago_em) DESC LIMIT 100");
-            $st->execute([$desde, $desde]);
+                AND (cp.boleto_produtos_pago_em <= DATE_ADD(?, INTERVAL 1 DAY) OR cp.boleto_taxas_pago_em <= DATE_ADD(?, INTERVAL 1 DAY))
+                ORDER BY COALESCE(cp.boleto_produtos_pago_em, cp.boleto_taxas_pago_em) DESC LIMIT 200");
+            $st->execute([$desde, $desde, $ate, $ate]);
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                 if ((float)$r['valor_produtos'] > 0 && $r['boleto_produtos_pago_em']) {
-                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['boleto_produtos_pago_em'])), 'data_sort' => $r['boleto_produtos_pago_em'], 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' Parc ' . $r['numero_parcela'] . ' (Produtos)', 'gateway' => 'CR Produtos', 'tipo' => 'entrada', 'valor' => (float)$r['valor_produtos'], 'moeda' => 'BRL'];
+                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['boleto_produtos_pago_em'])), 'data_sort' => $r['boleto_produtos_pago_em'], 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' — Parc ' . $r['numero_parcela'] . ' (Produtos)', 'gateway' => 'CR Produtos', 'tipo' => 'entrada', 'valor' => (float)$r['valor_produtos'], 'moeda' => 'BRL'];
                 }
                 if ((float)$r['valor_taxas'] > 0 && $r['boleto_taxas_pago_em']) {
-                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['boleto_taxas_pago_em'])), 'data_sort' => $r['boleto_taxas_pago_em'], 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' Parc ' . $r['numero_parcela'] . ' (Taxas)', 'gateway' => 'CR Taxas', 'tipo' => 'entrada', 'valor' => (float)$r['valor_taxas'], 'moeda' => 'BRL'];
+                    $movimentos[] = ['data' => date('d/m/Y', strtotime($r['boleto_taxas_pago_em'])), 'data_sort' => $r['boleto_taxas_pago_em'], 'descricao' => 'Carnê Ped #' . $r['pedido_id'] . ' — Parc ' . $r['numero_parcela'] . ' (Taxas)', 'gateway' => 'CR Taxas', 'tipo' => 'entrada', 'valor' => (float)$r['valor_taxas'], 'moeda' => 'BRL'];
                 }
             }
 
             // SAÍDAS: despesas pagas
             try {
-                $st = $this->db->prepare("SELECT descricao, valor, moeda, pago_em, categoria FROM despesas WHERE status = 'paga' AND pago_em >= ? ORDER BY pago_em DESC LIMIT 200");
-                $st->execute([$desde]);
+                $st = $this->db->prepare("SELECT descricao, valor, moeda, pago_em, categoria FROM despesas WHERE status = 'paga' AND pago_em >= ? AND pago_em <= DATE_ADD(?, INTERVAL 1 DAY) ORDER BY pago_em DESC LIMIT 200");
+                $st->execute([$desde, $ate]);
                 foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
                     $movimentos[] = ['data' => date('d/m/Y', strtotime($r['pago_em'])), 'data_sort' => $r['pago_em'], 'descricao' => ($r['descricao'] ?? 'Despesa') . ($r['categoria'] ? ' (' . $r['categoria'] . ')' : ''), 'gateway' => 'Saída', 'tipo' => 'saida', 'valor' => (float)($r['valor'] ?? 0), 'moeda' => $r['moeda'] ?? 'BRL'];
                 }
@@ -591,7 +608,7 @@ class AdminDreCompletoController extends Controller {
         }
     }
 
-    private function conciliacaoStripe(): array {
+    private function conciliacaoStripe(?string $dateStart = null, ?string $dateEnd = null): array {
         $result = ['saldo' => [], 'transacoes' => [], 'divergencias' => [], 'erro' => null];
 
         try {
@@ -616,8 +633,8 @@ class AdminDreCompletoController extends Controller {
                 }
             }
 
-            // 2. Últimas transações (últimos 30 dias)
-            $desde = strtotime('-30 days');
+            // 2. Últimas transações (período do DRE)
+            $desde = $dateStart ? strtotime($dateStart) : strtotime('-30 days');
             $txResp = $this->stripeRequest($stripeKey, 'GET', '/v1/balance_transactions?limit=100&created[gte]=' . $desde . '&type=charge');
             $transacoes = $txResp['data'] ?? [];
 
@@ -632,6 +649,12 @@ class AdminDreCompletoController extends Controller {
                     'data' => date('Y-m-d H:i', $tx['created'] ?? time()),
                     'source' => $tx['source'] ?? '',
                 ];
+            }
+
+            // Calcular total recebido no Stripe (soma das transações)
+            $result['total_recebido_usd'] = 0;
+            foreach ($result['transacoes'] as $tx) {
+                $result['total_recebido_usd'] += $tx['valor'];
             }
 
             // 3. Comparar com pedido_pagamentos local
@@ -665,15 +688,16 @@ class AdminDreCompletoController extends Controller {
         return $result;
     }
 
-    private function conciliacaoCambioReal(string $gateway): array {
+    private function conciliacaoCambioReal(string $gateway, ?string $dateStart = null, ?string $dateEnd = null): array {
         $result = ['total_recebido_usd' => 0, 'total_recebido_brl' => 0, 'total_sistema' => 0, 'moeda_principal' => 'USD', 'total_registros' => 0, 'total_consultados' => 0, 'transacoes' => [], 'divergencias' => [], 'erro' => null];
 
         try {
-            $desde = date('Y-m-d', strtotime('-30 days'));
+            $desde = $dateStart ?: date('Y-m-d', strtotime('-30 days'));
+            $ate = $dateEnd ?: date('Y-m-d');
 
             // Somar valores pagos no sistema (sem consultar API)
-            $st = $this->db->prepare("SELECT SUM(valor) as total, COUNT(*) as qtd, moeda FROM pedido_pagamentos WHERE gateway = ? AND (status = 'approved' OR gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA')) AND created_at >= ? GROUP BY moeda");
-            $st->execute([$gateway, $desde]);
+            $st = $this->db->prepare("SELECT SUM(valor) as total, COUNT(*) as qtd, moeda FROM pedido_pagamentos WHERE gateway = ? AND (status = 'approved' OR gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA')) AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY moeda");
+            $st->execute([$gateway, $desde, $ate]);
             $totais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             foreach ($totais as $t) {
                 $result['total_sistema'] += (float)($t['total'] ?? 0);
@@ -688,20 +712,20 @@ class AdminDreCompletoController extends Controller {
 
             // Também somar parcelas de carnê pagas
             if ($gateway === 'cambioreal') {
-                $stC = $this->db->prepare("SELECT SUM(cp.valor_produtos) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_produtos_pago_em >= ?");
-                $stC->execute([$desde]);
+                $stC = $this->db->prepare("SELECT SUM(cp.valor_produtos) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_produtos_pago_em >= ? AND cp.boleto_produtos_pago_em <= DATE_ADD(?, INTERVAL 1 DAY)");
+                $stC->execute([$desde, $ate]);
                 $r = $stC->fetch(\PDO::FETCH_ASSOC);
                 if ($r) { $result['total_recebido_brl'] += (float)($r['total'] ?? 0); $result['total_registros'] += (int)($r['qtd'] ?? 0); }
             } elseif ($gateway === 'cambioreal_taxas') {
-                $stC = $this->db->prepare("SELECT SUM(cp.valor_taxas) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_taxas_pago_em >= ?");
-                $stC->execute([$desde]);
+                $stC = $this->db->prepare("SELECT SUM(cp.valor_taxas) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_taxas_pago_em >= ? AND cp.boleto_taxas_pago_em <= DATE_ADD(?, INTERVAL 1 DAY)");
+                $stC->execute([$desde, $ate]);
                 $r = $stC->fetch(\PDO::FETCH_ASSOC);
                 if ($r) { $result['total_recebido_brl'] += (float)($r['total'] ?? 0); $result['total_registros'] += (int)($r['qtd'] ?? 0); }
             }
 
             // Consultar apenas alguns tokens na API para verificar divergências (amostra)
-            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? ORDER BY created_at DESC LIMIT 20");
-            $st->execute([$gateway, $desde]);
+            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at DESC LIMIT 20");
+            $st->execute([$gateway, $desde, $ate]);
             $amostra = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             $paymentService = new \App\Services\PaymentService();

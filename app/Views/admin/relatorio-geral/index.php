@@ -769,7 +769,15 @@ function carregarFluxoCaixa(btn, force) {
     var container = document.getElementById('conciliacao-gateways-container');
     container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin fs-3 text-muted"></i><div class="text-muted small mt-2">Carregando fluxo de caixa...</div></div>';
 
-    fetch('/admin/dre-completo/conciliacao' + (force ? '?force=1' : ''))
+    // Passar datas do DRE para o endpoint de conciliação
+    var dateParams = '';
+    var ds = document.getElementById('dre-date-start');
+    var de = document.getElementById('dre-date-end');
+    if (ds && de && ds.value && de.value) {
+        dateParams = '&date_start=' + ds.value + '&date_end=' + de.value;
+    }
+
+    fetch('/admin/dre-completo/conciliacao?' + (force ? 'force=1' : '') + dateParams)
         .then(function(r){return r.json()})
         .then(function(d){
             btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync me-1"></i>Atualizar APIs';
@@ -783,7 +791,10 @@ function carregarFluxoCaixa(btn, force) {
 
 function renderFluxoCaixa(d, container) {
     var h = '';
-    var fmtV = function(v,moeda){ moeda=moeda||'USD'; return (moeda==='BRL'?'R$ ':'$ ')+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+    var taxaConv = (d.taxa_conversao) ? d.taxa_conversao : ((window._dreData && window._dreData.taxaUsdBrl) ? window._dreData.taxaUsdBrl : 5.85);
+    var fmtBRL = function(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+    var fmtUSD = function(v){ return '$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+    var fmtV = function(v,moeda){ moeda=moeda||'USD'; return moeda==='BRL' ? fmtBRL(v) : fmtUSD(v); };
 
     // Cache info
     if (d._from_cache) h += '<div class="small text-muted mb-3"><i class="fas fa-database me-1"></i>Cache de '+(d._cache_age||'?')+' · Use "Atualizar APIs" para dados em tempo real</div>';
@@ -798,8 +809,8 @@ function renderFluxoCaixa(d, container) {
             var total = (b.disponivel||0) + (b.pendente||0);
             h += '<div class="col-md-4"><div class="border rounded p-3 d-flex align-items-center gap-3">';
             h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#635bff20;"><i class="fab fa-stripe-s" style="color:#635bff;font-size:18px;"></i></div>';
-            h += '<div><div class="small text-muted">Stripe ('+b.moeda+')</div><div class="fs-5 fw-bold text-success">'+fmtV(total,b.moeda)+'</div>';
-            h += '<div class="text-muted" style="font-size:10px;">Disponível: '+fmtV(b.disponivel,b.moeda)+' · Pendente: '+fmtV(b.pendente,b.moeda)+'</div>';
+            h += '<div><div class="small text-muted">Stripe ('+b.moeda+')</div><div class="fs-5 fw-bold text-success">'+fmtUSD(total)+'</div>';
+            h += '<div class="text-muted" style="font-size:10px;">Disponível: '+fmtUSD(b.disponivel)+' · Pendente: '+fmtUSD(b.pendente)+'</div>';
             h += '</div></div></div>';
         });
     } else if (s.erro) {
@@ -813,9 +824,11 @@ function renderFluxoCaixa(d, container) {
     h += '<div><div class="small text-muted">Câmbio Real (Produtos)</div>';
     if (cr.erro) h += '<div class="text-danger small">'+cr.erro+'</div>';
     else {
-        var crMoeda = cr.moeda_principal || 'USD';
-        var crTotal = crMoeda === 'BRL' ? (cr.total_recebido_brl||0) : (cr.total_recebido_usd||0);
-        h += '<div class="fs-5 fw-bold text-success">'+fmtV(crTotal, crMoeda)+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+cr.total_registros+' transações</div>';
+        var crUsd = cr.total_recebido_usd || 0;
+        var crBrlDireto = cr.total_recebido_brl || 0;
+        var crTotalBrl = crBrlDireto + (crUsd * taxaConv);
+        h += '<div class="fs-5 fw-bold text-success">'+fmtBRL(crTotalBrl)+'</div>';
+        h += '<div class="text-muted" style="font-size:10px;">'+cr.total_registros+' transações · USD '+fmtUSD(crUsd)+' × '+taxaConv+'</div>';
     }
     h += '</div></div></div>';
 
@@ -826,15 +839,17 @@ function renderFluxoCaixa(d, container) {
     h += '<div><div class="small text-muted">Câmbio Real (Taxas)</div>';
     if (crt.erro) h += '<div class="text-danger small">'+crt.erro+'</div>';
     else {
-        var crtMoeda = crt.moeda_principal || 'BRL';
-        var crtTotal = crtMoeda === 'BRL' ? (crt.total_recebido_brl||0) : (crt.total_recebido_usd||0);
-        h += '<div class="fs-5 fw-bold text-success">'+fmtV(crtTotal, crtMoeda)+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+crt.total_registros+' transações</div>';
+        var crtUsd = crt.total_recebido_usd || 0;
+        var crtBrlDireto = crt.total_recebido_brl || 0;
+        var crtTotalBrl = crtBrlDireto + (crtUsd * taxaConv);
+        h += '<div class="fs-5 fw-bold text-success">'+fmtBRL(crtTotalBrl)+'</div>';
+        h += '<div class="text-muted" style="font-size:10px;">'+crt.total_registros+' transações · USD '+fmtUSD(crtUsd)+' × '+taxaConv+'</div>';
     }
     h += '</div></div></div>';
     h += '</div>';
 
     // === EXTRATO / MOVIMENTAÇÃO ===
-    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-list me-2"></i>Movimentação (últimos 30 dias)</h6><span class="badge bg-secondary">'+(d.fluxo_caixa?d.fluxo_caixa.length:0)+' lançamentos</span></div>';
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-list me-2"></i>Movimentação (período do DRE)</h6><span class="badge bg-secondary">'+(d.fluxo_caixa?d.fluxo_caixa.length:0)+' lançamentos</span></div>';
     h += '<div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:12px;">';
     h += '<thead class="table-light"><tr><th>Data</th><th>Descrição</th><th>Gateway</th><th class="text-end">Entrada</th><th class="text-end">Saída</th><th class="text-end">Saldo</th></tr></thead><tbody>';
 
@@ -872,25 +887,49 @@ function renderFluxoCaixa(d, container) {
         h += '<div class="alert alert-warning mt-4 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>'+divTotal+' divergência(s) encontrada(s)</strong> entre o sistema e os gateways. Verifique os pagamentos que não batem.</div>';
     }
 
-    // === COMPARAÇÃO: SITE vs GATEWAYS ===
-    var totalSite = 0; var totalGateways = 0;
-    // Total do site = soma das entradas do fluxo de caixa, ou usar conciliação do DRE
-    if (d.fluxo_caixa && d.fluxo_caixa.length) d.fluxo_caixa.forEach(function(m){ if(m.tipo==='entrada') totalSite += m.valor; });
-    if (totalSite === 0 && window._dreData && window._dreData.conciliacao) totalSite = window._dreData.conciliacao.total_creditos || 0;
-    // Total gateways = Stripe + CR Produtos (USD) + CR Taxas (BRL convertido)
-    if (s.saldo) s.saldo.forEach(function(b){ totalGateways += (b.disponivel||0) + (b.pendente||0); });
-    totalGateways += (cr.total_recebido_usd||0);
-    // CR Taxas é em BRL, converter para USD para comparar (usar taxa do DRE)
-    var taxaConv = (window._dreData && window._dreData.taxa_usd_brl) ? window._dreData.taxa_usd_brl : 5.5;
-    var crtBrl = crt.total_recebido_brl || 0;
-    totalGateways += crtBrl > 0 ? (crtBrl / taxaConv) : (crt.total_recebido_usd||0);
+    // === COMPARAÇÃO: SITE vs GATEWAYS (tudo em BRL) ===
+    // Total Entradas (Sistema) = total_creditos do DRE (já em BRL)
+    var totalSiteBrl = 0;
+    if (window._dreData && window._dreData.conciliacao) {
+        totalSiteBrl = window._dreData.conciliacao.total_creditos || 0;
+    }
+    // Fallback: somar entradas do fluxo convertendo para BRL
+    if (totalSiteBrl === 0 && d.fluxo_caixa && d.fluxo_caixa.length) {
+        d.fluxo_caixa.forEach(function(m){
+            if(m.tipo==='entrada') {
+                totalSiteBrl += (m.moeda === 'BRL') ? m.valor : (m.valor * taxaConv);
+            }
+        });
+    }
 
-    h += '<div class="card border-0 shadow-sm mt-4 mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Comparativo: Sistema vs Gateways (30 dias)</h6></div><div class="card-body">';
+    // Total nos Gateways (convertido para BRL)
+    // Stripe: total recebido em USD × taxa
+    var stripeUsd = s.total_recebido_usd || 0;
+    if (stripeUsd === 0 && s.saldo) {
+        s.saldo.forEach(function(b){ stripeUsd += (b.disponivel||0) + (b.pendente||0); });
+    }
+    var stripeBrl = stripeUsd * taxaConv;
+
+    // CR Produtos: USD × taxa + BRL direto
+    var crProdUsd = cr.total_recebido_usd || 0;
+    var crProdBrlDireto = cr.total_recebido_brl || 0;
+    var crProdBrl = crProdBrlDireto + (crProdUsd * taxaConv);
+
+    // CR Taxas: USD × taxa + BRL direto
+    var crTaxUsd = crt.total_recebido_usd || 0;
+    var crTaxBrlDireto = crt.total_recebido_brl || 0;
+    var crTaxBrl = crTaxBrlDireto + (crTaxUsd * taxaConv);
+
+    var totalGatewaysBrl = stripeBrl + crProdBrl + crTaxBrl;
+
+    h += '<div class="card border-0 shadow-sm mt-4 mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Comparativo: Sistema vs Gateways (BRL, taxa '+taxaConv+')</h6></div><div class="card-body">';
     h += '<div class="row g-3 text-center">';
-    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total Entradas (Sistema)</div><div class="fs-4 fw-bold text-success">'+fmtV(totalSite,'USD')+'</div></div></div>';
-    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total nos Gateways</div><div class="fs-4 fw-bold text-primary">'+fmtV(totalGateways,'USD')+'</div></div></div>';
-    var diff = totalSite - totalGateways;
-    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Diferença</div><div class="fs-4 fw-bold '+(Math.abs(diff)<1?'text-success':'text-danger')+'">'+fmtV(diff,'USD')+'</div>'+(Math.abs(diff)<1?'<div class="text-success small"><i class="fas fa-check-circle"></i> Conciliado</div>':'<div class="text-danger small"><i class="fas fa-exclamation-triangle"></i> Verificar</div>')+'</div></div>';
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total Entradas (Sistema)</div><div class="fs-4 fw-bold text-success">'+fmtBRL(totalSiteBrl)+'</div></div></div>';
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Total nos Gateways</div><div class="fs-4 fw-bold text-primary">'+fmtBRL(totalGatewaysBrl)+'</div>';
+    h += '<div class="text-muted" style="font-size:10px;">Stripe: '+fmtBRL(stripeBrl)+' · CR Prod: '+fmtBRL(crProdBrl)+' · CR Tax: '+fmtBRL(crTaxBrl)+'</div>';
+    h += '</div></div>';
+    var diff = totalSiteBrl - totalGatewaysBrl;
+    h += '<div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Diferença</div><div class="fs-4 fw-bold '+(Math.abs(diff)<100?'text-success':'text-danger')+'">'+fmtBRL(diff)+'</div>'+(Math.abs(diff)<100?'<div class="text-success small"><i class="fas fa-check-circle"></i> Conciliado</div>':'<div class="text-danger small"><i class="fas fa-exclamation-triangle"></i> Verificar</div>')+'</div></div>';
     h += '</div></div></div>';
 
     // === MOVIMENTAÇÕES POR GATEWAY (3 blocos) ===
@@ -902,7 +941,10 @@ function renderFluxoCaixa(d, container) {
     ];
     gateways.forEach(function(gw){
         var movs = (d.fluxo_caixa||[]).filter(function(m){ return m.gateway === gw.key; });
-        var total = movs.reduce(function(s,m){ return s + (m.tipo==='entrada'?m.valor:-m.valor); }, 0);
+        var totalBrl = movs.reduce(function(acc,m){
+            var valBrl = (m.moeda === 'BRL') ? m.valor : (m.valor * taxaConv);
+            return acc + (m.tipo==='entrada' ? valBrl : -valBrl);
+        }, 0);
         h += '<div class="col-md-4"><div class="card border-0 shadow-sm h-100" style="border-top:3px solid '+gw.cor+';">';
         h += '<div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><span class="fw-bold small"><i class="'+gw.icon+' me-1" style="color:'+gw.cor+';"></i>'+gw.key+'</span><span class="badge bg-light text-dark border">'+movs.length+'</span></div>';
         h += '<div class="card-body p-0" style="max-height:250px;overflow-y:auto;"><table class="table table-sm mb-0" style="font-size:11px;"><tbody>';
@@ -911,7 +953,7 @@ function renderFluxoCaixa(d, container) {
             h += '<tr><td class="text-nowrap">'+m.data+'</td><td class="text-truncate" style="max-width:120px;">'+m.descricao+'</td><td class="text-end '+(m.tipo==='entrada'?'text-success':'text-danger')+' fw-semibold">'+(m.tipo==='entrada'?'+':'-')+fmtV(m.valor,m.moeda)+'</td></tr>';
         });
         h += '</tbody></table></div>';
-        h += '<div class="card-footer bg-white border-top text-end"><span class="fw-bold small">Total: <span class="'+(total>=0?'text-success':'text-danger')+'">'+fmtV(total,'USD')+'</span></span></div>';
+        h += '<div class="card-footer bg-white border-top text-end"><span class="fw-bold small">Total: <span class="'+(totalBrl>=0?'text-success':'text-danger')+'">'+fmtBRL(totalBrl)+'</span></span></div>';
         h += '</div></div>';
     });
     h += '</div>';
