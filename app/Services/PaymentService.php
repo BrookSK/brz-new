@@ -2598,6 +2598,14 @@ class PaymentService {
         return $this->cambioRealRequest('GET', '/service/v1/checkout/get/' . rawurlencode($token), null);
     }
 
+    public function obterTransacaoCambioRealTaxas(string $token): array {
+        $token = trim((string) $token);
+        if ($token === '') {
+            throw new \Exception('Câmbio Real Taxas: token inválido');
+        }
+        return $this->cambioRealTaxasRequest('GET', '/service/v1/checkout/get/' . rawurlencode($token), null);
+    }
+
     public function processarWebhookCambioReal(array $payload): array {
         // Extrair todos os identificadores possíveis
         $candidates = [];

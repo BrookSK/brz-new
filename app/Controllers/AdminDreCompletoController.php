@@ -376,6 +376,7 @@ class AdminDreCompletoController extends Controller {
     public function conciliacao(Request $request) {
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
+        set_time_limit(120); // Permitir até 2 min para consultar todos os tokens
 
         try {
             $auth = new AuthService();
@@ -689,65 +690,124 @@ class AdminDreCompletoController extends Controller {
     }
 
     private function conciliacaoCambioReal(string $gateway, ?string $dateStart = null, ?string $dateEnd = null): array {
-        $result = ['total_recebido_usd' => 0, 'total_recebido_brl' => 0, 'total_sistema' => 0, 'moeda_principal' => 'USD', 'total_registros' => 0, 'total_consultados' => 0, 'transacoes' => [], 'divergencias' => [], 'erro' => null];
+        $result = [
+            'total_recebido_usd' => 0,
+            'total_recebido_brl' => 0,
+            'total_gateway_usd' => 0, // Total real confirmado na API do CR
+            'total_sistema' => 0,
+            'moeda_principal' => 'USD',
+            'total_registros' => 0,
+            'total_consultados' => 0,
+            'transacoes' => [],
+            'divergencias' => [],
+            'erro' => null,
+        ];
 
         try {
             $desde = $dateStart ?: date('Y-m-d', strtotime('-30 days'));
             $ate = $dateEnd ?: date('Y-m-d');
 
-            // Somar valores pagos no sistema (sem consultar API)
-            $st = $this->db->prepare("SELECT SUM(valor) as total, COUNT(*) as qtd, moeda FROM pedido_pagamentos WHERE gateway = ? AND (status = 'approved' OR gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA')) AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY moeda");
+            // Buscar TODOS os tokens do período para consultar na API
+            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, moeda, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at DESC");
             $st->execute([$gateway, $desde, $ate]);
-            $totais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            foreach ($totais as $t) {
-                $result['total_sistema'] += (float)($t['total'] ?? 0);
-                $result['total_registros'] += (int)($t['qtd'] ?? 0);
-                if (strtoupper($t['moeda'] ?? '') === 'BRL') {
-                    $result['total_recebido_brl'] += (float)($t['total'] ?? 0);
+            $todosRegistros = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $result['total_registros'] = count($todosRegistros);
+
+            // Somar valores locais (para referência)
+            foreach ($todosRegistros as $reg) {
+                $val = (float)($reg['valor'] ?? 0);
+                $moeda = strtoupper(trim($reg['moeda'] ?? 'USD'));
+                $result['total_sistema'] += $val;
+                if ($moeda === 'BRL') {
+                    $result['total_recebido_brl'] += $val;
                     $result['moeda_principal'] = 'BRL';
                 } else {
-                    $result['total_recebido_usd'] += (float)($t['total'] ?? 0);
+                    $result['total_recebido_usd'] += $val;
                 }
             }
 
-            // Também somar parcelas de carnê pagas
+            // Também somar parcelas de carnê pagas (valores locais)
             if ($gateway === 'cambioreal') {
                 $stC = $this->db->prepare("SELECT SUM(cp.valor_produtos) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_produtos_pago_em >= ? AND cp.boleto_produtos_pago_em <= DATE_ADD(?, INTERVAL 1 DAY)");
                 $stC->execute([$desde, $ate]);
                 $r = $stC->fetch(\PDO::FETCH_ASSOC);
-                if ($r) { $result['total_recebido_brl'] += (float)($r['total'] ?? 0); $result['total_registros'] += (int)($r['qtd'] ?? 0); }
+                if ($r && (float)($r['total'] ?? 0) > 0) {
+                    $result['total_recebido_brl'] += (float)$r['total'];
+                    $result['total_registros'] += (int)($r['qtd'] ?? 0);
+                }
             } elseif ($gateway === 'cambioreal_taxas') {
                 $stC = $this->db->prepare("SELECT SUM(cp.valor_taxas) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_taxas_pago_em >= ? AND cp.boleto_taxas_pago_em <= DATE_ADD(?, INTERVAL 1 DAY)");
                 $stC->execute([$desde, $ate]);
                 $r = $stC->fetch(\PDO::FETCH_ASSOC);
-                if ($r) { $result['total_recebido_brl'] += (float)($r['total'] ?? 0); $result['total_registros'] += (int)($r['qtd'] ?? 0); }
+                if ($r && (float)($r['total'] ?? 0) > 0) {
+                    $result['total_recebido_brl'] += (float)$r['total'];
+                    $result['total_registros'] += (int)($r['qtd'] ?? 0);
+                }
             }
 
-            // Consultar apenas alguns tokens na API para verificar divergências (amostra)
-            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY created_at DESC LIMIT 20");
-            $st->execute([$gateway, $desde, $ate]);
-            $amostra = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-
+            // Consultar TODOS os tokens na API do CR para obter o valor real
+            // Limitar a 150 para não travar (se tiver mais, usar cache/cron)
             $paymentService = new \App\Services\PaymentService();
-            foreach ($amostra as $l) {
+            $totalGatewayUsd = 0;
+            $consultados = 0;
+
+            // Buscar taxa de conversão para converter BRL→USD
+            $taxaUsdBrl = 5.85;
+            try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+
+            foreach ($todosRegistros as $l) {
                 $token = $l['payment_id'];
                 $statusLocal = strtoupper(trim((string)($l['gateway_status'] ?? $l['status'] ?? '')));
+
+                if ($consultados >= 150) break; // Safety limit
+
                 try {
-                    $resp = $paymentService->obterTransacaoCambioReal($token);
+                    // Usar método correto dependendo do gateway (contas separadas no CR)
+                    if ($gateway === 'cambioreal_taxas') {
+                        $resp = $paymentService->obterTransacaoCambioRealTaxas($token);
+                    } else {
+                        $resp = $paymentService->obterTransacaoCambioReal($token);
+                    }
                     $data = $resp['data'] ?? [];
                     $statusGw = strtoupper(trim((string)($data['status'] ?? '')));
-                    $result['total_consultados']++;
+                    $consultados++;
 
-                    $pagoGateway = in_array($statusGw, ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','ON_HOLD']);
-                    $pagoLocal = in_array($statusLocal, ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','APPROVED']);
+                    // Status que indicam pagamento confirmado (Finalizadas + Compensadas)
+                    $pagoGateway = in_array($statusGw, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'ON_HOLD']);
+                    $pagoLocal = in_array($statusLocal, ['SOLICITACAO_PAGO', 'SOLICITACAO_FINALIZADA', 'APPROVED']);
 
+                    // Somar valor real do gateway
+                    // A API retorna 'amount' em BRL (moeda do checkout). Converter para USD.
+                    if ($pagoGateway) {
+                        $valorGw = 0;
+                        // Tentar pegar amount da transação
+                        if (isset($data['transaction']['amount'])) {
+                            $valorGw = (float)$data['transaction']['amount'];
+                        } elseif (isset($data['amount'])) {
+                            $valorGw = (float)$data['amount'];
+                        } else {
+                            // Fallback: usar valor local
+                            $valorGw = (float)($l['valor'] ?? 0);
+                        }
+                        // O valor vem em BRL, converter para USD
+                        $valorUsd = $valorGw / $taxaUsdBrl;
+                        $totalGatewayUsd += $valorUsd;
+                    }
+
+                    // Divergências
                     if ($pagoGateway && !$pagoLocal) {
                         $result['divergencias'][] = ['tipo' => 'pago_gateway_nao_local', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $statusGw, 'status_local' => $statusLocal, 'msg' => 'Pago no CR mas não no sistema'];
                     } elseif (!$pagoGateway && $pagoLocal) {
                         $result['divergencias'][] = ['tipo' => 'pago_local_nao_gateway', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $statusGw, 'status_local' => $statusLocal, 'msg' => 'Pago no sistema mas não no CR'];
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                    // Se falhar a consulta, continuar com os próximos
+                    continue;
+                }
             }
+
+            $result['total_consultados'] = $consultados;
+            $result['total_gateway_usd'] = round($totalGatewayUsd, 2);
 
         } catch (\Exception $e) {
             $result['erro'] = $e->getMessage();
