@@ -122,9 +122,41 @@ class CarneService {
     public function gerarPixParcela($parcela, $pedidoId, $clientData, $descBase) {
         $paymentService = new PaymentService();
         $parcelaId = $parcela['id'];
+        $numeroParcela = (int) ($parcela['numero_parcela'] ?? 1);
+
+        // Determinar expiração: 1ª parcela = 0 dias (expira hoje), demais = 0 dias (expira no dia do vencimento)
+        $dueDateDays = 0; // Expira no mesmo dia (23:59)
 
         // Marcar como PIX
         $this->carneModel->atualizarParcela($parcelaId, ['metodo_pagamento' => 'pix']);
+
+        // Calcular data de expiração para salvar na parcela
+        if ($numeroParcela === 1) {
+            // 1ª parcela: 30 minutos
+            $minutosExpiracao = 30;
+            try {
+                $db = \Config\Database::getConnection();
+                $stCfg = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_primeira_parcela_minutos' LIMIT 1");
+                $stCfg->execute();
+                $cfgMin = (int) ($stCfg->fetchColumn() ?: 30);
+                if ($cfgMin > 0) $minutosExpiracao = $cfgMin;
+            } catch (\Exception $e) {}
+            $expiraEm = date('Y-m-d H:i:s', strtotime("+{$minutosExpiracao} minutes"));
+
+            // Salvar no carnê para o cron verificar
+            try {
+                $db = \Config\Database::getConnection();
+                $db->prepare("UPDATE carnes SET primeira_parcela_expira_em = ? WHERE id = ? AND primeira_parcela_expira_em IS NULL")
+                    ->execute([$expiraEm, $parcela['carne_id']]);
+            } catch (\Exception $e) {}
+        } else {
+            // Demais parcelas: expira às 23:59 do dia do vencimento
+            $vencimento = $parcela['vencimento'] ?? date('Y-m-d');
+            $expiraEm = $vencimento . ' 23:59:59';
+        }
+
+        // Salvar expiração na parcela
+        $this->carneModel->atualizarParcela($parcelaId, ['expira_em' => $expiraEm]);
 
         // 1. PIX Produtos via Câmbio Real
         if ($parcela['valor_produtos'] > 0) {
@@ -151,7 +183,10 @@ class CarneService {
                         $valorUsd,
                         $valorBrl,
                         $descBase . ' - Produtos',
-                        $clientData
+                        $clientData,
+                        null,
+                        null,
+                        $dueDateDays
                     );
 
                 if (!empty($crResult['success'])) {
@@ -189,7 +224,7 @@ class CarneService {
                         'boleto_produtos_id_externo' => $crResult['payment_id'] ?? '',
                         'pix_produtos_qrcode' => $pixQrcode,
                         'pix_produtos_payload' => $pixPayload,
-                        'pix_produtos_expiracao' => date('Y-m-d H:i:s', strtotime('+30 minutes')),
+                        'pix_produtos_expiracao' => $expiraEm,
                     ]);
 
                     $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'pix_gerado', "PIX Produtos gerado para parcela #{$parcelaId}", json_encode(['payment_id' => $crResult['payment_id'] ?? '', 'valor_brl' => $valorBrl]));
@@ -214,7 +249,8 @@ class CarneService {
                     (int) $pedidoId,
                     (float) $parcela['valor_taxas'],
                     $descBase . ' - Taxas',
-                    $clientData
+                    $clientData,
+                    $dueDateDays
                 );
 
                 if (!empty($result['success'])) {
@@ -233,7 +269,7 @@ class CarneService {
                         'boleto_taxas_id_externo' => $result['payment_id'] ?? '',
                         'pix_taxas_qrcode'        => $pixTaxasQrcode,
                         'pix_taxas_payload'       => $pixTaxasPayload,
-                        'pix_taxas_expiracao'     => date('Y-m-d H:i:s', strtotime('+30 minutes')),
+                        'pix_taxas_expiracao'     => $expiraEm,
                     ]);
                     $this->carneModel->registrarLog($parcela['carne_id'] ?? null, (int) $pedidoId, $parcelaId, 'pix_gerado', "PIX Taxas gerado para parcela #{$parcelaId}", json_encode(['payment_id' => $result['payment_id'] ?? '', 'valor' => $parcela['valor_taxas']]));
                     error_log('[CARNE] PIX Câmbio Real Taxas gerado: id=' . ($result['payment_id'] ?? ''));
@@ -438,6 +474,21 @@ class CarneService {
             error_log('[CARNE processarPagamentoBoleto] Parcela #' . $parcela['id'] . ' está cancelada, ignorando webhook');
             return false;
         }
+
+        // Verificar se a parcela expirou (pagamento fora do prazo)
+        $expiraEm = trim((string) ($parcela['expira_em'] ?? ''));
+        if ($expiraEm !== '' && strtotime($expiraEm) < time()) {
+            // Verificar se tem juros (parcela em atraso mas dentro da tolerância)
+            $diasAtraso = (int) ($parcela['dias_atraso'] ?? 0);
+            if ($diasAtraso > 0 && $parcelaStatus === 'em_atraso') {
+                // Parcela em atraso com juros — aceitar pagamento se o valor bater (com juros)
+                error_log('[CARNE processarPagamentoBoleto] Parcela #' . $parcela['id'] . ' em atraso (' . $diasAtraso . ' dias), aceitando pagamento com juros');
+            } else {
+                error_log('[CARNE processarPagamentoBoleto] Parcela #' . $parcela['id'] . ' expirou em ' . $expiraEm . ', ignorando pagamento tardio');
+                $this->carneModel->registrarLog($parcela['carne_id'] ?? null, null, $parcela['id'] ?? null, 'pagamento_expirado', "Pagamento ignorado - parcela expirada em {$expiraEm}", json_encode(['parcela_id' => $parcela['id'], 'expira_em' => $expiraEm]));
+                return false;
+            }
+        }
         try {
             $stCarne = $this->db->prepare("SELECT c.pedido_id FROM carnes c WHERE c.id = ? LIMIT 1");
             $stCarne->execute([$parcela['carne_id']]);
@@ -537,6 +588,158 @@ class CarneService {
         foreach ($proximasVencer as $p) {
             $this->dispararNotificacao($p['carne_id'], $p['id'], 'parcela_proxima_vencimento');
             $resultados['notificadas']++;
+        }
+
+        // 6b. CANCELAMENTO POR EXPIRAÇÃO DA 1ª PARCELA (30 minutos)
+        try {
+            $agora = date('Y-m-d H:i:s');
+            $stPrimeira = $this->db->prepare("
+                SELECT c.id, c.pedido_id FROM carnes c
+                WHERE c.status = 'ativo'
+                AND c.primeira_parcela_expira_em IS NOT NULL
+                AND c.primeira_parcela_expira_em < :agora
+                AND NOT EXISTS (
+                    SELECT 1 FROM carne_parcelas cp 
+                    WHERE cp.carne_id = c.id AND cp.numero_parcela = 1 AND cp.status = 'paga'
+                )
+            ");
+            $stPrimeira->execute([':agora' => $agora]);
+            $carnesExpirados = $stPrimeira->fetchAll(\PDO::FETCH_ASSOC);
+
+            foreach ($carnesExpirados as $ce) {
+                $cid = (int) $ce['id'];
+                $pidCarne = (int) $ce['pedido_id'];
+
+                // Cancelar carnê
+                $this->carneModel->update($cid, [
+                    'status' => 'cancelado',
+                    'cancelado_em' => $agora,
+                    'motivo_cancelamento' => 'Primeira parcela não paga dentro do prazo'
+                ]);
+
+                // Cancelar parcelas pendentes
+                $this->db->prepare("UPDATE carne_parcelas SET status = 'cancelada' WHERE carne_id = ? AND status NOT IN ('paga')")
+                    ->execute([$cid]);
+
+                // Cancelar pedido
+                if ($pidCarne > 0) {
+                    try {
+                        $this->db->prepare("UPDATE pedidos SET status = 'cancelado' WHERE id = ? AND status NOT IN ('cancelado')")
+                            ->execute([$pidCarne]);
+                    } catch (\Exception $e) {}
+                }
+
+                $this->carneModel->registrarHistorico($cid, null, 'carne_cancelado',
+                    'Carnê cancelado: primeira parcela não paga dentro do prazo de 30 minutos.');
+                $this->dispararNotificacao($cid, null, 'carne_cancelado');
+                $resultados['cancelados']++;
+                error_log("[CARNE CRON] Carnê #{$cid} cancelado: 1ª parcela expirou (pedido #{$pidCarne})");
+            }
+        } catch (\Exception $e) {
+            error_log('[CARNE CRON] Erro verificação 1ª parcela: ' . $e->getMessage());
+        }
+
+        // 6c. JUROS E CANCELAMENTO POR ATRASO (parcelas seguintes)
+        // Regra: venceu → corre juros diário por 7 dias → cancela
+        try {
+            $diasTolerancia = 7;
+            $jurosDiario = 0.033; // 0.033% ao dia
+            try {
+                $stCfg = $this->db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('carne_dias_tolerancia_atraso','carne_juros_diario_percent')");
+                $stCfg->execute();
+                $cfgs = $stCfg->fetchAll(\PDO::FETCH_KEY_PAIR);
+                $diasTolerancia = (int) ($cfgs['carne_dias_tolerancia_atraso'] ?? 7);
+                $jurosDiario = (float) ($cfgs['carne_juros_diario_percent'] ?? 0.033);
+                if ($diasTolerancia < 1) $diasTolerancia = 7;
+                if ($jurosDiario <= 0) $jurosDiario = 0.033;
+            } catch (\Exception $e) {}
+
+            // Buscar parcelas vencidas (não pagas, não canceladas, vencimento já passou)
+            $stVencidas = $this->db->prepare("
+                SELECT cp.*, c.pedido_id, c.id AS carne_id_ref
+                FROM carne_parcelas cp
+                JOIN carnes c ON cp.carne_id = c.id
+                WHERE cp.status IN ('aguardando_pagamento', 'vencida', 'em_atraso')
+                AND cp.numero_parcela > 1
+                AND cp.vencimento < :hoje
+                AND c.status NOT IN ('cancelado', 'quitado', 'encerrado', 'liberado_envio')
+            ");
+            $stVencidas->execute([':hoje' => $hoje]);
+            $parcelasVencidas = $stVencidas->fetchAll(\PDO::FETCH_ASSOC);
+
+            foreach ($parcelasVencidas as $pv) {
+                $pvId = (int) $pv['id'];
+                $vencimento = $pv['vencimento'];
+                $diasAtraso = (int) ((strtotime($hoje) - strtotime($vencimento)) / 86400);
+                if ($diasAtraso < 1) $diasAtraso = 1;
+
+                // Calcular juros
+                $valorProdOriginal = (float) ($pv['valor_produtos_original'] ?: $pv['valor_produtos']);
+                $valorTaxasOriginal = (float) ($pv['valor_taxas_original'] ?: $pv['valor_taxas']);
+                $valorBase = $valorProdOriginal + $valorTaxasOriginal;
+                $jurosAcumulado = round($valorBase * ($jurosDiario / 100) * $diasAtraso, 2);
+
+                // Atualizar parcela com juros e dias de atraso
+                $updateData = [
+                    'dias_atraso' => $diasAtraso,
+                    'valor_juros' => $jurosAcumulado,
+                    'status' => $diasAtraso > $diasTolerancia ? 'cancelada' : 'em_atraso',
+                ];
+
+                // Salvar valores originais se ainda não salvos
+                if (empty($pv['valor_produtos_original'])) {
+                    $updateData['valor_produtos_original'] = $valorProdOriginal;
+                }
+                if (empty($pv['valor_taxas_original'])) {
+                    $updateData['valor_taxas_original'] = $valorTaxasOriginal;
+                }
+
+                $this->carneModel->atualizarParcela($pvId, $updateData);
+
+                // Notificar cliente no 1º dia de atraso e no 5º dia (último aviso)
+                if ($diasAtraso === 1 || $diasAtraso === 5) {
+                    $this->dispararNotificacao((int) $pv['carne_id_ref'], $pvId, 'parcela_em_atraso_juros');
+                }
+
+                // Se passou da tolerância, cancelar o carnê inteiro
+                if ($diasAtraso > $diasTolerancia) {
+                    $cid = (int) $pv['carne_id_ref'];
+                    $pidCarne = (int) $pv['pedido_id'];
+
+                    // Verificar se já não foi cancelado
+                    $stStatus = $this->db->prepare("SELECT status FROM carnes WHERE id = ? LIMIT 1");
+                    $stStatus->execute([$cid]);
+                    $statusAtual = (string) $stStatus->fetchColumn();
+
+                    if ($statusAtual !== 'cancelado') {
+                        $this->carneModel->update($cid, [
+                            'status' => 'cancelado',
+                            'cancelado_em' => date('Y-m-d H:i:s'),
+                            'motivo_cancelamento' => "Cancelado por atraso de {$diasAtraso} dias na parcela #{$pv['numero_parcela']}"
+                        ]);
+
+                        // Cancelar demais parcelas pendentes
+                        $this->db->prepare("UPDATE carne_parcelas SET status = 'cancelada' WHERE carne_id = ? AND status NOT IN ('paga','cancelada')")
+                            ->execute([$cid]);
+
+                        // Cancelar pedido
+                        if ($pidCarne > 0) {
+                            try {
+                                $this->db->prepare("UPDATE pedidos SET status = 'cancelado' WHERE id = ? AND status NOT IN ('cancelado')")
+                                    ->execute([$pidCarne]);
+                            } catch (\Exception $e) {}
+                        }
+
+                        $this->carneModel->registrarHistorico($cid, $pvId, 'carne_cancelado',
+                            "Carnê cancelado: parcela #{$pv['numero_parcela']} com {$diasAtraso} dias de atraso (limite: {$diasTolerancia} dias).");
+                        $this->dispararNotificacao($cid, null, 'carne_cancelado');
+                        $resultados['cancelados']++;
+                        error_log("[CARNE CRON] Carnê #{$cid} cancelado: atraso de {$diasAtraso} dias na parcela #{$pv['numero_parcela']}");
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[CARNE CRON] Erro juros/cancelamento: ' . $e->getMessage());
         }
 
         // 7. CANCELAMENTO POR ABANDONO
@@ -914,6 +1117,22 @@ class CarneService {
                     'alerta' => 'danger',
                     'alertaMensagem' => '<strong>❌ Cancelado:</strong> Seu carnê foi cancelado por falta de pagamento.',
                     'ctaTexto' => 'Entrar em contato',
+                ];
+
+            case 'parcela_em_atraso_juros':
+                $diasAtraso = (int) ($parcela['dias_atraso'] ?? 0);
+                $valorJuros = isset($parcela['valor_juros']) ? 'R$ ' . number_format((float) $parcela['valor_juros'], 2, ',', '.') : '';
+                if ($valorJuros) $detalhes['Juros acumulados'] = $valorJuros;
+                if ($diasAtraso) $detalhes['Dias em atraso'] = $diasAtraso;
+                $detalhes['Prazo máximo'] = '7 dias após vencimento';
+                return [
+                    'assunto' => "⚠️ Parcela em atraso com juros - Carnê #{$carneId}",
+                    'titulo' => 'Parcela em Atraso',
+                    'mensagem' => "Sua parcela está em atraso e estão sendo cobrados juros diários. Se o pagamento não for realizado em até 7 dias após o vencimento, o carnê será cancelado automaticamente.",
+                    'detalhes' => $detalhes,
+                    'alerta' => 'danger',
+                    'alertaMensagem' => "<strong>⚠️ Atenção:</strong> Sua parcela está em atraso há {$diasAtraso} dia(s). Juros estão sendo aplicados. Pague o quanto antes para evitar o cancelamento.",
+                    'ctaTexto' => 'Pagar agora',
                 ];
 
             default:

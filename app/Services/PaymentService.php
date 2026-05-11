@@ -833,7 +833,7 @@ class PaymentService {
         }
     }
 
-    public function createCambioRealPixPaymentProduto(int $pedidoId, float $amountUsd, float $valorBrlOriginal, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null): array {
+    public function createCambioRealPixPaymentProduto(int $pedidoId, float $amountUsd, float $valorBrlOriginal, string $descricao, array $customer = [], ?string $successUrl = null, ?string $errorUrl = null, ?int $dueDateDays = null): array {
         $pedidoId = (int) $pedidoId;
         $amountUsd = (float) $amountUsd;
         $valorBrlOriginal = (float) $valorBrlOriginal;
@@ -868,7 +868,7 @@ class PaymentService {
             'currency' => 'BRL',
             'payment_method' => 'pix',
             'client' => (array) $customer,
-            'duplicate' => 1,
+            'duplicate' => 0,
             'take_rates' => 1,
             'products' => [
                 [
@@ -880,6 +880,12 @@ class PaymentService {
                 ]
             ],
         ];
+
+        // Expiração: due_date em dias (0 = expira no mesmo dia)
+        if ($dueDateDays !== null) {
+            $payload['due_date'] = (int) $dueDateDays;
+            $payload['duplicate'] = 0; // Não permitir duplicar após expiração
+        }
 
         error_log('[CR_PIX_PAYLOAD] pedido=' . $pedidoId . ' amountBrl=' . round($valorBrlOriginal, 2) . ' amountUsdRef=' . round($amountUsd, 2) . ' currency=BRL take_rates=0 orderId=' . $orderId);
 
@@ -1438,7 +1444,7 @@ class PaymentService {
     /**
      * Cria cobrança PIX de taxas via Câmbio Real Taxas.
      */
-    public function createCambioRealTaxasPixPayment(int $pedidoId, float $valorBrl, string $descricao, array $client): array {
+    public function createCambioRealTaxasPixPayment(int $pedidoId, float $valorBrl, string $descricao, array $client, ?int $dueDateDays = null): array {
         $pedidoId = (int) $pedidoId;
         $valorBrl = (float) $valorBrl;
 
@@ -1492,7 +1498,7 @@ class PaymentService {
                     'number'   => (string) ($addr['number']   ?? ($addr['numero']   ?? '')),
                 ],
             ],
-            'duplicate'  => 1,
+            'duplicate'  => 0,
             'take_rates' => 1,
             'products' => [
                 [
@@ -1504,6 +1510,12 @@ class PaymentService {
                 ]
             ],
         ];
+
+        // Expiração: due_date em dias
+        if ($dueDateDays !== null) {
+            $payload['due_date'] = (int) $dueDateDays;
+            $payload['duplicate'] = 0;
+        }
 
         $buildErrorMessage = static function(array $resp, string $defaultMsg): string {
             $msg = (string) ($resp['message'] ?? $defaultMsg);
