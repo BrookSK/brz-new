@@ -460,11 +460,37 @@ class AdminDreCompletoController extends Controller {
             'agendamentos_futuros' => [],
             'resumo' => [],
             'taxa_conversao' => 5.85,
+            'totais_por_gateway' => [], // Totais da tabela pedidos por gateway (debug)
             '_timestamp' => time(),
         ];
 
         // Buscar taxa de conversão
         try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $resultado['taxa_conversao'] = $r; } catch (\Exception $e) {}
+
+        // Buscar totais por gateway da tabela pedidos (mesma fonte do DRE)
+        // para debug e para o comparativo
+        try {
+            $cols = [];
+            try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $colTotal = in_array('total', $cols) ? 'total' : (in_array('valor_total', $cols) ? 'valor_total' : '');
+            $colMoeda = in_array('moeda', $cols) ? 'moeda' : (in_array('currency', $cols) ? 'currency' : '');
+            $colStatus = in_array('status', $cols) ? 'status' : '';
+            $colPayGateway = in_array('payment_gateway', $cols) ? 'payment_gateway' : (in_array('gateway', $cols) ? 'gateway' : '');
+            $colCreatedAt = in_array('created_at', $cols) ? 'created_at' : (in_array('data_criacao', $cols) ? 'data_criacao' : '');
+            $deletedFilter = in_array('deleted_at', $cols) ? "AND p.deleted_at IS NULL" : "";
+            $paidStatuses = "('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
+
+            if ($colTotal && $colStatus && $colPayGateway && $colCreatedAt) {
+                $st = $this->db->prepare("SELECT LOWER(COALESCE(p.{$colPayGateway},'sem_gateway')) as gateway, " . ($colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'USD'))" : "'USD'") . " as moeda, COUNT(*) as qtd, COALESCE(SUM(p.{$colTotal}),0) as total
+                    FROM pedidos p
+                    WHERE p.{$colCreatedAt} >= ? AND p.{$colCreatedAt} < DATE_ADD(?, INTERVAL 1 DAY)
+                    AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
+                    {$deletedFilter}
+                    GROUP BY gateway, moeda ORDER BY total DESC");
+                $st->execute([$desde, $ate]);
+                $resultado['totais_por_gateway'] = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {}
 
         $resultado['resumo'] = [
             'stripe_saldo' => $resultado['stripe']['saldo'] ?? [],
@@ -714,7 +740,6 @@ class AdminDreCompletoController extends Controller {
 
             // 1. Total da tabela PEDIDOS por gateway (mesma fonte do DRE "Total Entradas")
             // Isso garante consistência com o "Total Entradas (Sistema)"
-            $gwFilter = $gateway === 'cambioreal_taxas' ? "IN ('cambioreal_taxas')" : "IN ('cambioreal','cambio_real')";
             $paidStatuses = "('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
 
             // Detectar colunas
@@ -728,14 +753,24 @@ class AdminDreCompletoController extends Controller {
             $deletedFilter = in_array('deleted_at', $cols) ? "AND p.deleted_at IS NULL" : "";
 
             if ($colTotal && $colStatus && $colPayGateway && $colCreatedAt) {
-                $st = $this->db->prepare("SELECT COALESCE(SUM(p.{$colTotal}), 0) as total, COUNT(*) as qtd, " . ($colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'USD'))" : "'USD'") . " as moeda
+                // Usar LIKE para pegar todas as variações do gateway (pix_cambioreal, boleto_cambioreal, etc)
+                $gwLike = $gateway === 'cambioreal_taxas' ? '%cambioreal_taxa%' : '%cambioreal%';
+                $gwNotLike = $gateway === 'cambioreal_taxas' ? '' : '%taxa%';
+
+                $sql = "SELECT COALESCE(SUM(p.{$colTotal}), 0) as total, COUNT(*) as qtd, " . ($colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'USD'))" : "'USD'") . " as moeda
                     FROM pedidos p
                     WHERE p.{$colCreatedAt} >= ? AND p.{$colCreatedAt} < DATE_ADD(?, INTERVAL 1 DAY)
                     AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
-                    AND LOWER(COALESCE(p.{$colPayGateway},'')) {$gwFilter}
+                    AND LOWER(COALESCE(p.{$colPayGateway},'')) LIKE ?
+                    " . ($gwNotLike ? "AND LOWER(COALESCE(p.{$colPayGateway},'')) NOT LIKE ?" : "") . "
                     {$deletedFilter}
-                    GROUP BY moeda");
-                $st->execute([$desde, $ate]);
+                    GROUP BY moeda";
+
+                $params = [$desde, $ate, $gwLike];
+                if ($gwNotLike) $params[] = $gwNotLike;
+
+                $st = $this->db->prepare($sql);
+                $st->execute($params);
                 $pedidosTotais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 foreach ($pedidosTotais as $pt) {
                     $val = (float)($pt['total'] ?? 0);
