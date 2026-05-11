@@ -863,7 +863,7 @@ class AdminRemessaConferenciaController extends Controller {
         $stripePagamentos = array_filter($pagamentos, fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === 'stripe');
         if (!empty($stripePagamentos)) {
             $stripeValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $stripePagamentos));
-            echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-dark text-white"><strong><i class="fas fa-credit-card me-1"></i>Stripe</strong></div><div class="card-body">';
+            echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-info text-white"><strong><i class="fas fa-credit-card me-1"></i>Stripe</strong></div><div class="card-body">';
             echo '<div class="mb-2"><strong>Valor Stripe (USD):</strong> ' . $fmtMoeda($stripeValorTotal, 'USD') . '</div>';
             foreach ($stripePagamentos as $pg) {
                 echo '<hr class="my-2"><table class="table table-sm mb-0">';
