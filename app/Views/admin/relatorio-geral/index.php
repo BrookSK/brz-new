@@ -812,7 +812,11 @@ function renderFluxoCaixa(d, container) {
     h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#0ea5e920;"><i class="fas fa-dollar-sign" style="color:#0ea5e9;font-size:18px;"></i></div>';
     h += '<div><div class="small text-muted">Câmbio Real (Produtos)</div>';
     if (cr.erro) h += '<div class="text-danger small">'+cr.erro+'</div>';
-    else h += '<div class="fs-5 fw-bold text-success">'+fmtV(cr.total_recebido_usd,'USD')+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+cr.total_registros+' transações</div>';
+    else {
+        var crMoeda = cr.moeda_principal || 'USD';
+        var crTotal = crMoeda === 'BRL' ? (cr.total_recebido_brl||0) : (cr.total_recebido_usd||0);
+        h += '<div class="fs-5 fw-bold text-success">'+fmtV(crTotal, crMoeda)+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+cr.total_registros+' transações</div>';
+    }
     h += '</div></div></div>';
 
     // Câmbio Real Taxas
@@ -821,7 +825,11 @@ function renderFluxoCaixa(d, container) {
     h += '<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#f59e0b20;"><i class="fas fa-receipt" style="color:#f59e0b;font-size:18px;"></i></div>';
     h += '<div><div class="small text-muted">Câmbio Real (Taxas)</div>';
     if (crt.erro) h += '<div class="text-danger small">'+crt.erro+'</div>';
-    else h += '<div class="fs-5 fw-bold text-success">'+fmtV(crt.total_recebido_usd,'USD')+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+crt.total_registros+' transações</div>';
+    else {
+        var crtMoeda = crt.moeda_principal || 'BRL';
+        var crtTotal = crtMoeda === 'BRL' ? (crt.total_recebido_brl||0) : (crt.total_recebido_usd||0);
+        h += '<div class="fs-5 fw-bold text-success">'+fmtV(crtTotal, crtMoeda)+'</div><div class="text-muted" style="font-size:10px;">Recebido (30 dias) · '+crt.total_registros+' transações</div>';
+    }
     h += '</div></div></div>';
     h += '</div>';
 
@@ -866,12 +874,16 @@ function renderFluxoCaixa(d, container) {
 
     // === COMPARAÇÃO: SITE vs GATEWAYS ===
     var totalSite = 0; var totalGateways = 0;
-    // Total do site = usar o total_creditos da conciliação financeira do DRE (que já está calculado corretamente)
+    // Total do site = soma das entradas do fluxo de caixa, ou usar conciliação do DRE
     if (d.fluxo_caixa && d.fluxo_caixa.length) d.fluxo_caixa.forEach(function(m){ if(m.tipo==='entrada') totalSite += m.valor; });
-    // Se fluxo_caixa vazio, usar o total dos gateways como referência
     if (totalSite === 0 && window._dreData && window._dreData.conciliacao) totalSite = window._dreData.conciliacao.total_creditos || 0;
+    // Total gateways = Stripe + CR Produtos (USD) + CR Taxas (BRL convertido)
     if (s.saldo) s.saldo.forEach(function(b){ totalGateways += (b.disponivel||0) + (b.pendente||0); });
-    totalGateways += (cr.total_recebido_usd||0) + (crt.total_recebido_usd||0);
+    totalGateways += (cr.total_recebido_usd||0);
+    // CR Taxas é em BRL, converter para USD para comparar (usar taxa do DRE)
+    var taxaConv = (window._dreData && window._dreData.taxa_usd_brl) ? window._dreData.taxa_usd_brl : 5.5;
+    var crtBrl = crt.total_recebido_brl || 0;
+    totalGateways += crtBrl > 0 ? (crtBrl / taxaConv) : (crt.total_recebido_usd||0);
 
     h += '<div class="card border-0 shadow-sm mt-4 mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Comparativo: Sistema vs Gateways (30 dias)</h6></div><div class="card-body">';
     h += '<div class="row g-3 text-center">';

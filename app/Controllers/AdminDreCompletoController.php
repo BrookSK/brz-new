@@ -666,76 +666,64 @@ class AdminDreCompletoController extends Controller {
     }
 
     private function conciliacaoCambioReal(string $gateway): array {
-        $result = ['total_recebido_usd' => 0, 'total_recebido_brl' => 0, 'transacoes' => [], 'divergencias' => [], 'erro' => null];
+        $result = ['total_recebido_usd' => 0, 'total_recebido_brl' => 0, 'total_sistema' => 0, 'moeda_principal' => 'USD', 'total_registros' => 0, 'total_consultados' => 0, 'transacoes' => [], 'divergencias' => [], 'erro' => null];
 
         try {
-            // Buscar tokens de pagamento dos últimos 30 dias
             $desde = date('Y-m-d', strtotime('-30 days'));
-            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status, metodo, created_at FROM pedido_pagamentos WHERE gateway = ? AND created_at >= ? AND payment_id IS NOT NULL AND payment_id != '' ORDER BY created_at DESC LIMIT 200");
-            $st->execute([$gateway, $desde]);
-            $locais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            // Também buscar parcelas do carnê
-            if ($gateway === 'cambioreal') {
-                $stCarne = $this->db->prepare("SELECT cp.boleto_produtos_id_externo as payment_id, c.pedido_id, cp.valor_produtos as valor, cp.status as gateway_status, cp.created_at FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.boleto_produtos_id_externo IS NOT NULL AND cp.boleto_produtos_id_externo != '' AND cp.created_at >= ? ORDER BY cp.created_at DESC LIMIT 100");
-                $stCarne->execute([$desde]);
-                $carneParcelas = $stCarne->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                $locais = array_merge($locais, $carneParcelas);
-            } elseif ($gateway === 'cambioreal_taxas') {
-                $stCarne = $this->db->prepare("SELECT cp.boleto_taxas_id_externo as payment_id, c.pedido_id, cp.valor_taxas as valor, cp.status as gateway_status, cp.created_at FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.boleto_taxas_id_externo IS NOT NULL AND cp.boleto_taxas_id_externo != '' AND cp.created_at >= ? ORDER BY cp.created_at DESC LIMIT 100");
-                $stCarne->execute([$desde]);
-                $carneParcelas = $stCarne->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                $locais = array_merge($locais, $carneParcelas);
+            // Somar valores pagos no sistema (sem consultar API)
+            $st = $this->db->prepare("SELECT SUM(valor) as total, COUNT(*) as qtd, moeda FROM pedido_pagamentos WHERE gateway = ? AND (status = 'approved' OR gateway_status IN ('SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA')) AND created_at >= ? GROUP BY moeda");
+            $st->execute([$gateway, $desde]);
+            $totais = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($totais as $t) {
+                $result['total_sistema'] += (float)($t['total'] ?? 0);
+                $result['total_registros'] += (int)($t['qtd'] ?? 0);
+                if (strtoupper($t['moeda'] ?? '') === 'BRL') {
+                    $result['total_recebido_brl'] += (float)($t['total'] ?? 0);
+                    $result['moeda_principal'] = 'BRL';
+                } else {
+                    $result['total_recebido_usd'] += (float)($t['total'] ?? 0);
+                }
             }
 
-            // Consultar status de cada token na API do Câmbio Real
+            // Também somar parcelas de carnê pagas
+            if ($gateway === 'cambioreal') {
+                $stC = $this->db->prepare("SELECT SUM(cp.valor_produtos) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_produtos_pago_em >= ?");
+                $stC->execute([$desde]);
+                $r = $stC->fetch(\PDO::FETCH_ASSOC);
+                if ($r) { $result['total_recebido_brl'] += (float)($r['total'] ?? 0); $result['total_registros'] += (int)($r['qtd'] ?? 0); }
+            } elseif ($gateway === 'cambioreal_taxas') {
+                $stC = $this->db->prepare("SELECT SUM(cp.valor_taxas) as total, COUNT(*) as qtd FROM carne_parcelas cp JOIN carnes c ON cp.carne_id = c.id WHERE cp.status = 'paga' AND cp.boleto_taxas_pago_em >= ?");
+                $stC->execute([$desde]);
+                $r = $stC->fetch(\PDO::FETCH_ASSOC);
+                if ($r) { $result['total_recebido_brl'] += (float)($r['total'] ?? 0); $result['total_registros'] += (int)($r['qtd'] ?? 0); }
+            }
+
+            // Consultar apenas alguns tokens na API para verificar divergências (amostra)
+            $st = $this->db->prepare("SELECT payment_id, pedido_id, valor, gateway_status, status FROM pedido_pagamentos WHERE gateway = ? AND payment_id IS NOT NULL AND payment_id != '' AND created_at >= ? ORDER BY created_at DESC LIMIT 20");
+            $st->execute([$gateway, $desde]);
+            $amostra = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
             $paymentService = new \App\Services\PaymentService();
-            $consultados = 0;
-            $maxConsultas = 50; // Limitar para não travar
-
-            foreach ($locais as $l) {
+            foreach ($amostra as $l) {
                 $token = $l['payment_id'];
-                $statusLocal = strtoupper(trim((string)($l['gateway_status'] ?? '')));
+                $statusLocal = strtoupper(trim((string)($l['gateway_status'] ?? $l['status'] ?? '')));
+                try {
+                    $resp = $paymentService->obterTransacaoCambioReal($token);
+                    $data = $resp['data'] ?? [];
+                    $statusGw = strtoupper(trim((string)($data['status'] ?? '')));
+                    $result['total_consultados']++;
 
-                $tx = ['token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'valor_local' => (float)($l['valor'] ?? 0), 'status_local' => $statusLocal, 'status_gateway' => null, 'valor_gateway' => null, 'data' => $l['created_at'] ?? ''];
-
-                // Consultar API (com limite)
-                if ($consultados < $maxConsultas) {
-                    try {
-                        $resp = $paymentService->obterTransacaoCambioReal($token);
-                        $data = $resp['data'] ?? [];
-                        $tx['status_gateway'] = strtoupper(trim((string)($data['status'] ?? '')));
-                        $tx['valor_gateway'] = (float)($data['amount'] ?? 0);
-                        $tx['moeda'] = strtoupper($data['currency'] ?? 'USD');
-                        $tx['beneficiary'] = (float)($data['beneficiary'] ?? 0);
-                        $consultados++;
-
-                        // Somar recebidos
-                        if (in_array($tx['status_gateway'], ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA'])) {
-                            $result['total_recebido_usd'] += $tx['beneficiary'] ?: $tx['valor_gateway'];
-                        }
-                    } catch (\Exception $e) {
-                        $tx['status_gateway'] = 'ERRO: ' . $e->getMessage();
-                    }
-                }
-
-                $result['transacoes'][] = $tx;
-
-                // Detectar divergências
-                if ($tx['status_gateway'] !== null) {
-                    $pagoGateway = in_array($tx['status_gateway'], ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','ON_HOLD']);
-                    $pagoLocal = in_array($statusLocal, ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','PAGA','PAID','APPROVED']);
+                    $pagoGateway = in_array($statusGw, ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','ON_HOLD']);
+                    $pagoLocal = in_array($statusLocal, ['SOLICITACAO_PAGO','SOLICITACAO_FINALIZADA','APPROVED']);
 
                     if ($pagoGateway && !$pagoLocal) {
-                        $result['divergencias'][] = ['tipo' => 'pago_gateway_nao_local', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $tx['status_gateway'], 'status_local' => $statusLocal, 'msg' => 'Pago no Câmbio Real mas NÃO marcado como pago no sistema'];
+                        $result['divergencias'][] = ['tipo' => 'pago_gateway_nao_local', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $statusGw, 'status_local' => $statusLocal, 'msg' => 'Pago no CR mas não no sistema'];
                     } elseif (!$pagoGateway && $pagoLocal) {
-                        $result['divergencias'][] = ['tipo' => 'pago_local_nao_gateway', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $tx['status_gateway'], 'status_local' => $statusLocal, 'msg' => 'Marcado como pago no sistema mas NÃO pago no Câmbio Real'];
+                        $result['divergencias'][] = ['tipo' => 'pago_local_nao_gateway', 'token' => $token, 'pedido_id' => $l['pedido_id'] ?? null, 'status_gateway' => $statusGw, 'status_local' => $statusLocal, 'msg' => 'Pago no sistema mas não no CR'];
                     }
-                }
+                } catch (\Exception $e) {}
             }
-
-            $result['total_consultados'] = $consultados;
-            $result['total_registros'] = count($locais);
 
         } catch (\Exception $e) {
             $result['erro'] = $e->getMessage();
