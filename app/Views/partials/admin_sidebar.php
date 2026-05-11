@@ -557,6 +557,39 @@ function renderAdminSidebarStyles() {
             display: none !important;
         }
 
+        /* Nav tabs/pills global override - navy instead of blue */
+        .nav-tabs .nav-link.active,
+        .nav-tabs .nav-link.active:focus,
+        .nav-tabs .nav-link.active:hover {
+            color: #18253D !important;
+            border-color: #18253D !important;
+            border-bottom-color: #fff !important;
+            font-weight: 600;
+        }
+        .nav-tabs .nav-link {
+            color: #64748B;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .nav-tabs .nav-link:hover {
+            color: #18253D;
+            border-color: transparent;
+        }
+        .nav-pills .nav-link.active {
+            background: #18253D !important;
+            color: #fff !important;
+            font-weight: 600;
+        }
+        .nav-pills .nav-link {
+            color: #334155;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .nav-pills .nav-link:hover {
+            color: #18253D;
+            background: #F8FAFC;
+        }
+
         body {
             background: var(--bg-surface);
             color: #0f172a;
