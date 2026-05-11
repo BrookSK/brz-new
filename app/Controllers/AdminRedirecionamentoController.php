@@ -1237,6 +1237,42 @@ class AdminRedirecionamentoController extends Controller {
         $this->json(['ok'=>true]);
     }
 
+    public function coletaCancelar(Request $request) {
+        $this->auth(); $this->migrar();
+        $id = (int) $request->getParam('id', 0);
+        if ($id <= 0) { $this->json(['ok'=>false,'msg'=>'ID inválido']); return; }
+        $db = $this->pdo();
+
+        // Verificar se a coleta pertence ao redirecionador logado (segurança)
+        $redFixo = $this->getRedirecionadorFixo();
+        if ($redFixo && (int)($redFixo['id'] ?? 0) > 0) {
+            $st = $db->prepare("SELECT id FROM redirecionamento_coletas WHERE id = ? AND redirecionador_id = ? AND status = 'agendado' LIMIT 1");
+            $st->execute([$id, (int)$redFixo['id']]);
+            if (!$st->fetchColumn()) { $this->json(['ok'=>false,'msg'=>'Coleta não encontrada ou não pode ser cancelada']); return; }
+        }
+
+        $db->prepare("UPDATE redirecionamento_coletas SET status = 'cancelado' WHERE id = ? AND status = 'agendado'")->execute([$id]);
+
+        // Notificar admin
+        try {
+            $st = $db->prepare("SELECT c.envio_id, r.nome AS red_nome FROM redirecionamento_coletas c LEFT JOIN redirecionadores r ON r.id = c.redirecionador_id WHERE c.id = ? LIMIT 1");
+            $st->execute([$id]);
+            $coleta = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($coleta) {
+                $emailsConfig = $this->getEmailsColetaConfig($db);
+                $assunto = "Coleta cancelada - Envio #{$coleta['envio_id']}";
+                $corpo = "<p>O redirecionador <b>" . htmlspecialchars($coleta['red_nome'] ?? '') . "</b> cancelou a coleta do envio #{$coleta['envio_id']}.</p>";
+                foreach ($emailsConfig as $email) {
+                    $this->enviarEmailNotificacao($email, $assunto, $corpo);
+                }
+                $emails = $this->getEmailsNotificacao();
+                $this->enviarEmailNotificacao($emails['fabiana'], $assunto, $corpo);
+            }
+        } catch (\Exception $e) {}
+
+        $this->json(['ok'=>true]);
+    }
+
     public function coletaReagendar(Request $request) {
         $this->adminOnly(); $this->migrar();
         $id=(int)$request->getParam('id',0);

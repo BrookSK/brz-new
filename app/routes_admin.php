@@ -246,6 +246,7 @@ $router->post('/admin/redirecionamento/comprovantes/upload',            'AdminRe
 $router->get('/admin/redirecionamento/coletas',                         'AdminRedirecionamentoController', 'coletas');
 $router->post('/admin/redirecionamento/coletas/agendar',                'AdminRedirecionamentoController', 'coletaAgendar');
 $router->post('/admin/redirecionamento/coletas/confirmar',              'AdminRedirecionamentoController', 'coletaConfirmar');
+$router->post('/admin/redirecionamento/coletas/cancelar',               'AdminRedirecionamentoController', 'coletaCancelar');
 $router->post('/admin/redirecionamento/coletas/coletado',               'AdminRedirecionamentoController', 'coletaMarcarColetado');
 $router->post('/admin/redirecionamento/coletas/reagendar',              'AdminRedirecionamentoController', 'coletaReagendar');
 $router->post('/admin/redirecionamento/pagamento/criar-intent',         'AdminRedirecionamentoController', 'criarIntentPagamento');

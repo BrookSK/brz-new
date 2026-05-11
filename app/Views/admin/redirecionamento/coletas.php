@@ -86,6 +86,9 @@ ksort($porDia);
                                 <?php if ($_isAdminColeta && in_array($c['status']??'agendado',['agendado','confirmado'])): ?>
                                 <button type="button" class="btn btn-xs btn-outline-success btn-coletado" data-id="<?= (int)$c['id'] ?>" style="font-size:.75rem;padding:2px 8px">Coletado</button>
                                 <?php endif; ?>
+                                <?php if (!$_isAdminColeta && ($c['status']??'agendado') === 'agendado'): ?>
+                                <button type="button" class="btn btn-xs btn-outline-danger btn-cancelar-coleta" data-id="<?= (int)$c['id'] ?>" style="font-size:.75rem;padding:2px 8px">Cancelar</button>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; endif; ?>
@@ -196,6 +199,19 @@ document.getElementById('btnReagendar')?.addEventListener('click', async () => {
     fd.append('horario', document.getElementById('reHora').value);
     const r = await fetch('/admin/redirecionamento/coletas/reagendar',{method:'POST',body:fd});
     const j = await r.json(); if (j.ok) location.reload();
+});
+
+// Cancelar coleta (redirecionador)
+document.querySelectorAll('.btn-cancelar-coleta').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        if (!confirm('Cancelar esta coleta?')) return;
+        const fd = new FormData();
+        fd.append('id', btn.dataset.id);
+        const r = await fetch('/admin/redirecionamento/coletas/cancelar', {method:'POST', body:fd});
+        const j = await r.json();
+        if (j.ok) location.reload();
+        else alert(j.msg || 'Erro ao cancelar');
+    });
 });
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../../layouts/admin.php'; ?>
