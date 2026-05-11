@@ -116,7 +116,17 @@ class AdminRemessaConferenciaController extends Controller {
                 'cliente_cpf_cnpj' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
                 'cliente_documento' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
                 'documento' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
-                'endereco' => $envio['dest_logradouro'] ?? '',
+                'endereco' => [
+                    'endereco' => $envio['dest_logradouro'] ?? '',
+                    'logradouro' => $envio['dest_logradouro'] ?? '',
+                    'numero' => $envio['dest_numero'] ?? '',
+                    'complemento' => $envio['dest_complemento'] ?? '',
+                    'bairro' => $envio['dest_bairro'] ?? '',
+                    'cidade' => $envio['dest_cidade'] ?? '',
+                    'estado' => $envio['dest_estado'] ?? '',
+                    'cep' => $envio['dest_cep'] ?? '',
+                    'pais' => 'BR',
+                ],
                 'endereco_entrega' => $envio['dest_logradouro'] ?? '',
                 'numero' => $envio['dest_numero'] ?? '',
                 'numero_entrega' => $envio['dest_numero'] ?? '',
@@ -778,13 +788,22 @@ class AdminRemessaConferenciaController extends Controller {
         echo '<div class="row"><div class="col-md-6">
 <div class="card mb-3"><div class="card-header"><strong><i class="fas fa-credit-card me-1"></i>Pagamento</strong></div><div class="card-body">
 <table class="table table-sm mb-0">';
-        echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl > 0 ? $totalBrl : null) . '</td></tr>';
+        $totalUsd = 0.0;
+        foreach ($pagamentos as $pg) {
+            $pgM = strtoupper(trim((string)($pg['moeda'] ?? '')));
+            if ($pgM === 'USD') $totalUsd += (float)($pg['valor'] ?? 0);
+        }
+        if ($totalUsd > 0 && $totalBrl <= 0) {
+            echo '<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
+        } else {
+            echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl > 0 ? $totalBrl : null) . '</td></tr>';
+        }
         echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
-        echo '<tr><td class="text-muted">Produtos</td><td>' . $fmtBrl($produtosValor > 0 ? $produtosValor : null) . '</td></tr>';
-        echo '<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtBrl($taxaServico > 0 ? $taxaServico : null) . '</td></tr>';
-        echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtBrl($impostoValor > 0 ? $impostoValor : null) . '</td></tr>';
-        echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtBrl($impostoLocal > 0 ? $impostoLocal : null) . '</td></tr>';
+        echo '<tr><td class="text-muted">Produtos</td><td>' . ($produtosValor > 0 ? $fmtMoeda($produtosValor, $moeda) : ($subtotal !== null ? $fmtMoeda($subtotal, $moeda) : '-')) . '</td></tr>';
+        echo '<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtMoeda($taxaServico > 0 ? $taxaServico : null, $moeda) . '</td></tr>';
+        echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtMoeda($impostoValor > 0 ? $impostoValor : null, $moeda) . '</td></tr>';
+        echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impostoLocal > 0 ? $impostoLocal : null, $moeda) . '</td></tr>';
         echo '</table></div></div></div>';
 
         // Cards AppMax e Câmbio Real lado a lado
@@ -839,6 +858,25 @@ class AdminRemessaConferenciaController extends Controller {
             }
         }
         echo '</div></div></div>';
+
+        // Stripe card
+        $stripePagamentos = array_filter($pagamentos, fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === 'stripe');
+        if (!empty($stripePagamentos)) {
+            $stripeValorTotal = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $stripePagamentos));
+            echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-dark text-white"><strong><i class="fas fa-credit-card me-1"></i>Stripe</strong></div><div class="card-body">';
+            echo '<div class="mb-2"><strong>Valor Stripe (USD):</strong> ' . $fmtMoeda($stripeValorTotal, 'USD') . '</div>';
+            foreach ($stripePagamentos as $pg) {
+                echo '<hr class="my-2"><table class="table table-sm mb-0">';
+                $fields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id'];
+                foreach ($fields as $f) {
+                    if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                    echo '<tr><td class="text-muted" style="width:140px">' . $h($f) . '</td><td>' . $h((string)$pg[$f]) . '</td></tr>';
+                }
+                echo '</table>';
+            }
+            echo '</div></div></div>';
+        }
+
         echo '</div>'; // end row cards
 
         // Split detalhado â€” sem coluna Link, status em português
