@@ -298,6 +298,72 @@ body {
         overflow-x: hidden !important;
     }
 
+    /* KILL table-responsive scroll */
+    .table-responsive {
+        overflow-x: hidden !important;
+        overflow: visible !important;
+    }
+
+    /* Transform tables to block layout - NO horizontal scroll */
+    .table {
+        display: block !important;
+        width: 100% !important;
+        font-size: 12px !important;
+    }
+
+    .table thead {
+        display: none !important;
+    }
+
+    .table tbody {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .table tbody tr {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+        padding: 12px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        background: #fff !important;
+    }
+
+    .table tbody tr td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 6px 0 !important;
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
+    .table tbody tr td:last-child {
+        border-bottom: none !important;
+    }
+
+    .table tbody tr td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 11px;
+        flex: 0 0 auto;
+        margin-right: 10px;
+        min-width: 80px;
+    }
+
+    /* Images in table */
+    .table img {
+        max-width: 40px !important;
+        height: auto !important;
+    }
+
     .container-fluid > .row {
         margin-left: 0 !important;
         margin-right: 0 !important;
@@ -322,32 +388,6 @@ body {
         padding: 14px !important;
     }
 
-    /* Tables - make them responsive without horizontal scroll */
-    .table {
-        font-size: 12px !important;
-    }
-
-    .table th, .table td {
-        white-space: normal !important;
-        word-break: break-word !important;
-        overflow-wrap: break-word !important;
-        max-width: 150px !important;
-        padding: 8px 6px !important;
-        vertical-align: top !important;
-    }
-
-    /* Product names - allow wrapping */
-    .table td:first-child,
-    .table td:nth-child(2) {
-        max-width: 120px !important;
-        word-break: break-word !important;
-    }
-
-    /* Hide less important columns on very small screens */
-    .table .d-none-mobile {
-        display: none !important;
-    }
-
     /* Form controls */
     .form-control, .form-select {
         font-size: 14px !important;
@@ -368,7 +408,6 @@ body {
     .badge {
         white-space: normal !important;
         word-break: break-word !important;
-        text-align: left !important;
     }
 
     /* Two-column layout to single column */
@@ -383,43 +422,15 @@ body {
         flex-wrap: wrap !important;
     }
 
-    .input-group .form-control,
-    .input-group .form-select {
-        min-width: 0 !important;
-    }
-
     /* Flex items that might overflow */
     .d-flex {
         flex-wrap: wrap !important;
     }
 
-    /* Long text fields */
-    textarea.form-control {
-        min-height: 80px !important;
-    }
-
-    /* Action buttons row */
-    .d-flex.gap-2,
-    .d-flex.flex-wrap {
-        gap: 6px !important;
-    }
-
-    /* Prevent text overflow */
-    h1, h2, h3, h4, h5, h6, p, span, a, td, th, label {
+    /* Prevent text overflow everywhere */
+    h1, h2, h3, h4, h5, h6, p, span, a, td, th, label, div {
         overflow-wrap: break-word !important;
         word-break: break-word !important;
-    }
-
-    /* Sidebar collapse on mobile */
-    .admin-sidebar {
-        position: fixed !important;
-        z-index: 1050 !important;
-        transform: translateX(-100%) !important;
-        transition: transform .3s ease !important;
-    }
-
-    .admin-sidebar.show {
-        transform: translateX(0) !important;
     }
 }
 
