@@ -1617,8 +1617,6 @@ class AdminComprasController extends Controller {
                                         <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
                                         <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
                                     </div>
-                                    <hr class="my-1">
-                                    <button type="button" class="btn btn-sm btn-primary w-100" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar filtro</button>
                                 </div>
                             </div>
                         </div>'
@@ -1636,40 +1634,8 @@ class AdminComprasController extends Controller {
                     var todasCheck = document.getElementById("lojaCheck_todas");
                     var lojaChecks = document.querySelectorAll(".loja-check:not(#lojaCheck_todas)");
                     var searchInput = document.getElementById("lojaSearchInput");
-                    var applyBtn = document.getElementById("lojaApplyBtn");
 
-                    // "Todas" unchecks others
-                    todasCheck.addEventListener("change", function() {
-                        if (this.checked) {
-                            lojaChecks.forEach(function(cb) { cb.checked = false; });
-                        }
-                    });
-
-                    // Any other check unchecks "Todas"
-                    lojaChecks.forEach(function(cb) {
-                        cb.addEventListener("change", function() {
-                            if (this.checked) {
-                                todasCheck.checked = false;
-                            }
-                            // If none selected, re-check "Todas"
-                            var anyChecked = Array.from(lojaChecks).some(function(c) { return c.checked; });
-                            if (!anyChecked) todasCheck.checked = true;
-                        });
-                    });
-
-                    // Search filter
-                    searchInput.addEventListener("input", function() {
-                        var term = this.value.toLowerCase();
-                        document.querySelectorAll(".loja-item").forEach(function(item) {
-                            var label = item.querySelector("label");
-                            if (label) {
-                                item.style.display = label.textContent.toLowerCase().indexOf(term) >= 0 ? "" : "none";
-                            }
-                        });
-                    });
-
-                    // Apply button
-                    applyBtn.addEventListener("click", function() {
+                    function aplicarFiltro() {
                         var selected = [];
                         lojaChecks.forEach(function(cb) {
                             if (cb.checked) selected.push(cb.value);
@@ -1684,6 +1650,38 @@ class AdminComprasController extends Controller {
                             url += "&tipo_compra=" + tipo;
                         }
                         window.location.href = url;
+                    }
+
+                    // "Todas" unchecks others and applies immediately
+                    todasCheck.addEventListener("change", function() {
+                        if (this.checked) {
+                            lojaChecks.forEach(function(cb) { cb.checked = false; });
+                        }
+                        aplicarFiltro();
+                    });
+
+                    // Any other check unchecks "Todas" and applies immediately
+                    lojaChecks.forEach(function(cb) {
+                        cb.addEventListener("change", function() {
+                            if (this.checked) {
+                                todasCheck.checked = false;
+                            }
+                            // If none selected, re-check "Todas"
+                            var anyChecked = Array.from(lojaChecks).some(function(c) { return c.checked; });
+                            if (!anyChecked) todasCheck.checked = true;
+                            aplicarFiltro();
+                        });
+                    });
+
+                    // Search filter
+                    searchInput.addEventListener("input", function() {
+                        var term = this.value.toLowerCase();
+                        document.querySelectorAll(".loja-item").forEach(function(item) {
+                            var label = item.querySelector("label");
+                            if (label) {
+                                item.style.display = label.textContent.toLowerCase().indexOf(term) >= 0 ? "" : "none";
+                            }
+                        });
                     });
                 });
                 </script>';
