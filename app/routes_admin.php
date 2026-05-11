@@ -228,6 +228,7 @@ $router->post('/admin/redirecionamento/envios/marcar-pago',             'AdminRe
 $router->post('/admin/redirecionamento/envios/{id}/entregue',           'AdminRedirecionamentoController', 'envioMarcarEntregue');
 $router->get('/admin/redirecionamento/divergencias',                    'AdminRedirecionamentoController', 'divergencias');
 $router->post('/admin/redirecionamento/divergencias/gerar-link',        'AdminRedirecionamentoController', 'divergenciaGerarLink');
+$router->post('/admin/redirecionamento/divergencias/pagar',             'AdminRedirecionamentoController', 'divergenciaPagar');
 $router->post('/admin/redirecionamento/divergencias/marcar-pago',       'AdminRedirecionamentoController', 'divergenciaMarcarPago');
 $router->get('/admin/redirecionamento/clientes',                        'AdminRedirecionamentoController', 'clientes');
 $router->post('/admin/redirecionamento/clientes/salvar',                'AdminRedirecionamentoController', 'clienteSalvar');

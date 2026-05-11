@@ -2,6 +2,8 @@
 $sidebarActive = 'redirecionamento-divergencias';
 $title = 'Divergências e Ajustes';
 $divergencias = is_array($divergencias ?? null) ? $divergencias : [];
+$_perfilDiv = strtolower(trim((string)($_SESSION['usuario_perfil'] ?? $_SESSION['usuario_role'] ?? '')));
+$_isAdminDiv = in_array($_perfilDiv, ['admin', 'suporte'], true);
 ?>
 <?php ob_start(); ?>
 <div class="container-fluid p-4">
@@ -49,10 +51,13 @@ $divergencias = is_array($divergencias ?? null) ? $divergencias : [];
                             </td>
                             <td class="pe-3 text-end d-flex gap-1 justify-content-end">
                                 <?php if (($d['status_pag']??'pendente') === 'pendente'): ?>
-                                <?php if ($dif > 0): ?>
-                                <button type="button" class="btn btn-xs btn-outline-danger btn-gerar-link" data-pag-id="<?= (int)$d['pag_id'] ?>" style="font-size:.75rem;padding:2px 8px">Gerar link Stripe</button>
-                                <?php endif; ?>
-                                <button type="button" class="btn btn-xs btn-outline-success btn-marcar-pago" data-pag-id="<?= (int)$d['pag_id'] ?>" style="font-size:.75rem;padding:2px 8px">Marcar pago</button>
+                                    <?php if ($_isAdminDiv): ?>
+                                        <button type="button" class="btn btn-xs btn-outline-success btn-marcar-pago" data-pag-id="<?= (int)$d['pag_id'] ?>" style="font-size:.75rem;padding:2px 8px">Marcar pago</button>
+                                    <?php else: ?>
+                                        <?php if ($dif > 0): ?>
+                                        <button type="button" class="btn btn-xs btn-danger btn-pagar-diferenca" data-pag-id="<?= (int)$d['pag_id'] ?>" data-valor="<?= number_format(abs($dif),2,'.','') ?>" style="font-size:.75rem;padding:2px 8px"><i class="fas fa-credit-card me-1"></i>Pagar US$ <?= number_format(abs($dif),2,',','.') ?></button>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                                 <?php if (!empty($d['comprovante_url'])): ?>
                                 <a href="<?= htmlspecialchars($d['comprovante_url'],ENT_QUOTES,'UTF-8') ?>" target="_blank" class="btn btn-xs btn-outline-info" style="font-size:.75rem;padding:2px 8px">Comprovante</a>
@@ -67,15 +72,7 @@ $divergencias = is_array($divergencias ?? null) ? $divergencias : [];
     </div>
 </div>
 <script>
-document.querySelectorAll('.btn-gerar-link').forEach(btn => {
-    btn.addEventListener('click', async () => {
-        const fd = new FormData(); fd.append('pag_id', btn.dataset.pagId);
-        const r = await fetch('/admin/redirecionamento/divergencias/gerar-link',{method:'POST',body:fd});
-        const j = await r.json();
-        if (j.ok) { alert('Link Stripe gerado. Client secret: ' + j.client_secret); }
-        else { alert('Erro: ' + (j.msg||'Tente novamente')); }
-    });
-});
+// Admin: marcar como pago
 document.querySelectorAll('.btn-marcar-pago').forEach(btn => {
     btn.addEventListener('click', async () => {
         if (!confirm('Marcar como pago?')) return;
@@ -84,6 +81,37 @@ document.querySelectorAll('.btn-marcar-pago').forEach(btn => {
         const j = await r.json();
         if (j.ok) location.reload();
         else alert('Erro: ' + (j.msg||'Tente novamente'));
+    });
+});
+
+// Redirecionador: pagar diferença via Stripe
+document.querySelectorAll('.btn-pagar-diferenca').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const pagId = btn.dataset.pagId;
+        const valor = btn.dataset.valor;
+        if (!confirm('Pagar US$ ' + parseFloat(valor).toFixed(2) + ' de diferença via cartão?')) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando...';
+
+        // Criar payment intent
+        const fd = new FormData();
+        fd.append('pag_id', pagId);
+        const r = await fetch('/admin/redirecionamento/divergencias/pagar',{method:'POST',body:fd});
+        const j = await r.json();
+        if (!j.ok) {
+            alert('Erro: ' + (j.msg||'Tente novamente'));
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-credit-card me-1"></i>Pagar US$ ' + parseFloat(valor).toFixed(2);
+            return;
+        }
+
+        // Redirecionar para checkout Stripe
+        if (j.checkout_url) {
+            window.location.href = j.checkout_url;
+        } else {
+            alert('Pagamento criado. Aguarde confirmação.');
+            location.reload();
+        }
     });
 });
 </script>

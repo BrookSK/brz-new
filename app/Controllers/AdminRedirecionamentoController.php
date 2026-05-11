@@ -1104,6 +1104,62 @@ class AdminRedirecionamentoController extends Controller {
         } catch (\Exception $e) { $this->json(['ok'=>false,'msg'=>$e->getMessage()]); }
     }
 
+    /**
+     * Redirecionador paga diferença via Stripe Checkout Session
+     */
+    public function divergenciaPagar(Request $request) {
+        $this->auth(); $this->migrar();
+        $pagId = (int) $request->getParam('pag_id', 0);
+        $db = $this->pdo();
+        $st = $db->prepare("SELECT p.*, e.id AS envio_id FROM redirecionamento_pagamentos p LEFT JOIN redirecionamento_envios e ON e.id = p.envio_id WHERE p.id = ? LIMIT 1");
+        $st->execute([$pagId]);
+        $pag = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$pag) { $this->json(['ok' => false, 'msg' => 'Pagamento não encontrado']); return; }
+        if (strtolower($pag['status'] ?? '') === 'pago') { $this->json(['ok' => false, 'msg' => 'Já foi pago']); return; }
+
+        $keys = $this->getStripeKeys();
+        if (empty($keys['secret'])) { $this->json(['ok' => false, 'msg' => 'Stripe não configurado']); return; }
+
+        $valorCentavos = (int) round((float) $pag['valor_usd'] * 100);
+        $envioId = (int) ($pag['envio_id'] ?? 0);
+
+        try {
+            // Criar Stripe Checkout Session
+            $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_USERPWD => $keys['secret'] . ':',
+                CURLOPT_POSTFIELDS => http_build_query([
+                    'mode' => 'payment',
+                    'payment_method_types[0]' => 'card',
+                    'line_items[0][price_data][currency]' => 'usd',
+                    'line_items[0][price_data][product_data][name]' => "Diferença de peso - Envio #{$envioId}",
+                    'line_items[0][price_data][unit_amount]' => $valorCentavos,
+                    'line_items[0][quantity]' => 1,
+                    'success_url' => "https://brazilianashop.com.br/admin/redirecionamento/divergencias?pago=1&pag_id={$pagId}",
+                    'cancel_url' => "https://brazilianashop.com.br/admin/redirecionamento/divergencias",
+                    'metadata[pag_id]' => $pagId,
+                    'metadata[envio_id]' => $envioId,
+                    'metadata[tipo]' => 'redirecionamento_diferenca',
+                ]),
+            ]);
+            $resp = curl_exec($ch);
+            curl_close($ch);
+            $data = json_decode($resp, true);
+
+            if (!empty($data['url'])) {
+                $db->prepare("UPDATE redirecionamento_pagamentos SET stripe_payment_intent = ? WHERE id = ?")
+                    ->execute([$data['id'] ?? '', $pagId]);
+                $this->json(['ok' => true, 'checkout_url' => $data['url']]);
+            } else {
+                $this->json(['ok' => false, 'msg' => $data['error']['message'] ?? 'Erro ao criar checkout Stripe']);
+            }
+        } catch (\Exception $e) {
+            $this->json(['ok' => false, 'msg' => $e->getMessage()]);
+        }
+    }
+
     public function divergenciaMarcarPago(Request $request) {
         $this->adminOnly(); $this->migrar();
         $pagId=(int)$request->getParam('pag_id',0);
