@@ -192,7 +192,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                 <div class="col-md-2"><label class="form-label small text-muted">Até</label><input type="month" name="competencia_ate" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_ate'] ?? '', 0, 7)) ?>"></div>
                 <div class="col-md-2"><label class="form-label small text-muted">Categoria</label><select name="categoria" class="form-select form-select-sm"><option value="">Todas</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>" <?= ($filtros['categoria']??'')==$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
                 <div class="col-md-2"><label class="form-label small text-muted">Status</label><select name="status" class="form-select form-select-sm"><option value="">Todos</option><option value="prevista" <?= ($filtros['status']??'')==='prevista'?'selected':'' ?>>Prevista</option><option value="a_vencer" <?= ($filtros['status']??'')==='a_vencer'?'selected':'' ?>>A vencer</option><option value="vencida" <?= ($filtros['status']??'')==='vencida'?'selected':'' ?>>Vencida</option><option value="paga" <?= ($filtros['status']??'')==='paga'?'selected':'' ?>>Paga</option><option value="cancelada" <?= ($filtros['status']??'')==='cancelada'?'selected':'' ?>>Cancelada</option></select></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Tipo</label><select name="tipo" class="form-select form-select-sm"><option value="">Todos</option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>>Avulsa</option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>>Fixa</option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>>Recorrente</option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>>Parcelada</option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>>Comissão</option></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted">Tipo</label><select name="tipo" class="form-select form-select-sm"><option value="">Todos</option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>>Avulsa</option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>>Fixa</option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>>Recorrente</option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>>Parcelada</option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>>Comissão</option><option value="por_hora" <?= ($filtros['tipo']??'')==='por_hora'?'selected':'' ?>>Por Hora</option></select></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
             </form>
         </div>
@@ -241,7 +241,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                     <?php else: ?>
                     <?php
                     $statusBadge = ['prevista'=>'bg-secondary','a_vencer'=>'bg-warning text-dark','vencida'=>'bg-danger','paga'=>'bg-success','parcialmente_paga'=>'bg-info','cancelada'=>'bg-dark bg-opacity-50'];
-                    $tipoBadge = ['avulsa'=>'Avulsa','fixa'=>'Fixa','recorrente'=>'Recorrente','parcelada'=>'Parcelada','comissao'=>'Comissão'];
+                    $tipoBadge = ['avulsa'=>'Avulsa','fixa'=>'Fixa','recorrente'=>'Recorrente','parcelada'=>'Parcelada','comissao'=>'Comissão','por_hora'=>'Por Hora'];
                     foreach ($despesas as $d):
                         $stClass = $statusBadge[$d['status'] ?? ''] ?? 'bg-secondary';
                     ?>
@@ -449,7 +449,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
             <div class="modal-body">
                 <div class="row g-3">
                     <div class="col-md-8"><label class="form-label small fw-semibold">Descrição</label><input type="text" name="descricao" class="form-control" required placeholder="Ex: Aluguel sede comercial"></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Tipo</label><select name="tipo" class="form-select" id="despesa-tipo" onchange="toggleTipoFields()"><option value="avulsa">Avulsa</option><option value="fixa">Fixa</option><option value="recorrente">Recorrente</option><option value="parcelada">Parcelada</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Tipo</label><select name="tipo" class="form-select" id="despesa-tipo" onchange="toggleTipoFields()"><option value="avulsa">Avulsa</option><option value="fixa">Fixa</option><option value="recorrente">Recorrente</option><option value="parcelada">Parcelada</option><option value="por_hora">Por Hora</option></select></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold">Categoria</label><select name="categoria_id" class="form-select"><option value="">Selecione</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" class="form-select" id="despesa-moeda" onchange="updateValorLabel()"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
                     <div class="col-md-4"><label class="form-label small fw-semibold" id="valor-label">Valor (R$)</label><input type="number" name="valor" class="form-control" step="0.01" min="0" required></div>
@@ -468,6 +468,18 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                                 <div class="col-md-4"><label class="form-label small">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
                                 <div class="col-md-4"><label class="form-label small">Data fim (opcional)</label><input type="date" name="data_fim" class="form-control form-control-sm"></div>
                             </div>
+                        </div></div>
+                    </div>
+                    <!-- Campos por hora -->
+                    <div class="col-12 d-none" id="fields-por-hora">
+                        <div class="card border-success"><div class="card-body">
+                            <h6 class="fw-bold small text-success mb-2"><i class="fas fa-clock me-1"></i>Despesa por Hora Trabalhada</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4"><label class="form-label small">Nome da pessoa</label><input type="text" name="pessoa_nome" class="form-control form-control-sm" placeholder="Ex: João Silva"></div>
+                                <div class="col-md-4"><label class="form-label small">Horas trabalhadas</label><input type="number" name="horas_trabalhadas" class="form-control form-control-sm" step="0.5" min="0.5" placeholder="Ex: 8"></div>
+                                <div class="col-md-4"><label class="form-label small">Valor por hora (R$)</label><input type="number" name="valor_hora" class="form-control form-control-sm" step="0.01" min="0" placeholder="Ex: 50.00"></div>
+                            </div>
+                            <div class="mt-2 small text-muted"><i class="fas fa-info-circle me-1"></i>O valor total será calculado automaticamente: horas × valor/hora</div>
                         </div></div>
                     </div>
                     <!-- Campos parcelamento -->
@@ -495,7 +507,28 @@ function toggleTipoFields() {
     const tipo = document.getElementById('despesa-tipo').value;
     document.getElementById('fields-recorrencia').classList.toggle('d-none', tipo !== 'recorrente');
     document.getElementById('fields-parcelamento').classList.toggle('d-none', tipo !== 'parcelada');
+    document.getElementById('fields-por-hora').classList.toggle('d-none', tipo !== 'por_hora');
+    // Auto-calcular valor quando tipo é por_hora
+    if (tipo === 'por_hora') {
+        calcularValorHora();
+    }
 }
+function calcularValorHora() {
+    const horas = parseFloat(document.querySelector('input[name="horas_trabalhadas"]').value) || 0;
+    const valorHora = parseFloat(document.querySelector('input[name="valor_hora"]').value) || 0;
+    const total = horas * valorHora;
+    if (total > 0) {
+        document.querySelector('input[name="valor"]').value = total.toFixed(2);
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const horasInput = document.querySelector('input[name="horas_trabalhadas"]');
+    const valorHoraInput = document.querySelector('input[name="valor_hora"]');
+    if (horasInput && valorHoraInput) {
+        horasInput.addEventListener('input', calcularValorHora);
+        valorHoraInput.addEventListener('input', calcularValorHora);
+    }
+});
 function updateValorLabel() {
     const moeda = document.getElementById('despesa-moeda').value;
     document.getElementById('valor-label').textContent = moeda === 'USD' ? 'Valor ($)' : 'Valor (R$)';

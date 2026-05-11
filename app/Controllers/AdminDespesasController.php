@@ -89,6 +89,9 @@ class AdminDespesasController extends Controller {
         if ($tipo === 'parcelada') {
             return $this->criarParcelamento($body);
         }
+        if ($tipo === 'por_hora') {
+            return $this->criarPorHora($body);
+        }
 
         $stmt = $this->db->prepare("INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, observacoes, origem, criado_por) VALUES (:desc, :cat, :tipo, :valor, :moeda, :comp, :venc, :status, :fp, :fav, :obs, 'manual', :uid)");
         $stmt->execute([
@@ -240,6 +243,44 @@ class AdminDespesasController extends Controller {
         $_SESSION['message'] = "Parcelamento criado com {$qtdParcelas} parcelas.";
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=parceladas');
+    }
+
+    private function criarPorHora(array $body) {
+        $pessoaNome = trim($body['pessoa_nome'] ?? '');
+        $horasTrabalhadas = (float)($body['horas_trabalhadas'] ?? 0);
+        $valorHora = (float)($body['valor_hora'] ?? 0);
+        $valorTotal = round($horasTrabalhadas * $valorHora, 2);
+
+        if (empty($pessoaNome) || $horasTrabalhadas <= 0 || $valorHora <= 0) {
+            $_SESSION['message'] = 'Preencha o nome da pessoa, horas trabalhadas e valor por hora.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
+        $descricao = ($body['descricao'] ?? '') ?: "{$pessoaNome} - {$horasTrabalhadas}h × R$ " . number_format($valorHora, 2, ',', '.');
+
+        $stmt = $this->db->prepare("INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, observacoes, pessoa_nome, horas_trabalhadas, valor_hora, origem, criado_por) VALUES (:desc, :cat, 'por_hora', :valor, :moeda, :comp, :venc, :status, :fp, :fav, :obs, :pessoa, :horas, :vh, 'manual', :uid)");
+        $stmt->execute([
+            ':desc' => $descricao,
+            ':cat' => !empty($body['categoria_id']) ? (int)$body['categoria_id'] : null,
+            ':valor' => $valorTotal,
+            ':moeda' => $body['moeda'] ?? 'BRL',
+            ':comp' => !empty($body['competencia']) ? $body['competencia'] . '-01' : date('Y-m-01'),
+            ':venc' => $body['vencimento'] ?? null,
+            ':status' => $body['status'] ?? 'prevista',
+            ':fp' => $body['forma_pagamento'] ?? null,
+            ':fav' => $pessoaNome,
+            ':obs' => $body['observacoes'] ?? null,
+            ':pessoa' => $pessoaNome,
+            ':horas' => $horasTrabalhadas,
+            ':vh' => $valorHora,
+            ':uid' => $_SESSION['usuario_id'] ?? null,
+        ]);
+
+        $_SESSION['message'] = "Despesa por hora criada: {$pessoaNome} ({$horasTrabalhadas}h × R$ " . number_format($valorHora, 2, ',', '.') . " = R$ " . number_format($valorTotal, 2, ',', '.') . ")";
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/despesas?tab=todas');
     }
 
     private function getStats(array $filtros): array {
@@ -572,6 +613,22 @@ class AdminDespesasController extends Controller {
                 }
             }
         }
+
+        // Garantir colunas de despesa por hora
+        try {
+            $this->db->query("SELECT pessoa_nome FROM despesas LIMIT 1");
+        } catch (\Exception $e) {
+            $sqlFile = __DIR__ . '/../../database/migrations/170_add_despesas_por_hora.sql';
+            if (file_exists($sqlFile)) {
+                $sql = file_get_contents($sqlFile);
+                $statements = array_filter(array_map('trim', explode(';', $sql)));
+                foreach ($statements as $stmt) {
+                    if ($stmt !== '' && stripos($stmt, '--') !== 0) {
+                        try { $this->db->exec($stmt); } catch (\Exception $ex) {}
+                    }
+                }
+            }
+        }
     }
 
     private function exportCSV(array $despesas): void {
@@ -582,7 +639,7 @@ class AdminDespesasController extends Controller {
         // BOM UTF-8
         fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
         // Header
-        fputcsv($out, ['ID', 'Descrição', 'Categoria', 'Tipo', 'Competência', 'Vencimento', 'Pagamento', 'Valor', 'Moeda', 'Status', 'Forma Pagamento', 'Favorecido', 'Origem'], ';');
+        fputcsv($out, ['ID', 'Descrição', 'Categoria', 'Tipo', 'Competência', 'Vencimento', 'Pagamento', 'Valor', 'Moeda', 'Status', 'Forma Pagamento', 'Favorecido', 'Origem', 'Pessoa (hora)', 'Horas', 'Valor/Hora'], ';');
         foreach ($despesas as $d) {
             fputcsv($out, [
                 $d['id'] ?? '',
@@ -598,6 +655,9 @@ class AdminDespesasController extends Controller {
                 $d['forma_pagamento'] ?? '',
                 $d['favorecido'] ?? '',
                 $d['origem'] ?? 'manual',
+                $d['pessoa_nome'] ?? '',
+                $d['horas_trabalhadas'] ?? '',
+                $d['valor_hora'] ?? '',
             ], ';');
         }
         fclose($out);
