@@ -46,9 +46,30 @@
                     <select name="status" class="form-select form-select-sm mb-2">
                         <?php foreach ($statusLabels as $k => $v): ?><option value="<?= $k ?>" <?= $d['status'] === $k ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
                     </select>
-                    <textarea name="nota" class="form-control form-control-sm mb-2" rows="2" placeholder="Nota interna (opcional)"></textarea>
+                    <div id="motivo-recusa-box" style="display:none;" class="mb-2">
+                        <label class="form-label small fw-semibold text-danger mb-1"><i class="fas fa-ban me-1"></i>Motivo da recusa</label>
+                        <textarea name="nota" id="nota-motivo" class="form-control form-control-sm border-danger" rows="3" placeholder="Explique o motivo da recusa (será enviado por email ao solicitante)"></textarea>
+                    </div>
+                    <div id="nota-normal-box" class="mb-2">
+                        <textarea name="nota" id="nota-normal" class="form-control form-control-sm" rows="2" placeholder="Nota interna (opcional)"></textarea>
+                    </div>
                     <button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-check me-1"></i>Atualizar</button>
                 </form>
+                <script>
+                (function(){
+                    var sel = document.querySelector('select[name="status"]');
+                    var motivoBox = document.getElementById('motivo-recusa-box');
+                    var normalBox = document.getElementById('nota-normal-box');
+                    var motivoTa = document.getElementById('nota-motivo');
+                    var normalTa = document.getElementById('nota-normal');
+                    function toggle(){
+                        if(sel.value==='recusado'){motivoBox.style.display='';normalBox.style.display='none';normalTa.name='';motivoTa.name='nota';}
+                        else{motivoBox.style.display='none';normalBox.style.display='';normalTa.name='';motivoTa.name='nota_motivo_unused';normalTa.name='nota';}
+                    }
+                    sel.addEventListener('change',toggle);
+                    toggle();
+                })();
+                </script>
             </div></div>
 
             <?php if ($d['nota_admin']): ?>
