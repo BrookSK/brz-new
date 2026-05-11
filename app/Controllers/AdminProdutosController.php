@@ -5472,10 +5472,35 @@ HTML;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-    [id*="variaco"],[id*="variacao"]{display:none!important;}
-    .card:has(.card-header h5:is([id*="variaco"])){display:none!important;}
+    #secao-variacoes,.variacoes-wrap{display:none!important;}
     </style>
-    <script>document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("h5,h4,h3,.card-header,label").forEach(function(el){if((el.textContent||"").indexOf("Variações")>-1||(el.textContent||"").indexOf("variações")>-1){var c=el.closest(".card")||el.closest(".mb-4")||el.closest("section");if(c)c.style.display="none";else el.style.display="none";}});document.querySelectorAll(".alert-info").forEach(function(el){if((el.textContent||"").indexOf("variações")>-1)el.style.display="none";});});</script>';
+    <script>document.addEventListener("DOMContentLoaded",function(){
+        // Esconder APENAS a seção de variações - não o card inteiro do produto
+        var found=false;
+        document.querySelectorAll("h5,h4,h3,h6,label,.fw-bold").forEach(function(el){
+            var txt=(el.textContent||"").trim();
+            if(txt==="Variações"||txt==="Variações do Produto"){
+                // Esconder apenas este elemento e seus irmãos até o próximo card-header
+                var parent=el.parentElement;
+                // Se está dentro de um card-body, esconder apenas a partir deste ponto
+                var section=el.closest("section")||el.closest("[id*='variaco']")||el.closest("[id*='variacao']");
+                if(section){section.style.display="none";found=true;return;}
+                // Se é um título solto, esconder ele e tudo depois dele até o fim do container
+                var sibling=el;
+                while(sibling){
+                    sibling.style.display="none";
+                    sibling=sibling.nextElementSibling;
+                    if(sibling&&(sibling.tagName==="H5"||sibling.tagName==="H4"||sibling.tagName==="H3"||sibling.classList.contains("card")))break;
+                }
+                el.style.display="none";
+                found=true;
+            }
+        });
+        // Esconder alert sobre variações
+        document.querySelectorAll(".alert-info,.alert").forEach(function(el){
+            if((el.textContent||"").indexOf("variações")>-1&&(el.textContent||"").indexOf("cadastrar variações")>-1)el.style.display="none";
+        });
+    });</script>';
 
         renderAdminSidebarStyles();
 

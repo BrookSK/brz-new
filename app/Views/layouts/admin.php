@@ -280,14 +280,25 @@
     <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/produtos') !== false): ?>
     <script>
     document.addEventListener('DOMContentLoaded',function(){
-        // Hide variations sections
-        document.querySelectorAll('[id*="variaco"],[id*="variacao"],[data-bs-target*="variaco"],[data-bs-target*="variacao"],[href*="variaco"],[href*="variacao"]').forEach(function(el){el.style.display='none';if(el.closest('.nav-item'))el.closest('.nav-item').style.display='none';});
-        // Hide the tab pane for variations
-        document.querySelectorAll('.tab-pane').forEach(function(el){if(el.id&&(el.id.indexOf('variaco')>-1||el.id.indexOf('variacao')>-1))el.style.display='none';});
-        // Hide alert about variations
-        document.querySelectorAll('.alert-info').forEach(function(el){if(el.textContent.indexOf('variações')>-1||el.textContent.indexOf('Variações')>-1)el.style.display='none';});
-        // Hide cards with "Variações" in header
-        document.querySelectorAll('.card-header,.card-title,h5,h4,h3').forEach(function(el){if(el.textContent.trim().indexOf('Variações')>-1||el.textContent.trim().indexOf('variações')>-1){var card=el.closest('.card')||el.closest('.mb-4');if(card)card.style.display='none';}});
+        // Hide only the variations section title and its content, not the whole product card
+        var hiding = false;
+        document.querySelectorAll('h5,h4,h3,h6').forEach(function(el){
+            var txt = (el.textContent||'').trim();
+            if (txt === 'Variações' || txt === 'Variações do Produto') {
+                // Hide this heading and all siblings after it until next major heading
+                el.style.display = 'none';
+                var sib = el.nextElementSibling;
+                while(sib) {
+                    if (sib.tagName === 'H5' || sib.tagName === 'H4' || sib.tagName === 'H3' || sib.classList.contains('card')) break;
+                    sib.style.display = 'none';
+                    sib = sib.nextElementSibling;
+                }
+            }
+        });
+        // Hide alert about variations in new product page
+        document.querySelectorAll('.alert-info').forEach(function(el){
+            if ((el.textContent||'').indexOf('cadastrar variações') > -1 || (el.textContent||'').indexOf('Para cadastrar variações') > -1) el.style.display = 'none';
+        });
     });
     </script>
     <?php endif; ?>
