@@ -69,15 +69,20 @@ class AdminRemessaConferenciaController extends Controller {
             $stP->execute([$envioId]);
             $produtos = $stP->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            // Montar no formato esperado pela view
+            // Montar itens no formato esperado pela view
             $itens = [];
+            $totalQtd = 0;
             foreach ($produtos as $p) {
+                $qtd = (int)($p['quantidade'] ?? 1);
+                $totalQtd += $qtd;
                 $itens[] = [
                     'produto_id' => 0,
                     'nome_produto' => $p['descricao'] ?? 'Produto',
-                    'quantidade' => (int)($p['quantidade'] ?? 1),
+                    'produto_nome' => $p['descricao'] ?? 'Produto',
+                    'quantidade' => $qtd,
                     'preco_unitario' => (float)($p['preco_usd'] ?? 0),
-                    'subtotal' => (float)($p['preco_usd'] ?? 0) * (int)($p['quantidade'] ?? 1),
+                    'valor_unitario' => (float)($p['preco_usd'] ?? 0),
+                    'subtotal' => (float)($p['preco_usd'] ?? 0) * $qtd,
                     'ncm' => $p['ncm'] ?? '',
                     'peso_kg' => (float)($p['peso_kg'] ?? 0),
                     'imagem' => 'placeholder.jpg',
@@ -85,6 +90,7 @@ class AdminRemessaConferenciaController extends Controller {
             }
 
             $totalProdutos = array_sum(array_column($itens, 'subtotal'));
+            $valorCobrado = (float)($envio['valor_cobrado_usd'] ?? 0);
 
             return [
                 'id' => 900000 + $envioId,
@@ -93,28 +99,52 @@ class AdminRemessaConferenciaController extends Controller {
                 'status' => $envio['status'] ?? 'pago',
                 'moeda' => 'USD',
                 'currency' => 'USD',
-                'total' => (float)($envio['valor_cobrado_usd'] ?? 0),
+                'total' => $valorCobrado,
+                'valor_total' => $valorCobrado,
                 'subtotal_produtos' => $totalProdutos,
+                'subtotal' => $totalProdutos,
                 'valor_frete' => (float)($envio['valor_frete_usd'] ?? 0),
+                'frete' => (float)($envio['valor_frete_usd'] ?? 0),
                 'taxa_servico' => 0,
+                'servicos' => 0,
                 'valor_impostos' => 0,
+                'impostos' => 0,
+                'imposto_local' => 0,
                 'cliente_nome' => $envio['destinatario_nome'] ?? ($envio['cliente_nome'] ?? ''),
                 'cliente_email' => $envio['destinatario_email'] ?? ($envio['cliente_email'] ?? ''),
                 'cliente_telefone' => $envio['destinatario_telefone'] ?? ($envio['cliente_telefone'] ?? ''),
                 'cliente_cpf_cnpj' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
                 'cliente_documento' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
+                'documento' => $envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? ''),
                 'endereco' => $envio['dest_logradouro'] ?? '',
+                'endereco_entrega' => $envio['dest_logradouro'] ?? '',
                 'numero' => $envio['dest_numero'] ?? '',
+                'numero_entrega' => $envio['dest_numero'] ?? '',
                 'complemento' => $envio['dest_complemento'] ?? '',
+                'complemento_entrega' => $envio['dest_complemento'] ?? '',
                 'bairro' => $envio['dest_bairro'] ?? '',
+                'bairro_entrega' => $envio['dest_bairro'] ?? '',
                 'cidade' => $envio['dest_cidade'] ?? '',
+                'cidade_entrega' => $envio['dest_cidade'] ?? '',
                 'estado' => $envio['dest_estado'] ?? '',
+                'estado_entrega' => $envio['dest_estado'] ?? '',
                 'cep' => $envio['dest_cep'] ?? '',
+                'cep_entrega' => $envio['dest_cep'] ?? '',
                 'peso_total' => (float)($envio['peso_kg'] ?? 0),
+                'peso_informado' => (float)($envio['peso_kg'] ?? 0),
+                'largura' => (float)($envio['largura_cm'] ?? 0),
+                'altura' => (float)($envio['altura_cm'] ?? 0),
+                'comprimento' => (float)($envio['comprimento_cm'] ?? 0),
+                'largura_informada' => (float)($envio['largura_cm'] ?? 0),
+                'altura_informada' => (float)($envio['altura_cm'] ?? 0),
+                'comprimento_informada' => (float)($envio['comprimento_cm'] ?? 0),
                 'items' => $itens,
+                'itens' => $itens,
+                'quantidade_itens' => $totalQtd,
                 'forma_pagamento' => 'stripe',
                 'payment_gateway' => 'stripe',
-                'pagamento_status' => $envio['status_pagamento'] ?? 'pago',
+                'pagamento_status' => ($envio['status_pagamento'] ?? '') === 'pago' ? 'PAID' : 'PENDING',
+                'payment_status' => ($envio['status_pagamento'] ?? '') === 'pago' ? 'PAID' : 'PENDING',
                 'observacoes' => 'Envio de Redirecionamento #' . $envioId . ' — Redirecionador: ' . ($envio['redirecionador_nome'] ?? ''),
                 '_is_redirecionamento' => true,
                 '_envio_id' => $envioId,
@@ -127,7 +157,7 @@ class AdminRemessaConferenciaController extends Controller {
                         'componente' => 'Envio Redirecionamento',
                         'metodo' => 'card',
                         'moeda' => 'USD',
-                        'valor' => (float)($envio['valor_cobrado_usd'] ?? 0),
+                        'valor' => $valorCobrado,
                         'status' => ($envio['status_pagamento'] ?? '') === 'pago' ? 'paid' : 'pending',
                         'gateway_status' => ($envio['status_pagamento'] ?? ''),
                         'payment_id' => $envio['stripe_payment_intent'] ?? '',
@@ -417,14 +447,18 @@ class AdminRemessaConferenciaController extends Controller {
                 if ($isRedir) {
                     $envioRedirId = $pid - 900000;
                     $pedidoLabel = 'REDIR-' . $envioRedirId;
-                    // Buscar nome do destinatário
+                    // Buscar nome do destinatário, data e qtd
                     try {
-                        $stR = $this->connection->prepare("SELECT e.destinatario_nome, e.dest_cep, c.nome AS cli_nome FROM redirecionamento_envios e LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id WHERE e.id = ? LIMIT 1");
+                        $stR = $this->connection->prepare("SELECT e.destinatario_nome, e.dest_cep, e.created_at, c.nome AS cli_nome,
+                            (SELECT SUM(p2.quantidade) FROM redirecionamento_produtos_envio p2 WHERE p2.envio_id = e.id) AS qtd_produtos
+                            FROM redirecionamento_envios e LEFT JOIN redirecionamento_clientes c ON c.id = e.cliente_id WHERE e.id = ? LIMIT 1");
                         $stR->execute([$envioRedirId]);
                         $redir = $stR->fetch(\PDO::FETCH_ASSOC);
                         if ($redir) {
                             $clienteNome = ($redir['destinatario_nome'] ?: $redir['cli_nome']) ?: 'Redirecionamento';
                             if (empty($cep)) $cep = (string)($redir['dest_cep'] ?? '');
+                            if ($dt === '-' && !empty($redir['created_at'])) $dt = date('d/m/Y H:i', strtotime((string)$redir['created_at']));
+                            if ($qtd === '-' && $redir['qtd_produtos'] !== null) $qtd = (int)$redir['qtd_produtos'];
                         }
                     } catch (\Exception $e) {}
                 }
@@ -1053,9 +1087,23 @@ th{background:#f5f5f5;width:160px}
         echo '</tbody></table>';
         echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
         echo '<h2>Total ' . $h($gwLabel) . '</h2><table>';
-        $totalUsdEq = $taxaUsdBrl > 0 ? ($totalGw / $taxaUsdBrl) : 0.0;
-        echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
-        echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+
+        // Detectar moeda do pagamento
+        $pgMoeda = 'BRL';
+        foreach ($pagamentos as $pg) {
+            if (!empty($pg['moeda'])) { $pgMoeda = strtoupper(trim((string)$pg['moeda'])); break; }
+        }
+        if ($pgMoeda === '' || $moeda === 'USD') $pgMoeda = $moeda;
+
+        if ($pgMoeda === 'USD') {
+            $totalBrlEq = $totalGw * $taxaUsdBrl;
+            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+        } else {
+            $totalUsdEq = $taxaUsdBrl > 0 ? ($totalGw / $taxaUsdBrl) : 0.0;
+            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        }
         echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
         $html = ob_get_clean();
