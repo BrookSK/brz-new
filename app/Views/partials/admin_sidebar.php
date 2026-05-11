@@ -529,6 +529,13 @@ function renderAdminSidebarStyles() {
             --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
         }
 
+        /* Hide icons in page titles globally */
+        main h1 > i, main h1 > .fas, main h1 > .far, main h1 > .fab, main h1 > .bi,
+        main h2 > i, main h2 > .fas, main h2 > .far, main h2 > .fab, main h2 > .bi,
+        main .h2 > i, main .h2 > .fas, main .h2 > .far, main .h2 > .fab, main .h2 > .bi {
+            display: none !important;
+        }
+
         body {
             background: var(--bg-surface);
             color: #0f172a;
