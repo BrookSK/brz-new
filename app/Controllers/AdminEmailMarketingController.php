@@ -2,7 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Core\Services\AuthService;
+use App\Services\AuthService;
 use Config\Database;
 
 class AdminEmailMarketingController extends Controller {
