@@ -131,7 +131,7 @@ class AdminOfertaGratuitaController extends Controller {
                 </form>
             </div>';
 
-            echo '<div class="table-responsive"><table class="table table-hover align-middle">
+            echo '<div class="table-responsive d-none d-md-block"><table class="table table-hover align-middle">
                 <thead><tr>
                     <th style="width:40px"><input type="checkbox" id="checkAll" class="form-check-input"></th>
                     <th>ID</th><th>Produto</th><th>Categoria</th><th>Peso</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th>
@@ -162,7 +162,7 @@ class AdminOfertaGratuitaController extends Controller {
                     <td>
                         <form method="POST" action="/admin/oferta-gratuita/remover" class="d-inline" onsubmit="return confirm(\'Remover este produto da oferta gratuita?\')">
                             <input type="hidden" name="produto_id" value="' . (int) $p['id'] . '">
-                            <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i> Remover</button>
+                            <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
                         </form>
                         <a href="/admin/produtos/editar/' . (int) $p['id'] . '" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
                     </td>
@@ -170,6 +170,36 @@ class AdminOfertaGratuitaController extends Controller {
             }
 
             echo '</tbody></table></div>';
+
+            // Mobile: Cards
+            echo '<div class="d-md-none">';
+            foreach ($produtos as $p) {
+                $statusBadge2 = ((int) ($p['active'] ?? 0) && ($p['status'] ?? '') === 'published')
+                    ? '<span class="badge bg-success">Ativo</span>'
+                    : '<span class="badge bg-secondary">Inativo</span>';
+                $pesoKg2 = (float) ($p['weight'] ?? 0);
+                $pesoG2 = round($pesoKg2 * 1000);
+
+                echo '<div class="border-bottom py-2 px-1">
+                    <div class="d-flex align-items-start gap-2">
+                        <input type="checkbox" class="form-check-input bulk-check mt-1" value="' . (int) $p['id'] . '">
+                        <div style="flex:1;min-width:0;">
+                            <div class="fw-semibold small" style="word-break:break-word;">' . htmlspecialchars((string) ($p['name'] ?? '')) . '</div>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                <span class="text-muted" style="font-size:11px;">#' . (int) $p['id'] . '</span>
+                                <span class="badge bg-light text-dark" style="font-size:10px;">' . $pesoG2 . 'g</span>
+                                <span class="badge bg-light text-dark" style="font-size:10px;">$ ' . number_format((float) ($p['price'] ?? 0), 2) . '</span>
+                                ' . $statusBadge2 . '
+                            </div>
+                        </div>
+                        <form method="POST" action="/admin/oferta-gratuita/remover" class="d-inline" onsubmit="return confirm(\'Remover?\')">
+                            <input type="hidden" name="produto_id" value="' . (int) $p['id'] . '">
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1"><i class="fas fa-times"></i></button>
+                        </form>
+                    </div>
+                </div>';
+            }
+            echo '</div>';
 
             // Paginação
             $perPage = 50;
