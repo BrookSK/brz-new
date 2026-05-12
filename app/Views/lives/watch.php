@@ -35,10 +35,30 @@ ob_start();
                 <iframe
                     id="liveVideo"
                     src="https://customer-4ecvlnu8p8fla6ag.cloudflarestream.com/<?= htmlspecialchars($cfUid) ?>/iframe?autoplay=true&muted=true&controls=false&preload=auto"
-                    style="border:none;position:absolute;top:0;left:0;height:100%;width:100%;pointer-events:none;"
+                    style="border:none;position:absolute;top:0;left:0;height:100%;width:100%;"
                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                     allowfullscreen="true">
                 </iframe>
+                <!-- Botão ativar som (aparece sobre o vídeo) -->
+                <div id="unmuteOverlay" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);z-index:10;cursor:pointer" onclick="unmuteLive()">
+                    <div style="background:rgba(0,0,0,0.7);border-radius:20px;padding:8px 16px;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-volume-mute" style="color:#fff;font-size:16px"></i>
+                        <span style="color:#fff;font-size:12px;font-weight:500">Toque para ativar o som</span>
+                    </div>
+                </div>
+                <script>
+                function unmuteLive() {
+                    var iframe = document.getElementById('liveVideo');
+                    if (iframe) {
+                        // Trocar src para remover muted
+                        var src = iframe.src.replace('muted=true', 'muted=false');
+                        iframe.src = src;
+                        iframe.style.pointerEvents = 'none';
+                    }
+                    var overlay = document.getElementById('unmuteOverlay');
+                    if (overlay) overlay.style.display = 'none';
+                }
+                </script>
                 <?php else: ?>
                 <video id="liveVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;background:#000"></video>
                 <?php endif; ?>
