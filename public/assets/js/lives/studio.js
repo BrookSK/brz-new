@@ -64,9 +64,11 @@ async function startLive() {
         // Se WebRTC, iniciar câmera e WHIP
         if (IS_WEBRTC && data.webrtc_url) {
             await startWebRTC(data.webrtc_url);
+            // Não recarregar — a conexão WHIP precisa ficar ativa
+            return;
         }
 
-        // Recarregar página para mostrar controles de live ativa
+        // Recarregar página para mostrar controles de live ativa (apenas para não-WebRTC)
         location.reload();
 
     } catch (e) {
@@ -391,7 +393,7 @@ startAdminPolling();
 
 if (IS_LIVE) {
     if (IS_WEBRTC) {
-        // Tentar iniciar preview da câmera com áudio
+        // Tentar iniciar preview da câmera com áudio E reconectar WHIP
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then(stream => {
                 const video = document.getElementById('localVideo');
@@ -399,6 +401,12 @@ if (IS_LIVE) {
                 const ph = document.getElementById('cameraPlaceholder');
                 if (ph) ph.classList.add('d-none');
                 localStream = stream;
+
+                // Reconectar WHIP para enviar stream ao Cloudflare
+                if (typeof WEBRTC_URL !== 'undefined' && WEBRTC_URL) {
+                    console.log('Reconnecting WHIP to CF...');
+                    startWebRTC(WEBRTC_URL);
+                }
             })
             .catch(() => {});
     }
