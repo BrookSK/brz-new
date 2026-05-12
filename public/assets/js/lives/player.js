@@ -13,18 +13,14 @@ function initPlayer() {
 
     var url = PLAYBACK_URL || RECORDING_URL;
     
-    // Preferir HLS para playback (mais confiável que WHEP)
-    // WHEP pode ter problemas de frames não renderizando
+    // Se a URL é WHEP (webRTC/play), usar player WHEP
     if (url && url.indexOf('/webRTC/play') !== -1) {
-        // Converter URL WHEP para HLS
-        // De: https://customer-xxx.cloudflarestream.com/UUID/webRTC/play
-        // Para: https://customer-xxx.cloudflarestream.com/UUID/manifest/video.m3u8
-        var hlsUrl = url.replace('/webRTC/play', '/manifest/video.m3u8');
-        console.log('Using HLS playback (converted from WHEP):', hlsUrl);
-        url = hlsUrl;
+        console.log('Using WHEP player for:', url);
+        initWHEPPlayer(video, url);
+        return;
     }
     
-    console.log('Player URL:', url);
+    console.log('Player URL (HLS):', url);
     
     if (!url) {
         console.log('No playback URL available');
@@ -79,9 +75,7 @@ async function initWHEPPlayer(video, whepUrl) {
         pc.ontrack = function(event) {
             console.log('WHEP: Got track!', event.track.kind);
             if (event.streams && event.streams[0]) {
-                if (!video.srcObject || video.srcObject !== event.streams[0]) {
-                    video.srcObject = event.streams[0];
-                }
+                video.srcObject = event.streams[0];
             } else if (event.track) {
                 var stream = video.srcObject;
                 if (!stream) {
@@ -97,13 +91,20 @@ async function initWHEPPlayer(video, whepUrl) {
             // Só dar play quando receber a track de vídeo (evita conflito)
             if (event.track.kind === 'video') {
                 video.muted = true;
+                // Workaround para tela preta: reatribuir srcObject após pequeno delay
                 setTimeout(function() {
+                    var s = video.srcObject;
+                    video.srcObject = null;
+                    video.srcObject = s;
                     video.play().then(function() {
                         console.log('WHEP: Video playing!');
+                        // Segundo workaround: forçar repaint
+                        video.style.opacity = '0.99';
+                        setTimeout(function() { video.style.opacity = '1'; }, 50);
                     }).catch(function(e) {
                         console.log('WHEP: Play error:', e.message);
                     });
-                }, 100);
+                }, 500);
             }
         };
 
