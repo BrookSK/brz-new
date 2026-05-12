@@ -1515,10 +1515,18 @@ class AdminEstoqueController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <h1 class="page-title">Estoque Interno</h1>
-                <div>
-                    <a class="btn btn-success me-2" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada de Estoque</a>
-                    <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</button>
+                <div class="d-none d-md-flex gap-2">
+                    <a class="btn btn-success" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada de Estoque</a>
+                    <button type="button" class="btn btn-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</button>
                     <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'estoqueActionsM\').classList.toggle(\'d-none\')"><i class="fas fa-ellipsis-v me-1"></i>Ações</button>
+            </div>
+            <div id="estoqueActionsM" class="d-none d-md-none mb-3">
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-sm btn-success" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada</a>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>PDF</button>
+                    <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                 </div>
             </div>';
 
@@ -1526,48 +1534,44 @@ class AdminEstoqueController extends Controller {
 
         // Cards de Estatisticas
         echo '<div class="row g-3 mb-4">';
-        echo '<div class="col-md-3"><div class="card bg-primary text-white"><div class="card-body"><h5 class="card-title">Total Produtos</h5><h3>' . number_format((int)($estatisticas['total_produtos'] ?? 0)) . '</h3><small>Ativos no sistema</small></div></div></div>';
-        echo '<div class="col-md-3"><div class="card bg-danger text-white" style="cursor:pointer" onclick="filtrarStatus(\'critico\')"><div class="card-body"><h5 class="card-title">Estoque Critico</h5><h3>' . number_format((int)($estatisticas['criticos'] ?? 0)) . '</h3><small>Abaixo do minimo</small></div></div></div>';
-        echo '<div class="col-md-3"><div class="card bg-warning text-dark" style="cursor:pointer" onclick="filtrarStatus(\'baixo\')"><div class="card-body"><h5 class="card-title">Estoque Baixo</h5><h3>' . number_format((int)($estatisticas['baixos'] ?? 0)) . '</h3><small>Abaixo do ideal</small></div></div></div>';
-        echo '<div class="col-md-3"><div class="card bg-success text-white" style="cursor:pointer" onclick="filtrarStatus(\'normal\')"><div class="card-body"><h5 class="card-title">Estoque Normal</h5><h3>' . number_format((int)($estatisticas['normais'] ?? 0)) . '</h3><small>Niveis adequados</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-primary text-white"><div class="card-body py-2"><h6 class="card-title mb-0">Total Produtos</h6><h3 class="mb-0">' . number_format((int)($estatisticas['total_produtos'] ?? 0)) . '</h3><small>Ativos no sistema</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-danger text-white" style="cursor:pointer" onclick="filtrarStatus(\'critico\')"><div class="card-body py-2"><h6 class="card-title mb-0">Estoque Critico</h6><h3 class="mb-0">' . number_format((int)($estatisticas['criticos'] ?? 0)) . '</h3><small>Abaixo do minimo</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-warning text-dark" style="cursor:pointer" onclick="filtrarStatus(\'baixo\')"><div class="card-body py-2"><h6 class="card-title mb-0">Estoque Baixo</h6><h3 class="mb-0">' . number_format((int)($estatisticas['baixos'] ?? 0)) . '</h3><small>Abaixo do ideal</small></div></div></div>';
+        echo '<div class="col-6 col-md-3"><div class="card bg-success text-white" style="cursor:pointer" onclick="filtrarStatus(\'normal\')"><div class="card-body py-2"><h6 class="card-title mb-0">Estoque Normal</h6><h3 class="mb-0">' . number_format((int)($estatisticas['normais'] ?? 0)) . '</h3><small>Niveis adequados</small></div></div></div>';
         echo '</div>';
 
         // Filtros
         $buscaEsc        = htmlspecialchars($busca);
         $filtroStatusEsc = htmlspecialchars($filtroStatus);
         echo '<div class="card mb-3"><div class="card-body py-2">
-            <form method="GET" class="row g-2 align-items-end" id="formFiltroEstoque">
-                <div class="col-md-5">
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" class="form-control" name="busca" id="estoque_busca"
-                            placeholder="Buscar por produto, SKU ou localizacao..."
-                            value="' . $buscaEsc . '">
-                    </div>
+            <form method="GET" class="row g-2 align-items-center" id="formFiltroEstoque">
+                <div class="col-8 col-md-5">
+                    <input type="text" class="form-control form-control-sm" name="busca" id="estoque_busca"
+                        placeholder="Buscar produto, SKU..."
+                        value="' . $buscaEsc . '">
                 </div>
-                <div class="col-md-3">
-                    <select class="form-select" name="status_filtro" id="status_filtro_sel" onchange="this.form.submit()">
-                        <option value="">Todos os status</option>
+                <div class="col-4 col-md-3">
+                    <select class="form-select form-select-sm" name="status_filtro" id="status_filtro_sel" onchange="this.form.submit()">
+                        <option value="">Todos</option>
                         <option value="critico"' . ($filtroStatus === 'critico' ? ' selected' : '') . '>Critico</option>
                         <option value="baixo"'   . ($filtroStatus === 'baixo'   ? ' selected' : '') . '>Baixo</option>
                         <option value="normal"'  . ($filtroStatus === 'normal'  ? ' selected' : '') . '>Normal</option>
                     </select>
                 </div>
-                <div class="col-md-auto">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
-                    <a href="/admin/estoque" class="btn btn-outline-secondary ms-1">Limpar</a>
+                <div class="col-6 col-md-2">
+                    <a href="/admin/estoque" class="btn btn-sm btn-outline-secondary w-100">Limpar</a>
                 </div>
-                <div class="col-md-auto align-self-end">
-                    <small class="text-muted">Exibindo ' . number_format($totalItens) . ' produto(s)</small>
+                <div class="col-6 col-md-2">
+                    <small class="text-muted">' . number_format($totalItens) . ' produto(s)</small>
                 </div>
             </form>
         </div></div>';
 
         // Tabela
         echo '<div class="card">
-            <div class="card-header"><h5 class="mb-0"><i class="fas fa-list me-2"></i>Estoque Atual</h5></div>
+            <div class="card-header"><h5 class="mb-0">Estoque Atual</h5></div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover mb-0">
                         <thead class="table-dark">
                             <tr>
@@ -1624,7 +1628,43 @@ class AdminEstoqueController extends Controller {
             echo '<tr><td colspan="9" class="text-center text-muted py-4">Nenhum produto encontrado.</td></tr>';
         }
 
-        echo '</tbody></table></div></div></div>';
+        echo '</tbody></table></div>';
+
+        // Mobile: Cards
+        echo '<div class="d-md-none p-2">';
+        if (empty($status_geral)) {
+            echo '<div class="text-center text-muted py-4">Nenhum produto encontrado.</div>';
+        }
+        foreach ($status_geral as $item) {
+            $produtoId   = (int)($item['produto_id'] ?? 0);
+            $produtoNome = (string)($item['produto_nome'] ?? '');
+            $sku         = (string)($item['sku'] ?? '');
+            $qtd         = (int)($item['quantidade_estoque'] ?? 0);
+            $reservado   = (int)($item['reservado'] ?? 0);
+            $disponivel  = $qtd - $reservado;
+            $status      = (string)($item['status_estoque'] ?? '');
+            if ($reservado > $qtd) $status = 'reposicao';
+            $statusClass = ($status === 'critico' || $status === 'reposicao') ? 'danger' : ($status === 'baixo' ? 'warning' : 'success');
+            $statusLabel = $status === 'reposicao' ? 'Reposição' : ucfirst($status);
+
+            echo '<div class="border-bottom py-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div style="min-width:0;flex:1;">
+                        <div class="fw-semibold small" style="word-break:break-word;">' . htmlspecialchars($produtoNome) . '</div>
+                        <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:11px;">
+                            <span class="text-muted">#' . $produtoId . '</span>
+                            ' . ($sku ? '<span class="badge bg-light text-dark">' . htmlspecialchars($sku) . '</span>' : '') . '
+                            <span class="badge bg-' . $statusClass . '">' . $qtd . ' un</span>
+                            <span class="badge bg-' . $statusClass . '">' . $statusLabel . '</span>
+                        </div>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary py-0 px-1" href="/admin/estoque/editar/' . $produtoId . '"><i class="fas fa-pen"></i></a>
+                </div>
+            </div>';
+        }
+        echo '</div>';
+
+        echo '</div></div>';
 
         // Paginacao
         if ($totalPaginas > 1) {
