@@ -667,9 +667,9 @@ if(chartData && chartData.labels && chartData.labels.length && document.getEleme
         data: {
             labels: chartData.labels,
             datasets: [
-                {label:"Visitas", data:chartData.visitas, borderColor:"#18253D", backgroundColor:"rgba(24,37,61,.08)", tension:0.4, fill:true, borderWidth:2},
-                {label:"Pedidos", data:chartData.pedidos, borderColor:"#065F46", backgroundColor:"rgba(6,95,70,.08)", tension:0.4, fill:true, borderWidth:2},
-                {label:"Novos Usuários", data:chartData.novos_usuarios, borderColor:"#075985", backgroundColor:"rgba(7,89,133,.08)", tension:0.4, fill:true, borderWidth:2}
+                {label:"Visitas", data:chartData.visitas, borderColor:"#F97316", backgroundColor:"rgba(249,115,22,.1)", tension:0.4, fill:true, borderWidth:2},
+                {label:"Pedidos", data:chartData.pedidos, borderColor:"#16A34A", backgroundColor:"rgba(22,163,74,.1)", tension:0.4, fill:true, borderWidth:2},
+                {label:"Novos Usuários", data:chartData.novos_usuarios, borderColor:"#2563EB", backgroundColor:"rgba(37,99,235,.1)", tension:0.4, fill:true, borderWidth:2}
             ]
         },
         options: {
