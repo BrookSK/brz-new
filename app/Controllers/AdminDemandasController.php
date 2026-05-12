@@ -340,7 +340,7 @@ class AdminDemandasController extends Controller {
             ? 'Bug reportado com prioridade ' . strtoupper($body['bug_prioridade'] ?? 'media') . '! Já aparece no Painel.'
             : 'Demanda registrada com sucesso! Ela já aparece no Painel de Demandas.';
         $_SESSION['message_type'] = 'success';
-        $this->redirect('/admin/demandas/painel');
+        $this->redirect('/admin/demandas/minhas');
     }
 
     public function moverStatus(Request $request, $id) {
