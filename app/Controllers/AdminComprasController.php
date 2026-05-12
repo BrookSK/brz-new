@@ -1302,7 +1302,7 @@ class AdminComprasController extends Controller {
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
-                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','pagamento')))" : '')
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','carne_pagando','carne_aguardando')))" : '')
                 . $whereTipoCompra
                 // Excluir itens de pedidos de carnê (tela separada) - por tabela carnes E por forma_pagamento
                 . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL) AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'))" : '')
@@ -1807,11 +1807,12 @@ class AdminComprasController extends Controller {
                             .replace(/\'/g, "&#039;");
                     }
 
-                    function formatMoney(v){
+                    function formatMoney(v, moeda){
                         if (v === null || v === undefined || v === "") return "-";
                         var n = Number(v);
                         if (isNaN(n)) return String(v);
-                        return "$ " + n.toFixed(2);
+                        var prefix = (moeda && moeda.toUpperCase() === \'BRL\') ? \'R$ \' : \'$ \';
+                        return prefix + n.toFixed(2);
                     }
 
                     function renderPedidosAccordion(pedidos){
@@ -1823,7 +1824,8 @@ class AdminComprasController extends Controller {
                             var pid = p.id || 0;
                             var headId = "pedidoHead_" + pid;
                             var bodyId = "pedidoBody_" + pid;
-                            var total = (p.valor_total !== null && p.valor_total !== undefined) ? formatMoney(p.valor_total) : "-";
+                            var moeda = p.moeda || \'USD\';
+                            var total = (p.valor_total !== null && p.valor_total !== undefined) ? formatMoney(p.valor_total, moeda) : "-";
                             var cliente = (p.cliente_nome || "") + (p.cliente_email ? (" - " + p.cliente_email) : "");
                             var criado = p.created_at ? escapeHtml(p.created_at) : "";
                             var pagoEm = p.pago_em ? escapeHtml(p.pago_em) : "";
