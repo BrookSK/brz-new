@@ -2319,22 +2319,37 @@ JS;
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="page-title">Pedidos (' . $total . ')</h1>
-                    <div>
-                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary me-2">
+                    <!-- Desktop: buttons inline -->
+                    <div class="d-none d-md-flex gap-2">
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary">
                             <i class="fas fa-plus me-1"></i>Novo Pedido Manual
                         </a>
-                        <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
+                        <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
                         </a>
-                        <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger me-2">
+                        <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger">
                             <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
-                        <a class="btn btn-success me-2" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
+                        <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
                             <i class="fas fa-download me-1"></i>Exportar XLSX
                         </a>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
+                    </div>
+                    <!-- Mobile: toggle button -->
+                    <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'pedidosActionsCollapse\').classList.toggle(\'d-none\')">
+                        <i class="fas fa-ellipsis-v me-1"></i>Ações
+                    </button>
+                </div>
+                <!-- Mobile: collapsible actions -->
+                <div id="pedidosActionsCollapse" class="d-none d-md-none mb-3">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Novo Pedido</a>
+                        <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
+                        <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Lixeira</a>
+                        <a class="btn btn-sm btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download me-1"></i>XLSX</a>
+                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                     </div>
                 </div>
                 
@@ -2360,8 +2375,8 @@ JS;
                     <div class="d-md-none mb-2">
                         <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
                             <option value="todos" ' . ($isCarneFiltro ? '' : 'selected') . '>Todos os Pedidos</option>
-                            <option value="dolar">Pagamentos em Dólar</option>
-                            <option value="real">Pagamentos em Reais</option>
+                            <option value="dolar">Dólar</option>
+                            <option value="real">Reais</option>
                             <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>Carnê</option>
                         </select>
                     </div>
@@ -2377,10 +2392,10 @@ JS;
                     }
                     echo '</li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">Pagamentos em Dólar</button>
+                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">Dólar</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">Pagamentos em Reais</button>
+                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">Reais</button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">Carnê</a>
