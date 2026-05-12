@@ -412,5 +412,6 @@ $router->post('/admin/email-marketing/aprovar', 'AdminEmailMarketingController',
 $router->post('/admin/email-marketing/rejeitar', 'AdminEmailMarketingController', 'rejeitar');
 $router->post('/admin/email-marketing/disparar', 'AdminEmailMarketingController', 'disparar');
 $router->post('/admin/email-marketing/agendar', 'AdminEmailMarketingController', 'agendar');
+$router->post('/admin/email-marketing/gerar-segmentos', 'AdminEmailMarketingController', 'gerarSegmentos');
 $router->get('/admin/email-marketing/detalhes', 'AdminEmailMarketingController', 'detalhes');
 $router->post('/admin/email-marketing/config', 'AdminEmailMarketingController', 'salvarConfig');

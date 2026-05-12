@@ -78,7 +78,7 @@ class AdminEmailMarketingController extends Controller {
         $this->ensureTables($pdo);
 
         $tab = strtolower(trim((string)$request->getParam('tab', 'dashboard')));
-        $validTabs = ['dashboard','campanhas','pendentes','aprovadas','agendadas','historico','segmentos','gatilhos','templates','config','logs','metricas'];
+        $validTabs = ['dashboard','campanhas','pendentes','aprovadas','agendadas','enviados','historico','segmentos','gatilhos','templates','config','logs','metricas'];
         if (!in_array($tab, $validTabs)) $tab = 'dashboard';
 
         // Stats
@@ -101,6 +101,7 @@ class AdminEmailMarketingController extends Controller {
             if ($tab === 'pendentes') $where = "status='pendente_revisao'";
             elseif ($tab === 'aprovadas') $where = "status IN ('aprovada','agendada')";
             elseif ($tab === 'agendadas') $where = "status='agendada'";
+            elseif ($tab === 'enviados') $where = "status IN ('disparando','finalizada')";
             elseif ($tab === 'historico') $where = "status IN ('finalizada','cancelada','rejeitada')";
             elseif ($tab === 'campanhas') $where = "1=1";
             $st = $pdo->query("SELECT * FROM email_mkt_campanhas WHERE {$where} ORDER BY updated_at DESC LIMIT 50");
@@ -577,7 +578,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 </div>';
 
         // Tabs
-        $tabs = ['dashboard'=>'Dashboard','campanhas'=>'Todas','pendentes'=>'Pendentes','aprovadas'=>'Aprovadas','agendadas'=>'Agendadas','historico'=>'Histórico','segmentos'=>'Segmentos','config'=>'Configurações'];
+        $tabs = ['dashboard'=>'Dashboard','campanhas'=>'Todas','pendentes'=>'Pendentes','aprovadas'=>'Aprovadas','agendadas'=>'Agendadas','enviados'=>'Enviados','historico'=>'Histórico','segmentos'=>'Segmentos','config'=>'Configurações'];
         echo '<nav class="mkt-tabs">';
         foreach ($tabs as $key => $label) {
             $active = ($tab === $key) ? ' active' : '';
@@ -590,8 +591,10 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         // Content based on tab
         if ($tab === 'config') {
             $this->renderConfigTab($pdo);
-        } elseif ($tab === 'dashboard' || $tab === 'campanhas' || $tab === 'pendentes' || $tab === 'aprovadas' || $tab === 'agendadas' || $tab === 'historico') {
+        } elseif ($tab === 'dashboard' || $tab === 'campanhas' || $tab === 'pendentes' || $tab === 'aprovadas' || $tab === 'agendadas' || $tab === 'enviados' || $tab === 'historico') {
             $this->renderCampanhasTable($campanhas);
+        } elseif ($tab === 'segmentos') {
+            $this->renderSegmentosTab($pdo);
         } else {
             echo '<div class="section-card"><div class="section-body"><p style="color:#94A3B8;">Seção em desenvolvimento.</p></div></div>';
         }
@@ -953,6 +956,184 @@ async function rejeitarCampanha(){
             echo '<td>'.$data.'</td><td><button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="verCampanha('.(int)$c['id'].')"><i class="bi bi-eye me-1"></i>Ver</button></td></tr>';
         }
         echo '</tbody></table></div></div>';
+    }
+
+    private function renderSegmentosTab(\PDO $pdo): void {
+        // Get existing segments
+        $segmentos = [];
+        try { $segmentos = $pdo->query("SELECT * FROM email_mkt_segmentos ORDER BY updated_at DESC")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
+
+        echo '<div class="d-flex justify-content-between align-items-center mb-3">
+<h6 style="color:var(--navy);font-weight:700;margin:0;">Segmentações Inteligentes</h6>
+<button class="btn-navy" style="padding:8px 14px;font-size:13px;" onclick="gerarSegmentosIA()"><i class="bi bi-stars me-1"></i>Gerar Segmentos com IA</button>
+</div>';
+
+        echo '<div id="segProgress" style="display:none;text-align:center;padding:20px;"><i class="bi bi-stars" style="font-size:24px;color:var(--navy);animation:spin 2s linear infinite;"></i><p style="color:#64748B;font-size:13px;margin-top:8px;">Analisando comportamento de clientes...</p></div>';
+
+        if (empty($segmentos)) {
+            echo '<div class="section-card"><div class="section-body" style="text-align:center;padding:40px;"><i class="bi bi-diagram-3" style="font-size:40px;color:#94A3B8;"></i><p style="color:#94A3B8;margin-top:12px;">Nenhum segmento criado. Clique em "Gerar Segmentos com IA" para analisar seus clientes.</p></div></div>';
+        } else {
+            echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">';
+            foreach ($segmentos as $seg) {
+                echo '<div class="section-card" style="margin-bottom:0;"><div style="padding:16px;">
+<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">'.htmlspecialchars($seg['nome']).'</div>
+<div style="font-size:12px;color:#64748B;margin-bottom:8px;">'.htmlspecialchars($seg['descricao'] ?? '').'</div>
+<div style="display:flex;gap:12px;font-size:12px;">
+<span style="color:#18253D;font-weight:600;"><i class="bi bi-people me-1"></i>'.(int)$seg['total_clientes'].' clientes</span>
+<span style="color:#94A3B8;">'.($seg['gatilho'] ?? 'automático').'</span>
+</div></div></div>';
+            }
+            echo '</div>';
+        }
+
+        echo '<script>
+async function gerarSegmentosIA(){
+    document.getElementById("segProgress").style.display="block";
+    const r=await fetch("/admin/email-marketing/gerar-segmentos",{method:"POST"});
+    const d=await r.json();
+    document.getElementById("segProgress").style.display="none";
+    if(d.success){alert(d.message||"Segmentos gerados!");location.reload();}
+    else alert(d.error||"Erro ao gerar segmentos");
+}
+</script>';
+    }
+
+    // ============================================================
+    // GERAR SEGMENTOS VIA IA
+    // ============================================================
+    public function gerarSegmentos(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $this->ensureTables($pdo);
+
+        $userNomeCol = 'nome';
+        try {
+            $cols = $pdo->query("DESCRIBE usuarios")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $userNomeCol = 'name';
+        } catch (\Exception $e) {}
+
+        // Analyze client behavior
+        $analise = [];
+        try {
+            // Clients by category
+            $sql = "SELECT c.nome AS categoria, COUNT(DISTINCT p.usuario_id) AS total_clientes
+                    FROM pedido_itens pi
+                    JOIN produtos pr ON pr.id = pi.produto_id
+                    JOIN categorias c ON c.id = pr.categoria_id
+                    JOIN pedidos p ON p.id = pi.pedido_id AND p.status IN ('pago','entregue','enviado')
+                    GROUP BY c.nome ORDER BY total_clientes DESC LIMIT 10";
+            $analise['categorias'] = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) { $analise['categorias'] = []; }
+
+        try {
+            // Recency groups
+            $sql = "SELECT
+                SUM(CASE WHEN ultima < DATE_SUB(NOW(), INTERVAL 90 DAY) THEN 1 ELSE 0 END) AS inativos_90,
+                SUM(CASE WHEN ultima BETWEEN DATE_SUB(NOW(), INTERVAL 90 DAY) AND DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS inativos_30_90,
+                SUM(CASE WHEN ultima > DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS ativos
+                FROM (SELECT MAX(p.created_at) AS ultima FROM usuarios u JOIN pedidos p ON p.usuario_id=u.id AND p.status IN ('pago','entregue') GROUP BY u.id) sub";
+            $analise['recencia'] = $pdo->query($sql)->fetch(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) { $analise['recencia'] = []; }
+
+        try {
+            $analise['total_usuarios'] = (int)$pdo->query("SELECT COUNT(*) FROM usuarios WHERE email IS NOT NULL AND email != ''")->fetchColumn();
+        } catch (\Exception $e) { $analise['total_usuarios'] = 0; }
+
+        // Ask AI to create segments
+        $systemPrompt = "Você é um analista de CRM. Com base nos dados abaixo, crie segmentos inteligentes de clientes para email marketing.
+Retorne um JSON array com objetos: [{\"nome\": \"...\", \"descricao\": \"...\", \"gatilho\": \"...\", \"criterio\": \"...\", \"total_estimado\": N}]
+Crie entre 5 e 10 segmentos relevantes. Exemplos: clientes por categoria favorita, clientes inativos, clientes VIP, novos clientes, etc.
+Use nomes curtos e descritivos em português.";
+
+        $userMsg = "Dados da loja:\n- Total de clientes: " . $analise['total_usuarios'];
+        if (!empty($analise['categorias'])) {
+            $userMsg .= "\n- Categorias mais compradas: " . implode(', ', array_map(fn($c) => $c['categoria'] . ' (' . $c['total_clientes'] . ' clientes)', $analise['categorias']));
+        }
+        if (!empty($analise['recencia'])) {
+            $r = $analise['recencia'];
+            $userMsg .= "\n- Clientes ativos (compra <30 dias): " . (int)($r['ativos'] ?? 0);
+            $userMsg .= "\n- Clientes inativos 30-90 dias: " . (int)($r['inativos_30_90'] ?? 0);
+            $userMsg .= "\n- Clientes inativos 90+ dias: " . (int)($r['inativos_90'] ?? 0);
+        }
+
+        $result = $this->callAI($pdo, $systemPrompt, $userMsg);
+        if (isset($result['error'])) {
+            echo json_encode(['success' => false, 'error' => $result['error']]);
+            return;
+        }
+
+        $segmentos = json_decode($result['text'], true);
+        if (!$segmentos) {
+            preg_match('/\[.*\]/s', $result['text'], $m);
+            if (!empty($m[0])) $segmentos = json_decode($m[0], true);
+        }
+        if (!is_array($segmentos) || empty($segmentos)) {
+            echo json_encode(['success' => false, 'error' => 'IA retornou formato inválido.']);
+            return;
+        }
+
+        // Save segments and generate campaigns for each
+        $criados = 0;
+        $campanhasCriadas = 0;
+        $stInsert = $pdo->prepare("INSERT INTO email_mkt_segmentos (nome, descricao, tipo, gatilho, criterios, total_clientes) VALUES (?, ?, 'automatico', ?, ?, ?)");
+        
+        $nomeLoja = 'Braziliana';
+        try { $st2 = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'loja_nome' OR (categoria='loja' AND chave='nome') LIMIT 1"); $st2->execute(); $v = $st2->fetchColumn(); if ($v) $nomeLoja = $v; } catch (\Exception $e) {}
+        $tom = $this->getConfig($pdo, 'tom_marca', 'humanizado, elegante, conversacional');
+        $palavrasProibidas = $this->getConfig($pdo, 'palavras_proibidas', '');
+
+        foreach ($segmentos as $seg) {
+            if (empty($seg['nome'])) continue;
+            $stInsert->execute([
+                $seg['nome'],
+                $seg['descricao'] ?? '',
+                $seg['gatilho'] ?? 'automatico',
+                json_encode($seg['criterio'] ?? $seg, JSON_UNESCAPED_UNICODE),
+                (int)($seg['total_estimado'] ?? 0)
+            ]);
+            $segmentoId = (int)$pdo->lastInsertId();
+            $criados++;
+
+            // Generate a campaign for this segment (pendente_revisao)
+            $segNome = $seg['nome'];
+            $segDesc = $seg['descricao'] ?? '';
+            
+            $campSystemPrompt = "Você é um especialista em email marketing. Gere o conteúdo de uma campanha para o segmento: '{$segNome}' ({$segDesc}).
+Tom: {$tom}. Palavras proibidas: {$palavrasProibidas}.
+NÃO crie descontos, cupons ou promoções. NÃO use urgência falsa.
+Retorne em JSON: {\"assunto\": \"...\", \"pre_header\": \"...\", \"tag_campanha\": \"...\", \"titulo_email\": \"...\", \"subtitulo_email\": \"...\", \"paragrafo_1\": \"...\", \"paragrafo_2\": \"...\", \"texto_destaque\": \"...\", \"paragrafo_fechamento\": \"...\", \"texto_cta\": \"...\", \"texto_sub_cta\": \"...\"}
+Assunto máx 50 chars. Corpo 120-220 palavras.";
+
+            $campResult = $this->callAI($pdo, $campSystemPrompt, "Loja: {$nomeLoja}\nSegmento: {$segNome}\nDescrição: {$segDesc}\nClientes estimados: " . (int)($seg['total_estimado'] ?? 0));
+            
+            if (!isset($campResult['error'])) {
+                $campContent = json_decode($campResult['text'], true);
+                if (!$campContent) { preg_match('/\{.*\}/s', $campResult['text'], $m2); if (!empty($m2[0])) $campContent = json_decode($m2[0], true); }
+                
+                if ($campContent && isset($campContent['assunto'])) {
+                    $stCamp = $pdo->prepare("INSERT INTO email_mkt_campanhas (nome, tipo, gatilho, segmento_id, status, assunto, pre_header, variaveis_ia, total_clientes, observacoes_ia) VALUES (?, 'reativacao', ?, ?, 'pendente_revisao', ?, ?, ?, ?, ?)");
+                    $stCamp->execute([
+                        $segNome . ' - ' . date('d/m'),
+                        $seg['gatilho'] ?? 'segmento_ia',
+                        $segmentoId,
+                        $campContent['assunto'] ?? '',
+                        $campContent['pre_header'] ?? '',
+                        json_encode($campContent, JSON_UNESCAPED_UNICODE),
+                        (int)($seg['total_estimado'] ?? 0),
+                        "Campanha gerada automaticamente para segmento: {$segNome}. {$segDesc}"
+                    ]);
+                    $campId = (int)$pdo->lastInsertId();
+
+                    // Build HTML
+                    $html = $this->buildEmailHtml($campContent, $nomeLoja);
+                    $pdo->prepare("UPDATE email_mkt_campanhas SET html_content = ? WHERE id = ?")->execute([$html, $campId]);
+                    $campanhasCriadas++;
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'message' => "{$criados} segmentos criados e {$campanhasCriadas} campanhas geradas (pendentes de revisão).", 'segmentos' => $criados, 'campanhas' => $campanhasCriadas]);
     }
 
     private function renderConfigTab(\PDO $pdo): void {
