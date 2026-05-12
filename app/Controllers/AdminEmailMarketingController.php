@@ -124,6 +124,8 @@ class AdminEmailMarketingController extends Controller {
         $instrucoes = trim((string)($input['instrucoes'] ?? ''));
         $categoriaFiltro = trim((string)($input['categoria'] ?? ''));
         $usuarioIndividualId = (int)($input['usuario_id'] ?? 0);
+        $apenasBuscar = !empty($input['apenas_buscar']);
+        $clienteIdsSelecionados = $input['cliente_ids'] ?? null;
 
         $diasRecompra = (int)$this->getConfig($pdo, 'dias_recompra_minimo', '30');
         $nomeLoja = 'Braziliana';
@@ -212,6 +214,25 @@ class AdminEmailMarketingController extends Controller {
         if (empty($clientes)) {
             echo json_encode(['success' => false, 'error' => 'Nenhum cliente encontrado para este tipo de campanha. Tente outro tipo.']);
             return;
+        }
+
+        // Step 1: Just return the client list for selection
+        if ($apenasBuscar) {
+            echo json_encode(['success' => true, 'clientes' => $clientes, 'total' => count($clientes)]);
+            return;
+        }
+
+        // Step 2: Filter to only selected clients if provided
+        if (is_array($clienteIdsSelecionados) && !empty($clienteIdsSelecionados)) {
+            $idsSet = array_flip(array_map('intval', $clienteIdsSelecionados));
+            $clientes = array_filter($clientes, function($c) use ($idsSet) {
+                return isset($idsSet[(int)$c['id']]);
+            });
+            $clientes = array_values($clientes);
+            if (empty($clientes)) {
+                echo json_encode(['success' => false, 'error' => 'Nenhum cliente selecionado válido.']);
+                return;
+            }
         }
 
         $tom = $this->getConfig($pdo, 'tom_marca', 'humanizado, elegante, conversacional');
@@ -554,9 +575,23 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 </div>
 </div>
 
-<div style="display:flex;gap:10px;margin-top:20px;">
-<button onclick="criarCampanhaIA()" class="btn-navy" style="flex:1;padding:12px;font-size:14px;"><i class="bi bi-stars me-1"></i>Gerar Campanha</button>
+<div style="display:flex;gap:10px;margin-top:20px;" id="campStep1Btns">
+<button onclick="buscarClientesElegiveis()" class="btn-navy" style="flex:1;padding:12px;font-size:14px;"><i class="bi bi-search me-1"></i>Buscar Clientes Elegíveis</button>
 <button onclick="document.getElementById(\'modalNovaCampanha\').style.display=\'none\'" style="flex:0;padding:12px 20px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">Cancelar</button>
+</div>
+
+<div id="campStep2" style="display:none;margin-top:20px;">
+<div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;">
+<div style="padding:10px 14px;background:#FAFBFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+<label style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;"><input type="checkbox" id="campSelectAll" onchange="toggleAllClientes(this)" style="margin-right:6px;">Selecionar todos (<span id="campTotalClientes">0</span>)</label>
+<span id="campSelecionados" style="font-size:12px;color:#18253D;font-weight:600;">0 selecionados</span>
+</div>
+<div id="campClientesList" style="max-height:200px;overflow-y:auto;padding:4px 0;"></div>
+</div>
+<div style="display:flex;gap:10px;margin-top:14px;">
+<button onclick="gerarComClientesSelecionados()" class="btn-navy" style="flex:1;padding:12px;font-size:14px;"><i class="bi bi-stars me-1"></i>Gerar Campanha</button>
+<button onclick="document.getElementById(\'campStep2\').style.display=\'none\';document.getElementById(\'campStep1Btns\').style.display=\'flex\';" style="flex:0;padding:12px 20px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">Voltar</button>
+</div>
 </div>
 
 <div id="campProgress" style="display:none;margin-top:16px;text-align:center;">
@@ -653,9 +688,8 @@ function stopRecording(){
     document.getElementById("btnMic").style.background = "#fff";
 }
 
-async function criarCampanhaIA(){
+async function buscarClientesElegiveis(){
     const tipo = document.getElementById("campTipo").value;
-    const instrucoes = document.getElementById("campInstrucoes").value.trim();
     const categoria = document.getElementById("campCategoria").value.trim();
     const individualId = document.getElementById("campIndividualId").value;
     
@@ -666,7 +700,60 @@ async function criarCampanhaIA(){
     
     document.getElementById("campProgress").style.display = "block";
     
-    const body = JSON.stringify({tipo, instrucoes, categoria, usuario_id: individualId || null});
+    const body = JSON.stringify({tipo, categoria, usuario_id: individualId || null, apenas_buscar: true});
+    const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
+    const d = await r.json();
+    
+    document.getElementById("campProgress").style.display = "none";
+    
+    if(!d.success && !d.clientes){
+        alert(d.error || "Erro ao buscar clientes");
+        return;
+    }
+    
+    const clientes = d.clientes || [];
+    if(!clientes.length){
+        alert("Nenhum cliente encontrado para este tipo de campanha.");
+        return;
+    }
+    
+    // Show step 2
+    document.getElementById("campStep1Btns").style.display = "none";
+    document.getElementById("campStep2").style.display = "block";
+    document.getElementById("campTotalClientes").textContent = clientes.length;
+    
+    const list = document.getElementById("campClientesList");
+    list.innerHTML = clientes.map(c => 
+        "<label style=\\"display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;font-size:13px;\\" onmouseover=\\"this.style.background=\'#F8FAFC\'\\" onmouseout=\\"this.style.background=\'\'\\">" +
+        "<input type=\\"checkbox\\" class=\\"cliente-check\\" value=\\""+c.id+"\\" checked onchange=\\"updateSelecionados()\\">" +
+        "<span><strong>"+c.nome+"</strong> <span style=\\"color:#94A3B8;\\">"+c.email+"</span></span></label>"
+    ).join("");
+    
+    document.getElementById("campSelectAll").checked = true;
+    updateSelecionados();
+}
+
+function toggleAllClientes(el){
+    document.querySelectorAll(".cliente-check").forEach(c => c.checked = el.checked);
+    updateSelecionados();
+}
+
+function updateSelecionados(){
+    const total = document.querySelectorAll(".cliente-check:checked").length;
+    document.getElementById("campSelecionados").textContent = total + " selecionados";
+}
+
+async function gerarComClientesSelecionados(){
+    const ids = [...document.querySelectorAll(".cliente-check:checked")].map(c => parseInt(c.value));
+    if(!ids.length){ alert("Selecione pelo menos 1 cliente."); return; }
+    
+    const tipo = document.getElementById("campTipo").value;
+    const instrucoes = document.getElementById("campInstrucoes").value.trim();
+    const categoria = document.getElementById("campCategoria").value.trim();
+    
+    document.getElementById("campProgress").style.display = "block";
+    
+    const body = JSON.stringify({tipo, instrucoes, categoria, cliente_ids: ids});
     const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
     const d = await r.json();
     
