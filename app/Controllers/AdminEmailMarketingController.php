@@ -601,17 +601,19 @@ function buscarUsuariosCamp(){
         const r = await fetch("/admin/email-marketing/buscar-usuarios?q="+encodeURIComponent(q));
         const d = await r.json();
         const wrap = document.getElementById("campIndividualResultados");
-        if(!d.success || !d.usuarios.length){ wrap.innerHTML="<div style='padding:8px 12px;color:#94A3B8;font-size:12px;'>Nenhum resultado</div>"; wrap.style.display="block"; return; }
-        wrap.innerHTML = d.usuarios.map(u=>"<div onclick='selecionarUsuarioCamp("+u.id+",\""+u.nome.replace(/"/g,"&quot;")+"\",\""+u.email+"\")' style='padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F1F5F9;' onmouseover='this.style.background=\"#F8FAFC\"' onmouseout='this.style.background=\"\"'><strong>"+u.nome+"</strong><br><small style='color:#94A3B8;'>"+u.email+"</small></div>").join("");
+        if(!d.success || !d.usuarios.length){ wrap.innerHTML="<div style=\\"padding:8px 12px;color:#94A3B8;font-size:12px;\\">Nenhum resultado</div>"; wrap.style.display="block"; return; }
+        wrap.innerHTML = d.usuarios.map(u=>"<div onclick=\\"selecionarUsuarioCamp("+u.id+",this)\\" data-nome=\\""+u.nome.replace(/"/g,"&quot;")+"\\" data-email=\\""+u.email+"\\" style=\\"padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F1F5F9;\\" onmouseover=\\"this.style.background=\'#F8FAFC\'\\" onmouseout=\\"this.style.background=\'\'\\">"+"<strong>"+u.nome+"</strong><br><small style=\\"color:#94A3B8;\\">"+u.email+"</small></div>").join("");
         wrap.style.display="block";
     }, 300);
 }
-function selecionarUsuarioCamp(id, nome, email){
+function selecionarUsuarioCamp(id, el){
+    var nome = el.getAttribute("data-nome");
+    var email = el.getAttribute("data-email");
     document.getElementById("campIndividualId").value = id;
     document.getElementById("campIndividualBusca").value = nome;
     document.getElementById("campIndividualResultados").style.display = "none";
     document.getElementById("campIndividualSelecionado").style.display = "block";
-    document.getElementById("campIndividualSelecionado").innerHTML = "<i class='bi bi-check-circle-fill' style='color:#065F46;'></i> "+nome+" ("+email+")";
+    document.getElementById("campIndividualSelecionado").innerHTML = "<i class=\\"bi bi-check-circle-fill\\" style=\\"color:#065F46;\\"></i> "+nome+" ("+email+")";
 }
 
 // Audio recording
