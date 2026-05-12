@@ -2,8 +2,8 @@
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h2 class="mb-1"><i class="fas fa-calendar-alt me-2"></i>Promoções Agendadas</h2>
-        <p class="text-muted mb-0">Agende campanhas de desconto com início e fim automáticos</p>
+        <h1 class="page-title">Promoções Agendadas</h1>
+        <p class="page-subtitle">Agende campanhas de desconto com início e fim automáticos</p>
     </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaPromo">
         <i class="fas fa-plus me-1"></i>Nova Promoção

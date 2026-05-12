@@ -666,7 +666,7 @@ class AdminPedidosController extends Controller {
         renderAdminSidebar('pedidos');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-trash me-2"></i>Lixeira de Pedidos</h1>
+                    <h1 class="page-title">Lixeira de Pedidos</h1>
                     <div>
                         <a href="/admin/pedidos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                     </div>
@@ -2318,7 +2318,7 @@ JS;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Pedidos (' . $total . ')</h1>
+                    <h1 class="page-title">Pedidos (' . $total . ')</h1>
                     <div>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary me-2">
                             <i class="fas fa-plus me-1"></i>Novo Pedido Manual
@@ -2984,7 +2984,7 @@ HTML;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
-                <h2 class="fs-5 fw-bold"><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
+                <h1 class="page-title">Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h1>
                 <div class="d-flex flex-wrap gap-1">
                     ' . (((string) ($pedido['origem_pedido'] ?? '') === 'manual')
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary btn-sm">'
@@ -5574,7 +5574,7 @@ LINKSCRIPT;
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Minhas Comissões</h1>
+                    <h1 class="page-title">Minhas Comissões</h1>
                     <div>
                         <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>

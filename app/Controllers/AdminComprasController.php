@@ -395,7 +395,7 @@ class AdminComprasController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-plus me-2"></i>Novo Item na Lista de Compras</h1>
+                <h1 class="page-title">Novo Item na Lista de Compras</h1>
                 <div>
                     <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
                 </div>
@@ -1537,7 +1537,7 @@ class AdminComprasController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
+                    <h1 class="page-title">Lista de Compras</h1>
                     <div>';
 
         echo '<button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">

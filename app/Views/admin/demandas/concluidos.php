@@ -1,6 +1,6 @@
 <?php $demandas = $demandas ?? []; ?>
 <div class="container-fluid py-3">
-    <h4 class="fw-bold mb-4"><i class="fas fa-check-circle me-2 text-success"></i>Demandas Concluídas</h4>
+    <h1 class="page-title">Demandas Concluídas</h1>
     <?php if (empty($demandas)): ?>
     <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5"><i class="fas fa-inbox fs-2 d-block mb-2"></i>Nenhuma demanda concluída ainda.</div></div>
     <?php else: ?>

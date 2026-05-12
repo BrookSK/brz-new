@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h2 class="mb-1"><i class="fas fa-percent me-2"></i>Auditoria de Promoções</h2>
-        <p class="text-muted mb-0">Histórico e controle de preços promocionais</p>
+        <h1 class="page-title">Auditoria de Promoções</h1>
+        <p class="page-subtitle">Histórico e controle de preços promocionais</p>
     </div>
 </div>
 

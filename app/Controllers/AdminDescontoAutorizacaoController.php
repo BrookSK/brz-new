@@ -323,7 +323,7 @@ class AdminDescontoAutorizacaoController
         echo '</head><body><div class="container-fluid"><div class="row">';
         renderAdminSidebar('configuracoes');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-            <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="h2">Configuração de Desconto com Autorização</h1></div>';
+            <div class="pt-3 pb-2 mb-3 border-bottom"><h1 class="page-title">Configuração de Desconto com Autorização</h1></div>';
         if ($mensagem) echo '<div class="alert alert-' . $tipo . '">' . htmlspecialchars($mensagem) . '</div>';
         echo '<form method="POST"><div class="card"><div class="card-body">
             <div class="mb-3">
@@ -488,7 +488,7 @@ class AdminDescontoAutorizacaoController
         renderAdminSidebar('descontos');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-tag me-2"></i>Autorizações de Desconto</h1>
+                <h1 class="page-title">Autorizações de Desconto</h1>
             </div>';
 
         if ($mensagem) echo '<div class="alert alert-' . $tipo . '">' . $h($mensagem) . '</div>';

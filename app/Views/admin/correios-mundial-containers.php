@@ -1,7 +1,7 @@
 <?php ob_start(); ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Correios Mundial (PACKET) - Containers</h1>
+        <h1 class="page-title">Correios Mundial (PACKET) - Containers</h1>
         <div>
             <a class="btn btn-sm btn-outline-secondary" href="/admin/correios-mundial">Voltar</a>
             <a class="btn btn-sm btn-primary" href="/admin/correios-mundial/containers/novo">Novo container</a>

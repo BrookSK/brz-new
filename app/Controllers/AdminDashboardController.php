@@ -451,7 +451,7 @@ class AdminDashboardController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
+                    <h1 class="page-title">Dashboard</h1>
                 </div>
 
                 <div class="row mb-4">
@@ -676,7 +676,7 @@ class AdminDashboardController extends Controller {
         // === CALENDÁRIO DE MARKETING ===
         echo '<section class="section-card">
                 <header class="section-card-header">
-                    <h2 class="section-title"><i class="bi bi-calendar-event"></i> Calendário de Marketing</h2>
+                    <h2 class="section-title">Calendário de Marketing</h2>
                 </header>
                 <div class="section-body">';
         include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
@@ -730,7 +730,7 @@ class AdminDashboardController extends Controller {
         echo '<section class="executive-grid">
                 <article class="section-card">
                     <header class="section-card-header">
-                        <h2 class="section-title"><i class="bi bi-bar-chart-fill"></i> Resumo Gerencial</h2>
+                        <h2 class="section-title">Resumo Gerencial</h2>
                     </header>
                     <div class="section-body">
                         <div class="summary-list">
@@ -759,7 +759,7 @@ class AdminDashboardController extends Controller {
                 </article>
                 <article class="section-card">
                     <header class="section-card-header">
-                        <h2 class="section-title"><i class="bi bi-lightbulb-fill"></i> Pontos de Atenção</h2>
+                        <h2 class="section-title">Pontos de Atenção</h2>
                     </header>
                     <div class="section-body">
                         <div class="insight-list">
@@ -793,7 +793,7 @@ class AdminDashboardController extends Controller {
         if ($pendencias_pagamento_total > 0) {
             echo '<section class="section-card" style="border-color:var(--red-bg);">
                 <header class="section-card-header">
-                    <h2 class="section-title"><i class="bi bi-exclamation-circle-fill" style="color:var(--red-text)"></i> Pendências de pagamento</h2>
+                    <h2 class="section-title">Pendências de pagamento</h2>
                     <a href="/admin/pedidos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver pedidos</a>
                 </header>
                 <div class="section-body">

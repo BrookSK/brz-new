@@ -113,7 +113,6 @@ class AdminUsuariosController extends Controller {
         // === PAGE HEADER ===
         echo '<div class="page-header">
                 <div class="page-title-wrap">
-                    <div class="page-title-icon"><i class="bi bi-people-fill"></i></div>
                     <div>
                         <h1 class="page-title">Usuários</h1>
                         <div class="page-count">' . (int)$total . ' usuários cadastrados</div>
@@ -386,7 +385,7 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-user-plus me-2"></i>Novo Usuário</h1>
+                <h1 class="page-title">Novo Usuário</h1>
                 <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
             </div>
 
@@ -517,7 +516,7 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-user-edit me-2"></i>Editar Usuário</h1>
+                <h1 class="page-title">Editar Usuário</h1>
                 <a href="/admin/usuarios/detalhes/' . (int)$usuario['id'] . '" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
             </div>
 
@@ -950,7 +949,7 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">' . htmlspecialchars($usuario['nome']) . '</h1>
+                    <h1 class="page-title">' . htmlspecialchars($usuario['nome']) . '</h1>
                     <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
                 

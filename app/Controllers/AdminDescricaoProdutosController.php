@@ -368,8 +368,8 @@ class AdminDescricaoProdutosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">';
         // Title
         echo '<div class="d-flex align-items-center justify-content-between mb-4">
-<div><h1 class="h3 mb-0" style="color:var(--navy);font-weight:700;"><i class="fas fa-pen-fancy me-2"></i>Descrição de Produtos</h1>
-<small class="text-muted">Geração e revisão de descrições com IA</small></div></div>';
+<div><h1 class="page-title">Descrição de Produtos</h1>
+<p class="page-subtitle">Geração e revisão de descrições com IA</p></div></div>';
 
         // KPI Cards
         echo '<div class="row g-3 mb-4">

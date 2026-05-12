@@ -388,7 +388,7 @@ HTML;
 <body>
 <div class="container py-4" style="max-width: 1100px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="mb-0"><i class="fas fa-box me-2"></i>Meus Produtos</h3>
+        <h3 class="mb-0">Meus Produtos</h3>
         <div class="d-flex gap-2">
             <a href="/admin/produtos/cadastro-representante" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Novo produto</a>
             <a href="/admin/representante/comissoes" class="btn btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
@@ -477,7 +477,7 @@ HTML;
 <body>
 <div class="container py-4" style="max-width: 760px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="mb-0"><i class="fas fa-edit me-2"></i>Editar Produto</h3>
+        <h3 class="mb-0">Editar Produto</h3>
         <a href="/admin/representante/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
     </div>
 

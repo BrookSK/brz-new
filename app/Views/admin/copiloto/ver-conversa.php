@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
         <a href="/admin/copiloto/conversas" class="text-muted text-decoration-none small"><i class="fas fa-arrow-left me-1"></i>Voltar às conversas</a>
-        <h2 class="mb-0 mt-1"><i class="fas fa-comments me-2"></i>Conversa — <?= htmlspecialchars($sessao['usuario_nome'] ?: 'Visitante') ?></h2>
+        <h1 class="page-title">Conversa — <?= htmlspecialchars($sessao['usuario_nome'] ?: 'Visitante') ?></h1>
         <p class="text-muted mb-0 small">
             <?= htmlspecialchars($sessao['usuario_email'] ?? '') ?>
             · <?= (int) $sessao['total_mensagens'] ?> mensagens

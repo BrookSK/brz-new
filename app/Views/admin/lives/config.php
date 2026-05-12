@@ -6,7 +6,7 @@ $modo = $config['modo_operacao'] ?? 'desligado';
 ?>
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3"><i class="fas fa-cog me-2"></i>Configurações - Lives</h1>
+        <h1 class="page-title">Configurações - Lives</h1>
         <a href="/admin/lives" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i> Voltar
         </a>

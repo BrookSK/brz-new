@@ -2038,7 +2038,7 @@ Use nomes curtos e descritivos em português.";
             ],
         ];
 
-        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-sliders"></i> Configuração de Critérios</h2></div><div class="section-body">
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Configuração de Critérios</h2></div><div class="section-body">
 <p style="color:#64748B;font-size:13px;margin-bottom:16px;">Defina os parâmetros de cada critério de segmentação. Esses valores são usados quando a IA ou você seleciona um gatilho para filtrar clientes.</p>
 <div style="display:flex;flex-direction:column;gap:12px;">';
 
@@ -2090,7 +2090,7 @@ async function salvarCriterios(){
         $configs = [];
         try { $st = $pdo->query("SELECT chave, valor FROM email_mkt_config"); $configs = $st->fetchAll(\PDO::FETCH_KEY_PAIR) ?: []; } catch (\Exception $e) {}
 
-        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-gear-fill"></i> Configurações do Email Marketing</h2></div><div class="section-body">
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Configurações do Email Marketing</h2></div><div class="section-body">
 <div class="row g-3">
 <div class="col-md-6"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Tom da Marca</label><input type="text" class="form-control" id="cfg_tom_marca" value="'.htmlspecialchars($configs['tom_marca']??'').'"></div>
 <div class="col-md-6"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Palavras Proibidas</label><input type="text" class="form-control" id="cfg_palavras_proibidas" value="'.htmlspecialchars($configs['palavras_proibidas']??'').'"></div>

@@ -690,7 +690,7 @@ class AdminGruposComprasController extends Controller {
                 $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — Histórico (Receita Federal)';
                 ob_start();
                 echo '<div class="container py-4">';
-                echo '<h2 class="mb-1"><i class="fas fa-archive me-2"></i>' . htmlspecialchars($grupo['nome'] ?? '') . '</h2>';
+                echo '<h1 class="page-title">' . htmlspecialchars($grupo['nome'] ?? '') . '</h1>';
                 echo '<p class="text-muted mb-4">Histórico de períodos — Receita Federal</p>';
 
                 if (empty($snapshots)) {

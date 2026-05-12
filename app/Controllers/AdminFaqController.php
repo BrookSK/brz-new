@@ -72,7 +72,7 @@ class AdminFaqController
 
         echo '<div class="pt-3">';
         echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
-        echo '<h1 class="h2"><i class="fas fa-question-circle me-2"></i>Gerenciar FAQ / Termos</h1>';
+        echo '<h1 class="page-title">Gerenciar FAQ / Termos</h1>';
         echo '<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFaq" onclick="limparModal()"><i class="fas fa-plus me-1"></i>Novo item</button>';
         echo '</div>';
 

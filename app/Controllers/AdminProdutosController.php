@@ -4025,7 +4025,7 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
             . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> Arquivados</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
@@ -4632,7 +4632,7 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="h2">Arquivados (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">Arquivados (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
             . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
@@ -4890,7 +4890,7 @@ JS;
         echo <<<HTML
                 <div class="pt-3">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
-                    <h1 class="h2">Novo Produto</h1>
+                    <h1 class="page-title">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
 
@@ -5530,7 +5530,7 @@ HTML;
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Editar Produto</h1>
+                    <h1 class="page-title">Editar Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
 

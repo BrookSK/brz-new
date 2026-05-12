@@ -648,7 +648,7 @@ class AdminRemessaCorreiosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-shipping-fast me-2"></i>Remessa Correios</h1>
+                    <h1 class="page-title">Remessa Correios</h1>
                     <div>
                         <button type="button" class="btn btn-success me-2" onclick="gerarLoteEtiquetas()">
                             <i class="fas fa-tags me-1"></i>Gerar Lote

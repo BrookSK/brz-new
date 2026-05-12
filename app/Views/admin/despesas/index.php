@@ -19,8 +19,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center d-none d-md-flex" style="width:44px;height:44px;"><i class="fas fa-wallet text-danger"></i></div>
-            <div><h4 class="fw-bold mb-0">Despesas</h4><p class="text-muted small mb-0 d-none d-md-block">Centro de controle de saídas, recorrências, parcelas e comissões</p></div>
+            <div><h1 class="page-title">Despesas</h1><p class="page-subtitle">Centro de controle de saídas, recorrências, parcelas e comissões</p></div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <div class="border rounded-pill px-3 py-1 d-none d-lg-flex align-items-center gap-2 bg-white small">

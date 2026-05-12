@@ -1118,7 +1118,7 @@ class AdminEstoqueController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-plus me-2"></i>Entrada de Estoque (Galpão)</h1>
+                    <h1 class="page-title">Entrada de Estoque (Galpão)</h1>
                     <div>
                         <a class="btn btn-outline-secondary" href="/admin/estoque">
                             <i class="fas fa-arrow-left me-1"></i>Voltar
@@ -1514,7 +1514,7 @@ class AdminEstoqueController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-warehouse me-2"></i>Estoque Interno</h1>
+                <h1 class="page-title">Estoque Interno</h1>
                 <div>
                     <a class="btn btn-success me-2" href="/admin/estoque/entrada"><i class="fas fa-plus me-1"></i>Entrada de Estoque</a>
                     <button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</button>
@@ -2147,7 +2147,7 @@ class AdminEstoqueController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <div>
-                        <h1 class="h2 mb-0"><i class="fas fa-pen me-2"></i>Editar Estoque</h1>
+                        <h1 class="page-title">Editar Estoque</h1>
                         <div class="text-muted">Produto #' . (int) $produtoId . '</div>
                     </div>
                     <div>

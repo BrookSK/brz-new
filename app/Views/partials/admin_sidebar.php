@@ -558,8 +558,55 @@ function renderAdminSidebarStyles() {
         main .h2 i.fas, main .h2 i.far, main .h2 i.fab, main .h2 i.bi,
         main .h3 i.fas, main .h3 i.far, main .h3 i.fab, main .h3 i.bi,
         main .page-title i, main .page-title-icon,
-        main .border-bottom h1 i, main .border-bottom h2 i {
+        main .page-title-wrap .page-title-icon,
+        main .border-bottom h1 i, main .border-bottom h2 i,
+        main .border-bottom h3 i,
+        .col-md-9 h1 i.fas, .col-md-9 h1 i.far, .col-md-9 h1 i.fab, .col-md-9 h1 i.bi,
+        .col-md-9 h2 i.fas, .col-md-9 h2 i.far, .col-md-9 h2 i.fab, .col-md-9 h2 i.bi,
+        .col-md-9 h3 i.fas, .col-md-9 h3 i.far, .col-md-9 h3 i.fab, .col-md-9 h3 i.bi,
+        .col-lg-10 h1 i.fas, .col-lg-10 h1 i.far, .col-lg-10 h1 i.fab, .col-lg-10 h1 i.bi,
+        .col-lg-10 h2 i.fas, .col-lg-10 h2 i.far, .col-lg-10 h2 i.fab, .col-lg-10 h2 i.bi,
+        .col-lg-10 h3 i.fas, .col-lg-10 h3 i.far, .col-lg-10 h3 i.fab, .col-lg-10 h3 i.bi,
+        .container-fluid > .d-flex h1 i, .container-fluid > .d-flex h2 i, .container-fluid > .d-flex h3 i,
+        .page-header .page-title-icon {
             display: none !important;
+        }
+
+        /* Standardize page title sizes globally - match Dashboard pattern */
+        main h1.h2, main h1.h3, main .border-bottom h1,
+        .col-md-9 h1.h2, .col-md-9 h1.h3,
+        .col-lg-10 h1.h2, .col-lg-10 h1.h3,
+        .col-lg-10 .border-bottom h1,
+        main .page-title, .col-lg-10 .page-title,
+        .container-fluid .page-title,
+        main h4.fw-bold, .col-lg-10 h4.fw-bold,
+        .container-fluid h4.fw-bold {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            color: #18253D !important;
+            margin: 0 !important;
+            line-height: 1.3 !important;
+        }
+
+        main h2.mb-1, main h2.mb-0,
+        .col-lg-10 h2.mb-1, .col-lg-10 h2.mb-0,
+        .container-fluid h2.mb-1, .container-fluid h1.h3,
+        .container-fluid h2.mb-0 {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            color: #18253D !important;
+            margin: 0 !important;
+            line-height: 1.3 !important;
+        }
+
+        /* Standardize page subtitles */
+        main .border-bottom + p.text-muted,
+        main .page-subtitle, .col-lg-10 .page-subtitle,
+        .container-fluid .page-subtitle,
+        main .page-count {
+            font-size: 13px !important;
+            color: #64748B !important;
+            margin: 2px 0 0 0 !important;
         }
 
         /* Nav tabs/pills global override - navy instead of blue */

@@ -430,7 +430,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         }
 
         // Top Pages
-        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-bar-chart-fill"></i> Páginas Mais Acessadas</h2></div><div class="section-body">';
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Páginas Mais Acessadas</h2></div><div class="section-body">';
         if (!empty($topPages)) {
             echo '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Página</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Acessos</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Visitantes</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Tempo na Página</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Até onde rolaram</th></tr></thead><tbody>';
             foreach ($topPages as $p) {
@@ -448,7 +448,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
 
         // Funnel
-        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-funnel-fill"></i> Caminho dos Clientes</h2></div><div class="section-body">
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title">Caminho dos Clientes</h2></div><div class="section-body">
 <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">Mostra por quais páginas seus clientes mais passam. Quanto maior a barra, mais gente visita.</p>';
         if (!empty($funnel)) {
             $maxSessoes = (int)($funnel[0]['sessoes'] ?? 1);
@@ -462,7 +462,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '</div></div>';
 
         // Scroll depth
-        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-arrow-down-circle-fill"></i> Até onde rolam a página</h2></div><div class="section-body">
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title">Até onde rolam a página</h2></div><div class="section-body">
 <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">Mostra se os clientes veem a página inteira ou param no meio. Se param cedo, o conteúdo pode não estar atraente.</p>';
         if (!empty($scrollData)) {
             foreach ($scrollData as $s) {
@@ -476,7 +476,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '</div>';
 
         // Top Clicks
-        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-cursor-fill"></i> O que mais clicam</h2></div><div class="section-body">
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">O que mais clicam</h2></div><div class="section-body">
 <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">Botões, links e áreas que seus clientes mais clicam. Isso mostra o que eles procuram.</p>';
         if (!empty($topClicks)) {
             echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;">';
@@ -529,7 +529,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         } catch (\Throwable $e) {}
         echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
         // Most visited products
-        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-eye-fill"></i> Produtos Mais Visitados</h2></div><div class="section-body">';
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title">Produtos Mais Visitados</h2></div><div class="section-body">';
         try {
         if (!empty($prodMaisVisitados)) {
             foreach ($prodMaisVisitados as $i => $pv) {
@@ -540,7 +540,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '</div></div>';
 
         // Most purchased products
-        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-bag-check-fill"></i> Produtos Mais Comprados</h2></div><div class="section-body">';
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title">Produtos Mais Comprados</h2></div><div class="section-body">';
         try {
         if (!empty($prodMaisComprados)) {
             foreach ($prodMaisComprados as $i => $pc) {
@@ -567,7 +567,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
             }
         } catch (\Exception $e) {}
 
-        echo '<div class="section-card"><div class="section-card-header" style="flex-wrap:wrap;gap:8px;"><h2 class="section-title"><i class="bi bi-graph-up"></i> Evolução</h2>
+        echo '<div class="section-card"><div class="section-card-header" style="flex-wrap:wrap;gap:8px;"><h2 class="section-title">Evolução</h2>
 <div style="display:flex;gap:6px;align-items:center;">
 <a href="?periodo='.$periodo.'&dias=7" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==7?'#fff':'#374151').';background:'.($diasGrafico==7?'#18253D':'#fff').';">7 dias</a>
 <a href="?periodo='.$periodo.'&dias=14" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==14?'#fff':'#374151').';background:'.($diasGrafico==14?'#18253D':'#fff').';">14 dias</a>
@@ -587,7 +587,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
             }
         } catch (\Exception $e) {}
 
-        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-globe2"></i> Origem dos Visitantes (Cookies)</h2></div><div class="section-body">';
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Origem dos Visitantes (Cookies)</h2></div><div class="section-body">';
         if (!empty($origens)) {
             echo '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Origem</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Dispositivo</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Sessões</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Visitantes Únicos</th></tr></thead><tbody>';
             foreach ($origens as $o) {
@@ -606,7 +606,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         }
 
         // Heatmap Visualization Section
-        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-fire"></i> Visualização do Mapa de Calor</h2></div><div class="section-body">
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Visualização do Mapa de Calor</h2></div><div class="section-body">
 <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
 <select id="heatmapPageSelect" onchange="carregarHeatmap()" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">';
         if (!empty($topPages)) {

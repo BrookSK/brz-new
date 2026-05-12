@@ -1,8 +1,8 @@
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="fas fa-chart-bar me-2"></i>Analytics — Co-Piloto Bri</h2>
-            <p class="text-muted mb-0">Relatório de uso, perguntas frequentes e impacto em vendas</p>
+            <h1 class="page-title">Analytics — Co-Piloto Bri</h1>
+            <p class="page-subtitle">Relatório de uso, perguntas frequentes e impacto em vendas</p>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <select class="form-select form-select-sm" id="periodo-select" style="width:auto">

@@ -1,7 +1,7 @@
 <div class="container-fluid py-3">
     <div class="row justify-content-center">
         <div class="col-lg-9">
-            <h4 class="fw-bold mb-4"><i class="fas fa-file-alt me-2"></i>Nova Solicitação</h4>
+            <h1 class="page-title">Nova Solicitação</h1>
 
             <!-- Seletor de tipo -->
             <div class="card border-0 shadow-sm mb-4"><div class="card-body">

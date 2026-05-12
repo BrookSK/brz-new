@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h2 class="mb-1"><i class="fas fa-calendar-alt me-2"></i>Compras Carnê — Mensal</h2>
-        <p class="text-muted mb-0">Lista de compras de carnê separada por mês</p>
+        <h1 class="page-title">Compras Carnê — Mensal</h1>
+        <p class="page-subtitle">Lista de compras de carnê separada por mês</p>
     </div>
     <div class="d-flex gap-2">
         <a href="/admin/carnes/compras-internas" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>Lista Completa</a>

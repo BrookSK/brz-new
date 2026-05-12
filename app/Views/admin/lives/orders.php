@@ -3,7 +3,7 @@
 ?>
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3"><i class="fas fa-shopping-bag me-2"></i>Pedidos da Live</h1>
+        <h1 class="page-title">Pedidos da Live</h1>
     </div>
 
     <div class="card">

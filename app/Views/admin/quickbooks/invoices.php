@@ -8,7 +8,10 @@
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-file-invoice-dollar me-2"></i>Invoices QuickBooks</h2>
+    <div>
+        <h1 class="page-title">Invoices QuickBooks</h1>
+        <p class="page-subtitle">Faturas sincronizadas com QuickBooks Online</p>
+    </div>
     <a href="/admin/quickbooks" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
 </div>
 

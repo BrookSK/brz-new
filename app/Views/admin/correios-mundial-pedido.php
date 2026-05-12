@@ -78,7 +78,7 @@ $nonNatLabel = [
 ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Correios Mundial (PACKET) - Pedido #<?= str_pad((string) (int) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></h1>
+        <h1 class="page-title">Correios Mundial (PACKET) - Pedido #<?= str_pad((string) (int) ($pedido['id'] ?? 0), 6, '0', STR_PAD_LEFT) ?></h1>
         <div class="d-flex gap-2">
             <a href="/admin/correios-mundial" class="btn btn-outline-secondary">Voltar</a>
             <?php if (!$cmIsRedirecionador): ?>

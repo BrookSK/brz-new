@@ -6,7 +6,7 @@ $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['ti
 ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Recargas Clube (Checkout rápido)</h1>
+        <h1 class="page-title">Recargas Clube (Checkout rápido)</h1>
     </div>
 
     <!-- Totais Gerais -->

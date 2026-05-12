@@ -191,7 +191,7 @@ class AdminRemessaConferenciaController extends Controller {
         renderAdminSidebar('remessa-conferencia');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
 <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h3 mb-0"><i class="fas fa-clipboard-check me-2"></i>Conferência de Remessa</h1>
+    <h1 class="page-title">Conferência de Remessa</h1>
     <button class="btn btn-outline-primary" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
 </div>';
         if ($errorMsg) echo '<div class="alert alert-danger"><strong>Erro:</strong> ' . htmlspecialchars($errorMsg) . '</div>';
