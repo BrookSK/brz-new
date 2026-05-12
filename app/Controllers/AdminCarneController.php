@@ -31,6 +31,12 @@ class AdminCarneController extends Controller {
             'tab' => $request->getParam('tab', 'carnes'),
         ];
 
+        // Handle combined "filtro_rapido" dropdown
+        $filtroRapido = $request->getParam('filtro_rapido', '');
+        if ($filtroRapido === 'com_atraso') $filtros['com_atraso'] = '1';
+        elseif ($filtroRapido === 'liberado_compra') $filtros['liberado_compra'] = '1';
+        elseif ($filtroRapido === 'liberado_envio') $filtros['liberado_envio'] = '1';
+
         $carnes = $this->carneModel->listarAdmin($filtros);
 
         // Stats para os cards do topo
