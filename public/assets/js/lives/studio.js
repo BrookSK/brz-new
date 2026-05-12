@@ -64,7 +64,8 @@ async function startLive() {
         // Se WebRTC, iniciar câmera e WHIP
         if (IS_WEBRTC && data.webrtc_url) {
             await startWebRTC(data.webrtc_url);
-            // Não recarregar — a conexão WHIP precisa ficar ativa
+            // Recarregar para mostrar controles de live ativa (WHIP reconecta automaticamente)
+            location.reload();
             return;
         }
 
