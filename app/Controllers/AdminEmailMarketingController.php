@@ -1430,7 +1430,21 @@ async function carregarClientesSegmento(id){
 }
 async function recarregarClientesSegmento(){
     var id=document.getElementById("editSegId").value;
-    if(id) carregarClientesSegmento(id);
+    var gatilho=document.getElementById("editSegGatilho").value;
+    if(id){
+        document.getElementById("editSegClientes").innerHTML="<div style=\\"padding:20px;text-align:center;color:#94A3B8;\\"><i class=\\"bi bi-arrow-repeat\\" style=\\"animation:spin 1s linear infinite;\\"></i> Atualizando...</div>";
+        const r=await fetch("/admin/email-marketing/segmento-clientes?id="+id+"&gatilho="+encodeURIComponent(gatilho));
+        const d=await r.json();
+        const wrap=document.getElementById("editSegClientes");
+        const countEl=document.getElementById("editSegClientesCount");
+        if(d.success && d.clientes && d.clientes.length){
+            countEl.textContent=d.clientes.length+" clientes";
+            wrap.innerHTML=d.clientes.map(c=>"<label class=\\"seg-cliente-item\\" style=\\"display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;font-size:12px;\\" onmouseover=\\"this.style.background=\'#F8FAFC\'\\" onmouseout=\\"this.style.background=\'\'\\">"+"<input type=\\"checkbox\\" class=\\"seg-cl-check\\" value=\\""+c.id+"\\" checked>"+"<span style=\\"flex:1;min-width:0;\\"><strong style=\\"display:block;font-size:13px;\\">"+c.nome+"</strong><span style=\\"color:#94A3B8;\\">"+c.email+"</span></span>"+"<span style=\\"color:#94A3B8;font-size:11px;white-space:nowrap;\\">"+(c.ultima_compra||"")+"</span></label>").join("");
+        } else {
+            countEl.textContent="0 clientes";
+            wrap.innerHTML="<div style=\\"padding:20px;text-align:center;color:#94A3B8;font-size:12px;\\">Nenhum cliente encontrado para este critério.</div>";
+        }
+    }
 }
 function marcarTodosSegClientes(marcar){
     document.querySelectorAll(".seg-cl-check").forEach(c=>{if(c.closest(".seg-cliente-item").style.display!=="none")c.checked=marcar;});
@@ -1669,6 +1683,7 @@ Use nomes curtos e descritivos em português.";
         $auth = new AuthService(); $auth->requerPerfis(['admin']);
         $pdo = Database::getConnection();
         $id = (int)$request->getParam('id');
+        $gatilhoOverride = trim((string)$request->getParam('gatilho', ''));
         if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
 
         $userNomeCol = 'nome';
@@ -1677,12 +1692,13 @@ Use nomes curtos e descritivos em português.";
             if (!in_array('nome', $cols) && in_array('name', $cols)) $userNomeCol = 'name';
         } catch (\Exception $e) {}
 
-        // Get segment info to determine which clients belong
+        // Get segment info
         $st = $pdo->prepare("SELECT * FROM email_mkt_segmentos WHERE id = ?"); $st->execute([$id]);
         $seg = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$seg) { echo json_encode(['success'=>false,'error'=>'Segmento não encontrado']); return; }
 
-        $gatilho = $seg['gatilho'] ?? 'automatico';
+        // Use override gatilho if provided, otherwise use saved
+        $gatilho = ($gatilhoOverride !== '') ? $gatilhoOverride : ($seg['gatilho'] ?? 'automatico');
         $clientes = [];
 
         try {
