@@ -240,12 +240,26 @@
         </div>
         
         <div class="position-relative">
-            <div id="produtos-destaque" class="d-flex overflow-hidden" style="gap:16px;scroll-behavior:smooth;">
-                <!-- Produtos serão carregados via AJAX como carrossel -->
+            <div style="overflow:hidden;">
+                <div id="produtos-destaque" class="carousel-track" style="display:flex;gap:16px;width:max-content;">
+                    <!-- Produtos serão carregados via AJAX como carrossel -->
+                </div>
             </div>
             <button class="btn btn-light shadow-sm position-absolute top-50 start-0 translate-middle-y rounded-circle d-none d-md-flex align-items-center justify-content-center" style="width:40px;height:40px;z-index:2;left:-10px;" onclick="scrollCarousel(-1)"><i class="fas fa-chevron-left"></i></button>
             <button class="btn btn-light shadow-sm position-absolute top-50 end-0 translate-middle-y rounded-circle d-none d-md-flex align-items-center justify-content-center" style="width:40px;height:40px;z-index:2;right:-10px;" onclick="scrollCarousel(1)"><i class="fas fa-chevron-right"></i></button>
         </div>
+        <style>
+        @keyframes carouselScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .carousel-track.animating {
+            animation: carouselScroll var(--carousel-duration, 30s) linear infinite;
+        }
+        .carousel-track.animating:hover {
+            animation-play-state: paused;
+        }
+        </style>
     </div>
 </section>
 
@@ -490,37 +504,33 @@ $(document).ready(function() {
     // Carousel functions
     function scrollCarousel(dir) {
         var el = document.getElementById('produtos-destaque');
-        if (el) el.scrollBy({ left: dir * 300, behavior: 'smooth' });
+        if (!el) return;
+        el.classList.remove('animating');
+        el.style.animation = 'none';
+        el.offsetHeight; // force reflow
+        var current = el.getBoundingClientRect().left;
+        var items = el.querySelectorAll('.carousel-item-card');
+        // Manual scroll by shifting margin
+        var shift = dir * 300;
+        var currentMargin = parseInt(el.style.marginLeft || '0') || 0;
+        el.style.transition = 'margin-left 0.3s ease';
+        el.style.marginLeft = (currentMargin - shift) + 'px';
+        setTimeout(function() { el.style.transition = ''; }, 350);
     }
     window.scrollCarousel = scrollCarousel;
 
     function initInfiniteCarousel() {
         var el = document.getElementById('produtos-destaque');
         if (!el || el.children.length < 2) return;
-        // Clone items for seamless loop
+        // Clone all items for seamless loop
         var items = Array.from(el.children);
         items.forEach(function(item) {
-            var clone = item.cloneNode(true);
-            el.appendChild(clone);
+            el.appendChild(item.cloneNode(true));
         });
-        var speed = 0.5;
-        var paused = false;
-        function step() {
-            if (!paused) {
-                el.scrollLeft += speed;
-                // When we've scrolled past the original items, reset silently
-                var halfWidth = el.scrollWidth / 2;
-                if (el.scrollLeft >= halfWidth) {
-                    el.scrollLeft -= halfWidth;
-                }
-            }
-            requestAnimationFrame(step);
-        }
-        requestAnimationFrame(step);
-        el.addEventListener('mouseenter', function() { paused = true; });
-        el.addEventListener('mouseleave', function() { paused = false; });
-        el.addEventListener('touchstart', function() { paused = true; });
-        el.addEventListener('touchend', function() { setTimeout(function(){ paused = false; }, 2000); });
+        // Set duration based on number of items (slower for more items)
+        var duration = Math.max(20, items.length * 4);
+        el.style.setProperty('--carousel-duration', duration + 's');
+        el.classList.add('animating');
     }
 });
 </script>
