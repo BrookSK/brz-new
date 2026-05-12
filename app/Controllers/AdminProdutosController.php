@@ -2261,6 +2261,10 @@ class AdminProdutosController extends Controller {
                 <input class="form-check-input" type="checkbox" id="ngClubeOnly" role="switch">
                 <label class="form-check-label" for="ngClubeOnly">Exclusivo do Clube Braziliana</label>
             </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="ngAtivo" role="switch" checked>
+                <label class="form-check-label" for="ngAtivo">Grupo ativo</label>
+            </div>
             <div id="msgNovoGrupo" class="mb-2"></div>
             <div class="d-flex gap-2">
                 <button class="btn btn-outline-secondary flex-fill" id="btnCancelarGrupo">Cancelar</button>
@@ -2651,6 +2655,7 @@ document.getElementById("btnSalvarNovoGrupo").addEventListener("click", async ()
     if (document.getElementById("ngClubeOnly").checked) {
         fd.append("clube_only", "1");
     }
+    fd.append("ativo", document.getElementById("ngAtivo").checked ? "1" : "0");
     const r = await fetch("/admin/grupos-compras/salvar", {method:"POST", body:fd});
     const j = await r.json();
     btn.disabled = false; btn.innerHTML = \'<i class="fas fa-check me-1"></i>Criar grupo\';

@@ -211,7 +211,7 @@ class AdminGruposComprasController extends Controller {
                 $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $bannerUrl, $clubeOnly, $id]);
             } else {
                 $st = $pdo->prepare("INSERT INTO grupos_compras (nome, slug, descricao, cobra_imposto_eua, imposto_local_percent, ativo, banner, clube_only, criado_por, criado_por_nome, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,NOW())");
-                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, 1, $bannerUrl, $clubeOnly, $userId ?: null, $userName ?: null]);
+                $st->execute([$nome, $slug, $descricao, $cobraImposto, $impostoLocalPercent, $ativo, $bannerUrl, $clubeOnly, $userId ?: null, $userName ?: null]);
                 $id = (int)$pdo->lastInsertId();
             }
 
