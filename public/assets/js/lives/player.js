@@ -75,9 +75,10 @@ async function initWHEPPlayer(video, whepUrl) {
         pc.ontrack = function(event) {
             console.log('WHEP: Got track!', event.track.kind);
             if (event.streams && event.streams[0]) {
-                video.srcObject = event.streams[0];
+                if (!video.srcObject || video.srcObject !== event.streams[0]) {
+                    video.srcObject = event.streams[0];
+                }
             } else if (event.track) {
-                // Fallback: criar stream manualmente
                 var stream = video.srcObject;
                 if (!stream) {
                     stream = new MediaStream();
@@ -89,14 +90,17 @@ async function initWHEPPlayer(video, whepUrl) {
             var overlays = document.querySelectorAll('.live-video-container > div[style*="position:absolute"]');
             overlays.forEach(function(el) { el.style.display = 'none'; });
             
-            video.muted = true; // Necessário para autoplay
-            video.play().then(function() {
-                console.log('WHEP: Video playing!');
-            }).catch(function(e) {
-                console.log('WHEP: Play failed, trying muted:', e.message);
+            // Só dar play quando receber a track de vídeo (evita conflito)
+            if (event.track.kind === 'video') {
                 video.muted = true;
-                video.play();
-            });
+                setTimeout(function() {
+                    video.play().then(function() {
+                        console.log('WHEP: Video playing!');
+                    }).catch(function(e) {
+                        console.log('WHEP: Play error:', e.message);
+                    });
+                }, 100);
+            }
         };
 
         const offer = await pc.createOffer();

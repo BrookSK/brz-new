@@ -229,7 +229,7 @@ const PRODUCTS = <?= json_encode(array_map(function($p) {
 }, $products)) ?>;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
-<script src="/assets/js/lives/player.js"></script>
+<script src="/assets/js/lives/player.js?v=<?= time() ?>"></script>
 <script src="/assets/js/lives/chat.js"></script>
 <script src="/assets/js/lives/shopping.js"></script>
 <script>
