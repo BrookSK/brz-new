@@ -162,7 +162,7 @@ class AdminEmailMarketingController extends Controller {
                         LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         GROUP BY u.id, u.{$userNomeCol}, u.email
                         HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
-                        ORDER BY ultima_compra ASC LIMIT 200";
+                        ORDER BY ultima_compra ASC LIMIT 5000";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes sem compra há mais de {$diasRecompra} dias";
 
@@ -171,7 +171,7 @@ class AdminEmailMarketingController extends Controller {
                         FROM usuarios u
                         WHERE u.data_nascimento IS NOT NULL
                         AND (MONTH(u.data_nascimento) = MONTH(NOW()) AND DAY(u.data_nascimento) BETWEEN DAY(NOW()) AND DAY(NOW())+7)
-                        LIMIT 200";
+                        LIMIT 5000";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Aniversariantes da semana";
 
@@ -181,7 +181,7 @@ class AdminEmailMarketingController extends Controller {
                         INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        LIMIT 200";
+                        LIMIT 5000";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes com compra nos últimos 7 dias";
 
@@ -191,18 +191,18 @@ class AdminEmailMarketingController extends Controller {
                         INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         GROUP BY u.id, u.{$userNomeCol}, u.email
                         HAVING total_pedidos >= 3 OR total_gasto >= 500
-                        ORDER BY total_gasto DESC LIMIT 200";
+                        ORDER BY total_gasto DESC LIMIT 5000";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes VIP (3+ pedidos ou $500+ gastos)";
 
             } elseif ($tipo === 'institucional') {
-                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 200";
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' ORDER BY u.{$userNomeCol} ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Todos os clientes (institucional)";
 
             } else {
                 // categoria, carrinho_abandonado, etc - get all active clients
-                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 200";
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 5000";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes ativos - campanha {$tipo}";
             }
@@ -304,13 +304,29 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $template = file_get_contents(__DIR__ . '/../../resources/email_marketing_template.html');
         if (!$template) return '<p>Template não encontrado</p>';
 
+        // Get logo URL from config
+        $logoUrl = '';
+        try {
+            $pdo2 = Database::getConnection();
+            $stLogo = $pdo2->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave='logo_email') OR chave='layout_logo_email' LIMIT 1");
+            $stLogo->execute();
+            $logoUrl = trim((string)($stLogo->fetchColumn() ?: ''));
+            if ($logoUrl === '') {
+                $stLogo2 = $pdo2->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave='logo_admin') OR chave='layout_logo_admin' LIMIT 1");
+                $stLogo2->execute();
+                $logoUrl = trim((string)($stLogo2->fetchColumn() ?: ''));
+            }
+        } catch (\Exception $e) {}
+        if ($logoUrl === '') $logoUrl = '/assets/img/logo.png';
+
         $replacements = [
+            '{{LOGO_URL}}' => htmlspecialchars($logoUrl),
             '{{NOME_LOJA}}' => htmlspecialchars($nomeLoja),
             '{{TAG_CAMPANHA}}' => htmlspecialchars($vars['tag_campanha'] ?? 'Novidades'),
             '{{TITULO_EMAIL}}' => htmlspecialchars($vars['titulo_email'] ?? $vars['assunto'] ?? ''),
             '{{SUBTITULO_EMAIL}}' => htmlspecialchars($vars['subtitulo_email'] ?? ''),
             '{{ASSUNTO_EMAIL}}' => htmlspecialchars($vars['assunto'] ?? ''),
-            '{{NOME_CLIENTE}}' => '{{NOME_CLIENTE}}', // kept for personalization at send time
+            '{{NOME_CLIENTE}}' => '{{NOME_CLIENTE}}',
             '{{PARAGRAFO_1}}' => htmlspecialchars($vars['paragrafo_1'] ?? ''),
             '{{PARAGRAFO_2}}' => htmlspecialchars($vars['paragrafo_2'] ?? ''),
             '{{TEXTO_DESTAQUE}}' => htmlspecialchars($vars['texto_destaque'] ?? ''),
@@ -434,7 +450,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $campanha = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$campanha) { echo json_encode(['success'=>false,'error'=>'Não encontrada']); return; }
         // Get clients
-        $st2 = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id = ? ORDER BY id LIMIT 200"); $st2->execute([$id]);
+        $st2 = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id = ? ORDER BY id LIMIT 5000"); $st2->execute([$id]);
         $clientes = $st2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         echo json_encode(['success'=>true,'campanha'=>$campanha,'clientes'=>$clientes]);
     }
@@ -582,11 +598,18 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 
 <div id="campStep2" style="display:none;margin-top:20px;">
 <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;">
-<div style="padding:10px 14px;background:#FAFBFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
-<label style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;"><input type="checkbox" id="campSelectAll" onchange="toggleAllClientes(this)" style="margin-right:6px;">Selecionar todos (<span id="campTotalClientes">0</span>)</label>
+<div style="padding:10px 14px;background:#FAFBFC;border-bottom:1px solid #E2E8F0;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+<span style="font-size:12px;font-weight:700;color:#94A3B8;text-transform:uppercase;">Clientes elegíveis (<span id="campTotalClientes">0</span>)</span>
 <span id="campSelecionados" style="font-size:12px;color:#18253D;font-weight:600;">0 selecionados</span>
 </div>
-<div id="campClientesList" style="max-height:200px;overflow-y:auto;padding:4px 0;"></div>
+<div style="display:flex;gap:6px;margin-bottom:8px;">
+<button type="button" onclick="marcarTodosClientes(true)" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;color:#18253D;font-weight:600;">Marcar todos</button>
+<button type="button" onclick="marcarTodosClientes(false)" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;color:#64748B;">Desmarcar todos</button>
+</div>
+<input type="text" id="campFiltroClientes" oninput="filtrarClientesLista()" placeholder="Filtrar por nome ou email..." style="width:100%;padding:7px 12px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+</div>
+<div id="campClientesList" style="max-height:250px;overflow-y:auto;padding:4px 0;"></div>
 </div>
 <div style="display:flex;gap:10px;margin-top:14px;">
 <button onclick="gerarComClientesSelecionados()" class="btn-navy" style="flex:1;padding:12px;font-size:14px;"><i class="bi bi-stars me-1"></i>Gerar Campanha</button>
@@ -736,6 +759,18 @@ async function buscarClientesElegiveis(){
 function toggleAllClientes(el){
     document.querySelectorAll(".cliente-check").forEach(c => c.checked = el.checked);
     updateSelecionados();
+}
+
+function marcarTodosClientes(marcar){
+    document.querySelectorAll(".cliente-check").forEach(c => { if(c.closest("label").style.display !== "none") c.checked = marcar; });
+    updateSelecionados();
+}
+
+function filtrarClientesLista(){
+    const termo = document.getElementById("campFiltroClientes").value.toLowerCase();
+    document.querySelectorAll("#campClientesList label").forEach(el => {
+        el.style.display = el.textContent.toLowerCase().includes(termo) ? "" : "none";
+    });
 }
 
 function updateSelecionados(){
