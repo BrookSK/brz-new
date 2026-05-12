@@ -2353,19 +2353,16 @@ JS;
                     </div>
                 </div>
                 
-                <form method="GET" class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <input type="text" class="form-control" name="busca" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                <form method="GET" class="row g-2 mb-4" id="pedidosFilterForm">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
                     </div>
-                    <div class="col-md-3">
-                        <select class="form-select" name="status">
+                    <div class="col-md-4">
+                        <select class="form-select" name="status" id="pedidosStatusSelect">
                             <option value="">Todos status</option>
                             ' . $this->buildStatusOptions($status) . '
                             <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
                         </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Filtrar</button>
                     </div>
                 </form>
                 
@@ -2837,6 +2834,22 @@ HTML;
             var btn = document.getElementById(tabMap[val]);
             if (btn) { btn.click(); }
         }
+        (function(){
+            var debounceTimer = null;
+            var form = document.getElementById("pedidosFilterForm");
+            var busca = document.getElementById("pedidosBuscaInput");
+            var status = document.getElementById("pedidosStatusSelect");
+            function submitFilter() { if (form) form.submit(); }
+            if (busca) {
+                busca.addEventListener("input", function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(submitFilter, 400);
+                });
+            }
+            if (status) {
+                status.addEventListener("change", submitFilter);
+            }
+        })();
         (function(){
             var modal = document.getElementById("modalLixeiraPedido");
             if(!modal) return;
