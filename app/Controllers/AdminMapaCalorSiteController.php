@@ -373,6 +373,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
     // RENDER PAGE
     // ============================================================
     private function renderPage(array $stats, array $topPages, array $topClicks, array $scrollData, array $funnel, Request $request, int $periodo): void {
+        $pdo = Database::getConnection();
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Mapa de Calor - Admin</title>
