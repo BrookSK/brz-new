@@ -99,7 +99,7 @@ class AdminEmailMarketingController extends Controller {
         // Campanhas list based on tab
         $campanhas = [];
         try {
-            $where = '1=1';
+            $where = "status != 'arquivada'";
             if ($tab === 'pendentes') $where = "status='pendente_revisao'";
             elseif ($tab === 'aprovadas') $where = "status IN ('aprovada','agendada')";
             elseif ($tab === 'agendadas') $where = "status='agendada'";
@@ -1408,26 +1408,36 @@ async function editarSegmento(id){
     document.getElementById("editSegId").value=s.id;
     document.getElementById("editSegNome").value=s.nome||"";
     document.getElementById("editSegDescricao").value=s.descricao||"";
-    document.getElementById("editSegGatilho").value=s.gatilho||"";
+    document.getElementById("editSegGatilho").value=s.gatilho||"automatico";
     document.getElementById("editSegTotal").value=s.total_clientes||0;
     document.getElementById("editSegCriterios").value=s.criterios||"";
-    // Load clients
-    var clientesHtml="<p style=\\"color:#94A3B8;font-size:12px;text-align:center;padding:12px;\\">Carregando clientes...</p>";
-    document.getElementById("editSegClientes").innerHTML=clientesHtml;
+    document.getElementById("editSegClientes").innerHTML="<div style=\\"padding:20px;text-align:center;color:#94A3B8;\\"><i class=\\"bi bi-arrow-repeat\\" style=\\"animation:spin 1s linear infinite;\\"></i> Carregando...</div>";
     document.getElementById("modalEditSeg").style.display="flex";
-    // Fetch clients for this segment
-    const rc=await fetch("/admin/email-marketing/segmento-clientes?id="+id);
-    const dc=await rc.json();
-    if(dc.success && dc.clientes && dc.clientes.length){
-        var html="<div style=\\"max-height:250px;overflow-y:auto;\\"><table style=\\"width:100%;border-collapse:collapse;font-size:12px;\\"><thead><tr style=\\"background:#FAFBFC;\\"><th style=\\"padding:8px;text-align:left;color:#94A3B8;font-size:11px;text-transform:uppercase;\\">Nome</th><th style=\\"padding:8px;text-align:left;color:#94A3B8;font-size:11px;text-transform:uppercase;\\">Email</th><th style=\\"padding:8px;text-align:left;color:#94A3B8;font-size:11px;text-transform:uppercase;\\">Última Compra</th><th style=\\"padding:8px;\\"></th></tr></thead><tbody>";
-        dc.clientes.forEach(c=>{
-            html+="<tr style=\\"border-bottom:1px solid #F1F5F9;\\"><td style=\\"padding:8px;\\">"+c.nome+"</td><td style=\\"padding:8px;color:#64748B;\\">"+c.email+"</td><td style=\\"padding:8px;color:#94A3B8;\\">"+(c.ultima_compra||"-")+"</td><td style=\\"padding:8px;\\"><button onclick=\\"removerClienteSegmento("+s.id+","+c.id+")\\" style=\\"border:none;background:none;color:#BE123C;cursor:pointer;font-size:14px;\\" title=\\"Remover\\">&times;</button></td></tr>";
-        });
-        html+="</tbody></table></div><div style=\\"padding:8px;font-size:11px;color:#94A3B8;border-top:1px solid #EBF0F6;\\">"+dc.clientes.length+" clientes no segmento</div>";
-        document.getElementById("editSegClientes").innerHTML=html;
+    carregarClientesSegmento(id);
+}
+async function carregarClientesSegmento(id){
+    const r=await fetch("/admin/email-marketing/segmento-clientes?id="+id);
+    const d=await r.json();
+    const wrap=document.getElementById("editSegClientes");
+    const countEl=document.getElementById("editSegClientesCount");
+    if(d.success && d.clientes && d.clientes.length){
+        countEl.textContent=d.clientes.length+" clientes";
+        wrap.innerHTML=d.clientes.map(c=>"<label class=\\"seg-cliente-item\\" style=\\"display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;font-size:12px;\\" onmouseover=\\"this.style.background=\'#F8FAFC\'\\" onmouseout=\\"this.style.background=\'\'\\">"+"<input type=\\"checkbox\\" class=\\"seg-cl-check\\" value=\\""+c.id+"\\" checked>"+"<span style=\\"flex:1;min-width:0;\\"><strong style=\\"display:block;font-size:13px;\\">"+c.nome+"</strong><span style=\\"color:#94A3B8;\\">"+c.email+"</span></span>"+"<span style=\\"color:#94A3B8;font-size:11px;white-space:nowrap;\\">"+(c.ultima_compra||"")+"</span></label>").join("");
     } else {
-        document.getElementById("editSegClientes").innerHTML="<p style=\\"color:#94A3B8;font-size:12px;text-align:center;padding:12px;\\">Nenhum cliente vinculado a este segmento.</p>";
+        countEl.textContent="0 clientes";
+        wrap.innerHTML="<div style=\\"padding:20px;text-align:center;color:#94A3B8;font-size:12px;\\">Nenhum cliente encontrado para este critério.</div>";
     }
+}
+async function recarregarClientesSegmento(){
+    var id=document.getElementById("editSegId").value;
+    if(id) carregarClientesSegmento(id);
+}
+function marcarTodosSegClientes(marcar){
+    document.querySelectorAll(".seg-cl-check").forEach(c=>{if(c.closest(".seg-cliente-item").style.display!=="none")c.checked=marcar;});
+}
+function filtrarSegClientes(){
+    var termo=document.getElementById("editSegClientesBusca").value.toLowerCase();
+    document.querySelectorAll(".seg-cliente-item").forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(termo)?"":"none";});
 }
 async function salvarSegmento(){
     const id=document.getElementById("editSegId").value;
@@ -1454,16 +1464,17 @@ async function removerClienteSegmento(segId, clienteId){
 
         // Modal editar segmento
         echo '<div id="modalEditSeg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
-<div style="background:#fff;border-radius:12px;max-width:500px;width:95%;max-height:90vh;overflow-y:auto;">
+<div style="background:#fff;border-radius:12px;max-width:600px;width:95%;max-height:90vh;overflow-y:auto;">
 <div style="background:var(--navy);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
-<h6 style="margin:0;font-size:15px;font-weight:700;">Editar Segmento</h6>
+<h6 style="margin:0;font-size:15px;font-weight:700;"><i class="bi bi-diagram-3 me-2"></i>Gerenciar Segmento</h6>
 <button onclick="document.getElementById(\'modalEditSeg\').style.display=\'none\'" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">&times;</button>
 </div>
 <div style="padding:20px;">
 <input type="hidden" id="editSegId">
-<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Nome</label><input type="text" id="editSegNome" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
-<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Descrição</label><textarea id="editSegDescricao" rows="3" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;resize:vertical;"></textarea></div>
-<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Gatilho</label><select id="editSegGatilho" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+<div><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Nome do Segmento</label><input type="text" id="editSegNome" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
+<div><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Critério de Seleção</label><select id="editSegGatilho" onchange="recarregarClientesSegmento()" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
 <option value="automatico">Automático (IA define)</option>
 <option value="primeira_compra">Primeira compra recente</option>
 <option value="sem_compra_30">Sem compra há 30 dias</option>
@@ -1481,15 +1492,28 @@ async function removerClienteSegmento(segId, clienteId){
 <option value="novo_cadastro">Novo cadastro (< 7 dias)</option>
 <option value="inativo_total">Inativo total (sem atividade)</option>
 </select></div>
-<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Total Clientes</label><input type="number" id="editSegTotal" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
-<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Critérios (JSON)</label><textarea id="editSegCriterios" rows="3" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;" readonly></textarea></div>
-<div style="margin-bottom:12px;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;">
-<div style="padding:8px 12px;background:#FAFBFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
-<label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;">Clientes do Segmento</label>
 </div>
-<div id="editSegClientes"></div>
+
+<div style="margin-bottom:16px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Descrição</label><textarea id="editSegDescricao" rows="2" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;resize:vertical;" placeholder="Descreva o objetivo deste segmento..."></textarea></div>
+<input type="hidden" id="editSegTotal">
+<input type="hidden" id="editSegCriterios">
+
+<div style="border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;margin-bottom:16px;">
+<div style="padding:10px 14px;background:#FAFBFC;border-bottom:1px solid #E2E8F0;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;">Clientes do Segmento</span>
+<span id="editSegClientesCount" style="font-size:12px;color:#18253D;font-weight:600;">0 clientes</span>
 </div>
-<button onclick="salvarSegmento()" style="width:100%;padding:10px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;"><i class="bi bi-check-lg me-1"></i>Salvar Alterações</button>
+<div style="display:flex;gap:6px;">
+<button type="button" onclick="marcarTodosSegClientes(true)" style="padding:3px 8px;border:1px solid #E2E8F0;border-radius:5px;background:#fff;font-size:10px;cursor:pointer;color:#18253D;font-weight:600;">Marcar todos</button>
+<button type="button" onclick="marcarTodosSegClientes(false)" style="padding:3px 8px;border:1px solid #E2E8F0;border-radius:5px;background:#fff;font-size:10px;cursor:pointer;color:#64748B;">Desmarcar</button>
+</div>
+<input type="text" id="editSegClientesBusca" oninput="filtrarSegClientes()" placeholder="Buscar por nome ou email..." style="width:100%;padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;margin-top:6px;">
+</div>
+<div id="editSegClientes" style="max-height:280px;overflow-y:auto;"></div>
+</div>
+
+<button onclick="salvarSegmento()" style="width:100%;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;"><i class="bi bi-check-lg me-1"></i>Salvar Segmento</button>
 </div></div></div>';
     }
 
