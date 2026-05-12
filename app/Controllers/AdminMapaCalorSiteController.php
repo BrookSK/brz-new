@@ -219,13 +219,26 @@ class AdminMapaCalorSiteController extends Controller {
 
         // Enriched behavioral data from cookies
         try {
-            $dados['dispositivos'] = $pdo->query("SELECT device_type, COUNT(*) AS total FROM visitor_sessions GROUP BY device_type")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            $dados['origens'] = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            $dados['scores'] = $pdo->query("SELECT classificacao, COUNT(*) AS total FROM visitor_scores GROUP BY classificacao")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            $dados['eventos_carrinho'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='add_to_cart'")->fetchColumn();
-            $dados['eventos_checkout'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='begin_checkout'")->fetchColumn();
-            $dados['exit_intents'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='exit_intent'")->fetchColumn();
-            $dados['buscas'] = $pdo->query("SELECT element_text, COUNT(*) AS total FROM behavior_events WHERE event_type='search_performed' GROUP BY element_text ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $stCheck = $pdo->query("SHOW TABLES LIKE 'visitor_sessions'");
+            if ($stCheck && $stCheck->fetchColumn()) {
+                $dados['dispositivos'] = $pdo->query("SELECT device_type, COUNT(*) AS total FROM visitor_sessions GROUP BY device_type")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $dados['origens'] = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {}
+        try {
+            $stCheck2 = $pdo->query("SHOW TABLES LIKE 'visitor_scores'");
+            if ($stCheck2 && $stCheck2->fetchColumn()) {
+                $dados['scores'] = $pdo->query("SELECT classificacao, COUNT(*) AS total FROM visitor_scores GROUP BY classificacao")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {}
+        try {
+            $stCheck3 = $pdo->query("SHOW TABLES LIKE 'behavior_events'");
+            if ($stCheck3 && $stCheck3->fetchColumn()) {
+                $dados['eventos_carrinho'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='add_to_cart'")->fetchColumn();
+                $dados['eventos_checkout'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='begin_checkout'")->fetchColumn();
+                $dados['exit_intents'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='exit_intent'")->fetchColumn();
+                $dados['buscas'] = $pdo->query("SELECT element_text, COUNT(*) AS total FROM behavior_events WHERE event_type='search_performed' AND element_text IS NOT NULL GROUP BY element_text ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
         } catch (\Exception $e) {}
 
         if (empty($dados['top_paginas'])) {
@@ -398,11 +411,14 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
                 $visitorStats['logados'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE usuario_id IS NOT NULL")->fetchColumn();
             } catch (\Exception $e) {}
             try {
-                $visitorStats['desktop'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='desktop'")->fetchColumn();
-                $visitorStats['mobile'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='mobile'")->fetchColumn();
-                $visitorStats['tablet'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='tablet'")->fetchColumn();
-                $origens = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                $visitorStats['origens'] = $origens;
+                $stCheck = $pdo->query("SHOW TABLES LIKE 'visitor_sessions'");
+                if ($stCheck && $stCheck->fetchColumn()) {
+                    $visitorStats['desktop'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='desktop'")->fetchColumn();
+                    $visitorStats['mobile'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='mobile'")->fetchColumn();
+                    $visitorStats['tablet'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='tablet'")->fetchColumn();
+                    $origens = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    $visitorStats['origens'] = $origens;
+                }
             } catch (\Exception $e) {}
 
             echo '<div class="section-card" style="border-left:3px solid #18253D;"><div class="section-body" style="padding:14px 18px;">
