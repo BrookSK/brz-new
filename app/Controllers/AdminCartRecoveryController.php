@@ -121,6 +121,41 @@ class AdminCartRecoveryController extends Controller {
         } catch (\Exception $e) {}
     }
 
+    public function detalhes(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin','vendedor']);
+        $pdo = Database::getConnection();
+        $id = (int)$request->getParam('id');
+        
+        // Get the cart recovery record
+        $st = $pdo->prepare("SELECT * FROM cart_recovery WHERE id = ?"); $st->execute([$id]);
+        $record = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$record) { echo json_encode(['success'=>false]); return; }
+
+        // Get cart items for this user
+        $uid = (int)$record['usuario_id'];
+        $itens = [];
+        try {
+            $nomeCol = 'nome';
+            $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
+
+            $sql = "SELECT ci.quantidade, ci.subtotal, p.{$nomeCol} AS nome
+                    FROM carrinho_items ci
+                    JOIN carrinhos c ON c.id = ci.carrinho_id
+                    JOIN produtos p ON p.id = ci.produto_id
+                    WHERE c.usuario_id = ?
+                    ORDER BY c.created_at DESC";
+            $st2 = $pdo->prepare($sql); $st2->execute([$uid]);
+            $itens = $st2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($itens as &$i) {
+                $i['subtotal'] = number_format((float)($i['subtotal'] ?? 0), 2, '.', ',');
+            }
+        } catch (\Exception $e) {}
+
+        echo json_encode(['success'=>true, 'itens'=>$itens]);
+    }
+
     public function atualizarStatus(Request $request) {
         header('Content-Type: application/json; charset=UTF-8');
         $auth = new AuthService(); $auth->requerPerfis(['admin','vendedor']);
@@ -231,9 +266,18 @@ class AdminCartRecoveryController extends Controller {
                 $data = !empty($r['detectado_em']) ? date('d/m H:i', strtotime($r['detectado_em'])) : '-';
 
                 echo '<tr style="border-bottom:1px solid #F1F5F9;">
-<td style="padding:12px 14px;"><strong>'.$nome.'</strong><br><small style="color:#94A3B8;">'.$email.'</small>'.($tel ? '<br><small style="color:#64748B;">'.$tel.'</small>' : '').'</td>
-<td style="padding:12px 14px;text-align:center;">'.(int)$r['itens_carrinho'].'</td>
-<td style="padding:12px 14px;text-align:center;font-weight:600;color:#18253D;">'.$valor.'</td>
+<td style="padding:12px 14px;">
+<div style="cursor:pointer;" onclick="this.parentElement.parentElement.nextElementSibling.style.display=this.parentElement.parentElement.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">
+<strong style="font-size:14px;">'.$nome.'</strong>
+<div style="margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;">
+<a href="tel:'.htmlspecialchars($r['cliente_telefone'] ?? '').'" style="color:#18253D;font-weight:600;font-size:13px;text-decoration:none;"><i class="bi bi-telephone-fill me-1"></i>'.($tel ?: 'Sem telefone').'</a>
+<a href="mailto:'.htmlspecialchars($r['cliente_email'] ?? '').'" style="color:#18253D;font-weight:600;font-size:13px;text-decoration:none;"><i class="bi bi-envelope-fill me-1"></i>'.$email.'</a>
+</div>
+<small style="color:#94A3B8;">▼ Clique para ver detalhes do carrinho</small>
+</div>
+</td>
+<td style="padding:12px 14px;text-align:center;font-weight:600;">'.(int)$r['itens_carrinho'].'</td>
+<td style="padding:12px 14px;text-align:center;font-weight:700;color:#18253D;">'.$valor.'</td>
 <td style="padding:12px 14px;text-align:center;color:#64748B;">'.$data.'</td>
 <td style="padding:12px 14px;text-align:center;"><span style="padding:3px 9px;border-radius:999px;font-size:11px;font-weight:500;background:'.$badge[1].';color:'.$badge[2].';">'.$badge[0].'</span></td>
 <td style="padding:12px 14px;text-align:center;">
@@ -244,6 +288,21 @@ class AdminCartRecoveryController extends Controller {
 <option value="perdido">Perdido</option>
 <option value="nao_retornou">Não Retornou</option>
 </select>
+</td></tr>
+<tr style="display:none;background:#FAFBFC;"><td colspan="6" style="padding:12px 20px;">
+<div style="font-size:12px;color:#64748B;" id="cart-detail-'.(int)$r['id'].'">Carregando itens...</div>
+<script>
+(function(){
+    fetch("/admin/cart-recovery/detalhes?id='.(int)$r['id'].'").then(r=>r.json()).then(d=>{
+        if(d.success && d.itens && d.itens.length){
+            var html="<table style=\\"width:100%;font-size:12px;border-collapse:collapse;\\"><tr style=\\"color:#94A3B8;\\"><th style=\\"padding:4px 8px;text-align:left;\\">Produto</th><th style=\\"padding:4px 8px;text-align:center;\\">Qtd</th><th style=\\"padding:4px 8px;text-align:right;\\">Valor</th></tr>";
+            d.itens.forEach(function(i){html+="<tr style=\\"border-top:1px solid #EBF0F6;\\"><td style=\\"padding:6px 8px;\\">"+i.nome+"</td><td style=\\"padding:6px 8px;text-align:center;\\">"+i.quantidade+"</td><td style=\\"padding:6px 8px;text-align:right;\\">US$ "+i.subtotal+"</td></tr>";});
+            html+="</table>";
+            document.getElementById("cart-detail-'.(int)$r['id'].'").innerHTML=html;
+        } else { document.getElementById("cart-detail-'.(int)$r['id'].'").innerHTML="<em>Sem itens no carrinho</em>"; }
+    }).catch(function(){document.getElementById("cart-detail-'.(int)$r['id'].'").innerHTML="<em>Erro ao carregar</em>";});
+})();
+</script>
 </td></tr>';
             }
             echo '</tbody></table></div></div>';

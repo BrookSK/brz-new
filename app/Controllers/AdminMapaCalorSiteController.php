@@ -402,40 +402,12 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 </div></div>';
         }
 
-        // Data sources info block + filters
+        // Data sources info block
         if ($stats['total_eventos'] > 0) {
-            // Get enriched stats
-            $visitorStats = ['anonimos'=>0,'logados'=>0,'desktop'=>0,'mobile'=>0,'tablet'=>0,'origens'=>[]];
-            try {
-                $visitorStats['anonimos'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE usuario_id IS NULL")->fetchColumn();
-                $visitorStats['logados'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE usuario_id IS NOT NULL")->fetchColumn();
-            } catch (\Exception $e) {}
-            try {
-                $stCheck = $pdo->query("SHOW TABLES LIKE 'visitor_sessions'");
-                if ($stCheck && $stCheck->fetchColumn()) {
-                    $visitorStats['desktop'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='desktop'")->fetchColumn();
-                    $visitorStats['mobile'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='mobile'")->fetchColumn();
-                    $visitorStats['tablet'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='tablet'")->fetchColumn();
-                    $origens = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                    $visitorStats['origens'] = $origens;
-                }
-            } catch (\Exception $e) {}
-
             echo '<div class="section-card" style="border-left:3px solid #18253D;"><div class="section-body" style="padding:14px 18px;">
 <div style="font-size:13px;font-weight:700;color:#18253D;margin-bottom:8px;"><i class="bi bi-info-circle me-1"></i>Informações consideradas nesta análise</div>
-<p style="font-size:12px;color:#64748B;margin-bottom:10px;">Esta análise usa dados de navegação e comportamento coletados por cookies (com consentimento), incluindo: origem do acesso, páginas visitadas, cliques, rolagem, tempo na página, produtos visualizados, eventos de carrinho e checkout.</p>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;font-size:12px;">
-<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['anonimos'].'</strong> <span style="color:#94A3B8;">visitantes anônimos</span></div>
-<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['logados'].'</strong> <span style="color:#94A3B8;">clientes logados</span></div>
-<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['desktop'].'</strong> <span style="color:#94A3B8;">desktop</span></div>
-<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['mobile'].'</strong> <span style="color:#94A3B8;">mobile</span></div>';
-            if (!empty($visitorStats['origens'])) {
-                foreach ($visitorStats['origens'] as $o) {
-                    echo '<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.(int)$o['total'].'</strong> <span style="color:#94A3B8;">via '.htmlspecialchars($o['utm_source']).'</span></div>';
-                }
-            }
-            echo '</div>
-<div style="margin-top:10px;font-size:11px;color:#94A3B8;"><i class="bi bi-cookie me-1"></i>Dados coletados com consentimento do visitante (cookies analíticos). Visitantes que recusaram cookies analíticos não são rastreados.</div>
+<p style="font-size:12px;color:#64748B;margin-bottom:6px;">Esta análise usa dados de navegação coletados por cookies (com consentimento): páginas visitadas, cliques, rolagem, tempo na página, produtos visualizados, eventos de carrinho e checkout.</p>
+<div style="font-size:11px;color:#94A3B8;"><i class="bi bi-cookie me-1"></i>Dados coletados com consentimento do visitante.</div>
 </div></div>';
         }
 

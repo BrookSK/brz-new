@@ -440,4 +440,5 @@ $router->post('/admin/mapa-calor-site/analise-ia', 'AdminMapaCalorSiteController
 
 // Recuperação de Carrinho
 $router->get('/admin/cart-recovery', 'AdminCartRecoveryController', 'index');
+$router->get('/admin/cart-recovery/detalhes', 'AdminCartRecoveryController', 'detalhes');
 $router->post('/admin/cart-recovery/status', 'AdminCartRecoveryController', 'atualizarStatus');
