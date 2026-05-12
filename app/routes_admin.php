@@ -418,6 +418,8 @@ $router->post('/admin/email-marketing/agendar', 'AdminEmailMarketingController',
 $router->post('/admin/email-marketing/gerar-segmentos', 'AdminEmailMarketingController', 'gerarSegmentos');
 $router->post('/admin/email-marketing/excluir-segmento', 'AdminEmailMarketingController', 'excluirSegmento');
 $router->get('/admin/email-marketing/segmento-detalhes', 'AdminEmailMarketingController', 'segmentoDetalhes');
+$router->get('/admin/email-marketing/segmento-clientes', 'AdminEmailMarketingController', 'segmentoClientes');
+$router->post('/admin/email-marketing/segmento-remover-cliente', 'AdminEmailMarketingController', 'segmentoRemoverCliente');
 $router->post('/admin/email-marketing/salvar-segmento', 'AdminEmailMarketingController', 'salvarSegmento');
 $router->get('/admin/email-marketing/detalhes', 'AdminEmailMarketingController', 'detalhes');
 $router->post('/admin/email-marketing/config', 'AdminEmailMarketingController', 'salvarConfig');

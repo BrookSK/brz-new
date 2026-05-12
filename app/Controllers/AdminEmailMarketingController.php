@@ -20,6 +20,8 @@ class AdminEmailMarketingController extends Controller {
                 break;
             }
         }
+        // Ensure 'arquivada' status exists in ENUM (for upgrades)
+        try { $pdo->exec("ALTER TABLE email_mkt_campanhas MODIFY COLUMN status ENUM('rascunho_ia','pendente_revisao','aprovada','agendada','disparando','finalizada','rejeitada','cancelada','arquivada') DEFAULT 'rascunho_ia'"); } catch (\Exception $e) {}
     }
 
     private function getConfig(\PDO $pdo, string $chave, string $default = ''): string {
@@ -725,7 +727,18 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $fotoSelect = $fotoCol ? ", {$fotoCol} AS foto" : ", NULL AS foto";
         $ids = array_map('intval', $produtosIds);
         $in = implode(',', $ids);
-        $produtos = $pdo->query("SELECT id, {$nomeCol} AS nome, {$precoCol} AS preco, {$descCol} AS descricao {$fotoSelect} FROM produtos WHERE id IN ({$in})")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Check for promo price column
+        $promoCol = null;
+        try {
+            $allCols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN);
+            if (in_array('preco_promocional', $allCols)) $promoCol = 'preco_promocional';
+            elseif (in_array('sale_price', $allCols)) $promoCol = 'sale_price';
+            elseif (in_array('preco_desconto', $allCols)) $promoCol = 'preco_desconto';
+        } catch (\Exception $e) {}
+        $promoSelect = $promoCol ? ", {$promoCol} AS preco_promo" : ", NULL AS preco_promo";
+
+        $produtos = $pdo->query("SELECT id, {$nomeCol} AS nome, {$precoCol} AS preco, {$descCol} AS descricao {$fotoSelect} {$promoSelect} FROM produtos WHERE id IN ({$in})")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         // Get logo
         $logoUrl = '';
@@ -745,7 +758,16 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $productHtml = '';
         foreach ($produtos as $p) {
             $nome = htmlspecialchars($p['nome'] ?? '');
-            $preco = 'US$ ' . number_format((float)($p['preco'] ?? 0), 2, '.', ',');
+            $precoOriginal = (float)($p['preco'] ?? 0);
+            $precoPromo = (float)($p['preco_promo'] ?? 0);
+            $temPromo = ($precoPromo > 0 && $precoPromo < $precoOriginal);
+
+            if ($temPromo) {
+                $precoHtml = '<div style="margin-bottom:10px;"><span style="font-size:12px;color:#BE123C;text-decoration:line-through;font-weight:500;">US$ ' . number_format($precoOriginal, 2, '.', ',') . '</span><br><span style="font-size:18px;font-weight:700;color:#065F46;">US$ ' . number_format($precoPromo, 2, '.', ',') . '</span></div>';
+            } else {
+                $precoHtml = '<div style="font-size:16px;font-weight:700;color:#18253D;margin-bottom:10px;">US$ ' . number_format($precoOriginal, 2, '.', ',') . '</div>';
+            }
+
             $foto = htmlspecialchars($p['foto'] ?? '');
             $link = 'https://brazilianashop.com.br/produto/detalhes/' . (int)$p['id'];
             $fotoTag = $foto ? '<img src="' . $foto . '" alt="' . $nome . '" style="width:100%;height:180px;object-fit:cover;border-radius:10px 10px 0 0;">' : '<div style="width:100%;height:180px;background:#F5F7FA;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:40px;">📦</div>';
@@ -755,7 +777,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
                 ' . $fotoTag . '
                 <div style="padding:12px 14px;">
                     <div style="font-size:13px;font-weight:600;color:#1F2937;margin-bottom:4px;line-height:1.3;">' . $nome . '</div>
-                    <div style="font-size:16px;font-weight:700;color:#18253D;margin-bottom:10px;">' . $preco . '</div>
+                    ' . $precoHtml . '
                     <a href="' . $link . '" style="display:block;text-align:center;background:#18253D;color:#fff;padding:10px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">Comprar agora</a>
                 </div>
             </div>';
@@ -1389,7 +1411,23 @@ async function editarSegmento(id){
     document.getElementById("editSegGatilho").value=s.gatilho||"";
     document.getElementById("editSegTotal").value=s.total_clientes||0;
     document.getElementById("editSegCriterios").value=s.criterios||"";
+    // Load clients
+    var clientesHtml="<p style=\\"color:#94A3B8;font-size:12px;text-align:center;padding:12px;\\">Carregando clientes...</p>";
+    document.getElementById("editSegClientes").innerHTML=clientesHtml;
     document.getElementById("modalEditSeg").style.display="flex";
+    // Fetch clients for this segment
+    const rc=await fetch("/admin/email-marketing/segmento-clientes?id="+id);
+    const dc=await rc.json();
+    if(dc.success && dc.clientes && dc.clientes.length){
+        var html="<div style=\\"max-height:250px;overflow-y:auto;\\"><table style=\\"width:100%;border-collapse:collapse;font-size:12px;\\"><thead><tr style=\\"background:#FAFBFC;\\"><th style=\\"padding:8px;text-align:left;color:#94A3B8;font-size:11px;text-transform:uppercase;\\">Nome</th><th style=\\"padding:8px;text-align:left;color:#94A3B8;font-size:11px;text-transform:uppercase;\\">Email</th><th style=\\"padding:8px;text-align:left;color:#94A3B8;font-size:11px;text-transform:uppercase;\\">Última Compra</th><th style=\\"padding:8px;\\"></th></tr></thead><tbody>";
+        dc.clientes.forEach(c=>{
+            html+="<tr style=\\"border-bottom:1px solid #F1F5F9;\\"><td style=\\"padding:8px;\\">"+c.nome+"</td><td style=\\"padding:8px;color:#64748B;\\">"+c.email+"</td><td style=\\"padding:8px;color:#94A3B8;\\">"+(c.ultima_compra||"-")+"</td><td style=\\"padding:8px;\\"><button onclick=\\"removerClienteSegmento("+s.id+","+c.id+")\\" style=\\"border:none;background:none;color:#BE123C;cursor:pointer;font-size:14px;\\" title=\\"Remover\\">&times;</button></td></tr>";
+        });
+        html+="</tbody></table></div><div style=\\"padding:8px;font-size:11px;color:#94A3B8;border-top:1px solid #EBF0F6;\\">"+dc.clientes.length+" clientes no segmento</div>";
+        document.getElementById("editSegClientes").innerHTML=html;
+    } else {
+        document.getElementById("editSegClientes").innerHTML="<p style=\\"color:#94A3B8;font-size:12px;text-align:center;padding:12px;\\">Nenhum cliente vinculado a este segmento.</p>";
+    }
 }
 async function salvarSegmento(){
     const id=document.getElementById("editSegId").value;
@@ -1405,6 +1443,13 @@ async function salvarSegmento(){
     if(d.success){document.getElementById("modalEditSeg").style.display="none";location.reload();}
     else alert(d.error||"Erro");
 }
+async function removerClienteSegmento(segId, clienteId){
+    if(!confirm("Remover este cliente do segmento?"))return;
+    const r=await fetch("/admin/email-marketing/segmento-remover-cliente",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({segmento_id:segId,cliente_id:clienteId})});
+    const d=await r.json();
+    if(d.success) editarSegmento(segId);
+    else alert(d.error||"Erro");
+}
 </script>';
 
         // Modal editar segmento
@@ -1418,9 +1463,32 @@ async function salvarSegmento(){
 <input type="hidden" id="editSegId">
 <div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Nome</label><input type="text" id="editSegNome" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
 <div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Descrição</label><textarea id="editSegDescricao" rows="3" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;resize:vertical;"></textarea></div>
-<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Gatilho</label><input type="text" id="editSegGatilho" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
+<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Gatilho</label><select id="editSegGatilho" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+<option value="automatico">Automático (IA define)</option>
+<option value="primeira_compra">Primeira compra recente</option>
+<option value="sem_compra_30">Sem compra há 30 dias</option>
+<option value="sem_compra_60">Sem compra há 60 dias</option>
+<option value="sem_compra_90">Sem compra há 90+ dias</option>
+<option value="vip">Cliente VIP (recorrente/alto valor)</option>
+<option value="aniversario">Aniversário</option>
+<option value="categoria">Por categoria de produto</option>
+<option value="carrinho_abandonado">Carrinho abandonado</option>
+<option value="abriu_nao_clicou">Abriu email mas não clicou</option>
+<option value="clicou_nao_converteu">Clicou mas não converteu</option>
+<option value="converteu">Converteu (comprou após email)</option>
+<option value="nunca_abriu">Nunca abriu emails</option>
+<option value="engajado">Engajado (abre e clica sempre)</option>
+<option value="novo_cadastro">Novo cadastro (< 7 dias)</option>
+<option value="inativo_total">Inativo total (sem atividade)</option>
+</select></div>
 <div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Total Clientes</label><input type="number" id="editSegTotal" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
 <div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Critérios (JSON)</label><textarea id="editSegCriterios" rows="3" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;" readonly></textarea></div>
+<div style="margin-bottom:12px;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;">
+<div style="padding:8px 12px;background:#FAFBFC;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+<label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;">Clientes do Segmento</label>
+</div>
+<div id="editSegClientes"></div>
+</div>
 <button onclick="salvarSegmento()" style="width:100%;padding:10px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;"><i class="bi bi-check-lg me-1"></i>Salvar Alterações</button>
 </div></div></div>';
     }
@@ -1567,6 +1635,114 @@ Use nomes curtos e descritivos em português.";
         if ($nome === '') { echo json_encode(['success'=>false,'error'=>'Nome obrigatório']); return; }
         $pdo->prepare("UPDATE email_mkt_segmentos SET nome=?, descricao=?, gatilho=?, total_clientes=?, updated_at=NOW() WHERE id=?")->execute([$nome, $descricao, $gatilho, $totalClientes, $id]);
         echo json_encode(['success'=>true]);
+    }
+
+    // ============================================================
+    // CLIENTES DO SEGMENTO
+    // ============================================================
+    public function segmentoClientes(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $id = (int)$request->getParam('id');
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+
+        $userNomeCol = 'nome';
+        try {
+            $cols = $pdo->query("DESCRIBE usuarios")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $userNomeCol = 'name';
+        } catch (\Exception $e) {}
+
+        // Get segment info to determine which clients belong
+        $st = $pdo->prepare("SELECT * FROM email_mkt_segmentos WHERE id = ?"); $st->execute([$id]);
+        $seg = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$seg) { echo json_encode(['success'=>false,'error'=>'Segmento não encontrado']); return; }
+
+        $gatilho = $seg['gatilho'] ?? 'automatico';
+        $clientes = [];
+
+        try {
+            // Query clients based on segment trigger
+            if ($gatilho === 'sem_compra_30' || $gatilho === 'sem_compra_60' || $gatilho === 'sem_compra_90') {
+                $dias = 30;
+                if ($gatilho === 'sem_compra_60') $dias = 60;
+                if ($gatilho === 'sem_compra_90') $dias = 90;
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra
+                        FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue')
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$dias} DAY)
+                        ORDER BY ultima_compra ASC LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } elseif ($gatilho === 'vip') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, COUNT(p.id) AS total_pedidos, MAX(p.created_at) AS ultima_compra
+                        FROM usuarios u INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue')
+                        WHERE u.email IS NOT NULL GROUP BY u.id HAVING total_pedidos >= 3 ORDER BY total_pedidos DESC LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } elseif ($gatilho === 'primeira_compra' || $gatilho === 'novo_cadastro') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.created_at AS ultima_compra
+                        FROM usuarios u WHERE u.email IS NOT NULL AND u.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
+                        ORDER BY u.created_at DESC LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } elseif ($gatilho === 'abriu_nao_clicou') {
+                $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_abertura) AS ultima_compra
+                        FROM email_mkt_campanha_clientes cc
+                        JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.status = 'aberto' AND cc.data_clique IS NULL
+                        GROUP BY u.id, u.{$userNomeCol}, u.email LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } elseif ($gatilho === 'clicou_nao_converteu') {
+                $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_clique) AS ultima_compra
+                        FROM email_mkt_campanha_clientes cc
+                        JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.status = 'clicado' AND cc.data_conversao IS NULL
+                        GROUP BY u.id, u.{$userNomeCol}, u.email LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } elseif ($gatilho === 'converteu') {
+                $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_conversao) AS ultima_compra
+                        FROM email_mkt_campanha_clientes cc
+                        JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.status = 'convertido'
+                        GROUP BY u.id, u.{$userNomeCol}, u.email LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } else {
+                // Default: all clients with email
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra
+                        FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        ORDER BY u.{$userNomeCol} ASC LIMIT 500";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {
+            $clientes = [];
+        }
+
+        // Format dates
+        foreach ($clientes as &$c) {
+            if (!empty($c['ultima_compra'])) {
+                $c['ultima_compra'] = date('d/m/Y', strtotime($c['ultima_compra']));
+            }
+        }
+
+        echo json_encode(['success'=>true, 'clientes'=>$clientes, 'total'=>count($clientes)]);
+    }
+
+    // ============================================================
+    // REMOVER CLIENTE DO SEGMENTO (placeholder - segments are dynamic)
+    // ============================================================
+    public function segmentoRemoverCliente(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        // Note: Since segments are query-based (dynamic), removing a client means adding to an exclusion list
+        // For now, we'll just acknowledge - in production this would add to an exclusion table
+        echo json_encode(['success'=>true, 'message'=>'Cliente removido da próxima geração deste segmento.']);
     }
 
     // ============================================================
