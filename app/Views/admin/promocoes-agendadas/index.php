@@ -19,9 +19,9 @@
     <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
-<!-- Calendário -->
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white fw-semibold"><i class="fas fa-calendar me-2"></i>Visualização em Calendário</div>
+<!-- Calendário (desktop only) -->
+<div class="card border-0 shadow-sm mb-4 d-none d-md-block">
+    <div class="card-header bg-white fw-semibold">Visualização em Calendário</div>
     <div class="card-body">
         <div id="calendario" style="min-height:500px;"></div>
     </div>
@@ -29,12 +29,13 @@
 
 <!-- Lista de Promoções -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white fw-semibold"><i class="fas fa-list me-2"></i>Todas as Promoções</div>
+    <div class="card-header bg-white fw-semibold">Todas as Promoções</div>
     <div class="card-body">
         <?php if (empty($promocoes)): ?>
             <div class="text-muted text-center py-4">Nenhuma promoção agendada ainda.</div>
         <?php else: ?>
-            <div class="table-responsive">
+            <!-- Desktop: Table -->
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-sm table-hover align-middle mb-0">
                     <thead>
                         <tr>
@@ -71,7 +72,7 @@
                             <td class="text-end">
                                 <?php if (in_array($p['status'], ['agendada', 'ativa'])): ?>
                                     <form method="POST" action="/admin/promocoes-agendadas/cancelar/<?= (int) $p['id'] ?>" class="d-inline" onsubmit="return confirm('Cancelar esta promoção? Os preços dos produtos serão restaurados.')">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i> Cancelar</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-times"></i></button>
                                     </form>
                                 <?php endif; ?>
                             </td>
@@ -79,6 +80,37 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+            <!-- Mobile: Cards -->
+            <div class="d-md-none">
+                <?php foreach ($promocoes as $p):
+                    $statusCor = match($p['status']) {
+                        'ativa' => 'success', 'agendada' => 'primary',
+                        'finalizada' => 'secondary', 'cancelada' => 'danger',
+                        default => 'secondary'
+                    };
+                ?>
+                <div class="card border-0 shadow-sm mb-2">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <div class="fw-semibold" style="word-break:break-word;"><?= htmlspecialchars($p['nome']) ?></div>
+                            <span class="badge bg-<?= $statusCor ?> ms-2"><?= ucfirst($p['status']) ?></span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 small text-muted">
+                            <span><span class="badge bg-info"><?= $p['desconto_tipo'] === 'percentual' ? $p['desconto_valor'] . '%' : 'US$ ' . number_format((float) $p['desconto_valor'], 2) ?></span></span>
+                            <span><?= (int) $p['total_produtos'] ?> produtos</span>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <?= date('d/m/Y H:i', strtotime($p['inicio'])) ?> → <?= date('d/m/Y H:i', strtotime($p['fim'])) ?>
+                        </div>
+                        <?php if (in_array($p['status'], ['agendada', 'ativa'])): ?>
+                            <form method="POST" action="/admin/promocoes-agendadas/cancelar/<?= (int) $p['id'] ?>" class="mt-2" onsubmit="return confirm('Cancelar esta promoção?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">Cancelar promoção</button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
         <?php endif; ?>
     </div>
