@@ -460,7 +460,7 @@ $(document).ready(function() {
                     var isClubeBlocked = produto.clube_only && !clubeAcesso;
                     var precoHtml = isClubeBlocked
                         ? '<span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>'
-                        : '<span class="h5 mb-0 text-primary">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
+                        : '<span class="h5 mb-0 text-primary" data-original-price="' + produto.valor + '" data-currency="' + (produto.moeda || 'USD') + '">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
                     var disponivel = parseInt(produto.estoque || 0) > 0;
                     var dispBadge = disponivel
                         ? '<span class="badge bg-success" style="font-size:10px;">Disponível</span>'
@@ -471,11 +471,12 @@ $(document).ready(function() {
                     html += `
                         <div class="carousel-item-card" style="min-width:260px;max-width:280px;flex-shrink:0;">
                             <div class="product-card card h-100">
-                                <div class="position-relative overflow-hidden">
+                                <div class="position-relative overflow-hidden" style="height:180px;background:#f8fafc;display:flex;align-items:center;justify-content:center;">
                                     <img src="${produto.foto_principal || '/uploads/produtos/placeholder.jpg'}" 
                                          alt="${produto.nome}" 
                                          class="product-image card-img-top"
-                                         onerror="this.src='/uploads/produtos/placeholder.jpg'">
+                                         style="width:100%;height:180px;object-fit:contain;"
+                                         onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\'width:100%;height:180px;display:flex;align-items:center;justify-content:center;color:#94A3B8;\'><i class=\'fas fa-image fa-2x\'></i></div>';">
                                 </div>
                                 <div class="card-body">
                                     <h6 class="card-title" style="font-size:13px;line-height:1.3;min-height:36px;">${produto.nome}</h6>
