@@ -387,7 +387,14 @@ class AdminDescricaoProdutosController extends Controller {
             'reprovado' => 'Reprovados',
             'erro' => 'Com erro'
         ];
-        echo '<nav class="filter-tabs mb-3"><ul class="nav">';
+        // Mobile: dropdown filter | Desktop: nav tabs
+        echo '<div class="d-md-none mb-3"><select class="form-select" onchange="window.location.href=\'?filtro=\'+this.value">';
+        foreach ($tabs as $key => $label) {
+            $sel = ($filtro === $key) ? ' selected' : '';
+            echo '<option value="' . $key . '"' . $sel . '>' . $label . '</option>';
+        }
+        echo '</select></div>';
+        echo '<nav class="filter-tabs mb-3 d-none d-md-block"><ul class="nav">';
         foreach ($tabs as $key => $label) {
             $active = ($filtro === $key) ? ' active' : '';
             echo '<li class="nav-item"><a class="nav-link' . $active . '" href="?filtro=' . $key . '">' . $label . '</a></li>';
@@ -396,16 +403,16 @@ class AdminDescricaoProdutosController extends Controller {
 
         // Action bar
         echo '<div class="d-flex gap-2 mb-3 flex-wrap" id="actionBar">
-<button class="btn btn-sm btn-primary" onclick="gerarSelecionados()" id="btnGerarSel" disabled><i class="fas fa-magic me-1"></i>Gerar selecionados</button>
-<button class="btn btn-sm btn-success" onclick="aprovarSelecionados()" id="btnAprovarSel" disabled><i class="fas fa-check me-1"></i>Aprovar selecionados</button>
-<button class="btn btn-sm btn-danger" onclick="reprovarSelecionados()" id="btnReprovarSel" disabled><i class="fas fa-times me-1"></i>Reprovar selecionados</button>
+<button class="btn btn-sm btn-primary" onclick="gerarSelecionados()" id="btnGerarSel" disabled><i class="fas fa-magic me-1"></i>Gerar</button>
+<button class="btn btn-sm btn-success" onclick="aprovarSelecionados()" id="btnAprovarSel" disabled><i class="fas fa-check me-1"></i>Aprovar</button>
+<button class="btn btn-sm btn-danger" onclick="reprovarSelecionados()" id="btnReprovarSel" disabled><i class="fas fa-times me-1"></i>Reprovar</button>
 <div id="progressArea" class="ms-3 align-self-center" style="display:none;min-width:200px;">
 <small class="text-muted" id="progressText">0/0</small>
 <div class="progress-bar-gen"><div class="fill" id="progressFill" style="width:0%"></div></div>
 </div></div>';
 
-        // Table
-        echo '<div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        // Desktop: Table
+        echo '<div class="card border-0 shadow-sm"><div class="table-responsive d-none d-md-block"><table class="table table-hover align-middle mb-0">
 <thead style="background:#f8f9fa;"><tr>
 <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
 <th style="width:50px;">Img</th>
@@ -439,7 +446,46 @@ class AdminDescricaoProdutosController extends Controller {
             echo '<tr id="row-' . $id . '"><td><input type="checkbox" class="row-check" value="' . $id . '" onchange="updateActionBar()"></td>';
             echo '<td>' . $fotoTag . '</td><td><strong>' . $nome . '</strong></td><td>' . $cat . '</td><td>' . $badge . '</td><td>' . $actions . '</td></tr>';
         }
-        echo '</tbody></table></div></div>';
+        echo '</tbody></table></div>';
+
+        // Mobile: Cards
+        echo '<div class="d-md-none p-2">';
+        if (empty($produtos)) {
+            echo '<div class="text-center text-muted py-4">Nenhum produto encontrado neste filtro.</div>';
+        }
+        foreach ($produtos as $p) {
+            $id = (int) $p['id'];
+            $nome = htmlspecialchars((string) ($p['nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $cat = htmlspecialchars((string) ($p['categoria'] ?? '-'), ENT_QUOTES, 'UTF-8');
+            $foto = !empty($p['foto']) ? htmlspecialchars($p['foto'], ENT_QUOTES, 'UTF-8') : '';
+            $status = $p['status_revisao'] ?? 'sem_descricao';
+            $statusLabels2 = ['sem_descricao'=>'Sem descrição','gerando'=>'Gerando...','pendente_revisao'=>'Pendente','aprovado'=>'Aprovado','reprovado'=>'Reprovado','erro'=>'Erro'];
+            $badge2 = '<span class="status-badge status-' . $status . '">' . ($statusLabels2[$status] ?? $status) . '</span>';
+
+            echo '<div class="card border-0 shadow-sm mb-2" id="mrow-' . $id . '"><div class="card-body py-2 px-3">';
+            echo '<div class="d-flex align-items-center gap-2">';
+            echo '<input type="checkbox" class="row-check" value="' . $id . '" onchange="updateActionBar()">';
+            if ($foto) {
+                echo '<img src="' . $foto . '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;" alt="">';
+            }
+            echo '<div style="flex:1;min-width:0;">';
+            echo '<div class="fw-semibold" style="word-break:break-word;font-size:13px;">' . $nome . '</div>';
+            echo '<div class="text-muted" style="font-size:11px;">' . $cat . '</div>';
+            echo '</div>';
+            echo $badge2;
+            echo '</div>';
+            // Actions
+            echo '<div class="d-flex gap-1 mt-2">';
+            if (in_array($status, ['sem_descricao','erro','reprovado'])) {
+                echo '<button class="btn btn-sm btn-outline-primary" onclick="gerarUm(' . $id . ')"><i class="fas fa-magic me-1"></i>Gerar</button>';
+            }
+            if (in_array($status, ['pendente_revisao','aprovado','reprovado','erro'])) {
+                echo '<button class="btn btn-sm btn-outline-secondary" onclick="revisarProduto(' . $id . ')"><i class="fas fa-eye me-1"></i>Revisar</button>';
+            }
+            echo '</div>';
+            echo '</div></div>';
+        }
+        echo '</div></div>';
 
         // Modal
         echo '<div class="modal fade" id="modalRevisar" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
