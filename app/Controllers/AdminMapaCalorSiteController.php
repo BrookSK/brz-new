@@ -92,13 +92,21 @@ class AdminMapaCalorSiteController extends Controller {
             $pdo = Database::getConnection();
             $this->ensureTable($pdo);
 
-            $sessionId = $data['session_id'] ?? (session_id() ?: md5($_SERVER['REMOTE_ADDR'] . ($_SERVER['HTTP_USER_AGENT'] ?? '')));
-            $usuarioId = $_SESSION['usuario_id'] ?? null;
+            $visitorId = substr((string)($data['visitor_id'] ?? ''), 0, 64);
+            $sessionId = substr((string)($data['session_id'] ?? ''), 0, 64);
+            if (!$visitorId) $visitorId = md5($_SERVER['REMOTE_ADDR'] . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+            if (!$sessionId) $sessionId = session_id() ?: $visitorId;
 
+            $usuarioId = null;
+            if (session_status() === PHP_SESSION_ACTIVE || @session_start()) {
+                $usuarioId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : null;
+            }
+
+            // Save to heatmap events (existing table)
             $st = $pdo->prepare("INSERT INTO site_heatmap_events (session_id, usuario_id, pagina, tipo, x, y, scroll_depth, tempo_segundos, elemento, viewport_width, viewport_height) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $st->execute([
                 $sessionId,
-                $usuarioId ? (int)$usuarioId : null,
+                $usuarioId,
                 substr((string)$data['pagina'], 0, 500),
                 $data['tipo'],
                 isset($data['x']) ? round((float)$data['x'], 1) : null,
@@ -109,6 +117,80 @@ class AdminMapaCalorSiteController extends Controller {
                 isset($data['vw']) ? (int)$data['vw'] : null,
                 isset($data['vh']) ? (int)$data['vh'] : null,
             ]);
+
+            // Save to behavior_events (enriched data)
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS behavior_events (id BIGINT AUTO_INCREMENT PRIMARY KEY, visitor_id VARCHAR(64), session_id VARCHAR(64), usuario_id INT DEFAULT NULL, event_type VARCHAR(50), page_url VARCHAR(500), page_type VARCHAR(50), product_id INT DEFAULT NULL, category_id INT DEFAULT NULL, element_text VARCHAR(255), metadata JSON, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_visitor(visitor_id), INDEX idx_event(event_type), INDEX idx_created(created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                
+                $eventType = $data['event_type'] ?? $data['tipo'];
+                $stBe = $pdo->prepare("INSERT INTO behavior_events (visitor_id, session_id, usuario_id, event_type, page_url, page_type, product_id, element_text, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stBe->execute([
+                    $visitorId,
+                    $sessionId,
+                    $usuarioId,
+                    $eventType,
+                    substr((string)$data['pagina'], 0, 500),
+                    $data['page_type'] ?? null,
+                    isset($data['product_id']) ? (int)$data['product_id'] : null,
+                    isset($data['elemento']) ? substr((string)$data['elemento'], 0, 255) : null,
+                    json_encode(array_intersect_key($data, array_flip(['utm_source','utm_medium','utm_campaign','device_type','referrer'])))
+                ]);
+            } catch (\Exception $e) {}
+
+            // Update/create visitor session
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS visitor_sessions (id BIGINT AUTO_INCREMENT PRIMARY KEY, visitor_id VARCHAR(64), session_id VARCHAR(64), usuario_id INT DEFAULT NULL, landing_page VARCHAR(500), referrer_url VARCHAR(500), utm_source VARCHAR(100), utm_medium VARCHAR(100), utm_campaign VARCHAR(200), device_type VARCHAR(20), pages_viewed INT DEFAULT 0, converted TINYINT(1) DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uk_session(session_id), INDEX idx_visitor(visitor_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                $stSess = $pdo->prepare("INSERT INTO visitor_sessions (visitor_id, session_id, usuario_id, landing_page, referrer_url, utm_source, utm_medium, utm_campaign, device_type, pages_viewed, last_activity_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW()) ON DUPLICATE KEY UPDATE pages_viewed = pages_viewed + 1, last_activity_at = NOW(), usuario_id = COALESCE(VALUES(usuario_id), usuario_id)");
+                $stSess->execute([
+                    $visitorId, $sessionId, $usuarioId,
+                    substr((string)$data['pagina'], 0, 500),
+                    substr((string)($data['referrer'] ?? ''), 0, 500),
+                    substr((string)($data['utm_source'] ?? ''), 0, 100),
+                    substr((string)($data['utm_medium'] ?? ''), 0, 100),
+                    substr((string)($data['utm_campaign'] ?? ''), 0, 200),
+                    $data['device_type'] ?? 'desktop'
+                ]);
+            } catch (\Exception $e) {}
+
+            // Update visitor score
+            try {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS visitor_scores (id INT AUTO_INCREMENT PRIMARY KEY, visitor_id VARCHAR(64) NOT NULL, usuario_id INT DEFAULT NULL, score INT DEFAULT 0, classificacao ENUM('frio','morno','quente','muito_quente') DEFAULT 'frio', ultima_visita DATETIME, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, UNIQUE KEY uk_visitor(visitor_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                $scoreAdd = 1; // pageview
+                $eventType = $data['event_type'] ?? $data['tipo'];
+                if ($eventType === 'product_view') $scoreAdd = 2;
+                elseif ($eventType === 'click') $scoreAdd = 1;
+                elseif ($eventType === 'add_to_cart') $scoreAdd = 6;
+                elseif ($eventType === 'begin_checkout') $scoreAdd = 8;
+                elseif ($eventType === 'purchase_completed') $scoreAdd = 15;
+
+                $pdo->prepare("INSERT INTO visitor_scores (visitor_id, usuario_id, score, ultima_visita) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE score = score + ?, usuario_id = COALESCE(VALUES(usuario_id), usuario_id), ultima_visita = NOW(), classificacao = CASE WHEN score + ? > 50 THEN 'muito_quente' WHEN score + ? > 25 THEN 'quente' WHEN score + ? > 10 THEN 'morno' ELSE 'frio' END")->execute([$visitorId, $usuarioId, $scoreAdd, $scoreAdd, $scoreAdd, $scoreAdd, $scoreAdd]);
+            } catch (\Exception $e) {}
+
+            // Link visitor to user if logged in
+            if ($usuarioId) {
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS visitor_customer_links (id INT AUTO_INCREMENT PRIMARY KEY, visitor_id VARCHAR(64), usuario_id INT, linked_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uk_vu(visitor_id, usuario_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                    $pdo->prepare("INSERT IGNORE INTO visitor_customer_links (visitor_id, usuario_id) VALUES (?, ?)")->execute([$visitorId, $usuarioId]);
+                } catch (\Exception $e) {}
+            }
+
+            // Save cookie consent if provided
+            if (($data['tipo'] ?? '') === 'consent') {
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS cookie_consents (id INT AUTO_INCREMENT PRIMARY KEY, visitor_id VARCHAR(64), usuario_id INT DEFAULT NULL, accepted_essential TINYINT(1) DEFAULT 1, accepted_analytics TINYINT(1) DEFAULT 0, accepted_marketing TINYINT(1) DEFAULT 0, policy_version VARCHAR(20) DEFAULT '1.0', ip_anonymized VARCHAR(45), user_agent VARCHAR(500), consented_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uk_visitor(visitor_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                    $ipAnon = preg_replace('/\.\d+$/', '.0', $_SERVER['REMOTE_ADDR'] ?? '');
+                    $pdo->prepare("INSERT INTO cookie_consents (visitor_id, usuario_id, accepted_essential, accepted_analytics, accepted_marketing, ip_anonymized, user_agent) VALUES (?, ?, 1, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE accepted_analytics=VALUES(accepted_analytics), accepted_marketing=VALUES(accepted_marketing), consented_at=NOW()")->execute([
+                        $visitorId, $usuarioId,
+                        !empty($data['consent_analytics']) ? 1 : 0,
+                        !empty($data['consent_marketing']) ? 1 : 0,
+                        $ipAnon,
+                        substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500)
+                    ]);
+                } catch (\Exception $e) {}
+            }
+
         } catch (\Exception $e) {}
 
         echo json_encode(['ok'=>true]);
@@ -133,6 +215,17 @@ class AdminMapaCalorSiteController extends Controller {
             $dados['scroll_abandono'] = $pdo->query("SELECT pagina, AVG(scroll_depth) AS scroll_medio FROM site_heatmap_events WHERE tipo='scroll' GROUP BY pagina ORDER BY scroll_medio ASC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             $dados['tempo_baixo'] = $pdo->query("SELECT pagina, AVG(tempo_segundos) AS tempo_medio FROM site_heatmap_events WHERE tipo='time_on_page' AND tempo_segundos IS NOT NULL GROUP BY pagina HAVING tempo_medio < 10 ORDER BY tempo_medio ASC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             $dados['total_sessoes'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events")->fetchColumn();
+        } catch (\Exception $e) {}
+
+        // Enriched behavioral data from cookies
+        try {
+            $dados['dispositivos'] = $pdo->query("SELECT device_type, COUNT(*) AS total FROM visitor_sessions GROUP BY device_type")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $dados['origens'] = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $dados['scores'] = $pdo->query("SELECT classificacao, COUNT(*) AS total FROM visitor_scores GROUP BY classificacao")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $dados['eventos_carrinho'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='add_to_cart'")->fetchColumn();
+            $dados['eventos_checkout'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='begin_checkout'")->fetchColumn();
+            $dados['exit_intents'] = (int)$pdo->query("SELECT COUNT(*) FROM behavior_events WHERE event_type='exit_intent'")->fetchColumn();
+            $dados['buscas'] = $pdo->query("SELECT element_text, COUNT(*) AS total FROM behavior_events WHERE event_type='search_performed' GROUP BY element_text ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
         if (empty($dados['top_paginas'])) {
@@ -192,6 +285,31 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         if ($perguntaUsuario !== '') {
             $userMsg .= "\n\nPERGUNTA DO PROPRIETÁRIO DA LOJA:\n" . $perguntaUsuario . "\n\nResponda focando nesta dúvida específica, usando os dados acima como base.";
         }
+
+        // Add enriched behavioral data
+        if (!empty($dados['dispositivos'])) {
+            $userMsg .= "\n\nDISPOSITIVOS (dados de cookies):\n";
+            foreach ($dados['dispositivos'] as $d) $userMsg .= "- " . $d['device_type'] . ": " . $d['total'] . " sessões\n";
+        }
+        if (!empty($dados['origens'])) {
+            $userMsg .= "\nORIGENS DO TRÁFEGO (UTM - cookies):\n";
+            foreach ($dados['origens'] as $o) $userMsg .= "- " . $o['utm_source'] . ": " . $o['total'] . " visitas\n";
+        }
+        if (!empty($dados['scores'])) {
+            $userMsg .= "\nSCORE COMPORTAMENTAL DOS VISITANTES (cookies):\n";
+            foreach ($dados['scores'] as $s) $userMsg .= "- " . $s['classificacao'] . ": " . $s['total'] . " visitantes\n";
+        }
+        if (($dados['eventos_carrinho'] ?? 0) > 0 || ($dados['eventos_checkout'] ?? 0) > 0) {
+            $userMsg .= "\nEVENTOS DE CONVERSÃO (cookies):\n";
+            $userMsg .= "- Adições ao carrinho: " . ($dados['eventos_carrinho'] ?? 0) . "\n";
+            $userMsg .= "- Inícios de checkout: " . ($dados['eventos_checkout'] ?? 0) . "\n";
+            $userMsg .= "- Intenções de sair: " . ($dados['exit_intents'] ?? 0) . "\n";
+        }
+        if (!empty($dados['buscas'])) {
+            $userMsg .= "\nBUSCAS REALIZADAS (cookies):\n";
+            foreach ($dados['buscas'] as $b) $userMsg .= "- \"" . ($b['element_text'] ?? '') . "\" (" . $b['total'] . "x)\n";
+        }
+        $userMsg .= "\n\n[NOTA: Dados marcados com (cookies) foram coletados via cookies analíticos com consentimento do visitante.]";
 
         $payload = json_encode(['model'=>$model, 'messages'=>[['role'=>'system','content'=>$systemPrompt],['role'=>'user','content'=>$userMsg]], 'temperature'=>0.7, 'max_tokens'=>2000]);
         $ch = curl_init('https://api.openai.com/v1/chat/completions');
@@ -268,6 +386,40 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 <i class="bi bi-info-circle" style="font-size:40px;color:#94A3B8;"></i>
 <h5 style="color:var(--navy);margin-top:16px;">Coletando dados...</h5>
 <p style="color:#64748B;max-width:500px;margin:8px auto;">O sistema está ativo e coletando informações sobre como seus clientes navegam no site. Os dados aparecerão aqui assim que houver visitas. Isso acontece automaticamente — não precisa fazer nada.</p>
+</div></div>';
+        }
+
+        // Data sources info block + filters
+        if ($stats['total_eventos'] > 0) {
+            // Get enriched stats
+            $visitorStats = ['anonimos'=>0,'logados'=>0,'desktop'=>0,'mobile'=>0,'tablet'=>0,'origens'=>[]];
+            try {
+                $visitorStats['anonimos'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE usuario_id IS NULL")->fetchColumn();
+                $visitorStats['logados'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE usuario_id IS NOT NULL")->fetchColumn();
+            } catch (\Exception $e) {}
+            try {
+                $visitorStats['desktop'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='desktop'")->fetchColumn();
+                $visitorStats['mobile'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='mobile'")->fetchColumn();
+                $visitorStats['tablet'] = (int)$pdo->query("SELECT COUNT(*) FROM visitor_sessions WHERE device_type='tablet'")->fetchColumn();
+                $origens = $pdo->query("SELECT utm_source, COUNT(*) AS total FROM visitor_sessions WHERE utm_source IS NOT NULL AND utm_source != '' GROUP BY utm_source ORDER BY total DESC LIMIT 5")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $visitorStats['origens'] = $origens;
+            } catch (\Exception $e) {}
+
+            echo '<div class="section-card" style="border-left:3px solid #18253D;"><div class="section-body" style="padding:14px 18px;">
+<div style="font-size:13px;font-weight:700;color:#18253D;margin-bottom:8px;"><i class="bi bi-info-circle me-1"></i>Informações consideradas nesta análise</div>
+<p style="font-size:12px;color:#64748B;margin-bottom:10px;">Esta análise usa dados de navegação e comportamento coletados por cookies (com consentimento), incluindo: origem do acesso, páginas visitadas, cliques, rolagem, tempo na página, produtos visualizados, eventos de carrinho e checkout.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;font-size:12px;">
+<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['anonimos'].'</strong> <span style="color:#94A3B8;">visitantes anônimos</span></div>
+<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['logados'].'</strong> <span style="color:#94A3B8;">clientes logados</span></div>
+<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['desktop'].'</strong> <span style="color:#94A3B8;">desktop</span></div>
+<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.$visitorStats['mobile'].'</strong> <span style="color:#94A3B8;">mobile</span></div>';
+            if (!empty($visitorStats['origens'])) {
+                foreach ($visitorStats['origens'] as $o) {
+                    echo '<div style="padding:8px;background:#F8FAFC;border-radius:6px;"><strong style="color:#18253D;">'.(int)$o['total'].'</strong> <span style="color:#94A3B8;">via '.htmlspecialchars($o['utm_source']).'</span></div>';
+                }
+            }
+            echo '</div>
+<div style="margin-top:10px;font-size:11px;color:#94A3B8;"><i class="bi bi-cookie me-1"></i>Dados coletados com consentimento do visitante (cookies analíticos). Visitantes que recusaram cookies analíticos não são rastreados.</div>
 </div></div>';
         }
 
