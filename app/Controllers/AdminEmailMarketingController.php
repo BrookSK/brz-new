@@ -1336,13 +1336,14 @@ async function arquivarCampanha(id){
 
     private function renderCampanhasTable(array $campanhas): void {
         if (empty($campanhas)) {
-            echo '<div class="section-card"><div class="section-body" style="text-align:center;padding:40px;"><i class="bi bi-envelope" style="font-size:40px;color:#94A3B8;"></i><p style="color:#94A3B8;margin-top:12px;">Nenhuma campanha encontrada. Clique em "Gerar Campanhas com IA" para começar.</p></div></div>';
+            echo '<div class="section-card"><div class="section-body" style="text-align:center;padding:40px;"><p style="color:#94A3B8;margin-top:12px;">Nenhuma campanha encontrada.</p></div></div>';
             return;
         }
         $statusMap = ['rascunho_ia'=>'st-rascunho','pendente_revisao'=>'st-pendente','aprovada'=>'st-aprovada','agendada'=>'st-agendada','disparando'=>'st-disparando','finalizada'=>'st-finalizada','rejeitada'=>'st-rejeitada','cancelada'=>'st-cancelada','arquivada'=>'st-cancelada'];
         $statusLabels = ['rascunho_ia'=>'Rascunho IA','pendente_revisao'=>'Pendente','aprovada'=>'Aprovada','agendada'=>'Agendada','disparando'=>'Disparando','finalizada'=>'Finalizada','rejeitada'=>'Rejeitada','cancelada'=>'Cancelada','arquivada'=>'Arquivada'];
 
-        echo '<div class="section-card"><div style="overflow-x:auto;"><table class="camp-table"><thead><tr><th>Campanha</th><th>Tipo</th><th>Status</th><th>Clientes</th><th>Enviados</th><th>Abertos</th><th>Data</th><th>Ações</th></tr></thead><tbody>';
+        // Desktop: Table
+        echo '<div class="section-card"><div class="d-none d-md-block" style="overflow-x:auto;"><table class="camp-table"><thead><tr><th>Campanha</th><th>Tipo</th><th>Status</th><th>Clientes</th><th>Enviados</th><th>Abertos</th><th>Data</th><th>Ações</th></tr></thead><tbody>';
         foreach ($campanhas as $c) {
             $st = $c['status'] ?? 'rascunho_ia';
             $badge = '<span class="status-pill '.($statusMap[$st]??'st-rascunho').'">'.($statusLabels[$st]??$st).'</span>';
@@ -1350,6 +1351,7 @@ async function arquivarCampanha(id){
             echo '<tr><td><strong>'.htmlspecialchars($c['nome']??'').'</strong><br><small style="color:#94A3B8;">'.htmlspecialchars($c['assunto']??'').'</small></td>';
             echo '<td>'.ucfirst(str_replace('_',' ',$c['tipo']??'')).'</td><td>'.$badge.'</td>';
             echo '<td>'.(int)$c['total_clientes'].'</td><td>'.(int)$c['total_enviado'].'</td><td>'.(int)$c['total_aberto'].'</td>';
+            echo '<td>'.$data.'</td>';
             $acoes = '<button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="verCampanha('.(int)$c['id'].')"><i class="bi bi-eye me-1"></i>Ver</button>';
             if (in_array($st, ['finalizada','cancelada','rejeitada'])) {
                 $acoes .= ' <button style="padding:4px 8px;font-size:11px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;cursor:pointer;color:#94A3B8;" onclick="arquivarCampanha('.(int)$c['id'].')" title="Arquivar"><i class="bi bi-archive"></i></button>';
@@ -1358,7 +1360,25 @@ async function arquivarCampanha(id){
             }
             echo '<td>'.$acoes.'</td></tr>';
         }
-        echo '</tbody></table></div></div>';
+        echo '</tbody></table></div>';
+
+        // Mobile: Cards
+        echo '<div class="d-md-none">';
+        foreach ($campanhas as $c) {
+            $st = $c['status'] ?? 'rascunho_ia';
+            $badge = '<span class="status-pill '.($statusMap[$st]??'st-rascunho').'">'.($statusLabels[$st]??$st).'</span>';
+            echo '<div class="border-bottom py-2" onclick="verCampanha('.(int)$c['id'].')" style="cursor:pointer;">
+<div class="d-flex justify-content-between align-items-start">
+<div style="min-width:0;flex:1;"><div class="fw-semibold small" style="word-break:break-word;">'.htmlspecialchars($c['nome']??'').'</div>
+<div class="text-muted" style="font-size:11px;word-break:break-word;">'.htmlspecialchars($c['assunto']??'').'</div></div>
+'.$badge.'</div>
+<div class="d-flex flex-wrap gap-2 mt-1" style="font-size:11px;">
+<span class="text-muted">'.ucfirst(str_replace('_',' ',$c['tipo']??'')).'</span>
+<span>'.(int)$c['total_clientes'].' clientes</span>
+<span>'.(int)$c['total_enviado'].' enviados</span>
+</div></div>';
+        }
+        echo '</div></div>';
     }
 
     private function renderSegmentosTab(\PDO $pdo): void {

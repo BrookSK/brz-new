@@ -1054,8 +1054,8 @@ function renderAdminSidebarStyles() {
             main h1, main h2, main h3 { font-size: 1.1rem !important; word-break: break-word; }
             main .card-header h5, main .card-header h6 { font-size: 0.85rem; }
             main .card-body { padding: 0.75rem; }
-            main table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; font-size: 11px; }
-            main table th, main table td { padding: 4px 6px; font-size: 11px; }
+            main table { font-size: 11px; width: 100% !important; }
+            main table th, main table td { padding: 4px 6px; font-size: 11px; white-space: normal !important; word-break: break-word; }
             main .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             main .btn:not(.btn-sm):not(.btn-lg) { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
             main .row > [class*="col-md-4"],

@@ -440,13 +440,13 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         // Top Pages
         echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Páginas Mais Acessadas</h2></div><div class="section-body">';
         if (!empty($topPages)) {
-            echo '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Página</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Acessos</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Visitantes</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Tempo na Página</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Até onde rolaram</th></tr></thead><tbody>';
+            echo '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Página</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Acessos</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;" class="d-none d-md-table-cell">Visitantes</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;" class="d-none d-md-table-cell">Tempo</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;" class="d-none d-md-table-cell">Scroll</th></tr></thead><tbody>';
             foreach ($topPages as $p) {
                 $tempo = $p['tempo_medio'] ? gmdate('i:s', (int)$p['tempo_medio']) : '-';
                 $scroll = $p['max_scroll'] ? $p['max_scroll'].'%' : '-';
-                echo '<tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:10px 14px;"><strong>'.htmlspecialchars($p['pagina']).'</strong></td><td style="padding:10px 14px;text-align:center;">'.(int)$p['visitas'].'</td><td style="padding:10px 14px;text-align:center;">'.(int)$p['sessoes_unicas'].'</td><td style="padding:10px 14px;text-align:center;">'.$tempo.'</td><td style="padding:10px 14px;text-align:center;">'.$scroll.'</td></tr>';
+                echo '<tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:10px 14px;word-break:break-all;"><strong>'.htmlspecialchars($p['pagina']).'</strong></td><td style="padding:10px 14px;text-align:center;">'.(int)$p['visitas'].'</td><td style="padding:10px 14px;text-align:center;" class="d-none d-md-table-cell">'.(int)$p['sessoes_unicas'].'</td><td style="padding:10px 14px;text-align:center;" class="d-none d-md-table-cell">'.$tempo.'</td><td style="padding:10px 14px;text-align:center;" class="d-none d-md-table-cell">'.$scroll.'</td></tr>';
             }
-            echo '</tbody></table></div>';
+            echo '</tbody></table>';
         } else {
             echo '<p style="color:#94A3B8;text-align:center;">Sem dados ainda.</p>';
         }
@@ -597,13 +597,13 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 
         echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title">Origem dos Visitantes (Cookies)</h2></div><div class="section-body">';
         if (!empty($origens)) {
-            echo '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Origem</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Dispositivo</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Sessões</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Visitantes Únicos</th></tr></thead><tbody>';
+            echo '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Origem</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;" class="d-none d-md-table-cell">Dispositivo</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Sessões</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;" class="d-none d-md-table-cell">Únicos</th></tr></thead><tbody>';
             foreach ($origens as $o) {
                 $deviceIcon = $o['device_type'] === 'mobile' ? '📱' : ($o['device_type'] === 'tablet' ? '📟' : '💻');
-                echo '<tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:10px 14px;font-weight:600;color:#18253D;">'.htmlspecialchars($o['origem']).'</td><td style="padding:10px 14px;text-align:center;">'.$deviceIcon.' '.ucfirst($o['device_type']).'</td><td style="padding:10px 14px;text-align:center;">'.(int)$o['total'].'</td><td style="padding:10px 14px;text-align:center;">'.(int)$o['visitantes'].'</td></tr>';
+                echo '<tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:10px 14px;font-weight:600;color:#18253D;word-break:break-word;">'.htmlspecialchars($o['origem']).'</td><td style="padding:10px 14px;text-align:center;" class="d-none d-md-table-cell">'.$deviceIcon.' '.ucfirst($o['device_type']).'</td><td style="padding:10px 14px;text-align:center;">'.(int)$o['total'].'</td><td style="padding:10px 14px;text-align:center;" class="d-none d-md-table-cell">'.(int)$o['visitantes'].'</td></tr>';
             }
-            echo '</tbody></table></div>';
-            echo '<div style="margin-top:10px;font-size:11px;color:#94A3B8;"><i class="bi bi-cookie me-1"></i>Dados obtidos via cookies analíticos com consentimento do visitante.</div>';
+            echo '</tbody></table>';
+            echo '<div style="margin-top:10px;font-size:11px;color:#94A3B8;">Dados obtidos via cookies analíticos com consentimento do visitante.</div>';
         } else {
             echo '<p style="color:#94A3B8;font-size:12px;">Dados de origem serão exibidos após visitantes aceitarem cookies analíticos.</p>';
         }
