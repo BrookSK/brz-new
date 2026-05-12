@@ -72,9 +72,11 @@ class AdminDescricaoProdutosController extends Controller {
         $model = $this->getChatGPTModel($pdo);
 
         if ($lang === 'en') {
-            $systemPrompt = "Create a short, clear and commercial product description for the product below. Use only the information provided. Do not invent brand, measurements, composition, warranty, origin, material or technical specifications that are not present. The description should be suitable for e-commerce, with natural, objective and professional language. Return only the description text, without title, without bullet points and without explanations.";
+            $systemPrompt = "Create a detailed, engaging and commercial product description in English for the product below. Write as if you were the manufacturer or an experienced e-commerce copywriter. The description should be 3-4 sentences, highlighting key features, benefits and use cases. Use only the information provided — do not invent specifications, materials, dimensions or technical details not present. Return only the description text, no title, no bullet points, no explanations.";
+        } elseif ($lang === 'translate_to_pt') {
+            $systemPrompt = "Traduza o texto abaixo para português do Brasil. Mantenha o mesmo tom comercial, a mesma quantidade de informação e o mesmo nível de detalhe. A tradução deve soar natural em português, como se fosse escrita originalmente nesse idioma. Retorne apenas o texto traduzido, sem explicações.";
         } else {
-            $systemPrompt = "Crie uma descrição curta, clara e comercial para o produto abaixo. Use apenas as informações fornecidas. Não invente marca, medidas, composição, garantia, origem, material ou especificações técnicas que não estejam presentes. A descrição deve ser adequada para e-commerce, com linguagem natural, objetiva e profissional. Retorne apenas o texto da descrição, sem título, sem tópicos e sem explicações.";
+            $systemPrompt = "Crie uma descrição detalhada, envolvente e comercial em português do Brasil para o produto abaixo. Escreva como se fosse o fabricante ou um copywriter experiente de e-commerce. A descrição deve ter 3-4 frases, destacando características principais, benefícios e usos. Use apenas as informações fornecidas — não invente especificações, materiais, dimensões ou detalhes técnicos não presentes. Retorne apenas o texto da descrição, sem título, sem tópicos e sem explicações.";
         }
 
         $payload = json_encode([
@@ -143,29 +145,27 @@ class AdminDescricaoProdutosController extends Controller {
         }
 
         // Build user message
-        $msg = "Nome: " . ($produto['nome'] ?? '');
-        if (!empty($produto['categoria'])) $msg .= "\nCategoria: " . $produto['categoria'];
+        $msg = "Product name: " . ($produto['nome'] ?? '');
+        if (!empty($produto['categoria'])) $msg .= "\nCategory: " . $produto['categoria'];
 
-        $result = $this->callChatGPT($pdo, $msg);
+        // Step 1: Generate English description first (products are American, better native context)
+        $resultEn = $this->callChatGPT($pdo, $msg, 'en');
 
-        if (isset($result['error'])) {
-            $pdo->prepare("UPDATE produto_descricoes_ia SET status_revisao='erro', erro_geracao=?, data_geracao=NOW() WHERE produto_id=?")->execute([$result['error'], $produtoId]);
-            echo json_encode(['success' => false, 'error' => $result['error']]);
+        if (isset($resultEn['error'])) {
+            $pdo->prepare("UPDATE produto_descricoes_ia SET status_revisao='erro', erro_geracao=?, data_geracao=NOW() WHERE produto_id=?")->execute([$resultEn['error'], $produtoId]);
+            echo json_encode(['success' => false, 'error' => $resultEn['error']]);
             return;
         }
 
-        $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_gerada=?, status_revisao='pendente_revisao', erro_geracao=NULL, data_geracao=NOW() WHERE produto_id=?")->execute([$result['text'], $produtoId]);
+        $descEn = $resultEn['text'];
 
-        // Generate English version
-        $msgEn = "Product name: " . ($produto['nome'] ?? '');
-        if (!empty($produto['categoria'])) $msgEn .= "\nCategory: " . $produto['categoria'];
-        $resultEn = $this->callChatGPT($pdo, $msgEn, 'en');
-        $descEn = $resultEn['text'] ?? '';
-        if ($descEn !== '') {
-            $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_gerada_en=? WHERE produto_id=?")->execute([$descEn, $produtoId]);
-        }
+        // Step 2: Translate English description to Portuguese (ensures same quality/content)
+        $resultPt = $this->callChatGPT($pdo, $descEn, 'translate_to_pt');
+        $descPt = isset($resultPt['text']) ? $resultPt['text'] : $descEn; // fallback to EN if translation fails
 
-        echo json_encode(['success' => true, 'descricao' => $result['text'], 'descricao_en' => $descEn, 'produto_id' => $produtoId]);
+        $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_gerada=?, descricao_gerada_en=?, status_revisao='pendente_revisao', erro_geracao=NULL, data_geracao=NOW() WHERE produto_id=?")->execute([$descPt, $descEn, $produtoId]);
+
+        echo json_encode(['success' => true, 'descricao' => $descPt, 'descricao_en' => $descEn, 'produto_id' => $produtoId]);
     }
 
     public function gerarLote(Request $request) {
