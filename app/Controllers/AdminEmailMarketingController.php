@@ -475,7 +475,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         echo '<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
 <div><h1 style="font-size:20px;font-weight:700;color:var(--navy);margin:0;">Automações de Email Marketing</h1>
 <small style="color:#64748B;">Campanhas inteligentes geradas por IA</small></div>
-<button class="btn-navy" onclick="document.getElementById('modalNovaCampanha').style.display='flex'"><i class="bi bi-plus-lg me-1"></i>Nova Campanha</button>
+<button class="btn-navy" onclick="document.getElementById(\'modalNovaCampanha\').style.display=\'flex\'"><i class="bi bi-plus-lg me-1"></i>Nova Campanha</button>
 </div>';
 
         // KPI Cards
