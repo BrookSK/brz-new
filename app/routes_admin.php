@@ -410,6 +410,8 @@ $router->post('/admin/email-marketing/transcrever', 'AdminEmailMarketingControll
 $router->get('/admin/email-marketing/buscar-usuarios', 'AdminEmailMarketingController', 'buscarUsuarios');
 $router->post('/admin/email-marketing/aprovar', 'AdminEmailMarketingController', 'aprovar');
 $router->post('/admin/email-marketing/rejeitar', 'AdminEmailMarketingController', 'rejeitar');
+$router->post('/admin/email-marketing/excluir', 'AdminEmailMarketingController', 'excluir');
+$router->post('/admin/email-marketing/arquivar', 'AdminEmailMarketingController', 'arquivar');
 $router->post('/admin/email-marketing/disparar', 'AdminEmailMarketingController', 'disparar');
 $router->post('/admin/email-marketing/agendar', 'AdminEmailMarketingController', 'agendar');
 $router->post('/admin/email-marketing/gerar-segmentos', 'AdminEmailMarketingController', 'gerarSegmentos');

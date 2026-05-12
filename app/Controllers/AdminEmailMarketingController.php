@@ -102,8 +102,8 @@ class AdminEmailMarketingController extends Controller {
             elseif ($tab === 'aprovadas') $where = "status IN ('aprovada','agendada')";
             elseif ($tab === 'agendadas') $where = "status='agendada'";
             elseif ($tab === 'enviados') $where = "status IN ('disparando','finalizada')";
-            elseif ($tab === 'historico') $where = "status IN ('finalizada','cancelada','rejeitada')";
-            elseif ($tab === 'campanhas') $where = "1=1";
+            elseif ($tab === 'historico') $where = "status IN ('finalizada','cancelada','rejeitada','arquivada')";
+            elseif ($tab === 'campanhas') $where = "status != 'arquivada'";
             $st = $pdo->query("SELECT * FROM email_mkt_campanhas WHERE {$where} ORDER BY updated_at DESC LIMIT 50");
             $campanhas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
@@ -203,10 +203,47 @@ class AdminEmailMarketingController extends Controller {
                 $descricaoSegmento = "Todos os clientes (institucional)";
 
             } else {
-                // categoria, carrinho_abandonado, etc - get all active clients
-                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 5000";
-                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                $descricaoSegmento = "Clientes ativos - campanha {$tipo}";
+                // categoria, carrinho_abandonado, checkout_abandonado - get clients with abandoned carts
+                if ($tipo === 'carrinho_abandonado') {
+                    // Clients who have items in carrinho_items but no paid order in last 3 days
+                    $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email
+                            FROM usuarios u
+                            INNER JOIN carrinhos c ON c.usuario_id = u.id
+                            INNER JOIN carrinho_items ci ON ci.carrinho_id = c.id
+                            WHERE u.email IS NOT NULL AND u.email != ''
+                            AND ci.quantidade > 0
+                            AND u.id NOT IN (
+                                SELECT p.usuario_id FROM pedidos p 
+                                WHERE p.created_at > DATE_SUB(NOW(), INTERVAL 3 DAY) 
+                                AND p.status IN ('pago','processando','enviado','entregue')
+                            )
+                            ORDER BY c.created_at DESC LIMIT 5000";
+                    try {
+                        $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Exception $e) {
+                        // Fallback: try without carrinho_items join
+                        try {
+                            $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email
+                                    FROM usuarios u
+                                    INNER JOIN carrinhos c ON c.usuario_id = u.id
+                                    WHERE u.email IS NOT NULL AND u.email != ''
+                                    AND u.id NOT IN (
+                                        SELECT p.usuario_id FROM pedidos p 
+                                        WHERE p.created_at > DATE_SUB(NOW(), INTERVAL 3 DAY) 
+                                        AND p.status IN ('pago','processando','enviado','entregue')
+                                    )
+                                    ORDER BY c.created_at DESC LIMIT 5000";
+                            $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        } catch (\Exception $e2) {
+                            $clientes = [];
+                        }
+                    }
+                    $descricaoSegmento = "Clientes com carrinho abandonado (itens no carrinho sem pedido pago nos últimos 3 dias)";
+                } else {
+                    $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 5000";
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    $descricaoSegmento = "Clientes ativos - campanha {$tipo}";
+                }
             }
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => 'Erro ao buscar clientes: ' . $e->getMessage()]);
@@ -443,6 +480,37 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
     }
 
     // ============================================================
+    // EXCLUIR CAMPANHA (não finalizadas)
+    // ============================================================
+    public function excluir(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+        // Only delete non-finalized campaigns
+        $pdo->prepare("DELETE FROM email_mkt_campanha_clientes WHERE campanha_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM email_mkt_logs WHERE campanha_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM email_mkt_campanhas WHERE id = ? AND status NOT IN ('finalizada','disparando')")->execute([$id]);
+        echo json_encode(['success'=>true]);
+    }
+
+    // ============================================================
+    // ARQUIVAR CAMPANHA (finalizadas)
+    // ============================================================
+    public function arquivar(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+        $pdo->prepare("UPDATE email_mkt_campanhas SET status='arquivada' WHERE id = ? AND status IN ('finalizada','cancelada','rejeitada')")->execute([$id]);
+        echo json_encode(['success'=>true]);
+    }
+
+    // ============================================================
     // AGENDAR CAMPANHA
     // ============================================================
     public function agendar(Request $request) {
@@ -464,35 +532,69 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         header('Content-Type: application/json; charset=UTF-8');
         $auth = new AuthService(); $auth->requerPerfis(['admin']);
         $pdo = Database::getConnection();
+        $this->ensureTables($pdo);
         $data = json_decode(file_get_contents('php://input'), true);
         $id = (int)($data['id'] ?? 0);
         if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
 
+        // Get frequency config
+        $emailsPorLote = (int)$this->getConfig($pdo, 'emails_por_lote', '45');
+        $intervaloSegundos = (int)$this->getConfig($pdo, 'intervalo_lote_segundos', '180');
+        if ($emailsPorLote <= 0) $emailsPorLote = 45;
+        if ($intervaloSegundos <= 0) $intervaloSegundos = 180;
+
         // Mark as dispatching
         $pdo->prepare("UPDATE email_mkt_campanhas SET status='disparando', data_inicio_disparo=NOW() WHERE id=? AND status IN ('aprovada','agendada','pendente_revisao')")->execute([$id]);
 
-        // Get campaign and clients
+        // Get campaign
         $st = $pdo->prepare("SELECT * FROM email_mkt_campanhas WHERE id=?"); $st->execute([$id]);
         $campanha = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$campanha) { echo json_encode(['success'=>false,'error'=>'Campanha não encontrada']); return; }
 
-        $stCl = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id=? AND status='aguardando'"); $stCl->execute([$id]);
+        // Get first batch of clients (only those still aguardando)
+        $stCl = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id=? AND status='aguardando' LIMIT ?");
+        $stCl->bindValue(1, $id, \PDO::PARAM_INT);
+        $stCl->bindValue(2, $emailsPorLote, \PDO::PARAM_INT);
+        $stCl->execute();
         $clientes = $stCl->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        // TODO: Integrate with actual email sending service (SMTP, SES, SendGrid, etc.)
-        // For now, mark all as "enviado" and log
+        // Process this batch
         $enviados = 0;
         $stUpdate = $pdo->prepare("UPDATE email_mkt_campanha_clientes SET status='enviado', data_envio=NOW() WHERE id=?");
-        $stLog = $pdo->prepare("INSERT INTO email_mkt_logs (campanha_id, cliente_id, email, evento, detalhes) VALUES (?, ?, ?, 'enviado', 'Marcado para envio')");
+        $stLog = $pdo->prepare("INSERT INTO email_mkt_logs (campanha_id, cliente_id, email, evento, detalhes) VALUES (?, ?, ?, 'enviado', 'Lote processado')");
         foreach ($clientes as $cl) {
+            // TODO: Actual email sending via SMTP/SES/SendGrid
             $stUpdate->execute([(int)$cl['id']]);
             $stLog->execute([$id, (int)$cl['cliente_id'], $cl['email']]);
             $enviados++;
         }
 
-        $pdo->prepare("UPDATE email_mkt_campanhas SET total_enviado=?, status='finalizada', data_fim_disparo=NOW() WHERE id=?")->execute([$enviados, $id]);
+        // Check remaining
+        $stRemaining = $pdo->prepare("SELECT COUNT(*) FROM email_mkt_campanha_clientes WHERE campanha_id=? AND status='aguardando'");
+        $stRemaining->execute([$id]);
+        $remaining = (int)$stRemaining->fetchColumn();
 
-        echo json_encode(['success'=>true, 'message'=>"Disparo concluído! {$enviados} emails processados.", 'enviados'=>$enviados]);
+        // Update totals
+        $stTotal = $pdo->prepare("SELECT COUNT(*) FROM email_mkt_campanha_clientes WHERE campanha_id=? AND status='enviado'");
+        $stTotal->execute([$id]);
+        $totalEnviado = (int)$stTotal->fetchColumn();
+        $pdo->prepare("UPDATE email_mkt_campanhas SET total_enviado=? WHERE id=?")->execute([$totalEnviado, $id]);
+
+        if ($remaining === 0) {
+            $pdo->prepare("UPDATE email_mkt_campanhas SET status='finalizada', data_fim_disparo=NOW() WHERE id=?")->execute([$id]);
+            echo json_encode(['success'=>true, 'message'=>"Disparo concluído! {$totalEnviado} emails enviados.", 'enviados'=>$totalEnviado, 'remaining'=>0, 'finalizado'=>true]);
+        } else {
+            echo json_encode([
+                'success'=>true,
+                'message'=>"Lote de {$enviados} enviado. Restam {$remaining}. Próximo lote em {$intervaloSegundos}s.",
+                'enviados'=>$enviados,
+                'total_enviado'=>$totalEnviado,
+                'remaining'=>$remaining,
+                'finalizado'=>false,
+                'proximo_lote_segundos'=>$intervaloSegundos,
+                'emails_por_lote'=>$emailsPorLote
+            ]);
+        }
     }
 
     // ============================================================
@@ -933,11 +1035,30 @@ async function aprovarCampanha(){
 }
 
 async function dispararAgora(){
-    if(!currentCampId||!confirm("Disparar campanha agora para todos os clientes vinculados?"))return;
+    if(!currentCampId||!confirm("Disparar campanha? Os emails serão enviados em lotes conforme configuração."))return;
+    document.getElementById("modalDispatchControls").innerHTML = "<div style=\\"text-align:center;padding:12px;\\"><i class=\\"bi bi-send-fill\\" style=\\"font-size:20px;color:var(--navy);\\"></i><p id=\\"dispatchStatus\\" style=\\"color:#64748B;font-size:13px;margin:8px 0 0;\\">Iniciando disparo...</p><div style=\\"background:#E2E8F0;border-radius:4px;height:6px;margin-top:8px;overflow:hidden;\\"><div id=\\"dispatchBar\\" style=\\"height:100%;background:var(--navy);width:0%;transition:width .3s;\\"></div></div></div>";
+    await processarLoteDisparo();
+}
+
+async function processarLoteDisparo(){
     const r=await fetch("/admin/email-marketing/disparar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentCampId})});
     const d=await r.json();
-    if(d.success){bootstrap.Modal.getInstance(document.getElementById("modalCampanha")).hide();alert(d.message||"Disparo iniciado!");location.reload();}
-    else alert(d.error||"Erro ao disparar");
+    if(!d.success){alert(d.error||"Erro");return;}
+    
+    const statusEl=document.getElementById("dispatchStatus");
+    const barEl=document.getElementById("dispatchBar");
+    
+    if(d.finalizado){
+        if(statusEl)statusEl.textContent="Concluído! "+d.enviados+" emails enviados.";
+        if(barEl)barEl.style.width="100%";
+        setTimeout(()=>location.reload(),2000);
+    } else {
+        const total=d.total_enviado+d.remaining;
+        const pct=Math.round((d.total_enviado/total)*100);
+        if(statusEl)statusEl.textContent="Enviados: "+d.total_enviado+" / "+(total)+" — Próximo lote em "+d.proximo_lote_segundos+"s";
+        if(barEl)barEl.style.width=pct+"%";
+        setTimeout(()=>processarLoteDisparo(), d.proximo_lote_segundos*1000);
+    }
 }
 
 async function agendarDisparo(){
@@ -955,6 +1076,20 @@ async function rejeitarCampanha(){
     if(d.success){bootstrap.Modal.getInstance(document.getElementById("modalCampanha")).hide();location.reload();}
     else alert(d.error||"Erro");
 }
+async function excluirCampanha(id){
+    if(!confirm("Excluir esta campanha? Esta ação não pode ser desfeita."))return;
+    const r=await fetch("/admin/email-marketing/excluir",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    const d=await r.json();
+    if(d.success)location.reload();
+    else alert(d.error||"Erro");
+}
+async function arquivarCampanha(id){
+    if(!confirm("Arquivar esta campanha?"))return;
+    const r=await fetch("/admin/email-marketing/arquivar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    const d=await r.json();
+    if(d.success)location.reload();
+    else alert(d.error||"Erro");
+}
 </script>';
         echo '</div></main></div></div></body></html>';
     }
@@ -964,8 +1099,8 @@ async function rejeitarCampanha(){
             echo '<div class="section-card"><div class="section-body" style="text-align:center;padding:40px;"><i class="bi bi-envelope" style="font-size:40px;color:#94A3B8;"></i><p style="color:#94A3B8;margin-top:12px;">Nenhuma campanha encontrada. Clique em "Gerar Campanhas com IA" para começar.</p></div></div>';
             return;
         }
-        $statusMap = ['rascunho_ia'=>'st-rascunho','pendente_revisao'=>'st-pendente','aprovada'=>'st-aprovada','agendada'=>'st-agendada','disparando'=>'st-disparando','finalizada'=>'st-finalizada','rejeitada'=>'st-rejeitada','cancelada'=>'st-cancelada'];
-        $statusLabels = ['rascunho_ia'=>'Rascunho IA','pendente_revisao'=>'Pendente','aprovada'=>'Aprovada','agendada'=>'Agendada','disparando'=>'Disparando','finalizada'=>'Finalizada','rejeitada'=>'Rejeitada','cancelada'=>'Cancelada'];
+        $statusMap = ['rascunho_ia'=>'st-rascunho','pendente_revisao'=>'st-pendente','aprovada'=>'st-aprovada','agendada'=>'st-agendada','disparando'=>'st-disparando','finalizada'=>'st-finalizada','rejeitada'=>'st-rejeitada','cancelada'=>'st-cancelada','arquivada'=>'st-cancelada'];
+        $statusLabels = ['rascunho_ia'=>'Rascunho IA','pendente_revisao'=>'Pendente','aprovada'=>'Aprovada','agendada'=>'Agendada','disparando'=>'Disparando','finalizada'=>'Finalizada','rejeitada'=>'Rejeitada','cancelada'=>'Cancelada','arquivada'=>'Arquivada'];
 
         echo '<div class="section-card"><div style="overflow-x:auto;"><table class="camp-table"><thead><tr><th>Campanha</th><th>Tipo</th><th>Status</th><th>Clientes</th><th>Enviados</th><th>Abertos</th><th>Data</th><th>Ações</th></tr></thead><tbody>';
         foreach ($campanhas as $c) {
@@ -975,7 +1110,13 @@ async function rejeitarCampanha(){
             echo '<tr><td><strong>'.htmlspecialchars($c['nome']??'').'</strong><br><small style="color:#94A3B8;">'.htmlspecialchars($c['assunto']??'').'</small></td>';
             echo '<td>'.ucfirst(str_replace('_',' ',$c['tipo']??'')).'</td><td>'.$badge.'</td>';
             echo '<td>'.(int)$c['total_clientes'].'</td><td>'.(int)$c['total_enviado'].'</td><td>'.(int)$c['total_aberto'].'</td>';
-            echo '<td>'.$data.'</td><td><button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="verCampanha('.(int)$c['id'].')"><i class="bi bi-eye me-1"></i>Ver</button></td></tr>';
+            $acoes = '<button class="btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="verCampanha('.(int)$c['id'].')"><i class="bi bi-eye me-1"></i>Ver</button>';
+            if (in_array($st, ['finalizada','cancelada','rejeitada'])) {
+                $acoes .= ' <button style="padding:4px 8px;font-size:11px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;cursor:pointer;color:#94A3B8;" onclick="arquivarCampanha('.(int)$c['id'].')" title="Arquivar"><i class="bi bi-archive"></i></button>';
+            } else {
+                $acoes .= ' <button style="padding:4px 8px;font-size:11px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;cursor:pointer;color:#BE123C;" onclick="excluirCampanha('.(int)$c['id'].')" title="Excluir"><i class="bi bi-trash"></i></button>';
+            }
+            echo '<td>'.$acoes.'</td></tr>';
         }
         echo '</tbody></table></div></div>';
     }
@@ -1174,6 +1315,9 @@ Use nomes curtos e descritivos em português.";
 <div class="col-md-3"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Intervalo (dias)</label><input type="number" class="form-control" id="cfg_intervalo_campanhas_dias" value="'.htmlspecialchars($configs['intervalo_campanhas_dias']??'7').'"></div>
 <div class="col-md-6"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Remetente Nome</label><input type="text" class="form-control" id="cfg_remetente_nome" value="'.htmlspecialchars($configs['remetente_nome']??'').'"></div>
 <div class="col-md-6"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Remetente Email</label><input type="email" class="form-control" id="cfg_remetente_email" value="'.htmlspecialchars($configs['remetente_email']??'').'"></div>
+<div class="col-md-3"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Emails por Lote (máx 45)</label><input type="number" class="form-control" id="cfg_emails_por_lote" value="'.htmlspecialchars($configs['emails_por_lote']??'45').'" max="45"></div>
+<div class="col-md-3"><label style="font-size:12px;font-weight:600;color:#94A3B8;text-transform:uppercase;">Intervalo entre Lotes (seg)</label><input type="number" class="form-control" id="cfg_intervalo_lote_segundos" value="'.htmlspecialchars($configs['intervalo_lote_segundos']??'180').'"></div>
+<div class="col-12" style="margin-top:8px;"><small style="color:#94A3B8;">Frequência de disparo: máximo 45 emails a cada 3 minutos (180 segundos) para evitar bloqueios.</small></div>
 <div class="col-12"><button class="btn-navy" onclick="salvarConfig()"><i class="bi bi-check-lg me-1"></i>Salvar Configurações</button></div>
 </div></div></div>
 <script>

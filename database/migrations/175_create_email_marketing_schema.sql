@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS email_mkt_campanhas (
     tipo ENUM('reativacao','aniversario','pos_venda','categoria','vip','institucional','recompra','carrinho_abandonado') DEFAULT 'reativacao',
     gatilho VARCHAR(100) DEFAULT NULL,
     segmento_id INT DEFAULT NULL,
-    status ENUM('rascunho_ia','pendente_revisao','aprovada','agendada','disparando','finalizada','rejeitada','cancelada') DEFAULT 'rascunho_ia',
+    status ENUM('rascunho_ia','pendente_revisao','aprovada','agendada','disparando','finalizada','rejeitada','cancelada','arquivada') DEFAULT 'rascunho_ia',
     assunto VARCHAR(255) DEFAULT NULL,
     pre_header VARCHAR(255) DEFAULT NULL,
     html_content LONGTEXT DEFAULT NULL,
@@ -103,7 +103,9 @@ INSERT IGNORE INTO email_mkt_config (chave, valor) VALUES
 ('remetente_nome', 'Braziliana'),
 ('remetente_email', 'contato@brazilianashop.com.br'),
 ('velocidade_envio', '10'),
-('limite_por_lote', '50');
+('limite_por_lote', '50'),
+('emails_por_lote', '45'),
+('intervalo_lote_segundos', '180');
 
 -- Controle anti-duplicação
 CREATE TABLE IF NOT EXISTS email_mkt_envio_controle (
