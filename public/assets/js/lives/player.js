@@ -370,6 +370,13 @@ function escapeHtml(text) {
 
 // ─── Inicialização ──────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    // Se está usando iframe do Cloudflare, não precisa do player JS
+    var liveVideo = document.getElementById('liveVideo');
+    if (liveVideo && liveVideo.tagName === 'IFRAME') {
+        console.log('Using Cloudflare iframe player');
+        return;
+    }
+
     if (IS_ACTIVE || RECORDING_URL) {
         initPlayer();
     }

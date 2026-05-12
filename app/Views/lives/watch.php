@@ -17,8 +17,32 @@ ob_start();
     <div class="live-player-wrapper mb-4">
         <div class="live-video-container position-relative" style="border-radius:16px;overflow:hidden;background:#000;aspect-ratio:9/16;max-height:70vh;margin:0 auto;max-width:400px">
             <?php if ($isActive): ?>
+                <?php
+                // Extrair o UID do live input da playback URL para montar o iframe
+                $cfUid = '';
+                if (!empty($playbackUrl)) {
+                    // URL formato: https://customer-xxx.cloudflarestream.com/UUID/webRTC/play
+                    if (preg_match('#cloudflarestream\.com/([a-f0-9]+)/#', $playbackUrl, $m)) {
+                        $cfUid = $m[1];
+                    }
+                }
+                // Fallback: pegar do cf_live_input_id
+                if (empty($cfUid) && !empty($live['cf_live_input_id'])) {
+                    $cfUid = $live['cf_live_input_id'];
+                }
+                ?>
+                <?php if (!empty($cfUid)): ?>
+                <iframe
+                    id="liveVideo"
+                    src="https://customer-4ecvlnu8p8fla6ag.cloudflarestream.com/<?= htmlspecialchars($cfUid) ?>/iframe"
+                    style="border:none;position:absolute;top:0;left:0;height:100%;width:100%;"
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                    allowfullscreen="true">
+                </iframe>
+                <?php else: ?>
                 <video id="liveVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;background:#000"></video>
-                <?php if (empty($playbackUrl)): ?>
+                <?php endif; ?>
+                <?php if (empty($playbackUrl) && empty($cfUid)): ?>
                     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#fff;z-index:2">
                         <div class="mb-2"><span class="badge bg-danger" style="animation:pulse 2s infinite;font-size:14px"><i class="fas fa-circle me-1" style="font-size:8px"></i> AO VIVO</span></div>
                         <p class="text-white-50 small">Conectando ao stream...</p>
