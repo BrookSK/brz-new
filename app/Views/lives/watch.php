@@ -34,8 +34,8 @@ ob_start();
                 <?php if (!empty($cfUid)): ?>
                 <iframe
                     id="liveVideo"
-                    src="https://customer-4ecvlnu8p8fla6ag.cloudflarestream.com/<?= htmlspecialchars($cfUid) ?>/iframe"
-                    style="border:none;position:absolute;top:0;left:0;height:100%;width:100%;"
+                    src="https://customer-4ecvlnu8p8fla6ag.cloudflarestream.com/<?= htmlspecialchars($cfUid) ?>/iframe?autoplay=true&muted=true&controls=false&preload=auto"
+                    style="border:none;position:absolute;top:0;left:0;height:100%;width:100%;pointer-events:none;"
                     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                     allowfullscreen="true">
                 </iframe>
