@@ -435,3 +435,4 @@ $router->get('/email-track/check-conversions', 'EmailTrackController', 'checkCon
 $router->get('/admin/mapa-calor-site', 'AdminMapaCalorSiteController', 'index');
 $router->post('/admin/mapa-calor-site/collect', 'AdminMapaCalorSiteController', 'collect');
 $router->get('/admin/mapa-calor-site/dados-pagina', 'AdminMapaCalorSiteController', 'dadosPagina');
+$router->post('/admin/mapa-calor-site/analise-ia', 'AdminMapaCalorSiteController', 'analiseIA');
