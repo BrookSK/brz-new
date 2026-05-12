@@ -127,6 +127,7 @@ class AdminEmailMarketingController extends Controller {
         $usuarioIndividualId = (int)($input['usuario_id'] ?? 0);
         $apenasBuscar = !empty($input['apenas_buscar']);
         $clienteIdsSelecionados = $input['cliente_ids'] ?? null;
+        $segmentoIds = $input['segmento_ids'] ?? [];
 
         $diasRecompra = (int)$this->getConfig($pdo, 'dias_recompra_minimo', '30');
         $nomeLoja = 'Braziliana';
@@ -275,11 +276,13 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         }
 
         // Create campaign
-        $st = $pdo->prepare("INSERT INTO email_mkt_campanhas (nome, tipo, gatilho, status, assunto, pre_header, variaveis_ia, total_clientes, observacoes_ia) VALUES (?, ?, ?, 'pendente_revisao', ?, ?, ?, ?, ?)");
+        $segmentoIdForCamp = !empty($segmentoIds) ? (int)$segmentoIds[0] : null;
+        $st = $pdo->prepare("INSERT INTO email_mkt_campanhas (nome, tipo, gatilho, segmento_id, status, assunto, pre_header, variaveis_ia, total_clientes, observacoes_ia) VALUES (?, ?, ?, ?, 'pendente_revisao', ?, ?, ?, ?, ?)");
         $st->execute([
             "{$tipoLabel} - " . date('d/m'),
             $tipo,
             $gatilho,
+            $segmentoIdForCamp,
             $content['assunto'] ?? 'Campanha',
             $content['pre_header'] ?? '',
             json_encode($content, JSON_UNESCAPED_UNICODE),
@@ -631,6 +634,21 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 <div id="campIndividualSelecionado" style="margin-top:6px;font-size:12px;color:#065F46;display:none;"></div>
 </div>
 
+<div style="margin-bottom:16px;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Segmento (opcional - vincular a segmentos existentes)</label>
+<select id="campSegmento" multiple size="4" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">';
+
+        // Load segments for select
+        $segmentosAtivos = [];
+        try { $segmentosAtivos = $pdo->query("SELECT id, nome, total_clientes FROM email_mkt_segmentos WHERE ativo = 1 ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
+        foreach ($segmentosAtivos as $sa) {
+            echo '<option value="'.(int)$sa['id'].'">'.htmlspecialchars($sa['nome']).' ('.(int)$sa['total_clientes'].' clientes)</option>';
+        }
+
+        echo '</select>
+<small style="color:#94A3B8;font-size:11px;">Segure Ctrl para selecionar múltiplos. Deixe vazio para usar o tipo como critério.</small>
+</div>
+
 <div id="campCategoriaWrap" style="margin-bottom:16px;display:none;">
 <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Categoria</label>
 <input type="text" id="campCategoria" placeholder="Ex: snacks, beleza, limpeza..." style="width:100%;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
@@ -779,6 +797,8 @@ async function buscarClientesElegiveis(){
     const tipo = document.getElementById("campTipo").value;
     const categoria = document.getElementById("campCategoria").value.trim();
     const individualId = document.getElementById("campIndividualId").value;
+    const segmentoSelect = document.getElementById("campSegmento");
+    const segmentoIds = [...segmentoSelect.selectedOptions].map(o => parseInt(o.value));
     
     if(tipo === "individual" && !individualId){
         alert("Selecione um usuário para campanha individual.");
@@ -787,7 +807,7 @@ async function buscarClientesElegiveis(){
     
     document.getElementById("campProgress").style.display = "block";
     
-    const body = JSON.stringify({tipo, categoria, usuario_id: individualId || null, apenas_buscar: true});
+    const body = JSON.stringify({tipo, categoria, usuario_id: individualId || null, segmento_ids: segmentoIds, apenas_buscar: true});
     const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
     const d = await r.json();
     
@@ -849,10 +869,12 @@ async function gerarComClientesSelecionados(){
     const tipo = document.getElementById("campTipo").value;
     const instrucoes = document.getElementById("campInstrucoes").value.trim();
     const categoria = document.getElementById("campCategoria").value.trim();
+    const segmentoSelect = document.getElementById("campSegmento");
+    const segmentoIds = [...segmentoSelect.selectedOptions].map(o => parseInt(o.value));
     
     document.getElementById("campProgress").style.display = "block";
     
-    const body = JSON.stringify({tipo, instrucoes, categoria, cliente_ids: ids});
+    const body = JSON.stringify({tipo, instrucoes, categoria, cliente_ids: ids, segmento_ids: segmentoIds});
     const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
     const d = await r.json();
     
@@ -961,7 +983,7 @@ async function rejeitarCampanha(){
     private function renderSegmentosTab(\PDO $pdo): void {
         // Get existing segments
         $segmentos = [];
-        try { $segmentos = $pdo->query("SELECT * FROM email_mkt_segmentos ORDER BY updated_at DESC")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
+        try { $segmentos = $pdo->query("SELECT * FROM email_mkt_segmentos WHERE ativo = 1 ORDER BY updated_at DESC")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
 
         echo '<div class="d-flex justify-content-between align-items-center mb-3">
 <h6 style="color:var(--navy);font-weight:700;margin:0;">Segmentações Inteligentes</h6>
@@ -973,15 +995,24 @@ async function rejeitarCampanha(){
         if (empty($segmentos)) {
             echo '<div class="section-card"><div class="section-body" style="text-align:center;padding:40px;"><i class="bi bi-diagram-3" style="font-size:40px;color:#94A3B8;"></i><p style="color:#94A3B8;margin-top:12px;">Nenhum segmento criado. Clique em "Gerar Segmentos com IA" para analisar seus clientes.</p></div></div>';
         } else {
-            echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">';
+            echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">';
             foreach ($segmentos as $seg) {
-                echo '<div class="section-card" style="margin-bottom:0;"><div style="padding:16px;">
-<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">'.htmlspecialchars($seg['nome']).'</div>
+                $criterios = json_decode($seg['criterios'] ?? '{}', true);
+                $criterioText = $criterios['criterio'] ?? $criterios['descricao'] ?? ($seg['gatilho'] ?? '-');
+                echo '<div class="section-card" style="margin-bottom:0;" id="seg-'.(int)$seg['id'].'"><div style="padding:16px;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+<div style="font-size:14px;font-weight:700;color:var(--navy);">'.htmlspecialchars($seg['nome']).'</div>
+<div style="display:flex;gap:4px;">
+<button onclick="excluirSegmento('.(int)$seg['id'].')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E2E8F0;background:#fff;cursor:pointer;color:#BE123C;font-size:12px;" title="Excluir"><i class="bi bi-trash"></i></button>
+</div>
+</div>
 <div style="font-size:12px;color:#64748B;margin-bottom:8px;">'.htmlspecialchars($seg['descricao'] ?? '').'</div>
+<div style="font-size:11px;color:#94A3B8;margin-bottom:8px;padding:6px 8px;background:#F8FAFC;border-radius:6px;"><strong>Critério:</strong> '.htmlspecialchars(is_string($criterioText) ? $criterioText : json_encode($criterioText)).'</div>
 <div style="display:flex;gap:12px;font-size:12px;">
 <span style="color:#18253D;font-weight:600;"><i class="bi bi-people me-1"></i>'.(int)$seg['total_clientes'].' clientes</span>
-<span style="color:#94A3B8;">'.($seg['gatilho'] ?? 'automático').'</span>
-</div></div></div>';
+<span style="color:#94A3B8;">'.htmlspecialchars($seg['gatilho'] ?? 'automático').'</span>
+</div>
+</div></div>';
             }
             echo '</div>';
         }
@@ -994,6 +1025,13 @@ async function gerarSegmentosIA(){
     document.getElementById("segProgress").style.display="none";
     if(d.success){alert(d.message||"Segmentos gerados!");location.reload();}
     else alert(d.error||"Erro ao gerar segmentos");
+}
+async function excluirSegmento(id){
+    if(!confirm("Excluir este segmento?"))return;
+    const r=await fetch("/admin/email-marketing/excluir-segmento",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    const d=await r.json();
+    if(d.success){document.getElementById("seg-"+id).remove();}
+    else alert(d.error||"Erro");
 }
 </script>';
     }
@@ -1073,67 +1111,53 @@ Use nomes curtos e descritivos em português.";
             return;
         }
 
-        // Save segments and generate campaigns for each
+        // Save segments (with versioning - never overwrite existing)
         $criados = 0;
-        $campanhasCriadas = 0;
-        $stInsert = $pdo->prepare("INSERT INTO email_mkt_segmentos (nome, descricao, tipo, gatilho, criterios, total_clientes) VALUES (?, ?, 'automatico', ?, ?, ?)");
+        $stInsert = $pdo->prepare("INSERT INTO email_mkt_segmentos (nome, descricao, tipo, gatilho, criterios, total_clientes, ativo) VALUES (?, ?, 'automatico', ?, ?, ?, 1)");
         
-        $nomeLoja = 'Braziliana';
-        try { $st2 = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'loja_nome' OR (categoria='loja' AND chave='nome') LIMIT 1"); $st2->execute(); $v = $st2->fetchColumn(); if ($v) $nomeLoja = $v; } catch (\Exception $e) {}
-        $tom = $this->getConfig($pdo, 'tom_marca', 'humanizado, elegante, conversacional');
-        $palavrasProibidas = $this->getConfig($pdo, 'palavras_proibidas', '');
-
         foreach ($segmentos as $seg) {
             if (empty($seg['nome'])) continue;
+            
+            // Check if similar segment exists - if so, create as V2
+            $stCheck = $pdo->prepare("SELECT id, nome FROM email_mkt_segmentos WHERE nome LIKE ? AND ativo = 1 ORDER BY id DESC LIMIT 1");
+            $baseName = $seg['nome'];
+            $stCheck->execute(['%' . $baseName . '%']);
+            $existing = $stCheck->fetch(\PDO::FETCH_ASSOC);
+            
+            $finalName = $baseName;
+            if ($existing) {
+                // Find next version
+                $stVer = $pdo->prepare("SELECT COUNT(*) FROM email_mkt_segmentos WHERE nome LIKE ?");
+                $stVer->execute(['%' . $baseName . '%']);
+                $ver = (int)$stVer->fetchColumn() + 1;
+                $finalName = $baseName . ' (V' . $ver . ')';
+            }
+            
             $stInsert->execute([
-                $seg['nome'],
+                $finalName,
                 $seg['descricao'] ?? '',
                 $seg['gatilho'] ?? 'automatico',
-                json_encode($seg['criterio'] ?? $seg, JSON_UNESCAPED_UNICODE),
+                json_encode($seg, JSON_UNESCAPED_UNICODE),
                 (int)($seg['total_estimado'] ?? 0)
             ]);
-            $segmentoId = (int)$pdo->lastInsertId();
             $criados++;
-
-            // Generate a campaign for this segment (pendente_revisao)
-            $segNome = $seg['nome'];
-            $segDesc = $seg['descricao'] ?? '';
-            
-            $campSystemPrompt = "Você é um especialista em email marketing. Gere o conteúdo de uma campanha para o segmento: '{$segNome}' ({$segDesc}).
-Tom: {$tom}. Palavras proibidas: {$palavrasProibidas}.
-NÃO crie descontos, cupons ou promoções. NÃO use urgência falsa.
-Retorne em JSON: {\"assunto\": \"...\", \"pre_header\": \"...\", \"tag_campanha\": \"...\", \"titulo_email\": \"...\", \"subtitulo_email\": \"...\", \"paragrafo_1\": \"...\", \"paragrafo_2\": \"...\", \"texto_destaque\": \"...\", \"paragrafo_fechamento\": \"...\", \"texto_cta\": \"...\", \"texto_sub_cta\": \"...\"}
-Assunto máx 50 chars. Corpo 120-220 palavras.";
-
-            $campResult = $this->callAI($pdo, $campSystemPrompt, "Loja: {$nomeLoja}\nSegmento: {$segNome}\nDescrição: {$segDesc}\nClientes estimados: " . (int)($seg['total_estimado'] ?? 0));
-            
-            if (!isset($campResult['error'])) {
-                $campContent = json_decode($campResult['text'], true);
-                if (!$campContent) { preg_match('/\{.*\}/s', $campResult['text'], $m2); if (!empty($m2[0])) $campContent = json_decode($m2[0], true); }
-                
-                if ($campContent && isset($campContent['assunto'])) {
-                    $stCamp = $pdo->prepare("INSERT INTO email_mkt_campanhas (nome, tipo, gatilho, segmento_id, status, assunto, pre_header, variaveis_ia, total_clientes, observacoes_ia) VALUES (?, 'reativacao', ?, ?, 'pendente_revisao', ?, ?, ?, ?, ?)");
-                    $stCamp->execute([
-                        $segNome . ' - ' . date('d/m'),
-                        $seg['gatilho'] ?? 'segmento_ia',
-                        $segmentoId,
-                        $campContent['assunto'] ?? '',
-                        $campContent['pre_header'] ?? '',
-                        json_encode($campContent, JSON_UNESCAPED_UNICODE),
-                        (int)($seg['total_estimado'] ?? 0),
-                        "Campanha gerada automaticamente para segmento: {$segNome}. {$segDesc}"
-                    ]);
-                    $campId = (int)$pdo->lastInsertId();
-
-                    // Build HTML
-                    $html = $this->buildEmailHtml($campContent, $nomeLoja);
-                    $pdo->prepare("UPDATE email_mkt_campanhas SET html_content = ? WHERE id = ?")->execute([$html, $campId]);
-                    $campanhasCriadas++;
-                }
-            }
         }
 
-        echo json_encode(['success' => true, 'message' => "{$criados} segmentos criados e {$campanhasCriadas} campanhas geradas (pendentes de revisão).", 'segmentos' => $criados, 'campanhas' => $campanhasCriadas]);
+        echo json_encode(['success' => true, 'message' => "{$criados} segmentos criados. Revise na aba Segmentos.", 'total' => $criados]);
+    }
+
+    // ============================================================
+    // EXCLUIR SEGMENTO
+    // ============================================================
+    public function excluirSegmento(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+        $pdo->prepare("UPDATE email_mkt_segmentos SET ativo = 0 WHERE id = ?")->execute([$id]);
+        echo json_encode(['success'=>true]);
     }
 
     private function renderConfigTab(\PDO $pdo): void {
