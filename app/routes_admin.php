@@ -408,6 +408,7 @@ $router->get('/admin/email-marketing', 'AdminEmailMarketingController', 'index')
 $router->post('/admin/email-marketing/gerar', 'AdminEmailMarketingController', 'gerarCampanhas');
 $router->post('/admin/email-marketing/transcrever', 'AdminEmailMarketingController', 'transcrever');
 $router->get('/admin/email-marketing/buscar-usuarios', 'AdminEmailMarketingController', 'buscarUsuarios');
+$router->get('/admin/email-marketing/buscar-produtos', 'AdminEmailMarketingController', 'buscarProdutos');
 $router->post('/admin/email-marketing/aprovar', 'AdminEmailMarketingController', 'aprovar');
 $router->post('/admin/email-marketing/rejeitar', 'AdminEmailMarketingController', 'rejeitar');
 $router->post('/admin/email-marketing/excluir', 'AdminEmailMarketingController', 'excluir');
@@ -416,5 +417,13 @@ $router->post('/admin/email-marketing/disparar', 'AdminEmailMarketingController'
 $router->post('/admin/email-marketing/agendar', 'AdminEmailMarketingController', 'agendar');
 $router->post('/admin/email-marketing/gerar-segmentos', 'AdminEmailMarketingController', 'gerarSegmentos');
 $router->post('/admin/email-marketing/excluir-segmento', 'AdminEmailMarketingController', 'excluirSegmento');
+$router->get('/admin/email-marketing/segmento-detalhes', 'AdminEmailMarketingController', 'segmentoDetalhes');
+$router->post('/admin/email-marketing/salvar-segmento', 'AdminEmailMarketingController', 'salvarSegmento');
 $router->get('/admin/email-marketing/detalhes', 'AdminEmailMarketingController', 'detalhes');
 $router->post('/admin/email-marketing/config', 'AdminEmailMarketingController', 'salvarConfig');
+
+
+// Email Tracking (open pixel + click redirect + conversion cron)
+$router->get('/email-track/open/{hash}', 'EmailTrackController', 'open');
+$router->get('/email-track/click/{hash}', 'EmailTrackController', 'click');
+$router->get('/email-track/check-conversions', 'EmailTrackController', 'checkConversions');

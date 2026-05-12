@@ -117,3 +117,18 @@ CREATE TABLE IF NOT EXISTS email_mkt_envio_controle (
     UNIQUE KEY uk_cliente_campanha (cliente_id, campanha_id),
     INDEX idx_cliente_data (cliente_id, data_envio)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- Tracking de emails (pixel + clicks)
+CREATE TABLE IF NOT EXISTS email_mkt_tracking (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    hash VARCHAR(64) NOT NULL UNIQUE,
+    campanha_id INT NOT NULL,
+    cliente_id INT NOT NULL,
+    tipo ENUM('open','click') NOT NULL,
+    url_destino TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_hash (hash),
+    INDEX idx_campanha_cliente (campanha_id, cliente_id),
+    INDEX idx_tipo (tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

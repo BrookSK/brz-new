@@ -128,6 +128,7 @@ class AdminEmailMarketingController extends Controller {
         $apenasBuscar = !empty($input['apenas_buscar']);
         $clienteIdsSelecionados = $input['cliente_ids'] ?? null;
         $segmentoIds = $input['segmento_ids'] ?? [];
+        $produtosIds = $input['produtos_ids'] ?? [];
 
         $diasRecompra = (int)$this->getConfig($pdo, 'dias_recompra_minimo', '30');
         $nomeLoja = 'Braziliana';
@@ -281,7 +282,8 @@ class AdminEmailMarketingController extends Controller {
         $tipoLabels = [
             'reativacao'=>'Reativação','aniversario'=>'Aniversário','pos_venda'=>'Pós-venda',
             'categoria'=>'Por Categoria','vip'=>'Clientes VIP','institucional'=>'Institucional',
-            'recompra'=>'Recompra','carrinho_abandonado'=>'Carrinho Abandonado','individual'=>'Individual'
+            'recompra'=>'Recompra','carrinho_abandonado'=>'Carrinho Abandonado','individual'=>'Individual',
+            'produtos'=>'Vitrine de Produtos'
         ];
         $tipoLabel = $tipoLabels[$tipo] ?? ucfirst($tipo);
 
@@ -335,7 +337,11 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         }
 
         // Build HTML
-        $html = $this->buildEmailHtml($content, $nomeLoja);
+        if ($tipo === 'produtos' && !empty($produtosIds)) {
+            $html = $this->buildProductEmailHtml($content, $nomeLoja, $produtosIds, $pdo);
+        } else {
+            $html = $this->buildEmailHtml($content, $nomeLoja);
+        }
         $pdo->prepare("UPDATE email_mkt_campanhas SET html_content = ? WHERE id = ?")->execute([$html, $campanhaId]);
 
         echo json_encode(['success' => true, 'message' => "Campanha '{$tipoLabel}' gerada com " . count($clientes) . " clientes. Aguardando revisão.", 'campanha_id' => $campanhaId]);
@@ -562,10 +568,47 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $enviados = 0;
         $stUpdate = $pdo->prepare("UPDATE email_mkt_campanha_clientes SET status='enviado', data_envio=NOW() WHERE id=?");
         $stLog = $pdo->prepare("INSERT INTO email_mkt_logs (campanha_id, cliente_id, email, evento, detalhes) VALUES (?, ?, ?, 'enviado', 'Lote processado')");
+        $stTrack = $pdo->prepare("INSERT IGNORE INTO email_mkt_tracking (hash, campanha_id, cliente_id, tipo, url_destino) VALUES (?, ?, ?, ?, ?)");
+
+        // Ensure tracking table exists
+        try { $pdo->exec("CREATE TABLE IF NOT EXISTS email_mkt_tracking (id INT AUTO_INCREMENT PRIMARY KEY, hash VARCHAR(64) NOT NULL UNIQUE, campanha_id INT NOT NULL, cliente_id INT NOT NULL, tipo ENUM('open','click') NOT NULL, url_destino TEXT DEFAULT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_hash (hash))"); } catch (\Exception $e) {}
+
+        $baseUrl = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'novosite.brazilianashop.com.br');
+
         foreach ($clientes as $cl) {
-            // TODO: Actual email sending via SMTP/SES/SendGrid
+            $clienteId = (int)$cl['cliente_id'];
+            $clienteEmail = $cl['email'];
+
+            // Generate tracking hashes for this client
+            $openHash = md5("open_{$id}_{$clienteId}_" . time() . rand());
+            $clickHash = md5("click_{$id}_{$clienteId}_" . time() . rand());
+
+            // Save tracking records
+            $stTrack->execute([$openHash, $id, $clienteId, 'open', null]);
+            $stTrack->execute([$clickHash, $id, $clienteId, 'click', $baseUrl]);
+
+            // Personalize email HTML for this client
+            $personalizedHtml = str_replace('{{NOME_CLIENTE}}', htmlspecialchars($cl['nome'] ?? 'Cliente'), $campanha['html_content'] ?? '');
+
+            // Inject open tracking pixel before </body>
+            $pixelUrl = $baseUrl . '/email-track/open/' . $openHash;
+            $pixelTag = '<img src="' . $pixelUrl . '" width="1" height="1" style="display:none;" alt="">';
+            $personalizedHtml = str_replace('</body>', $pixelTag . '</body>', $personalizedHtml);
+
+            // Rewrite links to go through click tracking
+            $personalizedHtml = preg_replace_callback('/href="(https?:\/\/[^"]+)"/', function($matches) use ($baseUrl, $clickHash, $id, $clienteId, $pdo, $stTrack) {
+                $originalUrl = $matches[1];
+                if (strpos($originalUrl, '/email-track/') !== false) return $matches[0]; // Don't rewrite tracking URLs
+                $linkHash = md5("click_{$id}_{$clienteId}_" . $originalUrl . rand());
+                try { $stTrack->execute([$linkHash, $id, $clienteId, 'click', $originalUrl]); } catch (\Exception $e) {}
+                return 'href="' . $baseUrl . '/email-track/click/' . $linkHash . '?url=' . urlencode($originalUrl) . '"';
+            }, $personalizedHtml);
+
+            // TODO: Send $personalizedHtml to $clienteEmail via SMTP/SES/SendGrid
+            // mail($clienteEmail, $campanha['assunto'], $personalizedHtml, "Content-Type: text/html; charset=UTF-8");
+
             $stUpdate->execute([(int)$cl['id']]);
-            $stLog->execute([$id, (int)$cl['cliente_id'], $cl['email']]);
+            $stLog->execute([$id, $clienteId, $clienteEmail]);
             $enviados++;
         }
 
@@ -627,6 +670,123 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
             $pdo->prepare("INSERT INTO email_mkt_config (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)")->execute([$chave, (string)$valor]);
         }
         echo json_encode(['success'=>true]);
+    }
+
+    // ============================================================
+    // BUSCAR PRODUTOS (para campanha de produtos)
+    // ============================================================
+    public function buscarProdutos(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $q = trim((string)$request->getParam('q', ''));
+        if (strlen($q) < 2) { echo json_encode(['success'=>true,'produtos'=>[]]); return; }
+
+        $nomeCol = 'nome';
+        $fotoCol = null;
+        $precoCol = 'price';
+        try {
+            $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
+            if (in_array('foto_principal', $cols)) $fotoCol = 'foto_principal';
+            elseif (in_array('imagem', $cols)) $fotoCol = 'imagem';
+            elseif (in_array('image', $cols)) $fotoCol = 'image';
+            if (in_array('price', $cols)) $precoCol = 'price';
+            elseif (in_array('preco', $cols)) $precoCol = 'preco';
+            elseif (in_array('valor', $cols)) $precoCol = 'valor';
+        } catch (\Exception $e) {}
+
+        $fotoSelect = $fotoCol ? ", {$fotoCol} AS foto" : ", NULL AS foto";
+        $st = $pdo->prepare("SELECT id, {$nomeCol} AS nome, {$precoCol} AS preco {$fotoSelect} FROM produtos WHERE {$nomeCol} LIKE ? LIMIT 15");
+        $st->execute(["%{$q}%"]);
+        $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Format price
+        foreach ($produtos as &$p) {
+            $p['preco'] = 'US$ ' . number_format((float)($p['preco'] ?? 0), 2, '.', ',');
+        }
+
+        echo json_encode(['success'=>true,'produtos'=>$produtos]);
+    }
+
+    private function buildProductEmailHtml(array $vars, string $nomeLoja, array $produtosIds, \PDO $pdo): string {
+        // Get product details
+        $nomeCol = 'nome'; $fotoCol = null; $precoCol = 'price'; $descCol = 'descricao';
+        try {
+            $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
+            if (in_array('foto_principal', $cols)) $fotoCol = 'foto_principal';
+            elseif (in_array('imagem', $cols)) $fotoCol = 'imagem';
+            if (in_array('price', $cols)) $precoCol = 'price';
+            elseif (in_array('preco', $cols)) $precoCol = 'preco';
+            if (!in_array('descricao', $cols) && in_array('description', $cols)) $descCol = 'description';
+        } catch (\Exception $e) {}
+
+        $fotoSelect = $fotoCol ? ", {$fotoCol} AS foto" : ", NULL AS foto";
+        $ids = array_map('intval', $produtosIds);
+        $in = implode(',', $ids);
+        $produtos = $pdo->query("SELECT id, {$nomeCol} AS nome, {$precoCol} AS preco, {$descCol} AS descricao {$fotoSelect} FROM produtos WHERE id IN ({$in})")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Get logo
+        $logoUrl = '';
+        try {
+            $stLogo = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave='logo_email') OR chave='layout_logo_email' LIMIT 1");
+            $stLogo->execute();
+            $logoUrl = trim((string)($stLogo->fetchColumn() ?: ''));
+            if ($logoUrl === '') {
+                $stLogo2 = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE (categoria='layout' AND chave='logo_admin') OR chave='layout_logo_admin' LIMIT 1");
+                $stLogo2->execute();
+                $logoUrl = trim((string)($stLogo2->fetchColumn() ?: ''));
+            }
+        } catch (\Exception $e) {}
+        if ($logoUrl === '') $logoUrl = '/assets/img/logo.png';
+
+        // Build product grid HTML
+        $productHtml = '';
+        foreach ($produtos as $p) {
+            $nome = htmlspecialchars($p['nome'] ?? '');
+            $preco = 'US$ ' . number_format((float)($p['preco'] ?? 0), 2, '.', ',');
+            $foto = htmlspecialchars($p['foto'] ?? '');
+            $link = 'https://brazilianashop.com.br/produto/detalhes/' . (int)$p['id'];
+            $fotoTag = $foto ? '<img src="' . $foto . '" alt="' . $nome . '" style="width:100%;height:180px;object-fit:cover;border-radius:10px 10px 0 0;">' : '<div style="width:100%;height:180px;background:#F5F7FA;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:40px;">📦</div>';
+
+            $productHtml .= '
+            <div style="width:48%;display:inline-block;vertical-align:top;margin-bottom:16px;border:1px solid #EBF0F6;border-radius:10px;overflow:hidden;background:#fff;">
+                ' . $fotoTag . '
+                <div style="padding:12px 14px;">
+                    <div style="font-size:13px;font-weight:600;color:#1F2937;margin-bottom:4px;line-height:1.3;">' . $nome . '</div>
+                    <div style="font-size:16px;font-weight:700;color:#18253D;margin-bottom:10px;">' . $preco . '</div>
+                    <a href="' . $link . '" style="display:block;text-align:center;background:#18253D;color:#fff;padding:10px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">Comprar agora</a>
+                </div>
+            </div>';
+        }
+
+        // Build full email
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' . htmlspecialchars($vars['assunto'] ?? '') . '</title></head><body style="margin:0;background:#F5F7FA;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+<div style="max-width:620px;margin:32px auto;background:#fff;border-radius:16px;border:1px solid #EBF0F6;overflow:hidden;">
+  <div style="background:#18253D;padding:24px 40px;text-align:center;"><img src="' . htmlspecialchars($logoUrl) . '" alt="' . htmlspecialchars($nomeLoja) . '" style="max-height:48px;width:auto;"></div>
+  <div style="background:linear-gradient(135deg,#1E2F4D,#18253D);padding:28px 40px;text-align:center;">
+    <div style="display:inline-block;background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:4px 12px;border-radius:999px;margin-bottom:12px;">' . htmlspecialchars($vars['tag_campanha'] ?? 'Novidades') . '</div>
+    <h1 style="color:#fff;font-size:24px;font-weight:700;margin:0 0 8px;">' . htmlspecialchars($vars['titulo_email'] ?? '') . '</h1>
+    <p style="color:rgba(255,255,255,.68);font-size:14px;margin:0;">' . htmlspecialchars($vars['subtitulo_email'] ?? '') . '</p>
+  </div>
+  <div style="padding:32px 40px;">
+    <p style="font-size:15px;color:#1F2937;margin:0 0 16px;">Olá, <strong style="color:#18253D;">{{NOME_CLIENTE}}</strong>! 👋</p>
+    <p style="font-size:14px;color:#374151;line-height:1.7;margin:0 0 24px;">' . htmlspecialchars($vars['paragrafo_1'] ?? '') . '</p>
+    <div style="font-size:0;text-align:center;">' . $productHtml . '</div>
+    <div style="height:1px;background:#EBF0F6;margin:24px 0;"></div>
+    <p style="font-size:14px;color:#374151;line-height:1.7;margin:0 0 24px;">' . htmlspecialchars($vars['paragrafo_fechamento'] ?? '') . '</p>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://brazilianashop.com.br" style="display:inline-block;background:#18253D;color:#fff;padding:14px 36px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;">' . htmlspecialchars($vars['texto_cta'] ?? 'Ver todos os produtos') . '</a>
+    </div>
+  </div>
+  <div style="background:#FAFBFC;border-top:1px solid #EBF0F6;padding:20px 40px;text-align:center;">
+    <div style="font-size:13px;font-weight:600;color:#18253D;margin-bottom:4px;">' . htmlspecialchars($nomeLoja) . '</div>
+    <p style="font-size:12px;color:#94A3B8;margin:0;">Você está recebendo este email porque é cliente ' . htmlspecialchars($nomeLoja) . '.</p>
+  </div>
+</div></body></html>';
+
+        return $html;
     }
 
     // ============================================================
@@ -724,6 +884,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 <option value="institucional">Institucional / Relacionamento</option>
 <option value="recompra">Recompra Inteligente</option>
 <option value="carrinho_abandonado">Carrinho Abandonado</option>
+<option value="produtos">Produtos (vitrine de produtos)</option>
 <option value="individual">Usuário Individual</option>
 </select>
 </div>
@@ -736,19 +897,30 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 <div id="campIndividualSelecionado" style="margin-top:6px;font-size:12px;color:#065F46;display:none;"></div>
 </div>
 
+<div id="campProdutosWrap" style="margin-bottom:16px;display:none;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Buscar Produtos para o Email</label>
+<input type="text" id="campProdutoBusca" placeholder="Digite o nome do produto..." oninput="buscarProdutosCamp()" style="width:100%;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+<div id="campProdutoResultados" style="max-height:150px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;margin-top:6px;display:none;"></div>
+<div id="campProdutosSelecionados" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+<small style="color:#94A3B8;font-size:11px;">Selecione 1 a 6 produtos para exibir no email.</small>
+</div>
+
 <div style="margin-bottom:16px;">
 <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Segmento (opcional - vincular a segmentos existentes)</label>
-<select id="campSegmento" multiple size="4" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">';
+<div id="campSegmentosCheckboxes" style="max-height:160px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;padding:8px 12px;">';
 
-        // Load segments for select
+        // Load segments as checkboxes
         $segmentosAtivos = [];
         try { $segmentosAtivos = $pdo->query("SELECT id, nome, total_clientes FROM email_mkt_segmentos WHERE ativo = 1 ORDER BY nome")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
+        if (empty($segmentosAtivos)) {
+            echo '<span style="color:#94A3B8;font-size:12px;">Nenhum segmento criado. Gere na aba Segmentos.</span>';
+        }
         foreach ($segmentosAtivos as $sa) {
-            echo '<option value="'.(int)$sa['id'].'">'.htmlspecialchars($sa['nome']).' ('.(int)$sa['total_clientes'].' clientes)</option>';
+            echo '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px;"><input type="checkbox" class="seg-check" value="'.(int)$sa['id'].'"> '.htmlspecialchars($sa['nome']).' <span style="color:#94A3B8;font-size:11px;">('.(int)$sa['total_clientes'].')</span></label>';
         }
 
-        echo '</select>
-<small style="color:#94A3B8;font-size:11px;">Segure Ctrl para selecionar múltiplos. Deixe vazio para usar o tipo como critério.</small>
+        echo '</div>
+<small style="color:#94A3B8;font-size:11px;">Marque os segmentos desejados. Deixe vazio para usar o tipo como critério.</small>
 </div>
 
 <div id="campCategoriaWrap" style="margin-bottom:16px;display:none;">
@@ -831,6 +1003,7 @@ let isRecording = false;
 document.getElementById("campTipo").addEventListener("change", function(){
     document.getElementById("campCategoriaWrap").style.display = this.value === "categoria" ? "block" : "none";
     document.getElementById("campIndividualWrap").style.display = this.value === "individual" ? "block" : "none";
+    document.getElementById("campProdutosWrap").style.display = this.value === "produtos" ? "block" : "none";
 });
 
 // Search users for individual campaign
@@ -856,6 +1029,39 @@ function selecionarUsuarioCamp(id, el){
     document.getElementById("campIndividualResultados").style.display = "none";
     document.getElementById("campIndividualSelecionado").style.display = "block";
     document.getElementById("campIndividualSelecionado").innerHTML = "<i class=\\"bi bi-check-circle-fill\\" style=\\"color:#065F46;\\"></i> "+nome+" ("+email+")";
+}
+
+// Product search for product campaigns
+let produtosSelecionados = [];
+let prodSearchTimeout = null;
+function buscarProdutosCamp(){
+    clearTimeout(prodSearchTimeout);
+    const q = document.getElementById("campProdutoBusca").value.trim();
+    if(q.length < 2){ document.getElementById("campProdutoResultados").style.display="none"; return; }
+    prodSearchTimeout = setTimeout(async ()=>{
+        const r = await fetch("/admin/email-marketing/buscar-produtos?q="+encodeURIComponent(q));
+        const d = await r.json();
+        const wrap = document.getElementById("campProdutoResultados");
+        if(!d.success || !d.produtos.length){ wrap.innerHTML="<div style=\\"padding:8px 12px;color:#94A3B8;font-size:12px;\\">Nenhum produto encontrado</div>"; wrap.style.display="block"; return; }
+        wrap.innerHTML = d.produtos.map(p=>"<div onclick=\\"adicionarProdutoCamp("+p.id+",this)\\" data-nome=\\""+p.nome.replace(/"/g,"&quot;")+"\\" data-preco=\\""+p.preco+"\\" data-foto=\\""+(p.foto||"")+"\\" style=\\"display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid #F1F5F9;\\" onmouseover=\\"this.style.background=\'#F8FAFC\'\\" onmouseout=\\"this.style.background=\'\'\\">"+(p.foto?"<img src=\\""+p.foto+"\\" style=\\"width:32px;height:32px;object-fit:cover;border-radius:6px;\\">":"")+"<div><strong style=\\"font-size:13px;\\">"+p.nome+"</strong><br><small style=\\"color:#94A3B8;\\">"+p.preco+"</small></div></div>").join("");
+        wrap.style.display="block";
+    }, 300);
+}
+function adicionarProdutoCamp(id, el){
+    if(produtosSelecionados.length >= 6){ alert("Máximo 6 produtos."); return; }
+    if(produtosSelecionados.find(p=>p.id===id)) return;
+    produtosSelecionados.push({id, nome:el.getAttribute("data-nome"), preco:el.getAttribute("data-preco"), foto:el.getAttribute("data-foto")});
+    document.getElementById("campProdutoResultados").style.display="none";
+    document.getElementById("campProdutoBusca").value="";
+    renderProdutosSelecionados();
+}
+function removerProdutoCamp(id){
+    produtosSelecionados = produtosSelecionados.filter(p=>p.id!==id);
+    renderProdutosSelecionados();
+}
+function renderProdutosSelecionados(){
+    const wrap = document.getElementById("campProdutosSelecionados");
+    wrap.innerHTML = produtosSelecionados.map(p=>"<span style=\\"display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#EEF2F7;border-radius:6px;font-size:12px;\\">"+p.nome+" <button onclick=\\"removerProdutoCamp("+p.id+")\\" style=\\"background:none;border:none;color:#BE123C;cursor:pointer;font-size:14px;\\">&times;</button></span>").join("");
 }
 
 // Audio recording
@@ -899,8 +1105,7 @@ async function buscarClientesElegiveis(){
     const tipo = document.getElementById("campTipo").value;
     const categoria = document.getElementById("campCategoria").value.trim();
     const individualId = document.getElementById("campIndividualId").value;
-    const segmentoSelect = document.getElementById("campSegmento");
-    const segmentoIds = [...segmentoSelect.selectedOptions].map(o => parseInt(o.value));
+    const segmentoIds = [...document.querySelectorAll(".seg-check:checked")].map(c => parseInt(c.value));
     
     if(tipo === "individual" && !individualId){
         alert("Selecione um usuário para campanha individual.");
@@ -909,7 +1114,7 @@ async function buscarClientesElegiveis(){
     
     document.getElementById("campProgress").style.display = "block";
     
-    const body = JSON.stringify({tipo, categoria, usuario_id: individualId || null, segmento_ids: segmentoIds, apenas_buscar: true});
+    const body = JSON.stringify({tipo, categoria, usuario_id: individualId || null, segmento_ids: segmentoIds, produtos_ids: produtosSelecionados.map(p=>p.id), apenas_buscar: true});
     const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
     const d = await r.json();
     
@@ -971,12 +1176,11 @@ async function gerarComClientesSelecionados(){
     const tipo = document.getElementById("campTipo").value;
     const instrucoes = document.getElementById("campInstrucoes").value.trim();
     const categoria = document.getElementById("campCategoria").value.trim();
-    const segmentoSelect = document.getElementById("campSegmento");
-    const segmentoIds = [...segmentoSelect.selectedOptions].map(o => parseInt(o.value));
+    const segmentoIds = [...document.querySelectorAll(".seg-check:checked")].map(c => parseInt(c.value));
     
     document.getElementById("campProgress").style.display = "block";
     
-    const body = JSON.stringify({tipo, instrucoes, categoria, cliente_ids: ids, segmento_ids: segmentoIds});
+    const body = JSON.stringify({tipo, instrucoes, categoria, cliente_ids: ids, segmento_ids: segmentoIds, produtos_ids: produtosSelecionados.map(p=>p.id)});
     const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
     const d = await r.json();
     
@@ -1140,10 +1344,10 @@ async function arquivarCampanha(id){
             foreach ($segmentos as $seg) {
                 $criterios = json_decode($seg['criterios'] ?? '{}', true);
                 $criterioText = $criterios['criterio'] ?? $criterios['descricao'] ?? ($seg['gatilho'] ?? '-');
-                echo '<div class="section-card" style="margin-bottom:0;" id="seg-'.(int)$seg['id'].'"><div style="padding:16px;">
+                echo '<div class="section-card" style="margin-bottom:0;cursor:pointer;" id="seg-'.(int)$seg['id'].'" onclick="editarSegmento('.(int)$seg['id'].')"><div style="padding:16px;">
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
 <div style="font-size:14px;font-weight:700;color:var(--navy);">'.htmlspecialchars($seg['nome']).'</div>
-<div style="display:flex;gap:4px;">
+<div style="display:flex;gap:4px;" onclick="event.stopPropagation()">
 <button onclick="excluirSegmento('.(int)$seg['id'].')" style="width:26px;height:26px;border-radius:6px;border:1px solid #E2E8F0;background:#fff;cursor:pointer;color:#BE123C;font-size:12px;" title="Excluir"><i class="bi bi-trash"></i></button>
 </div>
 </div>
@@ -1174,7 +1378,51 @@ async function excluirSegmento(id){
     if(d.success){document.getElementById("seg-"+id).remove();}
     else alert(d.error||"Erro");
 }
+async function editarSegmento(id){
+    const r=await fetch("/admin/email-marketing/segmento-detalhes?id="+id);
+    const d=await r.json();
+    if(!d.success){alert(d.error||"Erro");return;}
+    const s=d.segmento;
+    document.getElementById("editSegId").value=s.id;
+    document.getElementById("editSegNome").value=s.nome||"";
+    document.getElementById("editSegDescricao").value=s.descricao||"";
+    document.getElementById("editSegGatilho").value=s.gatilho||"";
+    document.getElementById("editSegTotal").value=s.total_clientes||0;
+    document.getElementById("editSegCriterios").value=s.criterios||"";
+    document.getElementById("modalEditSeg").style.display="flex";
+}
+async function salvarSegmento(){
+    const id=document.getElementById("editSegId").value;
+    const data={
+        id:parseInt(id),
+        nome:document.getElementById("editSegNome").value,
+        descricao:document.getElementById("editSegDescricao").value,
+        gatilho:document.getElementById("editSegGatilho").value,
+        total_clientes:parseInt(document.getElementById("editSegTotal").value)||0
+    };
+    const r=await fetch("/admin/email-marketing/salvar-segmento",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+    const d=await r.json();
+    if(d.success){document.getElementById("modalEditSeg").style.display="none";location.reload();}
+    else alert(d.error||"Erro");
+}
 </script>';
+
+        // Modal editar segmento
+        echo '<div id="modalEditSeg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+<div style="background:#fff;border-radius:12px;max-width:500px;width:95%;max-height:90vh;overflow-y:auto;">
+<div style="background:var(--navy);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+<h6 style="margin:0;font-size:15px;font-weight:700;">Editar Segmento</h6>
+<button onclick="document.getElementById(\'modalEditSeg\').style.display=\'none\'" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">&times;</button>
+</div>
+<div style="padding:20px;">
+<input type="hidden" id="editSegId">
+<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Nome</label><input type="text" id="editSegNome" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
+<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Descrição</label><textarea id="editSegDescricao" rows="3" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;resize:vertical;"></textarea></div>
+<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Gatilho</label><input type="text" id="editSegGatilho" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
+<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Total Clientes</label><input type="number" id="editSegTotal" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></div>
+<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:4px;">Critérios (JSON)</label><textarea id="editSegCriterios" rows="3" style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;" readonly></textarea></div>
+<button onclick="salvarSegmento()" style="width:100%;padding:10px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;"><i class="bi bi-check-lg me-1"></i>Salvar Alterações</button>
+</div></div></div>';
     }
 
     // ============================================================
@@ -1285,6 +1533,40 @@ Use nomes curtos e descritivos em português.";
         }
 
         echo json_encode(['success' => true, 'message' => "{$criados} segmentos criados. Revise na aba Segmentos.", 'total' => $criados]);
+    }
+
+    // ============================================================
+    // SEGMENTO DETALHES (JSON)
+    // ============================================================
+    public function segmentoDetalhes(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $id = (int)$request->getParam('id');
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+        $st = $pdo->prepare("SELECT * FROM email_mkt_segmentos WHERE id = ?"); $st->execute([$id]);
+        $seg = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$seg) { echo json_encode(['success'=>false,'error'=>'Segmento não encontrado']); return; }
+        echo json_encode(['success'=>true,'segmento'=>$seg]);
+    }
+
+    // ============================================================
+    // SALVAR SEGMENTO (edição)
+    // ============================================================
+    public function salvarSegmento(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+        $nome = trim((string)($data['nome'] ?? ''));
+        $descricao = trim((string)($data['descricao'] ?? ''));
+        $gatilho = trim((string)($data['gatilho'] ?? ''));
+        $totalClientes = (int)($data['total_clientes'] ?? 0);
+        if ($nome === '') { echo json_encode(['success'=>false,'error'=>'Nome obrigatório']); return; }
+        $pdo->prepare("UPDATE email_mkt_segmentos SET nome=?, descricao=?, gatilho=?, total_clientes=?, updated_at=NOW() WHERE id=?")->execute([$nome, $descricao, $gatilho, $totalClientes, $id]);
+        echo json_encode(['success'=>true]);
     }
 
     // ============================================================
