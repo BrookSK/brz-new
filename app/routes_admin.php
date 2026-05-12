@@ -429,3 +429,9 @@ $router->post('/admin/email-marketing/config', 'AdminEmailMarketingController', 
 $router->get('/email-track/open/{hash}', 'EmailTrackController', 'open');
 $router->get('/email-track/click/{hash}', 'EmailTrackController', 'click');
 $router->get('/email-track/check-conversions', 'EmailTrackController', 'checkConversions');
+
+
+// Mapa de Calor do Site
+$router->get('/admin/mapa-calor-site', 'AdminMapaCalorSiteController', 'index');
+$router->post('/admin/mapa-calor-site/collect', 'AdminMapaCalorSiteController', 'collect');
+$router->get('/admin/mapa-calor-site/dados-pagina', 'AdminMapaCalorSiteController', 'dadosPagina');

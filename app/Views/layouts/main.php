@@ -1853,5 +1853,5 @@ if ($__copilotoMostrar):
     #whatsapp-float svg { width: 26px; height: 26px; }
 }
 </style>
-
+<script src="/assets/js/heatmap-tracker.js" defer></script>
 </html>

@@ -247,6 +247,7 @@ function renderAdminSidebar($activePage = '') {
         'live-shop-reports' => ['icon' => 'fas fa-chart-line', 'label' => 'Relatórios', 'url' => '/admin/live-shop/reports', 'roles' => ['admin', 'vendedor']],
         'quickbooks' => ['icon' => 'fas fa-calculator', 'label' => 'QuickBooks', 'url' => '/admin/quickbooks', 'roles' => ['admin']],
         'email-marketing' => ['icon' => 'fas fa-envelope-open-text', 'label' => 'Email Marketing', 'url' => '/admin/email-marketing', 'roles' => ['admin']],
+        'mapa-calor-site' => ['icon' => 'fas fa-fire', 'label' => 'Mapa de Calor', 'url' => '/admin/mapa-calor-site', 'roles' => ['admin']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
         'email-logs' => ['icon' => 'fas fa-envelope', 'label' => 'Log de Emails', 'url' => '/admin/emails', 'roles' => ['admin']],
         'descontos' => ['icon' => 'fas fa-tag', 'label' => 'Autorizações Desconto', 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
@@ -434,7 +435,7 @@ function renderAdminSidebar($activePage = '') {
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
                 'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos']],
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
-                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['email-marketing']],
+                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['email-marketing', 'mapa-calor-site']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
                 'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup']],
             ];
