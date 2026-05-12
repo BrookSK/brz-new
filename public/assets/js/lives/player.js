@@ -85,6 +85,10 @@ async function initWHEPPlayer(video, whepUrl) {
                 }
                 stream.addTrack(event.track);
             }
+            // Esconder overlay de "Conectando..."
+            var overlays = document.querySelectorAll('.live-video-container > div[style*="position:absolute"]');
+            overlays.forEach(function(el) { el.style.display = 'none'; });
+            
             video.muted = true; // Necessário para autoplay
             video.play().then(function() {
                 console.log('WHEP: Video playing!');
