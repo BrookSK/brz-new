@@ -1771,7 +1771,7 @@ class AdminComprasController extends Controller {
                 }
 
                 echo '        </div>
-                        <div class="table-responsive">
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
@@ -1900,6 +1900,38 @@ class AdminComprasController extends Controller {
                                 echo '</tbody>
                             </table>
                         </div>
+                        <!-- Mobile: Cards -->
+                        <div class="d-md-none p-2">';
+                        foreach ($compras as $mItem) {
+                            $mProdNome = trim((string) ($mItem['nome_produto_custom'] ?? ''));
+                            if ($mProdNome === '') $mProdNome = (string) ($mItem['produto_nome'] ?? '');
+                            $mQf = (int) ($mItem['quantidade_faltante'] ?? 0);
+                            if ($mQf <= 0) $mQf = (int) ($mItem['quantidade_necessaria'] ?? 0);
+                            $mStatus = (string) ($mItem['status'] ?? 'pendente');
+                            $mStatusClass = $mStatus == 'pendente' ? 'warning' : ($mStatus == 'comprado' ? 'success' : 'danger');
+                            $mPrioridade = (string) ($mItem['prioridade'] ?? '');
+                            $mPrioClass = $mPrioridade == 'urgente' ? 'danger' : ($mPrioridade == 'alta' ? 'warning' : 'info');
+                            $mImgUrl = $this->resolveProdutoImagem($mItem);
+                            $mImgTag = $mImgUrl
+                                ? '<img src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;">'
+                                : '<div style="width:32px;height:32px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;"><i class="fas fa-image text-muted" style="font-size:12px;"></i></div>';
+
+                            echo '<div class="border-bottom py-2">
+                                <div class="d-flex gap-2 align-items-start">
+                                    ' . $mImgTag . '
+                                    <div style="flex:1;min-width:0;">
+                                        <div class="fw-semibold small" style="word-break:break-word;">' . htmlspecialchars($mProdNome) . '</div>
+                                        <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:10px;">
+                                            <span class="text-muted">ID: ' . (int) $mItem['produto_id'] . '</span>
+                                            <span class="badge bg-primary">' . $mQf . ' un</span>
+                                            <span class="badge bg-' . $mStatusClass . '">' . ucfirst($mStatus) . '</span>
+                                            <span class="badge bg-' . $mPrioClass . '">' . ucfirst($mPrioridade) . '</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>';
+                        }
+                        echo '</div>
                     </div>
                 </div>';
 
