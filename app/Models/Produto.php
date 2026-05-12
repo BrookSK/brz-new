@@ -307,42 +307,93 @@ class Produto extends Model {
             $cols = [];
         }
 
-        $where = [];
+        $baseWhere = [];
         if (in_array('status', $cols, true)) {
-            // Compatibilidade: alguns bancos usam 'published' e outros usam 'ativo'
-            $where[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
+            $baseWhere[] = "(p.status IS NULL OR LOWER(COALESCE(p.status,'')) IN ('published','publish','publicado','ativo','active'))";
         }
         if (in_array('active', $cols, true)) {
-            $where[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
+            $baseWhere[] = "(p.active = 1 OR LOWER(COALESCE(p.active,'')) IN ('true','yes','sim','ativo','active'))";
         } elseif (in_array('ativo', $cols, true)) {
-            $where[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
-        }
-        $hasFeatured = in_array('featured', $cols, true);
-        if ($hasFeatured) {
-            $where[] = 'p.featured = 1';
+            $baseWhere[] = "(p.ativo = 1 OR LOWER(COALESCE(p.ativo,'')) IN ('true','yes','sim','ativo','active'))";
         }
 
-        $where[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
+        $baseWhere[] = "(p.sku IS NULL OR p.sku NOT LIKE 'ASS-%')";
         if (in_array('attributes', $cols, true)) {
-            $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
+            $baseWhere[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
         if (in_array('grupo_compras_id', $cols, true)) {
-            $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
+            $baseWhere[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
         }
-
-        // Excluir produtos ocultos (só aparecem no pedido manual)
         if (in_array('oculto', $cols, true)) {
-            $where[] = "(p.oculto IS NULL OR p.oculto = 0)";
+            $baseWhere[] = "(p.oculto IS NULL OR p.oculto = 0)";
         }
 
-        $orderBy = $hasFeatured ? 'ORDER BY p.featured DESC, p.created_at DESC' : 'ORDER BY p.created_at DESC';
+        $hasFeatured = in_array('featured', $cols, true);
+        $produtos = [];
 
-        $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                {$orderBy}\n                LIMIT :limit";
+        // First: try to get featured products
+        if ($hasFeatured) {
+            $where = array_merge($baseWhere, ['p.featured = 1']);
+            $sql = "SELECT p.*, c.name as categoria
+                FROM {$this->table} p
+                LEFT JOIN categorias c ON p.category_id = c.id
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY p.created_at DESC
+                LIMIT :limit";
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+            $stmt->execute();
+            $produtos = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        // Fallback: if fewer than 5 featured, fill with best-selling products
+        if (count($produtos) < 5) {
+            $existingIds = array_map(function($p) { return (int)$p['id']; }, $produtos);
+            $needed = $limit - count($produtos);
+
+            // Try best sellers from pedido_itens/pedido_items
+            $itensTable = null;
+            try { $pdo->query("SELECT 1 FROM pedido_itens LIMIT 1"); $itensTable = 'pedido_itens'; } catch (\Exception $e) {
+                try { $pdo->query("SELECT 1 FROM pedido_items LIMIT 1"); $itensTable = 'pedido_items'; } catch (\Exception $e2) {}
+            }
+
+            $bestSellers = [];
+            if ($itensTable) {
+                try {
+                    $excludeIds = !empty($existingIds) ? ' AND p.id NOT IN (' . implode(',', $existingIds) . ')' : '';
+                    $sql = "SELECT p.*, c.name as categoria, COUNT(pi.id) AS vendas
+                        FROM {$itensTable} pi
+                        JOIN {$this->table} p ON p.id = pi.produto_id
+                        LEFT JOIN categorias c ON p.category_id = c.id
+                        WHERE " . implode(' AND ', $baseWhere) . $excludeIds . "
+                        GROUP BY p.id
+                        ORDER BY vendas DESC
+                        LIMIT " . (int)$needed;
+                    $bestSellers = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) {}
+            }
+
+            // If still not enough, get most recent products
+            if (count($bestSellers) < $needed) {
+                $allExclude = array_merge($existingIds, array_map(function($p) { return (int)$p['id']; }, $bestSellers));
+                $excludeIds = !empty($allExclude) ? ' AND p.id NOT IN (' . implode(',', $allExclude) . ')' : '';
+                $stillNeeded = $needed - count($bestSellers);
+                try {
+                    $sql = "SELECT p.*, c.name as categoria
+                        FROM {$this->table} p
+                        LEFT JOIN categorias c ON p.category_id = c.id
+                        WHERE " . implode(' AND ', $baseWhere) . $excludeIds . "
+                        ORDER BY p.created_at DESC
+                        LIMIT " . (int)$stillNeeded;
+                    $recent = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    $bestSellers = array_merge($bestSellers, $recent);
+                } catch (\Exception $e) {}
+            }
+
+            $produtos = array_merge($produtos, $bestSellers);
+        }
+
+        return $produtos;
     }
     
     public function getCategoria($categoriaId) {
