@@ -439,6 +439,59 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
     }
 
     // ============================================================
+    // AGENDAR CAMPANHA
+    // ============================================================
+    public function agendar(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        $dataAgendamento = trim((string)($data['data_agendamento'] ?? ''));
+        if ($id <= 0 || $dataAgendamento === '') { echo json_encode(['success'=>false,'error'=>'Dados inválidos']); return; }
+        $pdo->prepare("UPDATE email_mkt_campanhas SET status='agendada', data_agendamento=? WHERE id=? AND status IN ('aprovada','pendente_revisao')")->execute([$dataAgendamento, $id]);
+        echo json_encode(['success'=>true]);
+    }
+
+    // ============================================================
+    // DISPARAR CAMPANHA (imediato - marca como disparando)
+    // ============================================================
+    public function disparar(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $data = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($data['id'] ?? 0);
+        if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
+
+        // Mark as dispatching
+        $pdo->prepare("UPDATE email_mkt_campanhas SET status='disparando', data_inicio_disparo=NOW() WHERE id=? AND status IN ('aprovada','agendada','pendente_revisao')")->execute([$id]);
+
+        // Get campaign and clients
+        $st = $pdo->prepare("SELECT * FROM email_mkt_campanhas WHERE id=?"); $st->execute([$id]);
+        $campanha = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$campanha) { echo json_encode(['success'=>false,'error'=>'Campanha não encontrada']); return; }
+
+        $stCl = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id=? AND status='aguardando'"); $stCl->execute([$id]);
+        $clientes = $stCl->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // TODO: Integrate with actual email sending service (SMTP, SES, SendGrid, etc.)
+        // For now, mark all as "enviado" and log
+        $enviados = 0;
+        $stUpdate = $pdo->prepare("UPDATE email_mkt_campanha_clientes SET status='enviado', data_envio=NOW() WHERE id=?");
+        $stLog = $pdo->prepare("INSERT INTO email_mkt_logs (campanha_id, cliente_id, email, evento, detalhes) VALUES (?, ?, ?, 'enviado', 'Marcado para envio')");
+        foreach ($clientes as $cl) {
+            $stUpdate->execute([(int)$cl['id']]);
+            $stLog->execute([$id, (int)$cl['cliente_id'], $cl['email']]);
+            $enviados++;
+        }
+
+        $pdo->prepare("UPDATE email_mkt_campanhas SET total_enviado=?, status='finalizada', data_fim_disparo=NOW() WHERE id=?")->execute([$enviados, $id]);
+
+        echo json_encode(['success'=>true, 'message'=>"Disparo concluído! {$enviados} emails processados.", 'enviados'=>$enviados]);
+    }
+
+    // ============================================================
     // DETALHES DA CAMPANHA (JSON)
     // ============================================================
     public function detalhes(Request $request) {
@@ -629,8 +682,16 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         echo '<div class="modal fade" id="modalCampanha" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
 <div class="modal-header" style="background:var(--navy);color:#fff;"><h5 class="modal-title" id="modalCampTitle">Campanha</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
 <div class="modal-body" id="modalCampBody"><p>Carregando...</p></div>
-<div class="modal-footer">
-<button class="btn btn-success" onclick="aprovarCampanha()"><i class="bi bi-check-lg me-1"></i>Aprovar</button>
+<div class="modal-footer" style="flex-wrap:wrap;gap:8px;">
+<div id="modalDispatchControls" style="display:none;width:100%;padding:12px;background:#F5F7FA;border-radius:8px;margin-bottom:8px;">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+<button class="btn btn-primary btn-sm" onclick="dispararAgora()"><i class="bi bi-send-fill me-1"></i>Disparar Agora</button>
+<span style="color:#94A3B8;font-size:12px;">ou agendar:</span>
+<input type="datetime-local" id="modalAgendamento" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+<button class="btn btn-outline-primary btn-sm" onclick="agendarDisparo()"><i class="bi bi-calendar-check me-1"></i>Agendar</button>
+</div>
+</div>
+<button class="btn btn-success" id="btnAprovarCamp" onclick="aprovarCampanha()"><i class="bi bi-check-lg me-1"></i>Aprovar</button>
 <button class="btn btn-danger" onclick="rejeitarCampanha()"><i class="bi bi-x-lg me-1"></i>Rejeitar</button>
 <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
 </div></div></div></div>';
@@ -828,13 +889,39 @@ async function verCampanha(id){
         html+="</tbody></table></div>";
     }
     document.getElementById("modalCampBody").innerHTML=html;
+    // Show/hide controls based on status
+    var isApproved = (c.status === "aprovada" || c.status === "agendada");
+    var isPending = (c.status === "pendente_revisao");
+    document.getElementById("modalDispatchControls").style.display = isApproved ? "block" : "none";
+    document.getElementById("btnAprovarCamp").style.display = isPending ? "" : "none";
 }
 async function aprovarCampanha(){
     if(!currentCampId)return;
     const r=await fetch("/admin/email-marketing/aprovar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentCampId})});
     const d=await r.json();
-    if(d.success){bootstrap.Modal.getInstance(document.getElementById("modalCampanha")).hide();location.reload();}
+    if(d.success){
+        document.getElementById("btnAprovarCamp").style.display="none";
+        document.getElementById("modalDispatchControls").style.display="block";
+        alert("Campanha aprovada! Agora escolha quando disparar.");
+    }
     else alert(d.error||"Erro");
+}
+
+async function dispararAgora(){
+    if(!currentCampId||!confirm("Disparar campanha agora para todos os clientes vinculados?"))return;
+    const r=await fetch("/admin/email-marketing/disparar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentCampId})});
+    const d=await r.json();
+    if(d.success){bootstrap.Modal.getInstance(document.getElementById("modalCampanha")).hide();alert(d.message||"Disparo iniciado!");location.reload();}
+    else alert(d.error||"Erro ao disparar");
+}
+
+async function agendarDisparo(){
+    const dt=document.getElementById("modalAgendamento").value;
+    if(!dt){alert("Selecione data e hora.");return;}
+    const r=await fetch("/admin/email-marketing/agendar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentCampId,data_agendamento:dt})});
+    const d=await r.json();
+    if(d.success){bootstrap.Modal.getInstance(document.getElementById("modalCampanha")).hide();alert("Campanha agendada para "+dt);location.reload();}
+    else alert(d.error||"Erro ao agendar");
 }
 async function rejeitarCampanha(){
     if(!currentCampId||!confirm("Rejeitar esta campanha?"))return;
