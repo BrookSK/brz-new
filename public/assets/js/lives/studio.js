@@ -394,21 +394,71 @@ startAdminPolling();
 
 if (IS_LIVE) {
     if (IS_WEBRTC) {
-        // Tentar iniciar preview da câmera com áudio E reconectar WHIP
+        // Iniciar câmera e conectar WHIP ao Cloudflare
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
+            .then(async (stream) => {
                 const video = document.getElementById('localVideo');
-                if (video) { video.srcObject = stream; video.play(); }
+                if (video) { video.srcObject = stream; video.play().catch(()=>{}); }
                 const ph = document.getElementById('cameraPlaceholder');
                 if (ph) ph.classList.add('d-none');
                 localStream = stream;
 
-                // Reconectar WHIP para enviar stream ao Cloudflare
+                // Conectar WHIP para enviar ao Cloudflare
                 if (typeof WEBRTC_URL !== 'undefined' && WEBRTC_URL) {
-                    console.log('Reconnecting WHIP to CF...');
-                    startWebRTC(WEBRTC_URL);
+                    console.log('Connecting WHIP to CF...');
+                    try {
+                        peerConnection = new RTCPeerConnection({
+                            iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+                            bundlePolicy: 'max-bundle'
+                        });
+
+                        stream.getTracks().forEach(track => {
+                            peerConnection.addTransceiver(track, { direction: 'sendonly' });
+                        });
+
+                        const offer = await peerConnection.createOffer();
+                        await peerConnection.setLocalDescription(offer);
+
+                        // Tentar direto no CF
+                        try {
+                            const response = await fetch(WEBRTC_URL, {
+                                method: 'POST',
+                                mode: 'cors',
+                                headers: { 'Content-Type': 'application/sdp' },
+                                body: peerConnection.localDescription.sdp
+                            });
+                            if (response.status === 201 || response.ok) {
+                                const answerSdp = await response.text();
+                                if (answerSdp.startsWith('v=')) {
+                                    await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+                                    console.log('WHIP: Connected directly to CF!');
+                                    return;
+                                }
+                            }
+                            console.log('WHIP direct failed, trying proxy...');
+                        } catch(e) {
+                            console.log('WHIP direct error, trying proxy:', e.message);
+                        }
+
+                        // Fallback: proxy
+                        const proxyRes = await fetch('/api/live/' + LIVE_ID + '/whip', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/sdp' },
+                            body: peerConnection.localDescription.sdp
+                        });
+                        if (proxyRes.status === 201 || proxyRes.ok) {
+                            const answerSdp = await proxyRes.text();
+                            if (answerSdp.startsWith('v=')) {
+                                await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+                                console.log('WHIP: Connected via proxy!');
+                            }
+                        }
+                    } catch(e) {
+                        console.error('WHIP connection error:', e);
+                    }
                 }
             })
-            .catch(() => {});
+            .catch((e) => { console.error('Camera error:', e); });
     }
 }
