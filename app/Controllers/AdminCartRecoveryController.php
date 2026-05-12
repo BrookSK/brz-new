@@ -78,25 +78,65 @@ class AdminCartRecoveryController extends Controller {
 
     private function detectarAbandonos(\PDO $pdo): void {
         // Find users who visited cart/checkout pages 15+ minutes ago but have no paid order since
+        // ALSO detect directly from carrinhos table: users with items in cart but no recent paid order
         try {
-            $sql = "SELECT DISTINCT be.usuario_id, MAX(be.created_at) AS ultimo_evento
-                    FROM behavior_events be
-                    WHERE be.event_type IN ('cart_view','begin_checkout')
-                    AND be.usuario_id IS NOT NULL
-                    AND be.created_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
-                    AND be.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    AND be.usuario_id NOT IN (
+            // Method 1: From behavior_events (heatmap tracking)
+            $abandonos = [];
+            try {
+                $stCheck = $pdo->query("SHOW TABLES LIKE 'behavior_events'");
+                if ($stCheck && $stCheck->fetchColumn()) {
+                    $sql = "SELECT DISTINCT be.usuario_id, MAX(be.created_at) AS ultimo_evento
+                            FROM behavior_events be
+                            WHERE be.event_type IN ('cart_view','begin_checkout')
+                            AND be.usuario_id IS NOT NULL
+                            AND be.created_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+                            AND be.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+                            AND be.usuario_id NOT IN (
+                                SELECT p.usuario_id FROM pedidos p
+                                WHERE p.status IN ('pago','processando','enviado','entregue')
+                                AND p.created_at > be.created_at
+                                AND p.usuario_id IS NOT NULL
+                            )
+                            AND be.usuario_id NOT IN (
+                                SELECT cr.usuario_id FROM cart_recovery cr
+                                WHERE cr.detectado_em > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                            )
+                            GROUP BY be.usuario_id";
+                    $abandonos = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+            } catch (\Exception $e) {}
+
+            // Method 2: Directly from carrinhos table - users with items updated 15+ min ago, no paid order since
+            try {
+                $sqlDirect = "SELECT c.usuario_id, MAX(c.updated_at) AS ultimo_evento
+                    FROM carrinhos c
+                    INNER JOIN carrinho_items ci ON ci.carrinho_id = c.id
+                    WHERE c.usuario_id IS NOT NULL
+                    AND c.usuario_id > 0
+                    AND c.updated_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+                    AND c.updated_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+                    AND c.usuario_id NOT IN (
                         SELECT p.usuario_id FROM pedidos p
-                        WHERE p.status IN ('pago','processando','enviado','entregue')
-                        AND p.created_at > be.created_at
+                        WHERE p.status IN ('pago','processando','enviado','entregue','aprovado')
+                        AND p.created_at > c.updated_at
                         AND p.usuario_id IS NOT NULL
                     )
-                    AND be.usuario_id NOT IN (
+                    AND c.usuario_id NOT IN (
                         SELECT cr.usuario_id FROM cart_recovery cr
                         WHERE cr.detectado_em > DATE_SUB(NOW(), INTERVAL 24 HOUR)
                     )
-                    GROUP BY be.usuario_id";
-            $abandonos = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    GROUP BY c.usuario_id
+                    HAVING COUNT(ci.id) > 0";
+                $directAbandonos = $pdo->query($sqlDirect)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                // Merge, avoiding duplicates
+                $existingUids = array_column($abandonos, 'usuario_id');
+                foreach ($directAbandonos as $da) {
+                    if (!in_array($da['usuario_id'], $existingUids)) {
+                        $abandonos[] = $da;
+                    }
+                }
+            } catch (\Exception $e) {}
 
             $stInsert = $pdo->prepare("INSERT INTO cart_recovery (usuario_id, pagina_abandono, detectado_em, valor_carrinho, itens_carrinho) VALUES (?, ?, ?, ?, ?)");
 
@@ -105,7 +145,7 @@ class AdminCartRecoveryController extends Controller {
                 // Get cart value
                 $valor = 0; $itens = 0;
                 try {
-                    $stCart = $pdo->prepare("SELECT c.id, c.subtotal_produtos, (SELECT COUNT(*) FROM carrinho_items WHERE carrinho_id = c.id) AS total_itens FROM carrinhos c WHERE c.usuario_id = ? ORDER BY c.created_at DESC LIMIT 1");
+                    $stCart = $pdo->prepare("SELECT c.id, c.subtotal_produtos, (SELECT COUNT(*) FROM carrinho_items WHERE carrinho_id = c.id) AS total_itens FROM carrinhos c WHERE c.usuario_id = ? ORDER BY c.updated_at DESC LIMIT 1");
                     $stCart->execute([$uid]);
                     $cart = $stCart->fetch(\PDO::FETCH_ASSOC);
                     if ($cart) {
@@ -115,7 +155,7 @@ class AdminCartRecoveryController extends Controller {
                 } catch (\Exception $e) {}
 
                 if ($itens > 0) {
-                    $stInsert->execute([$uid, 'checkout', $a['ultimo_evento'], $valor, $itens]);
+                    $stInsert->execute([$uid, 'carrinho', $a['ultimo_evento'], $valor, $itens]);
                 }
             }
         } catch (\Exception $e) {}
