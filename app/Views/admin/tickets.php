@@ -13,8 +13,8 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
 ?>
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
-        <h1 class="h4 mb-0"><?= __('admin.tickets.title', 'Tickets') ?></h1>
-        <div class="text-muted small"><?= __('admin.tickets.subtitle', 'Atendimento e comunicação pelo site') ?></div>
+        <h1 class="page-title"><?= __('admin.tickets.title', 'Tickets') ?></h1>
+        <p class="page-subtitle"><?= __('admin.tickets.subtitle', 'Atendimento e comunicação pelo site') ?></p>
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary btn-sm" href="/admin/tickets?status=open"><?= __('ticket.status.open', 'Aberto') ?>s</a>
@@ -75,7 +75,8 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
         <?php if (empty($tickets)): ?>
             <div class="text-muted"><?= __('admin.tickets.empty', 'Nenhum ticket encontrado.') ?></div>
         <?php else: ?>
-            <div class="table-responsive">
+            <!-- Desktop: Table -->
+            <div class="d-none d-md-block table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
@@ -124,6 +125,40 @@ $atendenteId = (int) ($_GET['atendente_id'] ?? 0);
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+            <!-- Mobile: Cards -->
+            <div class="d-md-none">
+                <?php foreach ($tickets as $t): ?>
+                    <?php
+                        $st = (string) ($t['status'] ?? 'open');
+                        $badge = ($st === 'open') ? 'bg-success' : 'bg-secondary';
+                    ?>
+                    <a href="/admin/tickets/<?= (int) ($t['id'] ?? 0) ?>" class="text-decoration-none d-block mb-2">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <span class="fw-bold text-dark">#<?= (int) ($t['id'] ?? 0) ?></span>
+                                    <span class="badge <?= $badge ?>"><?= $st === 'open' ? __('ticket.status.open', 'Aberto') : __('ticket.status.closed', 'Fechado') ?></span>
+                                </div>
+                                <div class="fw-semibold text-dark" style="word-break:break-word;"><?= htmlspecialchars((string) ($t['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="text-muted small" style="word-break:break-all;"><?= htmlspecialchars((string) ($t['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php if (!empty($t['atendente_nome'])): ?>
+                                    <div class="small mt-1"><span class="text-muted">Atendente:</span> <?= htmlspecialchars((string) ($t['atendente_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php endif; ?>
+                                <?php if (!empty($t['motivo'])): ?>
+                                    <div class="small mt-1"><span class="text-muted">Motivo:</span> <?= htmlspecialchars((string) ($t['motivo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php endif; ?>
+                                <?php if (!empty($t['assunto'])): ?>
+                                    <div class="small mt-1" style="word-break:break-word;"><span class="text-muted">Assunto:</span> <?= htmlspecialchars((string) ($t['assunto'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php endif; ?>
+                                <div class="text-muted small mt-1"><?= htmlspecialchars((string) ($t['updated_at'] ?? $t['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php if (!empty($t['has_unread'])): ?>
+                                    <span class="badge bg-danger mt-1">Nova mensagem</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </a>
+                <?php endforeach; ?>
             </div>
         <?php endif; ?>
     </div>
