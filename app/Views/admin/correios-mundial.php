@@ -39,7 +39,8 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header"><strong>Pedidos (Caixa Fechada) - prontos para etiqueta</strong></div>
         <div class="card-body">
-            <div class="table-responsive">
+            <!-- Desktop: Table -->
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
@@ -72,13 +73,34 @@
                     </tbody>
                 </table>
             </div>
+            <!-- Mobile: Cards -->
+            <div class="d-md-none">
+                <?php if (empty($pedidos)): ?>
+                    <div class="text-muted small py-3">Nenhum pedido aguardando etiqueta.</div>
+                <?php else: ?>
+                    <?php foreach ($pedidos as $p): ?>
+                        <?php $pid = (int) ($p['pedido_id'] ?? 0); ?>
+                        <div class="border-bottom py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
+                                    <span class="small ms-2" style="word-break:break-word;"><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></span>
+                                </div>
+                                <a class="btn btn-sm btn-primary py-0 px-2" href="/admin/correios-mundial/pedido/<?= $pid ?>">Abrir</a>
+                            </div>
+                            <div class="text-muted small"><?= !empty($p['created_at']) ? date('d/m/Y H:i', strtotime((string) $p['created_at'])) : '' ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
     <div class="card border-0 shadow-sm">
         <div class="card-header"><strong>Etiquetas geradas (PACKET)</strong></div>
         <div class="card-body">
-            <div class="table-responsive">
+            <!-- Desktop: Table -->
+            <div class="table-responsive d-none d-md-block">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
@@ -114,6 +136,31 @@
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+            <!-- Mobile: Cards -->
+            <div class="d-md-none">
+                <?php if (empty($etiquetas)): ?>
+                    <div class="text-muted small py-3">Nenhuma etiqueta gerada.</div>
+                <?php else: ?>
+                    <?php foreach ($etiquetas as $e): ?>
+                        <?php $pid = (int) ($e['pedido_id'] ?? 0); ?>
+                        <?php $trk = (string) ($e['tracking_number'] ?? ''); ?>
+                        <div class="border-bottom py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div style="min-width:0;flex:1;">
+                                    <span class="fw-bold small">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></span>
+                                    <span class="small ms-1" style="word-break:break-word;"><?= htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) ?></span>
+                                    <?php if ($trk !== ''): ?>
+                                        <div class="text-muted small" style="word-break:break-all;"><?= htmlspecialchars($trk) ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($trk !== ''): ?>
+                                    <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="/admin/correios-mundial/etiqueta/<?= rawurlencode($trk) ?>.pdf" target="_blank">PDF</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
     </div>

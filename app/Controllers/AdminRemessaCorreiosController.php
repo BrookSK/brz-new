@@ -649,53 +649,55 @@ class AdminRemessaCorreiosController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="page-title">Remessa Correios</h1>
-                    <div>
-                        <button type="button" class="btn btn-success me-2" onclick="gerarLoteEtiquetas()">
-                            <i class="fas fa-tags me-1"></i>Gerar Lote
-                        </button>
-                        <button type="button" class="btn btn-warning me-2" onclick="imprimirTodasEtiquetas()">
-                            <i class="fas fa-print me-1"></i>Imprimir Todas
-                        </button>
-                        <button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
-                        </button>
+                    <div class="d-none d-md-flex gap-2">
+                        <button type="button" class="btn btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
+                        <button type="button" class="btn btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir Todas</button>
+                        <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'correiosActionsM\').classList.toggle(\'d-none\')"><i class="fas fa-ellipsis-v me-1"></i>Ações</button>
+                </div>
+                <div id="correiosActionsM" class="d-none d-md-none mb-3">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
+                        <button type="button" class="btn btn-sm btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir</button>
+                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                     </div>
                 </div>
 
                 <!-- Estatísticas -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
+                <div class="row g-2 mb-4">
+                    <div class="col-6 col-md-3">
                         <div class="card card-stats bg-info text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Prontas</h5>
-                                <h3>' . count($remessasProntas) . '</h3>
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-0">Prontas</h6>
+                                <h3 class="mb-0">' . count($remessasProntas) . '</h3>
                                 <small>Aguardando etiqueta</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="card card-stats bg-purple text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Etiquetas</h5>
-                                <h3>' . count($etiquetasGeradas) . '</h3>
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-0">Etiquetas</h6>
+                                <h3 class="mb-0">' . count($etiquetasGeradas) . '</h3>
                                 <small>Geradas</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="card card-stats bg-success text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Impressas</h5>
-                                <h3>' . count($etiquetasImpressas) . '</h3>
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-0">Impressas</h6>
+                                <h3 class="mb-0">' . count($etiquetasImpressas) . '</h3>
                                 <small>Prontas para postagem</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <div class="card card-stats bg-primary text-white">
-                            <div class="card-body">
-                                <h5 class="card-title">Postadas</h5>
-                                <h3>' . $this->getTotalPostadas() . '</h3>
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-0">Postadas</h6>
+                                <h3 class="mb-0">' . $this->getTotalPostadas() . '</h3>
                                 <small>Enviadas</small>
                             </div>
                         </div>
@@ -707,10 +709,10 @@ class AdminRemessaCorreiosController extends Controller {
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Remessas Prontas para Etiqueta</h5>
+                                <h5 class="mb-0">Remessas Prontas para Etiqueta</h5>
                             </div>
                             <div class="card-body">
-                                <div class="table-responsive">
+                                <div class="table-responsive d-none d-md-block">
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
@@ -752,6 +754,28 @@ class AdminRemessaCorreiosController extends Controller {
                                         echo '</tbody>
                                     </table>
                                 </div>
+                                <!-- Mobile: Cards -->
+                                <div class="d-md-none">';
+                                foreach ($remessasProntas as $remessa) {
+                                    echo '<div class="border-bottom py-2">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <input type="checkbox" class="remessa-checkbox mt-1" value="' . (int) ($remessa['pedido_id'] ?? 0) . '">
+                                            <div style="flex:1;min-width:0;">
+                                                <div class="fw-semibold small">#' . str_pad($remessa['pedido_id'], 6, '0', STR_PAD_LEFT) . '</div>
+                                                <div class="small" style="word-break:break-word;">' . htmlspecialchars($remessa['cliente_nome'] ?? 'N/A') . '</div>
+                                                <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:10px;">
+                                                    <span class="text-muted">' . date('d/m/Y', strtotime($remessa['created_at'])) . '</span>
+                                                    ' . ($remessa['peso_total'] !== null && (float)$remessa['peso_total'] > 0 ? '<span class="badge bg-light text-dark">' . number_format((float)$remessa['peso_total'], 3, ',', '.') . ' kg</span>' : '') . '
+                                                </div>
+                                            </div>
+                                            <button class="btn btn-sm btn-purple py-0 px-2" onclick="gerarEtiqueta(' . (int) ($remessa['pedido_id'] ?? 0) . ')"><i class="fas fa-tags"></i></button>
+                                        </div>
+                                    </div>';
+                                }
+                                if (empty($remessasProntas)) {
+                                    echo '<div class="text-center text-muted py-3 small">Nenhuma remessa pronta</div>';
+                                }
+                                echo '</div>
                             </div>
                         </div>
                     </div>
