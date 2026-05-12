@@ -34,19 +34,41 @@
     document.addEventListener('click', function(e){
         var el = e.target.closest('a,button,input[type=submit],.btn,[onclick]') || e.target;
         var tag = el.tagName || '';
-        var text = (el.textContent || '').trim().substring(0,50);
+        var text = (el.textContent || el.value || '').trim().substring(0,60);
         var id = el.id || '';
-        var cls = (el.className || '').toString().substring(0,50);
-        var elemento = tag;
-        if(id) elemento += '#'+id;
-        else if(text) elemento += ':'+text;
-        else if(cls) elemento += '.'+cls.split(' ')[0];
+        var title = el.getAttribute('title') || el.getAttribute('aria-label') || '';
+        var href = el.getAttribute('href') || '';
+        
+        // Build friendly name: prioritize visible text
+        var elemento = '';
+        if(text && text.length > 1) {
+            elemento = text;
+        } else if(title) {
+            elemento = title;
+        } else if(id) {
+            elemento = id;
+        } else if(href && href !== '#' && href !== 'javascript:void(0)') {
+            elemento = 'Link: ' + href.substring(0,40);
+        } else {
+            elemento = tag.toLowerCase();
+        }
+        
+        // Add context
+        if(tag === 'A' && href && !elemento.startsWith('Link:')) {
+            elemento = '🔗 ' + elemento;
+        } else if(tag === 'BUTTON' || el.classList.contains('btn')) {
+            elemento = '🔘 ' + elemento;
+        } else if(tag === 'INPUT') {
+            elemento = '📝 ' + (el.placeholder || el.name || 'campo');
+        } else if(tag === 'IMG') {
+            elemento = '🖼️ ' + (el.alt || 'imagem');
+        }
 
         send({
             tipo:'click',
             x: Math.round((e.pageX / document.documentElement.scrollWidth) * 100),
             y: Math.round((e.pageY / document.documentElement.scrollHeight) * 100),
-            elemento: elemento
+            elemento: elemento.substring(0,80)
         });
     });
 

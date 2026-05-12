@@ -314,7 +314,17 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         if (!empty($topClicks)) {
             echo '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;">';
             foreach ($topClicks as $c) {
-                echo '<div style="border:1px solid #E2E8F0;border-radius:8px;padding:12px;"><div style="font-size:13px;font-weight:600;color:#18253D;margin-bottom:4px;">'.htmlspecialchars($c['elemento']).'</div><div style="font-size:11px;color:#94A3B8;">'.htmlspecialchars($c['pagina']).'</div><div style="font-size:14px;font-weight:700;color:var(--navy);margin-top:6px;">'.(int)$c['cliques'].' cliques</div></div>';
+                $elem = htmlspecialchars($c['elemento'] ?? '');
+                // Make page path friendly
+                $paginaFriendly = $c['pagina'] ?? '/';
+                $pageLabels = ['/'=>'Página Inicial', '/produtos'=>'Produtos', '/carrinho'=>'Carrinho', '/checkout'=>'Checkout', '/contato'=>'Contato', '/faq'=>'FAQ', '/assessoria'=>'Assessoria'];
+                foreach ($pageLabels as $path => $label) {
+                    if ($paginaFriendly === $path || strpos($paginaFriendly, $path.'/') === 0) { $paginaFriendly = $label; break; }
+                }
+                if (strpos($paginaFriendly, '/produto/detalhes/') === 0) $paginaFriendly = 'Página do Produto';
+                if (strpos($paginaFriendly, '/grupo') === 0) $paginaFriendly = 'Grupo de Compras';
+                
+                echo '<div style="border:1px solid #E2E8F0;border-radius:8px;padding:12px;"><div style="font-size:14px;font-weight:600;color:#18253D;margin-bottom:4px;">'.$elem.'</div><div style="font-size:11px;color:#64748B;">em: '.htmlspecialchars($paginaFriendly).'</div><div style="font-size:15px;font-weight:700;color:var(--navy);margin-top:6px;">'.(int)$c['cliques'].' cliques</div></div>';
             }
             echo '</div>';
         } else {
@@ -336,8 +346,9 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '</select>
 <button onclick="carregarHeatmap()" class="btn-dash-secondary" style="padding:8px 14px;font-size:13px;"><i class="bi bi-arrow-clockwise me-1"></i>Atualizar</button>
 </div>
-<div id="heatmapContainer" style="position:relative;width:100%;min-height:500px;background:#1a1a2e;border-radius:10px;overflow:hidden;">
-<canvas id="heatmapCanvas" style="width:100%;height:500px;"></canvas>
+<div id="heatmapContainer" style="position:relative;width:100%;height:600px;border-radius:10px;overflow:hidden;border:1px solid #E2E8F0;">
+<iframe id="heatmapIframe" src="/" style="width:100%;height:100%;border:none;pointer-events:none;"></iframe>
+<canvas id="heatmapCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.6;"></canvas>
 <div id="heatmapInfo" style="position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.7);color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;">Selecione uma página para visualizar</div>
 </div>
 <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:#94A3B8;">
@@ -364,27 +375,35 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 async function carregarHeatmap(){
     var pagina = document.getElementById("heatmapPageSelect").value;
     var info = document.getElementById("heatmapInfo");
-    info.textContent = "Carregando dados de: " + pagina;
+    var iframe = document.getElementById("heatmapIframe");
+    info.textContent = "Carregando: " + pagina;
+    
+    // Load the actual page in iframe
+    iframe.src = pagina;
     
     var r = await fetch("/admin/mapa-calor-site/dados-pagina?pagina="+encodeURIComponent(pagina));
     var d = await r.json();
     
     if(!d.success || !d.cliques || !d.cliques.length){
-        info.textContent = "Sem dados de cliques para esta página.";
+        info.textContent = "Sem dados de cliques para esta página ainda.";
         var canvas = document.getElementById("heatmapCanvas");
         var ctx = canvas.getContext("2d");
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         return;
     }
     
-    renderHeatmap(d.cliques);
-    info.textContent = pagina + " — " + d.cliques.length + " pontos de clique";
+    // Wait for iframe to load then render heatmap
+    setTimeout(function(){ renderHeatmap(d.cliques); }, 1000);
+    info.textContent = pagina + " — " + d.cliques.length + " zonas de clique";
 }
 
 function renderHeatmap(cliques){
     var canvas = document.getElementById("heatmapCanvas");
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    var container = document.getElementById("heatmapContainer");
+    canvas.width = container.offsetWidth;
+    canvas.height = container.offsetHeight;
     var ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -397,12 +416,13 @@ function renderHeatmap(cliques){
         var x = (c.x / 100) * canvas.width;
         var y = (c.y / 100) * canvas.height;
         var intensity = c.intensidade / maxInt;
-        var radius = 20 + (intensity * 30);
+        var radius = 25 + (intensity * 40);
         
         var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-        gradient.addColorStop(0, "rgba(255,0,0," + (intensity * 0.8) + ")");
-        gradient.addColorStop(0.4, "rgba(255,255,0," + (intensity * 0.4) + ")");
-        gradient.addColorStop(0.7, "rgba(0,255,0," + (intensity * 0.2) + ")");
+        gradient.addColorStop(0, "rgba(255,0,0," + (intensity * 0.7) + ")");
+        gradient.addColorStop(0.3, "rgba(255,165,0," + (intensity * 0.5) + ")");
+        gradient.addColorStop(0.6, "rgba(255,255,0," + (intensity * 0.3) + ")");
+        gradient.addColorStop(0.8, "rgba(0,255,0," + (intensity * 0.15) + ")");
         gradient.addColorStop(1, "rgba(0,0,255,0)");
         
         ctx.beginPath();
