@@ -406,6 +406,8 @@ $router->post('/admin/descricao-produtos/reprovar-lote', 'AdminDescricaoProdutos
 // Email Marketing Inteligente
 $router->get('/admin/email-marketing', 'AdminEmailMarketingController', 'index');
 $router->post('/admin/email-marketing/gerar', 'AdminEmailMarketingController', 'gerarCampanhas');
+$router->post('/admin/email-marketing/transcrever', 'AdminEmailMarketingController', 'transcrever');
+$router->get('/admin/email-marketing/buscar-usuarios', 'AdminEmailMarketingController', 'buscarUsuarios');
 $router->post('/admin/email-marketing/aprovar', 'AdminEmailMarketingController', 'aprovar');
 $router->post('/admin/email-marketing/rejeitar', 'AdminEmailMarketingController', 'rejeitar');
 $router->get('/admin/email-marketing/detalhes', 'AdminEmailMarketingController', 'detalhes');

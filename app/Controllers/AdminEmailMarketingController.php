@@ -119,6 +119,12 @@ class AdminEmailMarketingController extends Controller {
         $pdo = Database::getConnection();
         $this->ensureTables($pdo);
 
+        $input = json_decode(file_get_contents('php://input'), true);
+        $tipo = trim((string)($input['tipo'] ?? 'reativacao'));
+        $instrucoes = trim((string)($input['instrucoes'] ?? ''));
+        $categoriaFiltro = trim((string)($input['categoria'] ?? ''));
+        $usuarioIndividualId = (int)($input['usuario_id'] ?? 0);
+
         $diasRecompra = (int)$this->getConfig($pdo, 'dias_recompra_minimo', '30');
         $nomeLoja = 'Braziliana';
         try {
@@ -128,102 +134,149 @@ class AdminEmailMarketingController extends Controller {
             if ($v) $nomeLoja = $v;
         } catch (\Exception $e) {}
 
-        // Analyze clients
-        $userNomeCol = 'nome'; $userEmailCol = 'email';
+        $userNomeCol = 'nome';
         try {
             $cols = $pdo->query("DESCRIBE usuarios")->fetchAll(\PDO::FETCH_COLUMN);
             if (!in_array('nome', $cols) && in_array('name', $cols)) $userNomeCol = 'name';
         } catch (\Exception $e) {}
 
-        // Find clients without purchase in 30+ days
-        $clientes30 = [];
-        try {
-            $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra,
-                    COUNT(p.id) AS total_pedidos, COALESCE(AVG(p.valor_total),0) AS ticket_medio
-                    FROM usuarios u
-                    LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
-                    GROUP BY u.id, u.{$userNomeCol}, u.email
-                    HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
-                    ORDER BY ultima_compra ASC LIMIT 100";
-            $clientes30 = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } catch (\Exception $e) {}
+        // Build client query based on campaign type
+        $clientes = [];
+        $gatilho = $tipo;
+        $descricaoSegmento = '';
 
-        if (empty($clientes30)) {
-            echo json_encode(['success' => true, 'message' => 'Nenhum cliente elegível para campanha no momento.', 'campanhas_geradas' => 0]);
+        try {
+            if ($tipo === 'individual' && $usuarioIndividualId > 0) {
+                $st = $pdo->prepare("SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.id = ?");
+                $st->execute([$usuarioIndividualId]);
+                $clientes = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Usuário individual";
+                $gatilho = 'individual';
+
+            } elseif ($tipo === 'reativacao' || $tipo === 'recompra') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra,
+                        COUNT(p.id) AS total_pedidos
+                        FROM usuarios u
+                        LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
+                        ORDER BY ultima_compra ASC LIMIT 200";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Clientes sem compra há mais de {$diasRecompra} dias";
+
+            } elseif ($tipo === 'aniversario') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.data_nascimento
+                        FROM usuarios u
+                        WHERE u.data_nascimento IS NOT NULL
+                        AND (MONTH(u.data_nascimento) = MONTH(NOW()) AND DAY(u.data_nascimento) BETWEEN DAY(NOW()) AND DAY(NOW())+7)
+                        LIMIT 200";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Aniversariantes da semana";
+
+            } elseif ($tipo === 'pos_venda') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra
+                        FROM usuarios u
+                        INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        LIMIT 200";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Clientes com compra nos últimos 7 dias";
+
+            } elseif ($tipo === 'vip') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, COUNT(p.id) AS total_pedidos, SUM(COALESCE(p.valor_total,p.total,0)) AS total_gasto
+                        FROM usuarios u
+                        INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        HAVING total_pedidos >= 3 OR total_gasto >= 500
+                        ORDER BY total_gasto DESC LIMIT 200";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Clientes VIP (3+ pedidos ou $500+ gastos)";
+
+            } elseif ($tipo === 'institucional') {
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 200";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Todos os clientes (institucional)";
+
+            } else {
+                // categoria, carrinho_abandonado, etc - get all active clients
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 200";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                $descricaoSegmento = "Clientes ativos - campanha {$tipo}";
+            }
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Erro ao buscar clientes: ' . $e->getMessage()]);
             return;
         }
 
-        // Group by days since last purchase
-        $grupos = ['30_dias' => [], '60_dias' => [], '90_dias' => []];
-        foreach ($clientes30 as $c) {
-            $dias = (int)floor((time() - strtotime($c['ultima_compra'])) / 86400);
-            if ($dias >= 90) $grupos['90_dias'][] = $c;
-            elseif ($dias >= 60) $grupos['60_dias'][] = $c;
-            else $grupos['30_dias'][] = $c;
+        if (empty($clientes)) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum cliente encontrado para este tipo de campanha. Tente outro tipo.']);
+            return;
         }
 
-        $campanhasGeradas = 0;
         $tom = $this->getConfig($pdo, 'tom_marca', 'humanizado, elegante, conversacional');
         $palavrasProibidas = $this->getConfig($pdo, 'palavras_proibidas', '');
 
-        foreach ($grupos as $tipo => $clientes) {
-            if (empty($clientes)) continue;
+        // Generate campaign content via AI
+        $tipoLabels = [
+            'reativacao'=>'Reativação','aniversario'=>'Aniversário','pos_venda'=>'Pós-venda',
+            'categoria'=>'Por Categoria','vip'=>'Clientes VIP','institucional'=>'Institucional',
+            'recompra'=>'Recompra','carrinho_abandonado'=>'Carrinho Abandonado','individual'=>'Individual'
+        ];
+        $tipoLabel = $tipoLabels[$tipo] ?? ucfirst($tipo);
 
-            $tipoLabel = str_replace('_', ' ', $tipo);
-            $gatilho = 'reativacao_' . str_replace('_dias', '', $tipo);
-
-            // Check if similar campaign already exists recently
-            $st = $pdo->prepare("SELECT COUNT(*) FROM email_mkt_campanhas WHERE gatilho = ? AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY) AND status NOT IN ('rejeitada','cancelada')");
-            $st->execute([$gatilho]);
-            if ((int)$st->fetchColumn() > 0) continue;
-
-            // Generate campaign content via AI
-            $systemPrompt = "Você é um especialista em email marketing para e-commerce. Gere o conteúdo de uma campanha de reativação para clientes que não compram há {$tipoLabel}.
+        $systemPrompt = "Você é um especialista em email marketing para e-commerce. Gere o conteúdo de uma campanha do tipo '{$tipoLabel}'.
 Tom: {$tom}. Palavras proibidas: {$palavrasProibidas}.
-NÃO crie descontos, cupons ou promoções. NÃO use urgência falsa.
+NÃO crie descontos, cupons ou promoções. NÃO use urgência falsa. NÃO invente informações.
 Retorne em JSON com as chaves: assunto, pre_header, tag_campanha, titulo_email, subtitulo_email, paragrafo_1, paragrafo_2, texto_destaque, paragrafo_fechamento, texto_cta, texto_sub_cta.
 O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavras.";
 
-            $userMsg = "Loja: {$nomeLoja}\nTipo: Reativação {$tipoLabel}\nTotal de clientes: " . count($clientes) . "\nExemplos de nomes: " . implode(', ', array_slice(array_column($clientes, 'nome'), 0, 5));
+        $userMsg = "Loja: {$nomeLoja}\nTipo: {$tipoLabel}\nSegmento: {$descricaoSegmento}\nTotal de clientes: " . count($clientes);
+        if ($instrucoes !== '') $userMsg .= "\n\nInstruções do administrador:\n{$instrucoes}";
+        if ($categoriaFiltro !== '') $userMsg .= "\nCategoria foco: {$categoriaFiltro}";
+        $userMsg .= "\nExemplos de nomes: " . implode(', ', array_slice(array_column($clientes, 'nome'), 0, 5));
 
-            $result = $this->callAI($pdo, $systemPrompt, $userMsg);
-            if (isset($result['error'])) continue;
-
-            $content = json_decode($result['text'], true);
-            if (!$content || !isset($content['assunto'])) {
-                // Try to extract JSON from response
-                preg_match('/\{.*\}/s', $result['text'], $m);
-                if (!empty($m[0])) $content = json_decode($m[0], true);
-                if (!$content) continue;
-            }
-
-            // Create campaign
-            $st = $pdo->prepare("INSERT INTO email_mkt_campanhas (nome, tipo, gatilho, status, assunto, pre_header, variaveis_ia, total_clientes, observacoes_ia) VALUES (?, 'reativacao', ?, 'pendente_revisao', ?, ?, ?, ?, ?)");
-            $st->execute([
-                "Reativação {$tipoLabel} - " . date('d/m'),
-                $gatilho,
-                $content['assunto'] ?? 'Sentimos sua falta!',
-                $content['pre_header'] ?? '',
-                json_encode($content, JSON_UNESCAPED_UNICODE),
-                count($clientes),
-                "Campanha gerada automaticamente para " . count($clientes) . " clientes sem compra há {$tipoLabel}."
-            ]);
-            $campanhaId = (int)$pdo->lastInsertId();
-
-            // Link clients
-            $stInsert = $pdo->prepare("INSERT IGNORE INTO email_mkt_campanha_clientes (campanha_id, cliente_id, email, nome) VALUES (?, ?, ?, ?)");
-            foreach ($clientes as $c) {
-                $stInsert->execute([$campanhaId, (int)$c['id'], $c['email'], $c['nome']]);
-            }
-
-            // Build HTML from template
-            $html = $this->buildEmailHtml($content, $nomeLoja);
-            $pdo->prepare("UPDATE email_mkt_campanhas SET html_content = ? WHERE id = ?")->execute([$html, $campanhaId]);
-
-            $campanhasGeradas++;
+        $result = $this->callAI($pdo, $systemPrompt, $userMsg);
+        if (isset($result['error'])) {
+            echo json_encode(['success' => false, 'error' => 'Erro da IA: ' . $result['error']]);
+            return;
         }
 
-        echo json_encode(['success' => true, 'campanhas_geradas' => $campanhasGeradas, 'message' => "{$campanhasGeradas} campanha(s) gerada(s) com sucesso."]);
+        $content = json_decode($result['text'], true);
+        if (!$content || !isset($content['assunto'])) {
+            preg_match('/\{.*\}/s', $result['text'], $m);
+            if (!empty($m[0])) $content = json_decode($m[0], true);
+            if (!$content) {
+                echo json_encode(['success' => false, 'error' => 'IA retornou formato inválido. Tente novamente.']);
+                return;
+            }
+        }
+
+        // Create campaign
+        $st = $pdo->prepare("INSERT INTO email_mkt_campanhas (nome, tipo, gatilho, status, assunto, pre_header, variaveis_ia, total_clientes, observacoes_ia) VALUES (?, ?, ?, 'pendente_revisao', ?, ?, ?, ?, ?)");
+        $st->execute([
+            "{$tipoLabel} - " . date('d/m'),
+            $tipo,
+            $gatilho,
+            $content['assunto'] ?? 'Campanha',
+            $content['pre_header'] ?? '',
+            json_encode($content, JSON_UNESCAPED_UNICODE),
+            count($clientes),
+            ($instrucoes !== '' ? "Instruções: {$instrucoes}\n" : '') . "Segmento: {$descricaoSegmento}. " . count($clientes) . " clientes."
+        ]);
+        $campanhaId = (int)$pdo->lastInsertId();
+
+        // Link clients
+        $stInsert = $pdo->prepare("INSERT IGNORE INTO email_mkt_campanha_clientes (campanha_id, cliente_id, email, nome) VALUES (?, ?, ?, ?)");
+        foreach ($clientes as $c) {
+            $stInsert->execute([$campanhaId, (int)$c['id'], $c['email'], $c['nome']]);
+        }
+
+        // Build HTML
+        $html = $this->buildEmailHtml($content, $nomeLoja);
+        $pdo->prepare("UPDATE email_mkt_campanhas SET html_content = ? WHERE id = ?")->execute([$html, $campanhaId]);
+
+        echo json_encode(['success' => true, 'message' => "Campanha '{$tipoLabel}' gerada com " . count($clientes) . " clientes. Aguardando revisão.", 'campanha_id' => $campanhaId]);
     }
 
     private function buildEmailHtml(array $vars, string $nomeLoja): string {
@@ -253,6 +306,70 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $template = preg_replace('/<!-- PRODUTOS SUGERIDOS.*?<\/div>\s*<\/div>/s', '', $template);
 
         return str_replace(array_keys($replacements), array_values($replacements), $template);
+    }
+
+    // ============================================================
+    // BUSCAR USUÁRIOS (para campanha individual)
+    // ============================================================
+    public function buscarUsuarios(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+        $q = trim((string)$request->getParam('q', ''));
+        if (strlen($q) < 2) { echo json_encode(['success'=>true,'usuarios'=>[]]); return; }
+
+        $userNomeCol = 'nome';
+        try {
+            $cols = $pdo->query("DESCRIBE usuarios")->fetchAll(\PDO::FETCH_COLUMN);
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $userNomeCol = 'name';
+        } catch (\Exception $e) {}
+
+        $st = $pdo->prepare("SELECT id, {$userNomeCol} AS nome, email FROM usuarios WHERE ({$userNomeCol} LIKE ? OR email LIKE ?) AND email IS NOT NULL AND email != '' ORDER BY {$userNomeCol} LIMIT 10");
+        $st->execute(["%{$q}%", "%{$q}%"]);
+        $usuarios = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        echo json_encode(['success'=>true,'usuarios'=>$usuarios]);
+    }
+
+    // ============================================================
+    // TRANSCREVER ÁUDIO
+    // ============================================================
+    public function transcrever(Request $request) {
+        header('Content-Type: application/json; charset=UTF-8');
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $pdo = Database::getConnection();
+
+        if (empty($_FILES['audio'])) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum áudio recebido']);
+            return;
+        }
+
+        $apiKey = $this->getChatGPTApiKey($pdo);
+        if (!$apiKey) {
+            echo json_encode(['success' => false, 'error' => 'API Key não configurada']);
+            return;
+        }
+
+        $tmpFile = $_FILES['audio']['tmp_name'];
+        $cFile = new \CURLFile($tmpFile, 'audio/webm', 'audio.webm');
+
+        $ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => ['file' => $cFile, 'model' => 'whisper-1', 'language' => 'pt'],
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey],
+            CURLOPT_TIMEOUT => 60
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $data = json_decode($resp, true);
+        if ($code === 200 && isset($data['text'])) {
+            echo json_encode(['success' => true, 'text' => trim($data['text'])]);
+        } else {
+            echo json_encode(['success' => false, 'error' => $data['error']['message'] ?? 'Erro na transcrição']);
+        }
     }
 
     // ============================================================
@@ -358,7 +475,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         echo '<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
 <div><h1 style="font-size:20px;font-weight:700;color:var(--navy);margin:0;">Automações de Email Marketing</h1>
 <small style="color:#64748B;">Campanhas inteligentes geradas por IA</small></div>
-<button class="btn-navy" onclick="gerarCampanhasIA()"><i class="bi bi-stars me-1"></i>Gerar Campanhas com IA</button>
+<button class="btn-navy" onclick="document.getElementById('modalNovaCampanha').style.display='flex'"><i class="bi bi-plus-lg me-1"></i>Nova Campanha</button>
 </div>';
 
         // KPI Cards
@@ -389,13 +506,66 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
             echo '<div class="section-card"><div class="section-body"><p style="color:#94A3B8;">Seção em desenvolvimento.</p></div></div>';
         }
 
-        // Progress modal
-        echo '<div id="progressModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:none;align-items:center;justify-content:center;">
-<div style="background:#fff;border-radius:12px;padding:32px;max-width:400px;width:90%;text-align:center;">
-<i class="bi bi-stars" style="font-size:32px;color:var(--navy);"></i>
-<h5 style="margin:12px 0 8px;color:var(--navy);">Gerando campanhas...</h5>
-<p id="progressText" style="color:#64748B;font-size:13px;">Analisando clientes e criando segmentações</p>
-</div></div>';
+        // Modal Nova Campanha (seleção de tipo + instruções + áudio)
+        echo '<div id="modalNovaCampanha" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+<div style="background:#fff;border-radius:16px;max-width:560px;width:95%;max-height:90vh;overflow-y:auto;">
+<div style="background:var(--navy);color:#fff;padding:20px 24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;">
+<h5 style="margin:0;font-size:16px;font-weight:700;"><i class="bi bi-stars me-2"></i>Nova Campanha</h5>
+<button onclick="document.getElementById(\'modalNovaCampanha\').style.display=\'none\'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">&times;</button>
+</div>
+<div style="padding:24px;">
+
+<div style="margin-bottom:16px;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Tipo de Campanha</label>
+<select id="campTipo" style="width:100%;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+<option value="reativacao">Reativação (clientes sem comprar)</option>
+<option value="aniversario">Aniversariantes</option>
+<option value="pos_venda">Pós-venda (compra recente)</option>
+<option value="categoria">Por Categoria de Produto</option>
+<option value="vip">Clientes VIP</option>
+<option value="institucional">Institucional / Relacionamento</option>
+<option value="recompra">Recompra Inteligente</option>
+<option value="carrinho_abandonado">Carrinho Abandonado</option>
+<option value="individual">Usuário Individual</option>
+</select>
+</div>
+
+<div id="campIndividualWrap" style="margin-bottom:16px;display:none;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Buscar Usuário</label>
+<input type="text" id="campIndividualBusca" placeholder="Digite nome ou email..." oninput="buscarUsuariosCamp()" style="width:100%;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+<div id="campIndividualResultados" style="max-height:150px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;margin-top:6px;display:none;"></div>
+<input type="hidden" id="campIndividualId" value="">
+<div id="campIndividualSelecionado" style="margin-top:6px;font-size:12px;color:#065F46;display:none;"></div>
+</div>
+
+<div id="campCategoriaWrap" style="margin-bottom:16px;display:none;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Categoria</label>
+<input type="text" id="campCategoria" placeholder="Ex: snacks, beleza, limpeza..." style="width:100%;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+</div>
+
+<div style="margin-bottom:16px;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;display:block;margin-bottom:8px;">Instruções e Contexto para a IA</label>
+<textarea id="campInstrucoes" rows="4" placeholder="Descreva o objetivo da campanha, tom desejado, produtos a destacar, público-alvo específico..." style="width:100%;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+<button type="button" id="btnMic" onclick="toggleRecording()" style="width:36px;height:36px;border-radius:50%;border:2px solid #E2E8F0;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s;">
+<i class="bi bi-mic-fill" style="font-size:16px;color:#64748B;"></i>
+</button>
+<span id="micStatus" style="font-size:12px;color:#94A3B8;">Clique no microfone para ditar instruções</span>
+</div>
+</div>
+
+<div style="display:flex;gap:10px;margin-top:20px;">
+<button onclick="criarCampanhaIA()" class="btn-navy" style="flex:1;padding:12px;font-size:14px;"><i class="bi bi-stars me-1"></i>Gerar Campanha</button>
+<button onclick="document.getElementById(\'modalNovaCampanha\').style.display=\'none\'" style="flex:0;padding:12px 20px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">Cancelar</button>
+</div>
+
+<div id="campProgress" style="display:none;margin-top:16px;text-align:center;">
+<i class="bi bi-stars" style="font-size:24px;color:var(--navy);animation:spin 2s linear infinite;"></i>
+<p style="color:#64748B;font-size:13px;margin-top:8px;">Analisando clientes e gerando campanha...</p>
+</div>
+
+</div></div></div>
+<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>';
 
         // Campaign detail modal
         echo '<div class="modal fade" id="modalCampanha" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
@@ -411,11 +581,102 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 let currentCampId = null;
-async function gerarCampanhasIA(){
-    const m=document.getElementById("progressModal");m.style.display="flex";
-    const r=await fetch("/admin/email-marketing/gerar",{method:"POST"});
-    const d=await r.json();m.style.display="none";
-    alert(d.message||"Concluído");location.reload();
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+// Show/hide fields based on type
+document.getElementById("campTipo").addEventListener("change", function(){
+    document.getElementById("campCategoriaWrap").style.display = this.value === "categoria" ? "block" : "none";
+    document.getElementById("campIndividualWrap").style.display = this.value === "individual" ? "block" : "none";
+});
+
+// Search users for individual campaign
+let searchTimeout = null;
+function buscarUsuariosCamp(){
+    clearTimeout(searchTimeout);
+    const q = document.getElementById("campIndividualBusca").value.trim();
+    if(q.length < 2){ document.getElementById("campIndividualResultados").style.display="none"; return; }
+    searchTimeout = setTimeout(async ()=>{
+        const r = await fetch("/admin/email-marketing/buscar-usuarios?q="+encodeURIComponent(q));
+        const d = await r.json();
+        const wrap = document.getElementById("campIndividualResultados");
+        if(!d.success || !d.usuarios.length){ wrap.innerHTML="<div style='padding:8px 12px;color:#94A3B8;font-size:12px;'>Nenhum resultado</div>"; wrap.style.display="block"; return; }
+        wrap.innerHTML = d.usuarios.map(u=>"<div onclick='selecionarUsuarioCamp("+u.id+",\""+u.nome.replace(/"/g,"&quot;")+"\",\""+u.email+"\")' style='padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F1F5F9;' onmouseover='this.style.background=\"#F8FAFC\"' onmouseout='this.style.background=\"\"'><strong>"+u.nome+"</strong><br><small style='color:#94A3B8;'>"+u.email+"</small></div>").join("");
+        wrap.style.display="block";
+    }, 300);
+}
+function selecionarUsuarioCamp(id, nome, email){
+    document.getElementById("campIndividualId").value = id;
+    document.getElementById("campIndividualBusca").value = nome;
+    document.getElementById("campIndividualResultados").style.display = "none";
+    document.getElementById("campIndividualSelecionado").style.display = "block";
+    document.getElementById("campIndividualSelecionado").innerHTML = "<i class='bi bi-check-circle-fill' style='color:#065F46;'></i> "+nome+" ("+email+")";
+}
+
+// Audio recording
+function toggleRecording(){
+    if(isRecording){ stopRecording(); return; }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = async ()=>{
+            stream.getTracks().forEach(t=>t.stop());
+            const blob = new Blob(audioChunks,{type:"audio/webm"});
+            document.getElementById("micStatus").textContent = "Transcrevendo áudio...";
+            const fd = new FormData(); fd.append("audio", blob, "audio.webm");
+            try {
+                const r = await fetch("/admin/email-marketing/transcrever", {method:"POST", body:fd});
+                const d = await r.json();
+                if(d.success && d.text){
+                    document.getElementById("campInstrucoes").value += (document.getElementById("campInstrucoes").value ? "\n" : "") + d.text;
+                    document.getElementById("micStatus").textContent = "Transcrição adicionada!";
+                } else {
+                    document.getElementById("micStatus").textContent = d.error || "Erro na transcrição";
+                }
+            } catch(e){ document.getElementById("micStatus").textContent = "Erro de conexão"; }
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById("btnMic").style.borderColor = "#BE123C";
+        document.getElementById("btnMic").style.background = "#FFE4E6";
+        document.getElementById("micStatus").textContent = "Gravando... clique para parar";
+    }).catch(()=>{ document.getElementById("micStatus").textContent = "Microfone não disponível"; });
+}
+function stopRecording(){
+    if(mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    isRecording = false;
+    document.getElementById("btnMic").style.borderColor = "#E2E8F0";
+    document.getElementById("btnMic").style.background = "#fff";
+}
+
+async function criarCampanhaIA(){
+    const tipo = document.getElementById("campTipo").value;
+    const instrucoes = document.getElementById("campInstrucoes").value.trim();
+    const categoria = document.getElementById("campCategoria").value.trim();
+    const individualId = document.getElementById("campIndividualId").value;
+    
+    if(tipo === "individual" && !individualId){
+        alert("Selecione um usuário para campanha individual.");
+        return;
+    }
+    
+    document.getElementById("campProgress").style.display = "block";
+    
+    const body = JSON.stringify({tipo, instrucoes, categoria, usuario_id: individualId || null});
+    const r = await fetch("/admin/email-marketing/gerar", {method:"POST", headers:{"Content-Type":"application/json"}, body});
+    const d = await r.json();
+    
+    document.getElementById("campProgress").style.display = "none";
+    
+    if(d.success){
+        document.getElementById("modalNovaCampanha").style.display = "none";
+        alert(d.message || "Campanha gerada com sucesso!");
+        location.reload();
+    } else {
+        alert(d.error || d.message || "Erro ao gerar campanha");
+    }
 }
 async function verCampanha(id){
     currentCampId=id;
