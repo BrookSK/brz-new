@@ -13,14 +13,18 @@ function initPlayer() {
 
     var url = PLAYBACK_URL || RECORDING_URL;
     
-    // Se a URL é WHEP (webRTC/play), usar player WHEP via proxy
+    // Preferir HLS para playback (mais confiável que WHEP)
+    // WHEP pode ter problemas de frames não renderizando
     if (url && url.indexOf('/webRTC/play') !== -1) {
-        console.log('Using WHEP player via proxy for:', url);
-        initWHEPPlayer(video, url);
-        return;
+        // Converter URL WHEP para HLS
+        // De: https://customer-xxx.cloudflarestream.com/UUID/webRTC/play
+        // Para: https://customer-xxx.cloudflarestream.com/UUID/manifest/video.m3u8
+        var hlsUrl = url.replace('/webRTC/play', '/manifest/video.m3u8');
+        console.log('Using HLS playback (converted from WHEP):', hlsUrl);
+        url = hlsUrl;
     }
     
-    console.log('Player URL (HLS):', url);
+    console.log('Player URL:', url);
     
     if (!url) {
         console.log('No playback URL available');
