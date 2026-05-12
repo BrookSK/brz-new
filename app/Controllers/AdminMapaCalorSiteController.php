@@ -509,7 +509,19 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
             $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
 
-            $prodMaisVisitados = $pdo->query("SELECT p.{$nomeCol} AS nome, COUNT(*) AS visitas FROM site_heatmap_events e JOIN produtos p ON p.id = CAST(SUBSTRING_INDEX(e.pagina, '/', -1) AS UNSIGNED) WHERE e.pagina LIKE '/produto/detalhes/%' AND e.tipo = 'pageview' AND e.created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol} ORDER BY visitas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $prodMaisVisitados = $pdo->query("SELECT SUBSTRING_INDEX(e.pagina, '/', -1) AS prod_id, COUNT(*) AS visitas FROM site_heatmap_events e WHERE e.pagina LIKE '/produto/detalhes/%' AND e.tipo = 'pageview' AND e.created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY prod_id ORDER BY visitas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            // Get product names
+            if (!empty($prodMaisVisitados)) {
+                $ids = array_map(function($p){ return (int)$p['prod_id']; }, $prodMaisVisitados);
+                $ids = array_filter($ids);
+                if (!empty($ids)) {
+                    $in = implode(',', $ids);
+                    $nomes = $pdo->query("SELECT id, {$nomeCol} AS nome FROM produtos WHERE id IN ({$in})")->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
+                    foreach ($prodMaisVisitados as &$pv) {
+                        $pv['nome'] = $nomes[(int)$pv['prod_id']] ?? 'Produto #'.$pv['prod_id'];
+                    }
+                }
+            }
         } catch (\Exception $e) {}
         try {
             $nomeCol2 = in_array('nome', $cols ?? []) ? 'nome' : 'name';
@@ -521,20 +533,24 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
         // Most visited products
         echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-eye-fill"></i> Produtos Mais Visitados</h2></div><div class="section-body">';
+        try {
         if (!empty($prodMaisVisitados)) {
             foreach ($prodMaisVisitados as $i => $pv) {
                 echo '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;"><span style="font-size:13px;color:#374151;">'.($i+1).'. '.htmlspecialchars($pv['nome']).'</span><span style="font-size:13px;font-weight:700;color:#18253D;">'.(int)$pv['visitas'].' visitas</span></div>';
             }
         } else { echo '<p style="color:#94A3B8;font-size:12px;">Sem dados ainda.</p>'; }
+        } catch (\Exception $e) { echo '<p style="color:#94A3B8;font-size:12px;">Sem dados.</p>'; }
         echo '</div></div>';
 
         // Most purchased products
-        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-bag-check-fill"></i> Produtos Mais Comprados (30 dias)</h2></div><div class="section-body">';
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-bag-check-fill"></i> Produtos Mais Comprados</h2></div><div class="section-body">';
+        try {
         if (!empty($prodMaisComprados)) {
             foreach ($prodMaisComprados as $i => $pc) {
                 echo '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;"><span style="font-size:13px;color:#374151;">'.($i+1).'. '.htmlspecialchars($pc['nome']).'</span><span style="font-size:13px;font-weight:700;color:#065F46;">'.(int)$pc['vendas'].' vendas</span></div>';
             }
         } else { echo '<p style="color:#94A3B8;font-size:12px;">Sem dados ainda.</p>'; }
+        } catch (\Exception $e) { echo '<p style="color:#94A3B8;font-size:12px;">Sem dados.</p>'; }
         echo '</div></div>';
         echo '</div>';
 
