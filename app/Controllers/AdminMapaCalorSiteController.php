@@ -39,40 +39,46 @@ class AdminMapaCalorSiteController extends Controller {
         $pdo = Database::getConnection();
         $this->ensureTable($pdo);
 
-        // Stats
+        // Global period filter (default 30 days)
+        $periodo = (int)$request->getParam('periodo', 30);
+        if ($periodo < 1) $periodo = 30;
+        if ($periodo > 365) $periodo = 365;
+        $dateFilter = "AND created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY)";
+
+        // Stats (filtered by period)
         $stats = ['total_eventos'=>0, 'paginas_unicas'=>0, 'sessoes'=>0, 'cliques'=>0];
         try {
-            $stats['total_eventos'] = (int)$pdo->query("SELECT COUNT(*) FROM site_heatmap_events")->fetchColumn();
-            $stats['paginas_unicas'] = (int)$pdo->query("SELECT COUNT(DISTINCT pagina) FROM site_heatmap_events")->fetchColumn();
-            $stats['sessoes'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events")->fetchColumn();
-            $stats['cliques'] = (int)$pdo->query("SELECT COUNT(*) FROM site_heatmap_events WHERE tipo='click'")->fetchColumn();
+            $stats['total_eventos'] = (int)$pdo->query("SELECT COUNT(*) FROM site_heatmap_events WHERE 1=1 {$dateFilter}")->fetchColumn();
+            $stats['paginas_unicas'] = (int)$pdo->query("SELECT COUNT(DISTINCT pagina) FROM site_heatmap_events WHERE 1=1 {$dateFilter}")->fetchColumn();
+            $stats['sessoes'] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE 1=1 {$dateFilter}")->fetchColumn();
+            $stats['cliques'] = (int)$pdo->query("SELECT COUNT(*) FROM site_heatmap_events WHERE tipo='click' {$dateFilter}")->fetchColumn();
         } catch (\Exception $e) {}
 
-        // Top pages
+        // Top pages (filtered)
         $topPages = [];
         try {
-            $topPages = $pdo->query("SELECT pagina, COUNT(*) AS visitas, COUNT(DISTINCT session_id) AS sessoes_unicas, AVG(CASE WHEN tipo='time_on_page' THEN tempo_segundos END) AS tempo_medio, MAX(CASE WHEN tipo='scroll' THEN scroll_depth END) AS max_scroll FROM site_heatmap_events GROUP BY pagina ORDER BY visitas DESC LIMIT 20")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $topPages = $pdo->query("SELECT pagina, COUNT(*) AS visitas, COUNT(DISTINCT session_id) AS sessoes_unicas, AVG(CASE WHEN tipo='time_on_page' THEN tempo_segundos END) AS tempo_medio, MAX(CASE WHEN tipo='scroll' THEN scroll_depth END) AS max_scroll FROM site_heatmap_events WHERE 1=1 {$dateFilter} GROUP BY pagina ORDER BY visitas DESC LIMIT 20")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        // Top clicked elements
+        // Top clicked elements (filtered)
         $topClicks = [];
         try {
-            $topClicks = $pdo->query("SELECT elemento, pagina, COUNT(*) AS cliques FROM site_heatmap_events WHERE tipo='click' AND elemento IS NOT NULL AND elemento != '' GROUP BY elemento, pagina ORDER BY cliques DESC LIMIT 15")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $topClicks = $pdo->query("SELECT elemento, pagina, COUNT(*) AS cliques FROM site_heatmap_events WHERE tipo='click' AND elemento IS NOT NULL AND elemento != '' {$dateFilter} GROUP BY elemento, pagina ORDER BY cliques DESC LIMIT 15")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        // Scroll depth distribution
+        // Scroll depth (filtered)
         $scrollData = [];
         try {
-            $scrollData = $pdo->query("SELECT CASE WHEN scroll_depth <= 25 THEN '0-25%' WHEN scroll_depth <= 50 THEN '25-50%' WHEN scroll_depth <= 75 THEN '50-75%' ELSE '75-100%' END AS faixa, COUNT(*) AS total FROM site_heatmap_events WHERE tipo='scroll' AND scroll_depth IS NOT NULL GROUP BY faixa ORDER BY MIN(scroll_depth)")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $scrollData = $pdo->query("SELECT CASE WHEN scroll_depth <= 25 THEN '0-25%' WHEN scroll_depth <= 50 THEN '25-50%' WHEN scroll_depth <= 75 THEN '50-75%' ELSE '75-100%' END AS faixa, COUNT(*) AS total FROM site_heatmap_events WHERE tipo='scroll' AND scroll_depth IS NOT NULL {$dateFilter} GROUP BY faixa ORDER BY MIN(scroll_depth)")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        // Funnel: pages in order of visit frequency
+        // Funnel (filtered)
         $funnel = [];
         try {
-            $funnel = $pdo->query("SELECT pagina, COUNT(DISTINCT session_id) AS sessoes FROM site_heatmap_events WHERE tipo='pageview' GROUP BY pagina ORDER BY sessoes DESC LIMIT 10")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            $funnel = $pdo->query("SELECT pagina, COUNT(DISTINCT session_id) AS sessoes FROM site_heatmap_events WHERE tipo='pageview' {$dateFilter} GROUP BY pagina ORDER BY sessoes DESC LIMIT 10")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $this->renderPage($stats, $topPages, $topClicks, $scrollData, $funnel);
+        $this->renderPage($stats, $topPages, $topClicks, $scrollData, $funnel, $request, $periodo);
     }
 
     // ============================================================
@@ -366,7 +372,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
     // ============================================================
     // RENDER PAGE
     // ============================================================
-    private function renderPage(array $stats, array $topPages, array $topClicks, array $scrollData, array $funnel): void {
+    private function renderPage(array $stats, array $topPages, array $topClicks, array $scrollData, array $funnel, Request $request, int $periodo): void {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Mapa de Calor - Admin</title>
@@ -384,6 +390,17 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 <div style="display:flex;gap:8px;">
 <button class="btn-dash-primary" onclick="analisarComIA()" style="padding:8px 16px;font-size:13px;"><i class="bi bi-stars me-1"></i>Análise de IA</button>
 </div></header>';
+
+        // Global period filter
+        $periodos = [7=>'7 dias',14=>'14 dias',30=>'30 dias',60=>'60 dias',90=>'90 dias'];
+        echo '<div style="display:flex;gap:6px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+<span style="font-size:12px;color:#94A3B8;font-weight:600;">Período:</span>';
+        foreach ($periodos as $dias => $label) {
+            $active = ($periodo == $dias) ? 'background:#18253D;color:#fff;border-color:#18253D;' : '';
+            echo '<a href="?periodo='.$dias.'" style="padding:5px 12px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:500;text-decoration:none;color:#374151;'.$active.'">'.$label.'</a>';
+        }
+        echo '<span style="font-size:11px;color:#94A3B8;margin-left:8px;">Mostrando dados dos últimos '.$periodo.' dias</span>
+</div>';
 
         // KPIs
         echo '<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
@@ -481,6 +498,96 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         }
         echo '</div></div>';
 
+        // ============================================================
+        // ANALYTICS: Products, Temporal Graph, Origins
+        // ============================================================
+
+        // Products Analytics
+        $prodMaisVisitados = []; $prodMaisComprados = [];
+        try {
+            $nomeCol = 'nome';
+            $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
+
+            $prodMaisVisitados = $pdo->query("SELECT p.{$nomeCol} AS nome, COUNT(*) AS visitas FROM site_heatmap_events e JOIN produtos p ON p.id = CAST(SUBSTRING_INDEX(e.pagina, '/', -1) AS UNSIGNED) WHERE e.pagina LIKE '/produto/detalhes/%' AND e.tipo = 'pageview' AND e.created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol} ORDER BY visitas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {}
+        try {
+            $nomeCol2 = in_array('nome', $cols ?? []) ? 'nome' : 'name';
+            $prodMaisComprados = $pdo->query("SELECT p.{$nomeCol2} AS nome, COUNT(DISTINCT pi2.pedido_id) AS vendas FROM pedido_itens pi2 JOIN pedidos ped ON ped.id = pi2.pedido_id AND ped.status IN ('pago','entregue') JOIN produtos p ON p.id = pi2.produto_id WHERE ped.created_at > DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol2} ORDER BY vendas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            try { $prodMaisComprados = $pdo->query("SELECT p.{$nomeCol} AS nome, COUNT(DISTINCT pi2.pedido_id) AS vendas FROM pedido_items pi2 JOIN pedidos ped ON ped.id = pi2.pedido_id AND ped.status IN ('pago','entregue') JOIN produtos p ON p.id = pi2.produto_id WHERE ped.created_at > DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol} ORDER BY vendas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e2) {}
+        }
+
+        echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
+        // Most visited products
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-eye-fill"></i> Produtos Mais Visitados</h2></div><div class="section-body">';
+        if (!empty($prodMaisVisitados)) {
+            foreach ($prodMaisVisitados as $i => $pv) {
+                echo '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;"><span style="font-size:13px;color:#374151;">'.($i+1).'. '.htmlspecialchars($pv['nome']).'</span><span style="font-size:13px;font-weight:700;color:#18253D;">'.(int)$pv['visitas'].' visitas</span></div>';
+            }
+        } else { echo '<p style="color:#94A3B8;font-size:12px;">Sem dados ainda.</p>'; }
+        echo '</div></div>';
+
+        // Most purchased products
+        echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-bag-check-fill"></i> Produtos Mais Comprados (30 dias)</h2></div><div class="section-body">';
+        if (!empty($prodMaisComprados)) {
+            foreach ($prodMaisComprados as $i => $pc) {
+                echo '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;"><span style="font-size:13px;color:#374151;">'.($i+1).'. '.htmlspecialchars($pc['nome']).'</span><span style="font-size:13px;font-weight:700;color:#065F46;">'.(int)$pc['vendas'].' vendas</span></div>';
+            }
+        } else { echo '<p style="color:#94A3B8;font-size:12px;">Sem dados ainda.</p>'; }
+        echo '</div></div>';
+        echo '</div>';
+
+        // Temporal Graph (uses individual 'dias' param if set, otherwise global 'periodo')
+        $diasGrafico = (int)($request->getParam('dias', 0));
+        if ($diasGrafico <= 0) $diasGrafico = $periodo; // Use global period as default
+        if ($diasGrafico < 7) $diasGrafico = 7;
+        if ($diasGrafico > 90) $diasGrafico = 90;
+        $graphData = ['labels'=>[],'visitas'=>[],'pedidos'=>[],'novos_usuarios'=>[]];
+        try {
+            for ($d = $diasGrafico - 1; $d >= 0; $d--) {
+                $date = date('Y-m-d', strtotime("-{$d} days"));
+                $graphData['labels'][] = date('d/m', strtotime($date));
+                $graphData['visitas'][] = (int)$pdo->query("SELECT COUNT(DISTINCT session_id) FROM site_heatmap_events WHERE DATE(created_at) = '{$date}'")->fetchColumn();
+                $graphData['pedidos'][] = (int)$pdo->query("SELECT COUNT(*) FROM pedidos WHERE DATE(created_at) = '{$date}' AND status IN ('pago','entregue','enviado')")->fetchColumn();
+                $graphData['novos_usuarios'][] = (int)$pdo->query("SELECT COUNT(*) FROM usuarios WHERE DATE(created_at) = '{$date}'")->fetchColumn();
+            }
+        } catch (\Exception $e) {}
+
+        echo '<div class="section-card"><div class="section-card-header" style="flex-wrap:wrap;gap:8px;"><h2 class="section-title"><i class="bi bi-graph-up"></i> Evolução</h2>
+<div style="display:flex;gap:6px;align-items:center;">
+<a href="?periodo='.$periodo.'&dias=7" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==7?'#fff':'#374151').';background:'.($diasGrafico==7?'#18253D':'#fff').';">7 dias</a>
+<a href="?periodo='.$periodo.'&dias=14" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==14?'#fff':'#374151').';background:'.($diasGrafico==14?'#18253D':'#fff').';">14 dias</a>
+<a href="?periodo='.$periodo.'&dias=30" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==30?'#fff':'#374151').';background:'.($diasGrafico==30?'#18253D':'#fff').';">30 dias</a>
+<a href="?periodo='.$periodo.'&dias=60" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==60?'#fff':'#374151').';background:'.($diasGrafico==60?'#18253D':'#fff').';">60 dias</a>
+<a href="?periodo='.$periodo.'&dias=90" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;text-decoration:none;color:'.($diasGrafico==90?'#fff':'#374151').';background:'.($diasGrafico==90?'#18253D':'#fff').';">90 dias</a>
+</div></div><div class="section-body">
+<canvas id="chartTemporal" style="width:100%;height:280px;"></canvas>
+</div></div>';
+
+        // Origins block (cookies)
+        $origens = [];
+        try {
+            $stCheck = $pdo->query("SHOW TABLES LIKE 'visitor_sessions'");
+            if ($stCheck && $stCheck->fetchColumn()) {
+                $origens = $pdo->query("SELECT COALESCE(NULLIF(utm_source,''),'Direto') AS origem, device_type, COUNT(*) AS total, COUNT(DISTINCT visitor_id) AS visitantes FROM visitor_sessions WHERE created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY COALESCE(NULLIF(utm_source,''),'Direto'), device_type ORDER BY total DESC LIMIT 20")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Exception $e) {}
+
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-globe2"></i> Origem dos Visitantes (Cookies)</h2></div><div class="section-body">';
+        if (!empty($origens)) {
+            echo '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#FAFBFC;"><th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Origem</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Dispositivo</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Sessões</th><th style="padding:10px 14px;text-align:center;font-size:11px;text-transform:uppercase;color:#94A3B8;font-weight:700;">Visitantes Únicos</th></tr></thead><tbody>';
+            foreach ($origens as $o) {
+                $deviceIcon = $o['device_type'] === 'mobile' ? '📱' : ($o['device_type'] === 'tablet' ? '📟' : '💻');
+                echo '<tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:10px 14px;font-weight:600;color:#18253D;">'.htmlspecialchars($o['origem']).'</td><td style="padding:10px 14px;text-align:center;">'.$deviceIcon.' '.ucfirst($o['device_type']).'</td><td style="padding:10px 14px;text-align:center;">'.(int)$o['total'].'</td><td style="padding:10px 14px;text-align:center;">'.(int)$o['visitantes'].'</td></tr>';
+            }
+            echo '</tbody></table></div>';
+            echo '<div style="margin-top:10px;font-size:11px;color:#94A3B8;"><i class="bi bi-cookie me-1"></i>Dados obtidos via cookies analíticos com consentimento do visitante.</div>';
+        } else {
+            echo '<p style="color:#94A3B8;font-size:12px;">Dados de origem serão exibidos após visitantes aceitarem cookies analíticos.</p>';
+        }
+        echo '</div></div>';
+
         // Heatmap Visualization Section
         echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-fire"></i> Visualização do Mapa de Calor</h2></div><div class="section-body">
 <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -533,6 +640,29 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 
         echo '</div></main></div></div>';
         renderAdminScripts();
+        echo '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>';
+        echo '<script>
+// Temporal chart
+var chartData = ' . json_encode($graphData) . ';
+if(chartData && chartData.labels && chartData.labels.length && document.getElementById("chartTemporal")){
+    new Chart(document.getElementById("chartTemporal"), {
+        type: "line",
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {label:"Visitas", data:chartData.visitas, borderColor:"#18253D", backgroundColor:"rgba(24,37,61,.08)", tension:0.4, fill:true, borderWidth:2},
+                {label:"Pedidos", data:chartData.pedidos, borderColor:"#065F46", backgroundColor:"rgba(6,95,70,.08)", tension:0.4, fill:true, borderWidth:2},
+                {label:"Novos Usuários", data:chartData.novos_usuarios, borderColor:"#075985", backgroundColor:"rgba(7,89,133,.08)", tension:0.4, fill:true, borderWidth:2}
+            ]
+        },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            plugins:{legend:{position:"bottom",labels:{font:{size:12},padding:16}}},
+            scales:{y:{beginAtZero:true,grid:{color:"#F1F5F9"}},x:{grid:{display:false}}}
+        }
+    });
+}
+</script>';
         echo '<script>
 async function carregarHeatmap(){
     var pagina = document.getElementById("heatmapPageSelect").value;
