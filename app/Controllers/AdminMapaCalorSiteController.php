@@ -14,8 +14,8 @@ class AdminMapaCalorSiteController extends Controller {
             usuario_id INT DEFAULT NULL,
             pagina VARCHAR(500) NOT NULL,
             tipo ENUM('pageview','click','scroll','time_on_page') NOT NULL,
-            x INT DEFAULT NULL,
-            y INT DEFAULT NULL,
+            x DECIMAL(5,1) DEFAULT NULL,
+            y DECIMAL(5,1) DEFAULT NULL,
             scroll_depth INT DEFAULT NULL,
             tempo_segundos INT DEFAULT NULL,
             elemento VARCHAR(255) DEFAULT NULL,
@@ -27,6 +27,8 @@ class AdminMapaCalorSiteController extends Controller {
             INDEX idx_created (created_at),
             INDEX idx_session (session_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Upgrade x/y to decimal for precision
+        try { $pdo->exec("ALTER TABLE site_heatmap_events MODIFY COLUMN x DECIMAL(5,1) DEFAULT NULL, MODIFY COLUMN y DECIMAL(5,1) DEFAULT NULL"); } catch (\Exception $e) {}
     }
 
     // ============================================================
@@ -99,8 +101,8 @@ class AdminMapaCalorSiteController extends Controller {
                 $usuarioId ? (int)$usuarioId : null,
                 substr((string)$data['pagina'], 0, 500),
                 $data['tipo'],
-                isset($data['x']) ? (int)$data['x'] : null,
-                isset($data['y']) ? (int)$data['y'] : null,
+                isset($data['x']) ? round((float)$data['x'], 1) : null,
+                isset($data['y']) ? round((float)$data['y'], 1) : null,
                 isset($data['scroll_depth']) ? (int)$data['scroll_depth'] : null,
                 isset($data['tempo']) ? (int)$data['tempo'] : null,
                 isset($data['elemento']) ? substr((string)$data['elemento'], 0, 255) : null,
@@ -119,6 +121,9 @@ class AdminMapaCalorSiteController extends Controller {
         header('Content-Type: application/json; charset=UTF-8');
         $auth = new AuthService(); $auth->requerPerfis(['admin']);
         $pdo = Database::getConnection();
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $perguntaUsuario = trim((string)($input['pergunta'] ?? ''));
 
         // Collect data for AI analysis
         $dados = [];
@@ -182,6 +187,10 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
             foreach ($dados['tempo_baixo'] as $t) {
                 $userMsg .= "- " . $t['pagina'] . " | Tempo médio: " . round((float)$t['tempo_medio']) . "s\n";
             }
+        }
+
+        if ($perguntaUsuario !== '') {
+            $userMsg .= "\n\nPERGUNTA DO PROPRIETÁRIO DA LOJA:\n" . $perguntaUsuario . "\n\nResponda focando nesta dúvida específica, usando os dados acima como base.";
         }
 
         $payload = json_encode(['model'=>$model, 'messages'=>[['role'=>'system','content'=>$systemPrompt],['role'=>'user','content'=>$userMsg]], 'temperature'=>0.7, 'max_tokens'=>2000]);
@@ -346,10 +355,12 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '</select>
 <button onclick="carregarHeatmap()" class="btn-dash-secondary" style="padding:8px 14px;font-size:13px;"><i class="bi bi-arrow-clockwise me-1"></i>Atualizar</button>
 </div>
-<div id="heatmapContainer" style="position:relative;width:100%;height:600px;border-radius:10px;overflow:hidden;border:1px solid #E2E8F0;">
-<iframe id="heatmapIframe" src="/" style="width:100%;height:100%;border:none;pointer-events:none;"></iframe>
-<canvas id="heatmapCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:0.6;"></canvas>
-<div id="heatmapInfo" style="position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.7);color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;">Selecione uma página para visualizar</div>
+<div id="heatmapContainer" style="position:relative;width:100%;height:700px;border-radius:10px;overflow-y:scroll;overflow-x:hidden;border:1px solid #E2E8F0;">
+<div id="heatmapInner" style="position:relative;width:100%;height:2000px;">
+<iframe id="heatmapIframe" src="/" style="width:100%;height:2000px;border:none;pointer-events:none;"></iframe>
+<canvas id="heatmapCanvas" style="position:absolute;top:0;left:0;width:100%;height:2000px;pointer-events:none;opacity:0.55;"></canvas>
+</div>
+<div id="heatmapInfo" style="position:sticky;bottom:10px;left:10px;background:rgba(0,0,0,.7);color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;display:inline-block;margin:10px;">Selecione uma página para visualizar</div>
 </div>
 <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:#94A3B8;">
 <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#0000ff;vertical-align:middle;margin-right:4px;"></span>Pouco clicado</span>
@@ -363,10 +374,21 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '<div id="modalAnaliseIA" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
 <div style="background:#fff;border-radius:12px;max-width:700px;width:95%;max-height:85vh;overflow-y:auto;">
 <div style="background:var(--navy);color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
-<h6 style="margin:0;font-size:15px;font-weight:700;"><i class="bi bi-stars me-2"></i>Análise de IA - Comportamento do Site</h6>
+<h6 style="margin:0;font-size:15px;font-weight:700;"><i class="bi bi-stars me-2"></i>Análise de IA</h6>
 <button onclick="document.getElementById(\'modalAnaliseIA\').style.display=\'none\'" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">&times;</button>
 </div>
-<div id="analiseIAContent" style="padding:24px;"><div style="text-align:center;padding:40px;"><i class="bi bi-stars" style="font-size:32px;color:var(--navy);animation:spin 2s linear infinite;"></i><p style="color:#64748B;margin-top:12px;">Analisando dados de comportamento...</p></div></div>
+<div style="padding:20px;">
+<div style="margin-bottom:16px;">
+<label style="font-size:12px;font-weight:700;text-transform:uppercase;color:#94A3B8;display:block;margin-bottom:6px;">Sua dúvida ou pergunta (opcional)</label>
+<div style="display:flex;gap:8px;align-items:flex-start;">
+<textarea id="iaHeatmapPergunta" rows="2" placeholder="Ex: Por que os clientes não estão comprando? Onde estão travando no checkout?" style="flex:1;padding:10px 14px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+<button type="button" id="btnMicHeatmap" onclick="toggleMicHeatmap()" style="width:40px;height:40px;border-radius:50%;border:2px solid #E2E8F0;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="bi bi-mic-fill" style="font-size:16px;color:#64748B;"></i></button>
+</div>
+<small id="micHeatmapStatus" style="color:#94A3B8;font-size:11px;">Deixe vazio para análise geral. Ou pergunte algo específico.</small>
+</div>
+<button onclick="executarAnaliseIA()" class="btn-dash-primary" style="width:100%;padding:10px;font-size:14px;margin-bottom:16px;"><i class="bi bi-stars me-1"></i>Analisar</button>
+<div id="analiseIAContent"></div>
+</div>
 </div></div>';
 
         echo '</div></main></div></div>';
@@ -401,9 +423,9 @@ async function carregarHeatmap(){
 
 function renderHeatmap(cliques){
     var canvas = document.getElementById("heatmapCanvas");
-    var container = document.getElementById("heatmapContainer");
-    canvas.width = container.offsetWidth;
-    canvas.height = container.offsetHeight;
+    var inner = document.getElementById("heatmapInner");
+    canvas.width = inner.offsetWidth;
+    canvas.height = inner.offsetHeight;
     var ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -411,10 +433,10 @@ function renderHeatmap(cliques){
     var maxInt = 1;
     cliques.forEach(function(c){ if(c.intensidade > maxInt) maxInt = c.intensidade; });
     
-    // Draw heatmap points
+    // Draw heatmap points - x and y are percentages (0-100) of page width/height
     cliques.forEach(function(c){
-        var x = (c.x / 100) * canvas.width;
-        var y = (c.y / 100) * canvas.height;
+        var x = (parseFloat(c.x) / 100) * canvas.width;
+        var y = (parseFloat(c.y) / 100) * canvas.height;
         var intensity = c.intensidade / maxInt;
         var radius = 25 + (intensity * 40);
         
@@ -434,9 +456,15 @@ function renderHeatmap(cliques){
 
 async function analisarComIA(){
     document.getElementById("modalAnaliseIA").style.display = "flex";
-    document.getElementById("analiseIAContent").innerHTML = \'<div style="text-align:center;padding:40px;"><i class="bi bi-stars" style="font-size:32px;color:var(--navy);animation:spin 2s linear infinite;"></i><p style="color:#64748B;margin-top:12px;">Analisando dados de comportamento...</p></div>\';
+    document.getElementById("analiseIAContent").innerHTML = "";
+}
+
+async function executarAnaliseIA(){
+    var pergunta = document.getElementById("iaHeatmapPergunta").value.trim();
+    document.getElementById("analiseIAContent").innerHTML = \'<div style="text-align:center;padding:30px;"><i class="bi bi-stars" style="font-size:28px;color:var(--navy);animation:spin 2s linear infinite;"></i><p style="color:#64748B;margin-top:10px;">Analisando...</p></div>\';
     
-    var r = await fetch("/admin/mapa-calor-site/analise-ia", {method:"POST"});
+    var body = JSON.stringify({pergunta: pergunta});
+    var r = await fetch("/admin/mapa-calor-site/analise-ia", {method:"POST", headers:{"Content-Type":"application/json"}, body: body});
     var d = await r.json();
     
     if(d.success && d.analise){
@@ -444,6 +472,42 @@ async function analisarComIA(){
     } else {
         document.getElementById("analiseIAContent").innerHTML = \'<p style="color:#BE123C;">\' + (d.error || "Erro na análise") + \'</p>\';
     }
+}
+
+var heatmapRecorder = null;
+var heatmapRecording = false;
+function toggleMicHeatmap(){
+    if(heatmapRecording){ stopMicHeatmap(); return; }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+        heatmapRecorder = new MediaRecorder(stream);
+        var chunks = [];
+        heatmapRecorder.ondataavailable = function(e){ chunks.push(e.data); };
+        heatmapRecorder.onstop = async function(){
+            stream.getTracks().forEach(function(t){t.stop();});
+            var blob = new Blob(chunks,{type:"audio/webm"});
+            document.getElementById("micHeatmapStatus").textContent = "Transcrevendo...";
+            var fd = new FormData(); fd.append("audio", blob, "audio.webm");
+            var r = await fetch("/admin/email-marketing/transcrever", {method:"POST", body:fd});
+            var d = await r.json();
+            if(d.success && d.text){
+                document.getElementById("iaHeatmapPergunta").value += (document.getElementById("iaHeatmapPergunta").value ? " " : "") + d.text;
+                document.getElementById("micHeatmapStatus").textContent = "Transcrição adicionada!";
+            } else {
+                document.getElementById("micHeatmapStatus").textContent = d.error || "Erro";
+            }
+        };
+        heatmapRecorder.start();
+        heatmapRecording = true;
+        document.getElementById("btnMicHeatmap").style.borderColor = "#BE123C";
+        document.getElementById("btnMicHeatmap").style.background = "#FFE4E6";
+        document.getElementById("micHeatmapStatus").textContent = "Gravando... clique para parar";
+    }).catch(function(){ document.getElementById("micHeatmapStatus").textContent = "Microfone não disponível"; });
+}
+function stopMicHeatmap(){
+    if(heatmapRecorder && heatmapRecorder.state !== "inactive") heatmapRecorder.stop();
+    heatmapRecording = false;
+    document.getElementById("btnMicHeatmap").style.borderColor = "#E2E8F0";
+    document.getElementById("btnMicHeatmap").style.background = "#fff";
 }
 
 // Auto-load first page

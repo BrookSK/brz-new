@@ -30,7 +30,7 @@
     // Pageview
     send({tipo:'pageview'});
 
-    // Click tracking
+    // Click tracking - precise coordinates
     document.addEventListener('click', function(e){
         var el = e.target.closest('a,button,input[type=submit],.btn,[onclick]') || e.target;
         var tag = el.tagName || '';
@@ -64,10 +64,21 @@
             elemento = '🖼️ ' + (el.alt || 'imagem');
         }
 
+        // Use clientX/clientY + scrollTop for precise positioning
+        // X = percentage of viewport width (horizontal position)
+        // Y = absolute pixel position from top of page, then normalized to percentage of full page height
+        var pageX = e.pageX || (e.clientX + window.pageXOffset);
+        var pageY = e.pageY || (e.clientY + window.pageYOffset);
+        var docWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+        var docHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+        
+        var xPercent = docWidth > 0 ? Math.round((pageX / docWidth) * 1000) / 10 : 50;
+        var yPercent = docHeight > 0 ? Math.round((pageY / docHeight) * 1000) / 10 : 50;
+
         send({
             tipo:'click',
-            x: Math.round((e.pageX / document.documentElement.scrollWidth) * 100),
-            y: Math.round((e.pageY / document.documentElement.scrollHeight) * 100),
+            x: xPercent,
+            y: yPercent,
             elemento: elemento.substring(0,80)
         });
     });
