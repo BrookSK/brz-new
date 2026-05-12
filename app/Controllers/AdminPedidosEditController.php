@@ -446,6 +446,20 @@ class AdminPedidosEditController extends Controller {
             $statusAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
             $canEditItens = ($statusLower !== 'pago');
 
+            // Moeda e taxa de conversão para converter preços de produtos (USD) para moeda do pedido
+            $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
+            if ($moedaPedido === '') $moedaPedido = 'BRL';
+            $taxaConvPedido = (float) ($pedido['taxa_conversao'] ?? 0);
+            if ($taxaConvPedido <= 1.01 && $moedaPedido === 'BRL') {
+                try {
+                    $stTx = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+                    $stTx->execute();
+                    $v = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+                    if ($v > 1.01) $taxaConvPedido = $v;
+                } catch (\Exception $e) {}
+                if ($taxaConvPedido <= 1.01) $taxaConvPedido = 5.85;
+            }
+
             $gatewayPedido = strtolower((string) ($pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? ''));
             $transacao = (string) ($pedido['payment_id'] ?? $pedido['pagamento_transacao'] ?? '');
             $temPagamentoAsaas = ($gatewayPedido === 'asaas' && $transacao !== '');
@@ -690,6 +704,10 @@ class AdminPedidosEditController extends Controller {
                 $pid = (int) ($p['id'] ?? 0);
                 $nome = (string) ($p['name'] ?? '');
                 $preco = (float) ($p['price'] ?? 0);
+                // Converter preço USD para moeda do pedido
+                if ($moedaPedido === 'BRL' && $preco > 0) {
+                    $preco = round($preco * $taxaConvPedido, 2);
+                }
                 $sku = (string) ($p['sku'] ?? '');
                 $loja = (string) ($p['loja'] ?? '');
 
