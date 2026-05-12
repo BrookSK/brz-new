@@ -31,15 +31,26 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
         </div>
     </div>
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4 flex-nowrap overflow-auto" role="tablist" style="-webkit-overflow-scrolling:touch;">
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral">Visão Geral</a></li>
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas">Todas <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes">Recorrentes <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas">Parceladas <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes">Comissões <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias">Categorias</a></li>
-        <li class="nav-item flex-shrink-0"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios">Relatórios</a></li>
+    <!-- Tabs: Mobile dropdown + Desktop tabs -->
+    <div class="d-md-none mb-3">
+        <select class="form-select" onchange="window.location.href=this.value">
+            <option value="/admin/despesas?tab=visao-geral" <?= $tab==='visao-geral'?'selected':'' ?>>Visão Geral</option>
+            <option value="/admin/despesas?tab=todas" <?= $tab==='todas'?'selected':'' ?>>Todas (<?= $countAll ?>)</option>
+            <option value="/admin/despesas?tab=recorrentes" <?= $tab==='recorrentes'?'selected':'' ?>>Recorrentes (<?= count($recorrencias) ?>)</option>
+            <option value="/admin/despesas?tab=parceladas" <?= $tab==='parceladas'?'selected':'' ?>>Parceladas (<?= count($parcelamentos) ?>)</option>
+            <option value="/admin/despesas?tab=comissoes" <?= $tab==='comissoes'?'selected':'' ?>>Comissões (<?= $countComissoes ?>)</option>
+            <option value="/admin/despesas?tab=categorias" <?= $tab==='categorias'?'selected':'' ?>>Categorias</option>
+            <option value="/admin/despesas?tab=relatorios" <?= $tab==='relatorios'?'selected':'' ?>>Relatórios</option>
+        </select>
+    </div>
+    <ul class="nav nav-tabs mb-4 d-none d-md-flex" role="tablist">
+        <li class="nav-item"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral">Visão Geral</a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas">Todas <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes">Recorrentes <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas">Parceladas <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes">Comissões <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias">Categorias</a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios">Relatórios</a></li>
     </ul>
 
     <?php if (!empty($_SESSION['message'])): ?>

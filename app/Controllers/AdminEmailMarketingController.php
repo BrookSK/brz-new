@@ -858,16 +858,27 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 </div>';
 
         // KPI Cards
-        echo '<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
-<div class="kpi-card"><div><div class="kpi-label">Campanhas</div><div class="kpi-value">'.$stats['total_campanhas'].'</div></div><div class="kpi-icon"><i class="bi bi-envelope-fill"></i></div></div>
-<div class="kpi-card"><div><div class="kpi-label">Pendentes</div><div class="kpi-value">'.$stats['pendentes'].'</div></div><div class="kpi-icon"><i class="bi bi-clock-fill"></i></div></div>
-<div class="kpi-card"><div><div class="kpi-label">Enviados</div><div class="kpi-value">'.$stats['enviadas'].'</div></div><div class="kpi-icon"><i class="bi bi-send-fill"></i></div></div>
-<div class="kpi-card is-featured"><div><div class="kpi-label">Convertidos</div><div class="kpi-value">'.$stats['convertidas'].'</div></div><div class="kpi-icon"><i class="bi bi-graph-up-arrow"></i></div></div>
-</div>';
+        echo '<div class="kpi-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;">
+<div class="kpi-card"><div><div class="kpi-label">Campanhas</div><div class="kpi-value">'.$stats['total_campanhas'].'</div></div></div>
+<div class="kpi-card"><div><div class="kpi-label">Pendentes</div><div class="kpi-value">'.$stats['pendentes'].'</div></div></div>
+<div class="kpi-card"><div><div class="kpi-label">Enviados</div><div class="kpi-value">'.$stats['enviadas'].'</div></div></div>
+<div class="kpi-card is-featured"><div><div class="kpi-label">Convertidos</div><div class="kpi-value">'.$stats['convertidas'].'</div></div></div>
+</div>
+<style>@media(min-width:768px){.kpi-grid{grid-template-columns:repeat(4,1fr) !important;}}</style>';
 
         // Tabs
         $tabs = ['dashboard'=>'Dashboard','campanhas'=>'Todas','pendentes'=>'Pendentes','aprovadas'=>'Aprovadas','agendadas'=>'Agendadas','enviados'=>'Enviados','historico'=>'Histórico','segmentos'=>'Segmentos','criterios'=>'Critérios','config'=>'Configurações'];
-        echo '<nav class="mkt-tabs">';
+        // Mobile: Dropdown
+        echo '<div class="d-md-none mb-3"><select class="form-select" onchange="window.location.href=\'?tab=\'+this.value">';
+        foreach ($tabs as $key => $label) {
+            $sel = ($tab === $key) ? ' selected' : '';
+            $countLabel = '';
+            if ($key === 'pendentes' && $stats['pendentes'] > 0) $countLabel = ' ('.$stats['pendentes'].')';
+            echo '<option value="'.$key.'"'.$sel.'>'.$label.$countLabel.'</option>';
+        }
+        echo '</select></div>';
+        // Desktop: Tabs
+        echo '<nav class="mkt-tabs d-none d-md-flex">';
         foreach ($tabs as $key => $label) {
             $active = ($tab === $key) ? ' active' : '';
             $count = '';

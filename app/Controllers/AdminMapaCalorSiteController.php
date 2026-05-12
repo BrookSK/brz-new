@@ -394,22 +394,30 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
 
         // Global period filter
         $periodos = [7=>'7 dias',14=>'14 dias',30=>'30 dias',60=>'60 dias',90=>'90 dias'];
-        echo '<div style="display:flex;gap:6px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+        // Mobile: Dropdown
+        echo '<div class="d-md-none mb-3"><select class="form-select form-select-sm" onchange="window.location.href=\'?periodo=\'+this.value">';
+        foreach ($periodos as $dias => $label) {
+            $sel = ($periodo == $dias) ? ' selected' : '';
+            echo '<option value="'.$dias.'"'.$sel.'>Período: '.$label.'</option>';
+        }
+        echo '</select></div>';
+        // Desktop: Buttons
+        echo '<div style="display:none;gap:6px;margin-bottom:16px;align-items:center;flex-wrap:wrap;" class="d-md-flex">
 <span style="font-size:12px;color:#94A3B8;font-weight:600;">Período:</span>';
         foreach ($periodos as $dias => $label) {
             $active = ($periodo == $dias) ? 'background:#18253D;color:#fff;border-color:#18253D;' : '';
             echo '<a href="?periodo='.$dias.'" style="padding:5px 12px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:500;text-decoration:none;color:#374151;'.$active.'">'.$label.'</a>';
         }
-        echo '<span style="font-size:11px;color:#94A3B8;margin-left:8px;">Mostrando dados dos últimos '.$periodo.' dias</span>
-</div>';
+        echo '</div>';
 
         // KPIs
-        echo '<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
-<div class="kpi-card"><div><div class="kpi-label">Interações</div><div class="kpi-value">'.number_format($stats['total_eventos']).'</div><div class="kpi-subtext">Ações registradas</div></div><div class="kpi-icon"><i class="bi bi-activity"></i></div></div>
-<div class="kpi-card"><div><div class="kpi-label">Páginas Visitadas</div><div class="kpi-value">'.$stats['paginas_unicas'].'</div><div class="kpi-subtext">Diferentes</div></div><div class="kpi-icon"><i class="bi bi-file-earmark"></i></div></div>
-<div class="kpi-card"><div><div class="kpi-label">Visitantes</div><div class="kpi-value">'.number_format($stats['sessoes']).'</div><div class="kpi-subtext">Pessoas navegando</div></div><div class="kpi-icon"><i class="bi bi-people"></i></div></div>
-<div class="kpi-card is-featured"><div><div class="kpi-label">Cliques</div><div class="kpi-value">'.number_format($stats['cliques']).'</div><div class="kpi-subtext">Onde clicaram</div></div><div class="kpi-icon"><i class="bi bi-cursor-fill"></i></div></div>
-</div>';
+        echo '<div class="kpi-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px;">
+<div class="kpi-card"><div><div class="kpi-label">Interações</div><div class="kpi-value">'.number_format($stats['total_eventos']).'</div><div class="kpi-subtext">Ações registradas</div></div></div>
+<div class="kpi-card"><div><div class="kpi-label">Páginas Visitadas</div><div class="kpi-value">'.$stats['paginas_unicas'].'</div><div class="kpi-subtext">Diferentes</div></div></div>
+<div class="kpi-card"><div><div class="kpi-label">Visitantes</div><div class="kpi-value">'.number_format($stats['sessoes']).'</div><div class="kpi-subtext">Pessoas navegando</div></div></div>
+<div class="kpi-card is-featured"><div><div class="kpi-label">Cliques</div><div class="kpi-value">'.number_format($stats['cliques']).'</div><div class="kpi-subtext">Onde clicaram</div></div></div>
+</div>
+<style>@media(min-width:768px){.kpi-grid{grid-template-columns:repeat(4,1fr) !important;}.mapa-grid-2col{grid-template-columns:1fr 1fr !important;}}</style>';
 
         // Info about tracking
         if ($stats['total_eventos'] === 0) {
@@ -445,7 +453,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         echo '</div></div>';
 
         // Funnel + Scroll side by side
-        echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
+        echo '<div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px;" class="mapa-grid-2col">';
 
         // Funnel
         echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title">Caminho dos Clientes</h2></div><div class="section-body">
@@ -527,7 +535,7 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
             try { $pdo->query("SELECT 1 FROM pedido_itens LIMIT 1"); } catch (\Throwable $e) { $itensTable = 'pedido_items'; }
             $prodMaisComprados = $pdo->query("SELECT p.{$nomeCol} AS nome, COUNT(DISTINCT pi2.pedido_id) AS vendas FROM {$itensTable} pi2 JOIN pedidos ped ON ped.id = pi2.pedido_id AND ped.status IN ('pago','entregue') JOIN produtos p ON p.id = pi2.produto_id WHERE ped.created_at > DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol} ORDER BY vendas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Throwable $e) {}
-        echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
+        echo '<div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px;" class="mapa-grid-2col">';
         // Most visited products
         echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title">Produtos Mais Visitados</h2></div><div class="section-body">';
         try {
