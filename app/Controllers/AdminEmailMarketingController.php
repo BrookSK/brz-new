@@ -164,13 +164,13 @@ class AdminEmailMarketingController extends Controller {
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra,
                         COUNT(p.id) AS total_pedidos
                         FROM usuarios u
-                        LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         WHERE u.email IS NOT NULL AND u.email != ''
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        HAVING ultima_compra IS NULL OR ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
+                        HAVING ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
                         ORDER BY ultima_compra ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                $descricaoSegmento = "Clientes sem compra há mais de {$diasRecompra} dias";
+                $descricaoSegmento = "Clientes que já compraram mas não compram há mais de {$diasRecompra} dias";
 
             } elseif ($tipo === 'aniversario') {
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.data_nascimento
@@ -1707,52 +1707,177 @@ Use nomes curtos e descritivos em português.";
         try {
             // Query clients based on segment trigger
             if ($gatilho === 'sem_compra_30' || $gatilho === 'sem_compra_60' || $gatilho === 'sem_compra_90') {
+                // Clients who HAVE purchased before but last purchase was > X days ago
                 $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_30', '30');
                 if ($gatilho === 'sem_compra_60') $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_60', '60');
                 if ($gatilho === 'sem_compra_90') $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_90', '90');
                 if ($dias <= 0) $dias = 30;
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra
-                        FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        FROM usuarios u
+                        INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         WHERE u.email IS NOT NULL AND u.email != ''
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        HAVING ultima_compra IS NULL OR ultima_compra < DATE_SUB(NOW(), INTERVAL {$dias} DAY)
+                        HAVING MAX(p.created_at) < DATE_SUB(NOW(), INTERVAL {$dias} DAY)
                         ORDER BY ultima_compra ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } elseif ($gatilho === 'vip') {
-                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, COUNT(p.id) AS total_pedidos, MAX(p.created_at) AS ultima_compra
-                        FROM usuarios u INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue')
-                        WHERE u.email IS NOT NULL GROUP BY u.id HAVING total_pedidos >= 3 ORDER BY total_pedidos DESC";
+                // Clients with 3+ paid orders OR total spent >= $500
+                $minPedidos = (int)$this->getConfig($pdo, 'criterio_vip_min_pedidos', '3');
+                $minValor = (float)$this->getConfig($pdo, 'criterio_vip_min_valor', '500');
+                // Detect total column
+                $totalCol = 'valor_total';
+                try {
+                    $pedCols = $pdo->query("DESCRIBE pedidos")->fetchAll(\PDO::FETCH_COLUMN);
+                    if (!in_array('valor_total', $pedCols) && in_array('total', $pedCols)) $totalCol = 'total';
+                    elseif (!in_array('valor_total', $pedCols) && in_array('valor', $pedCols)) $totalCol = 'valor';
+                } catch (\Exception $e) {}
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, COUNT(p.id) AS total_pedidos, MAX(p.created_at) AS ultima_compra, COALESCE(SUM(p.{$totalCol}),0) AS total_gasto
+                        FROM usuarios u
+                        INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        HAVING COUNT(p.id) >= {$minPedidos} OR COALESCE(SUM(p.{$totalCol}),0) >= {$minValor}
+                        ORDER BY total_gasto DESC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-            } elseif ($gatilho === 'primeira_compra' || $gatilho === 'novo_cadastro') {
+            } elseif ($gatilho === 'primeira_compra') {
+                // Clients whose FIRST purchase was within last X days
+                $dias = (int)$this->getConfig($pdo, 'criterio_primeira_compra_dias', '30');
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MIN(p.created_at) AS ultima_compra
+                        FROM usuarios u
+                        INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        HAVING MIN(p.created_at) > DATE_SUB(NOW(), INTERVAL {$dias} DAY)
+                        ORDER BY ultima_compra DESC";
+                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            } elseif ($gatilho === 'novo_cadastro') {
+                // Users registered within last X days (with or without purchase)
+                $dias = (int)$this->getConfig($pdo, 'criterio_novo_cadastro_dias', '7');
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.created_at AS ultima_compra
-                        FROM usuarios u WHERE u.email IS NOT NULL AND u.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
+                        FROM usuarios u
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        AND u.created_at > DATE_SUB(NOW(), INTERVAL {$dias} DAY)
                         ORDER BY u.created_at DESC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+            } elseif ($gatilho === 'carrinho_abandonado') {
+                // Users with items in cart who did NOT complete a purchase in last X days
+                $dias = (int)$this->getConfig($pdo, 'criterio_carrinho_dias', '3');
+                $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, c.created_at AS ultima_compra
+                        FROM usuarios u
+                        INNER JOIN carrinhos c ON c.usuario_id = u.id
+                        INNER JOIN carrinho_items ci ON ci.carrinho_id = c.id AND ci.quantidade > 0
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        AND u.id NOT IN (
+                            SELECT DISTINCT p.usuario_id FROM pedidos p
+                            WHERE p.status IN ('pago','processando','enviado','entregue')
+                            AND p.created_at > DATE_SUB(NOW(), INTERVAL {$dias} DAY)
+                            AND p.usuario_id IS NOT NULL
+                        )
+                        ORDER BY c.created_at DESC";
+                try {
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) { $clientes = []; }
+
+            } elseif ($gatilho === 'aniversario') {
+                // Users with birthday this week - check if column exists
+                $hasNasc = false;
+                try {
+                    $uCols = $pdo->query("DESCRIBE usuarios")->fetchAll(\PDO::FETCH_COLUMN);
+                    $hasNasc = in_array('data_nascimento', $uCols);
+                } catch (\Exception $e) {}
+                if ($hasNasc) {
+                    $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.data_nascimento AS ultima_compra
+                            FROM usuarios u
+                            WHERE u.email IS NOT NULL AND u.email != ''
+                            AND u.data_nascimento IS NOT NULL
+                            AND (MONTH(u.data_nascimento) = MONTH(NOW()) AND DAY(u.data_nascimento) BETWEEN DAY(NOW()) AND DAY(NOW())+7)
+                            ORDER BY DAY(u.data_nascimento) ASC";
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } else {
+                    $clientes = [];
+                }
+
             } elseif ($gatilho === 'abriu_nao_clicou') {
+                // Users who opened emails but never clicked any link
                 $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_abertura) AS ultima_compra
                         FROM email_mkt_campanha_clientes cc
-                        JOIN usuarios u ON u.id = cc.cliente_id
-                        WHERE cc.status = 'aberto' AND cc.data_clique IS NULL
-                        GROUP BY u.id, u.{$userNomeCol}, u.email";
-                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        INNER JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.data_abertura IS NOT NULL AND cc.data_clique IS NULL
+                        AND u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        ORDER BY ultima_compra DESC";
+                try {
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) { $clientes = []; }
 
             } elseif ($gatilho === 'clicou_nao_converteu') {
+                // Users who clicked but did NOT convert (no purchase after click)
                 $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_clique) AS ultima_compra
                         FROM email_mkt_campanha_clientes cc
-                        JOIN usuarios u ON u.id = cc.cliente_id
-                        WHERE cc.status = 'clicado' AND cc.data_conversao IS NULL
-                        GROUP BY u.id, u.{$userNomeCol}, u.email";
-                $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        INNER JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.data_clique IS NOT NULL AND cc.data_conversao IS NULL
+                        AND u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        ORDER BY ultima_compra DESC";
+                try {
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) { $clientes = []; }
 
             } elseif ($gatilho === 'converteu') {
+                // Users who converted (purchased after clicking email)
                 $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_conversao) AS ultima_compra
                         FROM email_mkt_campanha_clientes cc
-                        JOIN usuarios u ON u.id = cc.cliente_id
-                        WHERE cc.status = 'convertido'
-                        GROUP BY u.id, u.{$userNomeCol}, u.email";
+                        INNER JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.data_conversao IS NOT NULL
+                        AND u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        ORDER BY ultima_compra DESC";
+                try {
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) { $clientes = []; }
+
+            } elseif ($gatilho === 'nunca_abriu') {
+                // Users who received emails but NEVER opened any
+                $sql = "SELECT DISTINCT u.id, u.{$userNomeCol} AS nome, u.email, MAX(cc.data_envio) AS ultima_compra
+                        FROM email_mkt_campanha_clientes cc
+                        INNER JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.data_envio IS NOT NULL AND cc.data_abertura IS NULL
+                        AND u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        ORDER BY ultima_compra DESC";
+                try {
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) { $clientes = []; }
+
+            } elseif ($gatilho === 'engajado') {
+                // Users who opened AND clicked multiple times
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, COUNT(cc.id) AS interacoes, MAX(cc.data_clique) AS ultima_compra
+                        FROM email_mkt_campanha_clientes cc
+                        INNER JOIN usuarios u ON u.id = cc.cliente_id
+                        WHERE cc.data_clique IS NOT NULL
+                        AND u.email IS NOT NULL AND u.email != ''
+                        GROUP BY u.id, u.{$userNomeCol}, u.email
+                        HAVING COUNT(cc.id) >= 2
+                        ORDER BY interacoes DESC";
+                try {
+                    $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) { $clientes = []; }
+
+            } elseif ($gatilho === 'inativo_total') {
+                // Users who NEVER made any purchase
+                $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.created_at AS ultima_compra
+                        FROM usuarios u
+                        WHERE u.email IS NOT NULL AND u.email != ''
+                        AND u.id NOT IN (
+                            SELECT DISTINCT p.usuario_id FROM pedidos p
+                            WHERE p.status IN ('pago','entregue','enviado')
+                            AND p.usuario_id IS NOT NULL
+                        )
+                        ORDER BY u.{$userNomeCol} ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } else {
