@@ -2948,6 +2948,8 @@ class CheckoutController extends Controller {
                             foreach (['subtotal' => ['subtotal','subtotal_produtos'], 'servicos' => ['servicos','taxa_servico'], 'impostos' => ['impostos','valor_impostos'], 'frete' => ['frete','valor_frete']] as $alias => $candidates) {
                                 foreach ($candidates as $c) { if (in_array($c, $colsPedSep, true)) { $selCols[] = $c . ' AS ' . $alias; break; } }
                             }
+                            // Incluir moeda para saber se precisa converter
+                            foreach (['moeda', 'currency'] as $mc) { if (in_array($mc, $colsPedSep, true)) { $selCols[] = $mc . ' AS moeda'; break; } }
                             $stPedSep = $dbCarneSep->prepare('SELECT ' . implode(', ', $selCols) . ' FROM pedidos WHERE id = ? LIMIT 1');
                             $stPedSep->execute([(int) $pedidoId]);
                             $pedSep = $stPedSep->fetch(\PDO::FETCH_ASSOC) ?: [];
@@ -2976,12 +2978,20 @@ class CheckoutController extends Controller {
                                 }
                             }
 
-                            // Converter USD -> BRL
-                            $subtotalProdutos = round($subUsd * $taxaConv, 2);
-                            $totalTaxas = round(($svcUsd + $impUsd + $freUsd) * $taxaConv, 2);
+                            // Verificar moeda do pedido — se já é BRL, não converter
+                            $moedaPedido = strtoupper(trim((string) ($pedSep['moeda'] ?? ($pedSep['currency'] ?? 'USD'))));
+                            if ($moedaPedido === '' || $moedaPedido === 'BRL') {
+                                // Valores já estão em BRL — usar diretamente sem multiplicar pela taxa
+                                $subtotalProdutos = round($subUsd, 2); // na verdade já é BRL
+                                $totalTaxas = round($svcUsd + $impUsd + $freUsd, 2);
+                            } else {
+                                // Converter USD -> BRL
+                                $subtotalProdutos = round($subUsd * $taxaConv, 2);
+                                $totalTaxas = round(($svcUsd + $impUsd + $freUsd) * $taxaConv, 2);
+                            }
                             $totalPedido = round($subtotalProdutos + $totalTaxas, 2);
 
-                            error_log("[CARNE] Valores: subUsd={$subUsd} svcUsd={$svcUsd} impUsd={$impUsd} freUsd={$freUsd} taxa={$taxaConv} => prodBrl={$subtotalProdutos} taxasBrl={$totalTaxas} totalBrl={$totalPedido}");
+                            error_log("[CARNE] Valores: subUsd={$subUsd} svcUsd={$svcUsd} impUsd={$impUsd} freUsd={$freUsd} taxa={$taxaConv} moeda={$moedaPedido} => prodBrl={$subtotalProdutos} taxasBrl={$totalTaxas} totalBrl={$totalPedido}");
 
                         } catch (\Exception $e) {
                             error_log('[CARNE] Erro ao calcular valores: ' . $e->getMessage());
