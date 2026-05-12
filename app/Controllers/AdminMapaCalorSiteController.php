@@ -501,35 +501,31 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
         // ============================================================
         // ANALYTICS: Products, Temporal Graph, Origins
         // ============================================================
+        try {
 
         // Products Analytics
         $prodMaisVisitados = []; $prodMaisComprados = [];
         try {
             $nomeCol = 'nome';
-            $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN) ?: [];
-            if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name';
+            try { $cols = $pdo->query("DESCRIBE produtos")->fetchAll(\PDO::FETCH_COLUMN) ?: []; if (!in_array('nome', $cols) && in_array('name', $cols)) $nomeCol = 'name'; } catch (\Throwable $e) {}
 
-            $prodMaisVisitados = $pdo->query("SELECT SUBSTRING_INDEX(e.pagina, '/', -1) AS prod_id, COUNT(*) AS visitas FROM site_heatmap_events e WHERE e.pagina LIKE '/produto/detalhes/%' AND e.tipo = 'pageview' AND e.created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY prod_id ORDER BY visitas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            // Get product names
-            if (!empty($prodMaisVisitados)) {
-                $ids = array_map(function($p){ return (int)$p['prod_id']; }, $prodMaisVisitados);
-                $ids = array_filter($ids);
+            $rows = $pdo->query("SELECT SUBSTRING_INDEX(e.pagina, '/', -1) AS prod_id, COUNT(*) AS visitas FROM site_heatmap_events e WHERE e.pagina LIKE '/produto/detalhes/%' AND e.tipo = 'pageview' AND e.created_at >= DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY prod_id ORDER BY visitas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (!empty($rows)) {
+                $ids = array_filter(array_map(function($p){ return (int)$p['prod_id']; }, $rows));
                 if (!empty($ids)) {
                     $in = implode(',', $ids);
-                    $nomes = $pdo->query("SELECT id, {$nomeCol} AS nome FROM produtos WHERE id IN ({$in})")->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
-                    foreach ($prodMaisVisitados as &$pv) {
-                        $pv['nome'] = $nomes[(int)$pv['prod_id']] ?? 'Produto #'.$pv['prod_id'];
-                    }
+                    $stN = $pdo->query("SELECT id, {$nomeCol} FROM produtos WHERE id IN ({$in})");
+                    $nomes = [];
+                    foreach (($stN ? $stN->fetchAll(\PDO::FETCH_ASSOC) : []) as $n) { $nomes[(int)$n['id']] = $n[$nomeCol] ?? ''; }
+                    foreach ($rows as $r) { $prodMaisVisitados[] = ['nome' => $nomes[(int)$r['prod_id']] ?? 'Produto #'.$r['prod_id'], 'visitas' => (int)$r['visitas']]; }
                 }
             }
-        } catch (\Exception $e) {}
+        } catch (\Throwable $e) {}
         try {
-            $nomeCol2 = in_array('nome', $cols ?? []) ? 'nome' : 'name';
-            $prodMaisComprados = $pdo->query("SELECT p.{$nomeCol2} AS nome, COUNT(DISTINCT pi2.pedido_id) AS vendas FROM pedido_itens pi2 JOIN pedidos ped ON ped.id = pi2.pedido_id AND ped.status IN ('pago','entregue') JOIN produtos p ON p.id = pi2.produto_id WHERE ped.created_at > DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol2} ORDER BY vendas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } catch (\Exception $e) {
-            try { $prodMaisComprados = $pdo->query("SELECT p.{$nomeCol} AS nome, COUNT(DISTINCT pi2.pedido_id) AS vendas FROM pedido_items pi2 JOIN pedidos ped ON ped.id = pi2.pedido_id AND ped.status IN ('pago','entregue') JOIN produtos p ON p.id = pi2.produto_id WHERE ped.created_at > DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol} ORDER BY vendas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e2) {}
-        }
-
+            $itensTable = 'pedido_itens';
+            try { $pdo->query("SELECT 1 FROM pedido_itens LIMIT 1"); } catch (\Throwable $e) { $itensTable = 'pedido_items'; }
+            $prodMaisComprados = $pdo->query("SELECT p.{$nomeCol} AS nome, COUNT(DISTINCT pi2.pedido_id) AS vendas FROM {$itensTable} pi2 JOIN pedidos ped ON ped.id = pi2.pedido_id AND ped.status IN ('pago','entregue') JOIN produtos p ON p.id = pi2.produto_id WHERE ped.created_at > DATE_SUB(NOW(), INTERVAL {$periodo} DAY) GROUP BY p.id, p.{$nomeCol} ORDER BY vendas DESC LIMIT 8")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {}
         echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">';
         // Most visited products
         echo '<div class="section-card" style="margin-bottom:0;"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-eye-fill"></i> Produtos Mais Visitados</h2></div><div class="section-body">';
@@ -603,6 +599,10 @@ Seja direto, prático e evite termos técnicos. Fale como se fosse um amigo dand
             echo '<p style="color:#94A3B8;font-size:12px;">Dados de origem serão exibidos após visitantes aceitarem cookies analíticos.</p>';
         }
         echo '</div></div>';
+
+        } catch (\Throwable $e) {
+            echo '<div class="section-card"><div class="section-body"><p style="color:#94A3B8;">Erro ao carregar analytics: '.htmlspecialchars($e->getMessage()).'</p></div></div>';
+        }
 
         // Heatmap Visualization Section
         echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-fire"></i> Visualização do Mapa de Calor</h2></div><div class="section-body">
