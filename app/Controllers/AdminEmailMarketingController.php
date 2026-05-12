@@ -167,7 +167,7 @@ class AdminEmailMarketingController extends Controller {
                         LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         GROUP BY u.id, u.{$userNomeCol}, u.email
                         HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
-                        ORDER BY ultima_compra ASC LIMIT 5000";
+                        ORDER BY ultima_compra ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes sem compra há mais de {$diasRecompra} dias";
 
@@ -176,7 +176,7 @@ class AdminEmailMarketingController extends Controller {
                         FROM usuarios u
                         WHERE u.data_nascimento IS NOT NULL
                         AND (MONTH(u.data_nascimento) = MONTH(NOW()) AND DAY(u.data_nascimento) BETWEEN DAY(NOW()) AND DAY(NOW())+7)
-                        LIMIT 5000";
+                       ";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Aniversariantes da semana";
 
@@ -186,7 +186,7 @@ class AdminEmailMarketingController extends Controller {
                         INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        LIMIT 5000";
+                       ";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes com compra nos últimos 7 dias";
 
@@ -196,7 +196,7 @@ class AdminEmailMarketingController extends Controller {
                         INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         GROUP BY u.id, u.{$userNomeCol}, u.email
                         HAVING total_pedidos >= 3 OR total_gasto >= 500
-                        ORDER BY total_gasto DESC LIMIT 5000";
+                        ORDER BY total_gasto DESC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes VIP (3+ pedidos ou $500+ gastos)";
 
@@ -220,7 +220,7 @@ class AdminEmailMarketingController extends Controller {
                                 WHERE p.created_at > DATE_SUB(NOW(), INTERVAL 3 DAY) 
                                 AND p.status IN ('pago','processando','enviado','entregue')
                             )
-                            ORDER BY c.created_at DESC LIMIT 5000";
+                            ORDER BY c.created_at DESC";
                     try {
                         $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                     } catch (\Exception $e) {
@@ -235,7 +235,7 @@ class AdminEmailMarketingController extends Controller {
                                         WHERE p.created_at > DATE_SUB(NOW(), INTERVAL 3 DAY) 
                                         AND p.status IN ('pago','processando','enviado','entregue')
                                     )
-                                    ORDER BY c.created_at DESC LIMIT 5000";
+                                    ORDER BY c.created_at DESC";
                             $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                         } catch (\Exception $e2) {
                             $clientes = [];
@@ -243,7 +243,7 @@ class AdminEmailMarketingController extends Controller {
                     }
                     $descricaoSegmento = "Clientes com carrinho abandonado (itens no carrinho sem pedido pago nos últimos 3 dias)";
                 } else {
-                    $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != '' LIMIT 5000";
+                    $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email FROM usuarios u WHERE u.email IS NOT NULL AND u.email != ''";
                     $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                     $descricaoSegmento = "Clientes ativos - campanha {$tipo}";
                 }
@@ -654,7 +654,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
         $campanha = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$campanha) { echo json_encode(['success'=>false,'error'=>'Não encontrada']); return; }
         // Get clients
-        $st2 = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id = ? ORDER BY id LIMIT 5000"); $st2->execute([$id]);
+        $st2 = $pdo->prepare("SELECT * FROM email_mkt_campanha_clientes WHERE campanha_id = ? ORDER BY id"); $st2->execute([$id]);
         $clientes = $st2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         echo json_encode(['success'=>true,'campanha'=>$campanha,'clientes'=>$clientes]);
     }
@@ -865,7 +865,7 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
 </div>';
 
         // Tabs
-        $tabs = ['dashboard'=>'Dashboard','campanhas'=>'Todas','pendentes'=>'Pendentes','aprovadas'=>'Aprovadas','agendadas'=>'Agendadas','enviados'=>'Enviados','historico'=>'Histórico','segmentos'=>'Segmentos','config'=>'Configurações'];
+        $tabs = ['dashboard'=>'Dashboard','campanhas'=>'Todas','pendentes'=>'Pendentes','aprovadas'=>'Aprovadas','agendadas'=>'Agendadas','enviados'=>'Enviados','historico'=>'Histórico','segmentos'=>'Segmentos','criterios'=>'Critérios','config'=>'Configurações'];
         echo '<nav class="mkt-tabs">';
         foreach ($tabs as $key => $label) {
             $active = ($tab === $key) ? ' active' : '';
@@ -882,6 +882,8 @@ O assunto deve ter no máximo 50 caracteres. O corpo total entre 120-220 palavra
             $this->renderCampanhasTable($campanhas);
         } elseif ($tab === 'segmentos') {
             $this->renderSegmentosTab($pdo);
+        } elseif ($tab === 'criterios') {
+            $this->renderCriteriosTab($pdo);
         } else {
             echo '<div class="section-card"><div class="section-body"><p style="color:#94A3B8;">Seção em desenvolvimento.</p></div></div>';
         }
@@ -1704,27 +1706,28 @@ Use nomes curtos e descritivos em português.";
         try {
             // Query clients based on segment trigger
             if ($gatilho === 'sem_compra_30' || $gatilho === 'sem_compra_60' || $gatilho === 'sem_compra_90') {
-                $dias = 30;
-                if ($gatilho === 'sem_compra_60') $dias = 60;
-                if ($gatilho === 'sem_compra_90') $dias = 90;
+                $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_30', '30');
+                if ($gatilho === 'sem_compra_60') $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_60', '60');
+                if ($gatilho === 'sem_compra_90') $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_90', '90');
+                if ($dias <= 0) $dias = 30;
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra
                         FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue')
                         WHERE u.email IS NOT NULL AND u.email != ''
                         GROUP BY u.id, u.{$userNomeCol}, u.email
                         HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$dias} DAY)
-                        ORDER BY ultima_compra ASC LIMIT 500";
+                        ORDER BY ultima_compra ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } elseif ($gatilho === 'vip') {
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, COUNT(p.id) AS total_pedidos, MAX(p.created_at) AS ultima_compra
                         FROM usuarios u INNER JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue')
-                        WHERE u.email IS NOT NULL GROUP BY u.id HAVING total_pedidos >= 3 ORDER BY total_pedidos DESC LIMIT 500";
+                        WHERE u.email IS NOT NULL GROUP BY u.id HAVING total_pedidos >= 3 ORDER BY total_pedidos DESC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } elseif ($gatilho === 'primeira_compra' || $gatilho === 'novo_cadastro') {
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, u.created_at AS ultima_compra
                         FROM usuarios u WHERE u.email IS NOT NULL AND u.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
-                        ORDER BY u.created_at DESC LIMIT 500";
+                        ORDER BY u.created_at DESC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } elseif ($gatilho === 'abriu_nao_clicou') {
@@ -1732,7 +1735,7 @@ Use nomes curtos e descritivos em português.";
                         FROM email_mkt_campanha_clientes cc
                         JOIN usuarios u ON u.id = cc.cliente_id
                         WHERE cc.status = 'aberto' AND cc.data_clique IS NULL
-                        GROUP BY u.id, u.{$userNomeCol}, u.email LIMIT 500";
+                        GROUP BY u.id, u.{$userNomeCol}, u.email";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } elseif ($gatilho === 'clicou_nao_converteu') {
@@ -1740,7 +1743,7 @@ Use nomes curtos e descritivos em português.";
                         FROM email_mkt_campanha_clientes cc
                         JOIN usuarios u ON u.id = cc.cliente_id
                         WHERE cc.status = 'clicado' AND cc.data_conversao IS NULL
-                        GROUP BY u.id, u.{$userNomeCol}, u.email LIMIT 500";
+                        GROUP BY u.id, u.{$userNomeCol}, u.email";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } elseif ($gatilho === 'converteu') {
@@ -1748,7 +1751,7 @@ Use nomes curtos e descritivos em português.";
                         FROM email_mkt_campanha_clientes cc
                         JOIN usuarios u ON u.id = cc.cliente_id
                         WHERE cc.status = 'convertido'
-                        GROUP BY u.id, u.{$userNomeCol}, u.email LIMIT 500";
+                        GROUP BY u.id, u.{$userNomeCol}, u.email";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
             } else {
@@ -1757,7 +1760,7 @@ Use nomes curtos e descritivos em português.";
                         FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id
                         WHERE u.email IS NOT NULL AND u.email != ''
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        ORDER BY u.{$userNomeCol} ASC LIMIT 500";
+                        ORDER BY u.{$userNomeCol} ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
             }
         } catch (\Exception $e) {
@@ -1797,6 +1800,164 @@ Use nomes curtos e descritivos em português.";
         if ($id <= 0) { echo json_encode(['success'=>false,'error'=>'ID inválido']); return; }
         $pdo->prepare("UPDATE email_mkt_segmentos SET ativo = 0 WHERE id = ?")->execute([$id]);
         echo json_encode(['success'=>true]);
+    }
+
+    private function renderCriteriosTab(\PDO $pdo): void {
+        // Load saved criteria configs
+        $criteriosConfig = [];
+        try {
+            $st = $pdo->query("SELECT chave, valor FROM email_mkt_config WHERE chave LIKE 'criterio_%'");
+            $criteriosConfig = $st ? ($st->fetchAll(\PDO::FETCH_KEY_PAIR) ?: []) : [];
+        } catch (\Exception $e) {}
+
+        $criterios = [
+            'sem_compra_30' => [
+                'nome' => 'Sem compra há 30 dias',
+                'descricao' => 'Clientes que fizeram pelo menos 1 pedido pago, mas a última compra foi há mais de X dias.',
+                'parametro' => 'criterio_dias_sem_compra_30',
+                'default' => '30',
+                'unidade' => 'dias',
+                'regra' => 'Última compra > X dias atrás'
+            ],
+            'sem_compra_60' => [
+                'nome' => 'Sem compra há 60 dias',
+                'descricao' => 'Clientes inativos entre X e Y dias sem compra.',
+                'parametro' => 'criterio_dias_sem_compra_60',
+                'default' => '60',
+                'unidade' => 'dias',
+                'regra' => 'Última compra > X dias atrás'
+            ],
+            'sem_compra_90' => [
+                'nome' => 'Sem compra há 90+ dias',
+                'descricao' => 'Clientes muito inativos, sem compra há mais de X dias.',
+                'parametro' => 'criterio_dias_sem_compra_90',
+                'default' => '90',
+                'unidade' => 'dias',
+                'regra' => 'Última compra > X dias atrás'
+            ],
+            'vip' => [
+                'nome' => 'Cliente VIP',
+                'descricao' => 'Clientes com alto volume de compras (mínimo de X pedidos pagos OU valor total acima de Y).',
+                'parametro' => 'criterio_vip_min_pedidos',
+                'default' => '3',
+                'unidade' => 'pedidos mínimos',
+                'parametro2' => 'criterio_vip_min_valor',
+                'default2' => '500',
+                'unidade2' => 'USD valor mínimo gasto',
+                'regra' => 'Total pedidos >= X OU Total gasto >= Y'
+            ],
+            'primeira_compra' => [
+                'nome' => 'Primeira compra recente',
+                'descricao' => 'Clientes que fizeram a primeira compra nos últimos X dias.',
+                'parametro' => 'criterio_primeira_compra_dias',
+                'default' => '30',
+                'unidade' => 'dias',
+                'regra' => 'Cadastro ou 1ª compra < X dias'
+            ],
+            'novo_cadastro' => [
+                'nome' => 'Novo cadastro',
+                'descricao' => 'Clientes que se cadastraram nos últimos X dias (com ou sem compra).',
+                'parametro' => 'criterio_novo_cadastro_dias',
+                'default' => '7',
+                'unidade' => 'dias',
+                'regra' => 'Data cadastro < X dias atrás'
+            ],
+            'carrinho_abandonado' => [
+                'nome' => 'Carrinho abandonado',
+                'descricao' => 'Clientes com itens no carrinho que NÃO finalizaram pedido nos últimos X dias.',
+                'parametro' => 'criterio_carrinho_dias',
+                'default' => '3',
+                'unidade' => 'dias sem finalizar',
+                'regra' => 'Tem itens no carrinho E sem pedido pago < X dias'
+            ],
+            'abriu_nao_clicou' => [
+                'nome' => 'Abriu email mas não clicou',
+                'descricao' => 'Clientes que abriram emails anteriores mas nunca clicaram em nenhum link.',
+                'parametro' => '',
+                'default' => '',
+                'unidade' => '',
+                'regra' => 'Status = aberto E clique = NULL (dados de tracking)'
+            ],
+            'clicou_nao_converteu' => [
+                'nome' => 'Clicou mas não converteu',
+                'descricao' => 'Clientes que clicaram em links de emails mas não fizeram compra após o clique.',
+                'parametro' => '',
+                'default' => '',
+                'unidade' => '',
+                'regra' => 'Status = clicado E conversão = NULL (dados de tracking)'
+            ],
+            'converteu' => [
+                'nome' => 'Converteu',
+                'descricao' => 'Clientes que compraram após receber e clicar em um email marketing.',
+                'parametro' => '',
+                'default' => '',
+                'unidade' => '',
+                'regra' => 'Status = convertido (pedido pago após clique)'
+            ],
+            'engajado' => [
+                'nome' => 'Engajado',
+                'descricao' => 'Clientes que abrem e clicam frequentemente nos emails.',
+                'parametro' => '',
+                'default' => '',
+                'unidade' => '',
+                'regra' => 'Múltiplas aberturas e cliques registrados'
+            ],
+            'inativo_total' => [
+                'nome' => 'Inativo total',
+                'descricao' => 'Clientes cadastrados que nunca fizeram nenhuma compra.',
+                'parametro' => '',
+                'default' => '',
+                'unidade' => '',
+                'regra' => 'Nenhum pedido registrado'
+            ],
+        ];
+
+        echo '<div class="section-card"><div class="section-card-header"><h2 class="section-title"><i class="bi bi-sliders"></i> Configuração de Critérios</h2></div><div class="section-body">
+<p style="color:#64748B;font-size:13px;margin-bottom:16px;">Defina os parâmetros de cada critério de segmentação. Esses valores são usados quando a IA ou você seleciona um gatilho para filtrar clientes.</p>
+<div style="display:flex;flex-direction:column;gap:12px;">';
+
+        foreach ($criterios as $key => $c) {
+            $valor = $criteriosConfig[$c['parametro'] ?? ''] ?? $c['default'];
+            $valor2 = isset($c['parametro2']) ? ($criteriosConfig[$c['parametro2']] ?? $c['default2']) : '';
+
+            echo '<div style="border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+<div style="flex:1;min-width:200px;">
+<div style="font-size:13px;font-weight:700;color:#18253D;margin-bottom:2px;">' . htmlspecialchars($c['nome']) . '</div>
+<div style="font-size:12px;color:#64748B;margin-bottom:4px;">' . htmlspecialchars($c['descricao']) . '</div>
+<div style="font-size:11px;color:#94A3B8;"><strong>Regra:</strong> ' . htmlspecialchars($c['regra']) . '</div>
+</div>';
+
+            if (!empty($c['parametro'])) {
+                echo '<div style="display:flex;gap:8px;align-items:center;">';
+                echo '<input type="number" class="criterio-input" data-chave="' . htmlspecialchars($c['parametro']) . '" value="' . htmlspecialchars($valor) . '" style="width:70px;padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:13px;text-align:center;">';
+                echo '<span style="font-size:11px;color:#94A3B8;">' . htmlspecialchars($c['unidade']) . '</span>';
+                if (isset($c['parametro2'])) {
+                    echo '<input type="number" class="criterio-input" data-chave="' . htmlspecialchars($c['parametro2']) . '" value="' . htmlspecialchars($valor2) . '" style="width:70px;padding:6px 10px;border:1px solid #E2E8F0;border-radius:6px;font-size:13px;text-align:center;margin-left:8px;">';
+                    echo '<span style="font-size:11px;color:#94A3B8;">' . htmlspecialchars($c['unidade2']) . '</span>';
+                }
+                echo '</div>';
+            } else {
+                echo '<span style="font-size:11px;color:#94A3B8;background:#F1F5F9;padding:4px 10px;border-radius:6px;">Automático (tracking)</span>';
+            }
+
+            echo '</div></div>';
+        }
+
+        echo '</div>
+<button onclick="salvarCriterios()" class="btn-navy" style="margin-top:16px;padding:10px 20px;font-size:14px;"><i class="bi bi-check-lg me-1"></i>Salvar Critérios</button>
+</div></div>
+<script>
+async function salvarCriterios(){
+    const data={};
+    document.querySelectorAll(".criterio-input").forEach(el=>{
+        if(el.dataset.chave) data[el.dataset.chave]=el.value;
+    });
+    const r=await fetch("/admin/email-marketing/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+    const d=await r.json();
+    alert(d.success?"Critérios salvos!":"Erro ao salvar");
+}
+</script>';
     }
 
     private function renderConfigTab(\PDO $pdo): void {
