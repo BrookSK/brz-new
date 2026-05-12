@@ -2356,30 +2356,34 @@ JS;
                 
                 <!-- Abas de Pedidos por Moeda -->
                 <div class="mb-3">
-                    <ul class="nav nav-pills" id="pedidosTabs" role="tablist">';
+                    <!-- Mobile: Dropdown -->
+                    <div class="d-md-none mb-2">
+                        <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
+                            <option value="todos" ' . ($isCarneFiltro ? '' : 'selected') . '>Todos os Pedidos</option>
+                            <option value="dolar">Pagamentos em Dólar</option>
+                            <option value="real">Pagamentos em Reais</option>
+                            <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>Carnê</option>
+                        </select>
+                    </div>
+                    <!-- Desktop: Pills -->
+                    <ul class="nav nav-pills d-none d-md-flex" id="pedidosTabs" role="tablist">';
                     $isCarneFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'carne');
                     echo '
                         <li class="nav-item" role="presentation">';
                     if ($isCarneFiltro) {
-                        echo '<a class="nav-link" href="/admin/pedidos"><i class="fas fa-list"></i> Todos os Pedidos</a>';
+                        echo '<a class="nav-link" href="/admin/pedidos">Todos os Pedidos</a>';
                     } else {
-                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button"><i class="fas fa-list"></i> Todos os Pedidos</button>';
+                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">Todos os Pedidos</button>';
                     }
                     echo '</li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">
-                                <i class="fas fa-dollar-sign"></i> Pagamentos em Dólar
-                            </button>
+                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">Pagamentos em Dólar</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">
-                                <i class="fas fa-currency-brl"></i> Pagamentos em Reais
-                            </button>
+                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">Pagamentos em Reais</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">
-                                <i class="fas fa-file-invoice-dollar"></i> Carnê
-                            </a>
+                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">Carnê</a>
                         </li>
                     </ul>';
                     echo '
@@ -2811,6 +2815,13 @@ HTML;
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        function handlePedidosTabMobile(val) {
+            if (val === "carne") { window.location.href = "/admin/pedidos?fp=carne"; return; }
+            if (val === "todos" && window.location.search.indexOf("fp=carne") !== -1) { window.location.href = "/admin/pedidos"; return; }
+            var tabMap = {todos:"pedidos-todos-tab", dolar:"pedidos-dolar-tab", real:"pedidos-real-tab"};
+            var btn = document.getElementById(tabMap[val]);
+            if (btn) { btn.click(); }
+        }
         (function(){
             var modal = document.getElementById("modalLixeiraPedido");
             if(!modal) return;

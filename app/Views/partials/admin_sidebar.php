@@ -1072,6 +1072,20 @@ function renderAdminSidebarStyles() {
             main .card select.form-select { font-size: 11px; padding: 2px 24px 2px 6px; height: auto; }
             /* Código do pedido longo */
             main .card .text-muted { word-break: break-all; }
+            /* Prevent horizontal scroll on nav tabs/pills */
+            main .nav-tabs, main .nav-pills {
+                flex-wrap: wrap !important;
+                overflow-x: visible !important;
+                white-space: normal !important;
+            }
+            main .nav-tabs .nav-link, main .nav-pills .nav-link {
+                font-size: 11px !important;
+                padding: 6px 10px !important;
+                white-space: nowrap;
+            }
+            /* Global no horizontal scroll */
+            body, html { overflow-x: hidden !important; }
+            main, .container-fluid, .col-md-9, .col-lg-10 { overflow-x: hidden !important; max-width: 100vw; }
         }
     </style>';
 }
