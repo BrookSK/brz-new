@@ -80,7 +80,7 @@ class AdminEmailMarketingController extends Controller {
         $this->ensureTables($pdo);
 
         $tab = strtolower(trim((string)$request->getParam('tab', 'dashboard')));
-        $validTabs = ['dashboard','campanhas','pendentes','aprovadas','agendadas','enviados','historico','segmentos','gatilhos','templates','config','logs','metricas'];
+        $validTabs = ['dashboard','campanhas','pendentes','aprovadas','agendadas','enviados','historico','segmentos','criterios','gatilhos','templates','config','logs','metricas'];
         if (!in_array($tab, $validTabs)) $tab = 'dashboard';
 
         // Stats
@@ -165,8 +165,9 @@ class AdminEmailMarketingController extends Controller {
                         COUNT(p.id) AS total_pedidos
                         FROM usuarios u
                         LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
+                        WHERE u.email IS NOT NULL AND u.email != ''
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
+                        HAVING ultima_compra IS NULL OR ultima_compra < DATE_SUB(NOW(), INTERVAL {$diasRecompra} DAY)
                         ORDER BY ultima_compra ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 $descricaoSegmento = "Clientes sem compra há mais de {$diasRecompra} dias";
@@ -1711,10 +1712,10 @@ Use nomes curtos e descritivos em português.";
                 if ($gatilho === 'sem_compra_90') $dias = (int)$this->getConfig($pdo, 'criterio_dias_sem_compra_90', '90');
                 if ($dias <= 0) $dias = 30;
                 $sql = "SELECT u.id, u.{$userNomeCol} AS nome, u.email, MAX(p.created_at) AS ultima_compra
-                        FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue')
+                        FROM usuarios u LEFT JOIN pedidos p ON p.usuario_id = u.id AND p.status IN ('pago','entregue','enviado')
                         WHERE u.email IS NOT NULL AND u.email != ''
                         GROUP BY u.id, u.{$userNomeCol}, u.email
-                        HAVING ultima_compra IS NOT NULL AND ultima_compra < DATE_SUB(NOW(), INTERVAL {$dias} DAY)
+                        HAVING ultima_compra IS NULL OR ultima_compra < DATE_SUB(NOW(), INTERVAL {$dias} DAY)
                         ORDER BY ultima_compra ASC";
                 $clientes = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
