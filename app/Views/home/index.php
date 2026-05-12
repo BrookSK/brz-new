@@ -497,23 +497,30 @@ $(document).ready(function() {
     function initInfiniteCarousel() {
         var el = document.getElementById('produtos-destaque');
         if (!el || el.children.length < 2) return;
-        var autoScroll = setInterval(function() {
-            if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
-                el.scrollTo({ left: 0, behavior: 'smooth' });
-            } else {
-                el.scrollBy({ left: 1, behavior: 'auto' });
-            }
-        }, 30);
-        el.addEventListener('mouseenter', function() { clearInterval(autoScroll); });
-        el.addEventListener('mouseleave', function() {
-            autoScroll = setInterval(function() {
-                if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
-                    el.scrollTo({ left: 0, behavior: 'smooth' });
-                } else {
-                    el.scrollBy({ left: 1, behavior: 'auto' });
-                }
-            }, 30);
+        // Clone items for seamless loop
+        var items = Array.from(el.children);
+        items.forEach(function(item) {
+            var clone = item.cloneNode(true);
+            el.appendChild(clone);
         });
+        var speed = 0.5;
+        var paused = false;
+        function step() {
+            if (!paused) {
+                el.scrollLeft += speed;
+                // When we've scrolled past the original items, reset silently
+                var halfWidth = el.scrollWidth / 2;
+                if (el.scrollLeft >= halfWidth) {
+                    el.scrollLeft -= halfWidth;
+                }
+            }
+            requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+        el.addEventListener('mouseenter', function() { paused = true; });
+        el.addEventListener('mouseleave', function() { paused = false; });
+        el.addEventListener('touchstart', function() { paused = true; });
+        el.addEventListener('touchend', function() { setTimeout(function(){ paused = false; }, 2000); });
     }
 });
 </script>
