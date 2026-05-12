@@ -186,7 +186,7 @@ if (_initMsgs.length > 0) {
     adminLastMsgId = parseInt(_initMsgs[_initMsgs.length - 1].getAttribute('data-msg-id')) || 0;
 }
 </script>
-<script src="/assets/js/lives/studio.js"></script>
+<script src="/assets/js/lives/studio.js?v=<?= time() ?>"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
