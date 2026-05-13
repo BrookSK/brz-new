@@ -27,45 +27,82 @@ const BriSidebar = (() => {
 
   frame?.addEventListener('load', () => {
     hideLoader();
-    // Garantir que todas as navegações internas do iframe incluam embed=1
     try {
       const iframeDoc = frame.contentDocument || frame.contentWindow.document;
-      if (iframeDoc) {
-        // Interceptar cliques em links dentro do iframe
-        iframeDoc.addEventListener('click', (e) => {
-          const link = e.target.closest('a[href]');
-          if (!link) return;
-          const href = link.getAttribute('href');
-          if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
-          // Adicionar embed=1 se não tem
-          if (!href.includes('embed=1')) {
-            e.preventDefault();
-            const newUrl = href + (href.includes('?') ? '&' : '?') + 'embed=1';
-            frame.src = newUrl;
-          }
-        });
-        // Interceptar submits de formulários
-        iframeDoc.addEventListener('submit', (e) => {
-          const form = e.target;
-          if (!form || form.method.toUpperCase() === 'POST') return; // POST forms are fine
-          // Para GET forms, adicionar embed=1 como hidden input
-          if (!form.querySelector('input[name="embed"]')) {
-            const input = iframeDoc.createElement('input');
-            input.type = 'hidden';
-            input.name = 'embed';
-            input.value = '1';
-            form.appendChild(input);
-          }
-        });
-        // Adicionar embed=1 a todos os links existentes que não o têm
-        iframeDoc.querySelectorAll('a[href]').forEach(a => {
-          const href = a.getAttribute('href');
-          if (href && href.startsWith('/') && !href.includes('embed=1')) {
-            a.setAttribute('href', href + (href.includes('?') ? '&' : '?') + 'embed=1');
-          }
-        });
+      const iframeWin = frame.contentWindow;
+      if (!iframeDoc || !iframeWin) return;
+
+      // Se a URL do iframe não tem embed=1, recarregar com embed=1
+      const iframeUrl = iframeWin.location.href;
+      const iframePath = iframeWin.location.pathname + iframeWin.location.search;
+      if (!iframePath.includes('embed=1') && iframePath !== '/bri/inicio') {
+        const sep = iframePath.includes('?') ? '&' : '?';
+        frame.src = iframePath + sep + 'embed=1';
+        return;
       }
-    } catch(e) { /* cross-origin error — ignore */ }
+
+      // Interceptar window.location changes dentro do iframe
+      const origAssign = iframeWin.location.assign?.bind(iframeWin.location);
+      Object.defineProperty(iframeWin, '__briNavigate', { value: function(url) {
+        if (url && !url.includes('embed=1') && url.startsWith('/')) {
+          url = url + (url.includes('?') ? '&' : '?') + 'embed=1';
+        }
+        frame.src = url;
+      }, writable: false });
+
+      // Override location.href setter via script injection
+      const script = iframeDoc.createElement('script');
+      script.textContent = `
+        (function(){
+          var _origHref = window.location.href;
+          var _nav = function(url) {
+            if (url && url.indexOf('embed=1') === -1 && url.indexOf('/') === 0) {
+              url = url + (url.indexOf('?') !== -1 ? '&' : '?') + 'embed=1';
+            }
+            window.location.replace(url);
+          };
+          // Patch onclick handlers that use window.location.href
+          document.addEventListener('click', function(e) {
+            var el = e.target.closest('a[onclick*="location"], button[onclick*="location"]');
+            if (el) {
+              var onclick = el.getAttribute('onclick') || '';
+              if (onclick.indexOf('location.href') !== -1 || onclick.indexOf('location=') !== -1) {
+                e.preventDefault();
+                e.stopPropagation();
+                var match = onclick.match(/location\\.href\\s*=\\s*['"](.*?)['"]/);
+                if (!match) match = onclick.match(/location\\s*=\\s*['"](.*?)['"]/);
+                if (match && match[1]) { _nav(match[1]); }
+              }
+            }
+          }, true);
+        })();
+      `;
+      iframeDoc.head.appendChild(script);
+
+      // Interceptar cliques em links
+      iframeDoc.addEventListener('click', (e) => {
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+        if (!href.includes('embed=1')) {
+          e.preventDefault();
+          e.stopPropagation();
+          frame.src = href + (href.includes('?') ? '&' : '?') + 'embed=1';
+        }
+      }, true);
+
+      // Interceptar form submits GET
+      iframeDoc.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (form && form.method.toUpperCase() !== 'POST' && !form.querySelector('input[name="embed"]')) {
+          const input = iframeDoc.createElement('input');
+          input.type = 'hidden'; input.name = 'embed'; input.value = '1';
+          form.appendChild(input);
+        }
+      }, true);
+
+    } catch(e) { /* cross-origin — ignore */ }
   });
 
   // ── Navegação no iframe ──────────────────────────────
