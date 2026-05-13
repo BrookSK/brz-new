@@ -167,15 +167,15 @@ const BriSidebar = (() => {
       { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: '/carrinho?embed=1', reply: 'Ok, vamos lá! 🛒' },
       { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒' },
       // Produtos & Catálogo
-      { regex: /^(produtos|catalogo|ver produtos|todos os produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
-      { regex: /^(grupos|grupos de compras|ver grupos)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
+      { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
+      { regex: /grupo.*(compra|compras)|ver grupos|me mostr.*grupo/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
       // Conta & Dados
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados!' },
-      { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos!' },
+      { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos!' },
       { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços!' },
       { regex: /meus tickets|tickets|suporte|atendimento/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte!' },
       // Clube
-      { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎' },
+      { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana|me mostr.*clube)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎' },
       { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube!' },
       { regex: /produtos do clube|produtos clube/, url: '/produtos-clube?embed=1', reply: 'Produtos exclusivos do Clube!' },
       // Informações
