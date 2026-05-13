@@ -315,7 +315,8 @@ class CarrinhoController extends Controller {
             $carrinho = $this->getCarrinhoFromDb($uid);
             error_log('[CART-INDEX-DEBUG] carrinho items count=' . count($carrinho));
         }
-        if (empty($carrinho)) {
+        // Só usar sessão como fallback se NÃO está logado
+        if (empty($carrinho) && $uid <= 0) {
             $carrinho = $_SESSION['carrinho'] ?? [];
         }
         
@@ -1016,7 +1017,9 @@ class CarrinhoController extends Controller {
                 return;
             } catch (\Throwable $e) {
                 error_log('[CART-ADD-EXCEPTION] ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
-                // fallback session
+                // Se está logado, retornar erro em vez de cair no fallback de sessão
+                $this->json(['error' => 'Erro ao adicionar: ' . $e->getMessage()], 500);
+                return;
             }
         }
 
