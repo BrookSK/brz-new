@@ -866,6 +866,9 @@ class CarrinhoController extends Controller {
         $this->debugLog('=== DEPURACAO CARRINHO ADICIONAR ===');
         $this->debugLog('Metodo: ' . $request->getMethod());
         $this->debugLog('Parametros recebidos: ' . json_encode($request->getParams()));
+        $this->debugLog('Session ID: ' . session_id());
+        $this->debugLog('Cookies: ' . json_encode(array_keys($_COOKIE ?? [])));
+        $this->debugLog('PHPSESSID cookie: ' . ($_COOKIE['PHPSESSID'] ?? 'NAO EXISTE'));
         
         $produtoId = $request->getParam('id');
         $quantidade = $request->getParam('quantidade', 1);
@@ -885,9 +888,7 @@ class CarrinhoController extends Controller {
         $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
-
-        $pvId = null;
-        if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
+        $this->debugLog('UID apos login check: ' . $uid . ' | session_id=' . session_id() . ' | SESSION[usuario_id]=' . ($_SESSION['usuario_id'] ?? 'NULL') . ' | SESSION[logado]=' . var_export($_SESSION['logado'] ?? null, true));
             $pvId = (int) $produtoVariacaoId;
             if ($pvId <= 0) {
                 $pvId = null;
