@@ -429,6 +429,23 @@ const BriSidebar = (() => {
         let url = p.url || p.pagina || '/';
         if (url.indexOf('/') !== 0) url = '/' + url;
         if (url.match(/^\/admin/i)) return null;
+        // Corrigir URLs comuns que a IA pode errar
+        const urlFixes = {
+          '/grupos-abertos': '/grupos-compras',
+          '/grupos': '/grupos-compras',
+          '/grupo-compras': '/grupos-compras',
+          '/grupo-de-compras': '/grupos-compras',
+          '/meus-dados-pessoais': '/meus-dados',
+          '/perfil': '/meus-dados',
+          '/pedidos': '/meus-pedidos',
+          '/enderecos': '/meus-enderecos',
+          '/suporte': '/meus-tickets',
+          '/clube': '/clube/recarga',
+          '/cart': '/carrinho',
+          '/products': '/produtos',
+        };
+        const urlLower = url.toLowerCase().split('?')[0];
+        if (urlFixes[urlLower]) url = urlFixes[urlLower];
         return url + (url.includes('?') ? '&' : '?') + 'embed=1';
       }
     };
