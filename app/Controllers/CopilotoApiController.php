@@ -181,7 +181,8 @@ class CopilotoApiController extends Controller {
                     $userId = (int) ($stUser->fetchColumn() ?: 0);
                 } catch (\Exception $e) {}
             }
-            if ($userId <= 0) {
+            $sessionId = session_id() ?: null;
+            if ($userId <= 0 && !$sessionId) {
                 $this->responderJson(['error' => 'Não logado', 'debug_session_keys' => array_keys($_SESSION ?? [])], 401);
             }
 
@@ -194,9 +195,17 @@ class CopilotoApiController extends Controller {
             }
 
             // Buscar o carrinho CORRETO do usuário (mesma lógica do CarrinhoController)
-            $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
-            $stCarts->execute([$userId]);
-            $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $cartIds = [];
+            if ($userId > 0) {
+                $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
+                $stCarts->execute([$userId]);
+                $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            }
+            if (empty($cartIds) && $sessionId) {
+                $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE session_id = ? ORDER BY created_at DESC LIMIT 10');
+                $stCarts->execute([$sessionId]);
+                $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            }
             
             $cartId = 0;
             foreach ($cartIds as $cid) {
@@ -207,7 +216,7 @@ class CopilotoApiController extends Controller {
             if ($cartId <= 0 && !empty($cartIds)) $cartId = (int)$cartIds[0];
             if ($cartId <= 0) {
                 $carrinho = new \App\Models\Carrinho();
-                $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
+                $cart = $carrinho->getOrCreateCarrinho($userId > 0 ? $userId : null, $userId <= 0 ? $sessionId : null, 'BRL');
                 $cartId = is_array($cart) ? (int)($cart['id'] ?? 0) : (int)$cart;
             }
 
@@ -243,15 +252,24 @@ class CopilotoApiController extends Controller {
         try {
             if (session_status() === PHP_SESSION_NONE) @session_start();
             $userId = (int) ($_SESSION['usuario_id'] ?? 0);
-            if ($userId <= 0) {
+            $sessionId = session_id() ?: null;
+            if ($userId <= 0 && !$sessionId) {
                 $this->responderJson(['error' => 'Não logado'], 401);
             }
 
             $pdo = \Config\Database::getConnection();
             // Buscar o carrinho correto (mesma lógica do site)
-            $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
-            $stCarts->execute([$userId]);
-            $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $cartIds = [];
+            if ($userId > 0) {
+                $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
+                $stCarts->execute([$userId]);
+                $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            }
+            if (empty($cartIds) && $sessionId) {
+                $stCarts = $pdo->prepare('SELECT id FROM carrinhos WHERE session_id = ? ORDER BY created_at DESC LIMIT 10');
+                $stCarts->execute([$sessionId]);
+                $cartIds = $stCarts->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            }
 
             // Limpar TODOS os carrinhos do usuário
             $carrinho = new \App\Models\Carrinho();
@@ -275,13 +293,15 @@ class CopilotoApiController extends Controller {
         try {
             if (session_status() === PHP_SESSION_NONE) @session_start();
             $userId = (int) ($_SESSION['usuario_id'] ?? 0);
-            if ($userId <= 0) {
+            $sessionId = session_id() ?: null;
+
+            if ($userId <= 0 && !$sessionId) {
                 $this->responderJson(['itens' => [], 'resumo' => null]);
             }
 
             $pdo = \Config\Database::getConnection();
             $carrinho = new \App\Models\Carrinho();
-            $cart = $carrinho->getOrCreateCarrinho($userId, null, 'BRL');
+            $cart = $carrinho->getOrCreateCarrinho($userId > 0 ? $userId : null, $userId <= 0 ? $sessionId : null, 'BRL');
             $cartId = is_array($cart) ? (int)($cart['id'] ?? 0) : (int)$cart;
 
             if ($cartId <= 0) {

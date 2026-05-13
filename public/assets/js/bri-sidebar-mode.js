@@ -24,7 +24,49 @@ const BriSidebar = (() => {
   // ── Loader ──────────────────────────────────────────
   function showLoader() { loader?.classList.add('visible'); }
   function hideLoader()  { loader?.classList.remove('visible'); }
-  frame?.addEventListener('load', hideLoader);
+
+  frame?.addEventListener('load', () => {
+    hideLoader();
+    // Garantir que todas as navegações internas do iframe incluam embed=1
+    try {
+      const iframeDoc = frame.contentDocument || frame.contentWindow.document;
+      if (iframeDoc) {
+        // Interceptar cliques em links dentro do iframe
+        iframeDoc.addEventListener('click', (e) => {
+          const link = e.target.closest('a[href]');
+          if (!link) return;
+          const href = link.getAttribute('href');
+          if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+          // Adicionar embed=1 se não tem
+          if (!href.includes('embed=1')) {
+            e.preventDefault();
+            const newUrl = href + (href.includes('?') ? '&' : '?') + 'embed=1';
+            frame.src = newUrl;
+          }
+        });
+        // Interceptar submits de formulários
+        iframeDoc.addEventListener('submit', (e) => {
+          const form = e.target;
+          if (!form || form.method.toUpperCase() === 'POST') return; // POST forms are fine
+          // Para GET forms, adicionar embed=1 como hidden input
+          if (!form.querySelector('input[name="embed"]')) {
+            const input = iframeDoc.createElement('input');
+            input.type = 'hidden';
+            input.name = 'embed';
+            input.value = '1';
+            form.appendChild(input);
+          }
+        });
+        // Adicionar embed=1 a todos os links existentes que não o têm
+        iframeDoc.querySelectorAll('a[href]').forEach(a => {
+          const href = a.getAttribute('href');
+          if (href && href.startsWith('/') && !href.includes('embed=1')) {
+            a.setAttribute('href', href + (href.includes('?') ? '&' : '?') + 'embed=1');
+          }
+        });
+      }
+    } catch(e) { /* cross-origin error — ignore */ }
+  });
 
   // ── Navegação no iframe ──────────────────────────────
   function navigatePainel(url) {
@@ -105,7 +147,9 @@ const BriSidebar = (() => {
           url_atual: '/home-ia',
           usuario_logado: document.cookie.indexOf('PHPSESSID') !== -1,
           moeda_atual: 'USD',
-          iframe_url: frame ? frame.src : ''
+          iframe_url: frame ? frame.src : '',
+          // Informar à BRI que o iframe está ativo e pode navegar
+          modo_sidebar: true
         }
       })
     })
