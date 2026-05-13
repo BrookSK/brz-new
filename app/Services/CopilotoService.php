@@ -256,17 +256,17 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
             try {
                 if (session_status() === PHP_SESSION_NONE) @session_start();
                 
-                // Usar mesma lógica do CarrinhoController: AuthService para pegar usuario_id
-                $userId = 0;
-                try {
-                    $authSvc = new \App\Services\AuthService();
-                    $u = $authSvc->getUsuarioLogado();
-                    $userId = (int) ($u['id'] ?? 0);
-                } catch (\Throwable $e) {
-                    $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+                // Pegar usuario_id de todas as formas possíveis (mesma lógica do site)
+                $userId = (int) ($_SESSION['usuario_id'] ?? $_SESSION['user_id'] ?? $_SESSION['logado_id'] ?? 0);
+                if ($userId <= 0) {
+                    try {
+                        $authSvc = new \App\Services\AuthService();
+                        $u = $authSvc->getUsuarioLogado();
+                        $userId = (int) ($u['id'] ?? 0);
+                    } catch (\Throwable $e) {}
                 }
 
-                // Mesma lógica de getUserCartIdPreferNonEmpty do CarrinhoController
+                // Buscar carrinho com itens — mesma lógica do CarrinhoController
                 $cartId = 0;
                 if ($userId > 0) {
                     $st = $this->pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
