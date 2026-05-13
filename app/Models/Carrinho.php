@@ -337,6 +337,13 @@ class Carrinho extends Model {
             // Inserir novo item
             $subtotal = $quantidade * $precoUnitario;
 
+            // Fix AUTO_INCREMENT if stuck at 0
+            try {
+                $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
+                $maxId = (int) $this->connection->query("SELECT COALESCE(MAX(id), 0) FROM carrinho_items")->fetchColumn();
+                $this->connection->exec("ALTER TABLE carrinho_items AUTO_INCREMENT = " . max(1, $maxId + 1));
+            } catch (\Exception $e) {}
+
             $colsIns = ['carrinho_id', 'produto_id', $varCol, 'variacao_descricao', 'quantidade', $unitCol, 'subtotal'];
             $valsIns = [':carrinho_id', ':produto_id', ':produto_variacao_id', ':variacao_descricao', ':quantidade', ':valor_unitario', ':subtotal'];
             if ($hasPriceSnap) {
