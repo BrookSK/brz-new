@@ -5,9 +5,29 @@ use App\Core\Request;
 
 class HomeIaController extends Controller {
     public function index(Request $request) {
-        // Garantir sessão ativa e usuário identificado (mesma sessão do site)
+        // Garantir sessão ativa e usuário identificado
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
+        }
+        // Se usuario_id não está na sessão, tentar identificar
+        if (empty($_SESSION['usuario_id'])) {
+            try {
+                $auth = new \App\Services\AuthService();
+                $u = $auth->getUsuarioLogado();
+                if (!empty($u['id'])) {
+                    $_SESSION['usuario_id'] = (int) $u['id'];
+                }
+            } catch (\Throwable $e) {}
+        }
+        // Fallback: remember_token
+        if (empty($_SESSION['usuario_id']) && !empty($_COOKIE['remember_token'])) {
+            try {
+                $pdo = \Config\Database::getConnection();
+                $st = $pdo->prepare("SELECT id FROM usuarios WHERE remember_token = ? LIMIT 1");
+                $st->execute([$_COOKIE['remember_token']]);
+                $uid = (int) ($st->fetchColumn() ?: 0);
+                if ($uid > 0) $_SESSION['usuario_id'] = $uid;
+            } catch (\Throwable $e) {}
         }
         include __DIR__ . '/../Views/home_ia.php';
     }

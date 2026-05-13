@@ -49,6 +49,25 @@ class CopilotoApiController extends Controller {
             }
 
             if (session_status() === PHP_SESSION_NONE) @session_start();
+            
+            // Garantir que usuario_id está na sessão (fallbacks)
+            if (empty($_SESSION['usuario_id'])) {
+                try {
+                    $authSvc = new \App\Services\AuthService();
+                    $u = $authSvc->getUsuarioLogado();
+                    if (!empty($u['id'])) $_SESSION['usuario_id'] = (int) $u['id'];
+                } catch (\Throwable $e) {}
+            }
+            if (empty($_SESSION['usuario_id']) && !empty($_COOKIE['remember_token'])) {
+                try {
+                    $pdoAuth = \Config\Database::getConnection();
+                    $stAuth = $pdoAuth->prepare("SELECT id FROM usuarios WHERE remember_token = ? LIMIT 1");
+                    $stAuth->execute([$_COOKIE['remember_token']]);
+                    $uidAuth = (int) ($stAuth->fetchColumn() ?: 0);
+                    if ($uidAuth > 0) $_SESSION['usuario_id'] = $uidAuth;
+                } catch (\Throwable $e) {}
+            }
+
             $cacheKey = 'cop_rate_' . (session_id() ?: 'x');
             $agora = time();
             if ($agora - (int)($_SESSION[$cacheKey.'_w'] ?? 0) > 60) {
