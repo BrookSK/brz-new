@@ -150,15 +150,14 @@ class AdminQuickBooksController extends Controller {
     public function sincronizarLote(Request $req) {
         (new AuthService())->requerPerfil('admin');
         header('Content-Type: application/json');
-        set_time_limit(600);
-        ini_set('memory_limit', '512M');
-        ignore_user_abort(true);
+        set_time_limit(120);
+        ini_set('memory_limit', '256M');
 
         $dataInicio = trim((string) ($req->getParam('data_inicio') ?? '2026-04-29'));
         if ($dataInicio === '') $dataInicio = '2026-04-29';
         $dataFim = trim((string) ($req->getParam('data_fim') ?? ''));
-        $maxPedidos = (int) ($req->getParam('max') ?: 25); // Limitar por request para evitar timeout
-        if ($maxPedidos <= 0 || $maxPedidos > 50) $maxPedidos = 25;
+        $maxPedidos = (int) ($req->getParam('max') ?: 10); // Limitar para evitar timeout do PHP-FPM
+        if ($maxPedidos <= 0 || $maxPedidos > 15) $maxPedidos = 10;
 
         try {
             $pdo = Database::getConnection();
@@ -278,18 +277,20 @@ class AdminQuickBooksController extends Controller {
                 }
             }
 
-            // Void invoices de pedidos cancelados/na lixeira que já foram sincronizados
+            // Void invoices de pedidos cancelados (apenas se sobrou tempo e poucos pedidos foram processados)
             $voidCount = 0;
-            try {
-                $sqlVoid = "SELECT qm.pedido_id, qm.qb_invoice_id FROM quickbooks_pedido_map qm
-                    INNER JOIN pedidos p ON p.id = qm.pedido_id
-                    WHERE qm.ambiente = ?
-                    AND (p.deleted_at IS NOT NULL OR LOWER(COALESCE(p.status,'')) = 'cancelado')
-                    AND qm.qb_invoice_id IS NOT NULL
-                    AND qm.pedido_id NOT IN (SELECT entidade_id FROM quickbooks_sync_log WHERE acao = 'void' AND status = 'success' AND entidade_id IS NOT NULL)";
-                $stVoid = $pdo->prepare($sqlVoid);
-                $stVoid->execute([$ambiente]);
-                $pedidosVoid = $stVoid->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if ($resultados['sucesso'] < 5) {
+                try {
+                    $sqlVoid = "SELECT qm.pedido_id, qm.qb_invoice_id FROM quickbooks_pedido_map qm
+                        INNER JOIN pedidos p ON p.id = qm.pedido_id
+                        WHERE qm.ambiente = ?
+                        AND (p.deleted_at IS NOT NULL OR LOWER(COALESCE(p.status,'')) = 'cancelado')
+                        AND qm.qb_invoice_id IS NOT NULL
+                        AND qm.pedido_id NOT IN (SELECT entidade_id FROM quickbooks_sync_log WHERE acao = 'void' AND status = 'success' AND entidade_id IS NOT NULL)
+                        LIMIT 3";
+                    $stVoid = $pdo->prepare($sqlVoid);
+                    $stVoid->execute([$ambiente]);
+                    $pedidosVoid = $stVoid->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
                 foreach ($pedidosVoid as $pv) {
                     try {
@@ -300,7 +301,8 @@ class AdminQuickBooksController extends Controller {
                         $resultados['erros'][] = 'Void #' . $pv['pedido_id'] . ': ' . $e->getMessage();
                     }
                 }
-            } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {}
+            }
 
             $resultados['voided'] = $voidCount;
 
