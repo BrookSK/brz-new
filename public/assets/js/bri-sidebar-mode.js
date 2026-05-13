@@ -122,7 +122,7 @@ const BriSidebar = (() => {
       { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒' },
       // Produtos & Catálogo
       { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
-      { regex: /^(grupos|ver grupos|me mostr.*grupo)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
+      { regex: /^(grupos|ver grupos|me mostr.*grupo|grupos? de compras?|grupo de compra|me mostr.*grupos? abertos?)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
       // Conta & Dados
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados!' },
       { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos!' },
@@ -171,7 +171,9 @@ const BriSidebar = (() => {
     const grupoMatch3 = msgLower.match(/grupo.*(?:tem|vende|encontro)\s+(.+)/);
     const termoProdutoGrupo = grupoMatch ? grupoMatch[1].replace(/\?/g,'').trim() : (grupoMatch2 ? grupoMatch2[1].replace(/\?/g,'').trim() : (grupoMatch3 ? grupoMatch3[1].replace(/\?/g,'').trim() : null));
     
-    if (termoProdutoGrupo) {
+    // Ignorar se o termo extraído é genérico (não é um produto específico)
+    const termosIgnorar = ['', 'grupo', 'grupos', 'compras', 'de compras', 'aberto', 'abertos', 'ativo', 'ativos', 'grupo de compras', 'grupos de compras'];
+    if (termoProdutoGrupo && !termosIgnorar.includes(termoProdutoGrupo.toLowerCase())) {
       const traducoes2 = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',sabonete:'soap',chocolate:'chocolate',vitamina:'vitamin',cafe:'coffee',biscoito:'cookie',banho:'bath',limpeza:'cleaning',vela:'candle'};
       let searchTerm = termoProdutoGrupo;
       for (const [pt, en] of Object.entries(traducoes2)) {
@@ -190,7 +192,7 @@ const BriSidebar = (() => {
       return;
     }
 
-    if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|porque|quando|onde|quem|ajuda|help)(\s|$)/)) {
+    if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|porque|quando|onde|quem|ajuda|help)(\s|$)/) && !msgLower.match(/grupo|carrinho|checkout|pedido|conta|endereco|ticket/)) {
       // Se não é uma pergunta/saudação, tratar como busca de produto
       const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby','bebê':'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',loção:'lotion'};
       let searchTerm = msg.trim();
