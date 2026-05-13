@@ -159,6 +159,14 @@ const BriSidebar = (() => {
     input.value = '';
     input.style.height = 'auto';
 
+    // Navegação direta por comando do usuário (sem esperar resposta da IA)
+    const msgLower = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (msgLower.match(/^(me mostr[ea]|abre?|abra|mostr[ea]|ver|veja|vai pro|vai para o|leva pro|leva para o|ir para o|ir pro)\s*(meu\s+)?carrinho/)) {
+      navigatePainel('/carrinho?embed=1');
+    } else if (msgLower.match(/^(me lev[ea]|vai|ir|leva|abr[ea])\s*(pro|para o|para)\s*checkout/)) {
+      navigatePainel('/carrinho/checkout?embed=1');
+    }
+
     historico.push({ role: 'user', content: msg, time: getTime() });
     renderMensagens();
 
