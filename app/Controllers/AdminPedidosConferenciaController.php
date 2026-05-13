@@ -515,6 +515,64 @@ HTML;
 
         echo '</div></div>';
 
+        // === ASSESSORIAS COM FALHA ===
+        $assessoriasFalhas = [];
+        try {
+            $sqlAss = "SELECT ao.id, ao.usuario_id, ao.status, ao.links_json, ao.erros_json, ao.created_at, ao.public_token,
+                       u.nome AS cliente_nome, u.email AS cliente_email, u.telefone AS cliente_telefone
+                       FROM assessoria_orcamentos ao
+                       LEFT JOIN usuarios u ON u.id = ao.usuario_id
+                       WHERE ao.status IN ('erro','falha','failed')
+                       ORDER BY ao.created_at DESC LIMIT 50";
+            $stAss = $this->connection->query($sqlAss);
+            $assessoriasFalhas = $stAss ? ($stAss->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (\Throwable $e) {
+            $assessoriasFalhas = [];
+        }
+
+        if (!empty($assessoriasFalhas)) {
+            echo '<div class="card mt-4 border-danger">
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Assessorias com Falha (' . count($assessoriasFalhas) . ')</h5>
+                </div>
+                <div class="card-body p-0">';
+
+            // Desktop table
+            echo '<div class="table-responsive d-none d-md-block"><table class="table table-sm table-hover mb-0 align-middle">
+                <thead class="table-light"><tr><th>ID</th><th>Cliente</th><th>Contato</th><th>Links</th><th>Erro</th><th>Data</th></tr></thead><tbody>';
+            foreach ($assessoriasFalhas as $af) {
+                $links = json_decode($af['links_json'] ?? '[]', true) ?: [];
+                $erros = json_decode($af['erros_json'] ?? '[]', true) ?: [];
+                $linksStr = implode(', ', array_slice(array_map(function($l) { return is_array($l) ? ($l['url'] ?? '') : (string)$l; }, $links), 0, 3));
+                $erroStr = is_array($erros) ? implode('; ', array_slice(array_map(function($e) { return is_string($e) ? $e : ($e['message'] ?? json_encode($e)); }, $erros), 0, 2)) : '';
+                echo '<tr>
+                    <td>#' . (int)$af['id'] . '</td>
+                    <td><strong>' . htmlspecialchars($af['cliente_nome'] ?? 'User #' . $af['usuario_id']) . '</strong></td>
+                    <td><div class="small">' . htmlspecialchars($af['cliente_email'] ?? '') . '</div><div class="small">' . htmlspecialchars($af['cliente_telefone'] ?? '') . '</div></td>
+                    <td class="small" style="max-width:200px;word-break:break-all;">' . htmlspecialchars(mb_substr($linksStr, 0, 100)) . '</td>
+                    <td class="small text-danger" style="max-width:200px;">' . htmlspecialchars(mb_substr($erroStr, 0, 100)) . '</td>
+                    <td class="small text-muted">' . (!empty($af['created_at']) ? date('d/m H:i', strtotime($af['created_at'])) : '-') . '</td>
+                </tr>';
+            }
+            echo '</tbody></table></div>';
+
+            // Mobile cards
+            echo '<div class="d-md-none p-2">';
+            foreach ($assessoriasFalhas as $af) {
+                $links = json_decode($af['links_json'] ?? '[]', true) ?: [];
+                $erros = json_decode($af['erros_json'] ?? '[]', true) ?: [];
+                $erroStr = is_array($erros) ? implode('; ', array_slice(array_map(function($e) { return is_string($e) ? $e : ($e['message'] ?? ''); }, $erros), 0, 1)) : '';
+                echo '<div class="border-bottom py-2">
+                    <div class="fw-semibold small">' . htmlspecialchars($af['cliente_nome'] ?? 'User #' . $af['usuario_id']) . '</div>
+                    <div class="small text-muted">' . htmlspecialchars($af['cliente_email'] ?? '') . ' | ' . htmlspecialchars($af['cliente_telefone'] ?? '') . '</div>
+                    <div class="small text-danger mt-1">' . htmlspecialchars(mb_substr($erroStr, 0, 80)) . '</div>
+                    <div class="text-muted" style="font-size:10px;">' . (!empty($af['created_at']) ? date('d/m/Y H:i', strtotime($af['created_at'])) : '') . '</div>
+                </div>';
+            }
+            echo '</div>';
+            echo '</div></div>';
+        }
+
         $this->renderPageEnd();
         exit;
     }

@@ -275,6 +275,7 @@ function renderAdminSidebar($activePage = '') {
 
     $unreadTickets = 0;
     $pendentesConferencia = 0;
+    $assessoriasFalhasCount = 0;
     try {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -324,6 +325,15 @@ function renderAdminSidebar($activePage = '') {
         }
     } catch (\Exception $e) {
         $pendentesConferencia = 0;
+    }
+
+    // Contar assessorias com falha
+    try {
+        $pdo = \Config\Database::getConnection();
+        $stAss = $pdo->query("SELECT COUNT(*) FROM assessoria_orcamentos WHERE status IN ('erro','falha','failed')");
+        $assessoriasFalhasCount = (int) ($stAss ? ($stAss->fetchColumn() ?: 0) : 0);
+    } catch (\Exception $e) {
+        $assessoriasFalhasCount = 0;
     }
 
     // Toggle mobile - custom JS (não usa collapse do Bootstrap para evitar conflito com grupos internos)
@@ -491,8 +501,9 @@ function renderAdminSidebar($activePage = '') {
                     if ($key === 'tickets' && $unreadTickets > 0) {
                         $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $unreadTickets . '</span>';
                     }
-                    if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
-                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $pendentesConferencia . '</span>';
+                    if ($key === 'pedidos-conferencia' && ($pendentesConferencia > 0 || $assessoriasFalhasCount > 0)) {
+                        $totalBadge = $pendentesConferencia + $assessoriasFalhasCount;
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $totalBadge . '</span>';
                     }
                     echo '<li class="nav-item">
                         <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '" style="padding:4px 12px;font-size:13px;">
