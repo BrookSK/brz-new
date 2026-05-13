@@ -96,6 +96,7 @@ const BriSidebar = (() => {
     fetch('/api/copiloto/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         mensagem: msg,
         historico: historico.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10),
@@ -155,20 +156,19 @@ const BriSidebar = (() => {
         fetch('/api/copiloto/addcart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ produto_id: prodId, quantidade: p.quantidade || 1 })
         }).then(r => r.json()).then(d => {
-          if (d.success) {
-            // Atualizar iframe se estiver no carrinho
-            if (frame.src && frame.src.includes('/carrinho')) {
-              frame.src = frame.src; // reload
-            }
+          if (d.success && frame.src && frame.src.includes('/carrinho')) {
+            frame.src = frame.src;
           }
         }).catch(() => {});
       },
       limpar_carrinho: () => {
         fetch('/api/copiloto/clearcart', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin'
         }).then(r => r.json()).then(d => {
           if (d.success && frame.src && frame.src.includes('/carrinho')) {
             frame.src = frame.src;
@@ -179,6 +179,7 @@ const BriSidebar = (() => {
         fetch('/api/copiloto/ticket', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ assunto: p.assunto || 'Suporte via BRI', mensagem: p.mensagem || '' })
         }).catch(() => {});
       },
