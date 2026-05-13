@@ -342,11 +342,33 @@ class QuickBooksService
             'CurrencyRef' => ['value' => 'USD'],
         ];
 
-        $res = $this->apiPost('/invoice', $pl);
+        try {
+            $res = $this->apiPost('/invoice', $pl);
+        } catch (\RuntimeException $e) {
+            // Se erro de DocNumber duplicado, buscar a invoice existente e salvar mapeamento
+            if (strpos($e->getMessage(), 'Duplicate Document Number') !== false || strpos($e->getMessage(), '6140') !== false) {
+                $docNumber = 'BRZ-' . $ped['id'];
+                $existing = $this->apiQuery("SELECT * FROM Invoice WHERE DocNumber = '" . addslashes($docNumber) . "' MAXRESULTS 1");
+                $inv = $existing['QueryResponse']['Invoice'][0] ?? null;
+                if ($inv && !empty($inv['Id'])) {
+                    $this->salvarMapeamentoPedido((int) $ped['id'], [
+                        'qb_invoice_id'         => $inv['Id'],
+                        'qb_invoice_doc_number' => $inv['DocNumber'] ?? $docNumber,
+                        'qb_customer_id'        => $cid,
+                        'sincronizado_em'       => date('Y-m-d H:i:s'),
+                    ]);
+                    $this->registrarLog('invoice', (int) $ped['id'], $inv['Id'], 'create', 'success_existing', $pl);
+                    return ['Invoice' => $inv];
+                }
+            }
+            throw $e;
+        }
+
         $this->salvarMapeamentoPedido((int) $ped['id'], [
             'qb_invoice_id'         => $res['Invoice']['Id'] ?? null,
             'qb_invoice_doc_number' => $res['Invoice']['DocNumber'] ?? null,
             'qb_customer_id'        => $cid,
+            'sincronizado_em'       => date('Y-m-d H:i:s'),
         ]);
         $this->registrarLog('invoice', (int) $ped['id'], $res['Invoice']['Id'] ?? null, 'create', 'success', $pl);
         return $res;
@@ -410,9 +432,17 @@ class QuickBooksService
     public function listarCustomers(array $f=[]): array { $lim=(int)($f["limit"]??100); $off=(int)($f["offset"]??1); return $this->apiQuery("SELECT * FROM Customer ORDERBY DisplayName ASC STARTPOSITION ".$off." MAXRESULTS ".$lim); }
     private function salvarMapeamentoPedido(int $pid,array $d): void {
         $d["ambiente"]=$this->ambiente;
-        $ex=$this->getMapeamentoPedido($pid);
-        if($ex){$sets=[];$vals=[];foreach($d as $col=>$val){$sets[]=$col."=?";$vals[]=$val;}$vals[]=$pid;$vals[]=$this->ambiente;$this->pdo->prepare("UPDATE quickbooks_pedido_map SET ".implode(",",$sets)." WHERE pedido_id=? AND ambiente=?") ->execute($vals);}
-        else{$d["pedido_id"]=$pid;$cols=implode(",",array_keys($d));$pls=implode(",",array_fill(0,count($d),"?"));$this->pdo->prepare("INSERT INTO quickbooks_pedido_map(".$cols.") VALUES(".$pls.")") ->execute(array_values($d));}
+        $d["pedido_id"]=$pid;
+        // Usar INSERT ... ON DUPLICATE KEY UPDATE para evitar erros de duplicidade
+        $cols=array_keys($d);
+        $placeholders=implode(",",array_fill(0,count($cols),"?"));
+        $updates=[];
+        foreach($cols as $col){
+            if($col==='pedido_id')continue;
+            $updates[]=$col."=VALUES(".$col.")";
+        }
+        $sql="INSERT INTO quickbooks_pedido_map(".implode(",",$cols).") VALUES(".$placeholders.") ON DUPLICATE KEY UPDATE ".implode(",",$updates);
+        $this->pdo->prepare($sql)->execute(array_values($d));
     }
     /**
      * Cancela (void) uma invoice no QuickBooks quando pedido é cancelado/excluído
