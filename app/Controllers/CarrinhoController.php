@@ -261,12 +261,17 @@ class CarrinhoController extends Controller {
         $cartId = 0;
         $carrinho = [];
         if ($uid > 0) {
-            try {
-                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
-            } catch (\Throwable $e) {
-                $cartId = 0;
+            // Usar getUserCartIdPreferNonEmpty (mesma lógica do adicionar)
+            $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+            if ($cartId <= 0) {
+                try {
+                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                } catch (\Throwable $e) {
+                    $cartId = 0;
+                }
             }
+            error_log('[CART-INDEX-DEBUG] uid=' . $uid . ' cartId=' . $cartId);
             $carrinho = $this->getCarrinhoFromDb($uid);
         }
         if (empty($carrinho)) {
