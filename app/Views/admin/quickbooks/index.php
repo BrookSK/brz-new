@@ -156,6 +156,9 @@
                 <button type="button" class="btn btn-warning btn-sm" id="btnSyncLote" onclick="executarSyncLote()">
                     <i class="fas fa-play me-1"></i>Executar Sincronização
                 </button>
+                <button type="button" class="btn btn-danger btn-sm" id="btnSyncLoteStop" style="display:none;" onclick="pararSyncLote()">
+                    <i class="fas fa-stop me-1"></i>Parar
+                </button>
             </div>
         </div>
         <div id="syncLoteResultado" class="mt-3" style="display:none;"></div>
@@ -169,47 +172,122 @@ document.addEventListener('keydown', function(e) {
         card.style.display = card.style.display === 'none' ? '' : 'none';
     }
 });
+
+var _syncAborted = false;
+
 function executarSyncLote() {
     var btn = document.getElementById('btnSyncLote');
+    var btnStop = document.getElementById('btnSyncLoteStop');
     var res = document.getElementById('syncLoteResultado');
     var inicio = document.getElementById('syncLoteInicio').value;
     var fim = document.getElementById('syncLoteFim').value;
     if (!inicio) { alert('Informe a data de início'); return; }
+
+    _syncAborted = false;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando...';
+    btn.style.display = 'none';
+    btnStop.style.display = '';
     res.style.display = '';
-    res.innerHTML = '<div class="alert alert-info">Sincronizando pedidos... Isso pode levar alguns minutos.</div>';
+    res.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Iniciando sincronização...</div>';
 
-    var fd = new FormData();
-    fd.append('data_inicio', inicio);
-    if (fim) fd.append('data_fim', fim);
+    var totalSucesso = 0;
+    var totalErros = [];
+    var totalVoided = 0;
+    var rodada = 0;
 
-    fetch('/admin/quickbooks/sincronizar-lote', { method: 'POST', body: fd })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.ok && data.resultados) {
-                var r = data.resultados;
-                var html = '<div class="alert alert-success">'
-                    + '<strong>Concluído!</strong> ' + r.sucesso + '/' + r.total + ' pedidos sincronizados.'
-                    + (r.voided ? ' | ' + r.voided + ' invoice(s) cancelada(s) no QB.' : '')
-                    + '</div>';
-                if (r.erros && r.erros.length > 0) {
-                    html += '<div class="alert alert-warning"><strong>Erros (' + r.erros.length + '):</strong><ul class="mb-0 small">';
-                    r.erros.forEach(function(e) { html += '<li>' + e + '</li>'; });
-                    html += '</ul></div>';
+    function rodarLote() {
+        if (_syncAborted) {
+            finalizar('Sincronização interrompida pelo usuário.');
+            return;
+        }
+
+        rodada++;
+        res.innerHTML = '<div class="alert alert-info">'
+            + '<i class="fas fa-spinner fa-spin me-2"></i>'
+            + '<strong>Processando...</strong> Rodada ' + rodada + ' | '
+            + totalSucesso + ' sincronizados até agora'
+            + (totalErros.length > 0 ? ' | ' + totalErros.length + ' erros' : '')
+            + '<div class="progress mt-2" style="height:4px;"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div></div>'
+            + '</div>';
+
+        var fd = new FormData();
+        fd.append('data_inicio', inicio);
+        if (fim) fd.append('data_fim', fim);
+
+        fetch('/admin/quickbooks/sincronizar-lote', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.ok) {
+                    finalizar('Erro: ' + (data.erro || 'Falha desconhecida'));
+                    return;
                 }
-                res.innerHTML = html;
-            } else {
-                res.innerHTML = '<div class="alert alert-danger">Erro: ' + (data.erro || 'Falha desconhecida') + '</div>';
-            }
-        })
-        .catch(function(e) {
-            res.innerHTML = '<div class="alert alert-danger">Erro de conexão: ' + e.message + '</div>';
-        })
-        .finally(function() {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-play me-1"></i>Executar Sincronização';
-        });
+
+                var r = data.resultados;
+                totalSucesso += (r.sucesso || 0);
+                totalVoided += (r.voided || 0);
+                if (r.erros && r.erros.length > 0) {
+                    totalErros = totalErros.concat(r.erros);
+                }
+
+                // Se processou 0 pedidos com sucesso e não tem mais pendentes, acabou
+                var pendente = r.total_pendente || 0;
+                if (r.sucesso === 0 && r.total === 0) {
+                    finalizar('Todos os pedidos já estão sincronizados!');
+                    return;
+                }
+
+                // Se todos deram erro nesta rodada, parar para não ficar em loop infinito
+                if (r.sucesso === 0 && r.erros && r.erros.length > 0) {
+                    finalizar('Parado: todos os pedidos desta rodada deram erro.');
+                    return;
+                }
+
+                // Se ainda tem pendentes, continuar
+                if (pendente > 0 && !_syncAborted) {
+                    // Pequena pausa entre rodadas
+                    setTimeout(rodarLote, 1500);
+                } else {
+                    finalizar('Sincronização concluída!');
+                }
+            })
+            .catch(function(e) {
+                // Se deu erro de conexão, tentar mais uma vez após pausa
+                if (rodada < 3 || totalSucesso > 0) {
+                    totalErros.push('Rodada ' + rodada + ': erro de conexão (' + e.message + ') - tentando novamente...');
+                    setTimeout(rodarLote, 3000);
+                } else {
+                    finalizar('Erro de conexão persistente: ' + e.message);
+                }
+            });
+    }
+
+    function finalizar(msg) {
+        btn.disabled = false;
+        btn.style.display = '';
+        btnStop.style.display = 'none';
+
+        var html = '<div class="alert alert-success">'
+            + '<strong>' + msg + '</strong><br>'
+            + '<span class="small">' + totalSucesso + ' pedidos sincronizados'
+            + (totalVoided > 0 ? ' | ' + totalVoided + ' invoices canceladas' : '')
+            + ' | ' + rodada + ' rodadas</span>'
+            + '</div>';
+
+        if (totalErros.length > 0) {
+            html += '<div class="alert alert-warning"><strong>Erros (' + totalErros.length + '):</strong>'
+                + '<ul class="mb-0 small" style="max-height:200px;overflow-y:auto;">';
+            totalErros.forEach(function(e) { html += '<li>' + e + '</li>'; });
+            html += '</ul></div>';
+        }
+
+        res.innerHTML = html;
+    }
+
+    rodarLote();
+}
+
+function pararSyncLote() {
+    _syncAborted = true;
 }
 </script>
 <?php endif; ?>
