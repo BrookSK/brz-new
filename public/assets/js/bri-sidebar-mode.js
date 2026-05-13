@@ -201,36 +201,9 @@ const BriSidebar = (() => {
       salvarHistorico();
       renderMensagens();
 
-      // Processar ação no iframe
+      // Processar ação no iframe — APENAS quando a API retorna ação explícita
       if (data.acao_frontend && data.acao_frontend.tipo && data.acao_frontend.tipo !== 'nenhuma') {
         handleAcao(data.acao_frontend);
-      } else {
-        // Auto-detectar navegação baseada no conteúdo da resposta e mensagem do usuário
-        const msgLower = (historico.length > 1 ? historico[historico.length - 2].content : '').toLowerCase();
-        const respLower = resp.toLowerCase();
-
-        // Detectar pedido de carrinho
-        if (msgLower.match(/carrinho|cart|meu carrinho|mostra.*carrinho|ver.*carrinho/)) {
-          navigatePainel('/carrinho?embed=1');
-        }
-        // Detectar busca de produtos
-        else if ((respLower.includes('encontrei') || respLower.includes('temos') || respLower.includes('achei'))
-            && (respLower.includes('produto') || respLower.includes('opç') || respLower.includes('us$') || respLower.includes('r$'))
-            && !frame.src.includes('/produtos')) {
-          const userMsg = msgLower.replace(/^(tem |me mostra |quero |busca |procura |mostra |me mostre )/i, '').replace(/\?/g, '').trim();
-          if (userMsg.length >= 2) {
-            const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate',café:'coffee',biscoito:'cookie',tineco:'tineco',dyson:'dyson'};
-            let searchTerm = userMsg;
-            for (const [pt, en] of Object.entries(traducoes)) {
-              if (userMsg.includes(pt)) { searchTerm = en; break; }
-            }
-            navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
-          }
-        }
-        // Detectar checkout
-        else if (msgLower.match(/checkout|finalizar|pagar|pagamento/)) {
-          navigatePainel('/carrinho/checkout?embed=1');
-        }
       }
     })
     .catch(err => {
