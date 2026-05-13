@@ -273,6 +273,7 @@ class CarrinhoController extends Controller {
             }
             error_log('[CART-INDEX-DEBUG] uid=' . $uid . ' cartId=' . $cartId);
             $carrinho = $this->getCarrinhoFromDb($uid);
+            error_log('[CART-INDEX-DEBUG] carrinho items count=' . count($carrinho));
         }
         if (empty($carrinho)) {
             $carrinho = $_SESSION['carrinho'] ?? [];
@@ -930,6 +931,7 @@ class CarrinhoController extends Controller {
                 }
                 error_log('[CART-ADD-DEBUG] cartId=' . $cartId);
                 $ok = $this->carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, ($pvId ?? null), ($variacaoDescricao !== null && $variacaoDescricao !== '' ? (string) $variacaoDescricao : null));
+                error_log('[CART-ADD-DEBUG] adicionarItem result=' . var_export($ok, true));
                 if (!$ok) {
                     $this->json(['error' => 'Não foi possível adicionar o item ao carrinho'], 400);
                     return;
