@@ -5386,9 +5386,25 @@ class PaymentService {
             $this->garantirTabelaCarteiraRecargas($db);
             $this->garantirTabelaTransacoesCarteira($db);
 
+            // Buscar recarga por payment_id
             $stmt = $db->prepare('SELECT * FROM carteira_recargas WHERE gateway = :g AND payment_id = :pid ORDER BY id DESC LIMIT 1');
             $stmt->execute([':g' => $gateway, ':pid' => $paymentId]);
             $recarga = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            // Fallback: buscar pelo token em payment_id ou invoice_url (token pode estar em qualquer um)
+            if ((!is_array($recarga) || empty($recarga['id'])) && strlen($paymentId) >= 10) {
+                $stmt2 = $db->prepare('SELECT * FROM carteira_recargas WHERE gateway = :g AND (payment_id LIKE :pidLike OR invoice_url LIKE :urlLike) ORDER BY id DESC LIMIT 1');
+                $stmt2->execute([':g' => $gateway, ':pidLike' => '%' . $paymentId . '%', ':urlLike' => '%' . $paymentId . '%']);
+                $recarga = $stmt2->fetch(\PDO::FETCH_ASSOC);
+            }
+
+            // Fallback 2: buscar sem filtro de gateway (pode ter sido salvo com variação do nome)
+            if ((!is_array($recarga) || empty($recarga['id'])) && strlen($paymentId) >= 10) {
+                $stmt3 = $db->prepare('SELECT * FROM carteira_recargas WHERE payment_id = :pid ORDER BY id DESC LIMIT 1');
+                $stmt3->execute([':pid' => $paymentId]);
+                $recarga = $stmt3->fetch(\PDO::FETCH_ASSOC);
+            }
+
             if (!is_array($recarga) || empty($recarga['id'])) {
                 return;
             }
@@ -5402,7 +5418,8 @@ class PaymentService {
             if ($recargaId <= 0 || $usuarioId <= 0 || $valor <= 0) {
                 return;
             }
-            if (in_array($statusAtual, ['paid', 'approved', 'credited'], true)) {
+            // Se status já é 'credited', definitivamente já foi processado
+            if ($statusAtual === 'credited') {
                 return;
             }
             if (!in_array($moeda, ['BRL', 'USD'], true)) {
@@ -5417,10 +5434,13 @@ class PaymentService {
                 $this->garantirCarteiraUsuario($db, $usuarioId);
                 $this->liberarBloqueiosCarteiraExpirados($db, $usuarioId);
 
-                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc LIMIT 1");
+                // Verificar se já foi creditado (busca por qualquer transação de crédito referenciando esta recarga)
+                $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND (descricao LIKE :desc1 OR descricao LIKE :desc2 OR recarga_id = :rid) LIMIT 1");
                 $stmtChk->execute([
                     ':uid' => $usuarioId,
-                    ':desc' => '%Recarga Carteira #' . $recargaId . '%',
+                    ':desc1' => '%#' . $recargaId . '%',
+                    ':desc2' => '%Recarga Carteira #' . $recargaId . '%',
+                    ':rid' => $recargaId,
                 ]);
                 $ja = (int) ($stmtChk->fetchColumn() ?: 0);
                 if ($ja > 0) {
