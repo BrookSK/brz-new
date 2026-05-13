@@ -139,6 +139,8 @@ const BriSidebar = (() => {
       { regex: /rastreamento|rastrear|rastreio|tracking/, url: '/rastreamento?embed=1', reply: 'Rastreamento de pedidos!' },
       { regex: /status.*(pedido|compra)|acompanhar pedido/, url: '/status-pedido?embed=1', reply: 'Status dos pedidos!' },
       { regex: /cobranca|calcular cobranca|simulador/, url: '/cobranca?embed=1', reply: 'Calculadora de cobrança!' },
+      // Assessoria / Redirecionamento
+      { regex: /assessoria|redirecionamento|redirecionar|compra por link|orçamento|orcamento/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦' },
       // Políticas
       { regex: /politica.*(privacidade)|privacidade/, url: '/politica-privacidade?embed=1', reply: 'Política de privacidade.' },
       { regex: /termos.*(uso)|termos/, url: '/termos-uso?embed=1', reply: 'Termos de uso.' },
