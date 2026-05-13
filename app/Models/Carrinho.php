@@ -337,15 +337,16 @@ class Carrinho extends Model {
             // Inserir novo item
             $subtotal = $quantidade * $precoUnitario;
 
-            // Fix AUTO_INCREMENT if stuck at 0
+            // Fix: calcular próximo ID manualmente para evitar problema de AUTO_INCREMENT
+            $nextId = 1;
             try {
                 $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
-                $maxId = (int) $this->connection->query("SELECT COALESCE(MAX(id), 0) FROM carrinho_items")->fetchColumn();
-                $this->connection->exec("ALTER TABLE carrinho_items AUTO_INCREMENT = " . max(1, $maxId + 1));
+                $nextId = (int) $this->connection->query("SELECT COALESCE(MAX(id), 0) + 1 FROM carrinho_items")->fetchColumn();
+                if ($nextId < 1) $nextId = 1;
             } catch (\Exception $e) {}
 
-            $colsIns = ['carrinho_id', 'produto_id', $varCol, 'variacao_descricao', 'quantidade', $unitCol, 'subtotal'];
-            $valsIns = [':carrinho_id', ':produto_id', ':produto_variacao_id', ':variacao_descricao', ':quantidade', ':valor_unitario', ':subtotal'];
+            $colsIns = ['id', 'carrinho_id', 'produto_id', $varCol, 'variacao_descricao', 'quantidade', $unitCol, 'subtotal'];
+            $valsIns = [':next_id', ':carrinho_id', ':produto_id', ':produto_variacao_id', ':variacao_descricao', ':quantidade', ':valor_unitario', ':subtotal'];
             if ($hasPriceSnap) {
                 $colsIns[] = 'preco_unit_snapshot';
                 $valsIns[] = ':preco_unit_snapshot';
@@ -358,6 +359,7 @@ class Carrinho extends Model {
             $stmt = $this->connection->prepare(
                 'INSERT INTO carrinho_items (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')'
             );
+            $stmt->bindValue(':next_id', $nextId, \PDO::PARAM_INT);
             $stmt->bindParam(':carrinho_id', $carrinhoId);
             $stmt->bindParam(':produto_id', $produtoId);
             $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
