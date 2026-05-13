@@ -150,11 +150,15 @@ class AdminQuickBooksController extends Controller {
     public function sincronizarLote(Request $req) {
         (new AuthService())->requerPerfil('admin');
         header('Content-Type: application/json');
-        set_time_limit(300);
+        set_time_limit(600);
+        ini_set('memory_limit', '512M');
+        ignore_user_abort(true);
 
         $dataInicio = trim((string) ($req->getParam('data_inicio') ?? '2026-04-29'));
         if ($dataInicio === '') $dataInicio = '2026-04-29';
         $dataFim = trim((string) ($req->getParam('data_fim') ?? ''));
+        $maxPedidos = (int) ($req->getParam('max') ?: 25); // Limitar por request para evitar timeout
+        if ($maxPedidos <= 0 || $maxPedidos > 50) $maxPedidos = 25;
 
         try {
             $pdo = Database::getConnection();
@@ -189,7 +193,8 @@ class AdminQuickBooksController extends Controller {
                     " . ($dataFim !== '' ? "AND p.created_at <= ?" : "") . "
                     AND p.deleted_at IS NULL
                     AND p.id NOT IN (SELECT pedido_id FROM quickbooks_pedido_map WHERE pedido_id IS NOT NULL AND ambiente = ?)
-                    ORDER BY p.id ASC";
+                    ORDER BY p.id ASC
+                    LIMIT " . (int) $maxPedidos;
             $params = [$dataInicio . ' 00:00:00'];
             if ($dataFim !== '') $params[] = $dataFim . ' 23:59:59';
             $params[] = $ambiente;
@@ -197,7 +202,20 @@ class AdminQuickBooksController extends Controller {
             $st->execute($params);
             $pedidoIds = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
 
-            $resultados = ['total' => count($pedidoIds), 'sucesso' => 0, 'erros' => []];
+            // Contar total pendente (para informar ao frontend)
+            $sqlCount = "SELECT COUNT(*) FROM pedidos p
+                    WHERE p.created_at >= ?
+                    " . ($dataFim !== '' ? "AND p.created_at <= ?" : "") . "
+                    AND p.deleted_at IS NULL
+                    AND p.id NOT IN (SELECT pedido_id FROM quickbooks_pedido_map WHERE pedido_id IS NOT NULL AND ambiente = ?)";
+            $paramsCount = [$dataInicio . ' 00:00:00'];
+            if ($dataFim !== '') $paramsCount[] = $dataFim . ' 23:59:59';
+            $paramsCount[] = $ambiente;
+            $stCount = $pdo->prepare($sqlCount);
+            $stCount->execute($paramsCount);
+            $totalPendente = (int) ($stCount->fetchColumn() ?: 0);
+
+            $resultados = ['total' => count($pedidoIds), 'total_pendente' => $totalPendente, 'sucesso' => 0, 'erros' => []];
 
             foreach ($pedidoIds as $pedidoId) {
                 try {
