@@ -2296,7 +2296,7 @@ class CheckoutController extends Controller {
             $total = (float) $subtotal + (float) $frete + (float) $taxaServico;
         }
 
-        // Calcular imposto local do grupo de compras
+        // Calcular imposto local do grupo de compras OU do produto individual
         $impostoLocal = 0.0;
         $impostoLocalPercent = 0.0;
         try {
@@ -2314,9 +2314,27 @@ class CheckoutController extends Controller {
             $produtoIds = array_keys($produtoIds);
             if (!empty($produtoIds)) {
                 $in = implode(',', array_fill(0, count($produtoIds), '?'));
+
+                // Buscar o maior imposto_local_percent do grupo de compras
+                $maxGrupo = 0.0;
                 $stImpL = $dbImpLocal->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
                 $stImpL->execute($produtoIds);
-                $impostoLocalPercent = (float) ($stImpL->fetchColumn() ?: 0);
+                $maxGrupo = (float) ($stImpL->fetchColumn() ?: 0);
+
+                // Buscar o maior imposto_local_percent direto do produto
+                $maxProduto = 0.0;
+                try {
+                    $prodCols = [];
+                    $stCols = $dbImpLocal->query('DESCRIBE produtos');
+                    $prodCols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    if (in_array('imposto_local_percent', $prodCols, true)) {
+                        $stImpP = $dbImpLocal->prepare("SELECT MAX(imposto_local_percent) FROM produtos WHERE id IN ($in) AND imposto_local_percent > 0");
+                        $stImpP->execute($produtoIds);
+                        $maxProduto = (float) ($stImpP->fetchColumn() ?: 0);
+                    }
+                } catch (\Throwable $e) {}
+
+                $impostoLocalPercent = max($maxGrupo, $maxProduto);
                 if ($impostoLocalPercent > 0) {
                     $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
                     $total = $total + $impostoLocal;
@@ -6051,7 +6069,7 @@ class CheckoutController extends Controller {
                 }
             }
 
-            // Imposto local do grupo de compras (baseado no grupo dos produtos no carrinho)
+            // Imposto local do grupo de compras OU do produto individual (baseado no grupo/produto dos produtos no carrinho)
             $impostoLocalUsd = 0.0;
             try {
                 $dbImp = \Config\Database::getConnection();
@@ -6064,9 +6082,27 @@ class CheckoutController extends Controller {
                 $produtoIds = array_keys($produtoIds);
                 if (!empty($produtoIds)) {
                     $in = implode(',', array_fill(0, count($produtoIds), '?'));
+
+                    // MAX do grupo de compras
+                    $maxGrupo = 0.0;
                     $stImp = $dbImp->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
                     $stImp->execute($produtoIds);
-                    $maxImpLocal = (float) ($stImp->fetchColumn() ?: 0);
+                    $maxGrupo = (float) ($stImp->fetchColumn() ?: 0);
+
+                    // MAX direto do produto
+                    $maxProduto = 0.0;
+                    try {
+                        $prodCols = [];
+                        $stCols = $dbImp->query('DESCRIBE produtos');
+                        $prodCols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        if (in_array('imposto_local_percent', $prodCols, true)) {
+                            $stImpP = $dbImp->prepare("SELECT MAX(imposto_local_percent) FROM produtos WHERE id IN ($in) AND imposto_local_percent > 0");
+                            $stImpP->execute($produtoIds);
+                            $maxProduto = (float) ($stImpP->fetchColumn() ?: 0);
+                        }
+                    } catch (\Throwable $e) {}
+
+                    $maxImpLocal = max($maxGrupo, $maxProduto);
                     if ($maxImpLocal > 0) {
                         $impostoLocalUsd = $subtotal * ($maxImpLocal / 100.0);
                     }

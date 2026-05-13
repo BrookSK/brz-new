@@ -5073,6 +5073,14 @@ HTML;
                                         </select>
                                         <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Imposto Local (%)</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" name="imposto_local_percent" value="0" placeholder="Ex: 8">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <small class="text-muted">Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.</small>
+                                    </div>
 
                                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save"></i> Salvar</button>
                                 </div>
@@ -5289,6 +5297,12 @@ HTML;
             if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
             if (in_array('elegivel_oferta_gratis', $cols, true)) $data['elegivel_oferta_gratis'] = $request->getParam('elegivel_oferta_gratis') ?: 0;
             if (in_array('oculto', $cols, true)) $data['oculto'] = (int) ($request->getParam('oculto') ?: 0);
+            if (in_array('imposto_local_percent', $cols, true)) {
+                $impostoLocalVal = (float) str_replace(',', '.', (string) ($request->getParam('imposto_local_percent') ?: '0'));
+                if ($impostoLocalVal < 0) $impostoLocalVal = 0;
+                if ($impostoLocalVal > 99) $impostoLocalVal = 99;
+                $data['imposto_local_percent'] = $impostoLocalVal;
+            }
 
             if (in_array('created_at', $cols, true) && empty($data['created_at'])) {
                 $data['created_at'] = date('Y-m-d H:i:s');
@@ -5953,6 +5967,14 @@ HTML;
                                         </select>
                                         <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Imposto Local (%)</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" name="imposto_local_percent" value="' . htmlspecialchars((string) ($produto['imposto_local_percent'] ?? '0')) . '" placeholder="Ex: 8">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <small class="text-muted">Percentual de imposto local cobrado sobre este produto (ex: sales tax EUA). Funciona igual ao imposto local do grupo de compras.</small>
+                                    </div>
 
                                     <!-- Brinde Vinculado -->
                                     <div class="mb-3 border-top pt-3">
@@ -6483,6 +6505,14 @@ HTMLSCRIPT;
             if (in_array('oculto', $cols, true)) {
                 $stmtOculto = $pdo->prepare('UPDATE produtos SET oculto = ? WHERE id = ?');
                 $stmtOculto->execute([(int) ($request->getParam('oculto') ?: 0), (int) $id]);
+            }
+
+            if (in_array('imposto_local_percent', $cols, true)) {
+                $impostoLocalVal = (float) str_replace(',', '.', (string) ($request->getParam('imposto_local_percent') ?: '0'));
+                if ($impostoLocalVal < 0) $impostoLocalVal = 0;
+                if ($impostoLocalVal > 99) $impostoLocalVal = 99;
+                $stmtImpLocal = $pdo->prepare('UPDATE produtos SET imposto_local_percent = ? WHERE id = ?');
+                $stmtImpLocal->execute([$impostoLocalVal, (int) $id]);
             }
 
             if ($perfil === 'representante') {

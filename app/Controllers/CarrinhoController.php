@@ -609,7 +609,7 @@ class CarrinhoController extends Controller {
         
         $total = $subtotal + $taxaServico + $impostos + $frete;
 
-        // Calcular imposto local do grupo de compras
+        // Calcular imposto local do grupo de compras OU do produto individual
         $impostoLocal = 0.0;
         $impostoLocalPercent = 0.0;
         try {
@@ -624,9 +624,25 @@ class CarrinhoController extends Controller {
             $pidsForTax = array_keys($pidsForTax);
             if (!empty($pidsForTax)) {
                 $in = implode(',', array_fill(0, count($pidsForTax), '?'));
+
+                // Buscar o maior imposto_local_percent do grupo de compras
+                $maxGrupo = 0.0;
                 $stImpL = $dbImpLocal->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
                 $stImpL->execute($pidsForTax);
-                $impostoLocalPercent = (float) ($stImpL->fetchColumn() ?: 0);
+                $maxGrupo = (float) ($stImpL->fetchColumn() ?: 0);
+
+                // Buscar o maior imposto_local_percent direto do produto
+                $maxProduto = 0.0;
+                try {
+                    $prodCols = $this->carrinhoModel->getConnection()->query('DESCRIBE produtos')->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                    if (in_array('imposto_local_percent', $prodCols, true)) {
+                        $stImpP = $dbImpLocal->prepare("SELECT MAX(imposto_local_percent) FROM produtos WHERE id IN ($in) AND imposto_local_percent > 0");
+                        $stImpP->execute($pidsForTax);
+                        $maxProduto = (float) ($stImpP->fetchColumn() ?: 0);
+                    }
+                } catch (\Throwable $e) {}
+
+                $impostoLocalPercent = max($maxGrupo, $maxProduto);
                 if ($impostoLocalPercent > 0) {
                     $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
                     $total = $total + $impostoLocal;
