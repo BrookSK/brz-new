@@ -1404,30 +1404,24 @@ class CarrinhoController extends Controller {
         $uid = $this->getLoggedUserId();
         if ($uid > 0) {
             try {
-                // Usar mesma lógica: primeiro o carrinho com itens
-                $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
-                if ($cartId <= 0) {
-                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                $db = $this->carrinhoModel->getConnection();
+                // Limpar TODOS os carrinhos do usuário
+                $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ?');
+                $st->execute([$uid]);
+                $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                foreach ($ids as $cid) {
+                    $db->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ?')->execute([(int)$cid]);
+                    $db->prepare("UPDATE carrinhos SET valor_total = 0, taxa_servico = 0, valor_impostos = 0, peso_total = 0, updated_at = NOW() WHERE id = ?")->execute([(int)$cid]);
                 }
-                if ($cartId > 0) {
-                    $this->carrinhoModel->limparCarrinho($cartId);
-                }
-                $this->json([
-                    'success' => true,
-                    'message' => 'Carrinho limpo com sucesso'
-                ]);
+                $this->json(['success' => true, 'message' => 'Carrinho limpo com sucesso']);
                 return;
             } catch (\Throwable $e) {
+                error_log('[CART-CLEAR] Error: ' . $e->getMessage());
             }
         }
 
         unset($_SESSION['carrinho']);
-        
-        $this->json([
-            'success' => true,
-            'message' => 'Carrinho limpo com sucesso'
-        ]);
+        $this->json(['success' => true, 'message' => 'Carrinho limpo com sucesso']);
     }
 
     public function calcular(Request $request) {
