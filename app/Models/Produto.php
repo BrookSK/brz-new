@@ -183,8 +183,14 @@ class Produto extends Model {
         }
 
         // Excluir produtos que pertencem a grupos de compras (devem ser acessados via grupo)
+        // EXCETO quando há busca ativa — nesse caso incluir produtos de grupos ativos
         if (in_array('grupo_compras_id', $cols, true)) {
-            $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
+            if ($term !== null && trim($term) !== '') {
+                // Busca ativa: incluir produtos de grupos ativos (status = 'aberto' ou 'ativo')
+                $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0 OR p.grupo_compras_id IN (SELECT gc.id FROM grupos_compras gc WHERE gc.status IN ('aberto','ativo','open','active')))";
+            } else {
+                $where[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
+            }
         }
 
         // Excluir produtos ocultos (só aparecem no pedido manual)
