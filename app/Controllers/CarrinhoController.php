@@ -18,7 +18,7 @@ class CarrinhoController extends Controller {
         if ($usuarioId <= 0) return 0;
         try {
             $db = $this->carrinhoModel->getConnection();
-            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
+            $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY updated_at DESC, created_at DESC LIMIT 10');
             $st->execute([$usuarioId]);
             $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
             $ids = array_values(array_filter(array_map('intval', $ids)));
@@ -26,20 +26,60 @@ class CarrinhoController extends Controller {
                 return 0;
             }
 
+            // Encontrar o carrinho com itens
+            $cartWithItems = 0;
             foreach ($ids as $cid) {
                 try {
                     $stCnt = $db->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
                     $stCnt->execute([$cid]);
                     $cnt = (int) ($stCnt->fetchColumn() ?: 0);
                     if ($cnt > 0) {
-                        return $cid;
+                        $cartWithItems = $cid;
+                        break;
                     }
                 } catch (\Throwable $e) {
                 }
             }
 
+            // Se encontrou um carrinho com itens, consolidar: mover itens de outros carrinhos para este
+            if ($cartWithItems > 0 && count($ids) > 1) {
+                foreach ($ids as $otherId) {
+                    if ($otherId === $cartWithItems) continue;
+                    try {
+                        $stOther = $db->prepare('SELECT COUNT(*) FROM carrinho_items WHERE carrinho_id = ?');
+                        $stOther->execute([$otherId]);
+                        $otherCount = (int) $stOther->fetchColumn();
+                        if ($otherCount > 0) {
+                            // Mover itens que não existem no carrinho principal
+                            $stItems = $db->prepare('SELECT produto_id, quantidade, preco_unitario, subtotal, produto_variacao_id FROM carrinho_items WHERE carrinho_id = ?');
+                            $stItems->execute([$otherId]);
+                            $otherItems = $stItems->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($otherItems as $item) {
+                                $pid = (int)$item['produto_id'];
+                                $pvid = (int)($item['produto_variacao_id'] ?? 0);
+                                // Verificar se já existe no carrinho principal
+                                $stCheck = $db->prepare('SELECT id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? AND COALESCE(produto_variacao_id,0) = ? LIMIT 1');
+                                $stCheck->execute([$cartWithItems, $pid, $pvid]);
+                                if (!$stCheck->fetchColumn()) {
+                                    // Mover para o carrinho principal
+                                    $db->prepare('UPDATE carrinho_items SET carrinho_id = ? WHERE carrinho_id = ? AND produto_id = ? AND COALESCE(produto_variacao_id,0) = ? LIMIT 1')
+                                        ->execute([$cartWithItems, $otherId, $pid, $pvid]);
+                                }
+                            }
+                            // Limpar carrinho vazio
+                            $db->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ?')->execute([$otherId]);
+                        }
+                        // Remover carrinho duplicado vazio
+                        $db->prepare('DELETE FROM carrinhos WHERE id = ? AND id != ?')->execute([$otherId, $cartWithItems]);
+                    } catch (\Throwable $e) {}
+                }
+                // Recalcular totais
+                try { $this->carrinhoModel->recalcularTotais($cartWithItems); } catch (\Throwable $e) {}
+                return $cartWithItems;
+            }
+
             // fallback: carrinho mais recente (mesmo vazio)
-            return (int) $ids[0];
+            return $cartWithItems > 0 ? $cartWithItems : (int) $ids[0];
         } catch (\Throwable $e) {
             return 0;
         }
@@ -975,6 +1015,7 @@ class CarrinhoController extends Controller {
                 ]);
                 return;
             } catch (\Throwable $e) {
+                error_log('[CART-ADD-EXCEPTION] ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
                 // fallback session
             }
         }

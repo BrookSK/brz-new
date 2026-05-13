@@ -118,7 +118,7 @@ const BriSidebar = (() => {
     
     const navMap = [
       // Carrinho & Checkout
-      { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: '/carrinho?embed=1', reply: 'Ok, vamos lá! 🛒' },
+      { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: () => '/carrinho?embed=1&_=' + Date.now(), reply: 'Ok, vamos lá! 🛒' },
       { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒' },
       // Produtos & Catálogo
       { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
