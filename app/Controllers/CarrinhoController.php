@@ -1404,8 +1404,12 @@ class CarrinhoController extends Controller {
         $uid = $this->getLoggedUserId();
         if ($uid > 0) {
             try {
-                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                // Usar mesma lógica: primeiro o carrinho com itens
+                $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+                if ($cartId <= 0) {
+                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                }
                 if ($cartId > 0) {
                     $this->carrinhoModel->limparCarrinho($cartId);
                 }
