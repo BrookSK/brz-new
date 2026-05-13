@@ -151,7 +151,7 @@ const BriSidebar = (() => {
         historico.push({ role: 'user', content: msg, time: getTime() });
         historico.push({ role: 'assistant', content: nav.reply, time: getTime() });
         salvarHistorico(); renderMensagens();
-        navigatePainel(nav.url);
+        navigatePainel(typeof nav.url === 'function' ? nav.url() : nav.url);
         return;
       }
     }
