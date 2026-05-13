@@ -156,6 +156,22 @@ const BriSidebar = (() => {
       }
     }
 
+    // Detecção de busca de produto: mensagens curtas (1-4 palavras) que parecem nomes de produto/marca
+    const palavras = msg.trim().split(/\s+/);
+    if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|quanto|qual|porque|quando|onde|quem|ajuda|help)/)) {
+      // Se não é uma pergunta/saudação, tratar como busca de produto
+      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie'};
+      let searchTerm = msg.trim();
+      for (const [pt, en] of Object.entries(traducoes)) {
+        if (msgLower.includes(pt)) { searchTerm = en; break; }
+      }
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Buscando ' + msg + '... 🔍', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
+      return;
+    }
+
     // === Para tudo que não é navegação direta, enviar à IA normalmente ===
     historico.push({ role: 'user', content: msg, time: getTime() });
     renderMensagens();

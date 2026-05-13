@@ -71,7 +71,7 @@ class CopilotoService {
         }
         $messages[] = ['role' => 'user', 'content' => $mensagem];
 
-        $timeout = (int) ($this->configs['timeout_claude_ms'] ?? 15000);
+        $timeout = (int) ($this->configs['timeout_claude_ms'] ?? 30000);
 
         $payload = [
             'model' => self::MODELO,
@@ -252,7 +252,8 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
         $carrinhoTexto = 'Vazio ou não disponível';
 
         // Se carrinho_itens não veio do frontend, buscar do banco diretamente
-        if (empty($contexto['carrinho_itens'])) {
+        // EXCETO no modo home_ia onde a navegação é feita pelo JS (não precisa de carrinho no prompt)
+        if (empty($contexto['carrinho_itens']) && ($contexto['pagina'] ?? '') !== 'home_ia') {
             try {
                 if (session_status() === PHP_SESSION_NONE) @session_start();
                 
