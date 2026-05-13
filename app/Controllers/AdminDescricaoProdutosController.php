@@ -347,7 +347,7 @@ class AdminDescricaoProdutosController extends Controller {
 .kpi-card { background:#fff; border-radius:12px; padding:20px; border:1px solid #e9ecef; }
 .kpi-card .kpi-value { font-size:1.8rem; font-weight:700; color:var(--navy); }
 .kpi-card .kpi-label { font-size:0.85rem; color:#6c757d; }
-.status-badge { font-size:0.75rem; padding:4px 10px; border-radius:20px; font-weight:500; }
+.status-badge { font-size:0.75rem; padding:4px 10px; border-radius:20px; font-weight:500; white-space:nowrap; }
 .status-sem_descricao { background:#f8d7da; color:#842029; }
 .status-gerando { background:#fff3cd; color:#664d03; }
 .status-pendente_revisao { background:#cff4fc; color:#055160; }
