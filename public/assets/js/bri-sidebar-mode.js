@@ -54,24 +54,21 @@ const BriSidebar = (() => {
       const script = iframeDoc.createElement('script');
       script.textContent = `
         (function(){
-          var _origHref = window.location.href;
-          var _nav = function(url) {
-            if (url && url.indexOf('embed=1') === -1 && url.indexOf('/') === 0) {
-              url = url + (url.indexOf('?') !== -1 ? '&' : '?') + 'embed=1';
-            }
-            window.location.replace(url);
-          };
-          // Patch onclick handlers that use window.location.href
+          // Patch APENAS links de navegação que usam window.location.href
+          // NÃO interceptar botões de add-to-cart, forms, ou ações de produto
           document.addEventListener('click', function(e) {
-            var el = e.target.closest('a[onclick*="location"], button[onclick*="location"]');
-            if (el) {
-              var onclick = el.getAttribute('onclick') || '';
-              if (onclick.indexOf('location.href') !== -1 || onclick.indexOf('location=') !== -1) {
+            var el = e.target.closest('a[onclick*="location.href"]');
+            if (!el) return;
+            // Não interceptar se é botão de carrinho/produto
+            var onclick = el.getAttribute('onclick') || '';
+            if (onclick.indexOf('carrinho') !== -1 || onclick.indexOf('cart') !== -1) return;
+            if (onclick.indexOf('location.href') !== -1) {
+              var match = onclick.match(/location\\.href\\s*=\\s*['"](.*?)['"]/);
+              if (match && match[1] && match[1].indexOf('embed=1') === -1) {
                 e.preventDefault();
                 e.stopPropagation();
-                var match = onclick.match(/location\\.href\\s*=\\s*['"](.*?)['"]/);
-                if (!match) match = onclick.match(/location\\s*=\\s*['"](.*?)['"]/);
-                if (match && match[1]) { _nav(match[1]); }
+                var url = match[1];
+                window.location.href = url + (url.indexOf('?') !== -1 ? '&' : '?') + 'embed=1';
               }
             }
           }, true);
@@ -79,12 +76,14 @@ const BriSidebar = (() => {
       `;
       iframeDoc.head.appendChild(script);
 
-      // Interceptar cliques em links
+      // Interceptar cliques em links de NAVEGAÇÃO (não botões de ação)
       iframeDoc.addEventListener('click', (e) => {
         const link = e.target.closest('a[href]');
         if (!link) return;
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
+        // Não interceptar links de ação (add-to-cart, POST actions, etc.)
+        if (link.closest('form') || link.getAttribute('onclick') || link.classList.contains('btn-primary') || href.includes('/adicionar') || href.includes('/add')) return;
         if (!href.includes('embed=1')) {
           e.preventDefault();
           e.stopPropagation();
