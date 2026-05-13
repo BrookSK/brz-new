@@ -159,26 +159,28 @@ const BriSidebar = (() => {
     input.style.height = 'auto';
 
     // === MODO NAVEGAÇÃO RÁPIDA ===
-    // Detectar intenção do usuário e navegar diretamente sem esperar a IA
+    // Apenas comandos CURTOS e DIRETOS são interceptados
+    // Frases longas ou complexas vão para a IA
     const msgLower = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const palavras = msg.trim().split(/\s+/).length;
     
-    // Carrinho
-    if (msgLower.match(/carrinho|meu carrinho|ver carrinho|cart/)) {
+    // Carrinho (apenas comandos diretos)
+    if (msgLower.match(/^(carrinho|meu carrinho|ver carrinho|me mostr[ea] meu carrinho|abre? o? ?carrinho)$/)) {
       historico.push({ role: 'user', content: msg, time: getTime() });
       historico.push({ role: 'assistant', content: 'Ok, vamos lá! 🛒', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/carrinho?embed=1');
       return;
     }
-    // Checkout / Finalizar
-    if (msgLower.match(/checkout|finalizar compra|pagar|fechar pedido/)) {
+    // Checkout (apenas comandos diretos)
+    if (msgLower.match(/^(checkout|finalizar compra|ir pro checkout|fechar pedido)$/)) {
       historico.push({ role: 'user', content: msg, time: getTime() });
       historico.push({ role: 'assistant', content: 'Te levo pro checkout! 🔒', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/carrinho/checkout?embed=1');
       return;
     }
-    // Produtos / Home
+    // Produtos / Home (apenas comandos diretos)
     if (msgLower.match(/^(produtos|catalogo|ver produtos|home|inicio)$/)) {
       historico.push({ role: 'user', content: msg, time: getTime() });
       historico.push({ role: 'assistant', content: 'Aqui estão os produtos! 🛍️', time: getTime() });
@@ -186,44 +188,28 @@ const BriSidebar = (() => {
       navigatePainel('/produtos?embed=1');
       return;
     }
-    // Grupos de compras
-    if (msgLower.match(/grupos|grupos de compras/)) {
+    // Grupos de compras (apenas comandos diretos)
+    if (msgLower.match(/^(grupos|grupos de compras|ver grupos)$/)) {
       historico.push({ role: 'user', content: msg, time: getTime() });
       historico.push({ role: 'assistant', content: 'Aqui estão os grupos disponíveis!', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/grupos-compras?embed=1');
       return;
     }
-    // Minha conta / Pedidos
-    if (msgLower.match(/minha conta|meus pedidos|pedidos|meu perfil/)) {
+    // Minha conta (apenas comandos diretos)
+    if (msgLower.match(/^(minha conta|meus pedidos|meu perfil)$/)) {
       historico.push({ role: 'user', content: msg, time: getTime() });
       historico.push({ role: 'assistant', content: 'Abrindo sua conta!', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/minha-conta?embed=1');
       return;
     }
-    // Clube
-    if (msgLower.match(/clube|recarga|saldo/)) {
+    // Clube (apenas comandos diretos)
+    if (msgLower.match(/^(clube|recarga|meu saldo|ver clube)$/)) {
       historico.push({ role: 'user', content: msg, time: getTime() });
       historico.push({ role: 'assistant', content: 'Vamos pro Clube! 💎', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/clube/recarga?embed=1');
-      return;
-    }
-    // Busca de produto específico
-    if (msgLower.match(/^(tem |busca |procura |quero |me mostr[ea] |encontr[ea] )/) || 
-        msgLower.match(/pipoca|popcorn|tineco|dyson|esponja|sabonete|shampoo|vitamina|chocolate/)) {
-      // Extrair termo de busca
-      let searchTerm = msg.replace(/^(tem |busca |procura |quero |me mostre |me mostra |encontre |encontra )/i, '').replace(/\?/g, '').trim();
-      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','café':'coffee',biscoito:'cookie'};
-      const termLower = searchTerm.toLowerCase();
-      for (const [pt, en] of Object.entries(traducoes)) {
-        if (termLower.includes(pt)) { searchTerm = en; break; }
-      }
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Buscando pra você! 🔍', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
       return;
     }
 
