@@ -1337,8 +1337,9 @@ PROMPT;
 
             // Fix AUTO_INCREMENT if stuck at 0
             try {
+                $this->pdo->exec("DELETE FROM copiloto_mensagens WHERE id = 0");
                 $maxId = (int) $this->pdo->query("SELECT COALESCE(MAX(id), 0) FROM copiloto_mensagens")->fetchColumn();
-                $this->pdo->exec("ALTER TABLE copiloto_mensagens AUTO_INCREMENT = " . ($maxId + 1));
+                $this->pdo->exec("ALTER TABLE copiloto_mensagens AUTO_INCREMENT = " . max(1, $maxId + 1));
             } catch (\Exception $e) {}
 
             $this->pdo->prepare("INSERT INTO copiloto_mensagens (sessao_id, role, conteudo, contexto_pagina) VALUES (?, 'user', ?, ?)")

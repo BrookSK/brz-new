@@ -888,7 +888,7 @@ class CarrinhoController extends Controller {
         $this->hydrateCartFromCookie();
 
         $uid = $this->getLoggedUserId();
-        $this->debugLog('UID apos login check: ' . $uid . ' | session_id=' . session_id() . ' | SESSION[usuario_id]=' . ($_SESSION['usuario_id'] ?? 'NULL') . ' | SESSION[logado]=' . var_export($_SESSION['logado'] ?? null, true));
+        error_log('[CART-ADD-DEBUG] uid=' . $uid . ' session_id=' . session_id() . ' produto=' . $produtoId);
 
         $pvId = null;
         if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
