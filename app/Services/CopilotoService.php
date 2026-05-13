@@ -1180,6 +1180,14 @@ PROMPT;
         try {
             $sessaoId = session_id() ?: ('anon_' . substr(md5($_SERVER['REMOTE_ADDR'] ?? ''), 0, 12));
 
+            // Fix AUTO_INCREMENT if stuck at 0
+            try {
+                $maxId = (int) $this->pdo->query("SELECT COALESCE(MAX(id), 0) FROM copiloto_mensagens")->fetchColumn();
+                if ($maxId === 0) {
+                    $this->pdo->exec("ALTER TABLE copiloto_mensagens AUTO_INCREMENT = 1");
+                }
+            } catch (\Exception $e) {}
+
             $this->pdo->prepare("INSERT INTO copiloto_mensagens (sessao_id, role, conteudo, contexto_pagina) VALUES (?, 'user', ?, ?)")
                 ->execute([$sessaoId, $mensagemUsuario, json_encode(['pagina' => $contexto['pagina'] ?? '', 'url' => $contexto['url_atual'] ?? ''])]);
 

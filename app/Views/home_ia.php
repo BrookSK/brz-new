@@ -65,7 +65,6 @@
       id="bri-frame"
       src="/bri/inicio?embed=1"
       title="Conteúdo BRI"
-      sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
     ></iframe>
 
   </main>

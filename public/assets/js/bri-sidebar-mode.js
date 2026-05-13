@@ -141,21 +141,33 @@ const BriSidebar = (() => {
 
     const p = parametros || {};
     const rotas = {
-      buscar_produto: () => '/busca?q=' + encodeURIComponent(p.termo || '') + '&embed=1',
+      buscar_produto: () => '/produtos?busca=' + encodeURIComponent(p.termo || p.busca || '') + '&embed=1',
       ir_para_carrinho: () => '/carrinho?embed=1',
-      ir_para_checkout: () => '/checkout?embed=1',
+      ir_para_checkout: () => '/carrinho/checkout?embed=1',
       ir_para_grupo: () => '/grupo/' + (p.slug || '') + '?embed=1',
-      ir_para_clube: () => '/clube?embed=1',
-      consultar_status_pedido: () => '/pedidos/' + (p.numero_pedido || '') + '?embed=1',
-      gerar_orcamento: () => '/orcamento/preview?embed=1',
+      ir_para_clube: () => '/clube/recarga?embed=1',
+      ir_para_contato: () => '/contato?embed=1',
+      ir_para_meus_dados: () => '/meus-dados?embed=1',
+      ir_para_assessoria: () => '/assessoria?embed=1',
+      consultar_status_pedido: () => '/minha-conta?embed=1',
+      gerar_orcamento: () => {
+        const links = p.links || [];
+        if (links.length > 0 && typeof links[0] === 'string') {
+          return links[0] + (links[0].includes('?') ? '&' : '?') + 'embed=1';
+        }
+        return '/assessoria?embed=1';
+      },
       navegar: () => {
-        const url = p.url || '/';
+        let url = p.url || p.pagina || '/';
+        if (url.indexOf('/') !== 0) url = '/' + url;
+        if (url.match(/^\/admin/i)) return null; // Bloquear admin
         return url + (url.includes('?') ? '&' : '?') + 'embed=1';
       }
     };
 
     if (rotas[tipo]) {
-      navigatePainel(rotas[tipo]());
+      const url = rotas[tipo]();
+      if (url) navigatePainel(url);
     }
   }
 
