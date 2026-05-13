@@ -1427,6 +1427,7 @@ class CarrinhoController extends Controller {
                     $db->prepare("UPDATE carrinhos SET valor_total = 0, taxa_servico = 0, valor_impostos = 0, peso_total = 0, updated_at = NOW() WHERE id = ?")->execute([(int)$cid]);
                 }
                 error_log('[CART-CLEAR] Cleared ' . count($ids) . ' carts for uid=' . $uid);
+                unset($_SESSION['carrinho']);
                 $this->json(['success' => true, 'message' => 'Carrinho limpo com sucesso']);
                 return;
             } catch (\Throwable $e) {
