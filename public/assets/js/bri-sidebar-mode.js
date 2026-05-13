@@ -34,7 +34,7 @@ const BriSidebar = (() => {
 
       // Se a URL do iframe não tem embed=1, recarregar com embed=1
       const iframePath = iframeWin.location.pathname + iframeWin.location.search;
-      if (!iframePath.includes('embed=1') && !iframePath.includes('/bri/inicio')) {
+      if (!iframePath.includes('embed=1') && !iframePath.includes('/bri/inicio') && !iframePath.includes('/checkout')) {
         const sep = iframePath.includes('?') ? '&' : '?';
         frame.src = iframePath + sep + 'embed=1';
         return;
@@ -119,7 +119,7 @@ const BriSidebar = (() => {
     const navMap = [
       // Carrinho & Checkout
       { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: () => '/carrinho?embed=1&_=' + Date.now(), reply: 'Ok, vamos lá! 🛒\n\nNo carrinho você vê todos os itens, valores com taxas e frete. Pode alterar quantidades ou remover itens.' },
-      { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒\n\nPreencha seus dados e escolha a forma de pagamento para finalizar.' },
+      { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/checkout?embed=1', reply: 'Te levo pro checkout! 🔒\n\nPreencha seus dados e escolha a forma de pagamento para finalizar.' },
       // Produtos & Catálogo
       { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️\n\nNavegue, use o campo de busca ou filtre por categoria. Clique em "Add to cart" para adicionar.' },
       { regex: /^(grupos|ver grupos|me mostr.*grupo|grupos? de compras?|grupo de compra|me mostr.*grupos? abertos?|grupos? abertos?)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos! 🏪\n\nGrupos de compras são compras coletivas com preços especiais. Clique em "Ver produtos" para explorar cada grupo.' },
