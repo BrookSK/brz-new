@@ -118,29 +118,31 @@ const BriSidebar = (() => {
     
     const navMap = [
       // Carrinho & Checkout
-      { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: () => '/carrinho?embed=1&_=' + Date.now(), reply: 'Ok, vamos lá! 🛒' },
-      { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒' },
+      { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: () => '/carrinho?embed=1&_=' + Date.now(), reply: 'Ok, vamos lá! 🛒\n\nNo carrinho você vê todos os itens, valores com taxas e frete. Pode alterar quantidades ou remover itens.' },
+      { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒\n\nPreencha seus dados e escolha a forma de pagamento para finalizar.' },
       // Produtos & Catálogo
-      { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
-      { regex: /^(grupos|ver grupos|me mostr.*grupo|grupos? de compras?|grupo de compra|me mostr.*grupos? abertos?)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
+      { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️\n\nNavegue, use o campo de busca ou filtre por categoria. Clique em "Add to cart" para adicionar.' },
+      { regex: /^(grupos|ver grupos|me mostr.*grupo|grupos? de compras?|grupo de compra|me mostr.*grupos? abertos?)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos! 🏪\n\nGrupos de compras são compras coletivas com preços especiais. Clique em "Ver produtos" para explorar cada grupo.' },
       // Conta & Dados
-      { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados!' },
-      { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos!' },
-      { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços!' },
-      { regex: /meus tickets|tickets|suporte|atendimento/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte!' },
+      { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados! 👤\n\nAqui você edita nome, email, telefone, CPF e foto de perfil.' },
+      { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos! 📦\n\nVeja o status de cada compra, rastreamento e detalhes.' },
+      { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços! 📍\n\nAdicione ou edite endereços de entrega para agilizar suas compras.' },
+      { regex: /meus tickets|tickets|suporte|atendimento/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte! 💬\n\nAqui você acompanha suas solicitações de atendimento.' },
       // Clube
-      { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana|me mostr.*clube)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎' },
-      { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube!' },
-      { regex: /produtos do clube|produtos clube/, url: '/produtos-clube?embed=1', reply: 'Produtos exclusivos do Clube!' },
+      { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana|me mostr.*clube)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎\n\nFaça recargas para ter saldo e aproveitar benefícios exclusivos.' },
+      { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube! ℹ️\n\nVeja como funciona o sistema de recargas e benefícios.' },
+      { regex: /produtos do clube|produtos clube/, url: '/produtos-clube?embed=1', reply: 'Produtos exclusivos do Clube! ⭐' },
       // Informações
-      { regex: /^(faq|perguntas frequentes|duvidas)$/, url: '/faq?embed=1', reply: 'Aqui está o FAQ!' },
-      { regex: /como funciona|como comprar/, url: '/como-funciona?embed=1', reply: 'Veja como funciona!' },
-      { regex: /^(contato|falar com alguem|fale conosco)$/, url: '/contato?embed=1', reply: 'Página de contato!' },
-      { regex: /rastreamento|rastrear|rastreio|tracking/, url: '/rastreamento?embed=1', reply: 'Rastreamento de pedidos!' },
+      { regex: /^(faq|perguntas frequentes|duvidas)$/, url: '/faq?embed=1', reply: 'Aqui está o FAQ! ❓\n\nRespostas para as dúvidas mais comuns sobre compras, envio e pagamento.' },
+      { regex: /como funciona|como comprar/, url: '/como-funciona?embed=1', reply: 'Veja como funciona! 📖\n\nPasso a passo de como comprar e receber seus produtos dos EUA.' },
+      { regex: /^(contato|falar com alguem|fale conosco)$/, url: '/contato?embed=1', reply: 'Página de contato! 📞' },
+      { regex: /rastreamento|rastrear|rastreio|tracking/, url: '/rastreamento?embed=1', reply: 'Rastreamento de pedidos! 🚚\n\nCole seu código de rastreio para acompanhar a entrega.' },
       { regex: /status.*(pedido|compra)|acompanhar pedido/, url: '/status-pedido?embed=1', reply: 'Status dos pedidos!' },
       { regex: /cobranca|calcular cobranca|simulador/, url: '/cobranca?embed=1', reply: 'Calculadora de cobrança!' },
+      // Comprar de outros sites / Assessoria
+      { regex: /comprar de outro|comprar.*outro site|posso comprar.*amazon|posso comprar.*walmart|posso comprar.*target|comprar.*eua|importar|trazer dos eua|mandar.*brasil/, url: '/assessoria?embed=1', reply: 'Sim! Você pode comprar de qualquer loja dos EUA! 🇺🇸\n\nNa página ao lado (Assessoria), cole os links dos produtos que quer e nós geramos um orçamento completo com frete e impostos.\n\nFunciona com Amazon, Walmart, Target, qualquer loja americana!' },
       // Assessoria / Redirecionamento
-      { regex: /assessoria|redirecionamento|redirecionar|compra por link/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦' },
+      { regex: /assessoria|redirecionamento|redirecionar|compra por link/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦\n\nAqui você cola os links de produtos de qualquer loja dos EUA e nós calculamos o orçamento completo (produto + frete + impostos).' },
       // Orçamento - instrução de como fazer
       { regex: /orcamento|orçamento|quanto fica|quanto custa tudo|simular|simulacao/, url: null, reply: 'Para montar seu orçamento é simples! 📋\n\n1. Me diga o produto que procura (ex: "tineco", "pipoca")\n2. Vou buscar pra você no painel ao lado\n3. Clique em "Add to cart" nos itens que quiser\n4. Repita até adicionar tudo\n5. Quando terminar, diga "carrinho" — lá terá o valor total com taxas e frete!\n\nQual produto quer buscar primeiro?' },
       // Políticas
@@ -175,7 +177,8 @@ const BriSidebar = (() => {
     const termosIgnorar = ['', 'grupo', 'grupos', 'compras', 'de compras', 'aberto', 'abertos', 'ativo', 'ativos', 'grupo de compras', 'grupos de compras'];
     if (termoProdutoGrupo && !termosIgnorar.includes(termoProdutoGrupo.toLowerCase())) {
       const traducoes2 = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',sabonete:'soap',chocolate:'chocolate',vitamina:'vitamin',cafe:'coffee',biscoito:'cookie',banho:'bath',limpeza:'cleaning',vela:'candle'};
-      let searchTerm = termoProdutoGrupo;
+      // Limpar artigos, preposições e pontuação do termo
+      let searchTerm = termoProdutoGrupo.replace(/^(o|a|os|as|um|uma|uns|umas|do|da|dos|das|de|no|na|nos|nas|pro|pra|para|esse|essa|aquele|aquela)\s+/gi, '').replace(/\b(um|uma|o|a|os|as|do|da|de|no|na)\b/gi, '').replace(/\s+/g, ' ').replace(/[?!.,;:]+$/g, '').trim();
       for (const [pt, en] of Object.entries(traducoes2)) {
         if (termoProdutoGrupo.includes(pt)) { searchTerm = en; break; }
       }
@@ -192,15 +195,31 @@ const BriSidebar = (() => {
       return;
     }
 
-    if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|porque|quando|onde|quem|ajuda|help)(\s|$)/) && !msgLower.match(/grupo|carrinho|checkout|pedido|conta|endereco|ticket/)) {
+    // Detectar perguntas sobre preço/entrega de produto específico (ex: "o aspirador da tineco fica quantos p entrega")
+    const precoMatch = msgLower.match(/(?:quanto|quantos?|fica|custa|sai|valor).*(?:entrega|envio|frete|brasil|br)\b/);
+    const produtoNaFrase = msgLower.match(/(?:tineco|dyson|ninja|kitchenaid|vitamix|iphone|samsung|apple|costco|walmart)/i);
+    if (precoMatch && produtoNaFrase) {
+      let searchTerm = produtoNaFrase[0];
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Vou buscar os ' + searchTerm + ' disponíveis! Para ver o valor total com entrega, adicione ao carrinho e diga "carrinho" 🛒', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
+      return;
+    }
+
+    if (palavras.length <= 5 && !msgLower.match(/^(oi|ola|obrigad|como|porque|quando|onde|quem|ajuda|help)(\s|$)/) && !msgLower.match(/grupo|carrinho|checkout|pedido|conta|endereco|ticket/)) {
       // Se não é uma pergunta/saudação, tratar como busca de produto
       const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby','bebê':'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',loção:'lotion'};
-      let searchTerm = msg.trim();
+      // Limpar artigos, preposições e pontuação
+      let searchTerm = msg.trim().replace(/^(o|a|os|as|um|uma|uns|umas|do|da|dos|das|de|no|na|nos|nas|pro|pra|para|esse|essa|aquele|aquela|me\s+mostr[ea]|quero|quero\s+comprar|tem|busca|procura|buscar|procurar|comprar)\s+/gi, '').replace(/[?!.,;:]+$/g, '').trim();
+      // Remover artigos internos também
+      searchTerm = searchTerm.replace(/\b(um|uma|o|a|os|as|do|da|de|no|na)\b/gi, '').replace(/\s+/g, ' ').trim();
+      if (!searchTerm) searchTerm = msg.trim();
       for (const [pt, en] of Object.entries(traducoes)) {
-        if (msgLower.includes(pt)) { searchTerm = en; break; }
+        if (searchTerm.toLowerCase().includes(pt)) { searchTerm = en; break; }
       }
       historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Buscando ' + msg + '... 🔍', time: getTime() });
+      historico.push({ role: 'assistant', content: 'Buscando ' + searchTerm + '... 🔍', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
 
@@ -289,6 +308,24 @@ const BriSidebar = (() => {
     .then(data => {
       typing.remove();
       const resp = data.resposta || 'Sem resposta.';
+      
+      // Detectar resposta de erro/timeout da IA e fazer retry automático
+      if (resp.match(/problema t[eé]cnico|tenta de novo|erro|timeout/i)) {
+        historico.push({ role: 'assistant', content: 'Hmmm, estou olhando mais profundamente... 🔍', time: getTime() });
+        salvarHistorico(); renderMensagens();
+        // Retry após 2s
+        setTimeout(() => {
+          const lastUserMsg = historico.filter(m => m.role === 'user').pop();
+          if (lastUserMsg) {
+            input.value = lastUserMsg.content;
+            enviando = false;
+            sendBtn.disabled = false;
+            enviar();
+          }
+        }, 2000);
+        return;
+      }
+      
       historico.push({ role: 'assistant', content: resp, time: getTime() });
       salvarHistorico();
       renderMensagens();
@@ -310,8 +347,19 @@ const BriSidebar = (() => {
     })
     .catch(err => {
       typing.remove();
-      historico.push({ role: 'assistant', content: err.message || 'Erro de conexão.', time: getTime() });
+      historico.push({ role: 'assistant', content: 'Hmmm, estou processando... ⏳', time: getTime() });
       renderMensagens();
+      // Retry após 2s
+      setTimeout(() => {
+        const lastUserMsg = historico.filter(m => m.role === 'user').pop();
+        if (lastUserMsg && !lastUserMsg._retried) {
+          lastUserMsg._retried = true;
+          input.value = lastUserMsg.content;
+          enviando = false;
+          sendBtn.disabled = false;
+          enviar();
+        }
+      }, 2000);
     })
     .finally(() => {
       enviando = false;
@@ -434,7 +482,61 @@ const BriSidebar = (() => {
   sendBtn?.addEventListener('click', enviar);
 
   // ── Init ────────────────────────────────────────────
-  renderMensagens();
+  // Wizard de boas-vindas (apenas na primeira visita)
+  if (historico.length === 0 && !sessionStorage.getItem('bri_wizard_done')) {
+    showWizard();
+  } else {
+    renderMensagens();
+  }
+
+  function showWizard() {
+    const wizardEl = document.createElement('div');
+    wizardEl.id = 'bri-wizard';
+    wizardEl.style.cssText = 'position:absolute;inset:0;background:var(--color-bg);z-index:10;display:flex;flex-direction:column;padding:20px;overflow-y:auto;';
+    
+    const steps = [
+      { icon: 'bi-search', title: 'Buscar Produtos', desc: 'Digite o nome do produto (ex: "tineco", "pipoca") e eu busco pra você no painel ao lado.' },
+      { icon: 'bi-cart-plus', title: 'Adicionar ao Carrinho', desc: 'Clique em "Add to cart" nos produtos que aparecem ao lado. Simples assim!' },
+      { icon: 'bi-shop', title: 'Grupos de Compras', desc: 'Digite "grupos" para ver os grupos abertos. Ou pergunte "qual grupo tem X?"' },
+      { icon: 'bi-person', title: 'Sua Conta', desc: 'Digite "minha conta", "meus pedidos" ou "meus endereços" para acessar seus dados.' },
+      { icon: 'bi-calculator', title: 'Orçamento', desc: 'Busque os produtos, adicione ao carrinho e diga "carrinho" — lá terá o valor total!' },
+    ];
+
+    let html = '<div style="text-align:center;margin-bottom:20px;"><div style="width:48px;height:48px;border-radius:50%;background:var(--color-primary);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px;"><i class="bi bi-stars"></i></div><h3 style="font-size:18px;font-weight:700;color:var(--color-primary);margin:0 0 4px;">Olá! Eu sou a BRI</h3><p style="font-size:13px;color:var(--color-text-secondary);margin:0;">Sua assistente de navegação. Veja como posso te ajudar:</p></div>';
+    
+    html += '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">';
+    steps.forEach(s => {
+      html += '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;"><i class="bi ' + s.icon + '" style="font-size:18px;color:var(--color-primary);flex-shrink:0;margin-top:2px;"></i><div><div style="font-size:13px;font-weight:600;color:var(--color-text);">' + s.title + '</div><div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;">' + s.desc + '</div></div></div>';
+    });
+    html += '</div>';
+
+    html += '<div style="text-align:center;margin-bottom:12px;"><p style="font-size:14px;font-weight:600;color:var(--color-primary);">Vamos começar? 🚀</p><p style="font-size:12px;color:var(--color-text-secondary);">Para onde gostaria de ir ou qual produto procura?</p></div>';
+    html += '<div style="display:flex;gap:8px;"><input type="text" id="bri-wizard-input" placeholder="Ex: tineco, grupos, meus pedidos..." style="flex:1;border:1px solid var(--color-border-input);border-radius:var(--radius-input);padding:10px 12px;font-size:13px;font-family:inherit;outline:none;"><button id="bri-wizard-btn" style="background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-btn);padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;">Ir!</button></div>';
+
+    wizardEl.innerHTML = html;
+    msgsEl.parentElement.insertBefore(wizardEl, msgsEl);
+    msgsEl.style.display = 'none';
+    document.getElementById('bri-input-area').style.display = 'none';
+
+    const wizInput = document.getElementById('bri-wizard-input');
+    const wizBtn = document.getElementById('bri-wizard-btn');
+    
+    function finishWizard() {
+      const val = (wizInput.value || '').trim();
+      if (!val) return;
+      sessionStorage.setItem('bri_wizard_done', '1');
+      wizardEl.remove();
+      msgsEl.style.display = '';
+      document.getElementById('bri-input-area').style.display = '';
+      // Inserir a mensagem do wizard como primeira mensagem do chat
+      input.value = val;
+      enviar();
+    }
+
+    wizBtn.addEventListener('click', finishWizard);
+    wizInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') finishWizard(); });
+    wizInput.focus();
+  }
 
   // Expor para uso externo
   function limparChat() {
