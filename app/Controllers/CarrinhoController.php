@@ -905,7 +905,8 @@ class CarrinhoController extends Controller {
         }
 
         $_SESSION['checkout_from_cart_at'] = time();
-        header('Location: /checkout');
+        $embedParam = !empty($_GET['embed']) ? '?embed=1' : '';
+        header('Location: /checkout' . $embedParam);
         exit;
     }
 
