@@ -1402,10 +1402,23 @@ class CarrinhoController extends Controller {
         session_start();
         $this->hydrateCartFromCookie();
         $uid = $this->getLoggedUserId();
+        
+        // Fallback: mesmo que uid=0, tentar pelo session_id
+        if ($uid <= 0) {
+            try {
+                $db = $this->carrinhoModel->getConnection();
+                $sessionId = session_id() ?: null;
+                if ($sessionId) {
+                    $st = $db->prepare('SELECT usuario_id FROM carrinhos WHERE session_id = ? AND usuario_id > 0 ORDER BY updated_at DESC LIMIT 1');
+                    $st->execute([$sessionId]);
+                    $uid = (int) ($st->fetchColumn() ?: 0);
+                }
+            } catch (\Throwable $e) {}
+        }
+        
         if ($uid > 0) {
             try {
                 $db = $this->carrinhoModel->getConnection();
-                // Limpar TODOS os carrinhos do usuário
                 $st = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ?');
                 $st->execute([$uid]);
                 $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
@@ -1413,6 +1426,7 @@ class CarrinhoController extends Controller {
                     $db->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ?')->execute([(int)$cid]);
                     $db->prepare("UPDATE carrinhos SET valor_total = 0, taxa_servico = 0, valor_impostos = 0, peso_total = 0, updated_at = NOW() WHERE id = ?")->execute([(int)$cid]);
                 }
+                error_log('[CART-CLEAR] Cleared ' . count($ids) . ' carts for uid=' . $uid);
                 $this->json(['success' => true, 'message' => 'Carrinho limpo com sucesso']);
                 return;
             } catch (\Throwable $e) {
