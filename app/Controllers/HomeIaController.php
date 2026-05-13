@@ -5,6 +5,10 @@ use App\Core\Request;
 
 class HomeIaController extends Controller {
     public function index(Request $request) {
+        // Garantir sessão ativa e usuário identificado (mesma sessão do site)
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         include __DIR__ . '/../Views/home_ia.php';
     }
 

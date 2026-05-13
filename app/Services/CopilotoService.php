@@ -273,6 +273,28 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                         $userId = (int) ($stU->fetchColumn() ?: 0);
                     } catch (\Throwable $e) {}
                 }
+                // Fallback: buscar usuario_id na sessão PHP armazenada no servidor
+                if ($userId <= 0 && $sessionId) {
+                    // Tentar ler a sessão do PHP diretamente do handler
+                    try {
+                        // Verificar se existe um carrinho com este session_id que tenha usuario_id
+                        $stU = $this->pdo->prepare("SELECT usuario_id FROM carrinhos WHERE session_id = ? AND usuario_id > 0 ORDER BY updated_at DESC LIMIT 1");
+                        $stU->execute([$sessionId]);
+                        $userId = (int) ($stU->fetchColumn() ?: 0);
+                    } catch (\Throwable $e) {}
+                }
+                // Fallback: buscar o carrinho mais recente com itens que tenha o mesmo IP (última hora)
+                if ($userId <= 0) {
+                    try {
+                        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+                        if ($ip) {
+                            // Buscar sessões recentes do copiloto com este IP que tenham usuario_id
+                            $stU = $this->pdo->prepare("SELECT usuario_id FROM copiloto_sessoes WHERE ip = ? AND usuario_id IS NOT NULL AND usuario_id > 0 ORDER BY ultima_interacao DESC LIMIT 1");
+                            $stU->execute([$ip]);
+                            $userId = (int) ($stU->fetchColumn() ?: 0);
+                        }
+                    } catch (\Throwable $e) {}
+                }
 
                 $cartId = 0;
 
@@ -303,11 +325,27 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                     }
                 }
 
-                // 3. Último fallback: se usuario_id > 0 mas não encontrou, buscar o carrinho mais recente com itens desse user (sem filtro de session)
-                if ($cartId <= 0 && $userId > 0) {
-                    $st = $this->pdo->prepare("SELECT c.id FROM carrinhos c INNER JOIN carrinho_items ci ON ci.carrinho_id = c.id WHERE c.usuario_id = ? GROUP BY c.id ORDER BY c.updated_at DESC LIMIT 1");
-                    $st->execute([$userId]);
-                    $cartId = (int)($st->fetchColumn() ?: 0);
+                // 3. Último fallback: buscar qualquer carrinho recente com itens (últimas 24h)
+                // Isso cobre o caso onde o session_id do fetch é diferente do session_id do site
+                if ($cartId <= 0 && $userId <= 0) {
+                    // Tentar encontrar o usuario_id pelo session_id na tabela de sessões PHP ou carrinhos
+                    try {
+                        $stFindUser = $this->pdo->prepare("SELECT usuario_id FROM carrinhos WHERE session_id = ? AND usuario_id IS NOT NULL AND usuario_id > 0 ORDER BY updated_at DESC LIMIT 1");
+                        $stFindUser->execute([$sessionId]);
+                        $foundUserId = (int)($stFindUser->fetchColumn() ?: 0);
+                        if ($foundUserId > 0) {
+                            $userId = $foundUserId;
+                            // Retry with found userId
+                            $st = $this->pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY updated_at DESC LIMIT 10');
+                            $st->execute([$userId]);
+                            $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                            foreach ($ids as $cid) {
+                                $stCnt = $this->pdo->prepare('SELECT COALESCE(SUM(quantidade),0) FROM carrinho_items WHERE carrinho_id = ?');
+                                $stCnt->execute([(int)$cid]);
+                                if ((int)$stCnt->fetchColumn() > 0) { $cartId = (int)$cid; break; }
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 }
 
                 if ($cartId > 0) {
@@ -1280,9 +1318,7 @@ PROMPT;
             // Fix AUTO_INCREMENT if stuck at 0
             try {
                 $maxId = (int) $this->pdo->query("SELECT COALESCE(MAX(id), 0) FROM copiloto_mensagens")->fetchColumn();
-                if ($maxId === 0) {
-                    $this->pdo->exec("ALTER TABLE copiloto_mensagens AUTO_INCREMENT = 1");
-                }
+                $this->pdo->exec("ALTER TABLE copiloto_mensagens AUTO_INCREMENT = " . ($maxId + 1));
             } catch (\Exception $e) {}
 
             $this->pdo->prepare("INSERT INTO copiloto_mensagens (sessao_id, role, conteudo, contexto_pagina) VALUES (?, 'user', ?, ?)")
