@@ -122,7 +122,7 @@ const BriSidebar = (() => {
       { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒' },
       // Produtos & Catálogo
       { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
-      { regex: /grupo.*(compra|compras)|ver grupos|me mostr.*grupo/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
+      { regex: /^(grupos|ver grupos|me mostr.*grupo)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
       // Conta & Dados
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados!' },
       { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos!' },
@@ -166,9 +166,10 @@ const BriSidebar = (() => {
     const palavras = msg.trim().split(/\s+/);
 
     // Detectar perguntas sobre "qual grupo tem X" / "em qual grupo encontro X"
-    const grupoMatch = msgLower.match(/(?:qual|em qual|que|quais)\s+grupo.*(?:tem|encontro|acho|vende|has)\s+(.+)/);
+    const grupoMatch = msgLower.match(/(?:qual|em qual|que|quais)\s+grupo.*(?:tem|encontro|acho|vende|has|vejo)\s+(.+)/);
     const grupoMatch2 = msgLower.match(/(?:tem|encontro|acho)\s+(.+?)\s+(?:em qual|em que|qual)\s+grupo/);
-    const termoProdutoGrupo = grupoMatch ? grupoMatch[1].trim() : (grupoMatch2 ? grupoMatch2[1].trim() : null);
+    const grupoMatch3 = msgLower.match(/grupo.*(?:tem|vende|encontro)\s+(.+)/);
+    const termoProdutoGrupo = grupoMatch ? grupoMatch[1].replace(/\?/g,'').trim() : (grupoMatch2 ? grupoMatch2[1].replace(/\?/g,'').trim() : (grupoMatch3 ? grupoMatch3[1].replace(/\?/g,'').trim() : null));
     
     if (termoProdutoGrupo) {
       const traducoes2 = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',sabonete:'soap',chocolate:'chocolate',vitamina:'vitamin',cafe:'coffee',biscoito:'cookie',banho:'bath',limpeza:'cleaning',vela:'candle'};
