@@ -363,6 +363,21 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                         }
                         $contexto['carrinho_subtotal_usd'] = $subUsd;
                         $contexto['carrinho_total_itens'] = array_sum(array_column($itensDb, 'quantidade'));
+
+                        // Buscar totais reais do carrinho (calculados pelo sistema)
+                        try {
+                            $stTotais = $this->pdo->prepare("SELECT valor_total, taxa_servico, valor_impostos, peso_total, moeda, taxa_conversao FROM carrinhos WHERE id = ?");
+                            $stTotais->execute([$cartId]);
+                            $totais = $stTotais->fetch(\PDO::FETCH_ASSOC);
+                            if ($totais && (float)($totais['valor_total'] ?? 0) > 0) {
+                                $moeda = $totais['moeda'] ?? 'BRL';
+                                $simbolo = ($moeda === 'USD') ? 'US$' : 'R$';
+                                $contexto['carrinho_subtotal_visivel'] = $simbolo . ' ' . number_format((float)($subUsd * ($totais['taxa_conversao'] ?? 1)), 2, ',', '.');
+                                $contexto['carrinho_taxa_servico_visivel'] = $simbolo . ' ' . number_format((float)($totais['taxa_servico'] ?? 0), 2, ',', '.');
+                                $contexto['carrinho_total_visivel'] = $simbolo . ' ' . number_format((float)($totais['valor_total'] ?? 0), 2, ',', '.');
+                                $contexto['carrinho_impostos_br_visivel'] = $simbolo . ' ' . number_format((float)($totais['valor_impostos'] ?? 0), 2, ',', '.');
+                            }
+                        } catch (\Throwable $e) {}
                     }
                 } else {
                     error_log('[CoPiloto] home_ia carrinho: userId=' . $userId . ', sessionId=' . ($sessionId ?? 'null') . ', cartId=0 (não encontrado)');
