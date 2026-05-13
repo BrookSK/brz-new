@@ -159,58 +159,47 @@ const BriSidebar = (() => {
     input.style.height = 'auto';
 
     // === MODO NAVEGAÇÃO RÁPIDA ===
-    // Apenas comandos CURTOS e DIRETOS são interceptados
-    // Frases longas ou complexas vão para a IA
+    // Mapa completo de comandos diretos → URLs
     const msgLower = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const palavras = msg.trim().split(/\s+/).length;
     
-    // Carrinho (apenas comandos diretos)
-    if (msgLower.match(/^(carrinho|meu carrinho|ver carrinho|me mostr[ea] meu carrinho|abre? o? ?carrinho)$/)) {
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Ok, vamos lá! 🛒', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/carrinho?embed=1');
-      return;
-    }
-    // Checkout (apenas comandos diretos)
-    if (msgLower.match(/^(checkout|finalizar compra|ir pro checkout|fechar pedido)$/)) {
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Te levo pro checkout! 🔒', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/carrinho/checkout?embed=1');
-      return;
-    }
-    // Produtos / Home (apenas comandos diretos)
-    if (msgLower.match(/^(produtos|catalogo|ver produtos|home|inicio)$/)) {
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Aqui estão os produtos! 🛍️', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/produtos?embed=1');
-      return;
-    }
-    // Grupos de compras (apenas comandos diretos)
-    if (msgLower.match(/^(grupos|grupos de compras|ver grupos)$/)) {
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Aqui estão os grupos disponíveis!', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/grupos-compras?embed=1');
-      return;
-    }
-    // Minha conta (apenas comandos diretos)
-    if (msgLower.match(/^(minha conta|meus pedidos|meu perfil)$/)) {
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Abrindo sua conta!', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/minha-conta?embed=1');
-      return;
-    }
-    // Clube (apenas comandos diretos)
-    if (msgLower.match(/^(clube|recarga|meu saldo|ver clube)$/)) {
-      historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Vamos pro Clube! 💎', time: getTime() });
-      salvarHistorico(); renderMensagens();
-      navigatePainel('/clube/recarga?embed=1');
-      return;
+    const navMap = [
+      // Carrinho & Checkout
+      { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: '/carrinho?embed=1', reply: 'Ok, vamos lá! 🛒' },
+      { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒' },
+      // Produtos & Catálogo
+      { regex: /^(produtos|catalogo|ver produtos|todos os produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️' },
+      { regex: /^(grupos|grupos de compras|ver grupos)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos!' },
+      // Conta & Dados
+      { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados!' },
+      { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos!' },
+      { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços!' },
+      { regex: /meus tickets|tickets|suporte|atendimento/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte!' },
+      // Clube
+      { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎' },
+      { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube!' },
+      { regex: /produtos do clube|produtos clube/, url: '/produtos-clube?embed=1', reply: 'Produtos exclusivos do Clube!' },
+      // Informações
+      { regex: /^(faq|perguntas frequentes|duvidas)$/, url: '/faq?embed=1', reply: 'Aqui está o FAQ!' },
+      { regex: /como funciona|como comprar/, url: '/como-funciona?embed=1', reply: 'Veja como funciona!' },
+      { regex: /^(contato|falar com alguem|fale conosco)$/, url: '/contato?embed=1', reply: 'Página de contato!' },
+      { regex: /rastreamento|rastrear|rastreio|tracking/, url: '/rastreamento?embed=1', reply: 'Rastreamento de pedidos!' },
+      { regex: /status.*(pedido|compra)|acompanhar pedido/, url: '/status-pedido?embed=1', reply: 'Status dos pedidos!' },
+      { regex: /cobranca|calcular cobranca|simulador/, url: '/cobranca?embed=1', reply: 'Calculadora de cobrança!' },
+      // Políticas
+      { regex: /politica.*(privacidade)|privacidade/, url: '/politica-privacidade?embed=1', reply: 'Política de privacidade.' },
+      { regex: /termos.*(uso)|termos/, url: '/termos-uso?embed=1', reply: 'Termos de uso.' },
+      // Home
+      { regex: /^(home|inicio|pagina inicial)$/, url: '/?embed=1', reply: 'Voltando pro início!' },
+    ];
+
+    for (const nav of navMap) {
+      if (nav.regex.test(msgLower)) {
+        historico.push({ role: 'user', content: msg, time: getTime() });
+        historico.push({ role: 'assistant', content: nav.reply, time: getTime() });
+        salvarHistorico(); renderMensagens();
+        navigatePainel(nav.url);
+        return;
+      }
     }
 
     // === Para tudo que não é navegação direta, enviar à IA normalmente ===
@@ -258,7 +247,17 @@ const BriSidebar = (() => {
 
       // Processar ação no iframe — APENAS quando a API retorna ação explícita
       if (data.acao_frontend && data.acao_frontend.tipo && data.acao_frontend.tipo !== 'nenhuma') {
+        console.log('[BRI] Ação recebida:', data.acao_frontend.tipo, data.acao_frontend.parametros);
         handleAcao(data.acao_frontend);
+      } else {
+        console.log('[BRI] Sem ação. Tipo:', data.acao_frontend?.tipo);
+        // Fallback: se a BRI disse que vai navegar mas não enviou ação
+        const respL = resp.toLowerCase();
+        if (respL.includes('meus dados') || respL.includes('minha conta')) {
+          navigatePainel('/meus-dados?embed=1');
+        } else if (respL.includes('carrinho') && (respL.includes('vou') || respL.includes('bora') || respL.includes('levo'))) {
+          navigatePainel('/carrinho?embed=1');
+        }
       }
     })
     .catch(err => {
