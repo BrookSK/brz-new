@@ -705,6 +705,78 @@ class ClubeRecargaController extends Controller {
                 'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
             ];
 
+            // Buscar endereço do usuário para enviar ao Câmbio Real (obrigatório para PIX)
+            try {
+                $dbEnd = \Config\Database::getConnection();
+                $endCols = [];
+                try {
+                    $stEC = $dbEnd->query('DESCRIBE enderecos');
+                    $endCols = $stEC ? ($stEC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Throwable $e) { $endCols = []; }
+
+                if (!empty($endCols)) {
+                    $userCol = in_array('usuario_id', $endCols, true) ? 'usuario_id' : (in_array('user_id', $endCols, true) ? 'user_id' : '');
+                    if ($userCol !== '') {
+                        $stEnd = $dbEnd->prepare('SELECT * FROM enderecos WHERE ' . $userCol . ' = ? ORDER BY id DESC LIMIT 1');
+                        $stEnd->execute([$usuarioId]);
+                        $endereco = $stEnd->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                        if (!empty($endereco)) {
+                            $street = trim((string) ($endereco['endereco'] ?? ($endereco['logradouro'] ?? ($endereco['street'] ?? ''))));
+                            $number = trim((string) ($endereco['numero'] ?? ($endereco['number'] ?? '')));
+                            $district = trim((string) ($endereco['bairro'] ?? ($endereco['district'] ?? ($endereco['neighborhood'] ?? ''))));
+                            $city = trim((string) ($endereco['cidade'] ?? ($endereco['city'] ?? '')));
+                            $state = trim((string) ($endereco['estado'] ?? ($endereco['uf'] ?? ($endereco['state'] ?? ''))));
+                            $zipCode = preg_replace('/\D+/', '', (string) ($endereco['cep'] ?? ($endereco['zip_code'] ?? ($endereco['zipcode'] ?? ''))));
+                            $complement = trim((string) ($endereco['complemento'] ?? ($endereco['complement'] ?? '')));
+
+                            if ($street !== '' && $city !== '' && $state !== '' && $zipCode !== '') {
+                                $customerData['address'] = [
+                                    'street' => $street,
+                                    'number' => $number !== '' ? $number : 'S/N',
+                                    'district' => $district !== '' ? $district : 'Centro',
+                                    'city' => $city,
+                                    'state' => $state,
+                                    'zip_code' => $zipCode,
+                                ];
+                                if ($complement !== '') {
+                                    $customerData['address']['complement'] = $complement;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // Fallback: se não encontrou endereço no banco, usar endereço genérico para não bloquear o pagamento
+            if (empty($customerData['address'])) {
+                // Tentar buscar da tabela usuarios (alguns sistemas guardam endereço direto no usuário)
+                try {
+                    $dbU = \Config\Database::getConnection();
+                    $stU = $dbU->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                    $stU->execute([$usuarioId]);
+                    $uRow = $stU->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                    $street = trim((string) ($uRow['endereco'] ?? ($uRow['logradouro'] ?? ($uRow['street'] ?? ''))));
+                    $number = trim((string) ($uRow['numero'] ?? ($uRow['number'] ?? '')));
+                    $district = trim((string) ($uRow['bairro'] ?? ($uRow['district'] ?? '')));
+                    $city = trim((string) ($uRow['cidade'] ?? ($uRow['city'] ?? '')));
+                    $state = trim((string) ($uRow['estado'] ?? ($uRow['uf'] ?? ($uRow['state'] ?? ''))));
+                    $zipCode = preg_replace('/\D+/', '', (string) ($uRow['cep'] ?? ($uRow['zip_code'] ?? '')));
+
+                    if ($street !== '' && $city !== '' && $state !== '' && $zipCode !== '') {
+                        $customerData['address'] = [
+                            'street' => $street,
+                            'number' => $number !== '' ? $number : 'S/N',
+                            'district' => $district !== '' ? $district : 'Centro',
+                            'city' => $city,
+                            'state' => $state,
+                            'zip_code' => $zipCode,
+                        ];
+                    }
+                } catch (\Throwable $e) {}
+            }
+
             if ($metodo === 'card') {
                 // Cartão continua via Stripe
                 $stripeCustomer = [
