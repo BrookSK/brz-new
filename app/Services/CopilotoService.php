@@ -251,12 +251,12 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
         // Carrinho
         $carrinhoTexto = 'Vazio ou não disponível';
 
-        // Se estamos no modo sidebar (home_ia), buscar carrinho do banco diretamente
-        if (($contexto['pagina'] ?? '') === 'home_ia' && empty($contexto['carrinho_itens'])) {
+        // Se carrinho_itens não veio do frontend, buscar do banco diretamente
+        if (empty($contexto['carrinho_itens'])) {
             try {
                 if (session_status() === PHP_SESSION_NONE) @session_start();
                 
-                // Pegar usuario_id de todas as formas possíveis (mesma lógica do site)
+                // Pegar usuario_id de todas as formas possíveis
                 $userId = (int) ($_SESSION['usuario_id'] ?? $_SESSION['user_id'] ?? $_SESSION['logado_id'] ?? 0);
                 if ($userId <= 0) {
                     try {
@@ -265,11 +265,20 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                         $userId = (int) ($u['id'] ?? 0);
                     } catch (\Throwable $e) {}
                 }
+                // Fallback: remember_token cookie
+                if ($userId <= 0 && !empty($_COOKIE['remember_token'])) {
+                    try {
+                        $stU = $this->pdo->prepare("SELECT id FROM usuarios WHERE remember_token = ? LIMIT 1");
+                        $stU->execute([$_COOKIE['remember_token']]);
+                        $userId = (int) ($stU->fetchColumn() ?: 0);
+                    } catch (\Throwable $e) {}
+                }
 
-                // Buscar carrinho com itens — mesma lógica do CarrinhoController
                 $cartId = 0;
+
+                // 1. Buscar por usuario_id
                 if ($userId > 0) {
-                    $st = $this->pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 10');
+                    $st = $this->pdo->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY updated_at DESC LIMIT 10');
                     $st->execute([$userId]);
                     $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
                     foreach ($ids as $cid) {
@@ -277,14 +286,13 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                         $stCnt->execute([(int)$cid]);
                         if ((int)$stCnt->fetchColumn() > 0) { $cartId = (int)$cid; break; }
                     }
-                    if ($cartId <= 0 && !empty($ids)) $cartId = (int)$ids[0];
                 }
 
-                // Fallback: session_id (guest)
+                // 2. Fallback: session_id
                 if ($cartId <= 0) {
                     $sessionId = session_id() ?: null;
                     if ($sessionId) {
-                        $st = $this->pdo->prepare('SELECT id FROM carrinhos WHERE session_id = ? ORDER BY created_at DESC LIMIT 10');
+                        $st = $this->pdo->prepare('SELECT id FROM carrinhos WHERE session_id = ? ORDER BY updated_at DESC LIMIT 10');
                         $st->execute([$sessionId]);
                         $ids = $st->fetchAll(\PDO::FETCH_COLUMN) ?: [];
                         foreach ($ids as $cid) {
@@ -293,6 +301,13 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                             if ((int)$stCnt->fetchColumn() > 0) { $cartId = (int)$cid; break; }
                         }
                     }
+                }
+
+                // 3. Último fallback: se usuario_id > 0 mas não encontrou, buscar o carrinho mais recente com itens desse user (sem filtro de session)
+                if ($cartId <= 0 && $userId > 0) {
+                    $st = $this->pdo->prepare("SELECT c.id FROM carrinhos c INNER JOIN carrinho_items ci ON ci.carrinho_id = c.id WHERE c.usuario_id = ? GROUP BY c.id ORDER BY c.updated_at DESC LIMIT 1");
+                    $st->execute([$userId]);
+                    $cartId = (int)($st->fetchColumn() ?: 0);
                 }
 
                 if ($cartId > 0) {
@@ -311,6 +326,8 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                         $contexto['carrinho_subtotal_usd'] = $subUsd;
                         $contexto['carrinho_total_itens'] = array_sum(array_column($itensDb, 'quantidade'));
                     }
+                } else {
+                    error_log('[CoPiloto] home_ia carrinho: userId=' . $userId . ', sessionId=' . ($sessionId ?? 'null') . ', cartId=0 (não encontrado)');
                 }
             } catch (\Throwable $e) {
                 error_log('[CoPiloto] Erro buscando carrinho home_ia: ' . $e->getMessage());
