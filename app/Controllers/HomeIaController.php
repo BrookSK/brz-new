@@ -5,49 +5,39 @@ use App\Core\Request;
 
 class HomeIaController extends Controller {
     public function index(Request $request) {
-        // Garantir sessão ativa e usuário identificado
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        // Se usuario_id não está na sessão, tentar identificar de todas as formas
-        if (empty($_SESSION['usuario_id'])) {
-            try {
-                $auth = new \App\Services\AuthService();
-                $u = $auth->getUsuarioLogado();
-                if (!empty($u['id'])) {
-                    $_SESSION['usuario_id'] = (int) $u['id'];
-                }
-            } catch (\Throwable $e) {}
-        }
-        // Fallback: remember_token
-        if (empty($_SESSION['usuario_id']) && !empty($_COOKIE['remember_token'])) {
+        
+        // Verificar se está logado (mesma lógica do AuthService)
+        $logado = (isset($_SESSION['logado']) && $_SESSION['logado'] === true && !empty($_SESSION['usuario_id']));
+        
+        // Se não está logado, tentar via remember_token
+        if (!$logado && !empty($_COOKIE['remember_token'])) {
             try {
                 $pdo = \Config\Database::getConnection();
-                $st = $pdo->prepare("SELECT id FROM usuarios WHERE remember_token = ? LIMIT 1");
+                $st = $pdo->prepare("SELECT * FROM usuarios WHERE remember_token = ? LIMIT 1");
                 $st->execute([$_COOKIE['remember_token']]);
-                $uid = (int) ($st->fetchColumn() ?: 0);
-                if ($uid > 0) $_SESSION['usuario_id'] = $uid;
-            } catch (\Throwable $e) {}
-        }
-        // Fallback: buscar sessão ativa do mesmo IP com usuario_id
-        if (empty($_SESSION['usuario_id'])) {
-            try {
-                $pdo = \Config\Database::getConnection();
-                $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-                if ($ip) {
-                    // Buscar na tabela de sessões PHP (se existir) ou nos carrinhos recentes
-                    $st = $pdo->prepare("SELECT usuario_id FROM carrinhos WHERE usuario_id > 0 ORDER BY updated_at DESC LIMIT 1");
-                    $st->execute();
-                    // Não usar isso — muito genérico. Melhor: verificar se há sessão ativa no copiloto
-                    $st2 = $pdo->prepare("SELECT usuario_id FROM copiloto_sessoes WHERE ip = ? AND usuario_id > 0 ORDER BY ultima_interacao DESC LIMIT 1");
-                    $st2->execute([$ip]);
-                    $uid = (int) ($st2->fetchColumn() ?: 0);
-                    if ($uid > 0) $_SESSION['usuario_id'] = $uid;
+                $usuario = $st->fetch(\PDO::FETCH_ASSOC);
+                if ($usuario && !empty($usuario['id'])) {
+                    // Recriar sessão completa (mesma lógica do AuthService::criarSessao)
+                    $_SESSION['usuario_id'] = (int) $usuario['id'];
+                    $_SESSION['usuario_nome'] = $usuario['nome'] ?? $usuario['name'] ?? '';
+                    $_SESSION['usuario_email'] = $usuario['email'] ?? '';
+                    $_SESSION['usuario_perfil'] = $usuario['perfil'] ?? $usuario['role'] ?? 'cliente';
+                    $_SESSION['usuario_role'] = $usuario['role'] ?? $usuario['perfil'] ?? 'cliente';
+                    $_SESSION['logado'] = true;
+                    $logado = true;
                 }
             } catch (\Throwable $e) {}
         }
         
-        // Passar usuario_id para o JS via meta tag (para debug)
+        // Se ainda não está logado, redirecionar para login
+        if (!$logado) {
+            header('Location: /login?redirect=/home-ia');
+            exit;
+        }
+        
         $jsUserId = (int) ($_SESSION['usuario_id'] ?? 0);
         include __DIR__ . '/../Views/home_ia.php';
     }
