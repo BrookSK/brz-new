@@ -920,19 +920,83 @@ class ClubeRecargaController extends Controller {
     }
 
     /**
-     * Credita a carteira do usuário (o saldo é calculado dinamicamente pela soma de recargas pagas,
-     * mas aqui podemos adicionar lógica extra como locked_until pra turbo)
+     * Credita a carteira do usuário quando o pagamento é confirmado via polling.
      */
     private function creditarCarteira(\PDO $db, array $row): void {
         try {
             $tipoRecarga = strtolower(trim((string) ($row['tipo_recarga'] ?? 'normal')));
             $recargaId = (int) ($row['id'] ?? 0);
+            $usuarioId = (int) ($row['usuario_id'] ?? 0);
+            $moeda = strtoupper(trim((string) ($row['moeda'] ?? 'USD')));
+            $valor = (float) ($row['valor'] ?? 0);
 
-            // Se é turbo, definir locked_until (90 dias)
-            if ($tipoRecarga === 'turbo' && $recargaId > 0) {
-                $lockedUntil = date('Y-m-d H:i:s', strtotime('+90 days'));
-                $db->prepare("UPDATE carteira_recargas SET locked_until = ? WHERE id = ? AND locked_until IS NULL")
-                    ->execute([$lockedUntil, $recargaId]);
+            if ($recargaId <= 0 || $usuarioId <= 0 || $valor <= 0) {
+                return;
+            }
+            if (!in_array($moeda, ['BRL', 'USD'], true)) {
+                $moeda = 'USD';
+            }
+
+            $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+            $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+            $saldoBloqCol = ($moeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+            $isTurbo = ($tipoRecarga === 'turbo');
+
+            // Garantir que a carteira existe
+            $stChkCart = $db->prepare('SELECT id FROM carteiras WHERE usuario_id = ? LIMIT 1');
+            $stChkCart->execute([$usuarioId]);
+            if (!$stChkCart->fetchColumn()) {
+                $db->prepare('INSERT INTO carteiras (usuario_id, saldo_usd, saldo_brl, saldo_usd_bloqueado, saldo_brl_bloqueado, created_at, updated_at) VALUES (?, 0, 0, 0, 0, NOW(), NOW())')->execute([$usuarioId]);
+            }
+
+            // Verificar se já foi creditado (evitar duplicidade)
+            $stmtChk = $db->prepare("SELECT id FROM transacoes_carteira WHERE usuario_id = :uid AND tipo = 'credito' AND descricao LIKE :desc LIMIT 1");
+            $stmtChk->execute([
+                ':uid' => $usuarioId,
+                ':desc' => '%#' . $recargaId . '%',
+            ]);
+            if ((int) ($stmtChk->fetchColumn() ?: 0) > 0) {
+                return; // Já creditado
+            }
+
+            // Creditar saldo
+            $sqlUpd = 'UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor';
+            if ($isTurbo) {
+                $sqlUpd .= ', ' . $saldoBloqCol . ' = ' . $saldoBloqCol . ' + :valor';
+            }
+            $sqlUpd .= ', updated_at = NOW() WHERE usuario_id = :uid';
+            $stmtUpd = $db->prepare($sqlUpd);
+            $stmtUpd->execute([':valor' => $valor, ':uid' => $usuarioId]);
+
+            // Registrar transação
+            $modalidadeLabel = $isTurbo ? 'Turbo' : 'Normal';
+            $desc = 'Recarga Clube Braziliana — ' . $modalidadeLabel . ' #' . $recargaId;
+            $txCols = 'usuario_id, tipo, ' . $valorCol . ', descricao, created_at';
+            $txVals = ':uid, \'credito\', :valor, :desc, NOW()';
+            $txParams = [':uid' => $usuarioId, ':valor' => $valor, ':desc' => $desc];
+
+            try {
+                $colsList = [];
+                $stCols = $db->query('DESCRIBE transacoes_carteira');
+                $colsList = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (in_array('modalidade', $colsList, true)) {
+                    $txCols .= ', modalidade';
+                    $txVals .= ', :modalidade';
+                    $txParams[':modalidade'] = $tipoRecarga;
+                }
+                if (in_array('recarga_id', $colsList, true)) {
+                    $txCols .= ', recarga_id';
+                    $txVals .= ', :recarga_id';
+                    $txParams[':recarga_id'] = $recargaId;
+                }
+            } catch (\Exception $e) {}
+
+            $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (' . $txCols . ') VALUES (' . $txVals . ')');
+            $stmtTx->execute($txParams);
+
+            // Se é turbo, definir locked_until (6 meses)
+            if ($isTurbo) {
+                $db->prepare("UPDATE carteira_recargas SET locked_until = COALESCE(locked_until, DATE_ADD(NOW(), INTERVAL 6 MONTH)), updated_at = NOW() WHERE id = ?")->execute([$recargaId]);
             }
         } catch (\Exception $e) {
             error_log('[ClubeRecarga] Erro ao creditar carteira: ' . $e->getMessage());

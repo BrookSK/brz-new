@@ -2702,6 +2702,12 @@ class PaymentService {
         }
 
         $this->atualizarSplitPorGatewayPaymentId($token, 'cambioreal', $internal, $statusNorm);
+
+        // Tentar creditar carteira (recarga do Clube) se pagamento aprovado
+        if ($internal === 'approved') {
+            $this->tentarCreditarCarteiraPorRecarga('cambioreal', $token, $internal, $statusNorm);
+        }
+
         if ($metodoNorm !== '') {
             try {
                 $this->garantirTabelaPedidoPagamentos();
