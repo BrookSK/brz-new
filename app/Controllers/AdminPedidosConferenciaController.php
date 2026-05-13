@@ -518,11 +518,16 @@ HTML;
         // === ASSESSORIAS COM FALHA ===
         $assessoriasFalhas = [];
         try {
+            // Buscar assessorias que têm erros registrados (erros_json não vazio e não null)
+            // OU que foram processadas mas não geraram produtos
             $sqlAss = "SELECT ao.id, ao.usuario_id, ao.status, ao.links_json, ao.erros_json, ao.created_at, ao.public_token,
-                       u.nome AS cliente_nome, u.email AS cliente_email, u.telefone AS cliente_telefone
+                       COALESCE(u.nome, u.name, '') AS cliente_nome, u.email AS cliente_email, 
+                       COALESCE(u.telefone, u.phone, '') AS cliente_telefone
                        FROM assessoria_orcamentos ao
                        LEFT JOIN usuarios u ON u.id = ao.usuario_id
-                       WHERE ao.status IN ('erro','falha','failed')
+                       WHERE (ao.erros_json IS NOT NULL AND ao.erros_json != '[]' AND ao.erros_json != 'null' AND ao.erros_json != '' AND ao.erros_json != 'NULL')
+                       AND (ao.produtos_json IS NULL OR ao.produtos_json = '[]' OR ao.produtos_json = '' OR ao.produtos_json = 'null')
+                       AND ao.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
                        ORDER BY ao.created_at DESC LIMIT 50";
             $stAss = $this->connection->query($sqlAss);
             $assessoriasFalhas = $stAss ? ($stAss->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];

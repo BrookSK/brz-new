@@ -330,7 +330,7 @@ function renderAdminSidebar($activePage = '') {
     // Contar assessorias com falha
     try {
         $pdo = \Config\Database::getConnection();
-        $stAss = $pdo->query("SELECT COUNT(*) FROM assessoria_orcamentos WHERE status IN ('erro','falha','failed')");
+        $stAss = $pdo->query("SELECT COUNT(*) FROM assessoria_orcamentos WHERE (erros_json IS NOT NULL AND erros_json != '[]' AND erros_json != 'null' AND erros_json != '' AND erros_json != 'NULL') AND (produtos_json IS NULL OR produtos_json = '[]' OR produtos_json = '' OR produtos_json = 'null') AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)");
         $assessoriasFalhasCount = (int) ($stAss ? ($stAss->fetchColumn() ?: 0) : 0);
     } catch (\Exception $e) {
         $assessoriasFalhasCount = 0;
