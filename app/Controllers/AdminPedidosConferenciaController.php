@@ -518,20 +518,28 @@ HTML;
         // === ASSESSORIAS COM FALHA ===
         $assessoriasFalhas = [];
         try {
-            // Buscar assessorias que têm erros registrados (erros_json não vazio e não null)
-            // OU que foram processadas mas não geraram produtos
-            $sqlAss = "SELECT ao.id, ao.usuario_id, ao.status, ao.links_json, ao.erros_json, ao.created_at, ao.public_token,
-                       COALESCE(u.nome, u.name, '') AS cliente_nome, u.email AS cliente_email, 
-                       COALESCE(u.telefone, u.phone, '') AS cliente_telefone
-                       FROM assessoria_orcamentos ao
-                       LEFT JOIN usuarios u ON u.id = ao.usuario_id
-                       WHERE (ao.erros_json IS NOT NULL AND ao.erros_json != '[]' AND ao.erros_json != 'null' AND ao.erros_json != '' AND ao.erros_json != 'NULL')
-                       AND (ao.produtos_json IS NULL OR ao.produtos_json = '[]' OR ao.produtos_json = '' OR ao.produtos_json = 'null')
-                       AND ao.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-                       ORDER BY ao.created_at DESC LIMIT 50";
-            $stAss = $this->connection->query($sqlAss);
-            $assessoriasFalhas = $stAss ? ($stAss->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            // Primeiro verificar se a tabela existe
+            $stCheck = $this->connection->query("SHOW TABLES LIKE 'assessoria_orcamentos'");
+            if ($stCheck && $stCheck->fetchColumn()) {
+                // Verificar colunas disponíveis na tabela usuarios
+                $colsU = [];
+                try { $stC = $this->connection->query('DESCRIBE usuarios'); $colsU = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Throwable $e) { $colsU = []; }
+                $nomeCol = in_array('nome', $colsU) ? 'u.nome' : (in_array('name', $colsU) ? 'u.name' : "''"  );
+                $telCol = in_array('telefone', $colsU) ? 'u.telefone' : (in_array('phone', $colsU) ? 'u.phone' : "''");
+
+                $sqlAss = "SELECT ao.id, ao.usuario_id, ao.status, ao.links_json, ao.erros_json, ao.created_at, ao.public_token,
+                           {$nomeCol} AS cliente_nome, u.email AS cliente_email, {$telCol} AS cliente_telefone
+                           FROM assessoria_orcamentos ao
+                           LEFT JOIN usuarios u ON u.id = ao.usuario_id
+                           WHERE (ao.erros_json IS NOT NULL AND ao.erros_json != '[]' AND ao.erros_json != 'null' AND ao.erros_json != '' AND LENGTH(ao.erros_json) > 5)
+                           AND (ao.produtos_json IS NULL OR ao.produtos_json = '[]' OR ao.produtos_json = '' OR ao.produtos_json = 'null' OR ao.produtos_json = 'NULL')
+                           AND ao.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+                           ORDER BY ao.created_at DESC LIMIT 50";
+                $stAss = $this->connection->query($sqlAss);
+                $assessoriasFalhas = $stAss ? ($stAss->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
         } catch (\Throwable $e) {
+            error_log('[CONFERENCIA] Erro buscando assessorias falhas: ' . $e->getMessage());
             $assessoriasFalhas = [];
         }
 
