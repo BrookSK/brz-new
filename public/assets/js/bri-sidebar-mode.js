@@ -159,14 +159,76 @@ const BriSidebar = (() => {
     input.value = '';
     input.style.height = 'auto';
 
-    // Navegação direta por comando do usuário (sem esperar resposta da IA)
+    // === MODO NAVEGAÇÃO RÁPIDA ===
+    // Detectar intenção do usuário e navegar diretamente sem esperar a IA
     const msgLower = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (msgLower.match(/^(me mostr[ea]|abre?|abra|mostr[ea]|ver|veja|vai pro|vai para o|leva pro|leva para o|ir para o|ir pro)\s*(meu\s+)?carrinho/)) {
+    
+    // Carrinho
+    if (msgLower.match(/carrinho|meu carrinho|ver carrinho|cart/)) {
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Ok, vamos lá! 🛒', time: getTime() });
+      salvarHistorico(); renderMensagens();
       navigatePainel('/carrinho?embed=1');
-    } else if (msgLower.match(/^(me lev[ea]|vai|ir|leva|abr[ea])\s*(pro|para o|para)\s*checkout/)) {
+      return;
+    }
+    // Checkout / Finalizar
+    if (msgLower.match(/checkout|finalizar compra|pagar|fechar pedido/)) {
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Te levo pro checkout! 🔒', time: getTime() });
+      salvarHistorico(); renderMensagens();
       navigatePainel('/carrinho/checkout?embed=1');
+      return;
+    }
+    // Produtos / Home
+    if (msgLower.match(/^(produtos|catalogo|ver produtos|home|inicio)$/)) {
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Aqui estão os produtos! 🛍️', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/produtos?embed=1');
+      return;
+    }
+    // Grupos de compras
+    if (msgLower.match(/grupos|grupos de compras/)) {
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Aqui estão os grupos disponíveis!', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/grupos-compras?embed=1');
+      return;
+    }
+    // Minha conta / Pedidos
+    if (msgLower.match(/minha conta|meus pedidos|pedidos|meu perfil/)) {
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Abrindo sua conta!', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/minha-conta?embed=1');
+      return;
+    }
+    // Clube
+    if (msgLower.match(/clube|recarga|saldo/)) {
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Vamos pro Clube! 💎', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/clube/recarga?embed=1');
+      return;
+    }
+    // Busca de produto específico
+    if (msgLower.match(/^(tem |busca |procura |quero |me mostr[ea] |encontr[ea] )/) || 
+        msgLower.match(/pipoca|popcorn|tineco|dyson|esponja|sabonete|shampoo|vitamina|chocolate/)) {
+      // Extrair termo de busca
+      let searchTerm = msg.replace(/^(tem |busca |procura |quero |me mostre |me mostra |encontre |encontra )/i, '').replace(/\?/g, '').trim();
+      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','café':'coffee',biscoito:'cookie'};
+      const termLower = searchTerm.toLowerCase();
+      for (const [pt, en] of Object.entries(traducoes)) {
+        if (termLower.includes(pt)) { searchTerm = en; break; }
+      }
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Buscando pra você! 🔍', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
+      return;
     }
 
+    // === Para tudo que não é navegação direta, enviar à IA normalmente ===
     historico.push({ role: 'user', content: msg, time: getTime() });
     renderMensagens();
 
