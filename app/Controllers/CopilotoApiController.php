@@ -181,7 +181,26 @@ class CopilotoApiController extends Controller {
                     $userId = (int) ($stUser->fetchColumn() ?: 0);
                 } catch (\Exception $e) {}
             }
+            // Fallback: buscar usuario_id pelo session_id nos carrinhos existentes
             $sessionId = session_id() ?: null;
+            if ($userId <= 0 && $sessionId) {
+                try {
+                    $stU = $pdo->prepare("SELECT usuario_id FROM carrinhos WHERE session_id = ? AND usuario_id > 0 ORDER BY updated_at DESC LIMIT 1");
+                    $stU->execute([$sessionId]);
+                    $userId = (int) ($stU->fetchColumn() ?: 0);
+                } catch (\Exception $e) {}
+            }
+            // Fallback: buscar pelo IP nas sessões do copiloto
+            if ($userId <= 0) {
+                try {
+                    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+                    if ($ip) {
+                        $stU = $pdo->prepare("SELECT usuario_id FROM copiloto_sessoes WHERE ip = ? AND usuario_id IS NOT NULL AND usuario_id > 0 ORDER BY ultima_interacao DESC LIMIT 1");
+                        $stU->execute([$ip]);
+                        $userId = (int) ($stU->fetchColumn() ?: 0);
+                    }
+                } catch (\Exception $e) {}
+            }
             if ($userId <= 0 && !$sessionId) {
                 $this->responderJson(['error' => 'Não logado', 'debug_session_keys' => array_keys($_SESSION ?? [])], 401);
             }
