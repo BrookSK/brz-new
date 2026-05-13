@@ -40,7 +40,18 @@ class QuickBooksService
     }
     public function renovarToken(): bool {
         $t=$this->getToken(); if(!$t)return false;
-        try { $r=$this->httpPost(self::TOKEN_URL,["grant_type"=>"refresh_token","refresh_token"=>$t["refresh_token"]],$this->getBasicAuthHeader()); if(isset($r["error"]))return false; $this->salvarToken($t["realm_id"],$r); return true; } catch(\Throwable $e){return false;}
+        try {
+            $r=$this->httpPost(self::TOKEN_URL,["grant_type"=>"refresh_token","refresh_token"=>$t["refresh_token"]],$this->getBasicAuthHeader());
+            if(isset($r["error"])){
+                error_log('[QUICKBOOKS] Erro ao renovar token: ' . json_encode($r));
+                return false;
+            }
+            $this->salvarToken($t["realm_id"],$r);
+            return true;
+        } catch(\Throwable $e){
+            error_log('[QUICKBOOKS] Exception ao renovar token: ' . $e->getMessage());
+            return false;
+        }
     }
     public function revogarToken(): bool {
         $t=$this->getToken(); if(!$t)return false;
@@ -51,7 +62,17 @@ class QuickBooksService
         $re=date("Y-m-d H:i:s",time()+(int)($d["x_refresh_token_expires_in"]??8726400));
         $this->pdo->prepare("INSERT INTO quickbooks_tokens(realm_id,access_token,refresh_token,access_token_expires_at,refresh_token_expires_at,ambiente) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE access_token=VALUES(access_token),refresh_token=VALUES(refresh_token),access_token_expires_at=VALUES(access_token_expires_at),refresh_token_expires_at=VALUES(refresh_token_expires_at),ambiente=VALUES(ambiente),atualizado_em=NOW()")->execute([$realmId,$d["access_token"],$d["refresh_token"],$ae,$re,$this->ambiente]);
     }
-    public function getToken(): ?array { $s=$this->pdo->query("SELECT * FROM quickbooks_tokens ORDER BY atualizado_em DESC LIMIT 1"); $t=$s?$s->fetch(\PDO::FETCH_ASSOC):null; return $t?:null; }
+    public function getToken(): ?array {
+        // Buscar token do ambiente atual primeiro
+        $s=$this->pdo->prepare("SELECT * FROM quickbooks_tokens WHERE ambiente = ? ORDER BY atualizado_em DESC LIMIT 1");
+        $s->execute([$this->ambiente]);
+        $t=$s->fetch(\PDO::FETCH_ASSOC);
+        if ($t) return $t;
+        // Fallback: qualquer token (compatibilidade)
+        $s2=$this->pdo->query("SELECT * FROM quickbooks_tokens ORDER BY atualizado_em DESC LIMIT 1");
+        $t2=$s2?$s2->fetch(\PDO::FETCH_ASSOC):null;
+        return $t2?:null;
+    }
     private function getAccessToken(): string {
         $t=$this->getToken(); if(!$t)throw new \RuntimeException("QuickBooks nao conectado.");
         if(strtotime($t["access_token_expires_at"])<(time()+300)){if(!$this->renovarToken())throw new \RuntimeException("Nao foi possivel renovar token."); $t=$this->getToken();}
