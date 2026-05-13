@@ -99,7 +99,13 @@ const BriSidebar = (() => {
       body: JSON.stringify({
         mensagem: msg,
         historico: historico.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10),
-        contexto: { pagina: 'home_ia', url_atual: '/home-ia' }
+        contexto: {
+          pagina: 'home_ia',
+          url_atual: '/home-ia',
+          usuario_logado: document.cookie.indexOf('PHPSESSID') !== -1,
+          moeda_atual: 'USD',
+          iframe_url: frame ? frame.src : ''
+        }
       })
     })
     .then(r => {
@@ -140,8 +146,58 @@ const BriSidebar = (() => {
     if (!tipo || tipo === 'nenhuma') return;
 
     const p = parametros || {};
+
+    // Ações silenciosas — executar via API sem mudar o iframe
+    const acoesSilenciosas = {
+      adicionar_carrinho: () => {
+        const prodId = p.produto_id || p.id;
+        if (!prodId) return;
+        fetch('/api/copiloto/addcart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ produto_id: prodId, quantidade: p.quantidade || 1 })
+        }).then(r => r.json()).then(d => {
+          if (d.success) {
+            // Atualizar iframe se estiver no carrinho
+            if (frame.src && frame.src.includes('/carrinho')) {
+              frame.src = frame.src; // reload
+            }
+          }
+        }).catch(() => {});
+      },
+      limpar_carrinho: () => {
+        fetch('/api/copiloto/clearcart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }).then(r => r.json()).then(d => {
+          if (d.success && frame.src && frame.src.includes('/carrinho')) {
+            frame.src = frame.src;
+          }
+        }).catch(() => {});
+      },
+      criar_ticket_suporte: () => {
+        fetch('/api/copiloto/ticket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assunto: p.assunto || 'Suporte via BRI', mensagem: p.mensagem || '' })
+        }).catch(() => {});
+      },
+      trocar_moeda_brl: () => { /* handled by currency converter */ },
+      trocar_moeda_usd: () => { /* handled by currency converter */ },
+      abrir_whatsapp_vendas: () => {
+        const whatsapp = '5517996203062';
+        window.open('https://wa.me/' + whatsapp + (p.mensagem ? '?text=' + encodeURIComponent(p.mensagem) : ''), '_blank');
+      }
+    };
+
+    if (acoesSilenciosas[tipo]) {
+      acoesSilenciosas[tipo]();
+      return;
+    }
+
+    // Ações de navegação — mudar o iframe
     const rotas = {
-      buscar_produto: () => '/produtos?busca=' + encodeURIComponent(p.termo || p.busca || '') + '&embed=1',
+      buscar_produto: () => '/produtos?search=' + encodeURIComponent(p.termo || p.busca || '') + '&embed=1',
       ir_para_carrinho: () => '/carrinho?embed=1',
       ir_para_checkout: () => '/carrinho/checkout?embed=1',
       ir_para_grupo: () => '/grupo/' + (p.slug || '') + '?embed=1',
@@ -160,7 +216,7 @@ const BriSidebar = (() => {
       navegar: () => {
         let url = p.url || p.pagina || '/';
         if (url.indexOf('/') !== 0) url = '/' + url;
-        if (url.match(/^\/admin/i)) return null; // Bloquear admin
+        if (url.match(/^\/admin/i)) return null;
         return url + (url.includes('?') ? '&' : '?') + 'embed=1';
       }
     };
@@ -191,6 +247,12 @@ const BriSidebar = (() => {
   renderMensagens();
 
   // Expor para uso externo
-  return { handleAcao, fecharPainel, navigatePainel };
+  function limparChat() {
+    historico = [];
+    try { sessionStorage.removeItem('bri_sidebar_hist'); } catch(e) {}
+    renderMensagens();
+  }
+
+  return { handleAcao, fecharPainel, navigatePainel, limparChat };
 
 })();

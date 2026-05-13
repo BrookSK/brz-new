@@ -27,6 +27,9 @@
       <a href="/" class="bri-icon-btn" title="Voltar ao site">
         <i class="bi bi-box-arrow-left"></i>
       </a>
+      <button class="bri-icon-btn" title="Limpar conversa" onclick="BriSidebar.limparChat()">
+        <i class="bi bi-trash3"></i>
+      </button>
     </header>
 
     <div id="bri-mensagens">
