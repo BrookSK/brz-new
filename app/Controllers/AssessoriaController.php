@@ -1525,6 +1525,19 @@ class AssessoriaController extends Controller {
         $job['status'] = 'done';
         $job['finished_at'] = date('Y-m-d H:i:s');
         $this->writeJobFile($jobId, $job);
+
+        // Persistir erros no banco imediatamente (não depender do polling do frontend)
+        try {
+            $db = \Config\Database::getConnection();
+            $erros = is_array($job['erros'] ?? null) ? $job['erros'] : [];
+            $produtos = is_array($job['produtos'] ?? null) ? $job['produtos'] : [];
+            if (!empty($erros)) {
+                $st = $db->prepare("UPDATE assessoria_orcamentos SET erros_json = ?, produtos_json = ?, last_processed_at = NOW(), updated_at = NOW() WHERE job_id = ?");
+                $st->execute([json_encode($erros), json_encode($produtos), $jobId]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[ASSESSORIA] Erro persistindo erros no banco: ' . $e->getMessage());
+        }
     }
 
     public function processarJobPorId(string $jobId): void {
