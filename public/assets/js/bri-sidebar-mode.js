@@ -209,7 +209,7 @@ const BriSidebar = (() => {
 
     if (palavras.length <= 5 && !msgLower.match(/^(oi|ola|obrigad|como|porque|quando|onde|quem|ajuda|help)(\s|$)/) && !msgLower.match(/grupo|carrinho|checkout|pedido|conta|endereco|ticket/)) {
       // Se não é uma pergunta/saudação, tratar como busca de produto
-      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby','bebê':'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',loção:'lotion'};
+      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',menta:'mint',hortela:'mint',morango:'strawberry',limao:'lemon',laranja:'orange',lavanda:'lavender',canela:'cinnamon',baunilha:'vanilla',coco:'coconut',mel:'honey',manteiga:'butter',leite:'milk',aveia:'oat',amendoim:'peanut',cereal:'cereal',tempero:'seasoning',molho:'sauce',azeite:'olive oil',lenco:'tissue',papel:'paper',protetor:'sunscreen',desodorante:'deodorant',shampoo:'shampoo',condicionador:'conditioner',escova:'brush',secador:'dryer',maquiagem:'makeup',batom:'lipstick',hidratante:'moisturizer',proteina:'protein',whey:'whey',creatina:'creatine',melatonina:'melatonin',probiotico:'probiotic',colageno:'collagen'};
       // Limpar artigos, preposições e pontuação
       let searchTerm = msg.trim().replace(/^(o|a|os|as|um|uma|uns|umas|do|da|dos|das|de|no|na|nos|nas|pro|pra|para|esse|essa|aquele|aquela|me\s+mostr[ea]|quero|quero\s+comprar|tem|busca|procura|buscar|procurar|comprar)\s+/gi, '').replace(/[?!.,;:]+$/g, '').trim();
       // Remover artigos internos também
@@ -234,8 +234,52 @@ const BriSidebar = (() => {
             iframeDoc.querySelectorAll('.product-card, .card').length === 0
           );
           if (noResults) {
-            historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" no nosso catálogo atual. 😕\n\nMas você pode comprar de qualquer loja dos EUA! Basta usar nossa Assessoria:\n\n1. Diga "assessoria" para abrir a página\n2. Cole o link do produto (Amazon, Walmart, etc.)\n3. Geramos o orçamento completo com frete e impostos!\n\nQuer que eu abra a assessoria pra você?', time: getTime() });
+            // Tentar tradução para inglês via IA se o termo não foi traduzido pelo mapa
+            historico.push({ role: 'assistant', content: 'Hmm, deixa eu tentar de outra forma... 🔍', time: getTime() });
             salvarHistorico(); renderMensagens();
+            
+            // Chamar IA para traduzir o termo para inglês
+            fetch('/api/copiloto/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                mensagem: 'Traduza para inglês o termo de produto: "' + msg + '". Responda APENAS com a tradução em inglês, uma única palavra ou frase curta, sem explicação. Se já está em inglês, repita o termo.',
+                historico: [],
+                contexto: { pagina: 'home_ia_translate', url_atual: '/home-ia' }
+              })
+            })
+            .then(r => r.json())
+            .then(data => {
+              const traducao = (data.resposta || '').trim().replace(/["""'']/g, '').replace(/\.$/, '').trim().toLowerCase();
+              if (traducao && traducao.length > 1 && traducao.length < 50 && traducao !== searchTerm.toLowerCase()) {
+                historico.push({ role: 'assistant', content: 'Buscando por "' + traducao + '"... 🔍', time: getTime() });
+                salvarHistorico(); renderMensagens();
+                navigatePainel('/produtos?search=' + encodeURIComponent(traducao) + '&ver_todos=1&embed=1');
+                // Verificar se encontrou após 3s
+                setTimeout(() => {
+                  try {
+                    const iDoc3 = frame.contentDocument || frame.contentWindow.document;
+                    const still404 = iDoc3 && (
+                      iDoc3.querySelector('.text-muted')?.textContent?.includes('No products') ||
+                      iDoc3.querySelector('.text-muted')?.textContent?.includes('Nenhum produto') ||
+                      iDoc3.querySelectorAll('.product-card, .card').length === 0
+                    );
+                    if (still404) {
+                      historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" no catálogo. 😕\n\nMas você pode comprar de qualquer loja dos EUA via Assessoria! Diga "assessoria" para abrir.', time: getTime() });
+                      salvarHistorico(); renderMensagens();
+                    }
+                  } catch(e) {}
+                }, 3000);
+              } else {
+                historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" no nosso catálogo. 😕\n\nMas você pode comprar de qualquer loja dos EUA! Diga "assessoria" para usar nossa compra por link.', time: getTime() });
+                salvarHistorico(); renderMensagens();
+              }
+            })
+            .catch(() => {
+              historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" no catálogo. Diga "assessoria" para comprar de qualquer loja dos EUA!', time: getTime() });
+              salvarHistorico(); renderMensagens();
+            });
           }
         } catch(e) { /* cross-origin or timing issue */ }
       }, 3000);
