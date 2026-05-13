@@ -252,8 +252,8 @@ class AdminQuickBooksController extends Controller {
                     $qb->criarInvoiceDePedido($pedido, $itens, $pedido);
                     $resultados['sucesso']++;
 
-                    // Pequena pausa para não sobrecarregar a API do QB
-                    usleep(200000); // 200ms
+                    // Pausa para não sobrecarregar a API do QB (rate limit: ~500 req/min em produção)
+                    usleep(500000); // 500ms
                 } catch (\Throwable $e) {
                     $resultados['erros'][] = '#' . $pedidoId . ': ' . $e->getMessage();
                     error_log('[QB_LOTE] Erro pedido #' . $pedidoId . ': ' . $e->getMessage());

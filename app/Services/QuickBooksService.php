@@ -463,6 +463,46 @@ class QuickBooksService
     private function apiGet(string $ep): array { $url=$this->getBaseUrl()."/".$this->getRealmId().$ep."?minorversion=65"; return $this->httpGet($url,["Authorization: Bearer ".$this->getAccessToken(),"Accept: application/json"]); }
     private function apiPost(string $ep,array $pl): array { $sep=strpos($ep,'?')!==false?'&':'?'; $url=$this->getBaseUrl()."/".$this->getRealmId().$ep.$sep."minorversion=65"; return $this->httpPost($url,$pl,null,["Authorization: Bearer ".$this->getAccessToken(),"Content-Type: application/json","Accept: application/json"],true); }
     private function apiQuery(string $q): array { $url=$this->getBaseUrl()."/".$this->getRealmId()."/query?query=".urlencode($q)."&minorversion=65"; return $this->httpGet($url,["Authorization: Bearer ".$this->getAccessToken(),"Accept: application/json"]); }
-    private function httpGet(string $url,array $h=[]): array { $ch=curl_init($url); curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>$h,CURLOPT_TIMEOUT=>30,CURLOPT_SSL_VERIFYPEER=>true]); $b=curl_exec($ch); $c=curl_getinfo($ch,CURLINFO_HTTP_CODE); $er=curl_error($ch); curl_close($ch); if($er)throw new \RuntimeException("cURL: ".$er); if($c>=400)throw new \RuntimeException("QB API ".$c.": ".$b); return json_decode((string)$b,true)?:[]; }
-    private function httpPost(string $url,array $d,?string $ah=null,array $eh=[],bool $jb=false): array { $h=$eh; if($ah)$h[]="Authorization: ".$ah; $ch=curl_init($url); curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$jb?json_encode($d):http_build_query($d),CURLOPT_HTTPHEADER=>$h,CURLOPT_TIMEOUT=>30,CURLOPT_SSL_VERIFYPEER=>true]); $b=curl_exec($ch); $c=curl_getinfo($ch,CURLINFO_HTTP_CODE); $er=curl_error($ch); curl_close($ch); if($er)throw new \RuntimeException("cURL: ".$er); if($c>=400)throw new \RuntimeException("QB API ".$c.": ".$b); return json_decode((string)$b,true)?:[]; }
+    private function httpGet(string $url,array $h=[]): array {
+        $ch=curl_init($url);
+        curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>$h,CURLOPT_TIMEOUT=>30,CURLOPT_SSL_VERIFYPEER=>true]);
+        $b=curl_exec($ch);
+        $c=curl_getinfo($ch,CURLINFO_HTTP_CODE);
+        $er=curl_error($ch);
+        curl_close($ch);
+        if($er)throw new \RuntimeException("cURL: ".$er);
+        if($c>=400){
+            $decoded=json_decode((string)$b,true);
+            if(is_array($decoded)){throw new \RuntimeException("QB API ".$c.": ".json_encode($decoded));}
+            throw new \RuntimeException("QB API ".$c.": ".substr((string)$b,0,300));
+        }
+        $decoded=json_decode((string)$b,true);
+        if(!is_array($decoded)){
+            throw new \RuntimeException("QB API: resposta não-JSON (HTTP ".$c."): ".substr((string)$b,0,200));
+        }
+        return $decoded;
+    }
+    private function httpPost(string $url,array $d,?string $ah=null,array $eh=[],bool $jb=false): array {
+        $h=$eh;
+        if($ah)$h[]="Authorization: ".$ah;
+        $ch=curl_init($url);
+        curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$jb?json_encode($d):http_build_query($d),CURLOPT_HTTPHEADER=>$h,CURLOPT_TIMEOUT=>30,CURLOPT_SSL_VERIFYPEER=>true]);
+        $b=curl_exec($ch);
+        $c=curl_getinfo($ch,CURLINFO_HTTP_CODE);
+        $er=curl_error($ch);
+        curl_close($ch);
+        if($er)throw new \RuntimeException("cURL: ".$er);
+        if($c>=400){
+            $decoded=json_decode((string)$b,true);
+            if(is_array($decoded)){throw new \RuntimeException("QB API ".$c.": ".json_encode($decoded));}
+            throw new \RuntimeException("QB API ".$c.": ".substr((string)$b,0,300));
+        }
+        $decoded=json_decode((string)$b,true);
+        if(!is_array($decoded)){
+            // Token endpoint pode retornar vazio em sucesso (204)
+            if($c>=200 && $c<300 && trim((string)$b)===''){return [];}
+            throw new \RuntimeException("QB API: resposta não-JSON (HTTP ".$c."): ".substr((string)$b,0,200));
+        }
+        return $decoded;
+    }
 }
