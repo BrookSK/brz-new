@@ -2476,8 +2476,9 @@ JS;
                 </form>
                 
                 <!-- Abas de Pedidos por Moeda -->
-                <div class="mb-3">
-                    <!-- Mobile: Dropdown -->
+                <div class="mb-3">';
+                    $isCarneFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'carne');
+                    echo '<!-- Mobile: Dropdown -->
                     <div class="d-md-none mb-2">
                         <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
                             <option value="todos" ' . ($isCarneFiltro ? '' : 'selected') . '>Todos os Pedidos</option>
@@ -2488,7 +2489,6 @@ JS;
                     </div>
                     <!-- Desktop: Pills -->
                     <ul class="nav nav-pills d-none d-md-flex" id="pedidosTabs" role="tablist">';
-                    $isCarneFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'carne');
                     echo '
                         <li class="nav-item" role="presentation">';
                     if ($isCarneFiltro) {
