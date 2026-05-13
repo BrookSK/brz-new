@@ -1171,7 +1171,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <?php endif; /* embed */ ?>
 
     <!-- Floating Cart (Mobile) -->
-    <?php if ($totalItens > 0 && empty($_GET['embed'])): ?>
+    <?php if (($totalItens ?? 0) > 0 && empty($_GET['embed'])): ?>
     <div class="floating-cart d-lg-none">
         <a href="/carrinho" class="text-decoration-none">
             <button>
