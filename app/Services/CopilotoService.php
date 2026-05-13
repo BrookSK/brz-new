@@ -258,6 +258,10 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                 
                 // Pegar usuario_id de todas as formas possíveis
                 $userId = (int) ($_SESSION['usuario_id'] ?? $_SESSION['user_id'] ?? $_SESSION['logado_id'] ?? 0);
+                // Fallback: usuario_id enviado pelo frontend (meta tag)
+                if ($userId <= 0 && !empty($contexto['usuario_id_meta'])) {
+                    $userId = (int) $contexto['usuario_id_meta'];
+                }
                 if ($userId <= 0) {
                     try {
                         $authSvc = new \App\Services\AuthService();

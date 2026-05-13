@@ -9,7 +9,7 @@ class HomeIaController extends Controller {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        // Se usuario_id não está na sessão, tentar identificar
+        // Se usuario_id não está na sessão, tentar identificar de todas as formas
         if (empty($_SESSION['usuario_id'])) {
             try {
                 $auth = new \App\Services\AuthService();
@@ -29,6 +29,26 @@ class HomeIaController extends Controller {
                 if ($uid > 0) $_SESSION['usuario_id'] = $uid;
             } catch (\Throwable $e) {}
         }
+        // Fallback: buscar sessão ativa do mesmo IP com usuario_id
+        if (empty($_SESSION['usuario_id'])) {
+            try {
+                $pdo = \Config\Database::getConnection();
+                $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+                if ($ip) {
+                    // Buscar na tabela de sessões PHP (se existir) ou nos carrinhos recentes
+                    $st = $pdo->prepare("SELECT usuario_id FROM carrinhos WHERE usuario_id > 0 ORDER BY updated_at DESC LIMIT 1");
+                    $st->execute();
+                    // Não usar isso — muito genérico. Melhor: verificar se há sessão ativa no copiloto
+                    $st2 = $pdo->prepare("SELECT usuario_id FROM copiloto_sessoes WHERE ip = ? AND usuario_id > 0 ORDER BY ultima_interacao DESC LIMIT 1");
+                    $st2->execute([$ip]);
+                    $uid = (int) ($st2->fetchColumn() ?: 0);
+                    if ($uid > 0) $_SESSION['usuario_id'] = $uid;
+                }
+            } catch (\Throwable $e) {}
+        }
+        
+        // Passar usuario_id para o JS via meta tag (para debug)
+        $jsUserId = (int) ($_SESSION['usuario_id'] ?? 0);
         include __DIR__ . '/../Views/home_ia.php';
     }
 

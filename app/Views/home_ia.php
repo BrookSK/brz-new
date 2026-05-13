@@ -6,6 +6,7 @@
   <title>BRI IA — Braziliana Shop</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/public/assets/css/bri-sidebar.css">
+  <meta name="bri-user-id" content="<?= (int) ($jsUserId ?? 0) ?>">
 </head>
 <body>
 

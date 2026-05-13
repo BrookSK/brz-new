@@ -237,10 +237,10 @@ const BriSidebar = (() => {
         contexto: {
           pagina: 'home_ia',
           url_atual: '/home-ia',
-          usuario_logado: document.cookie.indexOf('PHPSESSID') !== -1,
+          usuario_logado: !!(document.querySelector('meta[name="bri-user-id"]')?.content > '0'),
+          usuario_id_meta: parseInt(document.querySelector('meta[name="bri-user-id"]')?.content || '0'),
           moeda_atual: 'USD',
           iframe_url: frame ? frame.src : '',
-          // Informar à BRI que o iframe está ativo e pode navegar
           modo_sidebar: true
         }
       })
