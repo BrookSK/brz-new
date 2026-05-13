@@ -2,8 +2,8 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="fas fa-robot me-2"></i>Co-Piloto Braziliana</h2>
-            <p class="text-muted mb-0">Configurações do assistente inteligente do site</p>
+            <h1 class="page-title">Co-Piloto Braziliana</h1>
+            <p class="page-subtitle">Configurações do assistente inteligente do site</p>
         </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="/admin/copiloto/conversas" class="btn btn-outline-dark btn-sm">

@@ -405,3 +405,54 @@ $router->get('/api/me/payment-methods', 'LiveApiController', 'paymentMethods');
 $router->post('/api/me/payment-methods', 'LiveApiController', 'storePaymentMethod');
 $router->post('/api/me/payment-methods/{id}/default', 'LiveApiController', 'setDefaultPaymentMethod');
 $router->post('/api/me/payment-methods/{id}/delete', 'LiveApiController', 'deletePaymentMethod');
+
+// Descrição de Produtos (IA)
+$router->get('/admin/descricao-produtos', 'AdminDescricaoProdutosController', 'index');
+$router->post('/admin/descricao-produtos/gerar', 'AdminDescricaoProdutosController', 'gerarDescricao');
+$router->post('/admin/descricao-produtos/gerar-lote', 'AdminDescricaoProdutosController', 'gerarLote');
+$router->get('/admin/descricao-produtos/revisar/{id}', 'AdminDescricaoProdutosController', 'revisar');
+$router->post('/admin/descricao-produtos/aprovar', 'AdminDescricaoProdutosController', 'aprovar');
+$router->post('/admin/descricao-produtos/reprovar', 'AdminDescricaoProdutosController', 'reprovar');
+$router->post('/admin/descricao-produtos/aprovar-lote', 'AdminDescricaoProdutosController', 'aprovarLote');
+$router->post('/admin/descricao-produtos/reprovar-lote', 'AdminDescricaoProdutosController', 'reprovarLote');
+
+
+// Email Marketing Inteligente
+$router->get('/admin/email-marketing', 'AdminEmailMarketingController', 'index');
+$router->post('/admin/email-marketing/gerar', 'AdminEmailMarketingController', 'gerarCampanhas');
+$router->post('/admin/email-marketing/transcrever', 'AdminEmailMarketingController', 'transcrever');
+$router->get('/admin/email-marketing/buscar-usuarios', 'AdminEmailMarketingController', 'buscarUsuarios');
+$router->get('/admin/email-marketing/buscar-produtos', 'AdminEmailMarketingController', 'buscarProdutos');
+$router->post('/admin/email-marketing/aprovar', 'AdminEmailMarketingController', 'aprovar');
+$router->post('/admin/email-marketing/rejeitar', 'AdminEmailMarketingController', 'rejeitar');
+$router->post('/admin/email-marketing/excluir', 'AdminEmailMarketingController', 'excluir');
+$router->post('/admin/email-marketing/arquivar', 'AdminEmailMarketingController', 'arquivar');
+$router->post('/admin/email-marketing/disparar', 'AdminEmailMarketingController', 'disparar');
+$router->post('/admin/email-marketing/agendar', 'AdminEmailMarketingController', 'agendar');
+$router->post('/admin/email-marketing/gerar-segmentos', 'AdminEmailMarketingController', 'gerarSegmentos');
+$router->post('/admin/email-marketing/excluir-segmento', 'AdminEmailMarketingController', 'excluirSegmento');
+$router->get('/admin/email-marketing/segmento-detalhes', 'AdminEmailMarketingController', 'segmentoDetalhes');
+$router->get('/admin/email-marketing/segmento-clientes', 'AdminEmailMarketingController', 'segmentoClientes');
+$router->post('/admin/email-marketing/segmento-remover-cliente', 'AdminEmailMarketingController', 'segmentoRemoverCliente');
+$router->post('/admin/email-marketing/salvar-segmento', 'AdminEmailMarketingController', 'salvarSegmento');
+$router->get('/admin/email-marketing/detalhes', 'AdminEmailMarketingController', 'detalhes');
+$router->post('/admin/email-marketing/config', 'AdminEmailMarketingController', 'salvarConfig');
+
+
+// Email Tracking (open pixel + click redirect + conversion cron)
+$router->get('/email-track/open/{hash}', 'EmailTrackController', 'open');
+$router->get('/email-track/click/{hash}', 'EmailTrackController', 'click');
+$router->get('/email-track/check-conversions', 'EmailTrackController', 'checkConversions');
+
+
+// Mapa de Calor do Site
+$router->get('/admin/mapa-calor-site', 'AdminMapaCalorSiteController', 'index');
+$router->post('/admin/mapa-calor-site/collect', 'AdminMapaCalorSiteController', 'collect');
+$router->get('/admin/mapa-calor-site/dados-pagina', 'AdminMapaCalorSiteController', 'dadosPagina');
+$router->post('/admin/mapa-calor-site/analise-ia', 'AdminMapaCalorSiteController', 'analiseIA');
+
+
+// Recuperação de Carrinho
+$router->get('/admin/cart-recovery', 'AdminCartRecoveryController', 'index');
+$router->get('/admin/cart-recovery/detalhes', 'AdminCartRecoveryController', 'detalhes');
+$router->post('/admin/cart-recovery/status', 'AdminCartRecoveryController', 'atualizarStatus');

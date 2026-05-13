@@ -31,8 +31,8 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
 <div class="container-fluid py-3">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice-dollar me-2"></i>Gestão de Carnês</h4>
-            <p class="text-muted small mb-0 d-none d-md-block">Braziliana · Painel completo do ciclo de carnê</p>
+            <h4 class="fw-bold mb-1">Gestão de Carnês</h4>
+            <p class="text-muted small mb-0 d-none d-md-block">Painel completo do ciclo de carnê</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="/admin/carnes/logs" class="btn btn-outline-info btn-sm"><i class="fas fa-history me-1"></i><span class="d-none d-md-inline">Logs</span></a>
@@ -107,72 +107,68 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
         <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2 d-flex align-items-center justify-content-between"><div><div class="fw-bold fs-5"><?= (int)($stats['envios_pendentes'] ?? 0) ?></div><div class="text-muted small">Envios Pendentes</div></div><i class="fas fa-truck text-success"></i></div></div></div>
     </div>
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-0 flex-nowrap overflow-auto" role="tablist" style="-webkit-overflow-scrolling:touch;">
-        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'carnes' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-carnes" type="button"><i class="fas fa-list me-1"></i>Carnês <span class="badge bg-secondary ms-1"><?= count($carnes) ?></span></button></li>
-        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'cobrancas' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-cobrancas" type="button"><i class="fas fa-bell me-1"></i>Cobranças <span class="badge bg-danger ms-1"><?= count($cobrancas) ?></span></button></li>
-        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'compras' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button"><i class="fas fa-shopping-basket me-1"></i>Compras <span class="badge bg-warning text-dark ms-1"><?= count($comprasPendentes) ?></span></button></li>
-        <li class="nav-item flex-shrink-0"><button class="nav-link <?= $activeTab === 'envios' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-envios" type="button"><i class="fas fa-truck me-1"></i>Envios <span class="badge bg-success ms-1"><?= count($enviosPendentes) ?></span></button></li>
+    <!-- Tabs: Mobile dropdown + Desktop tabs -->
+    <div class="d-md-none mb-3">
+        <select class="form-select" onchange="switchCarneTab(this.value)">
+            <option value="tab-carnes" <?= $activeTab === 'carnes' ? 'selected' : '' ?>>Carnês (<?= count($carnes) ?>)</option>
+            <option value="tab-cobrancas" <?= $activeTab === 'cobrancas' ? 'selected' : '' ?>>Cobranças (<?= count($cobrancas) ?>)</option>
+            <option value="tab-compras" <?= $activeTab === 'compras' ? 'selected' : '' ?>>Compras (<?= count($comprasPendentes) ?>)</option>
+            <option value="tab-envios" <?= $activeTab === 'envios' ? 'selected' : '' ?>>Envios (<?= count($enviosPendentes) ?>)</option>
+        </select>
+    </div>
+    <ul class="nav nav-tabs mb-0 d-none d-md-flex" role="tablist">
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'carnes' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-carnes" type="button">Carnês <span class="badge bg-secondary ms-1"><?= count($carnes) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'cobrancas' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-cobrancas" type="button">Cobranças <span class="badge bg-danger ms-1"><?= count($cobrancas) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'compras' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button">Compras <span class="badge bg-warning text-dark ms-1"><?= count($comprasPendentes) ?></span></button></li>
+        <li class="nav-item"><button class="nav-link <?= $activeTab === 'envios' ? 'active' : '' ?>" data-bs-toggle="tab" data-bs-target="#tab-envios" type="button">Envios <span class="badge bg-success ms-1"><?= count($enviosPendentes) ?></span></button></li>
     </ul>
+    <script>
+    function switchCarneTab(tabId) {
+        var btn = document.querySelector('[data-bs-target="#' + tabId + '"]');
+        if (btn) btn.click();
+    }
+    </script>
 
     <div class="tab-content">
     <!-- TAB: Carnês -->
     <div class="tab-pane fade <?= $activeTab === 'carnes' ? 'show active' : '' ?>" id="tab-carnes" role="tabpanel">
         <div class="card border-0 shadow-sm border-top-0 rounded-0 rounded-bottom">
             <div class="card-body">
-                <!-- Filtros rápidos -->
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    <a href="/admin/carnes" class="btn btn-sm <?= empty($filtros['status']) && empty($filtros['com_atraso']) ? 'btn-dark' : 'btn-outline-secondary' ?>">Todos <?= count($carnes) ?></a>
-                    <a href="/admin/carnes?com_atraso=1" class="btn btn-sm <?= !empty($filtros['com_atraso']) ? 'btn-danger' : 'btn-outline-danger' ?>">Atrasados <?= $countAtrasados ?></a>
-                    <a href="/admin/carnes?status=aguardando_primeira_parcela" class="btn btn-sm <?= ($filtros['status'] ?? '') === 'aguardando_primeira_parcela' ? 'btn-info' : 'btn-outline-info' ?>">Aguardando 1ª <?= $countAguardando1 ?></a>
-                    <a href="/admin/carnes?liberado_compra=1" class="btn btn-sm <?= !empty($filtros['liberado_compra']) ? 'btn-warning' : 'btn-outline-warning' ?>">Aguardando compra</a>
-                    <a href="/admin/carnes?liberado_envio=1" class="btn btn-sm <?= !empty($filtros['liberado_envio']) ? 'btn-success' : 'btn-outline-success' ?>">Prontos p/ envio</a>
-                    <a href="/admin/carnes?status=quitado" class="btn btn-sm <?= ($filtros['status'] ?? '') === 'quitado' ? 'btn-success' : 'btn-outline-success' ?>">Quitados <?= $countQuitados ?></a>
-                </div>
-
-                <!-- Filtros avançados -->
-                <div class="mb-3">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosAvancados"><i class="fas fa-sliders-h me-1"></i>Filtros avançados</button>
-                    <button class="btn btn-sm btn-outline-warning ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#recriarCarneCollapse"><i class="fas fa-plus-circle me-1"></i>Recriar carnê</button>
-                </div>
-
-                <div class="collapse mb-3" id="filtrosAvancados">
-                    <div class="card border">
-                        <div class="card-body">
-                            <form method="GET" class="row g-2 align-items-end">
-                                <div class="col-md-2">
-                                    <label class="form-label small">Status financeiro</label>
-                                    <select name="status" class="form-select form-select-sm">
-                                        <option value="">Todos</option>
-                                        <?php foreach ($statusLabels as $k => $v): ?>
-                                        <option value="<?= $k ?>" <?= ($filtros['status'] ?? '') === $k ? 'selected' : '' ?>><?= $v['label'] ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label small">Cliente</label>
-                                    <input type="text" name="cliente" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['cliente'] ?? '') ?>" placeholder="Nome ou email">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label small">Pedido #</label>
-                                    <input type="text" name="pedido_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['pedido_id'] ?? '') ?>">
-                                </div>
-                                <div class="col-md-auto">
-                                    <div class="form-check"><input type="checkbox" name="com_atraso" value="1" class="form-check-input" <?= !empty($filtros['com_atraso']) ? 'checked' : '' ?>><label class="form-check-label small">Com atraso</label></div>
-                                </div>
-                                <div class="col-md-auto">
-                                    <div class="form-check"><input type="checkbox" name="liberado_compra" value="1" class="form-check-input" <?= !empty($filtros['liberado_compra']) ? 'checked' : '' ?>><label class="form-check-label small">Compra liberada</label></div>
-                                </div>
-                                <div class="col-md-auto">
-                                    <div class="form-check"><input type="checkbox" name="liberado_envio" value="1" class="form-check-input" <?= !empty($filtros['liberado_envio']) ? 'checked' : '' ?>><label class="form-check-label small">Envio liberado</label></div>
-                                </div>
-                                <div class="col-md-auto">
-                                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Aplicar</button>
-                                    <a href="/admin/carnes" class="btn btn-sm btn-outline-secondary ms-1">Limpar</a>
-                                </div>
-                            </form>
-                        </div>
+                <!-- Filtros combinatórios -->
+                <form method="GET" class="row g-2 mb-3" id="carneFilterForm">
+                    <div class="col-6 col-md-2">
+                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="" <?= empty($filtros['status']) && empty($filtros['com_atraso']) && empty($filtros['liberado_compra']) && empty($filtros['liberado_envio']) ? 'selected' : '' ?>>Todos (<?= count($carnes) ?>)</option>
+                            <option value="aguardando_primeira_parcela" <?= ($filtros['status'] ?? '') === 'aguardando_primeira_parcela' ? 'selected' : '' ?>>Aguardando 1ª (<?= $countAguardando1 ?>)</option>
+                            <option value="em_andamento" <?= ($filtros['status'] ?? '') === 'em_andamento' ? 'selected' : '' ?>>Em Andamento</option>
+                            <option value="quitado" <?= ($filtros['status'] ?? '') === 'quitado' ? 'selected' : '' ?>>Quitados (<?= $countQuitados ?>)</option>
+                            <?php foreach ($statusLabels as $k => $v): if (in_array($k, ['aguardando_primeira_parcela','em_andamento','quitado'])) continue; ?>
+                            <option value="<?= $k ?>" <?= ($filtros['status'] ?? '') === $k ? 'selected' : '' ?>><?= $v['label'] ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
+                    <div class="col-6 col-md-2">
+                        <select name="filtro_rapido" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="">Situação</option>
+                            <option value="com_atraso" <?= !empty($filtros['com_atraso']) ? 'selected' : '' ?>>Atrasados (<?= $countAtrasados ?>)</option>
+                            <option value="liberado_compra" <?= !empty($filtros['liberado_compra']) ? 'selected' : '' ?>>Aguardando compra</option>
+                            <option value="liberado_envio" <?= !empty($filtros['liberado_envio']) ? 'selected' : '' ?>>Prontos p/ envio</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="text" name="cliente" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['cliente'] ?? '') ?>" placeholder="Buscar cliente..." oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.submit(),400)">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <input type="text" name="pedido_id" class="form-control form-control-sm" value="<?= htmlspecialchars($filtros['pedido_id'] ?? '') ?>" placeholder="Pedido #" oninput="clearTimeout(this._t);this._t=setTimeout(()=>this.form.submit(),400)">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <a href="/admin/carnes" class="btn btn-sm btn-outline-secondary w-100">Limpar</a>
+                    </div>
+                </form>
+
+                <!-- Recriar carnê -->
+                <div class="mb-3">
+                    <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="#recriarCarneCollapse"><i class="fas fa-plus-circle me-1"></i>Recriar carnê</button>
                 </div>
 
                 <!-- Recriar Carnê (collapse) -->

@@ -200,6 +200,21 @@ class AdminConfiguracoesController extends Controller {
             $clubeFaixas = [];
         }
 
+        // Demandas config
+        $demandasConfig = ['demandas_senha_painel' => '', 'demandas_emails_notificacao' => '', 'demandas_webhook_url' => '', 'demandas_usuarios_notificacao' => ''];
+        $demandasUsuarios = [];
+        try {
+            if (isset($pdo) && $pdo instanceof \PDO) {
+                $st = $pdo->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('demandas_senha_painel','demandas_emails_notificacao','demandas_webhook_url','demandas_usuarios_notificacao')");
+                $st->execute();
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                    $demandasConfig[$r['chave']] = $r['valor'] ?? '';
+                }
+                $st2 = $pdo->query("SELECT id, nome, email FROM usuarios WHERE perfil IN ('admin','suporte') ORDER BY nome");
+                $demandasUsuarios = $st2 ? ($st2->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Exception $e) {}
+
         echo "<!-- DEBUG_ADMIN_CONFIG controller=" . basename(__FILE__) . " ts=" . date('c') . " -->\n";
         echo '<!DOCTYPE html>
 <html lang="pt-BR">
@@ -208,7 +223,70 @@ class AdminConfiguracoesController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configurações - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+    :root {
+      --navy: #18253D;
+      --navy-hover: #243049;
+      --bg-page: #F5F7FA;
+      --surface: #FFFFFF;
+      --surface-soft: #FAFBFC;
+      --border: #EBF0F6;
+      --border-strong: #E2E8F0;
+      --text-main: #1F2937;
+      --text-secondary: #64748B;
+      --text-muted: #94A3B8;
+    }
+    .settings-page { max-width: 1440px; margin: 0 auto; padding: 24px; }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .page-title { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 700; color: var(--navy); }
+    .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn-config { height: 36px; border-radius: 8px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 13px; font-weight: 500; cursor: pointer; transition: .18s ease; white-space: nowrap; border: 1px solid var(--border-strong); background: #fff; color: #374151; }
+    .btn-config:hover { background: #F8FAFC; border-color: #CBD5E1; }
+    .settings-layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 16px; align-items: start; }
+    .settings-sidebar { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+    .settings-nav { display: flex; flex-direction: column; gap: 4px; list-style: none; padding: 0; margin: 0; }
+    .settings-nav .nav-link { width: 100%; min-height: 38px; border: none; border-radius: 8px; background: transparent; color: #334155; padding: 0 12px; display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; transition: .18s ease; }
+    .settings-nav .nav-link i { width: 15px; font-size: 14px; color: var(--text-muted); flex: 0 0 auto; }
+    .settings-nav .nav-link:hover { background: #F8FAFC; color: var(--navy); }
+    .settings-nav .nav-link.active { background: var(--navy) !important; color: #fff !important; }
+    .settings-nav .nav-link.active i { color: #fff !important; }
+    .settings-mobile-nav-wrap { display: none; }
+    .settings-mobile-nav { width: 100%; height: 42px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: var(--text-main); padding: 0 12px; font-size: 13px; outline: none; }
+    .settings-mobile-nav:focus { border-color: #94A3B8; box-shadow: 0 0 0 3px rgba(100,116,139,.1); }
+    .settings-content-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+    .settings-content-card .card { border: none; box-shadow: none; margin: 0; }
+    .settings-content-card .card-header { padding: 16px 18px; border-bottom: 1px solid var(--border); background: var(--surface-soft); }
+    .settings-content-card .card-header h5 { margin: 0; color: var(--navy); font-size: 15px; font-weight: 700; }
+    .settings-content-card .card-body { padding: 18px; }
+    .settings-content-card .form-label { color: var(--text-main); font-size: 13px; font-weight: 500; }
+    .settings-content-card .form-control, .settings-content-card .form-select { border: 1px solid var(--border-strong); border-radius: 8px; font-size: 13px; transition: .18s ease; }
+    .settings-content-card .form-control:focus, .settings-content-card .form-select:focus { border-color: #94A3B8; box-shadow: 0 0 0 3px rgba(100,116,139,.1); }
+    .settings-content-card .form-check-input:checked { background-color: var(--navy); border-color: var(--navy); }
+    .settings-content-card .btn-primary { background: var(--navy); border-color: var(--navy); border-radius: 8px; font-size: 13px; font-weight: 500; }
+    .settings-content-card .btn-primary:hover { background: var(--navy-hover); }
+    @media (max-width: 1100px) {
+      .settings-page { padding: 20px; }
+      .settings-layout { grid-template-columns: 230px minmax(0, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .settings-page { padding: 14px; }
+      .page-header { flex-direction: column; align-items: stretch; gap: 14px; margin-bottom: 14px; }
+      .page-title { font-size: 19px; }
+      .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .header-actions .btn-config { width: 100%; height: 40px; }
+      .settings-layout { grid-template-columns: 1fr; gap: 12px; }
+      .settings-sidebar { display: none; }
+      .settings-mobile-nav-wrap { display: block; }
+      .settings-content-card .card-header { padding: 14px; }
+      .settings-content-card .card-body { padding: 14px; }
+    }
+    @media (max-width: 420px) {
+      .settings-page { padding: 12px; }
+      .header-actions { grid-template-columns: 1fr; }
+    }
+    </style>';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
@@ -222,116 +300,142 @@ class AdminConfiguracoesController extends Controller {
         renderAdminSidebar('configuracoes');
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Configurações</h1>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-primary" onclick="testarStripeAPI()">
-                            <i class="fas fa-plug"></i> Testar Conexão
-                        </button>
-                        <button type="button" class="btn btn-outline-info" onclick="verDocumentacaoStripe()">
-                            <i class="fas fa-book"></i> Documentação
-                        </button>
-                    </div>
+            <div class="settings-page">
+
+            <header class="page-header">
+                <h1 class="page-title">Configurações</h1>
+                <div class="header-actions">
+                    <button type="button" class="btn-config" onclick="testarStripeAPI()">
+                        <i class="bi bi-plug-fill"></i> Testar Conexão
+                    </button>
+                    <button type="button" class="btn-config" onclick="verDocumentacaoStripe()">
+                        <i class="bi bi-file-earmark-text"></i> Documentação
+                    </button>
                 </div>
-                
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist">
-                            <button class="nav-link active" id="v-pills-loja-tab" data-bs-toggle="pill" data-bs-target="#v-pills-loja" type="button">
-                                <i class="fas fa-store"></i> Loja
-                            </button>
-                            <button class="nav-link" id="v-pills-layout-tab" data-bs-toggle="pill" data-bs-target="#v-pills-layout" type="button">
-                                <i class="fas fa-image"></i> Layout
-                            </button>
-                            <button class="nav-link" id="v-pills-email-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email" type="button">
-                                <i class="fas fa-envelope"></i> Email
-                            </button>
-                            <button class="nav-link" id="v-pills-email-creator-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email-creator" type="button">
-                                <i class="fas fa-edit"></i> Criar E-mail
-                            </button>
-                            <button class="nav-link" id="v-pills-notificacoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-notificacoes" type="button">
-                                <i class="fas fa-bell"></i> Notificações
-                            </button>
-                            <button class="nav-link" id="v-pills-pagamentos-tab" data-bs-toggle="pill" data-bs-target="#v-pills-pagamentos" type="button">
-                                <i class="fas fa-credit-card"></i> Pagamentos
-                            </button>
-                            <button class="nav-link" id="v-pills-entrega-tab" data-bs-toggle="pill" data-bs-target="#v-pills-entrega" type="button">
-                                <i class="fas fa-truck"></i> Entrega
-                            </button>
-                            <button class="nav-link" id="v-pills-seo-tab" data-bs-toggle="pill" data-bs-target="#v-pills-seo" type="button">
-                                <i class="fas fa-search"></i> SEO
-                            </button>
-                            <button class="nav-link" id="v-pills-assessoria-tab" data-bs-toggle="pill" data-bs-target="#v-pills-assessoria" type="button">
-                                <i class="fas fa-robot"></i> Assessoria / IA
-                            </button>
-                            <button class="nav-link" id="v-pills-comissoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-comissoes" type="button">
-                                <i class="fas fa-percentage"></i> Comissões
-                            </button>
-                            <button class="nav-link" id="v-pills-mapa-calor-tab" data-bs-toggle="pill" data-bs-target="#v-pills-mapa-calor" type="button">
-                                <i class="fas fa-chart-area"></i> Mapa de calor
-                            </button>
-                            <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
-                                <i class="fas fa-cogs"></i> Sistema
-                            </button>
-                            <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
-                                <i class="fab fa-wordpress"></i> WordPress
-                            </button>
-                            <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
-                                <i class="fas fa-plug"></i> WooCommerce
-                            </button>
-                            <button class="nav-link" id="v-pills-demandas-tab" type="button" onclick="window.location.href=\'/admin/demandas/configuracoes\'">
-                                <i class="fas fa-tasks"></i> Demandas (TI)
-                            </button>
-                        </div>
+            </header>
+
+            <section class="settings-layout">
+
+                <!-- MENU LATERAL DESKTOP -->
+                <aside class="settings-sidebar">
+                    <div class="settings-nav nav flex-column nav-pills" id="v-pills-tab" role="tablist">
+                        <button class="nav-link active" id="v-pills-loja-tab" data-bs-toggle="pill" data-bs-target="#v-pills-loja" type="button">
+                            <i class="bi bi-shop"></i> Loja
+                        </button>
+                        <button class="nav-link" id="v-pills-layout-tab" data-bs-toggle="pill" data-bs-target="#v-pills-layout" type="button">
+                            <i class="bi bi-image"></i> Layout
+                        </button>
+                        <button class="nav-link" id="v-pills-email-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email" type="button">
+                            <i class="bi bi-envelope-fill"></i> Email
+                        </button>
+                        <button class="nav-link" id="v-pills-email-creator-tab" data-bs-toggle="pill" data-bs-target="#v-pills-email-creator" type="button">
+                            <i class="bi bi-pencil-square"></i> Criar E-mail
+                        </button>
+                        <button class="nav-link" id="v-pills-notificacoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-notificacoes" type="button">
+                            <i class="bi bi-bell-fill"></i> Notificações
+                        </button>
+                        <button class="nav-link" id="v-pills-pagamentos-tab" data-bs-toggle="pill" data-bs-target="#v-pills-pagamentos" type="button">
+                            <i class="bi bi-credit-card-fill"></i> Pagamentos
+                        </button>
+                        <button class="nav-link" id="v-pills-entrega-tab" data-bs-toggle="pill" data-bs-target="#v-pills-entrega" type="button">
+                            <i class="bi bi-truck"></i> Entrega
+                        </button>
+                        <button class="nav-link" id="v-pills-seo-tab" data-bs-toggle="pill" data-bs-target="#v-pills-seo" type="button">
+                            <i class="bi bi-search"></i> SEO
+                        </button>
+                        <button class="nav-link" id="v-pills-assessoria-tab" data-bs-toggle="pill" data-bs-target="#v-pills-assessoria" type="button">
+                            <i class="bi bi-robot"></i> Assessoria / IA
+                        </button>
+                        <button class="nav-link" id="v-pills-comissoes-tab" data-bs-toggle="pill" data-bs-target="#v-pills-comissoes" type="button">
+                            <i class="bi bi-percent"></i> Comissões
+                        </button>
+                        <button class="nav-link" id="v-pills-mapa-calor-tab" data-bs-toggle="pill" data-bs-target="#v-pills-mapa-calor" type="button">
+                            <i class="bi bi-map-fill"></i> Mapa de calor
+                        </button>
+                        <button class="nav-link" id="v-pills-sistema-tab" data-bs-toggle="pill" data-bs-target="#v-pills-sistema" type="button">
+                            <i class="bi bi-gear-fill"></i> Sistema
+                        </button>
+                        <button class="nav-link" id="v-pills-wordpress-tab" data-bs-toggle="pill" data-bs-target="#v-pills-wordpress" type="button">
+                            <i class="bi bi-wordpress"></i> WordPress
+                        </button>
+                        <button class="nav-link" id="v-pills-woocommerce-tab" data-bs-toggle="pill" data-bs-target="#v-pills-woocommerce" type="button">
+                            <i class="bi bi-bag-check-fill"></i> WooCommerce
+                        </button>
+                        <button class="nav-link" id="v-pills-demandas-tab" data-bs-toggle="pill" data-bs-target="#v-pills-demandas" type="button">
+                            <i class="bi bi-list-check"></i> Demandas (TI)
+                        </button>
                     </div>
-                    
-                    <div class="col-md-9">
-                        <form method="POST" action="/admin/configuracoes/salvar" enctype="multipart/form-data" novalidate>
-                            <div class="tab-content" id="v-pills-tabContent">
-                                <!-- Configurações da Loja -->
-                                <div class="tab-pane fade show active" id="v-pills-loja" role="tabpanel">
-                                    <div class="card">
-                                        <div class="card-header">
-                                            <h5 class="mb-0">Configurações da Loja</h5>
+                </aside>
+
+                <!-- MENU MOBILE -->
+                <div class="settings-mobile-nav-wrap">
+                    <select class="settings-mobile-nav" id="settingsMobileSelect">
+                        <option value="v-pills-loja" selected>Loja</option>
+                        <option value="v-pills-layout">Layout</option>
+                        <option value="v-pills-email">Email</option>
+                        <option value="v-pills-email-creator">Criar E-mail</option>
+                        <option value="v-pills-notificacoes">Notificações</option>
+                        <option value="v-pills-pagamentos">Pagamentos</option>
+                        <option value="v-pills-entrega">Entrega</option>
+                        <option value="v-pills-seo">SEO</option>
+                        <option value="v-pills-assessoria">Assessoria / IA</option>
+                        <option value="v-pills-comissoes">Comissões</option>
+                        <option value="v-pills-mapa-calor">Mapa de calor</option>
+                        <option value="v-pills-sistema">Sistema</option>
+                        <option value="v-pills-wordpress">WordPress</option>
+                        <option value="v-pills-woocommerce">WooCommerce</option>
+                        <option value="v-pills-demandas">Demandas (TI)</option>
+                    </select>
+                </div>
+
+                <!-- CONTEÚDO -->
+                <article class="settings-content-card">
+                    <form method="POST" action="/admin/configuracoes/salvar" enctype="multipart/form-data" novalidate>
+                        <div class="tab-content" id="v-pills-tabContent">
+                            <!-- Configurações da Loja -->
+                            <div class="tab-pane fade show active" id="v-pills-loja" role="tabpanel">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Configurações da Loja</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">Nome da Loja</label>
+                                            <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana') . '">
                                         </div>
-                                        <div class="card-body">
-                                            <div class="mb-3">
-                                                <label class="form-label">Nome da Loja</label>
-                                                <input type="text" class="form-control" name="loja_nome" value="' . $this->getConfigValue($config, 'loja', 'nome', 'Braziliana') . '">
+                                        <div class="mb-3">
+                                            <label class="form-label">Descrição</label>
+                                            <textarea class="form-control" name="loja_descricao" rows="3">' . $this->getConfigValue($config, 'loja', 'descricao', '') . '</textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Email de Contato</label>
+                                            <input type="email" class="form-control" name="loja_email" value="' . $this->getConfigValue($config, 'loja', 'email', 'contato@brazilianashop.com.br') . '">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefone</label>
+                                            <input type="tel" class="form-control" name="loja_telefone" value="' . $this->getConfigValue($config, 'loja', 'telefone', '') . '">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Endereço</label>
+                                            <input type="text" class="form-control" name="loja_endereco" value="' . $this->getConfigValue($config, 'loja', 'endereco', '') . '">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Logo URL</label>
+                                            <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
+                                        </div>
+                                        <hr>
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" role="switch" id="loja_conversao_moeda_ativa" name="loja_conversao_moeda_ativa" value="1" ' . ($this->getConfigValue($config, 'loja', 'conversao_moeda_ativa', '0') === '1' ? 'checked' : '') . '>
+                                                <label class="form-check-label" for="loja_conversao_moeda_ativa">
+                                                    <strong>Exibir conversão de moeda para o cliente</strong>
+                                                </label>
                                             </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Descrição</label>
-                                                <textarea class="form-control" name="loja_descricao" rows="3">' . $this->getConfigValue($config, 'loja', 'descricao', '') . '</textarea>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Email de Contato</label>
-                                                <input type="email" class="form-control" name="loja_email" value="' . $this->getConfigValue($config, 'loja', 'email', 'contato@brazilianashop.com.br') . '">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Telefone</label>
-                                                <input type="tel" class="form-control" name="loja_telefone" value="' . $this->getConfigValue($config, 'loja', 'telefone', '') . '">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Endereço</label>
-                                                <input type="text" class="form-control" name="loja_endereco" value="' . $this->getConfigValue($config, 'loja', 'endereco', '') . '">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">Logo URL</label>
-                                                <input type="text" class="form-control" name="loja_logo" value="' . $this->getConfigValue($config, 'loja', 'logo', '') . '">
-                                            </div>
-                                            <hr>
-                                            <div class="mb-3">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox" role="switch" id="loja_conversao_moeda_ativa" name="loja_conversao_moeda_ativa" value="1" ' . ($this->getConfigValue($config, 'loja', 'conversao_moeda_ativa', '0') === '1' ? 'checked' : '') . '>
-                                                    <label class="form-check-label" for="loja_conversao_moeda_ativa">
-                                                        <strong>Exibir conversão de moeda para o cliente</strong>
-                                                    </label>
-                                                </div>
-                                                <small class="text-muted">Quando desativado, o seletor de moeda BRL/USD e os valores convertidos não aparecem para o cliente nas telas do site (exceto no checkout, onde a conversão é sempre disponível).</small>
-                                            </div>
+                                            <small class="text-muted">Quando desativado, o seletor de moeda BRL/USD e os valores convertidos não aparecem para o cliente nas telas do site (exceto no checkout, onde a conversão é sempre disponível).</small>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
 
                                 <div class="tab-pane fade" id="v-pills-layout" role="tabpanel">
                                     <div class="card">
@@ -1638,9 +1742,6 @@ class AdminConfiguracoesController extends Controller {
                                                 </div>
                                                 <div class="col-md-6"></div>
                                             </div>
-                                                    
-                                    </div>
-                                </div>
 
                                 <h6 class="mb-3">ShipStation (UPS) - Exterior</h6>
 
@@ -2796,16 +2897,68 @@ class AdminConfiguracoesController extends Controller {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+
+                                <!-- Configurações de Demandas (TI) -->
+                                <div class="tab-pane fade" id="v-pills-demandas" role="tabpanel">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Configurações de Demandas (TI)</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-lock me-2"></i>Acesso ao Painel</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">Senha do Painel de Demandas</label>
+                                                <input type="text" class="form-control" name="demandas_senha_painel" value="' . htmlspecialchars($demandasConfig['demandas_senha_painel'], ENT_QUOTES, 'UTF-8') . '" placeholder="Deixe vazio para desativar">
+                                                <small class="text-muted">Se preenchida, será exigida ao acessar o painel de demandas.</small>
+                                            </div>
+
+                                            <hr>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-envelope me-2"></i>Notificações por Email</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">Emails que recebem novas solicitações</label>
+                                                <textarea class="form-control" name="demandas_emails_notificacao" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com">' . htmlspecialchars($demandasConfig['demandas_emails_notificacao'], ENT_QUOTES, 'UTF-8') . '</textarea>
+                                                <small class="text-muted">Separados por vírgula. Toda nova demanda (bug ou função) será enviada para esses emails.</small>
+                                            </div>
+
+                                            <hr>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-plug me-2"></i>Webhook</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">URL do Webhook</label>
+                                                <input type="url" class="form-control" name="demandas_webhook_url" value="' . htmlspecialchars($demandasConfig['demandas_webhook_url'], ENT_QUOTES, 'UTF-8') . '" placeholder="https://hooks.slack.com/...">
+                                                <small class="text-muted">Recebe POST JSON com dados da nova solicitação. Compatível com Slack, Discord, etc.</small>
+                                            </div>
+
+                                            <hr>
+                                            <h6 class="fw-bold small mb-3"><i class="fas fa-bell me-2"></i>Notificações Push (no Admin)</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">Usuários que recebem notificações</label>
+                                                <select class="form-select" name="demandas_usuarios_notificacao[]" multiple size="6">';
+
+        $idsNotifDemandas = array_filter(array_map('intval', explode(',', $demandasConfig['demandas_usuarios_notificacao'])));
+        foreach ($demandasUsuarios as $u) {
+            $sel = in_array((int)$u['id'], $idsNotifDemandas) ? ' selected' : '';
+            echo '<option value="' . (int)$u['id'] . '"' . $sel . '>' . htmlspecialchars($u['nome']) . ' (' . htmlspecialchars($u['email']) . ')</option>';
+        }
+
+        echo '                                </select>
+                                                <small class="text-muted">Segure Ctrl/Cmd para selecionar múltiplos. Esses usuários verão notificações em tempo real no painel admin.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                        </div>
                             
                             <div class="d-flex justify-content-end mt-4" id="admin-config-salvar-geral">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save"></i> Salvar Configurações
                                 </button>
                             </div>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </article>
+
+            </section>
+            </div>
             </main>
         </div>
     </div>';
@@ -2814,6 +2967,29 @@ class AdminConfiguracoesController extends Controller {
     renderAdminScripts();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Mobile select navigation sync
+    document.addEventListener("DOMContentLoaded", function() {
+        var mobileSelect = document.getElementById("settingsMobileSelect");
+        if (mobileSelect) {
+            mobileSelect.addEventListener("change", function() {
+                var val = this.value;
+                var tabBtn = document.getElementById(val + "-tab");
+                if (tabBtn) tabBtn.click();
+            });
+            // Sync select when tab changes
+            var tabBtns = document.querySelectorAll("#v-pills-tab .nav-link");
+            tabBtns.forEach(function(btn) {
+                btn.addEventListener("shown.bs.tab", function() {
+                    var target = this.getAttribute("data-bs-target");
+                    if (target) {
+                        mobileSelect.value = target.replace("#", "");
+                    }
+                });
+            });
+        }
+    });
+    </script>
     ' . $this->getPagamentosJS() . $this->getEmailCreatorJS() . $this->getNotificacoesJS() . $this->getEntregaJS() . $this->getComissoesJS() . $this->getUsuariosImportJS() . $this->getPedidosImportJS() . $this->getProdutosImportJS() . '
 </body>
 </html>';

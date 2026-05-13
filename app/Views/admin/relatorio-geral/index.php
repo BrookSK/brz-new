@@ -54,12 +54,9 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center d-none d-md-flex" style="width:44px;height:44px;">
-                <i class="fas fa-chart-line text-white"></i>
-            </div>
             <div>
-                <h4 class="fw-bold mb-0">Financeiro</h4>
-                <p class="text-muted small mb-0 d-none d-md-block">Visão consolidada de pedidos, receitas e impostos</p>
+                <h1 class="page-title">Financeiro</h1>
+                <p class="page-subtitle">Visão consolidada de pedidos, receitas e impostos</p>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">

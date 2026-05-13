@@ -4030,7 +4030,7 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="h2">Produtos (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">Produtos (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
             . '<a href="/admin/produtos/arquivados" class="btn btn-outline-dark"><i class="fas fa-archive"></i> Arquivados</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
@@ -4637,7 +4637,7 @@ HTML;
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="h2">Arquivados (' . (int) $total . ')</h1>'
+            . '<h1 class="page-title">Arquivados (' . (int) $total . ')</h1>'
             . '<div class="d-flex gap-2">'
             . '<a href="/admin/produtos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>'
             . '<a href="' . htmlspecialchars($urlCadastroRapido, ENT_QUOTES, 'UTF-8') . '" class="btn btn-outline-primary"><i class="fas fa-bolt"></i> Cadastro rápido</a>'
@@ -4895,7 +4895,7 @@ JS;
         echo <<<HTML
                 <div class="pt-3">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
-                    <h1 class="h2">Novo Produto</h1>
+                    <h1 class="page-title">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
 
@@ -5475,7 +5475,39 @@ HTML;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Editar Produto - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+    #secao-variacoes,.variacoes-wrap{display:none!important;}
+    </style>
+    <script>document.addEventListener("DOMContentLoaded",function(){
+        // Esconder o div.mb-3 que contém label "Variações"
+        document.querySelectorAll("label.form-label").forEach(function(el){
+            if((el.textContent||"").trim()==="Variações"){
+                var parent=el.closest(".mb-3");
+                if(parent)parent.style.display="none";
+            }
+        });
+        // Esconder card com tipo_ids[] (fallback)
+        var ti=document.querySelector("input[name=\\"tipo_ids[]\\"]");
+        if(ti){var c=ti.closest(".card")||ti.closest(".mb-3");if(c)c.style.display="none";}
+        // Esconder botões de gerar/apagar variações
+        document.querySelectorAll("button[formaction*=\\"variacoes\\"]").forEach(function(el){
+            var p=el.closest(".d-flex")||el.closest(".mb-3");
+            if(p)p.style.display="none";
+        });
+        // Esconder cards "Variações cadastradas" e "Galeria por variação"
+        document.querySelectorAll(".card-header strong").forEach(function(el){
+            var t=(el.textContent||"").trim();
+            if(t.indexOf("Variações")>-1||t.indexOf("variação")>-1||t.indexOf("Galeria por variação")>-1){
+                var card=el.closest(".card");
+                if(card)card.style.display="none";
+            }
+        });
+        // Esconder alert sobre variações
+        document.querySelectorAll(".alert-info").forEach(function(el){
+            if((el.textContent||"").indexOf("atributos e opções para gerar variações")>-1||(el.textContent||"").indexOf("cadastrar variações")>-1)el.style.display="none";
+        });
+    });</script>';
 
         renderAdminSidebarStyles();
 
@@ -5503,7 +5535,7 @@ HTML;
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Editar Produto</h1>
+                    <h1 class="page-title">Editar Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
 

@@ -253,6 +253,25 @@
                 $descCompleta = trim((string) ($produto['descricao'] ?? $produto['description'] ?? ''));
                 $descExtra = trim((string) ($produto['descricao_completa'] ?? ''));
                 $especificacoesIA = trim((string) ($produto['especificacoes'] ?? $produto['specifications'] ?? $produto['specs'] ?? ''));
+
+                // If locale is English, try to load the English description from IA table
+                $currentLocale = class_exists('\\App\\Core\\I18n') ? \App\Core\I18n::getLocale() : 'pt-BR';
+                if ($currentLocale === 'en' && !empty($produto['id'])) {
+                    try {
+                        $pdoDesc = \Config\Database::getConnection();
+                        $stDesc = $pdoDesc->prepare("SELECT descricao_gerada_en, descricao_editada_en FROM produto_descricoes_ia WHERE produto_id = ? AND status_revisao = 'aprovado' LIMIT 1");
+                        $stDesc->execute([(int)$produto['id']]);
+                        $rowDesc = $stDesc->fetch(\PDO::FETCH_ASSOC);
+                        if ($rowDesc) {
+                            $descEn = trim((string)($rowDesc['descricao_editada_en'] ?: $rowDesc['descricao_gerada_en']));
+                            if ($descEn !== '') {
+                                $descCompleta = $descEn;
+                                $descCurta = '';
+                                $descExtra = '';
+                            }
+                        }
+                    } catch (\Exception $e) {}
+                }
                 ?>
 
                 <?php if ($marcaProduto !== ''): ?>

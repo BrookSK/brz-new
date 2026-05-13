@@ -104,10 +104,12 @@ class AdminDashboardController extends Controller {
                     }
                 }
                 $stats['faturamento_total'] = $fatBrlAdmin + $fatUsdAdmin;
+                $stats['faturamento_brl'] = $fatBrlAdmin;
+                $stats['faturamento_usd'] = $fatUsdAdmin;
                 $partsAdmin = [];
                 if ($fatBrlAdmin > 0) $partsAdmin[] = 'R$ ' . number_format($fatBrlAdmin, 2, ',', '.');
                 if ($fatUsdAdmin > 0) $partsAdmin[] = 'US$ ' . number_format($fatUsdAdmin, 2, ',', '.');
-                $stats['faturamento_display'] = !empty($partsAdmin) ? implode(' / ', $partsAdmin) : 'R$ 0,00';
+                $stats['faturamento_display'] = !empty($partsAdmin) ? implode('<br>', $partsAdmin) : 'R$ 0,00';
             } else {
                 $colAdminCriador = null;
                 foreach (['admin_criador_id', 'admin_creator_id', 'created_by_admin_id', 'criador_admin_id', 'admin_id'] as $c) {
@@ -202,10 +204,12 @@ class AdminDashboardController extends Controller {
                 }
 
                 $stats['faturamento_total'] = $fatBrl + $fatUsd;
+                $stats['faturamento_brl'] = $fatBrl;
+                $stats['faturamento_usd'] = $fatUsd;
                 $parts = [];
                 if ($fatBrl > 0) $parts[] = 'R$ ' . number_format($fatBrl, 2, ',', '.');
                 if ($fatUsd > 0) $parts[] = 'US$ ' . number_format($fatUsd, 2, ',', '.');
-                $stats['faturamento_display'] = !empty($parts) ? implode(' / ', $parts) : 'R$ 0,00';
+                $stats['faturamento_display'] = !empty($parts) ? implode('<br>', $parts) : 'R$ 0,00';
             }
             
             // Pedidos recentes
@@ -447,7 +451,7 @@ class AdminDashboardController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
+                    <h1 class="page-title">Dashboard</h1>
                 </div>
 
                 <div class="row mb-4">
@@ -640,16 +644,14 @@ class AdminDashboardController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/public/assets/css/dashboard-redesign.css" rel="stylesheet">';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
         
-        echo '<style>
-        .stat-card { transition: none; }
-        .quick-action-card { transition: none; cursor: pointer; }
-    </style>
-</head>
+        echo '</head>
 <body>
     <div class="container-fluid">
         <div class="row">';
@@ -658,347 +660,303 @@ class AdminDashboardController extends Controller {
         renderAdminSidebar('dashboard');
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <button type="button" class="btn btn-sm btn-primary">
-                            <i class="fas fa-sync"></i> Atualizar
-                        </button>
-                    </div>
-                </div>';
+            <div class="dashboard-page">';
 
-        // Calendário de Marketing (acima dos cards)
-        echo '<div class="row mb-4"><div class="col-12">';
-        include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
-        echo '</div></div>';
-
-        echo '<div class="row mb-4">
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card stat-card border-left-primary shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Produtos</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . $stats['produtos_total'] . '</div>
-                                        <div class="text-xs text-muted">' . $stats['produtos_ativos'] . ' ativos</div>
-                                    </div>
-                                    <div class="col-auto"><i class="fas fa-box fa-2x text-gray-300"></i></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card stat-card border-left-success shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Pedidos</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . $stats['pedidos_total'] . '</div>
-                                        <div class="text-xs text-muted">Total</div>
-                                    </div>
-                                    <div class="col-auto"><i class="fas fa-shopping-cart fa-2x text-gray-300"></i></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card stat-card border-left-info shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Usuários</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . $stats['usuarios_total'] . '</div>
-                                        <div class="text-xs text-muted">Cadastrados</div>
-                                    </div>
-                                    <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-3 col-md-6 mb-4">
-                        <div class="card stat-card border-left-warning shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Faturamento</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">' . htmlspecialchars((string)($stats['faturamento_display'] ?: ('R$ ' . number_format((float)($stats['faturamento_total'] ?? 0), 2, ',', '.')))) . '</div>
-                                        <div class="text-xs text-muted">Total</div>
-                                    </div>
-                                    <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        // === HEADER ===
+        echo '<header class="page-header">
+                <div>
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Resumo operacional, financeiro e comercial da empresa</p>
                 </div>
+                <button class="btn-dash-primary" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                </button>
+            </header>';
 
-                <div class="row mb-4">
-                    <div class="col-12">
-                        ' . ($pendencias_pagamento_total > 0 ? ('
-                        <div class="card shadow mb-4">
-                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                                <h6 class="m-0 font-weight-bold text-danger"><i class="fas fa-circle-dollar-to-slot me-2"></i>Pendências de pagamento (diferença)</h6>
-                                <a href="/admin/pedidos" class="btn btn-sm btn-outline-danger">Ver pedidos</a>
+        // === CALENDÁRIO DE MARKETING ===
+        echo '<section class="section-card">
+                <header class="section-card-header">
+                    <h2 class="section-title">Calendário de Marketing</h2>
+                </header>
+                <div class="section-body">';
+        include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
+        echo '</div></section>';
+
+        // === KPI GRID ===
+        echo '<section class="kpi-grid">
+                <article class="kpi-card">
+                    <div>
+                        <div class="kpi-label">Produtos</div>
+                        <div class="kpi-value">' . (int)$stats['produtos_total'] . '</div>
+                        <div class="kpi-subtext">' . (int)$stats['produtos_ativos'] . ' ativos</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-box-seam-fill"></i></div>
+                </article>
+                <article class="kpi-card">
+                    <div>
+                        <div class="kpi-label">Pedidos</div>
+                        <div class="kpi-value">' . (int)$stats['pedidos_total'] . '</div>
+                        <div class="kpi-subtext">Total</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-cart-fill"></i></div>
+                </article>
+                <article class="kpi-card">
+                    <div>
+                        <div class="kpi-label">Usuários</div>
+                        <div class="kpi-value">' . number_format((int)$stats['usuarios_total']) . '</div>
+                        <div class="kpi-subtext">Cadastrados</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
+                </article>
+                <article class="kpi-card is-featured">
+                    <div>
+                        <div class="kpi-label">Faturamento BRL</div>
+                        <div class="kpi-value">R$ ' . number_format((float)($stats['faturamento_brl'] ?? 0), 2, ',', '.') . '</div>
+                        <div class="kpi-subtext">Pedidos pagos</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                </article>
+                <article class="kpi-card is-featured">
+                    <div>
+                        <div class="kpi-label">Faturamento USD</div>
+                        <div class="kpi-value">US$ ' . number_format((float)($stats['faturamento_usd'] ?? 0), 2, ',', '.') . '</div>
+                        <div class="kpi-subtext">Pedidos pagos</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+                </article>
+            </section>';
+
+        // === RESUMO GERENCIAL ===
+        echo '<section class="executive-grid">
+                <article class="section-card">
+                    <header class="section-card-header">
+                        <h2 class="section-title">Resumo Gerencial</h2>
+                    </header>
+                    <div class="section-body">
+                        <div class="summary-list">
+                            <div class="summary-item">
+                                <div class="summary-label">Faturamento total</div>
+                                <div class="summary-value">' . ($stats['faturamento_display'] ?: 'R$ 0,00') . '</div>
+                                <div class="summary-note">Pedidos pagos e processados</div>
                             </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <span class="badge bg-danger">' . (int) $pendencias_pagamento_total . ' pendência(s)</span>
-                                    <span class="badge bg-warning text-dark">R$ ' . number_format((float) $pendencias_pagamento_valor, 2, ',', '.') . '</span>
+                            <div class="summary-item">
+                                <div class="summary-label">Pedidos totais</div>
+                                <div class="summary-value">' . (int)$stats['pedidos_total'] . '</div>
+                                <div class="summary-note">Todos os status</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Produtos ativos</div>
+                                <div class="summary-value">' . (int)$stats['produtos_ativos'] . '</div>
+                                <div class="summary-note">Disponíveis para venda</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Usuários cadastrados</div>
+                                <div class="summary-value">' . number_format((int)$stats['usuarios_total']) . '</div>
+                                <div class="summary-note">Total na plataforma</div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+                <article class="section-card">
+                    <header class="section-card-header">
+                        <h2 class="section-title">Pontos de Atenção</h2>
+                    </header>
+                    <div class="section-body">
+                        <div class="insight-list">
+                            <div class="insight-item">
+                                <div class="insight-icon"><i class="bi bi-cash-stack"></i></div>
+                                <div>
+                                    <div class="insight-title">Validar pedidos não pagos</div>
+                                    <div class="insight-text">Pedidos pendentes não devem entrar no total financeiro realizado.</div>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-hover">
-                                        <thead><tr><th>Pedido</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
-                                        <tbody>
-                        '): '') . '
-                        ';
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon"><i class="bi bi-box-seam"></i></div>
+                                <div>
+                                    <div class="insight-title">Acompanhar estoque e validade</div>
+                                    <div class="insight-text">Produtos próximos do vencimento precisam continuar destacados no painel.</div>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                                <div>
+                                    <div class="insight-title">Monitorar produtos campeões</div>
+                                    <div class="insight-text">Use os mais vendidos para direcionar lives, campanhas e reposição.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </section>';
 
-        if (!empty($pendencias_pagamento)) {
+        // === PENDÊNCIAS DE PAGAMENTO ===
+        if ($pendencias_pagamento_total > 0) {
+            echo '<section class="section-card" style="border-color:var(--red-bg);">
+                <header class="section-card-header">
+                    <h2 class="section-title">Pendências de pagamento</h2>
+                    <a href="/admin/pedidos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver pedidos</a>
+                </header>
+                <div class="section-body">
+                    <div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Pedido</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>';
             foreach ($pendencias_pagamento as $pp) {
-                $pid = (int) ($pp['id'] ?? 0);
-                $codigo = (string) ($pp['codigo_pedido'] ?? $pid);
-                $valor = (float) ($pp['payment_diferenca_valor'] ?? 0);
-                $st = (string) ($pp['payment_diferenca_status'] ?? '');
-                $link = (string) ($pp['payment_diferenca_bank_slip_url'] ?? '');
-                if ($link === '') {
-                    $link = (string) ($pp['payment_diferenca_invoice_url'] ?? '');
-                }
-                echo '<tr>'
-                    . '<td><a class="text-decoration-none" href="/admin/pedidos/detalhes/' . $pid . '">#' . htmlspecialchars($codigo) . '</a></td>'
+                $pid = (int)($pp['id'] ?? 0);
+                $codigo = (string)($pp['codigo_pedido'] ?? $pid);
+                $valor = (float)($pp['payment_diferenca_valor'] ?? 0);
+                $st = (string)($pp['payment_diferenca_status'] ?? '');
+                $link = (string)($pp['payment_diferenca_bank_slip_url'] ?? '');
+                if ($link === '') $link = (string)($pp['payment_diferenca_invoice_url'] ?? '');
+                echo '<tr><td><a href="/admin/pedidos/detalhes/' . $pid . '">#' . htmlspecialchars($codigo) . '</a></td>'
                     . '<td><strong>R$ ' . number_format($valor, 2, ',', '.') . '</strong></td>'
-                    . '<td>' . ($st !== '' ? '<span class="badge bg-warning text-dark">' . htmlspecialchars($st) . '</span>' : '-') . '</td>'
-                    . '<td class="text-end">'
-                        . '<a class="btn btn-sm btn-outline-primary" href="/admin/pedidos/detalhes/' . $pid . '">Detalhes</a> '
-                        . ($link !== '' ? '<a class="btn btn-sm btn-outline-dark" href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">Abrir cobrança</a>' : '')
-                    . '</td>'
-                    . '</tr>';
+                    . '<td>' . ($st !== '' ? '<span class="badge-yellow" style="padding:2px 8px;border-radius:4px;">' . htmlspecialchars($st) . '</span>' : '-') . '</td>'
+                    . '<td><a href="/admin/pedidos/detalhes/' . $pid . '">Detalhes</a>'
+                    . ($link !== '' ? ' <a href="' . htmlspecialchars($link) . '" target="_blank">Cobrança</a>' : '')
+                    . '</td></tr>';
             }
+            echo '</tbody></table></div></div></section>';
         }
 
-        echo ($pendencias_pagamento_total > 0)
-            ? '</tbody></table></div></div></div>'
-            : '';
+        // === VALIDADE ===
+        echo '<section class="validity-card">
+                <header class="validity-header">
+                    <div class="validity-title"><i class="bi bi-exclamation-triangle-fill"></i> Validade (próximos 30 dias)</div>
+                    <a href="/admin/estoque" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver Estoque</a>
+                </header>
+                <div class="validity-body">';
 
-        echo '
-                        <div class="card shadow">
-                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                                <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-triangle-exclamation me-2"></i>Validade (próximos 30 dias)</h6>
-                                <a href="/admin/estoque" class="btn btn-sm btn-outline-primary">Ver Estoque</a>
-                            </div>
-                            <div class="card-body">';
+        if (empty($validade_alertas)) {
+            echo 'Nenhum produto com validade a vencer nos próximos 30 dias.';
+        } else {
+            echo '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Produto</th><th>Validade</th><th>Qtd</th></tr></thead><tbody>';
+            foreach ($validade_alertas as $va) {
+                $produtoNomeV = (string)($va['produto_nome'] ?? '');
+                $validadeV = (string)($va['validade_mais_proxima'] ?? '');
+                $qtdV = (int)($va['quantidade_total'] ?? 0);
+                $diasV = $validadeV !== '' ? (int)floor((strtotime($validadeV) - strtotime(date('Y-m-d'))) / 86400) : null;
+                $badgeClass = 'badge-navy';
+                if ($diasV !== null && $diasV <= 7) $badgeClass = 'badge-yellow';
+                elseif ($diasV !== null && $diasV <= 15) $badgeClass = 'badge-yellow';
+                echo '<tr><td>' . htmlspecialchars($produtoNomeV) . '</td>'
+                    . '<td><span class="' . $badgeClass . '" style="padding:2px 8px;border-radius:4px;">' . ($validadeV !== '' ? date('d/m/Y', strtotime($validadeV)) : '-') . '</span>'
+                    . ($diasV !== null ? ' <small>(' . $diasV . ' dias)</small>' : '') . '</td>'
+                    . '<td>' . $qtdV . '</td></tr>';
+            }
+            echo '</tbody></table></div>';
+        }
 
-                            if (empty($validade_alertas)) {
-                                echo '<p class="text-muted mb-0">Nenhum produto com validade a vencer nos próximos 30 dias.</p>';
-                            } else {
-                                $totalProdutos = count($validade_alertas);
-                                $totalUnidades = 0;
-                                foreach ($validade_alertas as $va) {
-                                    $totalUnidades += (int) ($va['quantidade_total'] ?? 0);
-                                }
+        echo '</div></section>';
 
-                                echo '<div class="mb-3">'
-                                    . '<span class="badge bg-warning">' . $totalProdutos . ' produto(s)</span> '
-                                    . '<span class="badge bg-info">' . $totalUnidades . ' unidade(s)</span>'
-                                    . '</div>';
+        // === AÇÕES RÁPIDAS ===
+        echo '<h2 class="quick-title">Ações Rápidas</h2>
+            <section class="quick-grid">
+                <a href="/admin/produtos/novo" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-plus-lg"></i></div>
+                        <div class="quick-label">Novo Produto</div>
+                        <div class="quick-subtext">Adicionar produto</div>
+                    </div>
+                </a>
+                <a href="/admin/pedidos" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-cart-fill"></i></div>
+                        <div class="quick-label">Pedidos</div>
+                        <div class="quick-subtext">Gerenciar pedidos</div>
+                    </div>
+                </a>
+                <a href="/admin/usuarios" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-people-fill"></i></div>
+                        <div class="quick-label">Usuários</div>
+                        <div class="quick-subtext">Gerenciar clientes</div>
+                    </div>
+                </a>
+                <a href="/admin/configuracoes" class="quick-card">
+                    <div>
+                        <div class="quick-icon"><i class="bi bi-gear-fill"></i></div>
+                        <div class="quick-label">Configurações</div>
+                        <div class="quick-subtext">Configurar loja</div>
+                    </div>
+                </a>
+            </section>';
 
-                                echo '<div class="table-responsive">'
-                                    . '<table class="table table-hover">'
-                                    . '<thead><tr><th>Produto</th><th>Validade</th><th>Qtd</th><th>Pedidos que contém</th></tr></thead><tbody>';
+        // === PEDIDOS RECENTES + PRODUTOS MAIS VENDIDOS ===
+        echo '<section class="bottom-grid">
+                <article class="list-card">
+                    <header class="list-card-header">
+                        <div class="list-card-title">Pedidos Recentes</div>
+                        <a href="/admin/pedidos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver Todos</a>
+                    </header>
+                    <div class="list-card-body">';
 
-                                foreach ($validade_alertas as $va) {
-                                    $produtoId = (int) ($va['produto_id'] ?? 0);
-                                    $produtoNome = (string) ($va['produto_nome'] ?? '');
-                                    $validade = (string) ($va['validade_mais_proxima'] ?? '');
-                                    $qtd = (int) ($va['quantidade_total'] ?? 0);
-                                    $dias = null;
-                                    if ($validade !== '') {
-                                        $dias = (int) floor((strtotime($validade) - strtotime(date('Y-m-d'))) / 86400);
-                                    }
-                                    $badgeStyle = 'bg-info';
-                                    if ($dias !== null && $dias <= 7) {
-                                        $badgeStyle = 'bg-danger';
-                                    } elseif ($dias !== null && $dias <= 15) {
-                                        $badgeStyle = 'bg-warning';
-                                    }
+        if (!empty($pedidos_recentes)) {
+            foreach ($pedidos_recentes as $pedido) {
+                $valorTotalPedido = 0;
+                if (isset($pedido['valor_total'])) $valorTotalPedido = floatval($pedido['valor_total']);
+                elseif (isset($pedido['total'])) $valorTotalPedido = floatval($pedido['total']);
+                elseif (isset($pedido['valor'])) $valorTotalPedido = floatval($pedido['valor']);
+                $moedaPedido = strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL')));
+                $statusPedido = strtolower(trim((string)($pedido['status'] ?? '')));
+                $statusBadge = 'badge-yellow';
+                if (in_array($statusPedido, ['pago','paid','approved','entregue'])) $statusBadge = 'badge-green';
+                $statusLabels = [
+                    'pago' => 'Pago', 'paid' => 'Pago', 'approved' => 'Aprovado',
+                    'pendente' => 'Pendente', 'pending' => 'Pendente',
+                    'pagamento' => 'Pagamento', 'processando' => 'Processando',
+                    'enviado' => 'Enviado', 'entregue' => 'Entregue',
+                    'cancelado' => 'Cancelado', 'cancelled' => 'Cancelado',
+                    'carne_pagando' => 'Carnê Pagando', 'carne_braziliana' => 'Carnê',
+                    'produto_consolidado' => 'Consolidado', 'consolidado' => 'Consolidado',
+                    'rascunho_etiqueta' => 'Etiqueta Rascunho', 'etiqueta_efetivada' => 'Etiqueta Efetivada',
+                    'aguardando_lib_alfandegaria' => 'Alfândega', 'finalizacao_embalagem' => 'Embalagem',
+                    'entrega_finalizada' => 'Entrega Finalizada',
+                ];
+                $statusLabel = $statusLabels[$statusPedido] ?? ucfirst(str_replace('_', ' ', $statusPedido));
 
-                                    $rowsP = $validade_alertas_pedidos[$produtoId] ?? [];
-                                    $countPedidos = is_array($rowsP) ? count($rowsP) : 0;
-
-                                    echo '<tr>'
-                                        . '<td><strong>' . htmlspecialchars($produtoNome) . '</strong><br><small class="text-muted">ID: ' . $produtoId . '</small></td>'
-                                        . '<td>'
-                                        . '<span class="badge ' . $badgeStyle . '">' . ($validade !== '' ? date('d/m/Y', strtotime($validade)) : '-') . '</span>'
-                                        . ($dias !== null ? '<br><small class="text-muted">em ' . $dias . ' dia(s)</small>' : '')
-                                        . '</td>'
-                                        . '<td><span class="badge bg-info">' . $qtd . '</span></td>'
-                                        . '<td>';
-
-                                    if ($countPedidos === 0) {
-                                        echo '<span class="text-muted">Nenhum</span>';
-                                    } else {
-                                        echo '<div class="mb-1"><span class="badge bg-warning">' . $countPedidos . '</span></div>';
-                                        echo '<div class="small">';
-                                        foreach (array_slice($rowsP, 0, 6) as $rp) {
-                                            $pedidoId = (int) ($rp['pedido_id'] ?? 0);
-                                            $pedidoData = (string) ($rp['pedido_data'] ?? '');
-                                            $usuarioId = (int) ($rp['usuario_id'] ?? 0);
-                                            $usuarioNome = (string) ($rp['usuario_nome'] ?? '');
-                                            $pedidoHref = '/admin/pedidos/detalhes/' . $pedidoId;
-                                            $usuarioHref = '/admin/usuarios/detalhes/' . $usuarioId;
-                                            echo '<div class="d-flex justify-content-between gap-2">'
-                                                . '<div>'
-                                                . '<a href="' . htmlspecialchars($pedidoHref) . '" class="text-decoration-none">Pedido #' . $pedidoId . '</a>'
-                                                . ($pedidoData !== '' ? ' <span class="text-muted">(' . date('d/m/Y', strtotime($pedidoData)) . ')</span>' : '')
-                                                . '</div>'
-                                                . '<div>'
-                                                . ($usuarioId > 0 ? '<a href="' . htmlspecialchars($usuarioHref) . '" class="text-decoration-none">' . htmlspecialchars($usuarioNome !== '' ? $usuarioNome : ('Cliente #' . $usuarioId)) . '</a>' : '<span class="text-muted">Cliente</span>')
-                                                . '</div>'
-                                                . '</div>';
-                                        }
-                                        if ($countPedidos > 6) {
-                                            echo '<div class="text-muted">+ ' . ($countPedidos - 6) . ' pedido(s)</div>';
-                                        }
-                                        echo '</div>';
-                                    }
-
-                                    echo '</td></tr>';
-                                }
-
-                                echo '</tbody></table></div>';
-                            }
-
-                            echo '</div>
-                        </div>
+                echo '<div class="recent-order">
+                    <div>
+                        <div class="item-title">#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . ' - ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '</div>
+                        <div class="item-subtext">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</div>
+                    </div>
+                    <div class="order-side">
+                        <span class="' . $statusBadge . '" style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;">' . htmlspecialchars($statusLabel) . '</span>
+                        <span class="item-value">' . ($moedaPedido === 'USD' ? 'US$ ' : 'R$ ') . number_format($valorTotalPedido, 2, ',', '.') . '</span>
                     </div>
                 </div>';
+            }
+        } else {
+            echo '<p style="color:var(--text-muted);text-align:center;padding:20px 0;">Nenhum pedido encontrado</p>';
+        }
 
-                            echo '<div class="row mb-4">
-                    <div class="col-12">
-                        <h3 class="h5 mb-3">Ações Rápidas</h3>
-                        <div class="row">
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/produtos/novo" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-primary text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-plus fa-3x mb-3"></i>
-                                            <h5 class="card-title">Novo Produto</h5>
-                                            <p class="card-text small">Adicionar produto</p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/pedidos" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-success text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-shopping-cart fa-3x mb-3"></i>
-                                            <h5 class="card-title">Pedidos</h5>
-                                            <p class="card-text small">Gerenciar pedidos</p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/usuarios" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-info text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-users fa-3x mb-3"></i>
-                                            <h5 class="card-title">Usuários</h5>
-                                            <p class="card-text small">Gerenciar clientes</p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
-                            <div class="col-lg-3 col-md-6 mb-3">
-                                <a href="/admin/configuracoes" class="text-decoration-none">
-                                    <div class="card quick-action-card bg-warning text-white h-100">
-                                        <div class="card-body text-center">
-                                            <i class="fas fa-cog fa-3x mb-3"></i>
-                                            <h5 class="card-title">Configurações</h5>
-                                            <p class="card-text small">Configurar loja</p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-lg-6 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                                <h6 class="m-0 font-weight-bold text-primary">Pedidos Recentes</h6>
-                                <a href="/admin/pedidos" class="btn btn-sm btn-outline-primary">Ver Todos</a>
-                            </div>
-                            <div class="card-body">';
-                            
-                            if (!empty($pedidos_recentes)) {
-                                foreach ($pedidos_recentes as $pedido) {
-                                    $valorTotalPedido = 0;
-                                    if (isset($pedido['valor_total'])) {
-                                        $valorTotalPedido = floatval($pedido['valor_total']);
-                                    } elseif (isset($pedido['total'])) {
-                                        $valorTotalPedido = floatval($pedido['total']);
-                                    } elseif (isset($pedido['valor'])) {
-                                        $valorTotalPedido = floatval($pedido['valor']);
-                                    }
+        echo '</div></article>
+                <article class="list-card">
+                    <header class="list-card-header">
+                        <div class="list-card-title">Produtos Mais Vendidos</div>
+                        <a href="/admin/produtos" class="btn-dash-secondary" style="height:30px;padding:0 10px;font-size:12px;">Ver Todos</a>
+                    </header>
+                    <div class="list-card-body">';
 
-                                    echo '<div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div>
-                                            <strong>#' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . '</strong> - ' . htmlspecialchars($pedido['cliente_nome'] ?? 'Visitante') . '
-                                            <br><small class="text-muted">' . date('d/m/Y H:i', strtotime($pedido['created_at'])) . '</small>
-                                        </div>
-                                        <div class="text-end">
-                                            <span class="badge bg-' . ($pedido['status'] == 'pago' ? 'success' : 'warning') . '">' . ucfirst($pedido['status']) . '</span>
-                                            <br><strong>' . (strtoupper(trim((string)($pedido['moeda'] ?? $pedido['currency'] ?? 'BRL'))) === 'USD' ? 'US$ ' : 'R$ ') . number_format($valorTotalPedido, 2, ',', '.') . '</strong>
-                                        </div>
-                                    </div>';
-                                }
-                            } else {
-                                echo '<p class="text-muted text-center">Nenhum pedido encontrado</p>';
-                            }
-                            
-                            echo '</div>
-                        </div>
+        if (!empty($produtos_mais_vendidos)) {
+            foreach ($produtos_mais_vendidos as $produto) {
+                echo '<div class="top-product">
+                    <div>
+                        <div class="item-title">' . htmlspecialchars($produto['nome']) . '</div>
+                        <div class="item-subtext">' . (int)$produto['vendas'] . ' vendas</div>
                     </div>
-                    
-                    <div class="col-lg-6 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                                <h6 class="m-0 font-weight-bold text-primary">Produtos Mais Vendidos</h6>
-                                <a href="/admin/produtos" class="btn btn-sm btn-outline-primary">Ver Todos</a>
-                            </div>
-                            <div class="card-body">';
-                            
-                            if (!empty($produtos_mais_vendidos)) {
-                                foreach ($produtos_mais_vendidos as $produto) {
-                                    echo '<div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div>
-                                            <strong>' . htmlspecialchars($produto['nome']) . '</strong>
-                                            <br><small class="text-muted">' . $produto['vendas'] . ' vendas</small>
-                                        </div>
-                                        <div class="text-end">
-                                            <span class="badge bg-info">' . $produto['quantidade'] . ' unidades</span>
-                                        </div>
-                                    </div>';
-                                }
-                            } else {
-                                echo '<p class="text-muted text-center">Nenhuma venda encontrada</p>';
-                            }
-                            
-                            echo '</div>
-                        </div>
-                    </div>
+                    <span class="badge-navy" style="padding:3px 9px;border-radius:6px;font-size:11px;font-weight:650;">' . (int)$produto['quantidade'] . ' unidades</span>
                 </div>';
+            }
+        } else {
+            echo '<p style="color:var(--text-muted);text-align:center;padding:20px 0;">Nenhuma venda encontrada</p>';
+        }
 
-        echo '</div>
-    </div>';
+        echo '</div></article>
+            </section>';
+
+        echo '</div></main></div></div>';
 
     // Renderizar scripts
     renderAdminScripts();
     
-    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>';
+    echo '</body></html>';
         exit;
     }
 }

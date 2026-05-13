@@ -3,7 +3,7 @@
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0"><i class="fas fa-shopping-basket me-2"></i> Lista de Compras — Carnê</h1>
+        <h1 class="page-title">Lista de Compras — Carnê</h1>
         <a href="/admin/carnes" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Voltar</a>
     </div>
 

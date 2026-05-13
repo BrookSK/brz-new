@@ -83,6 +83,16 @@
     <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/pedidos') !== false && strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/pedidos/') === false): ?>
+    <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">
+    <?php endif; ?>
+    <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/produtos') !== false): ?>
+    <link href="/assets/css/produtos-redesign.css" rel="stylesheet">
+    <?php endif; ?>
+    <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/grupos-compras') !== false): ?>
+    <link href="/assets/css/grupos-compras-redesign.css" rel="stylesheet">
+    <?php endif; ?>
     <?php
     include_once __DIR__ . '/../partials/admin_sidebar.php';
     if (function_exists('renderAdminSidebarStyles')) {
@@ -180,28 +190,7 @@
             min-height: 0;
         }
 
-        .sidebar {
-            min-height: 100vh;
-            background: #0b1f3a;
-        }
-        
-        .sidebar .nav-link {
-            color: rgba(255, 255, 255, 0.8);
-            border-radius: 0.35rem;
-            margin: 0.2rem 0;
-        }
-        
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            color: #fff;
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .sidebar .sidebar-brand {
-            color: #fff;
-            font-weight: bold;
-            padding: 1rem;
-        }
+        /* Sidebar styles are handled by renderAdminSidebarStyles() */
         
         .border-left-primary {
             border-left: 0.25rem solid #1d4ed8 !important;
@@ -267,5 +256,30 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/produtos') !== false): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded',function(){
+        // Hide only the variations section title and its content, not the whole product card
+        var hiding = false;
+        document.querySelectorAll('h5,h4,h3,h6').forEach(function(el){
+            var txt = (el.textContent||'').trim();
+            if (txt === 'Variações' || txt === 'Variações do Produto') {
+                // Hide this heading and all siblings after it until next major heading
+                el.style.display = 'none';
+                var sib = el.nextElementSibling;
+                while(sib) {
+                    if (sib.tagName === 'H5' || sib.tagName === 'H4' || sib.tagName === 'H3' || sib.classList.contains('card')) break;
+                    sib.style.display = 'none';
+                    sib = sib.nextElementSibling;
+                }
+            }
+        });
+        // Hide alert about variations in new product page
+        document.querySelectorAll('.alert-info').forEach(function(el){
+            if ((el.textContent||'').indexOf('cadastrar variações') > -1 || (el.textContent||'').indexOf('Para cadastrar variações') > -1) el.style.display = 'none';
+        });
+    });
+    </script>
+    <?php endif; ?>
 </body>
 </html>

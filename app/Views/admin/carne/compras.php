@@ -4,8 +4,8 @@
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
-            <h2 class="mb-1"><i class="fas fa-shopping-basket me-2"></i>Compras do Carnê</h2>
-            <p class="text-muted mb-0">Produtos de pedidos via carnê agrupados por mês</p>
+            <h1 class="page-title">Compras do Carnê</h1>
+            <p class="page-subtitle">Produtos de pedidos via carnê agrupados por mês</p>
         </div>
         <div class="d-flex gap-2">
             <a href="/admin/carnes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>

@@ -88,14 +88,14 @@ class AdminGruposComprasController extends Controller {
                         INNER JOIN pedido_itens pi ON pi.pedido_id = pd.id
                         INNER JOIN produtos pr ON pr.id = pi.produto_id
                         WHERE pr.grupo_compras_id = g.id) AS qtd_pedidos
-                FROM grupos_compras g ORDER BY g.created_at DESC
+                FROM grupos_compras g ORDER BY LOWER(g.nome) ASC
             ");
             $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
             try {
                 $pdo = $this->getPdo();
                 $this->ensureTables($pdo);
-                $stmt = $pdo->query("SELECT * FROM grupos_compras ORDER BY created_at DESC");
+                $stmt = $pdo->query("SELECT * FROM grupos_compras ORDER BY LOWER(nome) ASC");
                 $grupos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
                 foreach ($grupos as &$g) { $g['qtd_produtos'] = 0; $g['qtd_pedidos'] = 0; }
             } catch (\Throwable $e2) {}
@@ -690,7 +690,7 @@ class AdminGruposComprasController extends Controller {
                 $title = htmlspecialchars($grupo['nome'] ?? 'Grupo') . ' — Histórico (Receita Federal)';
                 ob_start();
                 echo '<div class="container py-4">';
-                echo '<h2 class="mb-1"><i class="fas fa-archive me-2"></i>' . htmlspecialchars($grupo['nome'] ?? '') . '</h2>';
+                echo '<h1 class="page-title">' . htmlspecialchars($grupo['nome'] ?? '') . '</h1>';
                 echo '<p class="text-muted mb-4">Histórico de períodos — Receita Federal</p>';
 
                 if (empty($snapshots)) {

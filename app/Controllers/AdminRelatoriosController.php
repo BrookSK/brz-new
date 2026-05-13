@@ -342,7 +342,7 @@ class AdminRelatoriosController extends Controller {
         renderAdminSidebar('relatorios');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
-            . '<h1 class="h2"><i class="fas fa-exchange-alt me-2"></i>Movimentação do Fluxo</h1>'
+            . '<h1 class="page-title">Movimentação do Fluxo</h1>'
             . '</div>';
 
         if (!$hasMov) {
@@ -540,7 +540,7 @@ class AdminRelatoriosController extends Controller {
         renderAdminSidebar('relatorios');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
-            . '<h1 class="h2"><i class="fas fa-user-shield me-2"></i>Auditoria / Logs de Uso</h1>'
+            . '<h1 class="page-title">Auditoria / Logs de Uso</h1>'
             . '</div>';
 
         if (!$hasLogs) {
@@ -1041,7 +1041,7 @@ class AdminRelatoriosController extends Controller {
         renderAdminSidebar('relatorios');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">'
-            . '<h1 class="h2"><i class="fas fa-chart-line me-2"></i>Relatório Financeiro (Completo)</h1>'
+            . '<h1 class="page-title">Relatório Financeiro (Completo)</h1>'
             . '</div>';
 
         echo '<div class="card mb-3"><div class="card-body">'
@@ -1526,7 +1526,7 @@ class AdminRelatoriosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-file-pdf me-2"></i>Relatórios e Análises</h1>
+                    <h1 class="page-title">Relatórios e Análises</h1>
                     <div>
                         <a class="btn btn-primary me-2" href="/admin/estoque/relatorios/financeiro">
                             <i class="fas fa-chart-line me-1"></i>Financeiro (Completo)

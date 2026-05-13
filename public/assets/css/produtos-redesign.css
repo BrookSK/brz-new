@@ -1,0 +1,241 @@
+/* =========================================================
+   PRODUTOS PAGE REDESIGN
+   Desktop: tabela limpa | Mobile: cards verticais
+   ========================================================== */
+
+:root {
+    --navy: #18253D;
+    --bg-page: #F5F7FA;
+    --surface: #FFFFFF;
+    --surface-soft: #FAFBFC;
+    --border: #EBF0F6;
+    --border-strong: #E2E8F0;
+    --text-main: #1F2937;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+    --green-bg: #D1FAE5;
+    --green-text: #065F46;
+    --gray-bg: #F1F5F9;
+    --gray-text: #475569;
+}
+
+/* Table styling */
+.table {
+    border-collapse: collapse !important;
+}
+
+.table thead {
+    background: var(--surface-soft) !important;
+}
+
+.table thead th {
+    color: var(--text-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .05em !important;
+    padding: 12px 14px !important;
+    border-bottom: 1px solid var(--border) !important;
+    white-space: nowrap !important;
+}
+
+.table tbody td {
+    padding: 13px 14px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    vertical-align: middle !important;
+}
+
+.table tbody tr {
+    transition: .18s ease !important;
+}
+
+.table tbody tr:hover {
+    background: var(--surface-soft) !important;
+}
+
+/* Product images */
+.table img {
+    border-radius: 10px !important;
+    border: 1px solid var(--border) !important;
+    object-fit: cover !important;
+}
+
+/* Badges */
+.badge {
+    border-radius: 999px !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    padding: 4px 9px !important;
+}
+
+/* Cards */
+.card {
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+
+/* Form controls */
+.form-control, .form-select {
+    border-radius: 8px !important;
+    border-color: var(--border-strong) !important;
+}
+
+/* =========================================================
+   MOBILE — Cards instead of table
+   ========================================================== */
+
+@media (max-width: 768px) {
+    /* Kill horizontal scroll */
+    html, body, .container-fluid {
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+    }
+
+    /* Hide table-responsive scroll */
+    .table-responsive {
+        overflow-x: hidden !important;
+        overflow: visible !important;
+    }
+
+    /* Transform table to card layout */
+    .table {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .table thead {
+        display: none !important;
+    }
+
+    .table tbody {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .table tbody tr {
+        display: grid !important;
+        grid-template-columns: auto 1fr !important;
+        gap: 0 12px !important;
+        padding: 14px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        background: var(--surface) !important;
+    }
+
+    .table tbody tr td {
+        display: block !important;
+        border: none !important;
+        padding: 4px 0 !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+
+    /* Image cell - spans left column */
+    .table tbody tr td:nth-child(1) { /* checkbox */
+        grid-row: 1;
+        grid-column: 1;
+        align-self: start;
+        padding-top: 4px !important;
+    }
+
+    .table tbody tr td:nth-child(2) { /* image */
+        grid-row: 1 / 3;
+        grid-column: 1;
+        padding-top: 24px !important;
+    }
+
+    .table tbody tr td:nth-child(2) img {
+        width: 60px !important;
+        height: 60px !important;
+    }
+
+    /* Name, store, weight, price, status, actions - right column */
+    .table tbody tr td:nth-child(n+3) {
+        grid-column: 1 / -1;
+    }
+
+    /* Product name */
+    .table tbody tr td:nth-child(3) {
+        font-weight: 650 !important;
+        font-size: 14px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Meta info styling */
+    .table tbody tr td:nth-child(4),
+    .table tbody tr td:nth-child(5),
+    .table tbody tr td:nth-child(6) {
+        font-size: 12px !important;
+        color: var(--text-secondary) !important;
+    }
+
+    .table tbody tr td:nth-child(4)::before { content: "Loja: "; font-weight: 600; color: var(--text-muted); font-size: 11px; }
+    .table tbody tr td:nth-child(5)::before { content: "Peso: "; font-weight: 600; color: var(--text-muted); font-size: 11px; }
+    .table tbody tr td:nth-child(6)::before { content: "Preço: "; font-weight: 600; color: var(--text-muted); font-size: 11px; }
+
+    /* Actions */
+    .table tbody tr td:last-child {
+        padding-top: 10px !important;
+        border-top: 1px solid #f1f5f9 !important;
+        margin-top: 8px !important;
+    }
+
+    /* Columns stack */
+    .col-lg-8, .col-lg-4, .col-md-8, .col-md-4,
+    .col-lg-6, .col-md-6, .col-lg-10, .col-md-9 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .table tbody tr {
+        grid-template-columns: 1fr !important;
+    }
+
+    .table tbody tr td:nth-child(1),
+    .table tbody tr td:nth-child(2) {
+        grid-column: 1 !important;
+        grid-row: auto !important;
+    }
+
+    .table tbody tr td:nth-child(2) {
+        padding-top: 0 !important;
+        margin-bottom: 8px !important;
+    }
+
+    .table tbody tr td:nth-child(2) img {
+        width: 72px !important;
+        height: 72px !important;
+    }
+}
+
+/* =========================================================
+   HIDE VARIATIONS SECTION
+   All products are simple - variations hidden via CSS
+   ========================================================== */
+
+/* Hide any element containing "Variações" or "variacao" in id/class/href */
+[id*="variaco"], [id*="Variaco"],
+[id*="variacao"], [id*="Variacao"],
+[data-bs-target*="variaco"], [data-bs-target*="variacao"],
+[href*="variaco"], [href*="variacao"],
+.nav-link[data-bs-target*="variaco"],
+.nav-item:has([data-bs-target*="variaco"]) {
+    display: none !important;
+}
+
+/* Also hide the alert about variations in the new product page */
+.alert-info:has(strong) {
+    display: none !important;
+}

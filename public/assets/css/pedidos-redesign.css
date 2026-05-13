@@ -1,0 +1,474 @@
+/* =========================================================
+   PEDIDOS PAGE REDESIGN
+   Transforms existing Bootstrap grid cards into mockup layout
+   ========================================================== */
+
+:root {
+    --navy: #18253D;
+    --navy-hover: #243049;
+    --bg-page: #F5F7FA;
+    --surface: #FFFFFF;
+    --surface-soft: #FAFBFC;
+    --border: #EBF0F6;
+    --border-strong: #E2E8F0;
+    --text-main: #1F2937;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+}
+
+/* Page background */
+.admin-shell .main-content {
+    background: var(--bg-page) !important;
+}
+
+/* Order cards - desktop grid layout */
+.order-card {
+    border-radius: 12px !important;
+    border: 1px solid var(--border) !important;
+    transition: .18s ease !important;
+    overflow: hidden;
+}
+
+.order-card:hover {
+    box-shadow: 0 4px 16px rgba(24, 37, 61, .07) !important;
+    transform: translateY(-1px);
+}
+
+.order-card .card-body {
+    padding: 18px 20px !important;
+}
+
+.order-card .card-body .row {
+    --bs-gutter-x: 20px;
+}
+
+/* Status badge */
+.order-card .badge {
+    border-radius: 999px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    padding: 4px 10px !important;
+}
+
+/* Order number */
+.order-card h6 {
+    font-weight: 700 !important;
+    color: var(--navy) !important;
+}
+
+/* Customer name */
+.order-card .col-12.col-lg-4 h6 {
+    font-size: 14px !important;
+    font-weight: 650 !important;
+}
+
+/* Total */
+.order-card .text-primary {
+    color: #2563EB !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+}
+
+/* Needs review highlight */
+.order-card.needs-review {
+    background: #FFFBFB !important;
+    border-color: #FDE68A !important;
+}
+
+.order-card.needs-review:hover {
+    background: #FFF5F5 !important;
+}
+
+/* Action buttons */
+.order-card .btn-outline-primary {
+    border-radius: 7px !important;
+    font-size: 12px !important;
+}
+
+.order-card .btn-outline-danger {
+    border-radius: 7px !important;
+    font-size: 12px !important;
+}
+
+.order-card .form-select-sm {
+    border-radius: 8px !important;
+    font-size: 12.5px !important;
+    border-color: var(--border-strong) !important;
+}
+
+/* Filters card */
+.card.border-0.shadow-sm .form-control,
+.card.border-0.shadow-sm .form-select {
+    border-radius: 8px !important;
+    border-color: var(--border-strong) !important;
+    font-size: 13px !important;
+}
+
+/* Tabs / Pills */
+.nav-tabs .nav-link,
+.nav-pills .nav-link {
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+    color: #6B7280 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    padding: 8px 4px 12px !important;
+    margin-right: 22px !important;
+    background: transparent !important;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-pills .nav-link:hover {
+    color: #374151 !important;
+}
+
+.nav-tabs .nav-link.active,
+.nav-pills .nav-link.active {
+    color: var(--navy) !important;
+    border-bottom-color: var(--navy) !important;
+    font-weight: 600 !important;
+    background: transparent !important;
+}
+
+.nav-tabs .nav-link .badge,
+.nav-pills .nav-link .badge {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px !important;
+    border-radius: 999px !important;
+    font-size: 11px !important;
+}
+
+.nav-tabs,
+.nav-pills {
+    border-bottom: 1px solid var(--border) !important;
+    margin-bottom: 16px !important;
+    gap: 0 !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+}
+
+.nav-tabs::-webkit-scrollbar,
+.nav-pills::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 992px) {
+    .order-card .card-body .row {
+        gap: 0 !important;
+    }
+
+    .order-card .card-body .row > [class*="col-lg"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Identification section */
+    .order-card .col-6.col-lg-2 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-bottom: 12px !important;
+        margin-bottom: 12px !important;
+        border-bottom: 1px solid var(--border) !important;
+    }
+
+    .order-card .col-6.col-lg-2 .text-center {
+        text-align: left !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+    }
+
+    .order-card .col-6.col-lg-2 .badge.fs-6 {
+        width: 32px !important;
+        height: 32px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 9px !important;
+        font-size: 14px !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* Customer section */
+    .order-card .col-12.col-lg-4 {
+        margin-bottom: 12px !important;
+    }
+
+    /* Financial section */
+    .order-card .col-6.col-lg-3:not(:last-child) {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        margin-top: 12px !important;
+        padding: 12px !important;
+        border-radius: 10px !important;
+        background: var(--surface-soft) !important;
+        border: 1px solid var(--border) !important;
+    }
+
+    .order-card .col-6.col-lg-3:not(:last-child) .text-center {
+        text-align: left !important;
+    }
+
+    .order-card .col-6.col-lg-3:not(:last-child) h5 {
+        font-size: 18px !important;
+    }
+
+    /* Actions section */
+    .order-card .col-12.col-lg-3:last-child {
+        margin-top: 12px !important;
+        padding-top: 12px !important;
+        border-top: 1px solid var(--border) !important;
+    }
+
+    .order-card .col-12.col-lg-3:last-child .d-flex {
+        justify-content: flex-start !important;
+    }
+
+    .order-card .col-12.col-lg-3:last-child .form-select-sm {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .order-card .card-body {
+        padding: 14px !important;
+    }
+
+    .order-card .col-12.col-lg-3:last-child .d-flex {
+        display: grid !important;
+        grid-template-columns: 38px 38px 1fr !important;
+        gap: 8px !important;
+    }
+
+    .order-card .col-12.col-lg-3:last-child .btn {
+        width: 38px !important;
+        height: 38px !important;
+        padding: 0 !important;
+        border: 1px solid var(--border-strong) !important;
+    }
+
+    .order-card .col-12.col-lg-3:last-child .form-select-sm {
+        height: 38px !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .order-card .col-12.col-lg-3:last-child .d-flex {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    .order-card .col-12.col-lg-3:last-child .form-select-sm {
+        grid-column: 1 / -1 !important;
+        order: -1 !important;
+    }
+}
+
+/* =========================================================
+   PEDIDO DETALHE PAGE
+   ========================================================== */
+
+/* Prevent horizontal scroll globally */
+body {
+    overflow-x: hidden !important;
+}
+
+.container-fluid {
+    overflow-x: hidden !important;
+}
+
+/* Tables in detail page - prevent horizontal scroll */
+.table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* On mobile, transform tables to stacked cards */
+@media (max-width: 768px) {
+    /* Prevent ANY horizontal scroll */
+    html, body, .container-fluid, .row {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* KILL table-responsive scroll */
+    .table-responsive {
+        overflow-x: hidden !important;
+        overflow: visible !important;
+    }
+
+    /* Transform tables to block layout - NO horizontal scroll */
+    .table {
+        display: block !important;
+        width: 100% !important;
+        font-size: 12px !important;
+    }
+
+    .table thead {
+        display: none !important;
+    }
+
+    .table tbody {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .table tbody tr {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+        padding: 12px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        background: #fff !important;
+    }
+
+    .table tbody tr td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 6px 0 !important;
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
+    .table tbody tr td:last-child {
+        border-bottom: none !important;
+    }
+
+    .table tbody tr td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 11px;
+        flex: 0 0 auto;
+        margin-right: 10px;
+        min-width: 80px;
+    }
+
+    /* Images in table */
+    .table img {
+        max-width: 40px !important;
+        height: auto !important;
+    }
+
+    .container-fluid > .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .container-fluid > .row > [class*="col-"] {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    /* Cards */
+    .card {
+        border-radius: 12px !important;
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 12px 14px !important;
+    }
+
+    .card-body {
+        padding: 14px !important;
+    }
+
+    /* Form controls */
+    .form-control, .form-select {
+        font-size: 14px !important;
+    }
+
+    /* Buttons */
+    .btn {
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+    }
+
+    .btn-group {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+
+    /* Status badges */
+    .badge {
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+
+    /* Two-column layout to single column */
+    .col-lg-8, .col-lg-4, .col-md-8, .col-md-4,
+    .col-lg-6, .col-md-6 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Input groups */
+    .input-group {
+        flex-wrap: wrap !important;
+    }
+
+    /* Flex items that might overflow */
+    .d-flex {
+        flex-wrap: wrap !important;
+    }
+
+    /* Prevent text overflow everywhere */
+    h1, h2, h3, h4, h5, h6, p, span, a, td, th, label, div {
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    /* Stack all grid items */
+    .row > [class*="col-"] {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Table cells even smaller */
+    .table th, .table td {
+        font-size: 11px !important;
+        padding: 6px 4px !important;
+        max-width: 100px !important;
+    }
+
+    /* Product image in table */
+    .table img {
+        max-width: 30px !important;
+        height: auto !important;
+    }
+
+    /* Header actions */
+    .d-flex.justify-content-between {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+
+    .d-flex.justify-content-end {
+        justify-content: flex-start !important;
+        flex-wrap: wrap !important;
+    }
+}

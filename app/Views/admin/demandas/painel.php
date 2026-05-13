@@ -8,7 +8,7 @@ foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatu
 ?>
 <div class="container-fluid py-3">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
-        <h4 class="fw-bold mb-0"><i class="fas fa-columns me-2"></i>Painel de Demandas</h4>
+        <h1 class="page-title">Painel de Demandas</h1>
         <a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>
     </div>
     <?php if (!empty($_SESSION['message'])): ?><div class="alert alert-<?= $_SESSION['message_type'] ?? 'info' ?> alert-dismissible fade show"><?= htmlspecialchars($_SESSION['message']) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php unset($_SESSION['message'], $_SESSION['message_type']); endif; ?>

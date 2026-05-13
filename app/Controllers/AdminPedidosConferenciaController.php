@@ -24,6 +24,26 @@ class AdminPedidosConferenciaController extends Controller {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
         renderAdminSidebarStyles();
+        echo '<style>
+        @media (max-width: 767.98px) {
+            .conferencia-card .card-header { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
+            .conferencia-card .card-header .d-flex { flex-wrap: wrap; gap: 4px !important; }
+            .conferencia-card .card-body table { display: block; }
+            .conferencia-card .card-body thead { display: none; }
+            .conferencia-card .card-body tbody { display: block; }
+            .conferencia-card .card-body tr { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border-bottom: 1px solid #f1f5f9; align-items: center; }
+            .conferencia-card .card-body td { display: block; border: none !important; padding: 2px 0 !important; white-space: normal !important; word-break: break-word; }
+            .conferencia-card .card-body td:first-child { flex: 0 0 50px; }
+            .conferencia-card .card-body td:nth-child(2) { flex: 1 1 calc(100% - 60px); }
+            .conferencia-card .card-body td:nth-child(n+3) { flex: 0 0 auto; font-size: 12px; }
+            .conferencia-card .card-body td input[type="number"] { width: 80px !important; }
+            .conferencia-card .card-footer { padding: 10px !important; }
+            .conferencia-card .card-footer form { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+            .conferencia-card .card-footer .d-flex { flex-wrap: wrap; width: 100%; }
+            .conferencia-card .card-footer .ms-auto { margin-left: 0 !important; }
+            .conferencia-card .card-footer .btn { font-size: 12px; }
+        }
+        </style>';
         echo '</head>
 <body>
     <div class="container-fluid">
@@ -32,7 +52,7 @@ class AdminPedidosConferenciaController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-clipboard-check me-2"></i>Pedidos para conferência</h1>
+                <h1 class="page-title">Pedidos para Conferência</h1>
             </div>';
 
         $this->renderFlashIfAny();
@@ -371,18 +391,20 @@ HTML;
                 $simbolo = strtoupper($moeda) === 'BRL' ? 'R$' : '$';
                 $simboloItem = '$'; // itens sempre em USD (preço original do produto)
 
-                echo '<div class="card mb-4 border' . ($temValorCliente ? ' border-danger' : '') . '">';
+                echo '<div class="card mb-4 border conferencia-card' . ($temValorCliente ? ' border-danger' : '') . '">';
 
                 // Header do pedido
-                echo '<div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">';
-                echo '<div class="d-flex align-items-center gap-3">';
+                echo '<div class="card-header py-2">';
+                echo '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">';
+                echo '<div class="d-flex align-items-center gap-2 flex-wrap">';
                 echo '<strong><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="text-decoration-none">#' . $pid . '</a></strong>';
                 if ($origem !== '') echo '<span class="badge bg-secondary">' . htmlspecialchars($origem) . '</span>';
-                if ($temValorCliente) echo '<span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
                 echo '<span class="text-muted small">' . htmlspecialchars($createdAt !== '' ? date('d/m/Y H:i', strtotime($createdAt)) : '') . '</span>';
-                if ($clienteNome !== '') echo '<span class="small"><i class="fas fa-user me-1"></i>' . htmlspecialchars($clienteNome) . '</span>';
                 echo '</div>';
                 echo '<div class="fw-bold">' . htmlspecialchars($simbolo . ' ' . number_format($total, 2, ',', '.')) . '</div>';
+                echo '</div>';
+                if ($clienteNome !== '') echo '<div class="small mt-1"><i class="fas fa-user me-1"></i>' . htmlspecialchars($clienteNome) . '</div>';
+                if ($temValorCliente) echo '<span class="badge bg-danger mt-1"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
                 echo '</div>';
 
                 // Itens do pedido

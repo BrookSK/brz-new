@@ -256,7 +256,7 @@ class AdminProdutosNovoController extends Controller {
 
         echo '<div class="pt-3">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">
-                    <h1 class="h2">Novo Produto</h1>
+                    <h1 class="page-title">Novo Produto</h1>
                     <a href="/admin/produtos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>';
 

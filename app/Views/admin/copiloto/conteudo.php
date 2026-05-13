@@ -2,8 +2,8 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="fas fa-book me-2"></i>Conteúdo de Referência</h2>
-            <p class="text-muted mb-0">Materiais que formam a inteligência de fundo da Bri</p>
+            <h1 class="page-title">Conteúdo de Referência</h1>
+            <p class="page-subtitle">Materiais que formam a inteligência de fundo da Bri</p>
         </div>
         <div class="d-flex gap-2">
             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalUpload">

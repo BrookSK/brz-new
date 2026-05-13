@@ -502,7 +502,7 @@ class AdminRemessaWpController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h3 mb-0"><i class="fab fa-wordpress me-2"></i>Remessa WP</h1>
+                <h1 class="page-title">Remessa WP</h1>
                 <div class="d-flex gap-2">
                     <form method="GET" action="/admin/remessa-wp" class="d-flex gap-2">
                         <select class="form-select" name="source" style="max-width: 160px;">

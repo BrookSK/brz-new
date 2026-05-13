@@ -38,7 +38,7 @@ class AdminController extends Controller {
         
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-tachometer-alt me-2"></i>Dashboard Administrativo</h1>
+                    <h1 class="page-title">Dashboard Administrativo</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <div class="btn-group me-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary">
@@ -217,7 +217,7 @@ class AdminController extends Controller {
         echo '<!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
+                    <h1 class="page-title">Dashboard</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <button type="button" class="btn btn-sm btn-primary">
                             <i class="fas fa-sync"></i> Atualizar
@@ -527,7 +527,7 @@ class AdminController extends Controller {
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Pedidos (' . $total . ' encontrados)</h1>
+                    <h1 class="page-title">Pedidos (' . $total . ' encontrados)</h1>
                 </div>
                 
                 <!-- Filtros -->
@@ -706,7 +706,7 @@ class AdminController extends Controller {
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Novo Produto</h1>
+                    <h1 class="page-title">Novo Produto</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <a href="/admin/produtos" class="btn btn-secondary">
                             <i class="fas fa-arrow-left"></i> Voltar

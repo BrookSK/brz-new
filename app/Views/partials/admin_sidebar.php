@@ -219,26 +219,24 @@ function renderAdminSidebar($activePage = '') {
         'dashboard' => ['icon' => 'fas fa-tachometer-alt', 'label' => __('admin.menu.dashboard', 'Dashboard'), 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'produtos' => ['icon' => 'fas fa-box', 'label' => __('admin.menu.products', 'Produtos'), 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
         'grupos-compras' => ['icon' => 'fas fa-store', 'label' => 'Grupos de Compras', 'url' => '/admin/grupos-compras', 'roles' => ['admin','vendedor','suporte']],
-        'variacoes' => ['icon' => 'fas fa-sliders-h', 'label' => __('admin.menu.variations', 'Variações'), 'url' => '/admin/variacoes', 'roles' => ['admin','vendedor','suporte']],
         'lojas' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.stores', 'Lojas'), 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.categories', 'Categorias'), 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
-        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => __('admin.menu.orders_audit', 'Pedidos para conferência'), 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
-        'pedidos-wp' => ['icon' => 'fab fa-wordpress', 'label' => __('admin.menu.orders_wp', 'Pedidos (WordPress)'), 'url' => '/admin/pedidos-wp', 'roles' => ['admin','vendedor','suporte']],
+        'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Em Conferência', 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
         'wp-estatisticas' => ['icon' => 'fas fa-chart-pie', 'label' => __('admin.menu.wp_orders_stats', 'Estatísticas (WP)'), 'url' => '/admin/pedidos-wp/estatisticas', 'roles' => ['admin']],
         'tickets' => ['icon' => 'fas fa-life-ring', 'label' => __('admin.menu.tickets', 'Tickets'), 'url' => '/admin/tickets', 'roles' => ['admin','suporte']],
         'pedidos-comissoes' => ['icon' => 'fas fa-percentage', 'label' => __('admin.menu.my_commissions', 'Minhas Comissões'), 'url' => '/admin/pedidos/comissoes', 'roles' => ['admin','vendedor']],
         'estoque' => ['icon' => 'fas fa-warehouse', 'label' => __('admin.menu.inventory', 'Estoque'), 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
         'compras' => ['icon' => 'fas fa-shopping-basket', 'label' => __('admin.menu.purchases', 'Compras'), 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
-        'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
-        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => __('admin.menu.international_shipment', 'Remessa Internacional'), 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
-        'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
+        // 'relatorios' => ['icon' => 'fas fa-file-pdf', 'label' => __('admin.menu.reports', 'Relatórios'), 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
+        'remessa-internacional' => ['icon' => 'fas fa-globe-americas', 'label' => 'Wexpress', 'url' => '/admin/remessa-internacional', 'roles' => ['admin','vendedor']],
+        // 'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
         'remessa-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Conferência de Remessa', 'url' => '/admin/remessa-conferencia', 'roles' => ['admin','vendedor','suporte','conferente']],
-        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => __('admin.menu.post_office_shipment', 'Remessa Correios'), 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
-        'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correios Mundial', 'url' => '/admin/correios-mundial', 'roles' => ['admin','vendedor','suporte']],
-        'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => __('admin.menu.shipstation_shipment', 'Remessa ShipStation (UPS)'), 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
+        'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Correio Brasil', 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
+        'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correio Internacional', 'url' => '/admin/correios-mundial', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => 'UPS', 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
         'usuarios' => ['icon' => 'fas fa-users', 'label' => __('admin.menu.users', 'Usuários'), 'url' => '/admin/usuarios', 'roles' => ['admin','vendedor','suporte']],
-        'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.payments', 'Pagamentos'), 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
+        // 'pagamentos' => ['icon' => 'fas fa-credit-card', 'label' => __('admin.menu.payments', 'Pagamentos'), 'url' => '/admin/pagamentos', 'roles' => ['admin','vendedor']],
         'carnes' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Carnê Braziliana', 'url' => '/admin/carnes', 'roles' => ['admin','vendedor']],
         'carnes-compras' => ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras do Carnê', 'url' => '/admin/carnes/compras', 'roles' => ['admin','vendedor']],
         'relatorio-pedidos' => ['icon' => 'fas fa-file-alt', 'label' => 'Relatório Pedidos', 'url' => '/admin/relatorio-pedidos', 'roles' => ['admin','vendedor']],
@@ -253,10 +251,14 @@ function renderAdminSidebar($activePage = '') {
         'live-shop-orders' => ['icon' => 'fas fa-shopping-bag', 'label' => 'Pedidos da Live', 'url' => '/admin/live-shop/orders', 'roles' => ['admin', 'vendedor']],
         'live-shop-reports' => ['icon' => 'fas fa-chart-line', 'label' => 'Relatórios', 'url' => '/admin/live-shop/reports', 'roles' => ['admin', 'vendedor']],
         'quickbooks' => ['icon' => 'fas fa-calculator', 'label' => 'QuickBooks', 'url' => '/admin/quickbooks', 'roles' => ['admin']],
+        'email-marketing' => ['icon' => 'fas fa-envelope-open-text', 'label' => 'Email Marketing', 'url' => '/admin/email-marketing', 'roles' => ['admin']],
+        'cart-recovery' => ['icon' => 'fas fa-cart-arrow-down', 'label' => 'Recuperação Carrinho', 'url' => '/admin/cart-recovery', 'roles' => ['admin','vendedor']],
+        'mapa-calor-site' => ['icon' => 'fas fa-fire', 'label' => 'Mapa de Calor', 'url' => '/admin/mapa-calor-site', 'roles' => ['admin']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
         'email-logs' => ['icon' => 'fas fa-envelope', 'label' => 'Log de Emails', 'url' => '/admin/emails', 'roles' => ['admin']],
         'descontos' => ['icon' => 'fas fa-tag', 'label' => 'Autorizações Desconto', 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
         'promocoes-auditoria' => ['icon' => 'fas fa-percent', 'label' => 'Auditoria Promoções', 'url' => '/admin/promocoes-auditoria', 'roles' => ['admin']],
+        'descricao-produtos' => ['icon' => 'fas fa-pen-fancy', 'label' => 'Descrição de Produtos', 'url' => '/admin/descricao-produtos', 'roles' => ['admin','vendedor']],
         'promocoes-agendadas' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Promoções Agendadas', 'url' => '/admin/promocoes-agendadas', 'roles' => ['admin', 'vendedor']],
         'faq' => ['icon' => 'fas fa-question-circle', 'label' => 'FAQ / Termos', 'url' => '/admin/faq', 'roles' => ['admin']],
         'comissoes-global' => ['icon' => 'fas fa-users-cog', 'label' => 'Comissões Global', 'url' => '/admin/comissoes-global', 'roles' => ['admin']],
@@ -329,8 +331,8 @@ function renderAdminSidebar($activePage = '') {
         $pendentesConferencia = 0;
     }
 
-    // Toggle mobile (collapse) - fica fixo no topo no mobile/tablet
-    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-expanded="false" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
+    // Toggle mobile - custom JS (não usa collapse do Bootstrap para evitar conflito com grupos internos)
+    echo '<button class="btn btn-primary admin-menu-toggle d-md-none" type="button" onclick="document.getElementById(\'adminSidebar\').classList.toggle(\'sidebar-open\')" aria-label="' . htmlspecialchars(__('admin.open_menu', 'Abrir menu'), ENT_QUOTES, 'UTF-8') . '">
             <i class="fas fa-bars"></i>
           </button>';
 
@@ -419,7 +421,7 @@ function renderAdminSidebar($activePage = '') {
         }
     }
 
-    echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+    echo '<nav id="adminSidebar" class="col-md-3 col-lg-2 d-md-block sidebar">
         <div class="position-sticky pt-3">
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="/admin/dashboard">
                 ' . (!empty($adminLogo)
@@ -432,13 +434,14 @@ function renderAdminSidebar($activePage = '') {
             // Definir grupos de menu
             $menuGroups = [
                 '_solo_dashboard' => ['items' => ['dashboard']],
-                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pedidos-conferencia', 'pedidos-wp', 'wp-estatisticas', 'tickets', 'pedidos-comissoes', 'carnes', 'payment-links', 'relatorio-pedidos']],
-                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'variacoes', 'lojas', 'categorias', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
+                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pedidos-conferencia', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
+                'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
                 'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
                 'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'remessa-shipstation']],
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
                 'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos']],
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
+                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['email-marketing', 'cart-recovery', 'mapa-calor-site']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
                 'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup']],
             ];
@@ -478,11 +481,11 @@ function renderAdminSidebar($activePage = '') {
                 $collapseClass = $groupActive ? 'show' : '';
 
                 echo '<li class="nav-item">
-                    <a class="nav-link sidebar-group-toggle' . ($groupActive ? ' active' : '') . '" href="#' . $groupId . '" data-bs-toggle="collapse" role="button" aria-expanded="' . ($groupActive ? 'true' : 'false') . '" style="display:flex;justify-content:space-between;align-items:center;">
+                    <a class="nav-link sidebar-group-toggle' . ($groupActive ? ' active' : '') . '" href="javascript:void(0)" onclick="toggleSidebarGroup(this)" aria-expanded="' . ($groupActive ? 'true' : 'false') . '" style="display:flex;justify-content:space-between;align-items:center;">
                         <span><i class="fas fa-fw ' . ($group['icon'] ?? 'fas fa-folder') . '"></i> ' . htmlspecialchars($groupName) . '</span>
-                        <i class="fas fa-chevron-down" style="font-size:10px;transition:transform .2s;' . ($groupActive ? 'transform:rotate(180deg);' : '') . '"></i>
+                        <i class="fas fa-chevron-down sidebar-chevron" style="font-size:10px;transition:transform .2s;' . ($groupActive ? 'transform:rotate(180deg);' : '') . '"></i>
                     </a>
-                    <div class="collapse ' . $collapseClass . '" id="' . $groupId . '">
+                    <div class="sidebar-group-content" style="' . ($groupActive ? '' : 'display:none;') . '">
                         <ul class="nav flex-column" style="padding-left:12px;">';
 
                 foreach ($groupItems as $key => $item) {
@@ -491,10 +494,10 @@ function renderAdminSidebar($activePage = '') {
                     // Remover prefixo (RED) dos labels dentro do grupo
                     $label = preg_replace('/^\(RED\)\s*/i', '', $label);
                     if ($key === 'tickets' && $unreadTickets > 0) {
-                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $unreadTickets . '</span>';
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $unreadTickets . '</span>';
                     }
                     if ($key === 'pedidos-conferencia' && $pendentesConferencia > 0) {
-                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #0b1f3a !important; border: 1px solid rgba(11, 31, 58, 0.25) !important; font-weight: 600;">' . (int) $pendentesConferencia . '</span>';
+                        $label .= ' <span class="badge ms-2" style="background: #ffffff !important; color: #18253D !important; border: 2px solid #18253D !important; font-weight: 700; font-size: 11px; min-width: 22px; padding: 2px 6px;">' . (int) $pendentesConferencia . '</span>';
                     }
                     echo '<li class="nav-item">
                         <a class="nav-link ' . $activeClass . '" href="' . $item['url'] . '" style="padding:4px 12px;font-size:13px;">
@@ -522,7 +525,24 @@ function renderAdminSidebar($activePage = '') {
                 </a>
             </div>
         </div>
-    </nav>';
+    </nav>
+    <script>
+    function toggleSidebarGroup(el){
+        var content=el.nextElementSibling;
+        var chevron=el.querySelector(".sidebar-chevron");
+        if(!content)return;
+        var isVisible=(content.style.display!=="none");
+        if(isVisible){
+            content.style.display="none";
+            if(chevron)chevron.style.transform="rotate(0deg)";
+            el.setAttribute("aria-expanded","false");
+        } else {
+            content.style.display="block";
+            if(chevron)chevron.style.transform="rotate(180deg)";
+            el.setAttribute("aria-expanded","true");
+        }
+    }
+    </script>';
 }
 
 // Estilos CSS comuns para o menu lateral
@@ -534,6 +554,97 @@ function renderAdminSidebarStyles() {
             --radius-md: 14px;
             --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.08);
             --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+        }
+
+        /* Hide icons in page titles globally */
+        main h1 i.fas, main h1 i.far, main h1 i.fab, main h1 i.bi,
+        main h2 i.fas, main h2 i.far, main h2 i.fab, main h2 i.bi,
+        main h3 i.fas, main h3 i.far, main h3 i.fab, main h3 i.bi,
+        main .h2 i.fas, main .h2 i.far, main .h2 i.fab, main .h2 i.bi,
+        main .h3 i.fas, main .h3 i.far, main .h3 i.fab, main .h3 i.bi,
+        main .page-title i, main .page-title-icon,
+        main .page-title-wrap .page-title-icon,
+        main .border-bottom h1 i, main .border-bottom h2 i,
+        main .border-bottom h3 i,
+        .col-md-9 h1 i.fas, .col-md-9 h1 i.far, .col-md-9 h1 i.fab, .col-md-9 h1 i.bi,
+        .col-md-9 h2 i.fas, .col-md-9 h2 i.far, .col-md-9 h2 i.fab, .col-md-9 h2 i.bi,
+        .col-md-9 h3 i.fas, .col-md-9 h3 i.far, .col-md-9 h3 i.fab, .col-md-9 h3 i.bi,
+        .col-lg-10 h1 i.fas, .col-lg-10 h1 i.far, .col-lg-10 h1 i.fab, .col-lg-10 h1 i.bi,
+        .col-lg-10 h2 i.fas, .col-lg-10 h2 i.far, .col-lg-10 h2 i.fab, .col-lg-10 h2 i.bi,
+        .col-lg-10 h3 i.fas, .col-lg-10 h3 i.far, .col-lg-10 h3 i.fab, .col-lg-10 h3 i.bi,
+        .container-fluid > .d-flex h1 i, .container-fluid > .d-flex h2 i, .container-fluid > .d-flex h3 i,
+        .page-header .page-title-icon {
+            display: none !important;
+        }
+
+        /* Standardize page title sizes globally - match Dashboard pattern */
+        main h1.h2, main h1.h3, main .border-bottom h1,
+        .col-md-9 h1.h2, .col-md-9 h1.h3,
+        .col-lg-10 h1.h2, .col-lg-10 h1.h3,
+        .col-lg-10 .border-bottom h1,
+        main .page-title, .col-lg-10 .page-title,
+        .container-fluid .page-title,
+        main h4.fw-bold, .col-lg-10 h4.fw-bold,
+        .container-fluid h4.fw-bold {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            color: #18253D !important;
+            margin: 0 !important;
+            line-height: 1.3 !important;
+        }
+
+        main h2.mb-1, main h2.mb-0,
+        .col-lg-10 h2.mb-1, .col-lg-10 h2.mb-0,
+        .container-fluid h2.mb-1, .container-fluid h1.h3,
+        .container-fluid h2.mb-0 {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            color: #18253D !important;
+            margin: 0 !important;
+            line-height: 1.3 !important;
+        }
+
+        /* Standardize page subtitles */
+        main .border-bottom + p.text-muted,
+        main .page-subtitle, .col-lg-10 .page-subtitle,
+        .container-fluid .page-subtitle,
+        main .page-count {
+            font-size: 13px !important;
+            color: #64748B !important;
+            margin: 2px 0 0 0 !important;
+        }
+
+        /* Nav tabs/pills global override - navy instead of blue */
+        .nav-tabs .nav-link.active,
+        .nav-tabs .nav-link.active:focus,
+        .nav-tabs .nav-link.active:hover {
+            color: #18253D !important;
+            border-color: #18253D !important;
+            border-bottom-color: #fff !important;
+            font-weight: 600;
+        }
+        .nav-tabs .nav-link {
+            color: #64748B;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .nav-tabs .nav-link:hover {
+            color: #18253D;
+            border-color: transparent;
+        }
+        .nav-pills .nav-link.active {
+            background: #18253D !important;
+            color: #fff !important;
+            font-weight: 600;
+        }
+        .nav-pills .nav-link {
+            color: #334155;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .nav-pills .nav-link:hover {
+            color: #18253D;
+            background: #F8FAFC;
         }
 
         body {
@@ -754,21 +865,84 @@ function renderAdminSidebarStyles() {
 
         .sidebar { 
             min-height: 100vh; 
-            background: #0b1f3a;
+            background: #ffffff;
+            border-right: 1px solid #EBF0F6;
+            padding: 16px;
+        }
+        .sidebar .position-sticky {
+            padding-top: 0 !important;
         }
         .sidebar .nav-link { 
-            color: rgba(255, 255, 255, 0.8); 
-            border-radius: 0.35rem; 
-            margin: 0.2rem 0; 
+            color: #334155; 
+            border-radius: 9px; 
+            margin: 2px 0;
+            padding: 9px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: .18s ease;
         }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { 
+        .sidebar .nav-link i {
+            color: #94A3B8;
+            width: 18px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .sidebar .nav-link:hover { 
+            color: #18253D; 
+            background: #F8FAFC; 
+        }
+        .sidebar .nav-link:hover i {
+            color: #18253D;
+        }
+        .sidebar .nav-link.active { 
             color: #fff; 
-            background-color: rgba(255, 255, 255, 0.1); 
+            background: #18253D;
+            box-shadow: 0 4px 14px rgba(24, 37, 61, .16);
+        }
+        .sidebar .nav-link.active i {
+            color: #fff;
+        }
+        .sidebar .sidebar-group-toggle {
+            font-weight: 600;
+            color: #1F2937;
+        }
+        .sidebar .sidebar-group-toggle:hover {
+            background: #F8FAFC;
+            color: #18253D;
+        }
+        .sidebar .sidebar-group-toggle.active {
+            background: rgba(24, 37, 61, 0.06);
+            color: #18253D;
+            box-shadow: none;
+        }
+        .sidebar .sidebar-group-toggle.active i {
+            color: #18253D;
         }
         .sidebar .sidebar-brand { 
-            color: #fff; 
+            color: #18253D; 
             font-weight: bold; 
-            padding: 1rem; 
+            padding: 10px 10px 16px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #EBF0F6;
+        }
+        .sidebar .sidebar-brand .sidebar-brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #18253D;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .sidebar .sidebar-brand .sidebar-brand-text {
+            font-size: 15px;
+            font-weight: 700;
+            color: #18253D;
         }
 
         .sidebar .sidebar-brand .admin-sidebar-logo {
@@ -777,6 +951,18 @@ function renderAdminSidebarStyles() {
             max-width: 100%;
             object-fit: contain;
             display: inline-block;
+        }
+        .sidebar .sidebar-divider {
+            border-color: #EBF0F6;
+            margin: 12px 0;
+        }
+        .sidebar .collapse .nav-link {
+            padding: 6px 12px;
+            font-size: 12.5px;
+            margin: 1px 0;
+        }
+        .sidebar .collapse .nav-link i {
+            font-size: 11px;
         }
         .card-stats { 
             transition: none;
@@ -799,11 +985,15 @@ function renderAdminSidebarStyles() {
                 box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
                 border-top-right-radius: 18px;
                 border-bottom-right-radius: 18px;
+                background: #ffffff;
+                border-right: none;
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                display: block !important;
             }
 
-            /* Quando aberto, precisa ficar acima */
-            #adminSidebar.sidebar.show {
-                display: block;
+            #adminSidebar.sidebar.sidebar-open {
+                transform: translateX(0);
             }
 
             /* Dar espaço no conteúdo pra não ficar atrás do botão */
@@ -869,8 +1059,8 @@ function renderAdminSidebarStyles() {
             main h1, main h2, main h3 { font-size: 1.1rem !important; word-break: break-word; }
             main .card-header h5, main .card-header h6 { font-size: 0.85rem; }
             main .card-body { padding: 0.75rem; }
-            main table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; font-size: 11px; }
-            main table th, main table td { padding: 4px 6px; font-size: 11px; }
+            main table { font-size: 11px; width: 100% !important; }
+            main table th, main table td { padding: 4px 6px; font-size: 11px; white-space: normal !important; word-break: break-word; }
             main .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             main .btn:not(.btn-sm):not(.btn-lg) { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
             main .row > [class*="col-md-4"],
@@ -887,6 +1077,20 @@ function renderAdminSidebarStyles() {
             main .card select.form-select { font-size: 11px; padding: 2px 24px 2px 6px; height: auto; }
             /* Código do pedido longo */
             main .card .text-muted { word-break: break-all; }
+            /* Prevent horizontal scroll on nav tabs/pills */
+            main .nav-tabs, main .nav-pills {
+                flex-wrap: wrap !important;
+                overflow-x: visible !important;
+                white-space: normal !important;
+            }
+            main .nav-tabs .nav-link, main .nav-pills .nav-link {
+                font-size: 11px !important;
+                padding: 6px 10px !important;
+                white-space: nowrap;
+            }
+            /* Global no horizontal scroll */
+            body, html { overflow-x: hidden !important; }
+            main, .container-fluid, .col-md-9, .col-lg-10 { overflow-x: hidden !important; max-width: 100vw; }
         }
     </style>';
 }

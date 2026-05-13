@@ -151,7 +151,11 @@ class PedidoEcommerce {
 
             $usdBrlRate = $this->getConfigNumber('sistema', 'usd_brl_rate', 0.0);
             if ($usdBrlRate <= 0) {
-                $usdBrlRate = 0.0;
+                // Fallback: usar PedidoManualService
+                try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $usdBrlRate = $r; } catch (\Exception $e) {}
+            }
+            if ($usdBrlRate <= 0) {
+                $usdBrlRate = 5.85; // fallback final
             }
 
             $faturadoBrlParaFaixa = 0.0;
@@ -167,6 +171,14 @@ class PedidoEcommerce {
             $percent = $this->resolvePercentualPorFaixas($faturadoBrlParaFaixa, $faixas);
             $resumoBase['percentual_comissao'] = $percent;
             $resumoBase['valor_comissao'] = ($resumoBase['total_liquido'] * ($percent / 100));
+
+            // Aplicar percentual por moeda também
+            foreach ($resumoBase['por_moeda'] as $m => &$dados) {
+                $dados['percentual_comissao'] = $percent;
+                $dados['valor_comissao'] = max(0, (float)$dados['total_liquido']) * ($percent / 100);
+            }
+            unset($dados);
+
             return $resumoBase;
         } catch (\Exception $e) {
             return $resumoBase;
@@ -293,14 +305,30 @@ class PedidoEcommerce {
     }
 
     private function getComissaoManualFaixasConfig(): array {
-        $raw = $this->getConfigValue('comissao', 'manual_faixas', '[{"min":0,"max":999999999,"percent":0}]');
-        $decoded = null;
+        // Buscar faixas usando a mesma lógica do AdminComissoesGlobalController
         try {
-            $decoded = json_decode((string) $raw, true);
-        } catch (\Exception $e) {
-            $decoded = null;
-        }
-        return is_array($decoded) ? $decoded : [];
+            // Tentar com categoria + chave
+            $st = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'comissao' AND chave = 'manual_faixas' LIMIT 1");
+            $st->execute();
+            $raw = (string)($st->fetchColumn() ?: '');
+            if ($raw !== '') { $arr = json_decode($raw, true); if (is_array($arr) && !empty($arr)) return $arr; }
+
+            // Tentar com chave direta
+            $st2 = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'comissao_manual_faixas' LIMIT 1");
+            $st2->execute();
+            $raw2 = (string)($st2->fetchColumn() ?: '');
+            if ($raw2 !== '') { $arr2 = json_decode($raw2, true); if (is_array($arr2) && !empty($arr2)) return $arr2; }
+
+            // Tentar tabela configuracoes
+            try {
+                $st3 = $this->connection->prepare("SELECT valor FROM configuracoes WHERE chave = 'comissao_manual_faixas' LIMIT 1");
+                $st3->execute();
+                $raw3 = (string)($st3->fetchColumn() ?: '');
+                if ($raw3 !== '') { $arr3 = json_decode($raw3, true); if (is_array($arr3) && !empty($arr3)) return $arr3; }
+            } catch (\Exception $e) {}
+        } catch (\Exception $e) {}
+
+        return [['min' => 0, 'max' => 999999999, 'percent' => 0]];
     }
 
     private function resolvePercentualPorFaixas(float $faturadoBrl, array $faixas): float {

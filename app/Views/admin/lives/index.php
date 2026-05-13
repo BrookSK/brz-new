@@ -4,7 +4,7 @@
 ?>
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3"><i class="fas fa-video me-2"></i>Lives</h1>
+        <h1 class="page-title">Lives</h1>
         <a href="/admin/lives/nova" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i> Nova Live
         </a>

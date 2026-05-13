@@ -3,7 +3,7 @@
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0"><i class="fas fa-envelope me-2"></i>Log de Emails</h4>
+        <h1 class="page-title">Log de Emails</h1>
         <div class="d-flex gap-2">
             <span class="badge bg-primary fs-6"><?= (int) ($stats['total'] ?? 0) ?> total</span>
             <span class="badge bg-success fs-6"><?= (int) ($stats['enviados'] ?? 0) ?> enviados</span>

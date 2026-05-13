@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
     <div>
-        <h2 class="mb-1"><i class="fas fa-comments me-2"></i>Conversas do Co-Piloto</h2>
-        <p class="text-muted mb-0">Histórico de chats dos clientes com a Bri</p>
+        <h1 class="page-title">Conversas do Co-Piloto</h1>
+        <p class="page-subtitle">Histórico de chats dos clientes com a Bri</p>
     </div>
     <a href="/admin/copiloto" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
 </div>

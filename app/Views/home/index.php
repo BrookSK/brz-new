@@ -239,9 +239,27 @@
             <p class="section-subtitle" data-aos="fade-up"><?= __('home.featured_subtitle', 'Ofertas exclusivas com preços promocionais — disponíveis por tempo limitado ou até acabar o estoque.') ?></p>
         </div>
         
-        <div class="row g-4" id="produtos-destaque">
-            <!-- Produtos serão carregados via AJAX -->
+        <div class="position-relative">
+            <div style="overflow:hidden;">
+                <div id="produtos-destaque" class="carousel-track" style="display:flex;gap:16px;width:max-content;">
+                    <!-- Produtos serão carregados via AJAX como carrossel -->
+                </div>
+            </div>
+            <button class="btn btn-light shadow-sm position-absolute top-50 start-0 translate-middle-y rounded-circle d-none d-md-flex align-items-center justify-content-center" style="width:40px;height:40px;z-index:2;left:-10px;" onclick="scrollCarousel(-1)"><i class="fas fa-chevron-left"></i></button>
+            <button class="btn btn-light shadow-sm position-absolute top-50 end-0 translate-middle-y rounded-circle d-none d-md-flex align-items-center justify-content-center" style="width:40px;height:40px;z-index:2;right:-10px;" onclick="scrollCarousel(1)"><i class="fas fa-chevron-right"></i></button>
         </div>
+        <style>
+        @keyframes carouselScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .carousel-track.animating {
+            animation: carouselScroll var(--carousel-duration, 30s) linear infinite;
+        }
+        .carousel-track.animating:hover {
+            animation-play-state: paused;
+        }
+        </style>
     </div>
 </section>
 
@@ -442,25 +460,30 @@ $(document).ready(function() {
                     var isClubeBlocked = produto.clube_only && !clubeAcesso;
                     var precoHtml = isClubeBlocked
                         ? '<span class="badge" style="background:#0b1f3a;"><i class="fas fa-crown me-1"></i>Exclusivo Clube</span>'
-                        : '<span class="h5 mb-0 text-primary">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
+                        : '<span class="h5 mb-0 text-primary" data-original-price="' + produto.valor + '" data-currency="' + (produto.moeda || 'USD') + '">' + produto.moeda + ' ' + formatMoney(produto.valor) + '</span>';
+                    var disponivel = parseInt(produto.estoque || 0) > 0;
+                    var dispBadge = disponivel
+                        ? '<span class="badge bg-success" style="font-size:10px;">Disponível</span>'
+                        : '<span class="badge bg-danger" style="font-size:10px;">Indisponível</span>';
                     var btnHtml = isClubeBlocked
-                        ? '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais sobre o Clube</a>'
+                        ? '<a href="/como-funciona-clube" class="btn btn-outline-secondary btn-sm w-100"><i class="fas fa-crown me-2"></i>Saiba mais</a>'
                         : '<a href="/produto/detalhes/' + produto.id + '" class="btn btn-outline-primary btn-sm w-100">' + UI.details + '</a>';
                     html += `
-                        <div class="col-lg-3 col-md-6">
+                        <div class="carousel-item-card" style="min-width:260px;max-width:280px;flex-shrink:0;">
                             <div class="product-card card h-100">
-                                <div class="position-relative overflow-hidden">
+                                <div class="position-relative overflow-hidden" style="height:180px;background:#f8fafc;display:flex;align-items:center;justify-content:center;">
                                     <img src="${produto.foto_principal || '/uploads/produtos/placeholder.jpg'}" 
                                          alt="${produto.nome}" 
-                                         class="product-image card-img-top">
-                                    ${produto.estoque <= 5 && !isClubeBlocked ? '<span class="position-absolute top-0 end-0 m-2 badge" style="background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.35); color: rgba(124, 45, 18, 1);">' + UI.badge_last_units + '</span>' : ''}
+                                         class="product-image card-img-top"
+                                         style="width:100%;height:180px;object-fit:contain;"
+                                         onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\'width:100%;height:180px;display:flex;align-items:center;justify-content:center;color:#94A3B8;\'><i class=\'fas fa-image fa-2x\'></i></div>';">
                                 </div>
                                 <div class="card-body">
-                                    <h6 class="card-title">${produto.nome}</h6>
-                                    <p class="text-muted small">${produto.categoria}</p>
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="card-title" style="font-size:13px;line-height:1.3;min-height:36px;">${produto.nome}</h6>
+                                    <p class="text-muted small mb-2">${produto.categoria}</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
                                         ${precoHtml}
-                                        ${!isClubeBlocked ? '<small class="text-muted">' + produto.estoque + ' ' + UI.units_short + '</small>' : ''}
+                                        ${!isClubeBlocked ? dispBadge : ''}
                                     </div>
                                     ${btnHtml}
                                 </div>
@@ -469,14 +492,47 @@ $(document).ready(function() {
                     `;
                 });
                 $('#produtos-destaque').html(html);
+                initInfiniteCarousel();
             } else {
-                $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">' + UI.no_featured + '</p></div>');
+                $('#produtos-destaque').html('<div class="text-center w-100"><p class="text-muted">' + UI.no_featured + '</p></div>');
             }
         },
         error: function() {
-            $('#produtos-destaque').html('<div class="col-12 text-center"><p class="text-muted">' + UI.cant_load + '</p></div>');
+            $('#produtos-destaque').html('<div class="text-center w-100"><p class="text-muted">' + UI.cant_load + '</p></div>');
         }
     });
+
+    // Carousel functions
+    function scrollCarousel(dir) {
+        var el = document.getElementById('produtos-destaque');
+        if (!el) return;
+        el.classList.remove('animating');
+        el.style.animation = 'none';
+        el.offsetHeight; // force reflow
+        var current = el.getBoundingClientRect().left;
+        var items = el.querySelectorAll('.carousel-item-card');
+        // Manual scroll by shifting margin
+        var shift = dir * 300;
+        var currentMargin = parseInt(el.style.marginLeft || '0') || 0;
+        el.style.transition = 'margin-left 0.3s ease';
+        el.style.marginLeft = (currentMargin - shift) + 'px';
+        setTimeout(function() { el.style.transition = ''; }, 350);
+    }
+    window.scrollCarousel = scrollCarousel;
+
+    function initInfiniteCarousel() {
+        var el = document.getElementById('produtos-destaque');
+        if (!el || el.children.length < 2) return;
+        // Clone all items for seamless loop
+        var items = Array.from(el.children);
+        items.forEach(function(item) {
+            el.appendChild(item.cloneNode(true));
+        });
+        // Set duration based on number of items (slower for more items)
+        var duration = Math.max(20, items.length * 4);
+        el.style.setProperty('--carousel-duration', duration + 's');
+        el.classList.add('animating');
+    }
 });
 </script>
 

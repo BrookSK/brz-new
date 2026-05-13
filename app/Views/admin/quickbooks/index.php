@@ -12,7 +12,10 @@
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-calculator me-2"></i>QuickBooks Online</h2>
+    <div>
+        <h1 class="page-title">QuickBooks Online</h1>
+        <p class="page-subtitle">Integração contábil</p>
+    </div>
 </div>
 
 <?php if (!empty($_GET['sucesso'])): ?>

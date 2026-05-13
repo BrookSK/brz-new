@@ -306,7 +306,7 @@ class AdminPagamentosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
+                    <h1 class="page-title">Pagamentos (' . $stats['total_transacoes'] . ' transações)</h1>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-success me-2" onclick="alert(\'Funcionalidade em desenvolvimento\')">
                             <i class="fas fa-download me-1"></i>Exportar Relatório
@@ -991,7 +991,7 @@ class AdminPagamentosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Comissões gerais</h1>
+                    <h1 class="page-title">Comissões gerais</h1>
                     <div>
                         <a href="/admin/pagamentos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                     </div>
@@ -1536,7 +1536,7 @@ class AdminPagamentosController extends Controller {
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Configurações de Pagamento</h1>
+                    <h1 class="page-title">Configurações de Pagamento</h1>
                     <a href="/admin/pagamentos" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
                 

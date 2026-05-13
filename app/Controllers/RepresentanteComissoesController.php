@@ -230,7 +230,7 @@ class RepresentanteComissoesController extends Controller {
 
         echo '<div class="pt-3">'
             . '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4 border-bottom" style="padding-bottom: 12px;">'
-            . '<h1 class="h2">Comissões</h1>'
+            . '<h1 class="page-title">Comissões</h1>'
             . '<div class="d-flex gap-2">'
             . '<a href="/admin/representante/produtos" class="btn btn-outline-primary"><i class="fas fa-box"></i> Produtos</a>'
             . '<a href="/admin/produtos/cadastro-representante" class="btn btn-primary"><i class="fas fa-plus"></i> Novo produto</a>'

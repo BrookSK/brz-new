@@ -2,8 +2,8 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="fas fa-times-circle me-2"></i>Cancelamentos via Co-Piloto</h2>
-            <p class="text-muted mb-0">Solicitações de cancelamento feitas pelo copiloto</p>
+            <h1 class="page-title">Cancelamentos via Co-Piloto</h1>
+            <p class="page-subtitle">Solicitações de cancelamento feitas pelo copiloto</p>
         </div>
         <a href="/admin/copiloto" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left me-1"></i>Voltar

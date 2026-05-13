@@ -6,7 +6,7 @@ ob_start();
 ?>
 <div class="container py-4" style="max-width:900px">
     <div class="text-center mb-4">
-        <h1 class="h2"><i class="fas fa-video me-2 text-danger"></i>Lives</h1>
+        <h1 class="page-title">Lives</h1>
         <p class="text-muted">Assista ao vivo e compre com 1 clique</p>
     </div>
 

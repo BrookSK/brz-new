@@ -14,10 +14,10 @@ class AdminUsuariosController extends Controller {
             $helper = new \App\Controllers\AdminUsuariosHelper();
             
             $pagina = $request->getParam('pagina', 1);
-            $limite = 12;
+            $limite = 100;
             $offset = ($pagina - 1) * $limite;
             $busca = $request->getParam('busca', '');
-            $ordem = $request->getParam('ordem', '');
+            $ordem = $request->getParam('ordem', 'nome_asc');
             
             $usuarios = $helper->getUsuariosComCarteira($busca, $limite, $offset, $ordem);
             $total = $helper->getTotalUsuarios($busca);
@@ -31,6 +31,56 @@ class AdminUsuariosController extends Controller {
             $stats = [];
             $erro = $e->getMessage();
         }
+
+        // Group users by first letter for alphabetical view
+        $usersGrouped = [];
+        foreach ($usuarios as $u) {
+            $nome = trim($u['nome'] ?? '');
+            $letter = mb_strtoupper(mb_substr($nome, 0, 1, 'UTF-8'), 'UTF-8');
+            if (!preg_match('/[A-Z]/', $letter)) $letter = '#';
+            $usersGrouped[$letter][] = $u;
+        }
+        ksort($usersGrouped);
+
+        // Helper: get initials from name
+        $getInitials = function($nome) {
+            $parts = preg_split('/\s+/', trim($nome));
+            $first = mb_strtoupper(mb_substr($parts[0] ?? '', 0, 1, 'UTF-8'), 'UTF-8');
+            $last = count($parts) > 1 ? mb_strtoupper(mb_substr(end($parts), 0, 1, 'UTF-8'), 'UTF-8') : '';
+            return $first . $last;
+        };
+
+        // Helper: role label and class
+        $getRoleInfo = function($usuario) {
+            $perfil = '';
+            if (is_array($usuario)) {
+                if (array_key_exists('perfil', $usuario) && $usuario['perfil'] !== null && trim((string) $usuario['perfil']) !== '') {
+                    $perfil = strtolower(trim((string) $usuario['perfil']));
+                } elseif (array_key_exists('role', $usuario) && $usuario['role'] !== null && trim((string) $usuario['role']) !== '') {
+                    $perfil = strtolower(trim((string) $usuario['role']));
+                }
+            }
+            if ($perfil === '') $perfil = 'cliente';
+            $map = [
+                'admin' => ['Admin', 'role-admin'],
+                'vendedor' => ['Vendedor', 'role-vendedor'],
+                'suporte' => ['Suporte', 'role-suporte'],
+            ];
+            return $map[$perfil] ?? ['Cliente', 'role-cliente'];
+        };
+
+        // Helper: format wallet
+        $formatWallet = function($u) {
+            return '$' . number_format((float)($u['carteira_usd'] ?? 0), 2, '.', ',');
+        };
+
+        // Helper: user status
+        $getUserStatus = function($u) {
+            if (isset($u['ativo']) && (int)$u['ativo'] === 1) return ['Ativo', 'badge-green'];
+            if (isset($u['status']) && strtolower($u['status']) === 'ativo') return ['Ativo', 'badge-green'];
+            if (!isset($u['ativo']) && !isset($u['status'])) return ['Ativo', 'badge-green'];
+            return ['Inativo', 'badge-red'];
+        };
         
         // Incluir o partial do menu lateral
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -42,16 +92,15 @@ class AdminUsuariosController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Usuários - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/public/assets/css/usuarios-redesign.css" rel="stylesheet">';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
         
-        // Adicionar estilos dos usuários
-        echo \App\Controllers\AdminUsuariosViews::getStyles();
-        
         echo '</head>
-<body>
+<body style="background:var(--bg-page);">
     <div class="container-fluid">
         <div class="row">';
         
@@ -59,128 +108,235 @@ class AdminUsuariosController extends Controller {
         renderAdminSidebar('usuarios');
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-users me-2"></i>Usuários (' . $total . ')</h1>
+            <div class="users-page">';
+
+        // === PAGE HEADER ===
+        echo '<div class="page-header">
+                <div class="page-title-wrap">
                     <div>
-                        <button type="button" class="btn btn-success me-2" onclick="adicionarCreditosEmLote()">
-                            <i class="fas fa-dollar-sign me-1"></i>Adicionar Créditos em Lote
-                        </button>
-                        <a href="/admin/usuarios/novo" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>Novo Usuário
-                        </a>
+                        <h1 class="page-title">Usuários</h1>
+                        <div class="page-count">' . (int)$total . ' usuários cadastrados</div>
                     </div>
-                </div>';
-                
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="btn btn-success-soft" onclick="adicionarCreditosEmLote()">
+                        <i class="bi bi-cash-stack"></i> Adicionar Créditos em Lote
+                    </button>
+                    <a href="/admin/usuarios/novo" class="btn btn-primary-navy">
+                        <i class="bi bi-plus-lg"></i> Novo Usuário
+                    </a>
+                </div>
+            </div>';
+
+        // === ERROR ===
         if (isset($erro)) {
-            echo '<div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
+            echo '<div class="alert alert-danger" style="border-radius:10px;margin-bottom:20px;">
+                <i class="bi bi-exclamation-triangle me-2"></i>
                 <strong>Erro:</strong> ' . htmlspecialchars($erro) . '
             </div>';
         }
-                
-        // Renderizar cards de estatísticas
-        echo \App\Controllers\AdminUsuariosViews::renderStatsCards($stats);
-                
-        echo '<form method="GET" class="row g-3 mb-4">
-                    <div class="col-md-5">
-                        <input type="text" class="form-control" name="busca" placeholder="Buscar por nome, email, CPF ou suite..." value="' . htmlspecialchars($busca) . '">
+
+        // === KPI GRID ===
+        $totalCarteiras = '$' . number_format((float)($stats['total_carteira_usd'] ?? 0), 2, '.', ',');
+        $usuariosAtivos = (int)($stats['usuarios_ativos'] ?? $total);
+        $novosHoje = (int)($stats['usuarios_hoje'] ?? 0);
+
+        echo '<div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Usuários</div>
+                    <div class="kpi-value">' . (int)$total . '</div>
+                </div>
+                <div class="kpi-card is-highlight">
+                    <div class="kpi-label">Total em Carteiras</div>
+                    <div class="kpi-value">' . $totalCarteiras . '</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Usuários Ativos</div>
+                    <div class="kpi-value">' . $usuariosAtivos . '</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Novos Hoje</div>
+                    <div class="kpi-value">' . $novosHoje . '</div>
+                </div>
+            </div>';
+
+        // === FILTERS CARD ===
+        echo '<div class="filters-card">
+                <form method="GET" action="/admin/usuarios" class="filters-grid">
+                    <div class="input-wrap">
+                        <i class="bi bi-search"></i>
+                        <input type="text" name="busca" placeholder="Buscar por nome, email, CPF ou suite..." value="' . htmlspecialchars($busca) . '">
                     </div>
-                    <div class="col-md-3">
-                        <select class="form-select" name="ordem" onchange="this.form.submit()">
-                            <option value="">Mais recentes</option>
-                            <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>Carteira: maior → menor</option>
-                            <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>Carteira: menor → maior</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-outline-primary me-2">
-                            <i class="fas fa-search me-1"></i>Buscar
-                        </button>
-                        <a href="/admin/usuarios" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-1"></i>Limpar
-                        </a>
-                    </div>
+                    <select name="ordem" onchange="this.form.submit()">
+                        <option value="nome_asc"' . ($ordem === 'nome_asc' ? ' selected' : '') . '>Nome A→Z</option>
+                        <option value="nome_desc"' . ($ordem === 'nome_desc' ? ' selected' : '') . '>Nome Z→A</option>
+                        <option value=""' . ($ordem === '' ? ' selected' : '') . '>Mais recentes</option>
+                        <option value="carteira_desc"' . ($ordem === 'carteira_desc' ? ' selected' : '') . '>Carteira maior→menor</option>
+                        <option value="carteira_asc"' . ($ordem === 'carteira_asc' ? ' selected' : '') . '>Carteira menor→maior</option>
+                    </select>
+                    <button type="submit" class="btn btn-search"><i class="bi bi-search"></i> Buscar</button>
+                    <a href="/admin/usuarios" class="btn btn-clear"><i class="bi bi-x-lg"></i> Limpar</a>
                 </form>
-                
-                <div class="row">';
-                
-                if (empty($usuarios)) {
-                    echo '<div class="col-12 text-center py-5">
-                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum usuário encontrado</h5>
-                        <p class="text-muted">Tente ajustar sua busca ou cadastre um novo usuário.</p>
+            </div>';
+
+        // === ALPHABETICAL LIST ===
+        if (empty($usuarios)) {
+            echo '<div style="text-align:center;padding:60px 20px;">
+                <i class="bi bi-people" style="font-size:48px;color:var(--text-muted);"></i>
+                <h5 style="color:var(--text-secondary);margin-top:16px;">Nenhum usuário encontrado</h5>
+                <p style="color:var(--text-muted);">Tente ajustar sua busca ou cadastre um novo usuário.</p>
+            </div>';
+        } else {
+            echo '<div class="alphabetical-list">';
+            foreach ($usersGrouped as $letter => $users) {
+                echo '<div class="letter-section">
+                    <div class="letter-header"><span>' . htmlspecialchars($letter) . '</span></div>
+                    <div class="users-list">';
+
+                foreach ($users as $u) {
+                    $initials = $getInitials($u['nome'] ?? '');
+                    [$roleLabel, $roleClass] = $getRoleInfo($u);
+                    $wallet = $formatWallet($u);
+                    [$statusLabel, $statusClass] = $getUserStatus($u);
+                    $email = htmlspecialchars($u['email'] ?? '');
+                    $nome = htmlspecialchars($u['nome'] ?? '');
+                    $suite = htmlspecialchars($u['suite'] ?? '');
+                    $pedidos = (int)($u['total_pedidos'] ?? 0);
+                    $userId = (int)$u['id'];
+
+                    // Desktop row
+                    echo '<div class="user-row">
+                        <div class="user-main">
+                            <div class="user-avatar">' . htmlspecialchars($initials) . '</div>
+                            <div class="user-data">
+                                <div class="user-name-line">
+                                    <span class="user-name">' . $nome . '</span>
+                                    <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>
+                                </div>
+                                <div class="user-email">' . $email . '</div>'
+                                . ($suite ? '<div class="user-suite">Suite: ' . $suite . '</div>' : '') .
+                            '</div>
+                        </div>
+                        <div>
+                            <div class="list-metric-label">Pedidos</div>
+                            <div class="list-metric-value">' . $pedidos . '</div>
+                        </div>
+                        <div>
+                            <div class="list-metric-label">Carteira</div>
+                            <div class="wallet-value">' . $wallet . '</div>
+                        </div>
+                        <div>
+                            <span class="badge ' . $statusClass . '">' . $statusLabel . '</span>
+                        </div>
+                        <div class="user-actions">
+                            <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> Ver</a>
+                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
+                            <span class="icon-btn icon-btn-credit" title="Crédito" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
+                            <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit" title="Editar"><i class="bi bi-pencil"></i></a>
+                            <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'Excluir ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="Excluir"><i class="bi bi-trash"></i></button></form>
+                        </div>
+                    </div>';
+
+                    // Mobile card
+                    echo '<div class="user-card-mobile">
+                        <div class="mobile-header">
+                            <div class="user-avatar">' . htmlspecialchars($initials) . '</div>
+                            <div class="user-data">
+                                <div class="user-name-line">
+                                    <span class="user-name">' . $nome . '</span>
+                                    <span class="role-badge ' . $roleClass . '">' . $roleLabel . '</span>
+                                </div>
+                                <div class="user-email">' . $email . '</div>'
+                                . ($suite ? '<div class="user-suite">Suite: ' . $suite . '</div>' : '') .
+                            '</div>
+                        </div>
+                        <div class="mobile-metrics">
+                            <div class="metric">
+                                <div class="metric-label">Pedidos</div>
+                                <div class="metric-value">' . $pedidos . '</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Carteira</div>
+                                <div class="metric-value">' . $wallet . '</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Status</div>
+                                <div class="metric-value"><span class="badge ' . $statusClass . '">' . $statusLabel . '</span></div>
+                            </div>
+                        </div>
+                        <div class="mobile-actions">
+                            <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> Ver</a>
+                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
+                            <span class="icon-btn icon-btn-credit" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
+                            <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit"><i class="bi bi-pencil"></i></a>
+                            <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'Excluir ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="Excluir"><i class="bi bi-trash"></i></button></form>
+                        </div>
                     </div>';
                 }
-                
-                foreach ($usuarios as $usuario) {
-                    echo \App\Controllers\AdminUsuariosViews::renderCardUsuario($usuario);
+
+                echo '</div></div>'; // .users-list, .letter-section
+            }
+            echo '</div>'; // .alphabetical-list
+        }
+
+        // === PAGINATION ===
+        if ($totalPaginas > 1) {
+            $paginaAtual = (int) $pagina;
+            if ($paginaAtual < 1) $paginaAtual = 1;
+            if ($paginaAtual > (int) $totalPaginas) $paginaAtual = (int) $totalPaginas;
+            $mkUrl = function(int $p) use ($busca, $ordem): string {
+                $url = "/admin/usuarios?pagina={$p}";
+                if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
+                if (!empty($ordem)) $url .= "&ordem=" . urlencode($ordem);
+                return $url;
+            };
+
+            $start = max(1, $paginaAtual - 1);
+            $end = min((int) $totalPaginas, $paginaAtual + 1);
+            if (($end - $start + 1) < 3) {
+                if ($start === 1) {
+                    $end = min((int) $totalPaginas, $start + 2);
+                } elseif ($end === (int) $totalPaginas) {
+                    $start = max(1, $end - 2);
                 }
-                
-                echo '</div>';
-                
-                // Paginação
-                if ($totalPaginas > 1) {
-                    $paginaAtual = (int) $pagina;
-                    if ($paginaAtual < 1) $paginaAtual = 1;
-                    if ($paginaAtual > (int) $totalPaginas) $paginaAtual = (int) $totalPaginas;
-                    $mkUrl = function(int $p) use ($busca, $ordem): string {
-                        $url = "/admin/usuarios?pagina={$p}";
-                        if (!empty($busca)) $url .= "&busca=" . urlencode($busca);
-                        if (!empty($ordem)) $url .= "&ordem=" . urlencode($ordem);
-                        return $url;
-                    };
+            }
 
-                    $start = max(1, $paginaAtual - 1);
-                    $end = min((int) $totalPaginas, $paginaAtual + 1);
-                    if (($end - $start + 1) < 3) {
-                        if ($start === 1) {
-                            $end = min((int) $totalPaginas, $start + 2);
-                        } elseif ($end === (int) $totalPaginas) {
-                            $start = max(1, $end - 2);
-                        }
-                    }
+            echo '<nav class="mt-4"><ul class="pagination justify-content-center flex-wrap">';
 
-                    echo '<nav class="mt-4"><ul class="pagination justify-content-center flex-wrap">';
+            $prev = max(1, $paginaAtual - 1);
+            echo '<li class="page-item ' . ($paginaAtual <= 1 ? 'disabled' : '') . '">'
+                . '<a class="page-link" href="' . ($paginaAtual <= 1 ? '#' : $mkUrl($prev)) . '" tabindex="-1">Anterior</a>'
+                . '</li>';
 
-                    // Anterior
-                    $prev = max(1, $paginaAtual - 1);
-                    echo '<li class="page-item ' . ($paginaAtual <= 1 ? 'disabled' : '') . '">'
-                        . '<a class="page-link" href="' . ($paginaAtual <= 1 ? '#' : $mkUrl($prev)) . '" tabindex="-1">Anterior</a>'
-                        . '</li>';
-
-                    // Primeira + reticências
-                    if ($start > 1) {
-                        echo '<li class="page-item"><a class="page-link" href="' . $mkUrl(1) . '">1</a></li>';
-                        if ($start > 2) {
-                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                        }
-                    }
-
-                    // Janela (máx 3)
-                    for ($i = $start; $i <= $end; $i++) {
-                        echo '<li class="page-item ' . ($i === $paginaAtual ? 'active' : '') . '">'
-                            . '<a class="page-link" href="' . $mkUrl($i) . '">' . $i . '</a>'
-                            . '</li>';
-                    }
-
-                    // Reticências + última
-                    if ($end < (int) $totalPaginas) {
-                        if ($end < ((int) $totalPaginas - 1)) {
-                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                        }
-                        echo '<li class="page-item"><a class="page-link" href="' . $mkUrl((int) $totalPaginas) . '">' . (int) $totalPaginas . '</a></li>';
-                    }
-
-                    // Próxima
-                    $next = min((int) $totalPaginas, $paginaAtual + 1);
-                    echo '<li class="page-item ' . ($paginaAtual >= (int) $totalPaginas ? 'disabled' : '') . '">'
-                        . '<a class="page-link" href="' . ($paginaAtual >= (int) $totalPaginas ? '#' : $mkUrl($next)) . '">Próxima</a>'
-                        . '</li>';
-
-                    echo '</ul></nav>';
+            if ($start > 1) {
+                echo '<li class="page-item"><a class="page-link" href="' . $mkUrl(1) . '">1</a></li>';
+                if ($start > 2) {
+                    echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
                 }
+            }
+
+            for ($i = $start; $i <= $end; $i++) {
+                echo '<li class="page-item ' . ($i === $paginaAtual ? 'active' : '') . '">'
+                    . '<a class="page-link" href="' . $mkUrl($i) . '">' . $i . '</a>'
+                    . '</li>';
+            }
+
+            if ($end < (int) $totalPaginas) {
+                if ($end < ((int) $totalPaginas - 1)) {
+                    echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                }
+                echo '<li class="page-item"><a class="page-link" href="' . $mkUrl((int) $totalPaginas) . '">' . (int) $totalPaginas . '</a></li>';
+            }
+
+            $next = min((int) $totalPaginas, $paginaAtual + 1);
+            echo '<li class="page-item ' . ($paginaAtual >= (int) $totalPaginas ? 'disabled' : '') . '">'
+                . '<a class="page-link" href="' . ($paginaAtual >= (int) $totalPaginas ? '#' : $mkUrl($next)) . '">Próxima</a>'
+                . '</li>';
+
+            echo '</ul></nav>';
+        }
                 
-                echo '</main></div></div>';
+        echo '</div></main></div></div>'; // .users-page, main, row, container
 
     // Renderizar scripts
     renderAdminScripts();
@@ -196,7 +352,7 @@ class AdminUsuariosController extends Controller {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Armazenar dados dos usuários para uso nos scripts
-        usuariosData = ' . json_encode(array_values($usuarios)) . ';
+        var usuariosData = ' . json_encode(array_values($usuarios)) . ';
     </script>
 </body>
 </html>';
@@ -229,7 +385,7 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-user-plus me-2"></i>Novo Usuário</h1>
+                <h1 class="page-title">Novo Usuário</h1>
                 <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
             </div>
 
@@ -360,7 +516,7 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-user-edit me-2"></i>Editar Usuário</h1>
+                <h1 class="page-title">Editar Usuário</h1>
                 <a href="/admin/usuarios/detalhes/' . (int)$usuario['id'] . '" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
             </div>
 
@@ -839,7 +995,7 @@ class AdminUsuariosController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">' . htmlspecialchars($usuario['nome']) . '</h1>
+                    <h1 class="page-title">' . htmlspecialchars($usuario['nome']) . '</h1>
                     <a href="/admin/usuarios" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                 </div>
                 

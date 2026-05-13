@@ -710,7 +710,7 @@ class AdminPedidosController extends Controller {
         renderAdminSidebar('pedidos');
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-trash me-2"></i>Lixeira de Pedidos</h1>
+                    <h1 class="page-title">Lixeira de Pedidos</h1>
                     <div>
                         <a href="/admin/pedidos" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
                     </div>
@@ -2383,7 +2383,9 @@ JS;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedidos - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
@@ -2425,68 +2427,84 @@ JS;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Pedidos (' . $total . ')</h1>
-                    <div>
-                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary me-2">
+                    <h1 class="page-title">Pedidos (' . $total . ')</h1>
+                    <!-- Desktop: buttons inline -->
+                    <div class="d-none d-md-flex gap-2">
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-primary">
                             <i class="fas fa-plus me-1"></i>Novo Pedido Manual
                         </a>
-                        <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary me-2">
+                        <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
                         </a>
-                        <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger me-2">
+                        <a href="/admin/pedidos/lixeira" class="btn btn-outline-danger">
                             <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
-                        <a class="btn btn-success me-2" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
+                        <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
                             <i class="fas fa-download me-1"></i>Exportar XLSX
                         </a>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
+                    <!-- Mobile: toggle button -->
+                    <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'pedidosActionsCollapse\').classList.toggle(\'d-none\')">
+                        <i class="fas fa-ellipsis-v me-1"></i>Ações
+                    </button>
+                </div>
+                <!-- Mobile: collapsible actions -->
+                <div id="pedidosActionsCollapse" class="d-none d-md-none mb-3">
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="/admin/pedidos/novo-manual" class="btn btn-sm btn-primary"><i class="fas fa-plus me-1"></i>Novo Pedido</a>
+                        <a href="/admin/pedidos/comissoes" class="btn btn-sm btn-outline-primary"><i class="fas fa-percentage me-1"></i>Comissões</a>
+                        <a href="/admin/pedidos/lixeira" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Lixeira</a>
+                        <a class="btn btn-sm btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '"><i class="fas fa-download me-1"></i>XLSX</a>
+                        <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
+                    </div>
                 </div>
                 
-                <form method="GET" class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <input type="text" class="form-control" name="busca" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                <form method="GET" class="row g-2 mb-4" id="pedidosFilterForm">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
                     </div>
-                    <div class="col-md-3">
-                        <select class="form-select" name="status">
+                    <div class="col-md-4">
+                        <select class="form-select" name="status" id="pedidosStatusSelect">
                             <option value="">Todos status</option>
                             ' . $this->buildStatusOptions($status) . '
                             <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-outline-primary"><i class="fas fa-search"></i> Filtrar</button>
-                    </div>
                 </form>
                 
                 <!-- Abas de Pedidos por Moeda -->
                 <div class="mb-3">
-                    <ul class="nav nav-pills" id="pedidosTabs" role="tablist">';
+                    <!-- Mobile: Dropdown -->
+                    <div class="d-md-none mb-2">
+                        <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
+                            <option value="todos" ' . ($isCarneFiltro ? '' : 'selected') . '>Todos os Pedidos</option>
+                            <option value="dolar">Dólar</option>
+                            <option value="real">Reais</option>
+                            <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>Carnê</option>
+                        </select>
+                    </div>
+                    <!-- Desktop: Pills -->
+                    <ul class="nav nav-pills d-none d-md-flex" id="pedidosTabs" role="tablist">';
                     $isCarneFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'carne');
                     echo '
                         <li class="nav-item" role="presentation">';
                     if ($isCarneFiltro) {
-                        echo '<a class="nav-link" href="/admin/pedidos"><i class="fas fa-list"></i> Todos os Pedidos</a>';
+                        echo '<a class="nav-link" href="/admin/pedidos">Todos os Pedidos</a>';
                     } else {
-                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button"><i class="fas fa-list"></i> Todos os Pedidos</button>';
+                        echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">Todos os Pedidos</button>';
                     }
                     echo '</li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">
-                                <i class="fas fa-dollar-sign"></i> Pagamentos em Dólar
-                            </button>
+                            <button class="nav-link" id="pedidos-dolar-tab" data-bs-toggle="pill" data-bs-target="#pedidos-dolar" type="button">Dólar</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">
-                                <i class="fas fa-currency-brl"></i> Pagamentos em Reais
-                            </button>
+                            <button class="nav-link" id="pedidos-real-tab" data-bs-toggle="pill" data-bs-target="#pedidos-real" type="button">Reais</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">
-                                <i class="fas fa-file-invoice-dollar"></i> Carnê
-                            </a>
+                            <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">Carnê</a>
                         </li>
                     </ul>';
                     echo '
@@ -2891,6 +2909,29 @@ HTML;
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        function handlePedidosTabMobile(val) {
+            if (val === "carne") { window.location.href = "/admin/pedidos?fp=carne"; return; }
+            if (val === "todos" && window.location.search.indexOf("fp=carne") !== -1) { window.location.href = "/admin/pedidos"; return; }
+            var tabMap = {todos:"pedidos-todos-tab", dolar:"pedidos-dolar-tab", real:"pedidos-real-tab"};
+            var btn = document.getElementById(tabMap[val]);
+            if (btn) { btn.click(); }
+        }
+        (function(){
+            var debounceTimer = null;
+            var form = document.getElementById("pedidosFilterForm");
+            var busca = document.getElementById("pedidosBuscaInput");
+            var status = document.getElementById("pedidosStatusSelect");
+            function submitFilter() { if (form) form.submit(); }
+            if (busca) {
+                busca.addEventListener("input", function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(submitFilter, 400);
+                });
+            }
+            if (status) {
+                status.addEventListener("change", submitFilter);
+            }
+        })();
         (function(){
             var modal = document.getElementById("modalLixeiraPedido");
             if(!modal) return;
@@ -3015,7 +3056,8 @@ HTML;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pedido #' . str_pad($pedido['id'], 6, '0', STR_PAD_LEFT) . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
@@ -3033,6 +3075,19 @@ HTML;
         .status-cancelado { background-color: #dc3545; }
         .status-enviado { background-color: #17a2b8; }
         .status-entregue { background-color: #6f42c1; }
+        @media(max-width:768px){
+            .table-responsive{overflow-x:hidden!important;overflow:visible!important;}
+            table.table{display:block!important;width:100%!important;}
+            table.table thead{display:none!important;}
+            table.table tbody{display:block!important;width:100%!important;}
+            table.table tbody tr{display:block!important;width:100%!important;margin-bottom:12px!important;padding:12px!important;border:1px solid #e2e8f0!important;border-radius:10px!important;background:#fff!important;}
+            table.table tbody tr td{display:block!important;width:100%!important;max-width:100%!important;padding:6px 0!important;border:none!important;border-bottom:1px solid #f1f5f9!important;white-space:normal!important;word-break:break-word!important;overflow-wrap:break-word!important;text-align:left!important;}
+            table.table tbody tr td:last-child{border-bottom:none!important;}
+            table.table img{max-width:50px!important;height:auto!important;}
+            .col-lg-8,.col-lg-4,.col-md-8,.col-md-4,.col-lg-6,.col-md-6{flex:0 0 100%!important;max-width:100%!important;}
+            .card-body{padding:12px!important;}
+            html,body,.container-fluid{overflow-x:hidden!important;max-width:100vw!important;}
+        }
     </style>
 </head>
 <body>
@@ -3050,7 +3105,7 @@ HTML;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
-                <h2 class="fs-5 fw-bold"><i class="fas fa-shopping-cart me-2"></i>Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h2>
+                <h1 class="page-title">Detalhes do Pedido #' . $pedido['codigo_pedido'] . '</h1>
                 <div class="d-flex flex-wrap gap-1">
                     ' . (((string) ($pedido['origem_pedido'] ?? '') === 'manual')
                         ? ('<a href="/admin/pedidos/novo-manual?pedido_id=' . (int) $id . '" class="btn btn-outline-primary btn-sm">'
@@ -5343,16 +5398,32 @@ LINKSCRIPT;
         return $html;
     }
 
+    private function buildUsuarioOptions(string $currentId): string {
+        $html = '';
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->query("SELECT id, nome, email FROM usuarios WHERE perfil IN ('admin','vendedor','suporte') ORDER BY nome ASC");
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $u) {
+                $sel = ((string)$u['id'] === $currentId) ? ' selected' : '';
+                $html .= '<option value="' . (int)$u['id'] . '"' . $sel . '>' . htmlspecialchars(($u['nome'] ?? '') . ' (' . ($u['email'] ?? '') . ')') . '</option>';
+            }
+        } catch (\Exception $e) {}
+        return $html;
+    }
+
     public function comissoes(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
         $admin = $auth->getUsuarioLogado();
         $perfil = strtolower(trim((string) ($admin['perfil'] ?? '')));
 
-        $escopo = strtolower(trim((string) $request->getParam('escopo', '')));
-        if ($escopo !== 'todos') {
-            $escopo = 'me';
-        }
+        $escopo = 'me'; // Sempre mostrar apenas do usuário logado
+
+        // Filtros
+        $filtroDataInicio = $request->getParam('data_inicio', '');
+        $filtroDataFim = $request->getParam('data_fim', '');
+        $filtroUsuario = $request->getParam('usuario_id', '');
+        $filtroStatus = $request->getParam('status_pedido', '');
 
         $pedidoModel = new PedidoEcommerce();
         $resumo = [
@@ -5620,13 +5691,31 @@ LINKSCRIPT;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minhas Comissões - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">';
 
         renderAdminSidebarStyles();
 
         echo '<style>
-        .comm-cards{display:flex;flex-wrap:nowrap;gap:12px;overflow-x:auto;padding-bottom:6px;align-items:stretch}
-        .comm-card{flex:0 0 240px;min-height:92px;background:#fff}
+        .comm-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding-bottom:6px;}
+        .comm-card{min-height:108px;background:#fff;border:1px solid #EBF0F6;border-radius:12px;padding:16px;transition:.18s ease;}
+        .comm-card:hover{box-shadow:0 4px 16px rgba(24,37,61,.07);transform:translateY(-1px);}
+        .comm-card .text-muted{font-size:12px;margin-bottom:7px;}
+        .comm-card .fw-bold,.comm-card h5{color:#18253D;font-size:20px;font-weight:700;}
+        @media(max-width:1100px){.comm-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
+        @media(max-width:768px){.comm-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.comm-card{min-height:auto;padding:14px;}.comm-card .fw-bold,.comm-card h5{font-size:18px;}}
+        @media(max-width:480px){.comm-cards{grid-template-columns:1fr;}}
+        .table-responsive{overflow-x:hidden!important;}
+        @media(max-width:768px){
+            table.table{display:block!important;width:100%!important;}
+            table.table thead{display:none!important;}
+            table.table tbody{display:block!important;}
+            table.table tbody tr{display:block!important;margin-bottom:12px!important;padding:12px!important;border:1px solid #e2e8f0!important;border-radius:10px!important;background:#fff!important;}
+            table.table tbody tr td{display:block!important;width:100%!important;padding:6px 0!important;border:none!important;border-bottom:1px solid #f1f5f9!important;white-space:normal!important;word-break:break-word!important;}
+            table.table tbody tr td:last-child{border-bottom:none!important;}
+            .col-lg-8,.col-lg-4,.col-md-8,.col-md-4,.col-md-9,.col-lg-10{flex:0 0 100%!important;max-width:100%!important;}
+            html,body,.container-fluid{overflow-x:hidden!important;max-width:100vw!important;}
+        }
         </style></head>
 <body>
     <div class="container-fluid">
@@ -5636,19 +5725,24 @@ LINKSCRIPT;
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Minhas Comissões</h1>
+                    <h1 class="page-title">Minhas Comissões</h1>
                     <div>
-                        ' . ($perfil === 'admin'
-                            ? (
-                                $escopo === 'todos'
-                                    ? '<a href="/admin/pedidos/comissoes" class="btn btn-outline-dark me-2"><i class="fas fa-user"></i> Ver minhas</a>'
-                                    : '<a href="/admin/pedidos/comissoes?escopo=todos" class="btn btn-outline-dark me-2"><i class="fas fa-users"></i> Ver todos</a>'
-                            )
-                            : '') . '
                         <a href="/admin/pedidos" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Voltar</a>
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary"><i class="fas fa-plus"></i> Novo Pedido Manual</a>
                     </div>
                 </div>
+
+                <!-- Filtros -->
+                <div class="card border-0 shadow-sm mb-4"><div class="card-body py-3">
+                    <form method="GET" class="row g-2 align-items-end">
+                        <input type="hidden" name="escopo" value="' . htmlspecialchars($escopo) . '">
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataInicio) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Data fim</label><input type="date" name="data_fim" class="form-control form-control-sm" value="' . htmlspecialchars($filtroDataFim) . '"></div>
+                        <div class="col-md-2"><label class="form-label small text-muted mb-1">Status pedido</label><select name="status_pedido" class="form-select form-select-sm"><option value="">Todos</option>' . $this->buildStatusOptions($filtroStatus, true) . '</select></div>
+                        <div class="col-md-auto"><button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
+                        <div class="col-md-auto"><a href="/admin/pedidos/comissoes" class="btn btn-outline-secondary btn-sm">Limpar</a></div>
+                    </form>
+                </div></div>
 
                 <div class="row g-3 mb-4">';
 

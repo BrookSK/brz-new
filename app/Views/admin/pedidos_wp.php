@@ -25,7 +25,7 @@ function wpFormatMoney($v, $currency) {
 ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><?= __('admin.orders_wp.title', 'Pedidos (WordPress)') ?> (<?= (int) $total ?>)</h1>
+    <h1 class="page-title"><?= __('admin.orders_wp.title', 'Pedidos (WordPress)') ?> (<?= (int) $total ?>)</h1>
     <div class="d-flex gap-2">
         <button type="button" class="btn btn-outline-success" data-bs-toggle="collapse" data-bs-target="#wpExportBox" aria-expanded="false" aria-controls="wpExportBox">
             <i class="fas fa-file-export"></i> Exportar pedidos

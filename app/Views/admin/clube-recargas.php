@@ -6,7 +6,7 @@ $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['ti
 ?>
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Recargas Clube (Checkout rápido)</h1>
+        <h1 class="page-title">Recargas Clube (Checkout rápido)</h1>
     </div>
 
     <!-- Totais Gerais -->
@@ -113,8 +113,15 @@ $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['ti
         </div>
     </div>
 
-    <!-- Abas -->
-    <ul class="nav nav-tabs mb-0" id="clubeRecargasTabs" role="tablist">
+    <!-- Abas: Mobile dropdown + Desktop tabs -->
+    <div class="d-md-none mb-3">
+        <select class="form-select" onchange="switchClubeTab(this.value)">
+            <option value="pane-todos" selected>Todos (<?= count($recargas) ?>)</option>
+            <option value="pane-turbo">Turbo (<?= count($turboRows) ?>)</option>
+            <option value="pane-normal">Normal (<?= count($normalRows) ?>)</option>
+        </select>
+    </div>
+    <ul class="nav nav-tabs mb-0 d-none d-md-flex" id="clubeRecargasTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="tab-todos" data-bs-toggle="tab" data-bs-target="#pane-todos" type="button" role="tab">
                 Todos <span class="badge bg-secondary ms-1"><?= count($recargas) ?></span>
@@ -122,7 +129,7 @@ $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['ti
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-turbo" data-bs-toggle="tab" data-bs-target="#pane-turbo" type="button" role="tab">
-                <i class="fas fa-bolt" style="color:#b45309;"></i> Turbo <span class="badge bg-warning text-dark ms-1"><?= count($turboRows) ?></span>
+                Turbo <span class="badge bg-warning text-dark ms-1"><?= count($turboRows) ?></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -131,6 +138,12 @@ $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['ti
             </button>
         </li>
     </ul>
+    <script>
+    function switchClubeTab(tabId) {
+        var btn = document.querySelector('[data-bs-target="#' + tabId + '"]');
+        if (btn) btn.click();
+    }
+    </script>
 
     <div class="tab-content">
 
@@ -138,14 +151,15 @@ $normalRows = array_filter($recargas, fn($r) => strtolower(trim((string) ($r['ti
 function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga encontrada.'): void {
     echo '<div class="card border-0 shadow-sm border-top-0" style="border-top-left-radius:0;border-top-right-radius:0;">';
     echo '<div class="card-body">';
-    echo '<div class="table-responsive">';
+    // Desktop: Table
+    echo '<div class="table-responsive d-none d-md-block">';
     echo '<table class="table table-hover align-middle mb-0">';
     echo '<thead><tr>';
-    echo '<th>ID</th><th>Usuário</th><th>Pagador</th><th>Documento</th><th>Tipo</th><th>Método</th><th>Gateway</th>';
-    echo '<th>Valor USD</th><th>Valor BRL</th><th>Status</th><th>Criado</th><th>Pago</th><th>Expira em</th>';
+    echo '<th>ID</th><th>Usuário</th><th>Pagador</th><th>Tipo</th><th>Gateway</th>';
+    echo '<th>Valor USD</th><th>Valor BRL</th><th>Status</th><th>Criado</th>';
     echo '</tr></thead><tbody>';
     if (empty($rows)) {
-        echo '<tr><td colspan="13" class="text-muted">' . htmlspecialchars($emptyMsg) . '</td></tr>';
+        echo '<tr><td colspan="9" class="text-muted">' . htmlspecialchars($emptyMsg) . '</td></tr>';
     } else {
         foreach ($rows as $r) {
             $status = strtolower(trim((string) ($r['status'] ?? 'pending')));
@@ -158,21 +172,8 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
             $tipoBadge = ($tipoRec === 'turbo') ? 'warning' : 'info';
             $tipoLabel = ($tipoRec === 'turbo') ? 'Turbo' : 'Normal';
 
-            $lockedUntil = $r['locked_until'] ?? null;
-            $expiraStr = '-';
-            $expiraClass = '';
-            if ($lockedUntil && $tipoRec === 'turbo') {
-                $ts = strtotime($lockedUntil);
-                $expiraStr = date('d/m/Y', $ts);
-                if ($ts > time()) {
-                    $dias = max(0, (int) ceil(($ts - time()) / 86400));
-                    $expiraStr .= ' (' . $dias . 'd)';
-                    $expiraClass = 'text-warning';
-                } else {
-                    $expiraStr .= ' (liberado)';
-                    $expiraClass = 'text-success';
-                }
-            }
+            $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
+            $gwLabel = $gw === 'cambioreal' ? 'Câmbio Real' : ($gw === 'stripe' ? 'Stripe' : ($gw !== '' ? ucfirst($gw) : 'N/A'));
 
             echo '<tr>';
             echo '<td>#' . (int) ($r['id'] ?? 0) . '</td>';
@@ -191,23 +192,58 @@ function renderRecargasTable(array $rows, string $emptyMsg = 'Nenhuma recarga en
             echo '</td>';
             echo '<td><div class="fw-semibold">' . htmlspecialchars((string) ($r['pagador_nome'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div>';
             echo '<div class="text-muted small">' . htmlspecialchars((string) ($r['pagador_email'] ?? ''), ENT_QUOTES, 'UTF-8') . '</div></td>';
-            echo '<td class="text-muted small">' . htmlspecialchars((string) ($r['pagador_documento'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
             echo '<td><span class="badge bg-' . $tipoBadge . '">' . $tipoLabel . '</span></td>';
-            echo '<td>' . htmlspecialchars((string) ($r['metodo'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
-            $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
-            $gwLabel = $gw === 'cambioreal' ? 'Câmbio Real' : ($gw === 'stripe' ? 'Stripe' : ($gw !== '' ? ucfirst($gw) : 'N/A'));
-            $gwBadge = $gw === 'cambioreal' ? 'primary' : ($gw === 'stripe' ? 'info' : 'secondary');
-            echo '<td><span class="badge bg-' . $gwBadge . '" style="font-size:10px;">' . htmlspecialchars($gwLabel) . '</span></td>';
+            echo '<td>' . htmlspecialchars($gwLabel) . '</td>';
             echo '<td>$ ' . number_format((float) ($r['valor'] ?? 0), 2, ',', '.') . '</td>';
             echo '<td>R$ ' . number_format((float) ($r['valor_brl'] ?? 0), 2, ',', '.') . '</td>';
             echo '<td><span class="badge bg-' . $badge . '">' . htmlspecialchars($status, ENT_QUOTES, 'UTF-8') . '</span></td>';
-            echo '<td class="text-muted small" style="white-space:nowrap;">' . htmlspecialchars((string) ($r['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
-            echo '<td class="text-muted small" style="white-space:nowrap;">' . htmlspecialchars((string) ($r['paid_at'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
-            echo '<td class="small ' . $expiraClass . '" style="white-space:nowrap;">' . $expiraStr . '</td>';
+            echo '<td class="text-muted small" style="white-space:nowrap;">' . (!empty($r['created_at']) ? date('d/m/Y', strtotime((string) $r['created_at'])) : '-') . '</td>';
             echo '</tr>';
         }
     }
-    echo '</tbody></table></div></div></div>';
+    echo '</tbody></table></div>';
+
+    // Mobile: Cards
+    echo '<div class="d-md-none">';
+    if (empty($rows)) {
+        echo '<div class="text-muted small py-3">' . htmlspecialchars($emptyMsg) . '</div>';
+    } else {
+        foreach ($rows as $r) {
+            $status = strtolower(trim((string) ($r['status'] ?? 'pending')));
+            $badge = 'secondary';
+            if (in_array($status, ['paid', 'approved', 'credited'], true)) $badge = 'success';
+            elseif (in_array($status, ['rejected', 'failed', 'canceled'], true)) $badge = 'danger';
+            elseif ($status === 'pending') $badge = 'warning';
+
+            $tipoRec = strtolower(trim((string) ($r['tipo_recarga'] ?? 'normal')));
+            $tipoBadge = ($tipoRec === 'turbo') ? 'warning' : 'info';
+            $tipoLabel = ($tipoRec === 'turbo') ? 'Turbo' : 'Normal';
+
+            $uNome  = htmlspecialchars((string)($r['usuario_nome'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $uEmail = htmlspecialchars((string)($r['usuario_email'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $uSuite = (int)($r['usuario_suite'] ?? 0);
+
+            echo '<div class="border-bottom py-2">';
+            echo '<div class="d-flex justify-content-between align-items-start">';
+            echo '<div style="min-width:0;flex:1;">';
+            echo '<div class="fw-semibold small" style="word-break:break-word;">' . ($uNome !== '' ? $uNome : '#' . (int)($r['usuario_id'] ?? 0)) . '</div>';
+            if ($uSuite > 0) echo '<span class="text-muted" style="font-size:11px;">Suite ' . $uSuite . '</span> ';
+            if ($uEmail !== '') echo '<div class="text-muted" style="font-size:11px;word-break:break-all;">' . $uEmail . '</div>';
+            echo '</div>';
+            echo '<span class="badge bg-' . $badge . ' ms-2">' . $status . '</span>';
+            echo '</div>';
+            echo '<div class="d-flex flex-wrap gap-1 mt-1" style="font-size:11px;">';
+            echo '<span class="text-muted">#' . (int)($r['id'] ?? 0) . '</span>';
+            echo '<span class="badge bg-' . $tipoBadge . '">' . $tipoLabel . '</span>';
+            echo '<span class="fw-bold">$ ' . number_format((float)($r['valor'] ?? 0), 2, ',', '.') . '</span>';
+            if ((float)($r['valor_brl'] ?? 0) > 0) echo '<span class="text-muted">R$ ' . number_format((float)($r['valor_brl'] ?? 0), 2, ',', '.') . '</span>';
+            echo '</div>';
+            echo '</div>';
+        }
+    }
+    echo '</div>';
+
+    echo '</div></div>';
 }
 ?>
 

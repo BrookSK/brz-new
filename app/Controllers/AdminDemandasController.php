@@ -72,7 +72,7 @@ class AdminDemandasController extends Controller {
         ob_start();
         echo '<div class="container-fluid py-3">';
         echo '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">';
-        echo '<h4 class="fw-bold mb-0"><i class="fas fa-file-alt me-2"></i>Minhas Solicitações</h4>';
+        echo '<h1 class="page-title">Minhas Solicitações</h1>';
         echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>';
         echo '</div>';
 
@@ -836,7 +836,7 @@ class AdminDemandasController extends Controller {
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3"><div class="row justify-content-center"><div class="col-lg-8">';
-        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h4 class="fw-bold"><i class="fas fa-cog me-2"></i>Configurações de Demandas</h4><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
+        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title">Configurações de Demandas</h1><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
 
         if (!empty($_SESSION['message'])) {
             echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' alert-dismissible fade show">' . htmlspecialchars($_SESSION['message']) . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';

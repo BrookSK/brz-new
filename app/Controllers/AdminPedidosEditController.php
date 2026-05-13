@@ -473,7 +473,8 @@ class AdminPedidosEditController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/assets/css/pedidos-redesign.css" rel="stylesheet">';
 
             renderAdminSidebarStyles();
 
@@ -487,7 +488,7 @@ class AdminPedidosEditController extends Controller {
 
             echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2><i class="fas fa-edit me-2"></i>Editar Pedido #' . htmlspecialchars($codigoPedido) . '</h2>
+                    <h1 class="page-title">Editar Pedido #' . htmlspecialchars($codigoPedido) . '</h1>
                     <div class="d-flex gap-2">
                         <a href="/admin/pedidos/detalhes/' . (int) $id . '" class="btn btn-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Voltar

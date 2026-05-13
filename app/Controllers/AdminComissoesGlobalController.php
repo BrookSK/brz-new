@@ -244,7 +244,7 @@ class AdminComissoesGlobalController
 
         echo '<div class="pt-3">';
         echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
-        echo '<h1 class="h2"><i class="fas fa-users-cog me-2"></i>Comissões - Visão Global</h1>';
+        echo '<h1 class="page-title">Comissões - Visão Global</h1>';
         echo '</div>';
 
         echo '<div class="alert alert-light border mb-4 small">';
@@ -463,7 +463,7 @@ class AdminComissoesGlobalController
 
         echo '<div class="pt-3">';
         echo '<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-3 border-bottom pb-2">';
-        echo '<h1 class="h2"><i class="fas fa-chart-bar me-2"></i>Resumo Financeiro Global</h1>';
+        echo '<h1 class="page-title">Resumo Financeiro Global</h1>';
         echo '</div>';
 
         // Filtros

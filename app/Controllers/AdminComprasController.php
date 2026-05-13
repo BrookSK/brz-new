@@ -395,7 +395,7 @@ class AdminComprasController extends Controller {
 
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2"><i class="fas fa-plus me-2"></i>Novo Item na Lista de Compras</h1>
+                <h1 class="page-title">Novo Item na Lista de Compras</h1>
                 <div>
                     <a class="btn btn-outline-secondary" href="/admin/estoque/compras" target="_blank"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
                 </div>
@@ -1252,6 +1252,49 @@ class AdminComprasController extends Controller {
                 }
             }
 
+            // Build loja WHERE clause for inside the subquery
+            $params = [];
+            $lojasMultiFilter = isset($_GET['lojas']) ? array_filter(explode(',', $_GET['lojas'])) : [];
+            $whereLojaInner = '';
+            if ($temLojaIdEmLista) {
+                if (!empty($lojasMultiFilter)) {
+                    $lojaConditions = [];
+                    foreach ($lojasMultiFilter as $idx => $lval) {
+                        if ($lval === 'sem_loja') {
+                            if ($temLojaIdEmProdutos) {
+                                $lojaConditions[] = '(COALESCE(lc.loja_id,0) = 0 AND COALESCE(p_inner.loja_id,0) = 0)';
+                            } else {
+                                $lojaConditions[] = 'COALESCE(lc.loja_id,0) = 0';
+                            }
+                        } else {
+                            $pkey = ':loja_multi_' . $idx;
+                            if ($temLojaIdEmProdutos) {
+                                $lojaConditions[] = '(lc.loja_id = ' . $pkey . ' OR (COALESCE(lc.loja_id,0) = 0 AND p_inner.loja_id = ' . $pkey . '))';
+                            } else {
+                                $lojaConditions[] = 'lc.loja_id = ' . $pkey;
+                            }
+                            $params[$pkey] = (int) $lval;
+                        }
+                    }
+                    if (!empty($lojaConditions)) {
+                        $whereLojaInner = ' AND (' . implode(' OR ', $lojaConditions) . ')';
+                    }
+                } elseif ($semLoja) {
+                    if ($temLojaIdEmProdutos) {
+                        $whereLojaInner = ' AND COALESCE(lc.loja_id,0) = 0 AND COALESCE(p_inner.loja_id,0) = 0';
+                    } else {
+                        $whereLojaInner = ' AND COALESCE(lc.loja_id,0) = 0';
+                    }
+                } elseif ($lojaIdFilter > 0) {
+                    if ($temLojaIdEmProdutos) {
+                        $whereLojaInner = ' AND (lc.loja_id = :loja_id OR (COALESCE(lc.loja_id,0) = 0 AND p_inner.loja_id = :loja_id))';
+                    } else {
+                        $whereLojaInner = ' AND lc.loja_id = :loja_id';
+                    }
+                    $params[':loja_id'] = $lojaIdFilter;
+                }
+            }
+
             $selectCols = [
                 'p.id as produto_id',
                 'p.sku as sku',
@@ -1318,6 +1361,7 @@ class AdminComprasController extends Controller {
                             return (int) ($x['produto_id'] ?? 0);
                         }, (array) $reabertos['items'])))) . ')'))
                     : '')
+                . $whereLojaInner
                 . '   GROUP BY lc.produto_id, '
                 . ($this->columnExists('lista_compras', 'nome_produto') ? 'COALESCE(lc.nome_produto, \'\'), ' : '')
                 . ($temTipoCompraEmLista ? "COALESCE(lc.tipo_compra, ''), " : '')
@@ -1327,15 +1371,6 @@ class AdminComprasController extends Controller {
                 . ' ) agg'
                 . ' LEFT JOIN produtos p ON agg.produto_id = p.id';
 
-            $params = [];
-            if ($temLojaIdEmLista) {
-                if ($semLoja) {
-                    $sql .= ' WHERE agg.loja_id = 0';
-                } elseif ($lojaIdFilter > 0) {
-                    $sql .= ' WHERE agg.loja_id = :loja_id';
-                    $params[':loja_id'] = $lojaIdFilter;
-                }
-            }
             if ($tipoCompraView === 'carne') {
                 $sql .= ' ORDER BY agg.data_solicitacao ASC, agg.prioridade DESC';
             } else {
@@ -1465,6 +1500,7 @@ class AdminComprasController extends Controller {
             $valorTotalPendente = 0.0;
             $produtosSelect = [];
             $pedidosSelect = [];
+            $lojasMultiFilter = [];
         }
 
         // Incluir o partial do menu lateral
@@ -1477,7 +1513,16 @@ class AdminComprasController extends Controller {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Compras - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">';
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+    #lojaDropdownWrapper { flex: 1; }
+    #lojaDropdownWrapper .dropdown-toggle { width: 100%; text-align: center; }
+    #lojaDropdownWrapper .dropdown-menu { width: 100% !important; min-width: 100% !important; }
+    @media (max-width: 767.98px) {
+        .card-body.d-flex { flex-direction: column !important; align-items: stretch !important; }
+        .card-body.d-flex > div { width: 100%; }
+    }
+    </style>';
         
         // Renderizar estilos do menu
         renderAdminSidebarStyles();
@@ -1492,7 +1537,7 @@ class AdminComprasController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2"><i class="fas fa-shopping-basket me-2"></i>Lista de Compras</h1>
+                    <h1 class="page-title">Lista de Compras</h1>
                     <div>';
 
         echo '<button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
@@ -1523,7 +1568,9 @@ class AdminComprasController extends Controller {
                     . '</div>';
 
                 $qsLoja = '';
-                if ($semLoja) {
+                if (!empty($lojasMultiFilter)) {
+                    $qsLoja = '&lojas=' . htmlspecialchars(implode(',', $lojasMultiFilter));
+                } elseif ($semLoja) {
                     $qsLoja = '&sem_loja=1';
                 } elseif ($lojaIdFilter > 0) {
                     $qsLoja = '&loja_id=' . (int) $lojaIdFilter;
@@ -1534,28 +1581,138 @@ class AdminComprasController extends Controller {
                     . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">Concluídas</a>'
                     . '</div>';
 
+                // Build active lojas array from query string (supports multi-select)
+                $lojasAtivas = [];
+                if ($semLoja) {
+                    $lojasAtivas[] = 'sem_loja';
+                } elseif ($lojaIdFilter > 0) {
+                    $lojasAtivas[] = (string) $lojaIdFilter;
+                }
+                // Check for multi-select param
+                $lojasMulti = isset($_GET['lojas']) ? array_filter(explode(',', $_GET['lojas'])) : [];
+                if (!empty($lojasMulti)) {
+                    $lojasAtivas = $lojasMulti;
+                }
+
+                $dropdownLabel = 'Todas as lojas';
+                if (in_array('sem_loja', $lojasAtivas)) {
+                    $dropdownLabel = 'Sem loja';
+                    if (count($lojasAtivas) > 1) {
+                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                    }
+                } elseif (!empty($lojasAtivas)) {
+                    if (count($lojasAtivas) === 1) {
+                        foreach ($lojas as $l) {
+                            if ((string)($l['id'] ?? '') === $lojasAtivas[0]) {
+                                $dropdownLabel = htmlspecialchars($l['nome'] ?? '');
+                                break;
+                            }
+                        }
+                    } else {
+                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                    }
+                }
+
                 echo '<div class="card mb-4">
                     <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                        <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <a class="btn btn-sm ' . (!$semLoja && $lojaIdFilter === 0 ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '">Todas</a>';
+                        <div class="d-flex flex-wrap gap-2 align-items-center" style="flex:1">
+                            <div class="dropdown" id="lojaDropdownWrapper">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="lojaDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                    <i class="fas fa-store me-1"></i>' . $dropdownLabel . '
+                                </button>
+                                <div class="dropdown-menu p-3" style="min-width:250px;max-height:320px;overflow-y:auto;" aria-labelledby="lojaDropdownBtn">
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="Buscar loja...">
+                                    </div>
+                                    <div class="form-check mb-1">
+                                        <input class="form-check-input loja-check" type="checkbox" value="todas" id="lojaCheck_todas" ' . (empty($lojasAtivas) ? 'checked' : '') . '>
+                                        <label class="form-check-label" for="lojaCheck_todas">Todas</label>
+                                    </div>
+                                    <hr class="my-1">';
 
                 foreach ($lojas as $l) {
                     $lid = (int) ($l['id'] ?? 0);
-                    $lname = (string) ($l['nome'] ?? '');
-                    $active = (!$semLoja && $lojaIdFilter === $lid);
-                    echo '<a class="btn btn-sm ' . ($active ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=' . $statusView . '&loja_id=' . $lid . '">' . htmlspecialchars($lname) . '</a>';
+                    $lname = htmlspecialchars($l['nome'] ?? '');
+                    $checked = in_array((string)$lid, $lojasAtivas) ? 'checked' : '';
+                    echo '<div class="form-check mb-1 loja-item">
+                                        <input class="form-check-input loja-check" type="checkbox" value="' . $lid . '" id="lojaCheck_' . $lid . '" ' . $checked . '>
+                                        <label class="form-check-label" for="lojaCheck_' . $lid . '">' . $lname . '</label>
+                                    </div>';
                 }
 
-                echo '<a class="btn btn-sm ' . ($semLoja ? 'btn-danger' : 'btn-outline-danger') . '" href="/admin/estoque/compras?status=' . $statusView . '&sem_loja=1">Sem loja</a>'
-                    . '</div>'
+                echo '<hr class="my-1">
+                                    <div class="form-check mb-1 loja-item">
+                                        <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
+                                        <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>'
                     . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">Tipo:</small>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Online</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Offline</a>'
-                    . '<!-- Carnê oculto - tela separada em /admin/carnes/compras-mensal -->'
                     . '</div>'
                     . '</div>'
                     . '</div>';
+
+                // JavaScript for multi-select dropdown
+                echo '<script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    var todasCheck = document.getElementById("lojaCheck_todas");
+                    var lojaChecks = document.querySelectorAll(".loja-check:not(#lojaCheck_todas)");
+                    var searchInput = document.getElementById("lojaSearchInput");
+
+                    function aplicarFiltro() {
+                        var selected = [];
+                        lojaChecks.forEach(function(cb) {
+                            if (cb.checked) selected.push(cb.value);
+                        });
+                        var status = "' . $statusView . '";
+                        var tipo = "' . $tipoCompraView . '";
+                        var url = "/admin/estoque/compras?status=" + status;
+                        if (selected.length > 0 && !todasCheck.checked) {
+                            url += "&lojas=" + selected.join(",");
+                        }
+                        if (tipo !== "todos") {
+                            url += "&tipo_compra=" + tipo;
+                        }
+                        window.location.href = url;
+                    }
+
+                    // "Todas" unchecks others and applies immediately
+                    todasCheck.addEventListener("change", function() {
+                        if (this.checked) {
+                            lojaChecks.forEach(function(cb) { cb.checked = false; });
+                        }
+                        aplicarFiltro();
+                    });
+
+                    // Any other check unchecks "Todas" and applies immediately
+                    lojaChecks.forEach(function(cb) {
+                        cb.addEventListener("change", function() {
+                            if (this.checked) {
+                                todasCheck.checked = false;
+                            }
+                            // If none selected, re-check "Todas"
+                            var anyChecked = Array.from(lojaChecks).some(function(c) { return c.checked; });
+                            if (!anyChecked) todasCheck.checked = true;
+                            aplicarFiltro();
+                        });
+                    });
+
+                    // Search filter
+                    searchInput.addEventListener("input", function() {
+                        var term = this.value.toLowerCase();
+                        document.querySelectorAll(".loja-item").forEach(function(item) {
+                            var label = item.querySelector("label");
+                            if (label) {
+                                item.style.display = label.textContent.toLowerCase().indexOf(term) >= 0 ? "" : "none";
+                            }
+                        });
+                    });
+                });
+                </script>';
 
                 // Cards de Estatísticas
                 echo '<div class="row mb-4">
@@ -1614,7 +1771,7 @@ class AdminComprasController extends Controller {
                 }
 
                 echo '        </div>
-                        <div class="table-responsive">
+                        <div class="table-responsive d-none d-md-block">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
@@ -1743,6 +1900,38 @@ class AdminComprasController extends Controller {
                                 echo '</tbody>
                             </table>
                         </div>
+                        <!-- Mobile: Cards -->
+                        <div class="d-md-none p-2">';
+                        foreach ($compras as $mItem) {
+                            $mProdNome = trim((string) ($mItem['nome_produto_custom'] ?? ''));
+                            if ($mProdNome === '') $mProdNome = (string) ($mItem['produto_nome'] ?? '');
+                            $mQf = (int) ($mItem['quantidade_faltante'] ?? 0);
+                            if ($mQf <= 0) $mQf = (int) ($mItem['quantidade_necessaria'] ?? 0);
+                            $mStatus = (string) ($mItem['status'] ?? 'pendente');
+                            $mStatusClass = $mStatus == 'pendente' ? 'warning' : ($mStatus == 'comprado' ? 'success' : 'danger');
+                            $mPrioridade = (string) ($mItem['prioridade'] ?? '');
+                            $mPrioClass = $mPrioridade == 'urgente' ? 'danger' : ($mPrioridade == 'alta' ? 'warning' : 'info');
+                            $mImgUrl = $this->resolveProdutoImagem($mItem);
+                            $mImgTag = $mImgUrl
+                                ? '<img src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;">'
+                                : '<div style="width:32px;height:32px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;"><i class="fas fa-image text-muted" style="font-size:12px;"></i></div>';
+
+                            echo '<div class="border-bottom py-2">
+                                <div class="d-flex gap-2 align-items-start">
+                                    ' . $mImgTag . '
+                                    <div style="flex:1;min-width:0;">
+                                        <div class="fw-semibold small" style="word-break:break-word;">' . htmlspecialchars($mProdNome) . '</div>
+                                        <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:10px;">
+                                            <span class="text-muted">ID: ' . (int) $mItem['produto_id'] . '</span>
+                                            <span class="badge bg-primary">' . $mQf . ' un</span>
+                                            <span class="badge bg-' . $mStatusClass . '">' . ucfirst($mStatus) . '</span>
+                                            <span class="badge bg-' . $mPrioClass . '">' . ucfirst($mPrioridade) . '</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>';
+                        }
+                        echo '</div>
                     </div>
                 </div>';
 
