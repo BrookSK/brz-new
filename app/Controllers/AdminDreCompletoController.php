@@ -44,6 +44,7 @@ class AdminDreCompletoController extends Controller {
         $colServicos = $pick(['servicos','taxa_servico']);
         $colImpostos = $pick(['impostos','valor_impostos']);
         $colFrete = $pick(['frete','valor_frete']);
+        $colImpostoLocal = $pick(['imposto_local']);
         $colMoeda = $pick(['moeda','currency']);
         $colStatus = $pick(['status']);
         $colPayGateway = $pick(['payment_gateway','gateway']);
@@ -72,6 +73,7 @@ class AdminDreCompletoController extends Controller {
             " . ($colSubtotal ? "COALESCE(SUM(p.{$colSubtotal}),0) as subtotal" : "0 as subtotal") . ",
             " . ($colServicos ? "COALESCE(SUM(p.{$colServicos}),0) as servicos" : "0 as servicos") . ",
             " . ($colImpostos ? "COALESCE(SUM(p.{$colImpostos}),0) as impostos" : "0 as impostos") . ",
+            " . ($colImpostoLocal ? "COALESCE(SUM(p.{$colImpostoLocal}),0) as imposto_local" : "0 as imposto_local") . ",
             " . ($colFrete ? "COALESCE(SUM(p.{$colFrete}),0) as frete" : "0 as frete") . "
             FROM pedidos p
             WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)
@@ -128,42 +130,81 @@ class AdminDreCompletoController extends Controller {
             $despesasPorFavorecido = $stDF->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
+        // === DESCONTOS E PROMOÇÕES ===
+        // Calcular total de descontos: diferença entre preço original do produto e preço cobrado no pedido
+        $totalDescontos = 0;
+        try {
+            // Detectar tabela de itens
+            $itensTable = null;
+            try { $this->db->query("SELECT 1 FROM pedido_itens LIMIT 1"); $itensTable = 'pedido_itens'; } catch (\Exception $e) {
+                try { $this->db->query("SELECT 1 FROM pedido_items LIMIT 1"); $itensTable = 'pedido_items'; } catch (\Exception $e2) {}
+            }
+            if ($itensTable) {
+                // Detectar colunas da tabela de itens
+                $colsItens = [];
+                try { $stI = $this->db->query("DESCRIBE {$itensTable}"); $colsItens = $stI ? $stI->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $colPrecoItem = in_array('preco', $colsItens, true) ? 'preco' : (in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : (in_array('price', $colsItens, true) ? 'price' : ''));
+                $colQtdItem = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : 'quantidade');
+                $colProdutoIdItem = in_array('produto_id', $colsItens, true) ? 'produto_id' : 'product_id';
+                
+                // Detectar coluna de preço original do produto
+                $colPrecoOriginal = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : '');
+                
+                if ($colPrecoItem && $colPrecoOriginal) {
+                    // Soma dos descontos: (preço original - preço cobrado) * quantidade, para pedidos pagos no período
+                    $sqlDesc = "SELECT COALESCE(SUM((prod.{$colPrecoOriginal} - i.{$colPrecoItem}) * i.{$colQtdItem}), 0) as total_desconto
+                        FROM {$itensTable} i
+                        INNER JOIN pedidos p ON p.id = i.pedido_id
+                        INNER JOIN produtos prod ON prod.id = i.{$colProdutoIdItem}
+                        WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)
+                        AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
+                        {$deletedFilter}
+                        AND prod.{$colPrecoOriginal} > i.{$colPrecoItem}";
+                    $stDesc = $this->db->prepare($sqlDesc);
+                    $stDesc->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                    $totalDescontos = (float)($stDesc->fetchColumn() ?: 0);
+                }
+            }
+        } catch (\Throwable $e) { $totalDescontos = 0; }
+
         // === RESUMO MENSAL CONSOLIDADO ===
-        // Receita real = apenas taxa de serviço (o que a empresa ganha)
-        // O total do pedido inclui custos repassados (produtos, impostos, frete)
+        // Receita operacional = total do pedido (tudo que entra)
+        // Composição: produtos + impostos brasil + imposto local + taxa de serviço
         $meses = [];
         foreach ($entradasPorMes as $r) {
             $m = $r['mes'];
-            if (!isset($meses[$m])) $meses[$m] = ['mes' => $m, 'entradas_brl' => 0, 'entradas_usd' => 0, 'receita_servico_brl' => 0, 'receita_servico_usd' => 0, 'repasse_produtos_brl' => 0, 'repasse_produtos_usd' => 0, 'repasse_impostos_brl' => 0, 'repasse_impostos_usd' => 0, 'despesas_brl' => 0, 'despesas_usd' => 0, 'qtd_pedidos' => 0, 'qtd_despesas' => 0];
+            if (!isset($meses[$m])) $meses[$m] = ['mes' => $m, 'entradas_brl' => 0, 'entradas_usd' => 0, 'custo_produtos_brl' => 0, 'custo_produtos_usd' => 0, 'custo_impostos_br_brl' => 0, 'custo_impostos_br_usd' => 0, 'custo_imposto_local_brl' => 0, 'custo_imposto_local_usd' => 0, 'taxa_servico_brl' => 0, 'taxa_servico_usd' => 0, 'despesas_brl' => 0, 'despesas_usd' => 0, 'qtd_pedidos' => 0, 'qtd_despesas' => 0];
             $valTotal = (float)$r['total'];
             $valServicos = (float)($r['servicos'] ?? 0);
             $valSubtotal = (float)($r['subtotal'] ?? 0);
             $valImpostos = (float)($r['impostos'] ?? 0);
+            $valImpostoLocal = (float)($r['imposto_local'] ?? 0);
             $valFrete = (float)($r['frete'] ?? 0);
             
-            // Receita real = taxa de serviço
-            // Se não tem coluna de serviços, estimar como total - subtotal - impostos - frete
+            // Se não tem coluna de serviços, estimar como total - subtotal - impostos - imposto_local - frete
             if ($valServicos <= 0 && $valTotal > 0) {
-                $valServicos = $valTotal - $valSubtotal - $valImpostos - $valFrete;
+                $valServicos = $valTotal - $valSubtotal - $valImpostos - $valImpostoLocal - $valFrete;
                 if ($valServicos < 0) $valServicos = 0;
             }
             
             if ($r['moeda'] === 'USD') {
                 $meses[$m]['entradas_usd'] += $valTotal;
-                $meses[$m]['receita_servico_usd'] += $valServicos;
-                $meses[$m]['repasse_produtos_usd'] += $valSubtotal;
-                $meses[$m]['repasse_impostos_usd'] += $valImpostos;
+                $meses[$m]['custo_produtos_usd'] += $valSubtotal;
+                $meses[$m]['custo_impostos_br_usd'] += $valImpostos;
+                $meses[$m]['custo_imposto_local_usd'] += $valImpostoLocal;
+                $meses[$m]['taxa_servico_usd'] += $valServicos;
             } else {
                 $meses[$m]['entradas_brl'] += $valTotal;
-                $meses[$m]['receita_servico_brl'] += $valServicos;
-                $meses[$m]['repasse_produtos_brl'] += $valSubtotal;
-                $meses[$m]['repasse_impostos_brl'] += $valImpostos;
+                $meses[$m]['custo_produtos_brl'] += $valSubtotal;
+                $meses[$m]['custo_impostos_br_brl'] += $valImpostos;
+                $meses[$m]['custo_imposto_local_brl'] += $valImpostoLocal;
+                $meses[$m]['taxa_servico_brl'] += $valServicos;
             }
             $meses[$m]['qtd_pedidos'] += (int)$r['qtd'];
         }
         foreach ($despesasPorMes as $r) {
             $m = $r['mes'];
-            if (!isset($meses[$m])) $meses[$m] = ['mes' => $m, 'entradas_brl' => 0, 'entradas_usd' => 0, 'receita_servico_brl' => 0, 'receita_servico_usd' => 0, 'repasse_produtos_brl' => 0, 'repasse_produtos_usd' => 0, 'repasse_impostos_brl' => 0, 'repasse_impostos_usd' => 0, 'despesas_brl' => 0, 'despesas_usd' => 0, 'qtd_pedidos' => 0, 'qtd_despesas' => 0];
+            if (!isset($meses[$m])) $meses[$m] = ['mes' => $m, 'entradas_brl' => 0, 'entradas_usd' => 0, 'custo_produtos_brl' => 0, 'custo_produtos_usd' => 0, 'custo_impostos_br_brl' => 0, 'custo_impostos_br_usd' => 0, 'custo_imposto_local_brl' => 0, 'custo_imposto_local_usd' => 0, 'taxa_servico_brl' => 0, 'taxa_servico_usd' => 0, 'despesas_brl' => 0, 'despesas_usd' => 0, 'qtd_pedidos' => 0, 'qtd_despesas' => 0];
             $val = (float)$r['total'];
             if ($r['moeda'] === 'USD') $meses[$m]['despesas_usd'] += $val;
             else $meses[$m]['despesas_brl'] += $val;
@@ -171,38 +212,42 @@ class AdminDreCompletoController extends Controller {
         }
         ksort($meses);
 
-        // Calcular totais — RECEITA = apenas taxa de serviço
+        // Calcular totais
         $totalEntradasBrl = 0; $totalEntradasUsd = 0; $totalDespBrl = 0; $totalDespUsd = 0;
-        $totalReceitaServicoBrl = 0; $totalReceitaServicoUsd = 0;
-        $totalRepasseProdutosBrl = 0; $totalRepasseProdutosUsd = 0;
-        $totalRepasseImpostosBrl = 0; $totalRepasseImpostosUsd = 0;
+        $totalCustoProdutosBrl = 0; $totalCustoProdutosUsd = 0;
+        $totalCustoImpostosBrBrl = 0; $totalCustoImpostosBrUsd = 0;
+        $totalCustoImpostoLocalBrl = 0; $totalCustoImpostoLocalUsd = 0;
+        $totalTaxaServicoBrl = 0; $totalTaxaServicoUsd = 0;
         foreach ($meses as &$m) {
-            // Receita real = taxa de serviço (não o total do pedido)
-            $m['receita_total'] = $m['receita_servico_brl'] + ($m['receita_servico_usd'] * $taxaUsdBrl);
             $m['entradas_total'] = $m['entradas_brl'] + ($m['entradas_usd'] * $taxaUsdBrl);
+            $m['custo_produtos_total'] = $m['custo_produtos_brl'] + ($m['custo_produtos_usd'] * $taxaUsdBrl);
+            $m['custo_impostos_br_total'] = $m['custo_impostos_br_brl'] + ($m['custo_impostos_br_usd'] * $taxaUsdBrl);
+            $m['custo_imposto_local_total'] = $m['custo_imposto_local_brl'] + ($m['custo_imposto_local_usd'] * $taxaUsdBrl);
+            $m['taxa_servico_total'] = $m['taxa_servico_brl'] + ($m['taxa_servico_usd'] * $taxaUsdBrl);
             $m['despesas_total'] = $m['despesas_brl'] + ($m['despesas_usd'] * $taxaUsdBrl);
-            $m['resultado'] = $m['receita_total'] - $m['despesas_total'];
+            $m['resultado'] = $m['entradas_total'] - $m['despesas_total'];
             $totalEntradasBrl += $m['entradas_brl'];
             $totalEntradasUsd += $m['entradas_usd'];
             $totalDespBrl += $m['despesas_brl'];
             $totalDespUsd += $m['despesas_usd'];
-            $totalReceitaServicoBrl += $m['receita_servico_brl'];
-            $totalReceitaServicoUsd += $m['receita_servico_usd'];
-            $totalRepasseProdutosBrl += $m['repasse_produtos_brl'];
-            $totalRepasseProdutosUsd += $m['repasse_produtos_usd'];
-            $totalRepasseImpostosBrl += $m['repasse_impostos_brl'];
-            $totalRepasseImpostosUsd += $m['repasse_impostos_usd'];
+            $totalCustoProdutosBrl += $m['custo_produtos_brl'];
+            $totalCustoProdutosUsd += $m['custo_produtos_usd'];
+            $totalCustoImpostosBrBrl += $m['custo_impostos_br_brl'];
+            $totalCustoImpostosBrUsd += $m['custo_impostos_br_usd'];
+            $totalCustoImpostoLocalBrl += $m['custo_imposto_local_brl'];
+            $totalCustoImpostoLocalUsd += $m['custo_imposto_local_usd'];
+            $totalTaxaServicoBrl += $m['taxa_servico_brl'];
+            $totalTaxaServicoUsd += $m['taxa_servico_usd'];
         }
         unset($m);
 
-        // Receita real = taxa de serviço (não total dos pedidos)
-        $totalReceitaServico = $totalReceitaServicoBrl + ($totalReceitaServicoUsd * $taxaUsdBrl);
         $totalEntradas = $totalEntradasBrl + ($totalEntradasUsd * $taxaUsdBrl);
         $totalDespesas = $totalDespBrl + ($totalDespUsd * $taxaUsdBrl);
-        $totalRepasseProdutos = $totalRepasseProdutosBrl + ($totalRepasseProdutosUsd * $taxaUsdBrl);
-        $totalRepasseImpostos = $totalRepasseImpostosBrl + ($totalRepasseImpostosUsd * $taxaUsdBrl);
-        $resultado = $totalReceitaServico - $totalDespesas;
-
+        $totalCustoProdutos = $totalCustoProdutosBrl + ($totalCustoProdutosUsd * $taxaUsdBrl);
+        $totalCustoImpostosBr = $totalCustoImpostosBrBrl + ($totalCustoImpostosBrUsd * $taxaUsdBrl);
+        $totalCustoImpostoLocal = $totalCustoImpostoLocalBrl + ($totalCustoImpostoLocalUsd * $taxaUsdBrl);
+        $totalTaxaServico = $totalTaxaServicoBrl + ($totalTaxaServicoUsd * $taxaUsdBrl);
+        $resultado = $totalEntradas - $totalDespesas;
         // === CONCILIAÇÃO ===
         $conciliacao = [
             'total_creditos' => $totalEntradas,
@@ -280,21 +325,16 @@ class AdminDreCompletoController extends Controller {
                 'total_entradas' => $totalEntradas,
                 'total_entradas_brl' => $totalEntradasBrl,
                 'total_entradas_usd' => $totalEntradasUsd,
-                'total_receita_servico' => $totalReceitaServico,
-                'total_receita_servico_brl' => $totalReceitaServicoBrl,
-                'total_receita_servico_usd' => $totalReceitaServicoUsd,
-                'total_repasse_produtos' => $totalRepasseProdutos,
-                'total_repasse_produtos_brl' => $totalRepasseProdutosBrl,
-                'total_repasse_produtos_usd' => $totalRepasseProdutosUsd,
-                'total_repasse_impostos' => $totalRepasseImpostos,
-                'total_repasse_impostos_brl' => $totalRepasseImpostosBrl,
-                'total_repasse_impostos_usd' => $totalRepasseImpostosUsd,
-                'total_repasse_frete' => $totalEntradas - $totalReceitaServico - $totalRepasseProdutos - $totalRepasseImpostos,
+                'custo_produtos' => $totalCustoProdutos,
+                'custo_impostos_br' => $totalCustoImpostosBr,
+                'custo_imposto_local' => $totalCustoImpostoLocal,
+                'taxa_servico' => $totalTaxaServico,
+                'total_descontos' => $totalDescontos,
                 'total_despesas' => $totalDespesas,
                 'total_despesas_brl' => $totalDespBrl,
                 'total_despesas_usd' => $totalDespUsd,
                 'resultado' => $resultado,
-                'margem' => $totalReceitaServico > 0 ? round($resultado / $totalReceitaServico * 100, 1) : 0,
+                'margem' => $totalEntradas > 0 ? round($resultado / $totalEntradas * 100, 1) : 0,
                 'maior_categoria' => $maiorCategoria,
                 'qtd_pedidos' => array_sum(array_column(array_values($meses), 'qtd_pedidos')),
             ],
@@ -369,10 +409,10 @@ class AdminDreCompletoController extends Controller {
         $w("Período{$sep}{$dateStart} a {$dateEnd}"); $w("Moeda do relatório{$sep}BRL"); $w("Taxa USD→BRL{$sep}".$fV($taxaUsdBrl)); $w("Gerado em{$sep}".date('d/m/Y H:i:s')); $w("");
 
         $w("=== 1. RESUMO DA DRE REALIZADA ==="); $w("Descrição{$sep}Valor BRL");
-        $w("Receita Operacional (Taxa de Serviço){$sep}".$fV($srvT)); $w("Custos de Repasse (produtos+impostos+frete){$sep}".$fV($subT+$impT+$frtT)); $w("Total Movimentado (pedidos){$sep}".$fV($rec)); $w("(-) Despesas operacionais{$sep}".$fV($despR)); $w("(=) Resultado (Receita Serviço - Despesas){$sep}".$fV($srvT-$despR)); $w("Margem sobre receita de serviço{$sep}".$fV($srvT>0?round(($srvT-$despR)/$srvT*100,2):0)."%"); $w("");
+        $w("Receita Operacional (total pedidos){$sep}".$fV($rec)); $w("  Custo de Produtos{$sep}".$fV($subT)); $w("  Custo de Impostos Brasil{$sep}".$fV($impT)); $w("  Taxa de Serviço{$sep}".$fV($srvT)); $w("(-) Despesas{$sep}".$fV($despR)); $w("(=) Resultado{$sep}".$fV($res)); $w("Margem{$sep}".$fV($mrg)."%"); $w("");
 
-        $w("=== 2. COMPOSIÇÃO DA RECEITA E REPASSES ==="); $w("Descrição{$sep}Valor BRL");
-        $w("Taxa de Serviço (receita real){$sep}".$fV($srvT)); $w("Repasse Produtos (subtotal){$sep}".$fV($subT)); $w("Repasse Impostos{$sep}".$fV($impT)); $w("Repasse Frete{$sep}".$fV($frtT)); $w("Total Movimentado{$sep}".$fV($rec)); $w("Quantidade de pedidos pagos{$sep}".count($pDre)); $w("");
+        $w("=== 2. COMPOSIÇÃO DA RECEITA OPERACIONAL ==="); $w("Descrição{$sep}Valor BRL");
+        $w("Custo de Produtos (subtotal){$sep}".$fV($subT)); $w("Custo de Impostos Brasil{$sep}".$fV($impT)); $w("Taxa de Serviço{$sep}".$fV($srvT)); $w("Total Receita Operacional{$sep}".$fV($rec)); $w("Quantidade de pedidos pagos{$sep}".count($pDre)); $w("");
 
         $w("=== 3. COMPOSIÇÃO DAS DESPESAS REALIZADAS ==="); $w("Categoria{$sep}Valor BRL");
         foreach($dCat as $c=>$v)$w(str_replace($sep,' ',$c).$sep.$fV($v));
@@ -407,7 +447,7 @@ class AdminDreCompletoController extends Controller {
         $w("");
 
         $w("=== 10. CONCILIAÇÃO DO PERÍODO ==="); $w("Descrição{$sep}Valor BRL");
-        $w("Receita Operacional (Taxa de Serviço){$sep}".$fV($srvT)); $w("Custos de Repasse{$sep}".$fV($subT+$impT+$frtT)); $w("Total Movimentado{$sep}".$fV($rec)); $w("Despesas operacionais{$sep}".$fV($despR)); $w("Resultado (Receita - Despesas){$sep}".$fV($srvT-$despR));
+        $w("Receita Operacional (total pedidos){$sep}".$fV($rec)); $w("  Custo de Produtos{$sep}".$fV($subT)); $w("  Custo de Impostos Brasil{$sep}".$fV($impT)); $w("  Taxa de Serviço{$sep}".$fV($srvT)); $w("(-) Despesas{$sep}".$fV($despR)); $w("(=) Resultado{$sep}".$fV($res));
         $w("Pedidos ainda não realizados{$sep}".$fV($tfP)); $w("Despesas ainda não realizadas{$sep}".$fV($tfD));
         $w("Quantidade de pedidos pagos{$sep}".count($pDre)); $w("Quantidade de pedidos fora da DRE{$sep}{$tqP}");
         $w("Quantidade de despesas pagas{$sep}".count($dDre)); $w("Quantidade de despesas fora da DRE{$sep}{$tqD}");

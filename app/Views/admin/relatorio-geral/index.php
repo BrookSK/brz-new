@@ -615,38 +615,36 @@ function renderDreCompleto(d) {
 
     // Cards resumo (8 cards)
     h += '<div class="row g-3 mb-4">';
-    h += card('Receita (Taxa Serviço)','fas fa-concierge-bell','#10b981',fmtR(r.total_receita_servico||0));
-    h += card('Total Movimentado','fas fa-exchange-alt','#3b82f6',fmtR(r.total_entradas));
-    h += card('Custos de Repasse','fas fa-undo','#f59e0b',fmtR((r.total_repasse_produtos||0)+(r.total_repasse_impostos||0)+(r.total_repasse_frete||0)));
-    h += card('Total Despesas','fas fa-arrow-down','#ef4444',fmtR(r.total_despesas));
-    h += card('Resultado Líquido','fas fa-equals',r.resultado>=0?'#10b981':'#ef4444',fmtR(r.resultado));
-    h += card('Margem s/ Receita','fas fa-percentage',r.margem>=0?'#3b82f6':'#ef4444',r.margem+'%');
-    h += card('Pedidos','fas fa-shopping-cart','#6366f1',(r.qtd_pedidos||0)+' pedidos');
-    h += card('Maior Gasto','fas fa-fire','#dc2626',r.maior_categoria||'N/A');
+    h += card('Receita Operacional','fas fa-arrow-up','#10b981',fmtR(r.total_entradas));
+    h += card('Custo Produtos','fas fa-box','#3b82f6',fmtR(r.custo_produtos||0));
+    h += card('Impostos Brasil','fas fa-landmark','#f59e0b',fmtR(r.custo_impostos_br||0));
+    h += card('Imposto Local','fas fa-flag','#ef4444',fmtR(r.custo_imposto_local||0));
+    h += card('Taxa de Serviço','fas fa-concierge-bell','#06b6d4',fmtR(r.taxa_servico||0));
+    if ((r.total_descontos||0) > 0) h += card('Descontos/Promoções','fas fa-tag','#f97316',fmtR(r.total_descontos||0));
+    h += card('Despesas','fas fa-arrow-down','#dc2626',fmtR(r.total_despesas));
+    h += card('Resultado','fas fa-equals',r.resultado>=0?'#10b981':'#ef4444',fmtR(r.resultado));
+    h += card('Margem','fas fa-percentage',r.margem>=0?'#3b82f6':'#ef4444',r.margem+'%');
     h += '</div>';
 
     // DRE Profissional
-    const totalRepasse = (r.total_repasse_produtos||0) + (r.total_repasse_impostos||0) + (r.total_repasse_frete||0);
     h += '<div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><div class="d-flex align-items-center gap-2"><div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:28px;height:28px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:11px;"></i></div><div><h6 class="fw-bold mb-0">DRE — Balanço Financeiro</h6><span class="text-muted" style="font-size:10px;">Período: '+d.periodo.inicio+' a '+d.periodo.fim+'</span></div></div></div><div class="card-body"><table class="table table-sm mb-0" style="font-size:13px;"><tbody>';
-    h += dreRow('RECEITA OPERACIONAL (Taxa de Serviço)',fmtR(r.total_receita_servico||0),'fw-bold text-success','fs-5');
-    h += dreRow('  Receita Serviço em BRL',fmtR(r.total_receita_servico_brl||0),'ps-3 text-muted');
-    h += dreRow('  Receita Serviço em USD (×'+taxa.toFixed(2)+')',fmtR((r.total_receita_servico_usd||0)*taxa),'ps-3 text-muted');
-    h += '<tr class="border-top"><td class="fw-bold text-warning"><i class="fas fa-undo me-1"></i>CUSTOS DE REPASSE (pass-through)</td><td class="text-end fw-bold text-warning fs-5">'+fmtR(totalRepasse)+'</td></tr>';
-    h += dreRow('  Repasse Produtos (subtotal)',fmtR(r.total_repasse_produtos||0),'ps-3 text-muted');
-    h += dreRow('  Repasse Impostos',fmtR(r.total_repasse_impostos||0),'ps-3 text-muted');
-    h += dreRow('  Repasse Frete',fmtR(r.total_repasse_frete||0),'ps-3 text-muted');
-    h += '<tr class="border-top"><td class="text-muted"><i class="fas fa-exchange-alt me-1"></i>Total Movimentado (pedidos)</td><td class="text-end fw-bold">'+fmtR(r.total_entradas)+'</td></tr>';
-    h += dreRow('(-) DESPESAS OPERACIONAIS',fmtR(r.total_despesas),'fw-bold text-danger border-top','fs-5');
+    h += dreRow('RECEITA OPERACIONAL',fmtR(r.total_entradas),'fw-bold text-success','fs-5');
+    h += dreRow('  Custo de Produtos',fmtR(r.custo_produtos||0),'ps-3 text-muted');
+    h += dreRow('  Custo de Impostos Brasil',fmtR(r.custo_impostos_br||0),'ps-3 text-muted');
+    h += dreRow('  Custo de Imposto Local',fmtR(r.custo_imposto_local||0),'ps-3 text-muted');
+    h += dreRow('  Taxa de Serviço',fmtR(r.taxa_servico||0),'ps-3 text-muted');
+    if ((r.total_descontos||0) > 0) h += dreRow('(-) Descontos e Promoções',fmtR(r.total_descontos),'fw-bold text-warning border-top','');
+    h += dreRow('(-) DESPESAS',fmtR(r.total_despesas),'fw-bold text-danger border-top','fs-5');
     h += dreRow('  Despesas em BRL',fmtR(r.total_despesas_brl),'ps-3 text-muted');
     if (r.total_despesas_usd > 0) h += dreRow('  Despesas em USD (×'+taxa.toFixed(2)+')',fmtR(r.total_despesas_usd*taxa),'ps-3 text-muted');
-    h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;">(=) RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td></tr>';
-    h += '<tr><td class="text-muted small">Margem sobre Receita de Serviço</td><td class="text-end"><span class="badge '+(r.margem>=0?'bg-success':'bg-danger')+'">'+r.margem+'%</span></td></tr>';
+    h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;">(=) RESULTADO</td><td class="text-end fw-bold fs-4 '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td></tr>';
+    h += '<tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge '+(r.margem>=0?'bg-success':'bg-danger')+'">'+r.margem+'%</span></td></tr>';
     h += '</tbody></table></div></div>';
 
     // Resumo Mensal
-    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-calendar-alt me-2 text-muted"></i>Resumo Mensal</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>Mês</th><th class="text-end">Receita Serviço</th><th class="text-end">Movimentado</th><th class="text-end">Despesas</th><th class="text-end">Resultado</th><th class="text-end">Pedidos</th></tr></thead><tbody>';
-    d.meses.forEach(m => { h += '<tr><td class="fw-semibold">'+m.mes+'</td><td class="text-end text-success">'+fmtR(m.receita_total||0)+'</td><td class="text-end text-muted">'+fmtR(m.entradas_total)+'</td><td class="text-end text-danger">'+fmtR(m.despesas_total)+'</td><td class="text-end fw-bold '+(m.resultado>=0?'text-success':'text-danger')+'">'+fmtR(m.resultado)+'</td><td class="text-end">'+m.qtd_pedidos+'</td></tr>'; });
-    h += '<tr class="fw-bold border-top table-light"><td>ACUMULADO</td><td class="text-end">'+fmtR(r.total_receita_servico||0)+'</td><td class="text-end">'+fmtR(r.total_entradas)+'</td><td class="text-end">'+fmtR(r.total_despesas)+'</td><td class="text-end '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td><td></td></tr>';
+    h += '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-calendar-alt me-2 text-muted"></i>Resumo Mensal</h6></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:12px;"><thead class="table-light"><tr><th>Mês</th><th class="text-end">Receita Op.</th><th class="text-end">Produtos</th><th class="text-end">Imp. BR</th><th class="text-end">Imp. Local</th><th class="text-end">Taxa Serv.</th><th class="text-end">Despesas</th><th class="text-end">Resultado</th></tr></thead><tbody>';
+    d.meses.forEach(m => { h += '<tr><td class="fw-semibold">'+m.mes+'</td><td class="text-end">'+fmtR(m.entradas_total)+'</td><td class="text-end">'+fmtR(m.custo_produtos_total||0)+'</td><td class="text-end">'+fmtR(m.custo_impostos_br_total||0)+'</td><td class="text-end">'+fmtR(m.custo_imposto_local_total||0)+'</td><td class="text-end">'+fmtR(m.taxa_servico_total||0)+'</td><td class="text-end text-danger">'+fmtR(m.despesas_total)+'</td><td class="text-end fw-bold '+(m.resultado>=0?'text-success':'text-danger')+'">'+fmtR(m.resultado)+'</td></tr>'; });
+    h += '<tr class="fw-bold border-top table-light"><td>ACUMULADO</td><td class="text-end">'+fmtR(r.total_entradas)+'</td><td class="text-end">'+fmtR(r.custo_produtos||0)+'</td><td class="text-end">'+fmtR(r.custo_impostos_br||0)+'</td><td class="text-end">'+fmtR(r.custo_imposto_local||0)+'</td><td class="text-end">'+fmtR(r.taxa_servico||0)+'</td><td class="text-end">'+fmtR(r.total_despesas)+'</td><td class="text-end '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td></tr>';
     h += '</tbody></table></div></div></div>';
 
     // Gateways
@@ -692,11 +690,14 @@ function renderDreCompleto(d) {
 
     // Conciliação
     h += '<div class="card border-0 shadow-sm" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small mb-0"><i class="fas fa-balance-scale me-2"></i>Conciliação Financeira</h6></div><div class="card-body"><table class="table table-sm mb-0" style="font-size:13px;"><tbody>';
-    h += '<tr><td>Receita Operacional (Taxa de Serviço)</td><td class="text-end fw-bold text-success">'+fmtR(r.total_receita_servico||0)+'</td></tr>';
-    h += '<tr><td>Total Movimentado (pedidos)</td><td class="text-end fw-bold text-muted">'+fmtR(d.conciliacao.total_creditos)+'</td></tr>';
-    h += '<tr><td>Custos de Repasse (produtos + impostos + frete)</td><td class="text-end fw-bold text-warning">'+fmtR((r.total_repasse_produtos||0)+(r.total_repasse_impostos||0)+(r.total_repasse_frete||0))+'</td></tr>';
-    h += '<tr><td>Total de Despesas Operacionais</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';
-    h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold">Resultado (Receita - Despesas)</td><td class="text-end fw-bold fs-5 '+(d.conciliacao.saldo_final>=0?'text-success':'text-danger')+'">'+fmtR(d.conciliacao.saldo_final)+'</td></tr>';
+    h += '<tr><td>Receita Operacional (total pedidos)</td><td class="text-end fw-bold text-success">'+fmtR(d.conciliacao.total_creditos)+'</td></tr>';
+    h += '<tr><td class="ps-3 text-muted">Custo de Produtos</td><td class="text-end">'+fmtR(r.custo_produtos||0)+'</td></tr>';
+    h += '<tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end">'+fmtR(r.custo_impostos_br||0)+'</td></tr>';
+    h += '<tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end">'+fmtR(r.custo_imposto_local||0)+'</td></tr>';
+    h += '<tr><td class="ps-3 text-muted">Taxa de Serviço</td><td class="text-end">'+fmtR(r.taxa_servico||0)+'</td></tr>';
+    if ((r.total_descontos||0) > 0) h += '<tr><td>(-) Descontos e Promoções</td><td class="text-end fw-bold text-warning">'+fmtR(r.total_descontos)+'</td></tr>';
+    h += '<tr><td>(-) Despesas</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';
+    h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold">Resultado</td><td class="text-end fw-bold fs-5 '+(d.conciliacao.saldo_final>=0?'text-success':'text-danger')+'">'+fmtR(d.conciliacao.saldo_final)+'</td></tr>';
     h += '<tr><td class="text-muted small">Quantidade de lançamentos</td><td class="text-end">'+d.conciliacao.qtd_lancamentos+'</td></tr>';
     h += '</tbody></table>';
     h += '<hr class="my-3">';
