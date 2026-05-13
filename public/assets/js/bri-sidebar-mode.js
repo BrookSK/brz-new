@@ -33,73 +33,27 @@ const BriSidebar = (() => {
       if (!iframeDoc || !iframeWin) return;
 
       // Se a URL do iframe não tem embed=1, recarregar com embed=1
-      const iframeUrl = iframeWin.location.href;
       const iframePath = iframeWin.location.pathname + iframeWin.location.search;
-      if (!iframePath.includes('embed=1') && iframePath !== '/bri/inicio') {
+      if (!iframePath.includes('embed=1') && !iframePath.includes('/bri/inicio')) {
         const sep = iframePath.includes('?') ? '&' : '?';
         frame.src = iframePath + sep + 'embed=1';
         return;
       }
 
-      // Interceptar window.location changes dentro do iframe
-      const origAssign = iframeWin.location.assign?.bind(iframeWin.location);
-      Object.defineProperty(iframeWin, '__briNavigate', { value: function(url) {
-        if (url && !url.includes('embed=1') && url.startsWith('/')) {
-          url = url + (url.includes('?') ? '&' : '?') + 'embed=1';
-        }
-        frame.src = url;
-      }, writable: false });
-
-      // Override location.href setter via script injection
-      const script = iframeDoc.createElement('script');
-      script.textContent = `
-        (function(){
-          // Patch APENAS links de navegação que usam window.location.href
-          // NÃO interceptar botões de add-to-cart, forms, ou ações de produto
-          document.addEventListener('click', function(e) {
-            var el = e.target.closest('a[onclick*="location.href"]');
-            if (!el) return;
-            // Não interceptar se é botão de carrinho/produto
-            var onclick = el.getAttribute('onclick') || '';
-            if (onclick.indexOf('carrinho') !== -1 || onclick.indexOf('cart') !== -1) return;
-            if (onclick.indexOf('location.href') !== -1) {
-              var match = onclick.match(/location\\.href\\s*=\\s*['"](.*?)['"]/);
-              if (match && match[1] && match[1].indexOf('embed=1') === -1) {
-                e.preventDefault();
-                e.stopPropagation();
-                var url = match[1];
-                window.location.href = url + (url.indexOf('?') !== -1 ? '&' : '?') + 'embed=1';
-              }
-            }
-          }, true);
-        })();
-      `;
-      iframeDoc.head.appendChild(script);
-
-      // Interceptar cliques em links de NAVEGAÇÃO (não botões de ação)
-      iframeDoc.addEventListener('click', (e) => {
-        const link = e.target.closest('a[href]');
-        if (!link) return;
-        const href = link.getAttribute('href');
-        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http')) return;
-        // Não interceptar links de ação (add-to-cart, POST actions, etc.)
-        if (link.closest('form') || link.getAttribute('onclick') || link.classList.contains('btn-primary') || href.includes('/adicionar') || href.includes('/add')) return;
-        if (!href.includes('embed=1')) {
-          e.preventDefault();
-          e.stopPropagation();
-          frame.src = href + (href.includes('?') ? '&' : '?') + 'embed=1';
-        }
-      }, true);
-
-      // Interceptar form submits GET
-      iframeDoc.addEventListener('submit', (e) => {
-        const form = e.target;
-        if (form && form.method.toUpperCase() !== 'POST' && !form.querySelector('input[name="embed"]')) {
-          const input = iframeDoc.createElement('input');
-          input.type = 'hidden'; input.name = 'embed'; input.value = '1';
-          form.appendChild(input);
-        }
-      }, true);
+      // Adicionar embed=1 a TODOS os links <a> que são navegação pura
+      // NÃO tocar em botões, forms, ou elementos com onclick/AJAX
+      iframeDoc.querySelectorAll('a[href]').forEach(a => {
+        const href = a.getAttribute('href') || '';
+        // Ignorar: links externos, anchors, javascript, links que já têm embed
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('http') || href.includes('embed=1')) return;
+        // Ignorar: botões de ação (add to cart, remover, etc.)
+        if (a.getAttribute('onclick')) return;
+        if (a.closest('form')) return;
+        if (a.classList.contains('btn-primary') || a.classList.contains('btn-danger') || a.classList.contains('btn-success')) return;
+        if (href.includes('/adicionar') || href.includes('/remover') || href.includes('/toggle') || href.includes('/limpar')) return;
+        // Adicionar embed=1
+        a.setAttribute('href', href + (href.includes('?') ? '&' : '?') + 'embed=1');
+      });
 
     } catch(e) { /* cross-origin — ignore */ }
   });
