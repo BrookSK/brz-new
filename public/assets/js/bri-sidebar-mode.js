@@ -160,7 +160,7 @@ const BriSidebar = (() => {
     const palavras = msg.trim().split(/\s+/);
     if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|quanto|qual|porque|quando|onde|quem|ajuda|help)/)) {
       // Se não é uma pergunta/saudação, tratar como busca de produto
-      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie'};
+      const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby','bebê':'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',loção:'lotion'};
       let searchTerm = msg.trim();
       for (const [pt, en] of Object.entries(traducoes)) {
         if (msgLower.includes(pt)) { searchTerm = en; break; }
@@ -169,6 +169,50 @@ const BriSidebar = (() => {
       historico.push({ role: 'assistant', content: 'Buscando ' + msg + '... 🔍', time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
+
+      // Busca inteligente: após 3s, verificar se o iframe encontrou resultados
+      // Se não encontrou, chamar a IA para sugerir termos alternativos
+      setTimeout(() => {
+        try {
+          const iframeDoc = frame.contentDocument || frame.contentWindow.document;
+          const noResults = iframeDoc && (
+            iframeDoc.querySelector('.text-muted')?.textContent?.includes('No products') ||
+            iframeDoc.querySelector('.text-muted')?.textContent?.includes('Nenhum produto') ||
+            iframeDoc.querySelectorAll('.product-card, .card').length === 0
+          );
+          if (noResults) {
+            historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" diretamente. Deixa eu pensar em alternativas... 🤔', time: getTime() });
+            salvarHistorico(); renderMensagens();
+            // Chamar IA para sugerir termos relacionados
+            fetch('/api/copiloto/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                mensagem: 'O cliente buscou "' + msg + '" mas não encontrou. Sugira 3 termos de busca em inglês que possam encontrar produtos relacionados no catálogo. Responda APENAS com os termos separados por vírgula, sem explicação. Ex: ice cream maker,frozen dessert,ninja creami',
+                historico: [],
+                contexto: { pagina: 'home_ia_search_fallback', url_atual: '/home-ia' }
+              })
+            })
+            .then(r => r.json())
+            .then(data => {
+              const sugestoes = (data.resposta || '').split(',').map(s => s.trim()).filter(s => s.length > 1);
+              if (sugestoes.length > 0) {
+                // Tentar o primeiro termo sugerido
+                const melhorTermo = sugestoes[0];
+                historico.push({ role: 'assistant', content: 'Encontrei uma possibilidade! Buscando por "' + melhorTermo + '"... 🔍', time: getTime() });
+                salvarHistorico(); renderMensagens();
+                navigatePainel('/produtos?search=' + encodeURIComponent(melhorTermo) + '&ver_todos=1&embed=1');
+              } else {
+                historico.push({ role: 'assistant', content: 'Não encontrei produtos similares. Tente outro termo ou navegue pelos grupos de compras!', time: getTime() });
+                salvarHistorico(); renderMensagens();
+              }
+            })
+            .catch(() => {});
+          }
+        } catch(e) { /* cross-origin or timing issue */ }
+      }, 3000);
+
       return;
     }
 
