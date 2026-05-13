@@ -889,6 +889,9 @@ class CarrinhoController extends Controller {
 
         $uid = $this->getLoggedUserId();
         $this->debugLog('UID apos login check: ' . $uid . ' | session_id=' . session_id() . ' | SESSION[usuario_id]=' . ($_SESSION['usuario_id'] ?? 'NULL') . ' | SESSION[logado]=' . var_export($_SESSION['logado'] ?? null, true));
+
+        $pvId = null;
+        if ($produtoVariacaoId !== null && $produtoVariacaoId !== '') {
             $pvId = (int) $produtoVariacaoId;
             if ($pvId <= 0) {
                 $pvId = null;
