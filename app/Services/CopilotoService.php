@@ -365,17 +365,17 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
                         $contexto['carrinho_total_itens'] = array_sum(array_column($itensDb, 'quantidade'));
 
                         // Buscar totais reais do carrinho (calculados pelo sistema)
+                        // NOTA: estes valores podem estar desatualizados no banco — o cálculo real é feito no checkout
+                        // Por isso, instruímos a BRI a NÃO informar valores de taxa/total, apenas listar os itens
                         try {
                             $stTotais = $this->pdo->prepare("SELECT valor_total, taxa_servico, valor_impostos, peso_total, moeda, taxa_conversao FROM carrinhos WHERE id = ?");
                             $stTotais->execute([$cartId]);
                             $totais = $stTotais->fetch(\PDO::FETCH_ASSOC);
-                            if ($totais && (float)($totais['valor_total'] ?? 0) > 0) {
-                                $moeda = $totais['moeda'] ?? 'BRL';
-                                $simbolo = ($moeda === 'USD') ? 'US$' : 'R$';
-                                $contexto['carrinho_subtotal_visivel'] = $simbolo . ' ' . number_format((float)($subUsd * ($totais['taxa_conversao'] ?? 1)), 2, ',', '.');
-                                $contexto['carrinho_taxa_servico_visivel'] = $simbolo . ' ' . number_format((float)($totais['taxa_servico'] ?? 0), 2, ',', '.');
-                                $contexto['carrinho_total_visivel'] = $simbolo . ' ' . number_format((float)($totais['valor_total'] ?? 0), 2, ',', '.');
-                                $contexto['carrinho_impostos_br_visivel'] = $simbolo . ' ' . number_format((float)($totais['valor_impostos'] ?? 0), 2, ',', '.');
+                            if ($totais) {
+                                $pesoTotal = (float)($totais['peso_total'] ?? 0);
+                                if ($pesoTotal > 0) {
+                                    $contexto['carrinho_peso_total'] = $pesoTotal;
+                                }
                             }
                         } catch (\Throwable $e) {}
                     }
@@ -711,6 +711,7 @@ CARRINHO ATUAL:
 Subtotal (como o usuário vê na tela): {$subtotal}
 Total (como o usuário vê na tela): {$totalCarrinho}
 {$resumoCarrinho}
+REGRA CRÍTICA SOBRE VALORES DO CARRINHO: Se o subtotal/total acima mostrar "N/A" ou estiver vazio, NÃO calcule taxas, impostos ou total por conta própria. Apenas liste os itens e diga "Para ver o valor total com taxas e frete, acesse o carrinho". Use acao: ir_para_carrinho para levar o cliente até lá. Os valores exatos de taxa de serviço, impostos e frete são calculados dinamicamente pelo sistema e podem variar — NUNCA invente esses números.
 {$resumoCheckout}
 {$resumoOrcamento}
 
