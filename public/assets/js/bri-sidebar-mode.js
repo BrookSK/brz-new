@@ -234,34 +234,8 @@ const BriSidebar = (() => {
             iframeDoc.querySelectorAll('.product-card, .card').length === 0
           );
           if (noResults) {
-            historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" diretamente. Deixa eu pensar em alternativas... 🤔', time: getTime() });
+            historico.push({ role: 'assistant', content: 'Não encontrei "' + msg + '" no nosso catálogo atual. 😕\n\nMas você pode comprar de qualquer loja dos EUA! Basta usar nossa Assessoria:\n\n1. Diga "assessoria" para abrir a página\n2. Cole o link do produto (Amazon, Walmart, etc.)\n3. Geramos o orçamento completo com frete e impostos!\n\nQuer que eu abra a assessoria pra você?', time: getTime() });
             salvarHistorico(); renderMensagens();
-            // Chamar IA para sugerir termos relacionados
-            fetch('/api/copiloto/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'same-origin',
-              body: JSON.stringify({
-                mensagem: 'O cliente buscou "' + msg + '" mas não encontrou. Sugira 3 termos de busca em inglês que possam encontrar produtos relacionados no catálogo. Responda APENAS com os termos separados por vírgula, sem explicação. Ex: ice cream maker,frozen dessert,ninja creami',
-                historico: [],
-                contexto: { pagina: 'home_ia_search_fallback', url_atual: '/home-ia' }
-              })
-            })
-            .then(r => r.json())
-            .then(data => {
-              const sugestoes = (data.resposta || '').split(',').map(s => s.trim()).filter(s => s.length > 1);
-              if (sugestoes.length > 0) {
-                // Tentar o primeiro termo sugerido
-                const melhorTermo = sugestoes[0];
-                historico.push({ role: 'assistant', content: 'Encontrei uma possibilidade! Buscando por "' + melhorTermo + '"... 🔍', time: getTime() });
-                salvarHistorico(); renderMensagens();
-                navigatePainel('/produtos?search=' + encodeURIComponent(melhorTermo) + '&ver_todos=1&embed=1');
-              } else {
-                historico.push({ role: 'assistant', content: 'Não encontrei produtos similares. Tente outro termo ou navegue pelos grupos de compras!', time: getTime() });
-                salvarHistorico(); renderMensagens();
-              }
-            })
-            .catch(() => {});
           }
         } catch(e) { /* cross-origin or timing issue */ }
       }, 3000);
