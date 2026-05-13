@@ -3023,7 +3023,7 @@ JS;
                 $impostos = 0.0;
             }
 
-            // Imposto local do grupo de compras
+            // Imposto local do grupo de compras OU do produto individual
             $impostoLocal = 0.0;
             $impostoLocalPercent = 0.0;
             try {
@@ -3036,9 +3036,27 @@ JS;
                 $pids = array_keys($pids);
                 if (!empty($pids)) {
                     $in = implode(',', array_fill(0, count($pids), '?'));
+
+                    // MAX do grupo de compras
+                    $maxGrupo = 0.0;
                     $stImpL = $db->prepare("SELECT MAX(g.imposto_local_percent) FROM grupos_compras g INNER JOIN produtos p ON p.grupo_compras_id = g.id WHERE p.id IN ($in) AND g.imposto_local_percent > 0");
                     $stImpL->execute($pids);
-                    $impostoLocalPercent = (float) ($stImpL->fetchColumn() ?: 0);
+                    $maxGrupo = (float) ($stImpL->fetchColumn() ?: 0);
+
+                    // MAX direto do produto
+                    $maxProduto = 0.0;
+                    try {
+                        $prodCols = [];
+                        $stCols2 = $db->query('DESCRIBE produtos');
+                        $prodCols = $stCols2 ? ($stCols2->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                        if (in_array('imposto_local_percent', $prodCols, true)) {
+                            $stImpP = $db->prepare("SELECT MAX(imposto_local_percent) FROM produtos WHERE id IN ($in) AND imposto_local_percent > 0");
+                            $stImpP->execute($pids);
+                            $maxProduto = (float) ($stImpP->fetchColumn() ?: 0);
+                        }
+                    } catch (\Throwable $e) {}
+
+                    $impostoLocalPercent = max($maxGrupo, $maxProduto);
                     if ($impostoLocalPercent > 0) {
                         $impostoLocal = $subtotal * ($impostoLocalPercent / 100.0);
                         $total = $total + $impostoLocal;
