@@ -917,8 +917,13 @@ class CarrinhoController extends Controller {
         
         if ($uid > 0) {
             try {
-                $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
-                $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                // Usar mesma lógica do index(): primeiro getUserCartIdPreferNonEmpty
+                $cartId = (int) $this->getUserCartIdPreferNonEmpty($uid);
+                if ($cartId <= 0) {
+                    $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                }
+                error_log('[CART-ADD-DEBUG] cartId=' . $cartId);
                 $ok = $this->carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, ($pvId ?? null), ($variacaoDescricao !== null && $variacaoDescricao !== '' ? (string) $variacaoDescricao : null));
                 if (!$ok) {
                     $this->json(['error' => 'Não foi possível adicionar o item ao carrinho'], 400);
