@@ -139,8 +139,10 @@ const BriSidebar = (() => {
       { regex: /rastreamento|rastrear|rastreio|tracking/, url: '/rastreamento?embed=1', reply: 'Rastreamento de pedidos! 🚚\n\nCole seu código de rastreio para acompanhar a entrega.' },
       { regex: /status.*(pedido|compra)|acompanhar pedido/, url: '/status-pedido?embed=1', reply: 'Status dos pedidos!' },
       { regex: /cobranca|calcular cobranca|simulador/, url: '/cobranca?embed=1', reply: 'Calculadora de cobrança!' },
-      // Comprar de outros sites / Assessoria
+      // Comprar de outros sites / Assessoria / Envio
       { regex: /comprar de outro|comprar.*outro site|posso comprar.*amazon|posso comprar.*walmart|posso comprar.*target|comprar.*eua|importar|trazer dos eua|mandar.*brasil/, url: '/assessoria?embed=1', reply: 'Sim! Você pode comprar de qualquer loja dos EUA! 🇺🇸\n\nNa página ao lado (Assessoria), cole os links dos produtos que quer e nós geramos um orçamento completo com frete e impostos.\n\nFunciona com Amazon, Walmart, Target, qualquer loja americana!' },
+      // Perguntas sobre envio/entrega
+      { regex: /voces enviam|vocês enviam|enviam.*brasil|entregam|mandam pro brasil|fazem entrega/, url: null, reply: 'Sim! Enviamos praticamente tudo dos EUA para o Brasil! 📦\n\nO frete é calculado pelo peso total. Para saber o valor exato:\n1. Adicione os produtos ao carrinho\n2. Diga "carrinho" — lá mostra o valor total com frete\n\nOu use a "assessoria" para orçar produtos de qualquer loja americana!' },
       // Assessoria / Redirecionamento
       { regex: /assessoria|redirecionamento|redirecionar|compra por link/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦\n\nAqui você cola os links de produtos de qualquer loja dos EUA e nós calculamos o orçamento completo (produto + frete + impostos).' },
       // Orçamento - instrução de como fazer
