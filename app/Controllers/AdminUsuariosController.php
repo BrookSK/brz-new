@@ -342,6 +342,10 @@ class AdminUsuariosController extends Controller {
     renderAdminScripts();
     
     // Adicionar scripts dos usuários
+    echo '<script>
+        // Armazenar dados dos usuários para uso nos scripts
+        var usuariosData = ' . json_encode(array_values($usuarios)) . ';
+    </script>';
     echo \App\Controllers\AdminUsuariosViews::getScripts();
     
     // Adicionar modais
@@ -350,10 +354,6 @@ class AdminUsuariosController extends Controller {
     echo \App\Controllers\AdminUsuariosViews::renderModalCreditosLote();
     
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Armazenar dados dos usuários para uso nos scripts
-        var usuariosData = ' . json_encode(array_values($usuarios)) . ';
-    </script>
 </body>
 </html>';
         exit;

@@ -433,7 +433,6 @@ class AdminUsuariosViews {
     public static function getScripts() {
         return '
             <script>
-            let usuariosData = [];
             
             function adicionarCredito(usuarioId, nomeUsuario) {
                 document.getElementById("creditoUsuarioId").value = usuarioId;
