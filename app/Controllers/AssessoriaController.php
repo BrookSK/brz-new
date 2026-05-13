@@ -2464,6 +2464,25 @@ class AssessoriaController extends Controller {
             
             $orcamento = $_SESSION['assessoria_orcamento'];
             $produtosAdicionados = 0;
+
+            // Detectar se o usuário está logado para persistir no banco de dados
+            $auth = new AuthService();
+            $uid = 0;
+            $cartId = 0;
+            $carrinhoModel = null;
+            if ($auth->estaLogado()) {
+                $usuarioLogado = $auth->getUsuarioLogado();
+                $uid = (int) ($usuarioLogado['id'] ?? 0);
+            }
+            if ($uid > 0) {
+                $carrinhoModel = new \App\Models\Carrinho();
+                try {
+                    $cart = $carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
+                    $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
+                } catch (\Exception $e) {
+                    $cartId = 0;
+                }
+            }
             
             foreach ($produtosSelecionados as $produtoIndex) {
                 $index = null;
@@ -2524,56 +2543,113 @@ class AssessoriaController extends Controller {
 
                     $produtoId = $this->criarOuReutilizarProdutoNoSistema($produto);
 
-                    $itemKey = (string) $produtoId;
-                    if (!empty($produto['variacao_selecionada']['id'])) {
-                        $itemKey = $itemKey . ':' . (string) $produto['variacao_selecionada']['id'];
-                    }
+                    // Persistir no banco de dados quando o usuário está logado
+                    if ($uid > 0 && $cartId > 0 && $carrinhoModel !== null) {
+                        try {
+                            $preco = floatval($produto['valor'] ?? 0);
+                            if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
+                                $preco = $valorInformadoCliente;
+                            }
 
-                    if (isset($_SESSION['carrinho'][$itemKey])) {
-                        $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
-                        $preco = floatval($_SESSION['carrinho'][$itemKey]['preco_unitario'] ?? 0);
-                        $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $preco;
+                            $carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, null, null);
+
+                            // Atualizar o preço unitário no carrinho_items para refletir o valor correto
+                            // (o adicionarItem usa o preço do produto cadastrado, mas assessoria pode ter valor diferente)
+                            if ($preco > 0) {
+                                $db = \Config\Database::getConnection();
+                                $itemsCols = [];
+                                try {
+                                    $stCols = $db->query('DESCRIBE carrinho_items');
+                                    $itemsCols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                                } catch (\Exception $e) {
+                                    $itemsCols = [];
+                                }
+                                $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
+                                $subtotalItem = $quantidade * $preco;
+
+                                $setExtra = '';
+                                if (is_array($itemsCols) && in_array('preco_unit_snapshot', $itemsCols, true)) {
+                                    $setExtra .= ', preco_unit_snapshot = :snap';
+                                }
+
+                                $stUpd = $db->prepare("UPDATE carrinho_items SET {$unitCol} = :preco, subtotal = :subtotal{$setExtra} WHERE carrinho_id = :cid AND produto_id = :pid ORDER BY id DESC LIMIT 1");
+                                $stUpd->bindValue(':preco', $preco);
+                                $stUpd->bindValue(':subtotal', $subtotalItem);
+                                if (strpos($setExtra, ':snap') !== false) {
+                                    $stUpd->bindValue(':snap', $preco);
+                                }
+                                $stUpd->bindValue(':cid', $cartId);
+                                $stUpd->bindValue(':pid', (int) $produtoId);
+                                $stUpd->execute();
+                            }
+
+                            $produtosAdicionados++;
+                        } catch (\Exception $e) {
+                            // Fallback: adicionar na sessão se falhar no banco
+                            error_log('[ASSESSORIA-CARRINHO] Erro ao persistir no DB: ' . $e->getMessage());
+                        }
                     } else {
-                        $preco = floatval($produto['valor'] ?? 0);
-
-                        // Se o cliente informou o valor manualmente, usar esse valor e marcar
-                        if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
-                            $preco = $valorInformadoCliente;
-                            $produto['valor'] = $valorInformadoCliente;
+                        // Usuário não logado: usar sessão (fallback)
+                        $itemKey = (string) $produtoId;
+                        if (!empty($produto['variacao_selecionada']['id'])) {
+                            $itemKey = $itemKey . ':' . (string) $produto['variacao_selecionada']['id'];
                         }
 
-                        $_SESSION['carrinho'][$itemKey] = [
-                            'produto_id' => $produtoId,
-                            'nome' => (string) ($produto['nome'] ?? ''),
-                            'preco_unitario' => $preco,
-                            'quantidade' => $quantidade,
-                            'subtotal' => $quantidade * $preco
-                        ];
+                        if (isset($_SESSION['carrinho'][$itemKey])) {
+                            $_SESSION['carrinho'][$itemKey]['quantidade'] += $quantidade;
+                            $preco = floatval($_SESSION['carrinho'][$itemKey]['preco_unitario'] ?? 0);
+                            $_SESSION['carrinho'][$itemKey]['subtotal'] = $_SESSION['carrinho'][$itemKey]['quantidade'] * $preco;
+                        } else {
+                            $preco = floatval($produto['valor'] ?? 0);
 
-                        // Persistir URL original informada pelo usuário
-                        if (!empty($produto['url_original'])) {
-                            $_SESSION['carrinho'][$itemKey]['url_original'] = (string) $produto['url_original'];
-                        }
+                            // Se o cliente informou o valor manualmente, usar esse valor e marcar
+                            if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
+                                $preco = $valorInformadoCliente;
+                                $produto['valor'] = $valorInformadoCliente;
+                            }
 
-                        if (!empty($produto['variacao_selecionada'])) {
-                            $_SESSION['carrinho'][$itemKey]['variacao'] = $produto['variacao_selecionada'];
-                        }
+                            $_SESSION['carrinho'][$itemKey] = [
+                                'produto_id' => $produtoId,
+                                'nome' => (string) ($produto['nome'] ?? ''),
+                                'preco_unitario' => $preco,
+                                'quantidade' => $quantidade,
+                                'subtotal' => $quantidade * $preco
+                            ];
 
-                        // Marcar valor informado pelo cliente para revisão no admin
-                        if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
-                            $_SESSION['carrinho'][$itemKey]['valor_informado_cliente'] = true;
+                            // Persistir URL original informada pelo usuário
+                            if (!empty($produto['url_original'])) {
+                                $_SESSION['carrinho'][$itemKey]['url_original'] = (string) $produto['url_original'];
+                            }
+
+                            if (!empty($produto['variacao_selecionada'])) {
+                                $_SESSION['carrinho'][$itemKey]['variacao'] = $produto['variacao_selecionada'];
+                            }
+
+                            // Marcar valor informado pelo cliente para revisão no admin
+                            if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
+                                $_SESSION['carrinho'][$itemKey]['valor_informado_cliente'] = true;
+                            }
+                            if ($observacaoCliente !== '') {
+                                $_SESSION['carrinho'][$itemKey]['observacao_cliente'] = $observacaoCliente;
+                            }
+                            // Marcar peso manual informado pelo cliente para revisão no admin
+                            if ($pesoManual !== null && $pesoManual > 0) {
+                                $_SESSION['carrinho'][$itemKey]['peso_manual'] = $pesoManual;
+                                $_SESSION['carrinho'][$itemKey]['peso_original'] = (float) ($produto['peso_original'] ?? $produto['peso'] ?? 0);
+                            }
                         }
-                        if ($observacaoCliente !== '') {
-                            $_SESSION['carrinho'][$itemKey]['observacao_cliente'] = $observacaoCliente;
-                        }
-                        // Marcar peso manual informado pelo cliente para revisão no admin
-                        if ($pesoManual !== null && $pesoManual > 0) {
-                            $_SESSION['carrinho'][$itemKey]['peso_manual'] = $pesoManual;
-                            $_SESSION['carrinho'][$itemKey]['peso_original'] = (float) ($produto['peso_original'] ?? $produto['peso'] ?? 0);
-                        }
+                        
+                        $produtosAdicionados++;
                     }
-                    
-                    $produtosAdicionados++;
+                }
+            }
+
+            // Recalcular totais do carrinho no banco após adicionar todos os itens
+            if ($uid > 0 && $cartId > 0 && $carrinhoModel !== null) {
+                try {
+                    $carrinhoModel->atualizarTotais($cartId);
+                } catch (\Exception $e) {
+                    error_log('[ASSESSORIA-CARRINHO] Erro ao atualizar totais: ' . $e->getMessage());
                 }
             }
             
