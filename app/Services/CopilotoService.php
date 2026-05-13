@@ -250,6 +250,38 @@ INSTRUÇÃO: Use o conhecimento acima para calibrar tom e argumentação. Nunca 
 
         // Carrinho
         $carrinhoTexto = 'Vazio ou não disponível';
+
+        // Se estamos no modo sidebar (home_ia), buscar carrinho do banco diretamente
+        if (($contexto['pagina'] ?? '') === 'home_ia' && empty($contexto['carrinho_itens'])) {
+            try {
+                if (session_status() === PHP_SESSION_NONE) @session_start();
+                $userId = (int) ($_SESSION['usuario_id'] ?? 0);
+                $sessionId = session_id() ?: null;
+                if ($userId > 0 || $sessionId) {
+                    $carrinhoModel = new \App\Models\Carrinho();
+                    $cart = $carrinhoModel->getOrCreateCarrinho($userId > 0 ? $userId : null, $userId <= 0 ? $sessionId : null, 'BRL');
+                    $cartId = is_array($cart) ? (int)($cart['id'] ?? 0) : (int)$cart;
+                    if ($cartId > 0) {
+                        $stItens = $this->pdo->prepare("SELECT ci.produto_id, ci.quantidade, ci.subtotal, ci.preco_unitario, p.name AS nome, p.price, p.weight FROM carrinho_items ci JOIN produtos p ON p.id = ci.produto_id WHERE ci.carrinho_id = ?");
+                        $stItens->execute([$cartId]);
+                        $itensDb = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        if (!empty($itensDb)) {
+                            $contexto['carrinho_itens'] = [];
+                            $subUsd = 0;
+                            foreach ($itensDb as $it) {
+                                $preco = (float)($it['preco_unitario'] ?? $it['price'] ?? 0);
+                                $qtd = (int)($it['quantidade'] ?? 1);
+                                $contexto['carrinho_itens'][] = ['nome' => $it['nome'], 'preco' => $preco, 'quantidade' => $qtd, 'produto_id' => (int)$it['produto_id']];
+                                $subUsd += $preco * $qtd;
+                            }
+                            $contexto['carrinho_subtotal_usd'] = $subUsd;
+                            $contexto['carrinho_total_itens'] = count($itensDb);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
         if (!empty($contexto['carrinho_itens']) && is_array($contexto['carrinho_itens'])) {
             $linhas = [];
             foreach ($contexto['carrinho_itens'] as $item) {
