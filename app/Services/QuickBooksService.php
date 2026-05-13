@@ -55,7 +55,12 @@ class QuickBooksService
     }
     public function revogarToken(): bool {
         $t=$this->getToken(); if(!$t)return false;
-        try { $this->httpPost(self::REVOKE_URL,["token"=>$t["refresh_token"]],$this->getBasicAuthHeader()); $this->pdo->prepare("DELETE FROM quickbooks_tokens WHERE realm_id=?") ->execute([$t["realm_id"]]); return true; } catch(\Throwable $e){return false;}
+        try { $this->httpPost(self::REVOKE_URL,["token"=>$t["refresh_token"]],$this->getBasicAuthHeader()); } catch(\Throwable $e){ /* Ignorar erro na API — token pode já estar inválido */ }
+        // Sempre deletar do banco local, independente da resposta da API
+        try { $this->pdo->prepare("DELETE FROM quickbooks_tokens WHERE realm_id=?")->execute([$t["realm_id"]]); } catch(\Throwable $e){}
+        // Fallback: deletar todos os tokens (caso realm_id não bata)
+        try { $this->pdo->exec("DELETE FROM quickbooks_tokens"); } catch(\Throwable $e){}
+        return true;
     }
     private function salvarToken(string $realmId,array $d): void {
         $ae=date("Y-m-d H:i:s",time()+(int)($d["expires_in"]??3600));
