@@ -230,7 +230,7 @@ class AdminUsuariosController extends Controller {
                         </div>
                         <div class="user-actions">
                             <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> Ver</a>
-                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
+                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
                             <span class="icon-btn icon-btn-credit" title="Crédito" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
                             <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit" title="Editar"><i class="bi bi-pencil"></i></a>
                             <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'Excluir ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="Excluir"><i class="bi bi-trash"></i></button></form>
@@ -266,7 +266,7 @@ class AdminUsuariosController extends Controller {
                         </div>
                         <div class="mobile-actions">
                             <a href="/admin/usuarios/detalhes/' . $userId . '" class="btn-view"><i class="bi bi-eye"></i> Ver</a>
-                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
+                            <form method="POST" action="/admin/usuarios/impersonar/' . $userId . '" style="display:inline;margin:0;"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="icon-btn icon-btn-admin" title="Login As"><i class="bi bi-box-arrow-in-right"></i></button></form>
                             <span class="icon-btn icon-btn-credit" onclick="adicionarCredito(' . $userId . ', \'' . addslashes($nome) . '\')"><i class="bi bi-wallet2"></i></span>
                             <a href="/admin/usuarios/editar/' . $userId . '" class="icon-btn icon-btn-edit"><i class="bi bi-pencil"></i></a>
                             <form method="POST" action="/admin/usuarios/excluir/' . $userId . '" style="display:inline;margin:0;" onsubmit="return confirm(\'Excluir ' . addslashes($nome) . '?\')"><button type="submit" class="icon-btn icon-btn-delete" title="Excluir"><i class="bi bi-trash"></i></button></form>
