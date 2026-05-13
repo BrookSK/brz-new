@@ -122,7 +122,7 @@ const BriSidebar = (() => {
       { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒\n\nPreencha seus dados e escolha a forma de pagamento para finalizar.' },
       // Produtos & Catálogo
       { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️\n\nNavegue, use o campo de busca ou filtre por categoria. Clique em "Add to cart" para adicionar.' },
-      { regex: /^(grupos|ver grupos|me mostr.*grupo|grupos? de compras?|grupo de compra|me mostr.*grupos? abertos?)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos! 🏪\n\nGrupos de compras são compras coletivas com preços especiais. Clique em "Ver produtos" para explorar cada grupo.' },
+      { regex: /^(grupos|ver grupos|me mostr.*grupo|grupos? de compras?|grupo de compra|me mostr.*grupos? abertos?|grupos? abertos?)$/, url: '/grupos-compras?embed=1', reply: 'Aqui estão os grupos! 🏪\n\nGrupos de compras são compras coletivas com preços especiais. Clique em "Ver produtos" para explorar cada grupo.' },
       // Conta & Dados
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados! 👤\n\nAqui você edita nome, email, telefone, CPF e foto de perfil.' },
       { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos! 📦\n\nVeja o status de cada compra, rastreamento e detalhes.' },
