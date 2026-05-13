@@ -140,7 +140,9 @@ const BriSidebar = (() => {
       { regex: /status.*(pedido|compra)|acompanhar pedido/, url: '/status-pedido?embed=1', reply: 'Status dos pedidos!' },
       { regex: /cobranca|calcular cobranca|simulador/, url: '/cobranca?embed=1', reply: 'Calculadora de cobrança!' },
       // Assessoria / Redirecionamento
-      { regex: /assessoria|redirecionamento|redirecionar|compra por link|orçamento|orcamento/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦' },
+      { regex: /assessoria|redirecionamento|redirecionar|compra por link/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦' },
+      // Orçamento - instrução de como fazer
+      { regex: /orcamento|orçamento|quanto fica|quanto custa tudo|simular|simulacao/, url: null, reply: 'Para montar seu orçamento é simples! 📋\n\n1. Me diga o produto que procura (ex: "tineco", "pipoca")\n2. Vou buscar pra você no painel ao lado\n3. Clique em "Add to cart" nos itens que quiser\n4. Repita até adicionar tudo\n5. Quando terminar, diga "carrinho" — lá terá o valor total com taxas e frete!\n\nQual produto quer buscar primeiro?' },
       // Políticas
       { regex: /politica.*(privacidade)|privacidade/, url: '/politica-privacidade?embed=1', reply: 'Política de privacidade.' },
       { regex: /termos.*(uso)|termos/, url: '/termos-uso?embed=1', reply: 'Termos de uso.' },
@@ -153,13 +155,40 @@ const BriSidebar = (() => {
         historico.push({ role: 'user', content: msg, time: getTime() });
         historico.push({ role: 'assistant', content: nav.reply, time: getTime() });
         salvarHistorico(); renderMensagens();
-        navigatePainel(typeof nav.url === 'function' ? nav.url() : nav.url);
+        if (nav.url) {
+          navigatePainel(typeof nav.url === 'function' ? nav.url() : nav.url);
+        }
         return;
       }
     }
 
     // Detecção de busca de produto: mensagens curtas (1-4 palavras) que parecem nomes de produto/marca
     const palavras = msg.trim().split(/\s+/);
+
+    // Detectar perguntas sobre "qual grupo tem X" / "em qual grupo encontro X"
+    const grupoMatch = msgLower.match(/(?:qual|em qual|que|quais)\s+grupo.*(?:tem|encontro|acho|vende|has)\s+(.+)/);
+    const grupoMatch2 = msgLower.match(/(?:tem|encontro|acho)\s+(.+?)\s+(?:em qual|em que|qual)\s+grupo/);
+    const termoProdutoGrupo = grupoMatch ? grupoMatch[1].trim() : (grupoMatch2 ? grupoMatch2[1].trim() : null);
+    
+    if (termoProdutoGrupo) {
+      const traducoes2 = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',sabonete:'soap',chocolate:'chocolate',vitamina:'vitamin',cafe:'coffee',biscoito:'cookie',banho:'bath',limpeza:'cleaning',vela:'candle'};
+      let searchTerm = termoProdutoGrupo;
+      for (const [pt, en] of Object.entries(traducoes2)) {
+        if (termoProdutoGrupo.includes(pt)) { searchTerm = en; break; }
+      }
+      historico.push({ role: 'user', content: msg, time: getTime() });
+      historico.push({ role: 'assistant', content: 'Vou buscar pra você! 🔍', time: getTime() });
+      salvarHistorico(); renderMensagens();
+      navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
+      
+      // Segunda mensagem após carregar
+      setTimeout(() => {
+        historico.push({ role: 'assistant', content: 'Pronto! Os produtos que aparecem ao lado são dos grupos de compras ativos. Veja o nome do grupo na descrição de cada item. Se quiser ver o grupo completo, me diga o nome dele! 😊', time: getTime() });
+        salvarHistorico(); renderMensagens();
+      }, 2500);
+      return;
+    }
+
     if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|quanto|qual|porque|quando|onde|quem|ajuda|help)/)) {
       // Se não é uma pergunta/saudação, tratar como busca de produto
       const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby','bebê':'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',loção:'lotion'};
