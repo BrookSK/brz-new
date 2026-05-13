@@ -197,7 +197,13 @@ const BriSidebar = (() => {
 
     // Ações de navegação — mudar o iframe
     const rotas = {
-      buscar_produto: () => '/produtos?search=' + encodeURIComponent(p.termo || p.busca || '') + '&embed=1',
+      buscar_produto: () => {
+        const termo = p.termo || p.busca || '';
+        const slug = p.grupo_slug || p.slug || '';
+        if (slug) return '/grupo/' + slug + '?embed=1';
+        // Buscar em produtos + grupos (a página /produtos exclui grupos, então usar /grupos-compras também)
+        return '/produtos?search=' + encodeURIComponent(termo) + '&ver_todos=1&embed=1';
+      },
       ir_para_carrinho: () => '/carrinho?embed=1',
       ir_para_checkout: () => '/carrinho/checkout?embed=1',
       ir_para_grupo: () => '/grupo/' + (p.slug || '') + '?embed=1',
