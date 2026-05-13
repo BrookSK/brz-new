@@ -178,19 +178,19 @@ const BriSidebar = (() => {
         if (termoProdutoGrupo.includes(pt)) { searchTerm = en; break; }
       }
       historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Vou buscar pra você! 🔍', time: getTime() });
+      historico.push({ role: 'assistant', content: 'Buscando "' + termoProdutoGrupo + '" nos grupos... 🔍', time: getTime() });
       salvarHistorico(); renderMensagens();
+      // Navegar para busca de produtos (inclui produtos de grupos ativos)
       navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
       
-      // Segunda mensagem após carregar
       setTimeout(() => {
-        historico.push({ role: 'assistant', content: 'Pronto! Os produtos que aparecem ao lado são dos grupos de compras ativos. Veja o nome do grupo na descrição de cada item. Se quiser ver o grupo completo, me diga o nome dele! 😊', time: getTime() });
+        historico.push({ role: 'assistant', content: 'Aqui estão os resultados! Os produtos ao lado são dos grupos de compras ativos. Clique em "Add to cart" para adicionar ao seu carrinho. 🛒', time: getTime() });
         salvarHistorico(); renderMensagens();
       }, 2500);
       return;
     }
 
-    if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|quanto|qual|porque|quando|onde|quem|ajuda|help)/)) {
+    if (palavras.length <= 4 && !msgLower.match(/^(oi|ola|obrigad|como|porque|quando|onde|quem|ajuda|help)(\s|$)/)) {
       // Se não é uma pergunta/saudação, tratar como busca de produto
       const traducoes = {pipoca:'popcorn',pipocas:'popcorn',esponja:'sponge',panela:'pan',sabonete:'soap',detergente:'dish soap',aspirador:'vacuum',vitamina:'vitamin',fralda:'diaper',chocolate:'chocolate','cafe':'coffee',biscoito:'cookie',sorveteira:'ice cream maker',sorvete:'ice cream',liquidificador:'blender',batedeira:'mixer',cafeteira:'coffee maker',frigideira:'frying pan',airfryer:'air fryer',fritadeira:'air fryer',banho:'bath',corpo:'body',cabelo:'hair',rosto:'face',pele:'skin',limpeza:'cleaning',cozinha:'kitchen',banheiro:'bathroom',roupa:'laundry',bebe:'baby','bebê':'baby',perfume:'perfume',vela:'candle',toalha:'towel',sabao:'soap',creme:'cream',loção:'lotion'};
       let searchTerm = msg.trim();
