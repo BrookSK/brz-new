@@ -1,0 +1,184 @@
+/**
+ * bri-sidebar-mode.js
+ *
+ * Módulo da interface /home-ia.
+ * NÃO modifica nenhuma função do copiloto.js existente.
+ * Responsabilidade: chat com a BRI + navegação no iframe.
+ */
+
+const BriSidebar = (() => {
+
+  const frame   = document.getElementById('bri-frame');
+  const loader  = document.getElementById('bri-painel-loader');
+  const painel  = document.getElementById('bri-painel');
+  const msgsEl  = document.getElementById('bri-mensagens');
+  const input   = document.getElementById('bri-input');
+  const sendBtn = document.getElementById('bri-send-btn');
+
+  let historico = [];
+  let enviando = false;
+
+  // Restaurar histórico da sessão
+  try { historico = JSON.parse(sessionStorage.getItem('bri_sidebar_hist') || '[]'); } catch(e) { historico = []; }
+
+  // ── Loader ──────────────────────────────────────────
+  function showLoader() { loader?.classList.add('visible'); }
+  function hideLoader()  { loader?.classList.remove('visible'); }
+  frame?.addEventListener('load', hideLoader);
+
+  // ── Navegação no iframe ──────────────────────────────
+  function navigatePainel(url) {
+    if (!frame) return;
+    showLoader();
+    frame.src = url;
+    if (window.innerWidth < 768) {
+      painel?.classList.add('aberto');
+    }
+  }
+
+  function fecharPainel() {
+    painel?.classList.remove('aberto');
+  }
+
+  // ── Renderizar mensagens ────────────────────────────
+  function renderMensagens() {
+    if (!msgsEl) return;
+    if (historico.length === 0) {
+      msgsEl.innerHTML = '<div style="color:#94A3B8;text-align:center;padding:60px 20px;font-size:13px;">Olá! Sou a BRI, sua assistente.<br>Me pergunte qualquer coisa!</div>';
+      return;
+    }
+    let html = '';
+    historico.forEach(function(m) {
+      const cls = m.role === 'user' ? 'user' : 'assistant';
+      const time = m.time || '';
+      html += '<div class="bri-bubble ' + cls + '">' + escHtml(m.content) + (time ? '<span class="bri-bubble-time">' + time + '</span>' : '') + '</div>';
+    });
+    msgsEl.innerHTML = html;
+    scrollBottom();
+  }
+
+  function scrollBottom() {
+    if (msgsEl) setTimeout(() => { msgsEl.scrollTop = msgsEl.scrollHeight; }, 50);
+  }
+
+  function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function getTime() {
+    const now = new Date();
+    return now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  }
+
+  // ── Enviar mensagem ─────────────────────────────────
+  function enviar() {
+    if (enviando) return;
+    const msg = (input.value || '').trim();
+    if (!msg) return;
+    input.value = '';
+    input.style.height = 'auto';
+
+    historico.push({ role: 'user', content: msg, time: getTime() });
+    renderMensagens();
+
+    // Typing indicator
+    const typing = document.createElement('div');
+    typing.className = 'bri-typing';
+    typing.innerHTML = '<span></span><span></span><span></span>';
+    msgsEl.appendChild(typing);
+    scrollBottom();
+
+    enviando = true;
+    sendBtn.disabled = true;
+
+    fetch('/api/copiloto/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mensagem: msg,
+        historico: historico.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10),
+        contexto: { pagina: 'home_ia', url_atual: '/home-ia' }
+      })
+    })
+    .then(r => {
+      if (!r.ok) return r.json().then(d => { throw new Error(d.resposta || 'Erro ' + r.status); });
+      return r.json();
+    })
+    .then(data => {
+      typing.remove();
+      const resp = data.resposta || 'Sem resposta.';
+      historico.push({ role: 'assistant', content: resp, time: getTime() });
+      salvarHistorico();
+      renderMensagens();
+
+      // Processar ação no iframe
+      if (data.acao_frontend) {
+        handleAcao(data.acao_frontend);
+      }
+    })
+    .catch(err => {
+      typing.remove();
+      historico.push({ role: 'assistant', content: err.message || 'Erro de conexão.', time: getTime() });
+      renderMensagens();
+    })
+    .finally(() => {
+      enviando = false;
+      sendBtn.disabled = false;
+    });
+  }
+
+  function salvarHistorico() {
+    try { sessionStorage.setItem('bri_sidebar_hist', JSON.stringify(historico.slice(-30))); } catch(e) {}
+  }
+
+  // ── Mapeamento de ações → URL do iframe ─────────────
+  function handleAcao(acao) {
+    if (!frame || !acao) return;
+    const { tipo, parametros } = acao;
+    if (!tipo || tipo === 'nenhuma') return;
+
+    const p = parametros || {};
+    const rotas = {
+      buscar_produto: () => '/busca?q=' + encodeURIComponent(p.termo || '') + '&embed=1',
+      ir_para_carrinho: () => '/carrinho?embed=1',
+      ir_para_checkout: () => '/checkout?embed=1',
+      ir_para_grupo: () => '/grupo/' + (p.slug || '') + '?embed=1',
+      ir_para_clube: () => '/clube?embed=1',
+      consultar_status_pedido: () => '/pedidos/' + (p.numero_pedido || '') + '?embed=1',
+      gerar_orcamento: () => '/orcamento/preview?embed=1',
+      navegar: () => {
+        const url = p.url || '/';
+        return url + (url.includes('?') ? '&' : '?') + 'embed=1';
+      }
+    };
+
+    if (rotas[tipo]) {
+      navigatePainel(rotas[tipo]());
+    }
+  }
+
+  // ── Auto-resize textarea ────────────────────────────
+  input?.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  // Enter para enviar, Shift+Enter para nova linha
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      enviar();
+    }
+  });
+
+  sendBtn?.addEventListener('click', enviar);
+
+  // ── Init ────────────────────────────────────────────
+  renderMensagens();
+
+  // Expor para uso externo
+  return { handleAcao, fecharPainel, navigatePainel };
+
+})();

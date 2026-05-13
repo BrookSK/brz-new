@@ -907,6 +907,9 @@
       // Assim não mostramos "Adicionei!" se a ação falhar
       var acaoTipo = (d.acao_frontend && d.acao_frontend.tipo) ? d.acao_frontend.tipo : 'nenhuma'
       var acaoParams = (d.acao_frontend && d.acao_frontend.parametros) ? d.acao_frontend.parametros : {}
+
+      // Hook para BriSidebar (modo /home-ia) — não altera comportamento existente
+      if (window.BriSidebar && d.acao_frontend) { BriSidebar.handleAcao(d.acao_frontend); }
       
       // Detectar se Claude disse que adicionou mas não mandou a ação
       var textoResp = d.resposta || ''

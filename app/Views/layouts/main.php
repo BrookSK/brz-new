@@ -904,6 +904,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             </div>
         </div>
     <?php endif; ?>
+    <?php if (empty($_GET['embed'])): ?>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid px-3">
@@ -1167,9 +1168,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             </div>
         </div>
     </nav>
+    <?php endif; /* embed */ ?>
 
     <!-- Floating Cart (Mobile) -->
-    <?php if ($totalItens > 0): ?>
+    <?php if ($totalItens > 0 && empty($_GET['embed'])): ?>
     <div class="floating-cart d-lg-none">
         <a href="/carrinho" class="text-decoration-none">
             <button>
@@ -1178,6 +1180,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             </button>
         </a>
     </div>
+    <?php endif; ?>
+
+    <?php if (!empty($_GET['embed'])): ?>
+    <style>body{padding-top:0 !important;}</style>
     <?php endif; ?>
 
     <!-- Main Content -->
@@ -1195,6 +1201,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
         <?= $content ?? '' ?>
     </main>
 
+    <?php if (empty($_GET['embed'])): ?>
     <!-- Footer -->
     <footer class="site-footer text-light py-5 mt-auto">
         <div class="container">
@@ -1348,6 +1355,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             </div>
         </div>
     </footer>
+    <?php endif; /* embed footer */ ?>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
