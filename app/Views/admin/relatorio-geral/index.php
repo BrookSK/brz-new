@@ -619,7 +619,6 @@ function renderDreCompleto(d) {
     h += card('Custo Produtos','fas fa-box','#3b82f6',fmtR(r.custo_produtos||0));
     h += card('Impostos Brasil','fas fa-landmark','#f59e0b',fmtR(r.custo_impostos_br||0));
     h += card('Imposto Local','fas fa-flag','#ef4444',fmtR(r.custo_imposto_local||0));
-    h += card('Taxa de Serviço','fas fa-concierge-bell','#06b6d4',fmtR(r.taxa_servico||0));
     if ((r.total_descontos||0) > 0) h += card('Descontos/Promoções','fas fa-tag','#f97316',fmtR(r.total_descontos||0));
     h += card('Despesas','fas fa-arrow-down','#dc2626',fmtR(r.total_despesas));
     h += card('Resultado','fas fa-equals',r.resultado>=0?'#10b981':'#ef4444',fmtR(r.resultado));
@@ -629,14 +628,12 @@ function renderDreCompleto(d) {
     // DRE Profissional
     h += '<div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><div class="d-flex align-items-center gap-2"><div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:28px;height:28px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:11px;"></i></div><div><h6 class="fw-bold mb-0">DRE — Balanço Financeiro</h6><span class="text-muted" style="font-size:10px;">Período: '+d.periodo.inicio+' a '+d.periodo.fim+'</span></div></div></div><div class="card-body"><table class="table table-sm mb-0" style="font-size:13px;"><tbody>';
     h += dreRow('RECEITA OPERACIONAL',fmtR(r.total_entradas),'fw-bold text-success','fs-5');
+    h += '<tr class="border-top"><td class="fw-bold text-danger"><i class="fas fa-minus-circle me-1"></i>(-) DEDUÇÕES E CUSTOS</td><td class="text-end fw-bold text-danger fs-5">'+fmtR((r.custo_produtos||0)+(r.custo_impostos_br||0)+(r.custo_imposto_local||0)+(r.total_descontos||0)+(r.total_despesas||0))+'</td></tr>';
     h += dreRow('  Custo de Produtos',fmtR(r.custo_produtos||0),'ps-3 text-muted');
     h += dreRow('  Custo de Impostos Brasil',fmtR(r.custo_impostos_br||0),'ps-3 text-muted');
     h += dreRow('  Custo de Imposto Local',fmtR(r.custo_imposto_local||0),'ps-3 text-muted');
-    h += dreRow('  Taxa de Serviço',fmtR(r.taxa_servico||0),'ps-3 text-muted');
-    if ((r.total_descontos||0) > 0) h += dreRow('(-) Descontos e Promoções',fmtR(r.total_descontos),'fw-bold text-warning border-top','');
-    h += dreRow('(-) DESPESAS',fmtR(r.total_despesas),'fw-bold text-danger border-top','fs-5');
-    h += dreRow('  Despesas em BRL',fmtR(r.total_despesas_brl),'ps-3 text-muted');
-    if (r.total_despesas_usd > 0) h += dreRow('  Despesas em USD (×'+taxa.toFixed(2)+')',fmtR(r.total_despesas_usd*taxa),'ps-3 text-muted');
+    if ((r.total_descontos||0) > 0) h += dreRow('  Descontos e Promoções',fmtR(r.total_descontos),'ps-3 text-muted');
+    h += dreRow('  Despesas Operacionais',fmtR(r.total_despesas||0),'ps-3 text-muted');
     h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;">(=) RESULTADO</td><td class="text-end fw-bold fs-4 '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td></tr>';
     h += '<tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge '+(r.margem>=0?'bg-success':'bg-danger')+'">'+r.margem+'%</span></td></tr>';
     h += '</tbody></table></div></div>';
@@ -694,9 +691,9 @@ function renderDreCompleto(d) {
     h += '<tr><td class="ps-3 text-muted">Custo de Produtos</td><td class="text-end">'+fmtR(r.custo_produtos||0)+'</td></tr>';
     h += '<tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end">'+fmtR(r.custo_impostos_br||0)+'</td></tr>';
     h += '<tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end">'+fmtR(r.custo_imposto_local||0)+'</td></tr>';
-    h += '<tr><td class="ps-3 text-muted">Taxa de Serviço</td><td class="text-end">'+fmtR(r.taxa_servico||0)+'</td></tr>';
-    if ((r.total_descontos||0) > 0) h += '<tr><td>(-) Descontos e Promoções</td><td class="text-end fw-bold text-warning">'+fmtR(r.total_descontos)+'</td></tr>';
-    h += '<tr><td>(-) Despesas</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';
+    if ((r.total_descontos||0) > 0) h += '<tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end">'+fmtR(r.total_descontos)+'</td></tr>';
+    h += '<tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end">'+fmtR(r.total_despesas||0)+'</td></tr>';
+    h += '<tr><td>(-) Total Deduções</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';
     h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold">Resultado</td><td class="text-end fw-bold fs-5 '+(d.conciliacao.saldo_final>=0?'text-success':'text-danger')+'">'+fmtR(d.conciliacao.saldo_final)+'</td></tr>';
     h += '<tr><td class="text-muted small">Quantidade de lançamentos</td><td class="text-end">'+d.conciliacao.qtd_lancamentos+'</td></tr>';
     h += '</tbody></table>';

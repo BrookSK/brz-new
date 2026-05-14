@@ -225,7 +225,7 @@ class AdminDreCompletoController extends Controller {
             $m['custo_imposto_local_total'] = $m['custo_imposto_local_brl'] + ($m['custo_imposto_local_usd'] * $taxaUsdBrl);
             $m['taxa_servico_total'] = $m['taxa_servico_brl'] + ($m['taxa_servico_usd'] * $taxaUsdBrl);
             $m['despesas_total'] = $m['despesas_brl'] + ($m['despesas_usd'] * $taxaUsdBrl);
-            $m['resultado'] = $m['entradas_total'] - $m['despesas_total'];
+            $m['resultado'] = $m['entradas_total'] - $m['custo_produtos_total'] - $m['custo_impostos_br_total'] - $m['custo_imposto_local_total'] - $m['despesas_total'];
             $totalEntradasBrl += $m['entradas_brl'];
             $totalEntradasUsd += $m['entradas_usd'];
             $totalDespBrl += $m['despesas_brl'];
@@ -247,11 +247,13 @@ class AdminDreCompletoController extends Controller {
         $totalCustoImpostosBr = $totalCustoImpostosBrBrl + ($totalCustoImpostosBrUsd * $taxaUsdBrl);
         $totalCustoImpostoLocal = $totalCustoImpostoLocalBrl + ($totalCustoImpostoLocalUsd * $taxaUsdBrl);
         $totalTaxaServico = $totalTaxaServicoBrl + ($totalTaxaServicoUsd * $taxaUsdBrl);
-        $resultado = $totalEntradas - $totalDespesas;
+        // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + despesas)
+        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalDespesas;
+        $resultado = $totalEntradas - $totalDeducoes;
         // === CONCILIAÇÃO ===
         $conciliacao = [
             'total_creditos' => $totalEntradas,
-            'total_debitos' => $totalDespesas,
+            'total_debitos' => $totalDeducoes,
             'saldo_final' => $resultado,
             'qtd_lancamentos' => array_sum(array_column(array_values($meses), 'qtd_pedidos')) + array_sum(array_column(array_values($meses), 'qtd_despesas')),
         ];
@@ -447,7 +449,7 @@ class AdminDreCompletoController extends Controller {
         $w("");
 
         $w("=== 10. CONCILIAÇÃO DO PERÍODO ==="); $w("Descrição{$sep}Valor BRL");
-        $w("Receita Operacional (total pedidos){$sep}".$fV($rec)); $w("  Custo de Produtos{$sep}".$fV($subT)); $w("  Custo de Impostos Brasil{$sep}".$fV($impT)); $w("  Taxa de Serviço{$sep}".$fV($srvT)); $w("(-) Despesas{$sep}".$fV($despR)); $w("(=) Resultado{$sep}".$fV($res));
+        $w("Receita Operacional (total pedidos){$sep}".$fV($rec)); $w("  Custo de Produtos{$sep}".$fV($subT)); $w("  Custo de Impostos Brasil{$sep}".$fV($impT)); $w("  Despesas Operacionais{$sep}".$fV($despR)); $w("(-) Total Deduções{$sep}".$fV($subT+$impT+$despR)); $w("(=) Resultado{$sep}".$fV($res));
         $w("Pedidos ainda não realizados{$sep}".$fV($tfP)); $w("Despesas ainda não realizadas{$sep}".$fV($tfD));
         $w("Quantidade de pedidos pagos{$sep}".count($pDre)); $w("Quantidade de pedidos fora da DRE{$sep}{$tqP}");
         $w("Quantidade de despesas pagas{$sep}".count($dDre)); $w("Quantidade de despesas fora da DRE{$sep}{$tqD}");
