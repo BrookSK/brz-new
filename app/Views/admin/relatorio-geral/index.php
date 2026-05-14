@@ -224,7 +224,9 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
     $receitaBruta = $totalTotal;
     $totalDespesas = (float)($despesasResumo['total'] ?? 0);
-    $lucroLiquido = $receitaBruta - $totalDespesas;
+    // Resultado = Receita - todos os custos (produtos + impostos + despesas operacionais)
+    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalDespesas;
+    $lucroLiquido = $receitaBruta - $totalDeducoes;
     $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
     $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
     $despBrl = (float)($despesasResumo['total_brl'] ?? 0);
@@ -246,21 +248,18 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                         <div class="col-lg-5">
                             <table class="table table-sm mb-0" style="font-size:13px;">
                                 <tbody>
-                                    <tr class="border-bottom"><td class="fw-bold text-success" data-i18n="receita_bruta"><i class="fas fa-arrow-up me-1"></i>RECEITA BRUTA</td><td class="text-end fw-bold text-success fs-5 fin-value" data-value-brl="<?= $receitaBruta ?>"><?= fmtNum($receitaBruta) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Subtotal produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Taxa de serviço</td><td class="text-end"><?= fmtNum($totalServicos) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Impostos cobrados</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Frete</td><td class="text-end"><?= fmtNum($totalFrete) ?></td></tr>
-                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger" data-i18n="despesas_totais"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5 fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
+                                    <tr class="border-bottom"><td class="fw-bold text-success" data-i18n="receita_bruta"><i class="fas fa-arrow-up me-1"></i>RECEITA OPERACIONAL</td><td class="text-end fw-bold text-success fs-5 fin-value" data-value-brl="<?= $receitaBruta ?>"><?= fmtNum($receitaBruta) ?></td></tr>
+                                    <tr class="border-top border-bottom"><td class="fw-bold text-danger" data-i18n="despesas_totais"><i class="fas fa-arrow-down me-1"></i>(-) DEDUÇÕES E CUSTOS</td><td class="text-end fw-bold text-danger fs-5 fin-value" data-value-brl="<?= $totalDeducoes ?>"><?= fmtNum($totalDeducoes) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Custo de Produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
-                                    <tr><td class="ps-3 text-muted">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
+                                    <tr><td class="ps-4 text-muted" style="font-size:11px;">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end" style="font-size:11px;">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
                                     <?php endif; ?>
                                     <?php if ($despBrl > 0): ?>
-                                    <tr><td class="ps-3 text-muted">BRL</td><td class="text-end">R$ <?= fmtNum($despBrl) ?></td></tr>
+                                    <tr><td class="ps-4 text-muted" style="font-size:11px;">BRL</td><td class="text-end" style="font-size:11px;">R$ <?= fmtNum($despBrl) ?></td></tr>
                                     <?php endif; ?>
-                                    <tr><td class="ps-3 text-muted">Pagas no período</td><td class="text-end"><?= fmtNum($despesasResumo['pago']) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Em aberto</td><td class="text-end"><?= fmtNum($despesasResumo['aberto']) ?></td></tr>
-                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;" data-i18n="resultado"><i class="fas fa-equals me-1"></i>RESULTADO LÍQUIDO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?> fin-value" data-value-brl="<?= $lucroLiquido ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
+                                    <tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;" data-i18n="resultado"><i class="fas fa-equals me-1"></i>RESULTADO</td><td class="text-end fw-bold fs-4 <?= $lucroLiquido >= 0 ? 'text-success' : 'text-danger' ?> fin-value" data-value-brl="<?= $lucroLiquido ?>"><?= fmtNum($lucroLiquido) ?></td></tr>
                                     <tr><td class="text-muted small">Margem</td><td class="text-end"><span class="badge <?= $margemLucro >= 0 ? 'bg-success' : 'bg-danger' ?>"><?= $margemLucro ?>%</span></td></tr>
                                 </tbody>
                             </table>
