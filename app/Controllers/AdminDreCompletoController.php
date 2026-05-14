@@ -131,27 +131,41 @@ class AdminDreCompletoController extends Controller {
         } catch (\Exception $e) {}
 
         // === DESCONTOS E PROMOÇÕES ===
-        // Calcular total de descontos: diferença entre preço original do produto e preço cobrado no pedido
+        // Calcular total de descontos dos pedidos pagos no período
+        // Método: para cada item vendido, se o produto tem sale_price < price, a diferença é o desconto
         $totalDescontos = 0;
+        $itensTable = null;
         try {
-            // Detectar tabela de itens
-            $itensTable = null;
             try { $this->db->query("SELECT 1 FROM pedido_itens LIMIT 1"); $itensTable = 'pedido_itens'; } catch (\Exception $e) {
                 try { $this->db->query("SELECT 1 FROM pedido_items LIMIT 1"); $itensTable = 'pedido_items'; } catch (\Exception $e2) {}
             }
             if ($itensTable) {
-                // Detectar colunas da tabela de itens
                 $colsItens = [];
                 try { $stI = $this->db->query("DESCRIBE {$itensTable}"); $colsItens = $stI ? $stI->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
                 $colPrecoItem = in_array('preco', $colsItens, true) ? 'preco' : (in_array('preco_unitario', $colsItens, true) ? 'preco_unitario' : (in_array('price', $colsItens, true) ? 'price' : ''));
                 $colQtdItem = in_array('quantidade', $colsItens, true) ? 'quantidade' : (in_array('qty', $colsItens, true) ? 'qty' : 'quantidade');
                 $colProdutoIdItem = in_array('produto_id', $colsItens, true) ? 'produto_id' : 'product_id';
                 
-                // Detectar coluna de preço original do produto
                 $colPrecoOriginal = in_array('price', $cols, true) ? 'price' : (in_array('valor', $cols, true) ? 'valor' : '');
+                $hasSalePrice = in_array('sale_price', $cols, true);
                 
-                if ($colPrecoItem && $colPrecoOriginal) {
-                    // Soma dos descontos: (preço original - preço cobrado) * quantidade, para pedidos pagos no período
+                if ($colPrecoItem && $colPrecoOriginal && $hasSalePrice) {
+                    // Método 1: Produtos com sale_price ativa que foram vendidos no período
+                    // O desconto é (price - sale_price) * quantidade vendida
+                    $sqlDesc = "SELECT COALESCE(SUM((prod.{$colPrecoOriginal} - prod.sale_price) * i.{$colQtdItem}), 0) as total_desconto
+                        FROM {$itensTable} i
+                        INNER JOIN pedidos p ON p.id = i.pedido_id
+                        INNER JOIN produtos prod ON prod.id = i.{$colProdutoIdItem}
+                        WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)
+                        AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
+                        {$deletedFilter}
+                        AND prod.sale_price > 0
+                        AND prod.{$colPrecoOriginal} > prod.sale_price";
+                    $stDesc = $this->db->prepare($sqlDesc);
+                    $stDesc->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                    $totalDescontos = (float)($stDesc->fetchColumn() ?: 0);
+                } elseif ($colPrecoItem && $colPrecoOriginal) {
+                    // Fallback: comparar preço original com preço cobrado no item
                     $sqlDesc = "SELECT COALESCE(SUM((prod.{$colPrecoOriginal} - i.{$colPrecoItem}) * i.{$colQtdItem}), 0) as total_desconto
                         FROM {$itensTable} i
                         INNER JOIN pedidos p ON p.id = i.pedido_id
@@ -159,13 +173,131 @@ class AdminDreCompletoController extends Controller {
                         WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)
                         AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}
                         {$deletedFilter}
-                        AND prod.{$colPrecoOriginal} > i.{$colPrecoItem}";
+                        AND prod.{$colPrecoOriginal} > i.{$colPrecoItem}
+                        AND (prod.{$colPrecoOriginal} - i.{$colPrecoItem}) > 0.01";
                     $stDesc = $this->db->prepare($sqlDesc);
                     $stDesc->execute([':ds' => $dateStart, ':de' => $dateEnd]);
                     $totalDescontos = (float)($stDesc->fetchColumn() ?: 0);
                 }
             }
         } catch (\Throwable $e) { $totalDescontos = 0; }
+
+        // === COMISSÕES ===
+        // Calcular total de comissões pagas no período (mesma lógica do AdminComissoesGlobalController)
+        $totalComissoes = 0;
+        try {
+            $colOrigem = in_array('origem_pedido', $cols, true) ? 'origem_pedido' : (in_array('origem', $cols, true) ? 'origem' : '');
+            $colCriadoPor = in_array('admin_criador_id', $cols, true) ? 'admin_criador_id' : (in_array('criado_por', $cols, true) ? 'criado_por' : (in_array('vendedor_id', $cols, true) ? 'vendedor_id' : (in_array('created_by', $cols, true) ? 'created_by' : '')));
+            $colSemComissao = in_array('sem_comissao', $cols, true) ? 'sem_comissao' : '';
+
+            if ($colCriadoPor || $colOrigem) {
+                // Buscar faixas de comissão
+                $faixas = [['min' => 0, 'max' => 999999999, 'percent' => 0]];
+                try {
+                    $tables = ['configuracoes_sistema', 'configuracoes', 'settings', 'config'];
+                    foreach ($tables as $t) {
+                        $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                        $stT->execute([$t]);
+                        if ((int)($stT->fetchColumn() ?: 0) === 0) continue;
+                        $tCols = [];
+                        try { $stC = $this->db->query("DESCRIBE {$t}"); $tCols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        if (in_array('categoria', $tCols, true) && in_array('chave', $tCols, true)) {
+                            $valC = in_array('valor', $tCols, true) ? 'valor' : (in_array('value', $tCols, true) ? 'value' : '');
+                            if ($valC) {
+                                $st2 = $this->db->prepare("SELECT {$valC} FROM {$t} WHERE categoria = 'comissao' AND chave = 'manual_faixas' LIMIT 1");
+                                $st2->execute();
+                                $raw = (string)($st2->fetchColumn() ?: '');
+                                if ($raw !== '') { $arr = json_decode($raw, true); if (is_array($arr)) { $faixas = $arr; break; } }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {}
+
+                // Buscar pedidos manuais pagos no período
+                $whereC = [];
+                if ($colOrigem && $colCriadoPor) {
+                    $whereC[] = "(LOWER(COALESCE(p.{$colOrigem},'')) IN ('manual','admin') OR (p.{$colCriadoPor} IS NOT NULL AND p.{$colCriadoPor} > 0))";
+                } elseif ($colOrigem) {
+                    $whereC[] = "LOWER(COALESCE(p.{$colOrigem},'')) IN ('manual','admin')";
+                } elseif ($colCriadoPor) {
+                    $whereC[] = "(p.{$colCriadoPor} IS NOT NULL AND p.{$colCriadoPor} > 0)";
+                }
+                if (in_array('deleted_at', $cols, true)) $whereC[] = "p.deleted_at IS NULL";
+                $whereC[] = "LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses}";
+                if ($colSemComissao) $whereC[] = "(p.{$colSemComissao} IS NULL OR p.{$colSemComissao} = 0)";
+                $whereC[] = "p.{$colCreatedAt} >= :ds";
+                $whereC[] = "p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY)";
+
+                $sqlC = "SELECT p.id" . ($colTotal ? ", p.{$colTotal} AS valor_total" : "") . ($colImpostos ? ", p.{$colImpostos} AS impostos" : "") . ($colMoeda ? ", p.{$colMoeda} AS moeda" : "") . ($colCriadoPor ? ", p.{$colCriadoPor} AS criado_por" : ", 0 AS criado_por") . " FROM pedidos p WHERE " . implode(' AND ', $whereC) . " LIMIT 2000";
+                $stC = $this->db->prepare($sqlC);
+                $stC->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                $rowsC = $stC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                // Custo por pedido
+                $custoByPedido = [];
+                if ($itensTable && !empty($rowsC)) {
+                    $ids = array_column($rowsC, 'id');
+                    $chunks = array_chunk($ids, 500);
+                    $colsIt = [];
+                    try { $stI2 = $this->db->query("DESCRIBE {$itensTable}"); $colsIt = $stI2 ? $stI2->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $cPreco = in_array('preco', $colsIt, true) ? 'preco' : (in_array('preco_unitario', $colsIt, true) ? 'preco_unitario' : (in_array('price', $colsIt, true) ? 'price' : ''));
+                    $cQtd = in_array('quantidade', $colsIt, true) ? 'quantidade' : (in_array('qty', $colsIt, true) ? 'qty' : 'quantidade');
+                    if ($cPreco) {
+                        foreach ($chunks as $chunk) {
+                            $in = implode(',', array_fill(0, count($chunk), '?'));
+                            $stCu = $this->db->prepare("SELECT pedido_id, SUM({$cPreco} * {$cQtd}) as custo FROM {$itensTable} WHERE pedido_id IN ({$in}) GROUP BY pedido_id");
+                            $stCu->execute($chunk);
+                            foreach ($stCu->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $cu) {
+                                $custoByPedido[(int)$cu['pedido_id']] = (float)$cu['custo'];
+                            }
+                        }
+                    }
+                }
+
+                // Agrupar por vendedor e calcular comissão
+                $porVendedor = [];
+                foreach ($rowsC as $r) {
+                    $uid = (int)($r['criado_por'] ?? 0);
+                    if ($uid <= 0) continue;
+                    $m = strtoupper(trim((string)($r['moeda'] ?? 'BRL')));
+                    if ($m === '') $m = 'BRL';
+                    $fat = (float)($r['valor_total'] ?? 0);
+                    $imp = (float)($r['impostos'] ?? 0);
+                    $custo = (float)($custoByPedido[(int)$r['id']] ?? 0);
+                    $liq = $fat - $custo - $imp;
+                    if ($m === 'USD') { $fat *= $taxaUsdBrl; $liq *= $taxaUsdBrl; }
+                    if (!isset($porVendedor[$uid])) $porVendedor[$uid] = ['faturado' => 0.0, 'liquido' => 0.0];
+                    $porVendedor[$uid]['faturado'] += $fat;
+                    $porVendedor[$uid]['liquido'] += $liq;
+                }
+
+                foreach ($porVendedor as $uid => $t) {
+                    $pct = 0.0;
+                    foreach ($faixas as $f) {
+                        if ($t['faturado'] >= (float)($f['min'] ?? 0) && $t['faturado'] <= (float)($f['max'] ?? PHP_FLOAT_MAX)) {
+                            $pct = (float)($f['percent'] ?? 0); break;
+                        }
+                    }
+                    $totalComissoes += max(0.0, $t['liquido']) * ($pct / 100);
+                }
+
+                // Comissões de processamento
+                try {
+                    $stT = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'comissoes_processamento'");
+                    $stT->execute();
+                    if ((int)($stT->fetchColumn() ?: 0) > 0) {
+                        $sqlP = "SELECT moeda, SUM(valor_comissao) AS total_comissao FROM comissoes_processamento WHERE DATE(created_at) >= ? AND DATE(created_at) <= ? GROUP BY moeda";
+                        $stP = $this->db->prepare($sqlP);
+                        $stP->execute([$dateStart, $dateEnd]);
+                        foreach ($stP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                            $com = (float)($r['total_comissao'] ?? 0);
+                            if (strtoupper(trim($r['moeda'] ?? 'BRL')) === 'USD') $com *= $taxaUsdBrl;
+                            $totalComissoes += $com;
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+        } catch (\Throwable $e) { $totalComissoes = 0; }
 
         // === RESUMO MENSAL CONSOLIDADO ===
         // Receita operacional = total do pedido (tudo que entra)
@@ -247,8 +379,8 @@ class AdminDreCompletoController extends Controller {
         $totalCustoImpostosBr = $totalCustoImpostosBrBrl + ($totalCustoImpostosBrUsd * $taxaUsdBrl);
         $totalCustoImpostoLocal = $totalCustoImpostoLocalBrl + ($totalCustoImpostoLocalUsd * $taxaUsdBrl);
         $totalTaxaServico = $totalTaxaServicoBrl + ($totalTaxaServicoUsd * $taxaUsdBrl);
-        // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + despesas)
-        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalDespesas;
+        // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + comissões + despesas)
+        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalComissoes + $totalDespesas;
         $resultado = $totalEntradas - $totalDeducoes;
         // === CONCILIAÇÃO ===
         $conciliacao = [
@@ -332,6 +464,7 @@ class AdminDreCompletoController extends Controller {
                 'custo_imposto_local' => $totalCustoImpostoLocal,
                 'taxa_servico' => $totalTaxaServico,
                 'total_descontos' => $totalDescontos,
+                'total_comissoes' => $totalComissoes,
                 'total_despesas' => $totalDespesas,
                 'total_despesas_brl' => $totalDespBrl,
                 'total_despesas_usd' => $totalDespUsd,
