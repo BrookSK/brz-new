@@ -24,20 +24,21 @@ $regionalData = ['taxaUsdBrl'=>$taxaUsdBrl,'usd'=>$usd,'brl'=>$brl,'porStatus'=>
 // Consolidar status
 $statusLabels = $statusList;
 $statusConsolidado = [];
-$totalQtd=0;$totalSubtotal=0;$totalServicos=0;$totalImpostos=0;$totalFrete=0;$totalTotal=0;
+$totalQtd=0;$totalSubtotal=0;$totalServicos=0;$totalImpostos=0;$totalImpostoLocal=0;$totalFrete=0;$totalTotal=0;
 foreach ($porStatus as $row) {
     $st=$row['status']??'N/A';
-    if(!isset($statusConsolidado[$st]))$statusConsolidado[$st]=['status'=>$st,'qtd'=>0,'subtotal'=>0,'servicos'=>0,'impostos'=>0,'frete'=>0,'total'=>0];
+    if(!isset($statusConsolidado[$st]))$statusConsolidado[$st]=['status'=>$st,'qtd'=>0,'subtotal'=>0,'servicos'=>0,'impostos'=>0,'imposto_local'=>0,'frete'=>0,'total'=>0];
     $fator=(strtoupper($row['moeda']??'USD')==='BRL')?1.0:$taxaUsdBrl;
     $statusConsolidado[$st]['qtd']+=(int)($row['qtd']??0);
     $statusConsolidado[$st]['subtotal']+=(float)($row['subtotal']??0)*$fator;
     $statusConsolidado[$st]['servicos']+=(float)($row['servicos']??0)*$fator;
     $statusConsolidado[$st]['impostos']+=(float)($row['impostos']??0)*$fator;
+    $statusConsolidado[$st]['imposto_local']+=(float)($row['imposto_local']??0)*$fator;
     $statusConsolidado[$st]['frete']+=(float)($row['frete']??0)*$fator;
     $statusConsolidado[$st]['total']+=(float)($row['total']??0)*$fator;
 }
 usort($statusConsolidado, function($a,$b){return $b['total']<=>$a['total'];});
-foreach($statusConsolidado as $r){$totalQtd+=$r['qtd'];$totalSubtotal+=$r['subtotal'];$totalServicos+=$r['servicos'];$totalImpostos+=$r['impostos'];$totalFrete+=$r['frete'];$totalTotal+=$r['total'];}
+foreach($statusConsolidado as $r){$totalQtd+=$r['qtd'];$totalSubtotal+=$r['subtotal'];$totalServicos+=$r['servicos'];$totalImpostos+=$r['impostos'];$totalImpostoLocal+=$r['imposto_local'];$totalFrete+=$r['frete'];$totalTotal+=$r['total'];}
 
 $totalMoedaQtd=0;$totalMoedaTotal=0;
 foreach($porMoeda as $r){$totalMoedaQtd+=(int)($r['qtd']??0);$totalMoedaTotal+=(float)($r['total']??0);}
@@ -224,8 +225,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
     $receitaBruta = $totalTotal;
     $totalDespesas = (float)($despesasResumo['total'] ?? 0);
-    // Resultado = Receita - todos os custos (produtos + impostos + despesas operacionais)
-    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalDespesas;
+    // Resultado = Receita - todos os custos (produtos + impostos + imposto local + despesas operacionais)
+    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + $totalDespesas;
     $lucroLiquido = $receitaBruta - $totalDeducoes;
     $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
     $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
@@ -252,6 +253,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <tr class="border-top border-bottom"><td class="fw-bold text-danger" data-i18n="despesas_totais"><i class="fas fa-arrow-down me-1"></i>(-) DEDUÇÕES E CUSTOS</td><td class="text-end fw-bold text-danger fs-5 fin-value" data-value-brl="<?= $totalDeducoes ?>"><?= fmtNum($totalDeducoes) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end"><?= fmtNum($totalImpostoLocal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
                                     <tr><td class="ps-4 text-muted" style="font-size:11px;">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end" style="font-size:11px;">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
