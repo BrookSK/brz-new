@@ -162,6 +162,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
         ['key'=>'imposto_local','label'=>'Imposto local','icon'=>'fas fa-flag','color'=>'danger'],
         ['key'=>'frete','label'=>'AWB & Transporte','icon'=>'fas fa-plane','color'=>'secondary'],
         ['key'=>'lastmile','label'=>'Last Mile Brasil','icon'=>'fas fa-truck','color'=>'danger'],
+        ['key'=>'envio_intl','label'=>'Envio Internacional Correios - Brasil','icon'=>'fas fa-globe-americas','color'=>'primary'],
+        ['key'=>'envio_stamps','label'=>'Envio Internacional Stamps','icon'=>'fas fa-stamp','color'=>'info'],
     ];
     $cardColors = ['primary'=>'#3b82f6','success'=>'#10b981','info'=>'#06b6d4','warning'=>'#f59e0b','danger'=>'#ef4444','secondary'=>'#64748b'];
     ?>
