@@ -401,7 +401,30 @@ class AdminDreCompletoController extends Controller {
         } catch (\Throwable $e) {}
         $totalAwbBrl = $totalAwbUsd * $taxaUsdBrl;
 
-        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalAwbBrl + $totalComissoes + $totalDespesas;
+        // === LAST MILE BRASIL (peso * R$10/kg para pedidos destino Brasil) ===
+        $totalLastMileBrl = 0;
+        try {
+            if ($itensTable) {
+                $colPesoLm = in_array('weight', $colsProdAwb ?? [], true) ? 'weight' : (in_array('peso', $colsProdAwb ?? [], true) ? 'peso' : '');
+                if (!$colPesoLm) {
+                    $colsProdLm = []; try { $stPrLm = $this->db->query("DESCRIBE produtos"); $colsProdLm = $stPrLm ? $stPrLm->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $colPesoLm = in_array('weight', $colsProdLm, true) ? 'weight' : (in_array('peso', $colsProdLm, true) ? 'peso' : '');
+                }
+                $colPaisLm = '';
+                foreach (['pais_entrega','pais','country','shipping_country','pais_destino'] as $cp) { if (in_array($cp, $cols, true)) { $colPaisLm = $cp; break; } }
+                $cQtdLm = in_array('quantidade', $colsItens ?? [], true) ? 'quantidade' : 'quantidade';
+                $cProdIdLm = in_array('produto_id', $colsItens ?? [], true) ? 'produto_id' : 'product_id';
+                if ($colPesoLm && $colPaisLm) {
+                    $sqlLm = "SELECT COALESCE(SUM(prod.{$colPesoLm} * i.{$cQtdLm}), 0) FROM {$itensTable} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdIdLm} WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY) AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses} {$deletedFilter} AND UPPER(COALESCE(p.{$colPaisLm},'')) IN ('BR','BRASIL','BRAZIL')";
+                    $stLm = $this->db->prepare($sqlLm);
+                    $stLm->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                    $pesoTotalBr = (float)($stLm->fetchColumn() ?: 0);
+                    $totalLastMileBrl = $pesoTotalBr * 10.0;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalAwbBrl + $totalLastMileBrl + $totalComissoes + $totalDespesas;
         $resultado = $totalEntradas - $totalDeducoes;
         // === CONCILIAÇÃO ===
         $conciliacao = [
@@ -487,6 +510,7 @@ class AdminDreCompletoController extends Controller {
                 'total_descontos' => $totalDescontos,
                 'total_awb' => $totalAwbBrl,
                 'total_awb_usd' => $totalAwbUsd,
+                'total_lastmile' => $totalLastMileBrl,
                 'total_comissoes' => $totalComissoes,
                 'total_despesas' => $totalDespesas,
                 'total_despesas_brl' => $totalDespBrl,

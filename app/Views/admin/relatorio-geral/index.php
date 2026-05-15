@@ -161,6 +161,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
         ['key'=>'impostos','label'=>'Impostos','icon'=>'fas fa-landmark','color'=>'warning'],
         ['key'=>'imposto_local','label'=>'Imposto local','icon'=>'fas fa-flag','color'=>'danger'],
         ['key'=>'frete','label'=>'AWB & Transporte','icon'=>'fas fa-plane','color'=>'secondary'],
+        ['key'=>'lastmile','label'=>'Last Mile Brasil','icon'=>'fas fa-truck','color'=>'danger'],
     ];
     $cardColors = ['primary'=>'#3b82f6','success'=>'#10b981','info'=>'#06b6d4','warning'=>'#f59e0b','danger'=>'#ef4444','secondary'=>'#64748b'];
     ?>
@@ -173,7 +174,12 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
             $vUsd = (float)($awbTransporteUsd ?? 0);
             $vBrl = 0;
         }
-        $convertidoBrl = ($c['key'] === 'frete') ? ($vUsd * $taxaUsdBrl) : totalEmBrl($usd, $brl, $c['key'], $taxaUsdBrl);
+        // Last Mile Brasil: usar valor calculado (peso BR * R$10/kg)
+        if ($c['key'] === 'lastmile') {
+            $vUsd = 0;
+            $vBrl = (float)($lastMileBrl ?? 0);
+        }
+        $convertidoBrl = ($c['key'] === 'frete') ? ($vUsd * $taxaUsdBrl) : (($c['key'] === 'lastmile') ? $vBrl : totalEmBrl($usd, $brl, $c['key'], $taxaUsdBrl));
         $temAlgo = ($vUsd > 0 || $vBrl > 0);
         $borderColor = $cardColors[$c['color']] ?? '#6b7280';
     ?>
@@ -230,8 +236,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
     $receitaBruta = $totalTotal;
     $totalDespesas = (float)($despesasResumo['total'] ?? 0);
-    // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + AWB + comissões + despesas)
-    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + ($descontosTotal ?? 0) + ($awbTransporteBrl ?? 0) + ($comissoesTotal ?? 0) + $totalDespesas;
+    // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + AWB + lastmile + comissões + despesas)
+    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + ($descontosTotal ?? 0) + ($awbTransporteBrl ?? 0) + ($lastMileBrl ?? 0) + ($comissoesTotal ?? 0) + $totalDespesas;
     $lucroLiquido = $receitaBruta - $totalDeducoes;
     $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
     $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
@@ -261,6 +267,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end"><?= fmtNum($totalImpostoLocal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end"><?= fmtNum($descontosTotal ?? 0) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">AWB & Transporte</td><td class="text-end"><?= fmtNum($awbTransporteBrl ?? 0) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Last Mile Brasil</td><td class="text-end"><?= fmtNum($lastMileBrl ?? 0) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Comissões</td><td class="text-end"><?= fmtNum($comissoesTotal ?? 0) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
@@ -639,12 +646,13 @@ function renderDreCompleto(d) {
     // DRE Profissional
     h += '<div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #1e293b;"><div class="card-header bg-white border-0 pt-3"><div class="d-flex align-items-center gap-2"><div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:28px;height:28px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:11px;"></i></div><div><h6 class="fw-bold mb-0">DRE — Balanço Financeiro</h6><span class="text-muted" style="font-size:10px;">Período: '+d.periodo.inicio+' a '+d.periodo.fim+'</span></div></div></div><div class="card-body"><table class="table table-sm mb-0" style="font-size:13px;"><tbody>';
     h += dreRow('RECEITA OPERACIONAL',fmtR(r.total_entradas),'fw-bold text-success','fs-5');
-    h += '<tr class="border-top"><td class="fw-bold text-danger"><i class="fas fa-minus-circle me-1"></i>(-) DEDUÇÕES E CUSTOS</td><td class="text-end fw-bold text-danger fs-5">'+fmtR((r.custo_produtos||0)+(r.custo_impostos_br||0)+(r.custo_imposto_local||0)+(r.total_descontos||0)+(r.total_awb||0)+(r.total_comissoes||0)+(r.total_despesas||0))+'</td></tr>';
+    h += '<tr class="border-top"><td class="fw-bold text-danger"><i class="fas fa-minus-circle me-1"></i>(-) DEDUÇÕES E CUSTOS</td><td class="text-end fw-bold text-danger fs-5">'+fmtR((r.custo_produtos||0)+(r.custo_impostos_br||0)+(r.custo_imposto_local||0)+(r.total_descontos||0)+(r.total_awb||0)+(r.total_lastmile||0)+(r.total_comissoes||0)+(r.total_despesas||0))+'</td></tr>';
     h += dreRow('  Custo de Produtos',fmtR(r.custo_produtos||0),'ps-3 text-muted');
     h += dreRow('  Custo de Impostos Brasil',fmtR(r.custo_impostos_br||0),'ps-3 text-muted');
     h += dreRow('  Custo de Imposto Local',fmtR(r.custo_imposto_local||0),'ps-3 text-muted');
     if ((r.total_descontos||0) > 0) h += dreRow('  Descontos e Promoções',fmtR(r.total_descontos),'ps-3 text-muted');
     h += dreRow('  AWB & Transporte',fmtR(r.total_awb||0),'ps-3 text-muted');
+    h += dreRow('  Last Mile Brasil',fmtR(r.total_lastmile||0),'ps-3 text-muted');
     if ((r.total_comissoes||0) > 0) h += dreRow('  Comissões',fmtR(r.total_comissoes),'ps-3 text-muted');
     h += dreRow('  Despesas Operacionais',fmtR(r.total_despesas||0),'ps-3 text-muted');
     h += '<tr class="border-top" style="background:#f8fafc;"><td class="fw-bold" style="font-size:14px;">(=) RESULTADO</td><td class="text-end fw-bold fs-4 '+(r.resultado>=0?'text-success':'text-danger')+'">'+fmtR(r.resultado)+'</td></tr>';
@@ -706,6 +714,7 @@ function renderDreCompleto(d) {
     h += '<tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end">'+fmtR(r.custo_imposto_local||0)+'</td></tr>';
     if ((r.total_descontos||0) > 0) h += '<tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end">'+fmtR(r.total_descontos)+'</td></tr>';
     h += '<tr><td class="ps-3 text-muted">AWB & Transporte</td><td class="text-end">'+fmtR(r.total_awb||0)+'</td></tr>';
+    h += '<tr><td class="ps-3 text-muted">Last Mile Brasil</td><td class="text-end">'+fmtR(r.total_lastmile||0)+'</td></tr>';
     if ((r.total_comissoes||0) > 0) h += '<tr><td class="ps-3 text-muted">Comissões</td><td class="text-end">'+fmtR(r.total_comissoes)+'</td></tr>';
     h += '<tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end">'+fmtR(r.total_despesas||0)+'</td></tr>';
     h += '<tr><td>(-) Total Deduções</td><td class="text-end fw-bold text-danger">'+fmtR(d.conciliacao.total_debitos)+'</td></tr>';

@@ -353,6 +353,28 @@ class AdminRelatorioGeralController extends Controller {
         } catch (\Throwable $e) {}
         $data['awbTransporteUsd'] = $awbTransporteUsd;
         $data['awbTransporteBrl'] = $awbTransporteUsd * $taxaUsdBrl;
+
+        // === LAST MILE BRASIL (peso * R$10/kg para pedidos com destino Brasil) ===
+        $lastMileBrl = 0;
+        try {
+            if (isset($itensTable2) && $itensTable2) {
+                $colPaisLm = '';
+                foreach (['pais_entrega','pais','country','shipping_country','pais_destino'] as $cp) { if (in_array($cp, $cols, true)) { $colPaisLm = $cp; break; } }
+                $colPesoLm = in_array('weight', $colsProd2 ?? [], true) ? 'weight' : (in_array('peso', $colsProd2 ?? [], true) ? 'peso' : '');
+                $cQtdLm = in_array('quantidade', $colsIt2 ?? [], true) ? 'quantidade' : 'quantidade';
+                $cProdIdLm = in_array('produto_id', $colsIt2 ?? [], true) ? 'produto_id' : 'product_id';
+                $delFLm = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
+                if ($colPesoLm && $colPaisLm) {
+                    $sqlLm = "SELECT COALESCE(SUM(prod.{$colPesoLm} * i.{$cQtdLm}), 0) FROM {$itensTable2} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdIdLm} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$delFLm} AND UPPER(COALESCE(p.{$colPaisLm},'')) IN ('BR','BRASIL','BRAZIL')";
+                    $stLm = $this->db->prepare($sqlLm);
+                    $stLm->execute([$dateStart, $dateEnd]);
+                    $pesoTotalBr = (float)($stLm->fetchColumn() ?: 0);
+                    $lastMileBrl = $pesoTotalBr * 10.0;
+                }
+            }
+        } catch (\Throwable $e) {}
+        $data['lastMileBrl'] = $lastMileBrl;
+        $data['awbTransporteBrl'] = $awbTransporteUsd * $taxaUsdBrl;
         $comissoesTotal = 0;
         try {
             $stCom = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='comissoes_processamento'");
