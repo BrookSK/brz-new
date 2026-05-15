@@ -254,12 +254,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <tr><td class="ps-3 text-muted">Custo de Produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end"><?= fmtNum($totalImpostoLocal) ?></td></tr>
-                                    <?php if (($descontosTotal ?? 0) > 0): ?>
-                                    <tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end"><?= fmtNum($descontosTotal) ?></td></tr>
-                                    <?php endif; ?>
-                                    <?php if (($comissoesTotal ?? 0) > 0): ?>
-                                    <tr><td class="ps-3 text-muted">Comissões</td><td class="text-end"><?= fmtNum($comissoesTotal) ?></td></tr>
-                                    <?php endif; ?>
+                                    <tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end"><?= fmtNum($descontosTotal ?? 0) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Comissões</td><td class="text-end"><?= fmtNum($comissoesTotal ?? 0) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
                                     <tr><td class="ps-4 text-muted" style="font-size:11px;">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end" style="font-size:11px;">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
