@@ -168,7 +168,12 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <?php foreach ($campos as $c):
         $vUsd = (float)($usd[$c['key']] ?? 0);
         $vBrl = (float)($brl[$c['key']] ?? 0);
-        $convertidoBrl = totalEmBrl($usd, $brl, $c['key'], $taxaUsdBrl);
+        // AWB & Transporte: usar valor calculado (peso * $4.80/kg)
+        if ($c['key'] === 'frete') {
+            $vUsd = (float)($awbTransporteUsd ?? 0);
+            $vBrl = 0;
+        }
+        $convertidoBrl = ($c['key'] === 'frete') ? ($vUsd * $taxaUsdBrl) : totalEmBrl($usd, $brl, $c['key'], $taxaUsdBrl);
         $temAlgo = ($vUsd > 0 || $vBrl > 0);
         $borderColor = $cardColors[$c['color']] ?? '#6b7280';
     ?>
