@@ -169,15 +169,47 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <?php foreach ($campos as $c):
         $vUsd = (float)($usd[$c['key']] ?? 0);
         $vBrl = (float)($brl[$c['key']] ?? 0);
-        // AWB & Transporte: usar valor calculado (peso * $4.80/kg)
+        // AWB & Transporte: calcular direto (peso * $4.80/kg)
         if ($c['key'] === 'frete') {
-            $vUsd = (float)($awbTransporteUsd ?? 0);
+            if (!isset($_awbCalcDone)) {
+                $_awbCalcDone = true;
+                $_awbUsd = 0; $_lastMileBrl = 0;
+                try {
+                    $pdo = \Config\Database::getConnection();
+                    $_it = null;
+                    try { $pdo->query("SELECT 1 FROM pedido_itens LIMIT 1"); $_it = 'pedido_itens'; } catch (\Exception $e) { try { $pdo->query("SELECT 1 FROM pedido_items LIMIT 1"); $_it = 'pedido_items'; } catch (\Exception $e2) {} }
+                    if ($_it) {
+                        $_cP = []; try { $_s = $pdo->query("DESCRIBE produtos"); $_cP = $_s ? $_s->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        $_cI = []; try { $_s = $pdo->query("DESCRIBE {$_it}"); $_cI = $_s ? $_s->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        $_colsPed = []; try { $_s = $pdo->query("DESCRIBE pedidos"); $_colsPed = $_s ? $_s->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        $_wt = in_array('weight', $_cP, true) ? 'weight' : (in_array('peso', $_cP, true) ? 'peso' : '');
+                        $_qt = in_array('quantidade', $_cI, true) ? 'quantidade' : 'quantidade';
+                        $_pi = in_array('produto_id', $_cI, true) ? 'produto_id' : 'product_id';
+                        $_dl = in_array('deleted_at', $_colsPed, true) ? "AND p.deleted_at IS NULL" : "";
+                        if ($_wt) {
+                            $_sq = "SELECT COALESCE(SUM(prod.{$_wt} * i.{$_qt}), 0) FROM {$_it} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$_pi} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$_dl}";
+                            $_st = $pdo->prepare($_sq); $_st->execute([$dateStart, $dateEnd]);
+                            $_pesoAll = (float)($_st->fetchColumn() ?: 0);
+                            $_awbUsd = $_pesoAll * 4.80;
+                            $_cp2 = '';
+                            foreach (['pais_entrega','pais','country','shipping_country','pais_destino'] as $_k) { if (in_array($_k, $_colsPed, true)) { $_cp2 = $_k; break; } }
+                            if ($_cp2) {
+                                $_sq2 = "SELECT COALESCE(SUM(prod.{$_wt} * i.{$_qt}), 0) FROM {$_it} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$_pi} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$_dl} AND UPPER(COALESCE(p.{$_cp2},'')) IN ('BR','BRASIL','BRAZIL')";
+                                $_st2 = $pdo->prepare($_sq2); $_st2->execute([$dateStart, $dateEnd]);
+                                $_lastMileBrl = (float)($_st2->fetchColumn() ?: 0) * 10.0;
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+            $vUsd = $_awbUsd;
             $vBrl = 0;
         }
-        // Last Mile Brasil: usar valor calculado (peso BR * R$10/kg)
+        // Last Mile Brasil
         if ($c['key'] === 'lastmile') {
+            if (!isset($_awbCalcDone)) { $_lastMileBrl = 0; }
             $vUsd = 0;
-            $vBrl = (float)($lastMileBrl ?? 0);
+            $vBrl = $_lastMileBrl ?? 0;
         }
         $convertidoBrl = ($c['key'] === 'frete') ? ($vUsd * $taxaUsdBrl) : (($c['key'] === 'lastmile') ? $vBrl : totalEmBrl($usd, $brl, $c['key'], $taxaUsdBrl));
         $temAlgo = ($vUsd > 0 || $vBrl > 0);
@@ -236,8 +268,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
     $receitaBruta = $totalTotal;
     $totalDespesas = (float)($despesasResumo['total'] ?? 0);
-    // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + AWB + lastmile + comissões + despesas)
-    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + ($descontosTotal ?? 0) + ($awbTransporteBrl ?? 0) + ($lastMileBrl ?? 0) + ($comissoesTotal ?? 0) + $totalDespesas;
+    // Resultado = Receita - todos os custos
+    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + ($descontosTotal ?? 0) + (($_awbUsd ?? 0) * $taxaUsdBrl) + ($_lastMileBrl ?? 0) + ($comissoesTotal ?? 0) + $totalDespesas;
     $lucroLiquido = $receitaBruta - $totalDeducoes;
     $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
     $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
@@ -266,8 +298,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end"><?= fmtNum($totalImpostoLocal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end"><?= fmtNum($descontosTotal ?? 0) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">AWB & Transporte</td><td class="text-end"><?= fmtNum($awbTransporteBrl ?? 0) ?></td></tr>
-                                    <tr><td class="ps-3 text-muted">Last Mile Brasil</td><td class="text-end"><?= fmtNum($lastMileBrl ?? 0) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">AWB & Transporte</td><td class="text-end"><?= fmtNum(($_awbUsd ?? 0) * $taxaUsdBrl) ?></td></tr>
+                                    <tr><td class="ps-3 text-muted">Last Mile Brasil</td><td class="text-end"><?= fmtNum($_lastMileBrl ?? 0) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Comissões</td><td class="text-end"><?= fmtNum($comissoesTotal ?? 0) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
