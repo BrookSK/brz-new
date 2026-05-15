@@ -194,9 +194,13 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                             $_cp2 = '';
                             foreach (['pais_entrega','pais','country','shipping_country','pais_destino'] as $_k) { if (in_array($_k, $_colsPed, true)) { $_cp2 = $_k; break; } }
                             if ($_cp2) {
-                                $_sq2 = "SELECT COALESCE(SUM(prod.{$_wt} * i.{$_qt}), 0) FROM {$_it} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$_pi} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$_dl} AND UPPER(COALESCE(p.{$_cp2},'')) IN ('BR','BRASIL','BRAZIL')";
+                                $_sq2 = "SELECT COALESCE(SUM(prod.{$_wt} * i.{$_qt}), 0) FROM {$_it} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$_pi} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$_dl} AND UPPER(COALESCE(p.{$_cp2},'')) IN ('BR','BRASIL','BRAZIL','')";
                                 $_st2 = $pdo->prepare($_sq2); $_st2->execute([$dateStart, $dateEnd]);
-                                $_lastMileBrl = (float)($_st2->fetchColumn() ?: 0) * 10.0;
+                                $_pesoBr = (float)($_st2->fetchColumn() ?: 0);
+                                if ($_pesoBr <= 0) $_pesoBr = $_pesoAll;
+                                $_lastMileBrl = $_pesoBr * 10.0;
+                            } else {
+                                $_lastMileBrl = $_pesoAll * 10.0;
                             }
                         }
                     }
