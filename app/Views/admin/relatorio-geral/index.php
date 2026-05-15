@@ -225,8 +225,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
     $receitaBruta = $totalTotal;
     $totalDespesas = (float)($despesasResumo['total'] ?? 0);
-    // Resultado = Receita - todos os custos (produtos + impostos + imposto local + despesas operacionais)
-    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + $totalDespesas;
+    // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + comissões + despesas)
+    $totalDeducoes = $totalSubtotal + $totalImpostos + $totalImpostoLocal + ($descontosTotal ?? 0) + ($comissoesTotal ?? 0) + $totalDespesas;
     $lucroLiquido = $receitaBruta - $totalDeducoes;
     $margemLucro = $receitaBruta > 0 ? round($lucroLiquido / $receitaBruta * 100, 1) : 0;
     $despUsd = (float)($despesasResumo['total_usd'] ?? 0);
@@ -254,6 +254,12 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <tr><td class="ps-3 text-muted">Custo de Produtos</td><td class="text-end"><?= fmtNum($totalSubtotal) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Impostos Brasil</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Custo de Imposto Local</td><td class="text-end"><?= fmtNum($totalImpostoLocal) ?></td></tr>
+                                    <?php if (($descontosTotal ?? 0) > 0): ?>
+                                    <tr><td class="ps-3 text-muted">Descontos e Promoções</td><td class="text-end"><?= fmtNum($descontosTotal) ?></td></tr>
+                                    <?php endif; ?>
+                                    <?php if (($comissoesTotal ?? 0) > 0): ?>
+                                    <tr><td class="ps-3 text-muted">Comissões</td><td class="text-end"><?= fmtNum($comissoesTotal) ?></td></tr>
+                                    <?php endif; ?>
                                     <tr><td class="ps-3 text-muted">Despesas Operacionais</td><td class="text-end fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
                                     <tr><td class="ps-4 text-muted" style="font-size:11px;">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end" style="font-size:11px;">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
