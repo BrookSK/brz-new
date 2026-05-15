@@ -8,8 +8,8 @@ class AdminRelatorioGeralController extends Controller {
     private $db;
 
     /**
-     * Mapa de normaliza├º├úo: status sin├┤nimos ÔåÆ status can├┤nico.
-     * Garante que varia├º├Áes gravadas no banco sejam agrupadas corretamente.
+     * Mapa de normaliza????o: status sin??nimos ??? status can??nico.
+     * Garante que varia????es gravadas no banco sejam agrupadas corretamente.
      */
     private static array $statusSinonimos = [
         'consolidado'       => 'produto_consolidado',
@@ -25,14 +25,14 @@ class AdminRelatorioGeralController extends Controller {
     }
 
     /**
-     * Retorna a lista can├┤nica de status (mesma usada em AdminPedidosController).
+     * Retorna a lista can??nica de status (mesma usada em AdminPedidosController).
      */
     private static function getStatusList(): array {
         return \App\Controllers\AdminPedidosController::getStatusList();
     }
 
     /**
-     * Gera express├úo SQL CASE para normalizar status sin├┤nimos no agrupamento.
+     * Gera express??o SQL CASE para normalizar status sin??nimos no agrupamento.
      */
     private function buildStatusNormalizeExpr(): string {
         $cases = [];
@@ -71,7 +71,7 @@ class AdminRelatorioGeralController extends Controller {
         $colFormaPagamento = $this->pick($cols, ['forma_pagamento','payment_method']);
         $colOrigemPedido = $this->pick($cols, ['origem_pedido']);
 
-        // WHERE ÔÇö excluir status irrelevantes para relat├│rio financeiro
+        // WHERE ??? excluir status irrelevantes para relat??rio financeiro
         $where = ["p.created_at >= :ds", "p.created_at < DATE_ADD(:de, INTERVAL 1 DAY)"];
         $params = [':ds' => $dateStart, ':de' => $dateEnd];
 
@@ -80,18 +80,18 @@ class AdminRelatorioGeralController extends Controller {
             $where[] = "p.deleted_at IS NULL";
         }
 
-        // Filtro por status: considerar sin├┤nimos (suporta m├║ltiplos)
+        // Filtro por status: considerar sin??nimos (suporta m??ltiplos)
         if (!empty($statusFilter)) {
             $sinonimosDoFiltro = [];
             foreach ($statusFilter as $sf) {
                 $sinonimosDoFiltro[] = $sf;
-                // Incluir sin├┤nimos reversos
+                // Incluir sin??nimos reversos
                 foreach (self::$statusSinonimos as $sin => $canonico) {
                     if ($canonico === $sf) {
                         $sinonimosDoFiltro[] = $sin;
                     }
                 }
-                // Se o filtro ├® um sin├┤nimo, incluir o can├┤nico e seus pares
+                // Se o filtro ?? um sin??nimo, incluir o can??nico e seus pares
                 if (isset(self::$statusSinonimos[$sf])) {
                     $canonico = self::$statusSinonimos[$sf];
                     $sinonimosDoFiltro[] = $canonico;
@@ -135,7 +135,7 @@ class AdminRelatorioGeralController extends Controller {
         $stmt->execute($params);
         $totais = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
 
-        // Totais por status (agrupado por status NORMALIZADO + moeda para convers├úo correta)
+        // Totais por status (agrupado por status NORMALIZADO + moeda para convers??o correta)
         $porStatusRaw = [];
         $statusExpr = $this->buildStatusNormalizeExpr();
         $moedaSelect = ($colMoeda !== '') ? ", UPPER(COALESCE(p.{$colMoeda},'USD')) AS moeda" : ", 'USD' AS moeda";
@@ -151,7 +151,7 @@ class AdminRelatorioGeralController extends Controller {
         $stmt2->execute($params);
         $porStatusRaw = $stmt2->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        // Consolidar por status (converter USDÔåÆBRL usando taxa ÔÇö feito na view)
+        // Consolidar por status (converter USD???BRL usando taxa ??? feito na view)
         $porStatus = $porStatusRaw;
 
         // Totais por moeda
@@ -179,13 +179,13 @@ class AdminRelatorioGeralController extends Controller {
             $porPagamento = $stmt4->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         }
 
-        // Status dispon├¡veis para filtro ÔÇö usar lista can├┤nica do sistema
+        // Status dispon??veis para filtro ??? usar lista can??nica do sistema
         $statusList = self::getStatusList();
 
-        // Taxa de convers├úo USDÔåÆBRL do sistema
+        // Taxa de convers??o USD???BRL do sistema
         $taxaUsdBrl = 5.85;
         try {
-            // Usar PedidoManualService que j├í tem a l├│gica robusta de busca
+            // Usar PedidoManualService que j?? tem a l??gica robusta de busca
             $svc = new \App\Services\PedidoManualService();
             $r = $svc->getTaxaConversaoUSDBRL();
             if ($r > 1) {
@@ -223,12 +223,12 @@ class AdminRelatorioGeralController extends Controller {
 
         $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'totaisPorMoedaCards', 'taxaUsdBrl', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList');
 
-        // === INTEGRA├ç├âO DESPESAS ===
+        // === INTEGRA????O DESPESAS ===
         $despesasResumo = ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
         try {
             $stDespExists = $this->db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'despesas'");
             if ((int)$stDespExists->fetchColumn() > 0) {
-                // Total despesas no per├¡odo por moeda (por compet├¬ncia)
+                // Total despesas no per??odo por moeda (por compet??ncia)
                 $stD = $this->db->prepare("SELECT UPPER(COALESCE(moeda,'BRL')) as moeda, COALESCE(SUM(valor),0) as total FROM despesas WHERE competencia >= ? AND competencia <= ? AND status != 'cancelada' AND deleted_at IS NULL GROUP BY UPPER(COALESCE(moeda,'BRL'))");
                 $stD->execute([$dateStart, $dateEnd]);
                 foreach ($stD->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
@@ -238,7 +238,7 @@ class AdminRelatorioGeralController extends Controller {
                 // Total convertido para BRL
                 $despesasResumo['total'] = $despesasResumo['total_brl'] + ($despesasResumo['total_usd'] * $taxaUsdBrl);
 
-                // Pago no per├¡odo por moeda
+                // Pago no per??odo por moeda
                 $stDP = $this->db->prepare("SELECT UPPER(COALESCE(moeda,'BRL')) as moeda, COALESCE(SUM(valor),0) as total FROM despesas WHERE status = 'paga' AND data_pagamento >= ? AND data_pagamento <= ? AND deleted_at IS NULL GROUP BY UPPER(COALESCE(moeda,'BRL'))");
                 $stDP->execute([$dateStart, $dateEnd]);
                 foreach ($stDP->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
@@ -255,7 +255,7 @@ class AdminRelatorioGeralController extends Controller {
                 $stDC = $this->db->prepare("SELECT c.nome as categoria, c.cor, c.grupo, d.moeda, COALESCE(SUM(d.valor),0) as total, COUNT(*) as qtd FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE d.competencia >= ? AND d.competencia <= ? AND d.status != 'cancelada' AND d.deleted_at IS NULL GROUP BY d.categoria_id, d.moeda ORDER BY total DESC");
                 $stDC->execute([$dateStart, $dateEnd]);
                 $rawCats = $stDC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                // Consolidar por categoria convertendo USDÔåÆBRL
+                // Consolidar por categoria convertendo USD???BRL
                 $catMap = [];
                 foreach ($rawCats as $rc) {
                     $catNome = $rc['categoria'] ?? 'Sem categoria';
@@ -272,7 +272,7 @@ class AdminRelatorioGeralController extends Controller {
 
         $data['despesasResumo'] = $despesasResumo;
 
-        // === DRE COMPLETO ÔÇö Concilia├º├úo por Gateway ===
+        // === DRE COMPLETO ??? Concilia????o por Gateway ===
         $dreGateways = [];
         try {
             $stGw = $this->db->prepare("
@@ -296,7 +296,7 @@ class AdminRelatorioGeralController extends Controller {
             $dreGateways = $stGw->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        // Configura├º├Áes DRE (al├¡quotas)
+        // Configura????es DRE (al??quotas)
         $dreConfig = ['imposto_percentual' => 15.0, 'taxa_gateway_percentual' => 0.0];
         try {
             $stCfg = $this->db->query("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('dre_imposto_percentual','dre_taxa_gateway_percentual')");
@@ -309,7 +309,7 @@ class AdminRelatorioGeralController extends Controller {
         $data['dreGateways'] = $dreGateways;
         $data['dreConfig'] = $dreConfig;
 
-        // === DESCONTOS E PROMOÇÕES ===
+        // === DESCONTOS E PROMO??ES ===
         $descontosTotal = 0;
         try {
             $colsProd2 = []; try { $stPr = $this->db->query("DESCRIBE produtos"); $colsProd2 = $stPr ? $stPr->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
@@ -390,6 +390,47 @@ class AdminRelatorioGeralController extends Controller {
             }
         } catch (\Throwable $e) {}
         $data['comissoesTotal'] = $comissoesTotal;
+        // === AWB & TRANSPORTE ===
+        $awbTransporteUsd = 0; $lastMileBrl = 0;
+        try {
+            if (isset($itensTable2) && $itensTable2 && isset($colsIt2) && isset($colsProd2)) {
+                $colPesoCalc = in_array('weight', $colsProd2, true) ? 'weight' : (in_array('peso', $colsProd2, true) ? 'peso' : '');
+                $cQtdCalc = in_array('quantidade', $colsIt2, true) ? 'quantidade' : 'quantidade';
+                $cProdIdCalc = in_array('produto_id', $colsIt2, true) ? 'produto_id' : 'product_id';
+                $delFCalc = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
+                if ($colPesoCalc) {
+                    $sqlAwbCalc = "SELECT COALESCE(SUM(prod.{$colPesoCalc} * i.{$cQtdCalc}), 0) FROM {$itensTable2} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdIdCalc} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$delFCalc}";
+                    $stAwbCalc = $this->db->prepare($sqlAwbCalc);
+                    $stAwbCalc->execute([$dateStart, $dateEnd]);
+                    $pesoTotalCalc = (float)($stAwbCalc->fetchColumn() ?: 0);
+                    $awbTransporteUsd = $pesoTotalCalc * 4.80;
+                    $colPaisCalc = '';
+                    foreach (['pais_entrega','pais','country','shipping_country','pais_destino'] as $cp2) { if (in_array($cp2, $cols, true)) { $colPaisCalc = $cp2; break; } }
+                    if ($colPaisCalc) {
+                        $sqlLmCalc = "SELECT COALESCE(SUM(prod.{$colPesoCalc} * i.{$cQtdCalc}), 0) FROM {$itensTable2} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdIdCalc} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$delFCalc} AND UPPER(COALESCE(p.{$colPaisCalc},'')) IN ('BR','BRASIL','BRAZIL')";
+                        $stLmCalc = $this->db->prepare($sqlLmCalc);
+                        $stLmCalc->execute([$dateStart, $dateEnd]);
+                        $lastMileBrl = (float)($stLmCalc->fetchColumn() ?: 0) * 10.0;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+        $data['awbTransporteUsd'] = $awbTransporteUsd;
+        $data['awbTransporteBrl'] = $awbTransporteUsd * $taxaUsdBrl;
+        $data['lastMileBrl'] = $lastMileBrl;
+
+        require_once __DIR__ . '/_dre_helpers.php';
+        $dreCalcs = calcularAwbELastMile($this->db, $cols, $dateStart, $dateEnd, $taxaUsdBrl);
+        $data['awbTransporteUsd'] = $dreCalcs['awbTransporteUsd'];
+        $data['awbTransporteBrl'] = $dreCalcs['awbTransporteBrl'];
+        $data['lastMileBrl'] = $dreCalcs['lastMileBrl'];
+
+        require_once __DIR__ . '/_dre_helpers.php';
+        $dreCalcs = calcularAwbELastMile($this->db, $cols, $dateStart, $dateEnd, $taxaUsdBrl);
+        $data['awbTransporteUsd'] = $dreCalcs['awbTransporteUsd'];
+        $data['awbTransporteBrl'] = $dreCalcs['awbTransporteBrl'];
+        $data['lastMileBrl'] = $dreCalcs['lastMileBrl'];
+
         extract($data);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -397,7 +438,7 @@ class AdminRelatorioGeralController extends Controller {
         require __DIR__ . '/../Views/admin/relatorio-geral/index.php';
         $content = ob_get_clean();
 
-        $title = 'Relat├│rio Geral';
+        $title = 'Relat??rio Geral';
         include __DIR__ . '/../Views/layouts/admin.php';
     }
 
