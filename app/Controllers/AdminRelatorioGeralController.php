@@ -333,6 +333,26 @@ class AdminRelatorioGeralController extends Controller {
             }
         } catch (\Throwable $e) {}
         $data['descontosTotal'] = $descontosTotal;
+
+        // === AWB & TRANSPORTE (peso total * $4.80/kg) ===
+        $awbTransporteUsd = 0;
+        try {
+            if (isset($itensTable2) && $itensTable2) {
+                $colPesoP = in_array('weight', $colsProd2 ?? [], true) ? 'weight' : (in_array('peso', $colsProd2 ?? [], true) ? 'peso' : '');
+                $cQtdAwb = in_array('quantidade', $colsIt2 ?? [], true) ? 'quantidade' : 'quantidade';
+                $cProdIdAwb = in_array('produto_id', $colsIt2 ?? [], true) ? 'produto_id' : 'product_id';
+                $delFAwb = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
+                if ($colPesoP) {
+                    $sqlAwb = "SELECT COALESCE(SUM(prod.{$colPesoP} * i.{$cQtdAwb}), 0) FROM {$itensTable2} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdIdAwb} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$delFAwb}";
+                    $stAwb = $this->db->prepare($sqlAwb);
+                    $stAwb->execute([$dateStart, $dateEnd]);
+                    $pesoTotal = (float)($stAwb->fetchColumn() ?: 0);
+                    $awbTransporteUsd = $pesoTotal * 4.80;
+                }
+            }
+        } catch (\Throwable $e) {}
+        $data['awbTransporteUsd'] = $awbTransporteUsd;
+        $data['awbTransporteBrl'] = $awbTransporteUsd * $taxaUsdBrl;
         $comissoesTotal = 0;
         try {
             $stCom = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='comissoes_processamento'");

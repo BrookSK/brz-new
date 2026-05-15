@@ -379,8 +379,29 @@ class AdminDreCompletoController extends Controller {
         $totalCustoImpostosBr = $totalCustoImpostosBrBrl + ($totalCustoImpostosBrUsd * $taxaUsdBrl);
         $totalCustoImpostoLocal = $totalCustoImpostoLocalBrl + ($totalCustoImpostoLocalUsd * $taxaUsdBrl);
         $totalTaxaServico = $totalTaxaServicoBrl + ($totalTaxaServicoUsd * $taxaUsdBrl);
-        // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + comissões + despesas)
-        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalComissoes + $totalDespesas;
+        // Resultado = Receita - todos os custos (produtos + impostos + imposto local + descontos + AWB + comissões + despesas)
+        // === AWB & TRANSPORTE (peso total * $4.80/kg) ===
+        $totalAwbUsd = 0;
+        try {
+            if ($itensTable) {
+                $colPesoP = in_array('weight', $cols, true) ? 'weight' : (in_array('peso', $cols, true) ? 'peso' : '');
+                $colsProdAwb = [];
+                try { $stPrAwb = $this->db->query("DESCRIBE produtos"); $colsProdAwb = $stPrAwb ? $stPrAwb->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                if (!$colPesoP) $colPesoP = in_array('weight', $colsProdAwb, true) ? 'weight' : (in_array('peso', $colsProdAwb, true) ? 'peso' : '');
+                $cQtdAwb = in_array('quantidade', $colsItens ?? [], true) ? 'quantidade' : 'quantidade';
+                $cProdIdAwb = in_array('produto_id', $colsItens ?? [], true) ? 'produto_id' : 'product_id';
+                if ($colPesoP) {
+                    $sqlAwb = "SELECT COALESCE(SUM(prod.{$colPesoP} * i.{$cQtdAwb}), 0) FROM {$itensTable} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdIdAwb} WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY) AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses} {$deletedFilter}";
+                    $stAwb = $this->db->prepare($sqlAwb);
+                    $stAwb->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                    $pesoTotal = (float)($stAwb->fetchColumn() ?: 0);
+                    $totalAwbUsd = $pesoTotal * 4.80;
+                }
+            }
+        } catch (\Throwable $e) {}
+        $totalAwbBrl = $totalAwbUsd * $taxaUsdBrl;
+
+        $totalDeducoes = $totalCustoProdutos + $totalCustoImpostosBr + $totalCustoImpostoLocal + $totalDescontos + $totalAwbBrl + $totalComissoes + $totalDespesas;
         $resultado = $totalEntradas - $totalDeducoes;
         // === CONCILIAÇÃO ===
         $conciliacao = [
@@ -464,6 +485,8 @@ class AdminDreCompletoController extends Controller {
                 'custo_imposto_local' => $totalCustoImpostoLocal,
                 'taxa_servico' => $totalTaxaServico,
                 'total_descontos' => $totalDescontos,
+                'total_awb' => $totalAwbBrl,
+                'total_awb_usd' => $totalAwbUsd,
                 'total_comissoes' => $totalComissoes,
                 'total_despesas' => $totalDespesas,
                 'total_despesas_brl' => $totalDespBrl,
