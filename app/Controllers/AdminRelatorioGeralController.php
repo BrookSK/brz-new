@@ -309,6 +309,45 @@ class AdminRelatorioGeralController extends Controller {
         $data['dreGateways'] = $dreGateways;
         $data['dreConfig'] = $dreConfig;
 
+        // === DESCONTOS E PROMOÇÕES ===
+        $descontosTotal = 0;
+        try {
+            $colsProd2 = []; try { $stPr = $this->db->query("DESCRIBE produtos"); $colsProd2 = $stPr ? $stPr->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $cPrice2 = in_array('price', $colsProd2, true) ? 'price' : (in_array('valor', $colsProd2, true) ? 'valor' : '');
+            $hasSalePrice2 = in_array('sale_price', $colsProd2, true);
+            if ($cPrice2 && $hasSalePrice2) {
+                $itensTable2 = null;
+                try { $this->db->query("SELECT 1 FROM pedido_itens LIMIT 1"); $itensTable2 = 'pedido_itens'; } catch (\Exception $e) {
+                    try { $this->db->query("SELECT 1 FROM pedido_items LIMIT 1"); $itensTable2 = 'pedido_items'; } catch (\Exception $e2) {}
+                }
+                if ($itensTable2) {
+                    $colsIt2 = []; try { $stI2 = $this->db->query("DESCRIBE {$itensTable2}"); $colsIt2 = $stI2 ? $stI2->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $cQtd2 = in_array('quantidade', $colsIt2, true) ? 'quantidade' : 'qty';
+                    $cProdId2 = in_array('produto_id', $colsIt2, true) ? 'produto_id' : 'product_id';
+                    $delF2 = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
+                    $sqlD2 = "SELECT COALESCE(SUM((prod.{$cPrice2} - prod.sale_price) * i.{$cQtd2}), 0) FROM {$itensTable2} i INNER JOIN pedidos p ON p.id = i.pedido_id INNER JOIN produtos prod ON prod.id = i.{$cProdId2} WHERE p.created_at >= ? AND p.created_at < DATE_ADD(?, INTERVAL 1 DAY) AND LOWER(COALESCE(p.status,'')) NOT IN ('apagado','deleted','lixeira','trash','cancelado','cancelled') {$delF2} AND prod.sale_price > 0 AND prod.{$cPrice2} > prod.sale_price";
+                    $stD2 = $this->db->prepare($sqlD2);
+                    $stD2->execute([$dateStart, $dateEnd]);
+                    $descontosTotal = (float)($stD2->fetchColumn() ?: 0);
+                }
+            }
+        } catch (\Throwable $e) {}
+        $data['descontosTotal'] = $descontosTotal;
+        $comissoesTotal = 0;
+        try {
+            $stCom = $this->db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='comissoes_processamento'");
+            $stCom->execute();
+            if ((int)($stCom->fetchColumn() ?: 0) > 0) {
+                $stComV = $this->db->prepare("SELECT moeda, SUM(valor_comissao) AS tc FROM comissoes_processamento WHERE DATE(created_at) >= ? AND DATE(created_at) <= ? GROUP BY moeda");
+                $stComV->execute([$dateStart, $dateEnd]);
+                foreach ($stComV->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    $com = (float)($r['tc'] ?? 0);
+                    if (strtoupper(trim($r['moeda'] ?? 'BRL')) === 'USD') $com *= $taxaUsdBrl;
+                    $comissoesTotal += $com;
+                }
+            }
+        } catch (\Throwable $e) {}
+        $data['comissoesTotal'] = $comissoesTotal;
         extract($data);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
