@@ -1897,17 +1897,30 @@ function regerarEtiqueta() {
         }
 
         $end = $pedido['endereco'] ?? [];
-        $cep = preg_replace('/\D+/', '', (string) ($end['cep'] ?? ''));
-        $addr1 = trim((string) ($end['endereco'] ?? ($end['logradouro'] ?? '')));
+        // Se 'endereco' é uma string (logradouro) e não um sub-array, montar a partir dos campos do pedido
+        if (!is_array($end)) {
+            $end = [
+                'cep' => $pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''),
+                'logradouro' => $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''),
+                'endereco' => $pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''),
+                'numero' => $pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''),
+                'complemento' => $pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''),
+                'bairro' => $pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''),
+                'cidade' => $pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''),
+                'estado' => $pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''),
+            ];
+        }
+        $cep = preg_replace('/\D+/', '', (string) ($end['cep'] ?? ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''))));
+        $addr1 = trim((string) ($end['endereco'] ?? ($end['logradouro'] ?? ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? '')))));
         $addr2Parts = [];
-        $compl = trim((string) ($end['complemento'] ?? ''));
-        $bairro = trim((string) ($end['bairro'] ?? ''));
+        $compl = trim((string) ($end['complemento'] ?? ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''))));
+        $bairro = trim((string) ($end['bairro'] ?? ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''))));
         if ($compl !== '') $addr2Parts[] = $compl;
         if ($bairro !== '') $addr2Parts[] = $bairro;
         $addr2 = trim(implode(', ', $addr2Parts));
-        $numero = trim((string) ($end['numero'] ?? ''));
-        $cidade = (string) ($end['cidade'] ?? '');
-        $estado = (string) ($end['estado'] ?? '');
+        $numero = trim((string) ($end['numero'] ?? ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''))));
+        $cidade = (string) ($end['cidade'] ?? ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? '')));
+        $estado = (string) ($end['estado'] ?? ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? '')));
 
         $itens = $pedido['itens'] ?? [];
         $items = [];
