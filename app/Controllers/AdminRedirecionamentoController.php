@@ -1669,20 +1669,28 @@ class AdminRedirecionamentoController extends Controller {
     }
 
     private function gerarEtiquetaCorreios(\PDO $db, array $envio, array $produtos, int $envioId): array {
-        // Buscar configuração dos Correios
+        // Buscar configuração dos Correios (Pré-Postagem v3)
         try {
             $ambiente = 'homologacao';
             $token = '';
+            $codigoServico = '';
+            $senderJson = '';
             try {
-                $stCfg = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('correios_prepostagem_token','sigep_ambiente') LIMIT 10");
+                $stCfg = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('correios_prepostagem_token','sigep_ambiente','correios_prepostagem_codigo_servico','correios_prepostagem_sender_json','correios_prepostagem_id_correios') LIMIT 10");
                 $stCfg->execute();
                 $cfgs = $stCfg->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
                 $token = (string) ($cfgs['correios_prepostagem_token'] ?? '');
                 $ambiente = (string) ($cfgs['sigep_ambiente'] ?? 'homologacao');
+                $codigoServico = trim((string) ($cfgs['correios_prepostagem_codigo_servico'] ?? ''));
+                $senderJson = trim((string) ($cfgs['correios_prepostagem_sender_json'] ?? ''));
             } catch (\Exception $e) {}
 
             if ($token === '') {
                 return ['ok' => false, 'msg' => 'Correios Pré-Postagem não configurado (token ausente).'];
+            }
+
+            if ($codigoServico === '') {
+                return ['ok' => false, 'msg' => 'Correios Pré-Postagem: código do serviço não configurado. Vá em Configurações > Entrega e preencha o campo "Código do serviço (Pré-Postagem)".'];
             }
 
             $baseUrl = ($ambiente === 'producao' || $ambiente === 'production')
@@ -1694,7 +1702,22 @@ class AdminRedirecionamentoController extends Controller {
             return ['ok' => false, 'msg' => 'Correios não configurado: ' . $e->getMessage()];
         }
 
-        // Montar dados para Correios (simplificado — reutiliza a mesma lógica do admin)
+        // Remetente (JSON configurado no admin)
+        $sender = [];
+        if ($senderJson !== '') {
+            $sender = json_decode($senderJson, true);
+            if (!is_array($sender)) $sender = [];
+            // Remover campos que a API não aceita
+            unset($sender['pais'], $sender['canalExternoOrigem']);
+            if (isset($sender['endereco']) && is_array($sender['endereco'])) {
+                unset($sender['endereco']['pais']);
+            }
+        }
+        if (empty($sender)) {
+            return ['ok' => false, 'msg' => 'Correios Pré-Postagem: remetente não configurado. Vá em Configurações > Entrega e preencha o JSON do remetente.'];
+        }
+
+        // Montar dados do destinatário
         $nome = trim((string) ($envio['destinatario_nome'] ?? ''));
         $cep = preg_replace('/\D+/', '', (string) ($envio['dest_cep'] ?? ''));
         $endereco = trim((string) ($envio['dest_logradouro'] ?? ''));
@@ -1705,38 +1728,124 @@ class AdminRedirecionamentoController extends Controller {
         $estado = trim((string) ($envio['dest_estado'] ?? ''));
         $cpf = preg_replace('/\D+/', '', (string) ($envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? '')));
 
+        $telefone = preg_replace('/\D+/', '', (string) ($envio['destinatario_telefone'] ?? ($envio['cliente_telefone'] ?? '')));
+        $ddd = '';
+        $telefone8 = '';
+        if (strlen($telefone) >= 10) {
+            $ddd = substr($telefone, 0, 2);
+            $telefone8 = substr($telefone, 2, 8);
+        }
+
+        $destinatario = [
+            'nome' => $nome,
+            'cpfCnpj' => $cpf,
+            'email' => trim((string) ($envio['destinatario_email'] ?? ($envio['cliente_email'] ?? ''))),
+            'dddTelefone' => $ddd,
+            'telefone' => $telefone8,
+            'endereco' => [
+                'cep' => $cep,
+                'logradouro' => $endereco,
+                'numero' => $numero,
+                'complemento' => $complemento,
+                'bairro' => $bairro,
+                'cidade' => $cidade,
+                'uf' => $estado,
+                'regiao' => '',
+            ],
+        ];
+
         $pesoGramas = (int) (((float) ($envio['peso_kg'] ?? 1)) * 1000);
         if ($pesoGramas <= 0) $pesoGramas = 1000;
 
+        $altura = (int) round((float) ($envio['altura_cm'] ?? 10));
+        $largura = (int) round((float) ($envio['largura_cm'] ?? 10));
+        $comprimento = (int) round((float) ($envio['comprimento_cm'] ?? 15));
+        if ($altura <= 0) $altura = 10;
+        if ($largura <= 0) $largura = 10;
+        if ($comprimento <= 0) $comprimento = 15;
+
+        // Itens para declaração de conteúdo
+        $itensDeclaracao = [];
+        $idx = 0;
+        foreach ($produtos as $p) {
+            $idx++;
+            $qtd = (int) ($p['quantidade'] ?? 1);
+            if ($qtd <= 0) $qtd = 1;
+            $nomeItem = trim((string) ($p['descricao'] ?? 'Item ' . $idx));
+            $ncm = preg_replace('/\D+/', '', (string) ($p['ncm'] ?? ''));
+            $valor = (float) ($p['preco_usd'] ?? 0);
+            if ($valor <= 0) $valor = 1.00;
+
+            $item = [
+                'conteudo' => substr($nomeItem, 0, 60),
+                'quantidade' => (string) $qtd,
+                'valor' => number_format($valor, 2, '.', ''),
+            ];
+            if ($ncm !== '' && strlen($ncm) >= 8) {
+                $item['ncm'] = $ncm;
+            }
+            $itensDeclaracao[] = $item;
+        }
+
+        // Montar payload completo para Pré-Postagem v3
+        $payload = [
+            'remetente' => $sender,
+            'destinatario' => $destinatario,
+            'codigoServico' => $codigoServico,
+            'pesoInformado' => (string) $pesoGramas,
+            'codigoFormatoObjetoInformado' => '2', // caixa/pacote
+            'alturaInformada' => (string) $altura,
+            'larguraInformada' => (string) $largura,
+            'comprimentoInformado' => (string) $comprimento,
+            'cienteObjetoNaoProibido' => '1',
+            'solicitarColeta' => 'N',
+            'observacao' => 'Redirecionamento #' . $envioId,
+        ];
+
+        if (!empty($itensDeclaracao)) {
+            $payload['itensDeclaracaoConteudo'] = $itensDeclaracao;
+        }
+
+        // idCorreios opcional
+        $idCorreios = trim((string) ($cfgs['correios_prepostagem_id_correios'] ?? ''));
+        if ($idCorreios !== '') {
+            $payload['idCorreios'] = $idCorreios;
+        }
+
         try {
-            $result = $svc->criarPrePostagem([
-                'destinatario' => [
-                    'nome' => $nome,
-                    'cpf' => $cpf,
-                    'endereco' => $endereco,
-                    'numero' => $numero,
-                    'complemento' => $complemento,
-                    'bairro' => $bairro,
-                    'cidade' => $cidade,
-                    'uf' => $estado,
-                    'cep' => $cep,
-                ],
-                'peso' => $pesoGramas,
-                'largura' => (int) (((float) ($envio['largura_cm'] ?? 10)) * 10), // mm
-                'altura' => (int) (((float) ($envio['altura_cm'] ?? 10)) * 10),
-                'comprimento' => (int) (((float) ($envio['comprimento_cm'] ?? 15)) * 10),
-            ]);
+            $result = $svc->criarPrePostagem($payload);
         } catch (\Exception $e) {
-            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios', etiqueta_response_json=? WHERE id=?")
-                ->execute([json_encode(['error' => $e->getMessage()]), $envioId]);
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios', etiqueta_request_json=?, etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($payload), json_encode(['error' => $e->getMessage()]), $envioId]);
             return ['ok' => false, 'msg' => 'Erro Correios: ' . $e->getMessage()];
         }
 
-        $tracking = (string) ($result['codigo_rastreio'] ?? ($result['tracking'] ?? ''));
-        $labelUrl = (string) ($result['label_url'] ?? ($result['etiqueta_url'] ?? ''));
+        // Salvar request para debug
+        $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios', etiqueta_request_json=? WHERE id=?")
+            ->execute([json_encode($payload), $envioId]);
+
+        // Verificar se a API retornou sucesso
+        if (!($result['success'] ?? false)) {
+            $errorMsg = (string) ($result['error'] ?? 'Erro desconhecido');
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($result), $envioId]);
+            return ['ok' => false, 'msg' => 'Erro Correios: ' . $errorMsg];
+        }
+
+        $data = $result['data'] ?? $result;
+        $tracking = (string) ($data['codigoObjeto'] ?? ($data['codigo_rastreio'] ?? ($data['tracking'] ?? '')));
+        $labelUrl = (string) ($data['label_url'] ?? ($data['etiqueta_url'] ?? ''));
+        $idPrePostagem = (string) ($data['id'] ?? '');
 
         if ($tracking === '') {
-            return ['ok' => false, 'msg' => 'Correios não retornou código de rastreio.'];
+            // Tentar extrair de outros campos possíveis
+            $tracking = (string) ($data['objetoPostal'] ?? '');
+        }
+
+        if ($tracking === '') {
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($result), $envioId]);
+            return ['ok' => false, 'msg' => 'Correios não retornou código de rastreio. Resposta: ' . json_encode($data)];
         }
 
         $db->prepare("UPDATE redirecionamento_envios SET
@@ -1752,7 +1861,7 @@ class AdminRedirecionamentoController extends Controller {
             ->execute([
                 $tracking,
                 $labelUrl ?: null,
-                json_encode($result['request'] ?? []),
+                json_encode($payload),
                 json_encode($result),
                 (int) ($_SESSION['usuario_id'] ?? 0),
                 $envioId,
@@ -1762,7 +1871,7 @@ class AdminRedirecionamentoController extends Controller {
             'ok' => true,
             'tracking' => $tracking,
             'label_url' => $labelUrl,
-            'msg' => 'Etiqueta gerada com sucesso!',
+            'msg' => 'Etiqueta gerada com sucesso! Código: ' . $tracking,
         ];
     }
 
