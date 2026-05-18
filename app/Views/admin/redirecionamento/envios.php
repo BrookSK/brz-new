@@ -96,7 +96,19 @@ $statusLabels = [
                             <td>US$ <?= number_format((float)($e['valor_cobrado_usd']??0),2,',','.') ?></td>
                             <td><span class="badge bg-<?= $pagColor ?> bg-opacity-10 text-<?= $pagColor ?> border border-<?= $pagColor ?> border-opacity-25"><?= $pagLabel ?></span></td>
                             <td><span class="badge bg-<?= $sc ?> bg-opacity-10 text-<?= $sc ?> border border-<?= $sc ?> border-opacity-25"><?= $sl ?></span></td>
-                            <td><?= htmlspecialchars($e['tracking_code']??'',ENT_QUOTES,'UTF-8') ?></td>
+                            <td>
+                                <?= htmlspecialchars($e['tracking_code']??'',ENT_QUOTES,'UTF-8') ?>
+                                <?php if (!empty($e['etiqueta_request_json'])):
+                                    $__rd = json_decode($e['etiqueta_request_json'], true);
+                                    $__cs = (string) ($__rd['codigoServico'] ?? ($__rd['service_code'] ?? ''));
+                                    $__ms = ['03220'=>'SEDEX','04162'=>'SEDEX','04014'=>'SEDEX','03298'=>'PAC','04510'=>'PAC','41106'=>'PAC','03158'=>'SEDEX 10','03140'=>'SEDEX 12','03204'=>'SEDEX Hoje'];
+                                    $__lb = $__ms[$__cs] ?? '';
+                                    if ($__lb !== ''):
+                                        $__bc = (stripos($__lb,'SEDEX')!==false)?'danger':'primary';
+                                ?>
+                                <span class="badge bg-<?= $__bc ?> ms-1" style="font-size:.65rem"><?= $__lb ?></span>
+                                <?php endif; endif; ?>
+                            </td>
                             <td class="pe-3">
                                 <a class="btn btn-xs btn-outline-primary" href="/admin/redirecionamento/envios/<?= (int)$e['id'] ?>" style="font-size:.75rem;padding:2px 8px">Ver</a>
                             </td>

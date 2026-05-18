@@ -135,6 +135,27 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
                         <?php if (!empty($envio['etiqueta_provedor'])): ?>
                         <span class="badge bg-info ms-2"><?= strtoupper($envio['etiqueta_provedor']) ?></span>
                         <?php endif; ?>
+                        <?php
+                        // Detectar tipo de serviço (SEDEX/PAC) pelo código usado na etiqueta
+                        $__servicoLabel = '';
+                        $__servicoBadge = 'secondary';
+                        if (!empty($envio['etiqueta_request_json'])) {
+                            $__reqData = json_decode($envio['etiqueta_request_json'], true);
+                            $__codSvc = (string) ($__reqData['codigoServico'] ?? ($__reqData['service_code'] ?? ''));
+                            if ($__codSvc !== '') {
+                                $__mapServicos = [
+                                    '03220' => 'SEDEX', '04162' => 'SEDEX', '04014' => 'SEDEX',
+                                    '03298' => 'PAC', '04510' => 'PAC', '41106' => 'PAC',
+                                    '03158' => 'SEDEX 10', '03140' => 'SEDEX 12', '03204' => 'SEDEX Hoje',
+                                ];
+                                $__servicoLabel = $__mapServicos[$__codSvc] ?? ('Cód: ' . $__codSvc);
+                                $__servicoBadge = (stripos($__servicoLabel, 'SEDEX') !== false) ? 'danger' : 'primary';
+                            }
+                        }
+                        ?>
+                        <?php if ($__servicoLabel !== ''): ?>
+                        <span class="badge bg-<?= $__servicoBadge ?> ms-1"><?= $__servicoLabel ?></span>
+                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
 
