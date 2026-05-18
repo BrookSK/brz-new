@@ -1910,6 +1910,44 @@ function regerarEtiqueta() {
                 'estado' => $pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''),
             ];
         }
+
+        // Fallback: se endereço ainda vazio, buscar da tabela enderecos pelo usuario_id
+        $endCep = trim((string) ($end['cep'] ?? ''));
+        $endAddr = trim((string) ($end['endereco'] ?? ($end['logradouro'] ?? '')));
+        if (($endCep === '' || $endAddr === '') && $this->tableExists('enderecos')) {
+            $uid = (int) ($pedido['usuario_id'] ?? 0);
+            $endEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
+            if ($uid > 0 || $endEntregaId > 0) {
+                try {
+                    $sqlEnd = '';
+                    $paramsEnd = [];
+                    if ($endEntregaId > 0) {
+                        $sqlEnd = 'SELECT * FROM enderecos WHERE id = ? LIMIT 1';
+                        $paramsEnd = [$endEntregaId];
+                    } else {
+                        // Buscar endereço principal ou mais recente do usuário
+                        $sqlEnd = 'SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1';
+                        $paramsEnd = [$uid];
+                    }
+                    $stEnd = $this->connection->prepare($sqlEnd);
+                    $stEnd->execute($paramsEnd);
+                    $rowEnd = $stEnd->fetch(\PDO::FETCH_ASSOC);
+                    if (is_array($rowEnd) && !empty($rowEnd)) {
+                        $end = [
+                            'cep' => $rowEnd['cep'] ?? '',
+                            'logradouro' => $rowEnd['endereco'] ?? ($rowEnd['logradouro'] ?? ''),
+                            'endereco' => $rowEnd['endereco'] ?? ($rowEnd['logradouro'] ?? ''),
+                            'numero' => $rowEnd['numero'] ?? '',
+                            'complemento' => $rowEnd['complemento'] ?? '',
+                            'bairro' => $rowEnd['bairro'] ?? '',
+                            'cidade' => $rowEnd['cidade'] ?? '',
+                            'estado' => $rowEnd['estado'] ?? ($rowEnd['uf'] ?? ''),
+                        ];
+                    }
+                } catch (\Exception $e) {}
+            }
+        }
+
         $cep = preg_replace('/\D+/', '', (string) ($end['cep'] ?? ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''))));
         $addr1 = trim((string) ($end['endereco'] ?? ($end['logradouro'] ?? ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? '')))));
         $addr2Parts = [];
