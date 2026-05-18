@@ -109,6 +109,7 @@ $router->get('/admin/correios-mundial', 'AdminCorreiosMundialController', 'index
 $router->get('/admin/correios-mundial/balance', 'AdminCorreiosMundialController', 'balance');
 $router->get('/admin/correios-mundial/pedido/{id}', 'AdminCorreiosMundialController', 'pedido');
 $router->post('/admin/correios-mundial/pedido/{id}/gerar-etiqueta', 'AdminCorreiosMundialController', 'gerarEtiqueta');
+$router->post('/admin/correios-mundial/pedido/{id}/regerar-etiqueta', 'AdminCorreiosMundialController', 'regerarEtiqueta');
 
 // Containers / Unitizadores
 $router->get('/admin/correios-mundial/containers', 'AdminCorreiosMundialController', 'containers');

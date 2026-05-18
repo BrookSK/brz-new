@@ -721,11 +721,25 @@ class AdminCorreiosMundialController extends Controller {
         }
         $pesoGramas = (int) max(1, round($pesoKg * 1000));
 
+        // Usar valores salvos no pedido se disponíveis, senão calcular dos itens
+        $pesoSalvo = isset($pedido['peso_total']) && is_numeric($pedido['peso_total']) && (float) $pedido['peso_total'] > 0
+            ? (int) round((float) $pedido['peso_total'] * 1000)
+            : $pesoGramas;
+        $comprimentoSalvo = isset($pedido['comprimento']) && is_numeric($pedido['comprimento']) && (float) $pedido['comprimento'] > 0
+            ? (float) $pedido['comprimento']
+            : 16;
+        $larguraSalva = isset($pedido['largura']) && is_numeric($pedido['largura']) && (float) $pedido['largura'] > 0
+            ? (float) $pedido['largura']
+            : 11;
+        $alturaSalva = isset($pedido['altura']) && is_numeric($pedido['altura']) && (float) $pedido['altura'] > 0
+            ? (float) $pedido['altura']
+            : 2;
+
         $defaults = [
-            'totalWeight' => $pesoGramas,
-            'packagingLength' => 16,
-            'packagingWidth' => 11,
-            'packagingHeight' => 2,
+            'totalWeight' => $pesoSalvo,
+            'packagingLength' => $comprimentoSalvo,
+            'packagingWidth' => $larguraSalva,
+            'packagingHeight' => $alturaSalva,
         ];
 
         $this->view('admin/correios-mundial-pedido', [
@@ -1051,6 +1065,41 @@ class AdminCorreiosMundialController extends Controller {
             'pedido_id' => $id,
             'tracking_number' => $tracking,
         ]);
+    }
+
+    /**
+     * Regerar etiqueta PACKET: deleta a existente e gera nova com medidas atuais do formulário
+     */
+    public function regerarEtiqueta(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $id = (int) $request->getParam('id');
+        if ($id <= 0) {
+            $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
+            return;
+        }
+
+        $this->ensurePacketEtiquetasTable();
+
+        // Deletar etiqueta existente
+        try {
+            $stDel = $this->connection->prepare('DELETE FROM correios_packet_etiquetas WHERE pedido_id = ?');
+            $stDel->execute([$id]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao deletar etiqueta anterior: ' . $e->getMessage()], 500);
+            return;
+        }
+
+        // Reverter status do pedido para permitir nova geração
+        try {
+            $pedidoModel = new PedidoEcommerce();
+            $pedidoModel->atualizarStatus($id, 'produto_consolidado', 'Etiqueta PACKET deletada para regeração', $_SESSION['usuario_id'] ?? null);
+        } catch (\Exception $e) {
+        }
+
+        // Agora gerar nova etiqueta usando o mesmo fluxo
+        $this->gerarEtiqueta($request);
     }
 
     private function cmFmtUsd($v): string {

@@ -90,8 +90,9 @@ $nonNatLabel = [
     <?php if (!empty($existingEtiqueta) && is_array($existingEtiqueta) && !empty($existingEtiqueta['tracking_number'])): ?>
         <div class="alert alert-success">
             Etiqueta já gerada. Rastreio: <strong><?= htmlspecialchars((string) $existingEtiqueta['tracking_number']) ?></strong>
-            <div class="mt-2">
+            <div class="mt-2 d-flex gap-2 flex-wrap">
                 <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/etiqueta/<?= rawurlencode((string) $existingEtiqueta['tracking_number']) ?>.pdf" target="_blank">Baixar etiqueta (PDF)</a>
+                <button class="btn btn-sm btn-outline-warning" type="button" onclick="regerarEtiquetaPacket()"><i class="fas fa-redo me-1"></i>Regerar etiqueta (com medidas atuais)</button>
             </div>
         </div>
     <?php endif; ?>
@@ -323,6 +324,39 @@ function gerarEtiqueta(){
         setErr(msg);
     })
     .catch(err => setErr(err.message || 'Falha ao gerar etiqueta'));
+}
+
+function regerarEtiquetaPacket(){
+    if(!confirm('Isso vai DELETAR a etiqueta atual e gerar uma nova com as medidas atuais do formulário. Continuar?')) return;
+
+    setErr('');
+    setOk('');
+
+    const body = {
+        totalWeight: document.getElementById('totalWeight').value,
+        packagingLength: document.getElementById('packagingLength').value,
+        packagingWidth: document.getElementById('packagingWidth').value,
+        packagingHeight: document.getElementById('packagingHeight').value,
+        freightPaidValue: document.getElementById('freightPaidValue').value,
+        insurancePaidValue: document.getElementById('insurancePaidValue').value,
+    };
+
+    fetch('/admin/correios-mundial/pedido/<?= (int) ($pedido["id"] ?? 0) ?>/regerar-etiqueta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json().catch(() => ({})).then(data => ({ok: r.ok, data})))
+    .then(({ok, data}) => {
+        if(ok && data && data.success){
+            setOk('Etiqueta regerada. Novo rastreio: ' + (data.tracking_number || ''));
+            setTimeout(() => location.reload(), 600);
+            return;
+        }
+        const msg = (data && (data.error || data.message)) ? (data.error || data.message) : 'Falha ao regerar etiqueta';
+        setErr(msg);
+    })
+    .catch(err => setErr(err.message || 'Falha ao regerar etiqueta'));
 }
 </script>
 
