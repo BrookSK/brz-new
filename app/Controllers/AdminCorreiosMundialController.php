@@ -244,6 +244,18 @@ class AdminCorreiosMundialController extends Controller {
         return (string) $v;
     }
 
+    private function getUsdToBrlRate(): float {
+        try {
+            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                $stCfg = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+                $stCfg->execute([$k]);
+                $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0'));
+                if ($v > 1.01) return $v;
+            }
+        } catch (\Exception $e) {}
+        return 5.85;
+    }
+
     private function packetFriendlyError(string $msg, $raw = null): string {
         $m = trim((string) $msg);
         $mUpper = strtoupper($m);
@@ -935,6 +947,14 @@ class AdminCorreiosMundialController extends Controller {
             return;
         }
 
+        // Detectar moeda do pedido para conversão BRL→USD
+        $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        $brlToUsdRate = 1.0;
+        if ($moedaPedido === 'BRL') {
+            $usdRate = $this->getUsdToBrlRate();
+            $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+        }
+
         $items = [];
         $sumItems = 0.0;
         $idx = 0;
@@ -957,6 +977,10 @@ class AdminCorreiosMundialController extends Controller {
             $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
 
             $val = (float) ($it['preco_unitario'] ?? 0);
+            // Se pedido em BRL, converter para USD
+            if ($moedaPedido === 'BRL' && $val > 0) {
+                $val = $val * $brlToUsdRate;
+            }
             if ($val < 0.01) {
                 $this->json(['success' => false, 'error' => 'Item #' . $idx . ' com valor inválido'], 400);
                 return;
