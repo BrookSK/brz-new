@@ -210,16 +210,16 @@ $nonNatLabel = [
                             <input class="form-control" id="totalWeight" type="number" min="1" max="30000" step="1" value="<?= htmlspecialchars((string) ($defaults['totalWeight'] ?? '')) ?>">
                         </div>
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Comprimento (cm)</label>
-                            <input class="form-control" id="packagingLength" type="number" min="16" max="100" step="0.01" value="<?= htmlspecialchars((string) ($defaults['packagingLength'] ?? '')) ?>">
-                        </div>
-                        <div class="col-md-3 mb-3">
                             <label class="form-label">Largura (cm)</label>
                             <input class="form-control" id="packagingWidth" type="number" min="11" max="100" step="0.01" value="<?= htmlspecialchars((string) ($defaults['packagingWidth'] ?? '')) ?>">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Altura (cm)</label>
                             <input class="form-control" id="packagingHeight" type="number" min="2" max="100" step="0.01" value="<?= htmlspecialchars((string) ($defaults['packagingHeight'] ?? '')) ?>">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Comprimento (cm)</label>
+                            <input class="form-control" id="packagingLength" type="number" min="16" max="100" step="0.01" value="<?= htmlspecialchars((string) ($defaults['packagingLength'] ?? '')) ?>">
                         </div>
                     </div>
 
