@@ -97,29 +97,37 @@
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header"><strong>Etiquetas geradas (PACKET)</strong></div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Etiquetas geradas (PACKET)</strong>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-warning" onclick="regerarSelecionadas()" id="btnRegerarMassa" disabled><i class="fas fa-redo me-1"></i>Regerar selecionadas</button>
+            </div>
+        </div>
         <div class="card-body">
             <!-- Desktop: Table -->
             <div class="table-responsive d-none d-md-block">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
+                            <th><input type="checkbox" id="checkAllPacket" onclick="toggleAllPacket(this)"></th>
                             <th>Pedido</th>
                             <th>Cliente</th>
                             <th>Rastreio</th>
                             <th>Etiqueta</th>
                             <th>Data</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php $etiquetas = isset($etiquetas) && is_array($etiquetas) ? $etiquetas : []; ?>
                         <?php if (empty($etiquetas)): ?>
-                            <tr><td colspan="5" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
+                            <tr><td colspan="7" class="text-muted">Nenhuma etiqueta gerada.</td></tr>
                         <?php else: ?>
                             <?php foreach ($etiquetas as $e): ?>
                                 <?php $pid = (int) ($e['pedido_id'] ?? 0); ?>
                                 <?php $trk = (string) ($e['tracking_number'] ?? ''); ?>
                                 <tr>
+                                    <td><input type="checkbox" class="packet-check" value="<?= $pid ?>" onchange="updateBtnMassa()"></td>
                                     <td><a href="/admin/correios-mundial/pedido/<?= $pid ?>">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></a></td>
                                     <td><?= htmlspecialchars((string) ($e['cliente_nome'] ?? '-')) ?></td>
                                     <td><?= htmlspecialchars($trk) ?></td>
@@ -131,6 +139,9 @@
                                         <?php endif; ?>
                                     </td>
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="regerarPacket(<?= $pid ?>)" title="Regerar etiqueta"><i class="fas fa-redo"></i></button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -226,5 +237,71 @@
 
     document.addEventListener('DOMContentLoaded', loadBalance);
 })();
+
+function toggleAllPacket(el) {
+    document.querySelectorAll('.packet-check').forEach(cb => cb.checked = el.checked);
+    updateBtnMassa();
+}
+
+function updateBtnMassa() {
+    const checked = document.querySelectorAll('.packet-check:checked').length;
+    const btn = document.getElementById('btnRegerarMassa');
+    if (btn) {
+        btn.disabled = checked === 0;
+        btn.textContent = checked > 0 ? 'Regerar selecionadas (' + checked + ')' : 'Regerar selecionadas';
+    }
+}
+
+async function regerarPacket(pedidoId) {
+    if (!confirm('Regerar etiqueta do pedido #' + pedidoId + '? A etiqueta atual será deletada e uma nova será gerada.')) return;
+    try {
+        const r = await fetch('/admin/correios-mundial/pedido/' + pedidoId + '/regerar-etiqueta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await r.json();
+        if (data && data.success) {
+            alert('Etiqueta regerada! Novo rastreio: ' + (data.tracking_number || ''));
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || data.message || 'Falha ao regerar'));
+        }
+    } catch (e) {
+        alert('Erro de rede: ' + e.message);
+    }
+}
+
+async function regerarSelecionadas() {
+    const checks = document.querySelectorAll('.packet-check:checked');
+    if (checks.length === 0) return;
+    const ids = Array.from(checks).map(cb => parseInt(cb.value));
+    if (!confirm('Regerar etiquetas de ' + ids.length + ' pedido(s) selecionados? As etiquetas atuais serão deletadas e novas serão geradas.')) return;
+
+    const btn = document.getElementById('btnRegerarMassa');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Regerando...'; }
+
+    let ok = 0, erros = [];
+    for (const pid of ids) {
+        try {
+            const r = await fetch('/admin/correios-mundial/pedido/' + pid + '/regerar-etiqueta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await r.json();
+            if (data && data.success) {
+                ok++;
+            } else {
+                erros.push('#' + pid + ': ' + (data.error || 'erro'));
+            }
+        } catch (e) {
+            erros.push('#' + pid + ': ' + e.message);
+        }
+    }
+
+    let msg = ok + ' etiqueta(s) regerada(s) com sucesso.';
+    if (erros.length > 0) msg += '\n\nErros:\n' + erros.join('\n');
+    alert(msg);
+    location.reload();
+}
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../layouts/admin.php'; ?>
