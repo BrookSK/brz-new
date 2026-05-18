@@ -852,6 +852,9 @@ class AdminRemessaCorreiosController extends Controller {
                                                     <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="Deletar etiqueta atual e gerar nova com as medidas atuais do pedido">
                                                         <i class="fas fa-redo"></i> Regerar
                                                     </button>
+                                                    <button class="btn btn-sm btn-danger" onclick="deletarEtiqueta(' . $etiqueta['id'] . ')" title="Deletar esta etiqueta">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                     <button class="btn btn-sm btn-outline-info" onclick="rastrearEtiqueta(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-search"></i>
                                                     </button>
@@ -913,6 +916,9 @@ class AdminRemessaCorreiosController extends Controller {
                                                     </button>
                                                     <button class="btn btn-sm btn-warning" onclick="regerarEtiqueta(' . (int)($etiqueta['pedido_id'] ?? 0) . ', ' . $etiqueta['id'] . ')" title="Deletar etiqueta atual e gerar nova com as medidas atuais do pedido">
                                                         <i class="fas fa-redo"></i> Regerar
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger" onclick="deletarEtiqueta(' . $etiqueta['id'] . ')" title="Deletar esta etiqueta">
+                                                        <i class="fas fa-trash"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-info" onclick="rastrearEtiqueta(' . $etiqueta['id'] . ')">
                                                         <i class="fas fa-search"></i>
@@ -1065,6 +1071,24 @@ class AdminRemessaCorreiosController extends Controller {
                 }
             })
             .catch(() => alert("Erro ao regerar etiqueta"));
+        }
+
+        function deletarEtiqueta(etiquetaId) {
+            if (!confirm("Tem certeza que deseja DELETAR a etiqueta #" + etiquetaId + "? Essa ação não pode ser desfeita.")) return;
+            fetch("/admin/remessa-correios/deletar-etiqueta/" + etiquetaId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Etiqueta deletada com sucesso!");
+                    location.reload();
+                } else {
+                    alert("Erro ao deletar: " + (data.message || "Erro desconhecido"));
+                }
+            })
+            .catch(() => alert("Erro ao deletar etiqueta"));
         }
     </script>
 </body>
@@ -1642,6 +1666,44 @@ class AdminRemessaCorreiosController extends Controller {
             ]);
         } catch (\Exception $e) {
             try { $this->connection->rollBack(); } catch (\Exception $e2) {}
+            echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function deletarEtiqueta($request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        $etiquetaId = (int) $request->getParam('id');
+
+        if ($etiquetaId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID da etiqueta inválido']);
+            exit;
+        }
+
+        try {
+            // Buscar a etiqueta para saber o pedido_id
+            $st = $this->connection->prepare('SELECT id, pedido_id, status FROM correios_etiquetas WHERE id = ? LIMIT 1');
+            $st->execute([$etiquetaId]);
+            $etiqueta = $st->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$etiqueta) {
+                echo json_encode(['success' => false, 'message' => 'Etiqueta não encontrada']);
+                exit;
+            }
+
+            // Não permitir deletar etiquetas já postadas
+            if (strtolower(trim((string) ($etiqueta['status'] ?? ''))) === 'postada') {
+                echo json_encode(['success' => false, 'message' => 'Não é possível deletar uma etiqueta já postada']);
+                exit;
+            }
+
+            // Deletar a etiqueta
+            $stDel = $this->connection->prepare('DELETE FROM correios_etiquetas WHERE id = ?');
+            $stDel->execute([$etiquetaId]);
+
+            echo json_encode(['success' => true, 'message' => 'Etiqueta deletada com sucesso']);
+        } catch (\Exception $e) {
             echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
         }
         exit;
