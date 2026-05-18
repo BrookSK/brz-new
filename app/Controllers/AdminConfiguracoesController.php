@@ -4922,6 +4922,31 @@ HTML;
             } catch (\Exception $e) {
             }
 
+            // Sincronizar: se sigep_servico_codigo foi preenchido, atualizar correios_prepostagem_codigo_servico
+            try {
+                $sigepCode = trim((string) ($request->getParam('entrega_sigep_servico_codigo') ?? ''));
+                if ($sigepCode !== '' && isset($table) && isset($valueCol)) {
+                    $syncKeyCol = $tableInfo['keyCol'] ?? 'chave';
+                    $syncKey = 'entrega_correios_prepostagem_codigo_servico';
+                    if (($tableInfo['mode'] ?? '') === 'categoria_chave') {
+                        $catCol = $tableInfo['categoriaCol'] ?? 'categoria';
+                        $chvCol = $tableInfo['chaveCol'] ?? 'chave';
+                        $stSync = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ? WHERE {$catCol} = 'entrega' AND {$chvCol} = 'correios_prepostagem_codigo_servico'");
+                        $stSync->execute([$sigepCode]);
+                    } else {
+                        $stSync = $pdo->prepare("UPDATE {$table} SET {$valueCol} = ? WHERE {$syncKeyCol} = ?");
+                        $stSync->execute([$sigepCode, $syncKey]);
+                        if ($stSync->rowCount() === 0) {
+                            $stExist = $pdo->prepare("SELECT 1 FROM {$table} WHERE {$syncKeyCol} = ? LIMIT 1");
+                            $stExist->execute([$syncKey]);
+                            if (!$stExist->fetchColumn()) {
+                                $pdo->prepare("INSERT INTO {$table} ({$syncKeyCol}, {$valueCol}) VALUES (?, ?)")->execute([$syncKey, $sigepCode]);
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {}
+
             $pdo->commit();
             
             header('Location: /admin/configuracoes?success=1');

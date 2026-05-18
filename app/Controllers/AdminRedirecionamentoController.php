@@ -1676,13 +1676,23 @@ class AdminRedirecionamentoController extends Controller {
             $codigoServico = '';
             $senderJson = '';
             try {
-                $stCfg = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('correios_prepostagem_token','sigep_ambiente','correios_prepostagem_codigo_servico','correios_prepostagem_sender_json','correios_prepostagem_id_correios') LIMIT 10");
+                $stCfg = $db->prepare("SELECT chave, valor FROM configuracoes_sistema WHERE chave IN ('correios_prepostagem_token','sigep_ambiente','correios_prepostagem_codigo_servico','correios_prepostagem_sender_json','correios_prepostagem_id_correios','entrega_correios_prepostagem_codigo_servico','entrega_sigep_servico_codigo','entrega_correios_prepostagem_token','entrega_sigep_ambiente','entrega_correios_prepostagem_sender_json','entrega_correios_prepostagem_id_correios') LIMIT 20");
                 $stCfg->execute();
                 $cfgs = $stCfg->fetchAll(\PDO::FETCH_KEY_PAIR) ?: [];
-                $token = (string) ($cfgs['correios_prepostagem_token'] ?? '');
-                $ambiente = (string) ($cfgs['sigep_ambiente'] ?? 'homologacao');
-                $codigoServico = trim((string) ($cfgs['correios_prepostagem_codigo_servico'] ?? ''));
-                $senderJson = trim((string) ($cfgs['correios_prepostagem_sender_json'] ?? ''));
+                // Token: tentar com e sem prefixo entrega_
+                $token = (string) ($cfgs['entrega_correios_prepostagem_token'] ?? ($cfgs['correios_prepostagem_token'] ?? ''));
+                $ambiente = (string) ($cfgs['entrega_sigep_ambiente'] ?? ($cfgs['sigep_ambiente'] ?? 'homologacao'));
+                // Código do serviço: prioridade para sigep_servico_codigo (campo editável pelo admin)
+                $codigoServico = trim((string) ($cfgs['entrega_correios_prepostagem_codigo_servico'] ?? ($cfgs['correios_prepostagem_codigo_servico'] ?? '')));
+                $sigepCodigo = trim((string) ($cfgs['entrega_sigep_servico_codigo'] ?? ''));
+                // Se o admin configurou o código no SIGEP, usar ele (é o campo que ele edita)
+                if ($sigepCodigo !== '') {
+                    $codigoServico = $sigepCodigo;
+                }
+                if ($codigoServico === '') {
+                    $codigoServico = $sigepCodigo;
+                }
+                $senderJson = trim((string) ($cfgs['entrega_correios_prepostagem_sender_json'] ?? ($cfgs['correios_prepostagem_sender_json'] ?? '')));
             } catch (\Exception $e) {}
 
             if ($token === '') {
@@ -1690,7 +1700,7 @@ class AdminRedirecionamentoController extends Controller {
             }
 
             if ($codigoServico === '') {
-                return ['ok' => false, 'msg' => 'Correios Pré-Postagem: código do serviço não configurado. Vá em Configurações > Entrega e preencha o campo "Código do serviço (Pré-Postagem)".'];
+                return ['ok' => false, 'msg' => 'Correios Pré-Postagem: código do serviço não configurado. Vá em Configurações > Entrega e preencha o campo "Código do serviço (Pré-Postagem)" ou "Código do Serviço no Contrato".'];
             }
 
             $baseUrl = ($ambiente === 'producao' || $ambiente === 'production')

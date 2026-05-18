@@ -287,6 +287,17 @@ class AdminRemessaCorreiosController extends Controller {
 
         $codigoServico = (string) ($cfg['prepostagem_codigo_servico'] ?? '');
         if ($codigoServico === '') {
+            // Fallback: usar o código do serviço do SIGEP se disponível
+            $codigoServico = (string) $this->getConfigEntregaValue('sigep_servico_codigo', '');
+        }
+        // Se o SIGEP tem um código diferente e mais recente, usar ele (o admin pode ter mudado lá)
+        $sigepCodigo = (string) $this->getConfigEntregaValue('sigep_servico_codigo', '');
+        if ($sigepCodigo !== '' && $sigepCodigo !== $codigoServico) {
+            // O sigep_servico_codigo é o campo que o admin edita no dropdown SEDEX/PAC
+            // Se foi alterado, deve ter prioridade sobre o campo de pré-postagem
+            $codigoServico = $sigepCodigo;
+        }
+        if ($codigoServico === '') {
             throw new \Exception('Pré-Postagem: informe o código do serviço nas configurações');
         }
 
