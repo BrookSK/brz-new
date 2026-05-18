@@ -648,7 +648,25 @@ class AdminRemessaCorreiosController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Remessa Correios</h1>
+                    <h1 class="page-title">Remessa Correios';
+        
+        // Mostrar badge do serviço configurado (SEDEX/PAC)
+        $__cfgProvider = $this->getCorreiosProviderConfig();
+        $__cfgSigep = $this->getSigepConfig();
+        $__svcAtual = '';
+        if (!empty($__cfgProvider['prepostagem_codigo_servico'])) {
+            $__svcAtual = $this->mapCodigoServicoLabel($__cfgProvider['prepostagem_codigo_servico']);
+        } elseif (!empty($__cfgSigep['servico_codigo'])) {
+            $__svcAtual = $this->mapCodigoServicoLabel($__cfgSigep['servico_codigo']);
+        } elseif (!empty($__cfgSigep['servico'])) {
+            $__svcAtual = strtoupper($__cfgSigep['servico']);
+        }
+        if ($__svcAtual !== '') {
+            $__badgeColor = (stripos($__svcAtual, 'SEDEX') !== false) ? 'danger' : ((stripos($__svcAtual, 'PAC') !== false) ? 'primary' : 'secondary');
+            echo ' <span class="badge bg-' . $__badgeColor . ' ms-2" style="font-size:.65rem;vertical-align:middle">' . htmlspecialchars($__svcAtual) . '</span>';
+        }
+        
+        echo '</h1>
                     <div class="d-none d-md-flex gap-2">
                         <button type="button" class="btn btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
                         <button type="button" class="btn btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir Todas</button>
@@ -806,12 +824,14 @@ class AdminRemessaCorreiosController extends Controller {
                                         <tbody>';
                                         
                                         foreach ($etiquetasGeradas as $etiqueta) {
+                                            $__svcLabel = $etiqueta['servico_label'] ?? '';
+                                            $__svcBadge = (stripos($__svcLabel, 'SEDEX') !== false) ? 'danger' : ((stripos($__svcLabel, 'PAC') !== false) ? 'primary' : 'secondary');
                                             echo '<tr class="etiqueta-card">
                                                 <td><strong>#' . str_pad($etiqueta['id'], 6, '0', STR_PAD_LEFT) . '</strong></td>
                                                 <td>#' . str_pad($etiqueta['remessa_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>#' . str_pad($etiqueta['pedido_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . htmlspecialchars($etiqueta['cliente_nome'] ?? 'N/A') . '</td>
-                                                <td><div class="codigo-etiqueta">' . htmlspecialchars($etiqueta['codigo_etiqueta']) . '</div></td>
+                                                <td><div class="codigo-etiqueta">' . htmlspecialchars($etiqueta['codigo_etiqueta']) . '</div>' . ($__svcLabel !== '' ? ' <span class="badge bg-' . $__svcBadge . '" style="font-size:.7rem">' . htmlspecialchars($__svcLabel) . '</span>' : '') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($etiqueta['created_at'])) . '</td>
                                                 <td><span class="badge bg-purple">Etiqueta Gerada</span></td>
                                                 <td>
@@ -864,12 +884,14 @@ class AdminRemessaCorreiosController extends Controller {
                                         <tbody>';
                                         
                                         foreach ($etiquetasImpressas as $etiqueta) {
+                                            $__svcLabel = $etiqueta['servico_label'] ?? '';
+                                            $__svcBadge = (stripos($__svcLabel, 'SEDEX') !== false) ? 'danger' : ((stripos($__svcLabel, 'PAC') !== false) ? 'primary' : 'secondary');
                                             echo '<tr class="table-success">
                                                 <td><strong>#' . str_pad($etiqueta['id'], 6, '0', STR_PAD_LEFT) . '</strong></td>
                                                 <td>#' . str_pad($etiqueta['remessa_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>#' . str_pad($etiqueta['pedido_id'], 6, '0', STR_PAD_LEFT) . '</td>
                                                 <td>' . htmlspecialchars($etiqueta['cliente_nome'] ?? 'N/A') . '</td>
-                                                <td><div class="codigo-etiqueta">' . htmlspecialchars($etiqueta['codigo_etiqueta']) . '</div></td>
+                                                <td><div class="codigo-etiqueta">' . htmlspecialchars($etiqueta['codigo_etiqueta']) . '</div>' . ($__svcLabel !== '' ? ' <span class="badge bg-' . $__svcBadge . '" style="font-size:.7rem">' . htmlspecialchars($__svcLabel) . '</span>' : '') . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($etiqueta['data_impressao'])) . '</td>
                                                 <td>
                                                     <button class="btn btn-sm btn-success" onclick="imprimirEtiqueta(' . $etiqueta['id'] . ')">
@@ -1486,6 +1508,7 @@ class AdminRemessaCorreiosController extends Controller {
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         foreach ($rows as &$r) {
             $r['remessa_id'] = (int) ($r['pedido_id'] ?? 0);
+            $r['servico_label'] = $this->detectarServicoEtiqueta($r);
         }
         unset($r);
         return $rows;
@@ -1505,9 +1528,45 @@ class AdminRemessaCorreiosController extends Controller {
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         foreach ($rows as &$r) {
             $r['remessa_id'] = (int) ($r['pedido_id'] ?? 0);
+            $r['servico_label'] = $this->detectarServicoEtiqueta($r);
         }
         unset($r);
         return $rows;
+    }
+
+    /** Detecta o tipo de serviço (SEDEX/PAC) a partir do JSON de request salvo na etiqueta */
+    private function detectarServicoEtiqueta(array $etiqueta): string {
+        $json = (string) ($etiqueta['prepostagem_last_request_json'] ?? ($etiqueta['sigep_last_request_json'] ?? ''));
+        if ($json !== '') {
+            $data = json_decode($json, true);
+            if (is_array($data)) {
+                $codigo = (string) ($data['codigoServico'] ?? '');
+                if ($codigo !== '') {
+                    return $this->mapCodigoServicoLabel($codigo);
+                }
+            }
+        }
+        // Fallback: ler da configuração atual
+        $cfg = $this->getCorreiosProviderConfig();
+        $codigo = (string) ($cfg['prepostagem_codigo_servico'] ?? '');
+        if ($codigo !== '') {
+            return $this->mapCodigoServicoLabel($codigo);
+        }
+        $sigepCfg = $this->getSigepConfig();
+        $servico = (string) ($sigepCfg['servico'] ?? '');
+        if ($servico !== '') {
+            return strtoupper($servico);
+        }
+        return '';
+    }
+
+    private function mapCodigoServicoLabel(string $codigo): string {
+        $map = [
+            '03220' => 'SEDEX', '04162' => 'SEDEX', '04014' => 'SEDEX',
+            '03298' => 'PAC', '04510' => 'PAC', '41106' => 'PAC',
+            '03158' => 'SEDEX 10', '03140' => 'SEDEX 12', '03204' => 'SEDEX Hoje',
+        ];
+        return $map[$codigo] ?? ('Cód ' . $codigo);
     }
 
     private function getTotalPostadas() {
