@@ -1599,8 +1599,65 @@ function fecharJanela() {
         $end = $pedido['endereco'] ?? null;
         if (is_array($end) && !empty($end)) {
             echo htmlspecialchars(trim((string) (($end['logradouro'] ?? '') . ' ' . ($end['numero'] ?? '') . ' ' . ($end['bairro'] ?? '') . ' ' . ($end['cidade'] ?? '') . ' ' . ($end['estado'] ?? '') . ' ' . ($end['cep'] ?? ''))));
+        } elseif (is_string($end) && trim($end) !== '') {
+            // endereco é string (logradouro) — montar a partir dos campos individuais
+            $endDisplay = trim(implode(', ', array_filter([
+                trim((string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''))),
+                trim((string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''))),
+                trim((string) ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''))),
+                trim((string) ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''))),
+                trim((string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''))),
+                trim((string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''))),
+                trim((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''))),
+            ])));
+            echo htmlspecialchars($endDisplay !== '' ? $endDisplay : (string) $end);
         } else {
-            echo '<span class="text-muted">Não encontrado</span>';
+            // Fallback: tentar campos individuais do pedido
+            $endDisplay = trim(implode(', ', array_filter([
+                trim((string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''))),
+                trim((string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''))),
+                trim((string) ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''))),
+                trim((string) ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''))),
+                trim((string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''))),
+                trim((string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''))),
+                trim((string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''))),
+            ])));
+            if ($endDisplay !== '') {
+                echo htmlspecialchars($endDisplay);
+            } else {
+                // Último fallback: buscar da tabela enderecos
+                $endFound = false;
+                $uid = (int) ($pedido['usuario_id'] ?? 0);
+                $endEntregaId = (int) ($pedido['endereco_entrega_id'] ?? 0);
+                if ($uid > 0 || $endEntregaId > 0) {
+                    try {
+                        if ($endEntregaId > 0) {
+                            $stE = $this->connection->prepare('SELECT * FROM enderecos WHERE id = ? LIMIT 1');
+                            $stE->execute([$endEntregaId]);
+                        } else {
+                            $stE = $this->connection->prepare('SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1');
+                            $stE->execute([$uid]);
+                        }
+                        $rowE = $stE->fetch(\PDO::FETCH_ASSOC);
+                        if (is_array($rowE) && !empty($rowE)) {
+                            $parts = array_filter([
+                                trim((string) ($rowE['endereco'] ?? ($rowE['logradouro'] ?? ''))),
+                                trim((string) ($rowE['numero'] ?? '')),
+                                trim((string) ($rowE['complemento'] ?? '')),
+                                trim((string) ($rowE['bairro'] ?? '')),
+                                trim((string) ($rowE['cidade'] ?? '')),
+                                trim((string) ($rowE['estado'] ?? ($rowE['uf'] ?? ''))),
+                                trim((string) ($rowE['cep'] ?? '')),
+                            ]);
+                            echo htmlspecialchars(implode(', ', $parts));
+                            $endFound = true;
+                        }
+                    } catch (\Exception $e) {}
+                }
+                if (!$endFound) {
+                    echo '<span class="text-muted">Não encontrado</span>';
+                }
+            }
         }
 
         echo '</div>
