@@ -9,6 +9,14 @@ if (isset($_GET['_deploy_check'])) {
     exit;
 }
 
+// Forçar invalidação do OPcache para o controller de pacotes WordPress
+if (function_exists('opcache_invalidate')) {
+    $pacotesCtrl = __DIR__ . '/../app/Controllers/AdminPacotesWordpressController.php';
+    if (is_file($pacotesCtrl)) {
+        opcache_invalidate($pacotesCtrl, true);
+    }
+}
+
 // Iniciar sessão antes de qualquer output
 $sessionLifetime = 60 * 60 * 24 * 7;
 ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
