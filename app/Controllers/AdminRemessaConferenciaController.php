@@ -311,11 +311,13 @@ class AdminRemessaConferenciaController extends Controller {
         try {
             if (!$this->tableExists('remessa_janelas')) throw new \Exception('Tabela remessa_janelas não encontrada.');
 
-            // Filtros
+            // Filtros (etiqueta padrão = 'gerada' quando não há parâmetro na URL)
+            $etiquetaRaw = $request->getParam('etiqueta', '');
+            $hasEtiquetaParam = isset($_GET['etiqueta']);
             $filtros = [
                 'janela_id' => $request->getParam('janela_id', ''),
                 'janela_status' => $request->getParam('janela_status', ''),
-                'etiqueta' => $request->getParam('etiqueta', ''),
+                'etiqueta' => $hasEtiquetaParam ? $etiquetaRaw : 'gerada',
                 'busca' => $request->getParam('busca', ''),
             ];
 
