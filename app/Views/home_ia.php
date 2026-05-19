@@ -102,11 +102,21 @@
   const sidebar = document.getElementById('bri-sidebar');
   const header = document.getElementById('bri-sidebar-header');
   const input = document.getElementById('bri-input');
+  const inputArea = document.getElementById('bri-input-area');
   if (!sidebar || !header) return;
 
   let dragging = false;
   let startY = 0;
   let startH = 0;
+  let minH = 100; // fallback
+
+  // Calcular min-height real após render (header + input area)
+  setTimeout(function() {
+    const hH = header.getBoundingClientRect().height;
+    const iH = inputArea ? inputArea.getBoundingClientRect().height : 50;
+    minH = Math.ceil(hH + iH) + 2; // +2 para border
+    sidebar.style.minHeight = minH + 'px';
+  }, 100);
 
   function onStart(e) {
     if (window.innerWidth >= 768) return;
@@ -123,11 +133,6 @@
     const y = e.touches ? e.touches[0].clientY : e.clientY;
     const delta = startY - y;
     const maxH = window.innerHeight * 0.8;
-    // Min = header height + input area height (header ~50px + input ~50px = 100px)
-    const headerH = header.offsetHeight || 50;
-    const inputArea = document.getElementById('bri-input-area');
-    const inputH = inputArea ? inputArea.offsetHeight : 50;
-    const minH = headerH + inputH;
     const newH = Math.min(Math.max(startH + delta, minH), maxH);
     sidebar.style.height = newH + 'px';
   }
@@ -142,7 +147,7 @@
   document.addEventListener('touchmove', onMove, { passive: false });
   document.addEventListener('touchend', onEnd);
 
-  // iOS: quando o teclado abre, ajustar o layout
+  // iOS: quando o teclado abre, ajustar
   if (input) {
     input.addEventListener('focus', function() {
       setTimeout(function() {
@@ -150,13 +155,6 @@
       }, 300);
     });
   }
-
-  // Prevenir bounce/scroll do body
-  document.body.addEventListener('touchmove', function(e) {
-    if (!e.target.closest('#bri-mensagens')) {
-      // Permitir scroll apenas dentro das mensagens
-    }
-  }, { passive: true });
 })();
 </script>
 

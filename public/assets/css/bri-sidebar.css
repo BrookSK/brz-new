@@ -371,12 +371,11 @@ body {
   #bri-divider { display: none; }
   #bri-back-btn { display: none !important; }
 
-  /* Chat fixo embaixo — não usa position:fixed, usa flex shrink 0 */
+  /* Chat fixo embaixo */
   #bri-sidebar {
     order: 2;
     width: 100%;
-    height: 200px;
-    min-height: 100px;
+    height: 30vh;
     max-height: 80vh;
     border-right: none;
     border-top: 1px solid var(--color-border);
