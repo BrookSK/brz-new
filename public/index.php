@@ -338,9 +338,14 @@ require_once __DIR__ . '/../app/routes_admin.php';
 
 // Pacotes WordPress: dispatch direto para ações via ?action= (bypass OPcache)
 if ($request->getPath() === '/admin/pacotes-wordpress' && isset($_GET['action']) && $_GET['action'] !== '') {
-    $ctrl = new \App\Controllers\AdminPacotesWordpressController();
     $act = $_GET['action'];
-    if ($act === 'etiqueta-pdf') { $ctrl->etiquetaPdf($request); exit; }
+    if ($act === 'etiqueta-pdf') {
+        $ctrl2 = new \App\Controllers\AdminPacotesWpController2();
+        $ctrl2->etiquetaPdf($request);
+        exit;
+    }
+    // Demais actions via controller principal
+    $ctrl = new \App\Controllers\AdminPacotesWordpressController();
     if ($act === 'containers') { $ctrl->containers($request); exit; }
     if ($act === 'container-novo') { $ctrl->containerNovo($request); exit; }
     if ($act === 'container-detalhes') { $ctrl->containerDetalhes($request); exit; }
