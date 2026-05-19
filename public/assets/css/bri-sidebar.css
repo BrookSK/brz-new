@@ -410,6 +410,7 @@ body {
     flex: 1 1 0;
     min-height: 0;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   #bri-input-area {
@@ -423,40 +424,14 @@ body {
     font-size: 16px;
   }
 
-  /* Truncar mensagens longas no mobile */
+  /* Mensagens no mobile — permitir scroll, sem truncar */
   #bri-mensagens .bri-bubble {
-    max-height: 80px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  #bri-mensagens .bri-bubble.bri-expanded {
     max-height: none;
     overflow: visible;
   }
 
-  #bri-mensagens .bri-bubble.bri-truncated::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 24px;
-    background: linear-gradient(transparent, #fff);
-    pointer-events: none;
-  }
-
-  #bri-mensagens .bri-bubble.user.bri-truncated::after {
-    background: linear-gradient(transparent, var(--color-primary));
-  }
-
   .bri-ver-mais {
-    font-size: 11px;
-    color: var(--color-primary);
-    cursor: pointer;
-    padding: 2px 0;
-    text-align: left;
-    font-weight: 500;
+    display: none;
   }
 
   #bri-wizard {
