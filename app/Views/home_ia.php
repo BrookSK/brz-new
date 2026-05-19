@@ -95,12 +95,13 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: drag-to-resize chat panel
+// Mobile: drag-to-resize chat panel + iOS keyboard fix
 (function() {
   if (window.innerWidth >= 768) return;
 
   const sidebar = document.getElementById('bri-sidebar');
   const header = document.getElementById('bri-sidebar-header');
+  const input = document.getElementById('bri-input');
   if (!sidebar || !header) return;
 
   let dragging = false;
@@ -109,19 +110,21 @@
 
   function onStart(e) {
     if (window.innerWidth >= 768) return;
+    // Não iniciar drag se clicou em botão ou link
+    if (e.target.closest('button, a, .bri-icon-btn')) return;
     dragging = true;
     startY = e.touches ? e.touches[0].clientY : e.clientY;
     startH = sidebar.offsetHeight;
     sidebar.style.transition = 'none';
-    document.body.style.overflow = 'hidden';
   }
 
   function onMove(e) {
     if (!dragging) return;
     e.preventDefault();
     const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const delta = startY - y; // dragging up = positive = bigger
-    const newH = Math.min(Math.max(startH + delta, 140), window.innerHeight * 0.85);
+    const delta = startY - y;
+    const maxH = window.innerHeight * 0.8;
+    const newH = Math.min(Math.max(startH + delta, 120), maxH);
     sidebar.style.height = newH + 'px';
   }
 
@@ -129,16 +132,27 @@
     if (!dragging) return;
     dragging = false;
     sidebar.style.transition = '';
-    document.body.style.overflow = '';
   }
 
   header.addEventListener('touchstart', onStart, { passive: true });
   document.addEventListener('touchmove', onMove, { passive: false });
   document.addEventListener('touchend', onEnd);
 
-  header.addEventListener('mousedown', onStart);
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onEnd);
+  // iOS: quando o teclado abre, ajustar o layout
+  if (input) {
+    input.addEventListener('focus', function() {
+      setTimeout(function() {
+        sidebar.scrollIntoView({ block: 'end' });
+      }, 300);
+    });
+  }
+
+  // Prevenir bounce/scroll do body
+  document.body.addEventListener('touchmove', function(e) {
+    if (!e.target.closest('#bri-mensagens')) {
+      // Permitir scroll apenas dentro das mensagens
+    }
+  }, { passive: true });
 })();
 </script>
 

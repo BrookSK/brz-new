@@ -346,8 +346,17 @@ body {
    MOBILE (< 768px) — Layout vertical: Navegação em cima, Chat embaixo
 ───────────────────────────────────────────────── */
 @media (max-width: 767px) {
+  body {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+
   #bri-fullscreen-mode {
     flex-direction: column;
+    height: 100dvh;
+    height: -webkit-fill-available;
   }
 
   /* Painel de navegação ocupa o topo */
@@ -358,22 +367,22 @@ body {
     height: auto;
     position: relative;
     min-height: 0;
+    overflow: hidden;
   }
 
   #bri-divider { display: none; }
   #bri-back-btn { display: none !important; }
 
-  /* Sidebar (chat) fica embaixo, com altura mínima mostrando ~3 mensagens */
+  /* Sidebar (chat) fica embaixo */
   #bri-sidebar {
     order: 2;
     width: 100%;
-    height: 220px;
-    min-height: 140px;
-    max-height: 85vh;
+    height: 200px;
+    min-height: 120px;
+    max-height: 80dvh;
     border-right: none;
     border-top: 1px solid var(--color-border);
     position: relative;
-    transition: height 0.05s linear;
     flex-shrink: 0;
   }
 
@@ -381,21 +390,22 @@ body {
   #bri-sidebar::before {
     content: '';
     position: absolute;
-    top: 0;
+    top: 6px;
     left: 50%;
     transform: translateX(-50%);
-    width: 40px;
+    width: 36px;
     height: 4px;
-    background: var(--color-border-input);
+    background: #CBD5E1;
     border-radius: 4px;
     z-index: 5;
-    margin-top: 6px;
   }
 
   #bri-sidebar-header {
-    padding: 14px 16px 8px;
+    padding: 16px 14px 6px;
     cursor: grab;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   #bri-sidebar-header:active {
@@ -403,15 +413,21 @@ body {
   }
 
   #bri-mensagens {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    gap: 8px;
   }
 
   #bri-input-area {
-    padding: 8px 12px;
+    padding: 8px 10px;
   }
 
   #bri-input {
     font-size: 16px; /* Previne zoom no iOS */
+  }
+
+  /* Esconder wizard no mobile — vai direto pro chat */
+  #bri-wizard {
+    display: none !important;
   }
 }
 

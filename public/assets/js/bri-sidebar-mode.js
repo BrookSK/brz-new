@@ -579,8 +579,8 @@ const BriSidebar = (() => {
   sendBtn?.addEventListener('click', enviar);
 
   // ── Init ────────────────────────────────────────────
-  // Wizard de boas-vindas (apenas na primeira visita)
-  if (historico.length === 0 && !sessionStorage.getItem('bri_wizard_done')) {
+  // Wizard de boas-vindas (apenas na primeira visita, apenas desktop)
+  if (historico.length === 0 && !sessionStorage.getItem('bri_wizard_done') && window.innerWidth >= 768) {
     showWizard();
   } else {
     renderMensagens();
