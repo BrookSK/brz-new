@@ -703,9 +703,29 @@ class AdminRemessaCorreiosController extends Controller {
                 <script>
                 function irParaPedidoCorreios(suffix){
                     var el = document.getElementById("buscarPedidoCorreios"+(suffix||""));
-                    var v = el.value.replace(/\\D/g,"");
+                    var v = el.value.replace(/\\D/g,"").trim();
                     if(v===""){alert("Digite o número do pedido");return;}
-                    window.location.href="/admin/pedidos/detalhes/"+parseInt(v,10);
+                    var num = parseInt(v,10);
+                    // Procurar na tabela de remessas prontas e etiquetas
+                    var found = false;
+                    document.querySelectorAll("table tr").forEach(function(tr){
+                        var cells = tr.querySelectorAll("td");
+                        if(cells.length > 0){
+                            var txt = tr.textContent || "";
+                            // Verificar se o número do pedido aparece na linha (formato #000XXX ou só o número)
+                            var padded = "#" + String(num).padStart(6,"0");
+                            if(txt.indexOf(padded) !== -1 || txt.indexOf("#"+num) !== -1){
+                                tr.style.background = "#fff3cd";
+                                tr.scrollIntoView({behavior:"smooth", block:"center"});
+                                found = true;
+                            } else {
+                                tr.style.background = "";
+                            }
+                        }
+                    });
+                    if(!found){
+                        alert("Pedido #"+num+" não encontrado nas tabelas desta página.");
+                    }
                 }
                 </script>
 
