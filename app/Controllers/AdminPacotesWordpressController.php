@@ -562,7 +562,7 @@ class AdminPacotesWordpressController extends Controller {
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
             http_response_code(404);
-            echo 'Etiqueta não encontrada.';
+            echo 'ID de etiqueta inválido.';
             return;
         }
 
@@ -574,7 +574,7 @@ class AdminPacotesWordpressController extends Controller {
 
         if (!$etiqueta) {
             http_response_code(404);
-            echo 'Etiqueta não encontrada.';
+            echo 'Etiqueta #' . $id . ' não encontrada na tabela local. Sincronize os pacotes primeiro.';
             return;
         }
 
@@ -585,12 +585,52 @@ class AdminPacotesWordpressController extends Controller {
 
         if ($tracking === '') {
             http_response_code(404);
-            echo 'Tracking number não disponível.';
+            echo 'Etiqueta #' . $id . ' não possui tracking number.';
             return;
         }
 
-        // Tentar gerar PDF local usando o mesmo padrão do Correios Mundial
-        // Buscar o label_data do meta_json
+        // Tentar buscar o PDF do WordPress via conexão direta
+        try {
+            $wp = $this->connectWp($origem);
+            $wpPdo = $wp['pdo'];
+            $prefix = $wp['prefix'];
+
+            // Buscar _label_data do postmeta no WordPress
+            $stLabel = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_label_data' LIMIT 1");
+            $stLabel->execute([$wpPostId]);
+            $labelData = (string) ($stLabel->fetchColumn() ?: '');
+
+            if ($labelData !== '') {
+                $pdfContent = base64_decode($labelData);
+                if ($pdfContent !== false && strlen($pdfContent) > 100) {
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: inline; filename="etiqueta-' . $tracking . '.pdf"');
+                    header('Content-Length: ' . strlen($pdfContent));
+                    echo $pdfContent;
+                    return;
+                }
+            }
+
+            // Tentar _correios_label_data
+            $stLabel2 = $wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id = ? AND meta_key = '_correios_label_data' LIMIT 1");
+            $stLabel2->execute([$wpPostId]);
+            $labelData2 = (string) ($stLabel2->fetchColumn() ?: '');
+
+            if ($labelData2 !== '') {
+                $pdfContent = base64_decode($labelData2);
+                if ($pdfContent !== false && strlen($pdfContent) > 100) {
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: inline; filename="etiqueta-' . $tracking . '.pdf"');
+                    header('Content-Length: ' . strlen($pdfContent));
+                    echo $pdfContent;
+                    return;
+                }
+            }
+        } catch (\Exception $e) {
+            // Falha ao conectar no WP, tentar do cache local
+        }
+
+        // Fallback: tentar do meta_json local
         $meta = json_decode((string) ($etiqueta['meta_json'] ?? '{}'), true) ?: [];
         $labelData = $meta['_label_data'] ?? ($meta['_correios_label_data'] ?? '');
 
@@ -613,6 +653,6 @@ class AdminPacotesWordpressController extends Controller {
         }
 
         http_response_code(404);
-        echo 'PDF da etiqueta não disponível. Gere a etiqueta no WordPress primeiro.';
+        echo 'PDF da etiqueta não disponível para tracking ' . htmlspecialchars($tracking) . '. Gere a etiqueta no WordPress primeiro.';
     }
 }
