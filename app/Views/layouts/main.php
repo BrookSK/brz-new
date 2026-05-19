@@ -1813,6 +1813,7 @@ $popupLogo = !empty($siteLogo) ? $siteLogo : '';
 <?php endif; ?>
 
 <!-- Co-Piloto Braziliana -->
+<?php if (empty($_GET['embed'])): ?>
 <?php
 $__copilotoMostrar = false;
 try {
@@ -1841,8 +1842,10 @@ if ($__copilotoMostrar):
 ?>
 <script src="/assets/js/copiloto.js?v=<?= time() ?>" async></script>
 <?php endif; ?>
+<?php endif; /* embed copiloto */ ?>
 
 <!-- WhatsApp Floating Button -->
+<?php if (empty($_GET['embed'])): ?>
 <a href="https://wa.me/5517991098286" target="_blank" rel="noopener noreferrer"
    id="whatsapp-float"
    aria-label="Falar no WhatsApp"
@@ -1861,5 +1864,6 @@ if ($__copilotoMostrar):
     #whatsapp-float svg { width: 26px; height: 26px; }
 }
 </style>
+<?php endif; /* embed whatsapp */ ?>
 <script src="/assets/js/heatmap-tracker.js" defer></script>
 </html>

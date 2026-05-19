@@ -124,7 +124,7 @@
     const y = e.touches ? e.touches[0].clientY : e.clientY;
     const delta = startY - y;
     const maxH = window.innerHeight * 0.8;
-    const newH = Math.min(Math.max(startH + delta, 120), maxH);
+    const newH = Math.min(Math.max(startH + delta, 56), maxH);
     sidebar.style.height = newH + 'px';
   }
 
