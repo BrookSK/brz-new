@@ -342,8 +342,9 @@ class AdminRemessaCorreiosController extends Controller {
                     break;
                 }
             }
+            // Itens gratuitos (brinde): usar valor mínimo simbólico
             if ($valor === null || $valor <= 0) {
-                throw new \Exception('Pré-Postagem: item #' . $idx . ' com valor inválido');
+                $valor = 0.01;
             }
 
             $itensDeclaracao[] = [
