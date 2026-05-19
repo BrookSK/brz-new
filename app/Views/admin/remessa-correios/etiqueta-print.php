@@ -22,40 +22,42 @@ $simbolo = $simboloEncaminhamento ?? 'sedex';
 <script src="https://cdn.jsdelivr.net/npm/bwip-js@4.3.0/dist/bwip-js-min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-@page { size: 138mm 106mm; margin: 0; }
+@page { size: 100mm 150mm; margin: 0; }
 body {
-  width: 138mm; min-height: 106mm;
+  width: 100mm; height: 150mm;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 9pt; background: #fff; color: #000;
+  font-size: 8pt; background: #fff; color: #000;
+  overflow: hidden;
 }
 .label {
-  width: 138mm; min-height: 106mm;
+  width: 100mm; height: 150mm;
   border: 1.5px solid #000;
   display: flex; flex-direction: column;
+  overflow: hidden;
 }
 
 /* ─── HEADER: Logo/Marca + DataMatrix + Símbolo ─── */
 .lbl-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 3mm 5mm 2mm 5mm;
+  padding: 2mm 4mm 1.5mm 4mm;
   border-bottom: 1.5px solid #000;
-  min-height: 28mm;
+  min-height: 22mm;
 }
 .lbl-header .logo-correios {
-  width: 25mm; display: flex; flex-direction: column; align-items: flex-start;
+  width: 22mm; display: flex; flex-direction: column; align-items: flex-start;
 }
-.lbl-header .logo-correios img { width: 25mm; height: auto; }
+.lbl-header .logo-correios img { width: 22mm; height: auto; }
 .lbl-header .datamatrix { text-align: center; }
-.lbl-header .datamatrix canvas { width: 25mm; height: 25mm; }
-.lbl-header .simbolo { width: 20mm; text-align: right; }
-.lbl-header .simbolo img { width: 20mm; height: auto; }
+.lbl-header .datamatrix canvas { width: 20mm; height: 20mm; }
+.lbl-header .simbolo { width: 18mm; text-align: right; }
+.lbl-header .simbolo img { width: 18mm; height: auto; }
 
 /* ─── INFO SERVIÇO ─── */
 .lbl-info {
   display: flex; justify-content: space-between; align-items: stretch;
-  padding: 1.5mm 5mm;
+  padding: 1mm 4mm;
   border-bottom: 1.5px solid #000;
-  font-size: 8pt; line-height: 1.4;
+  font-size: 7pt; line-height: 1.3;
 }
 .lbl-info .col-left { }
 .lbl-info .col-center { text-align: center; font-weight: bold; font-size: 9pt; }
@@ -64,27 +66,27 @@ body {
 
 /* ─── CÓDIGO RASTREIO ─── */
 .lbl-tracking {
-  padding: 2mm 5mm;
+  padding: 1.5mm 4mm;
   border-bottom: 1.5px solid #000;
 }
 .lbl-tracking .code-text {
-  font-size: 11pt; font-weight: bold; letter-spacing: 1px;
-  text-align: center; margin-bottom: 1mm;
+  font-size: 10pt; font-weight: bold; letter-spacing: 1px;
+  text-align: center; margin-bottom: 0.5mm;
 }
 .lbl-tracking .barcode-row {
-  display: flex; align-items: center; gap: 3mm;
+  display: flex; align-items: center; gap: 2mm;
 }
-.lbl-tracking .barcode-row svg { flex: 1; height: 15mm; }
+.lbl-tracking .barcode-row svg { flex: 1; height: 12mm; }
 .lbl-tracking .servicos-adic {
-  font-size: 9pt; font-weight: bold; text-align: right;
-  line-height: 1.3; white-space: nowrap;
+  font-size: 8pt; font-weight: bold; text-align: right;
+  line-height: 1.2; white-space: nowrap;
 }
 
 /* ─── RECEBEDOR ─── */
 .lbl-recebedor {
-  padding: 2mm 5mm;
+  padding: 1.5mm 4mm;
   border-bottom: 1.5px solid #000;
-  font-size: 8pt; line-height: 2;
+  font-size: 7pt; line-height: 1.6;
 }
 .lbl-recebedor .field { display: flex; align-items: baseline; gap: 1mm; }
 .lbl-recebedor .field .fl { font-weight: bold; white-space: nowrap; }
@@ -100,25 +102,25 @@ body {
 .lbl-dest .dest-header {
   display: flex; align-items: center; justify-content: space-between;
   background: #000; color: #fff;
-  padding: 1mm 5mm; font-size: 9pt; font-weight: bold;
+  padding: 0.5mm 4mm; font-size: 8pt; font-weight: bold;
 }
 .lbl-dest .dest-header .correios-sm { font-size: 8pt; letter-spacing: 0.5px; }
 .lbl-dest .dest-body {
-  padding: 2mm 5mm; flex: 1;
-  display: flex; gap: 3mm;
+  padding: 1.5mm 4mm; flex: 1;
+  display: flex; gap: 2mm;
 }
 .lbl-dest .dest-body .dest-text { flex: 1; }
-.lbl-dest .dest-body .dest-text .dn { font-size: 10pt; font-weight: bold; margin-bottom: 0.5mm; }
-.lbl-dest .dest-body .dest-text .de { font-size: 9pt; line-height: 1.4; }
-.lbl-dest .dest-body .dest-text .db { font-size: 9pt; }
-.lbl-dest .dest-body .dest-text .dc { font-size: 11pt; font-weight: 900; margin-top: 1mm; }
+.lbl-dest .dest-body .dest-text .dn { font-size: 9pt; font-weight: bold; margin-bottom: 0.3mm; }
+.lbl-dest .dest-body .dest-text .de { font-size: 8pt; line-height: 1.3; }
+.lbl-dest .dest-body .dest-text .db { font-size: 8pt; }
+.lbl-dest .dest-body .dest-text .dc { font-size: 10pt; font-weight: 900; margin-top: 0.5mm; }
 .lbl-dest .dest-body .dest-barcode { display: flex; flex-direction: column; justify-content: flex-end; }
-.lbl-dest .dest-body .dest-barcode svg { width: 40mm; height: 15mm; }
+.lbl-dest .dest-body .dest-barcode svg { width: 35mm; height: 12mm; }
 
 /* ─── REMETENTE ─── */
 .lbl-rem {
-  padding: 2mm 5mm;
-  font-size: 8pt; line-height: 1.4;
+  padding: 1.5mm 4mm;
+  font-size: 7pt; line-height: 1.3;
 }
 .lbl-rem .rem-title { font-weight: bold; }
 .lbl-rem .rem-cep { font-weight: bold; margin-top: 0.5mm; }
@@ -146,13 +148,13 @@ body {
   <!-- HEADER: Logo Correios + DataMatrix (25x25mm) + Símbolo Encaminhamento -->
   <div class="lbl-header">
     <div class="logo-correios">
-      <img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="width:25mm;height:auto;">
+      <img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="width:22mm;height:auto;">
     </div>
     <div class="datamatrix">
       <canvas id="datamatrix"></canvas>
     </div>
     <div class="simbolo">
-      <img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="Símbolo" style="width:20mm;height:auto;">
+      <img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="Símbolo" style="width:18mm;height:auto;">
     </div>
   </div>
 
@@ -245,9 +247,9 @@ body {
     JsBarcode('#barcode-tracking', trackingCode, {
       format: 'CODE128',
       displayValue: false,
-      margin: 5,
-      height: 55,
-      width: 2
+      margin: 3,
+      height: 45,
+      width: 1.6
     });
   } catch(e){ console.error('Barcode tracking:', e); }
 
@@ -257,9 +259,9 @@ body {
       JsBarcode('#barcode-cep', cep, {
         format: 'CODE128C',
         displayValue: false,
-        margin: 5,
-        height: 50,
-        width: 1.8
+        margin: 3,
+        height: 40,
+        width: 1.5
       });
     } catch(e){ console.error('Barcode CEP:', e); }
   }
