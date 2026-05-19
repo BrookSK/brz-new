@@ -17,7 +17,19 @@
 
     <header id="bri-sidebar-header">
       <div class="bri-avatar">
-        <div class="bri-avatar-icon"><i class="bi bi-stars"></i></div>
+        <?php
+          $briAvatarSrc = '/public/assets/img/bri-avatar.gif';
+          try {
+              $pdoBri = \Config\Database::getConnection();
+              $stmtBri = $pdoBri->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'bri_avatar' LIMIT 1");
+              $stmtBri->execute();
+              $briAvatarDb = $stmtBri->fetchColumn();
+              if ($briAvatarDb && trim($briAvatarDb) !== '') {
+                  $briAvatarSrc = trim($briAvatarDb);
+              }
+          } catch (\Exception $e) {}
+        ?>
+        <div class="bri-avatar-icon"><img src="<?= htmlspecialchars($briAvatarSrc, ENT_QUOTES, 'UTF-8') ?>" alt="BRI" style="width:32px;height:32px;border-radius:50%;object-fit:cover;"></div>
       </div>
       <div class="bri-header-info">
         <span class="bri-nome">BRI</span>

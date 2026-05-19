@@ -609,6 +609,49 @@ class AdminConfiguracoesController extends Controller {
                                                 });
                                                 </script>
                                                 ';
+
+                                            // --- Avatar BRI ---
+                                            echo '
+                                            <div class="mb-4">
+                                                <div class="mb-2 fw-semibold">Avatar BRI (GIF/PNG)</div>
+                                                <div class="text-muted small mb-3">Imagem do avatar da assistente BRI exibida no chat.</div>
+                                                ';
+                                                $existingBriAvatar = (string) $this->getConfigValue($config, 'layout', 'bri_avatar', '');
+                                                $existingBriAvatar = is_string($existingBriAvatar) ? trim($existingBriAvatar) : '';
+                                                $existingBriAvatarEsc = htmlspecialchars($existingBriAvatar, ENT_QUOTES, 'UTF-8');
+                                                echo '
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-12 col-md-5">
+                                                        <div class="border rounded p-2" style="background: #fff;">
+                                                            <div class="text-muted small mb-2">Pré-visualização</div>
+                                                            <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
+                                                                ' . ($existingBriAvatarEsc !== '' ? '<img src="' . $existingBriAvatarEsc . '" alt="Avatar BRI" style="height: 40px; width: 40px; border-radius: 50%; object-fit: cover;"> <span class="text-muted small">' . $existingBriAvatarEsc . '</span>' : '<div class="text-muted">Nenhum avatar cadastrado (usando padrão)</div>') . '
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" name="layout_bri_avatar_keep" value="' . $existingBriAvatarEsc . '">
+                                                    </div>
+                                                    <div class="col-12 col-md-7">
+                                                        <label class="form-label">Upload do Avatar BRI</label>
+                                                        <input type="file" class="form-control" name="layout_bri_avatar" accept="image/gif,image/png,image/webp">
+                                                        <div class="mt-2">
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutBriAvatar">Remover avatar</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                document.addEventListener("DOMContentLoaded", function() {
+                                                    var btn = document.getElementById("btnRemoveLayoutBriAvatar");
+                                                    if (!btn) return;
+                                                    btn.addEventListener("click", function() {
+                                                        var input = document.querySelector("input[name=layout_bri_avatar_keep]");
+                                                        if (input) input.value = "";
+                                                        alert("Avatar BRI será removido ao salvar (voltará ao padrão).");
+                                                    });
+                                                });
+                                                </script>
+                                            </div>
+                                                ';
+
                                             $selectedLang = (string) ($_POST['layout_banners_lang'] ?? ($_GET['layout_banners_lang'] ?? 'pt'));
                                             if (!in_array($selectedLang, ['pt', 'en'], true)) {
                                                 $selectedLang = 'pt';
@@ -4469,6 +4512,39 @@ HTML;
             } catch (\Exception $e) {
             }
 
+            // Upload do avatar BRI
+            try {
+                $keepBriAvatar = (string) ($request->getParam('layout_bri_avatar_keep', '') ?? '');
+                $keepBriAvatar = trim($keepBriAvatar);
+
+                $briAvatarUrl = $keepBriAvatar;
+                if (isset($_FILES['layout_bri_avatar']) && is_array($_FILES['layout_bri_avatar'])) {
+                    $name = (string) ($_FILES['layout_bri_avatar']['name'] ?? '');
+                    $tmp = (string) ($_FILES['layout_bri_avatar']['tmp_name'] ?? '');
+                    $err = (int) ($_FILES['layout_bri_avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (in_array($ext, ['gif','png','webp'], true)) {
+                            $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+                            $uploadDir = $docRoot . '/public/uploads/logo/';
+                            if (!is_dir($uploadDir)) {
+                                @mkdir($uploadDir, 0755, true);
+                            }
+                            if (is_dir($uploadDir) && is_writable($uploadDir)) {
+                                $fileName = 'bri_avatar_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+                                $filePath = $uploadDir . $fileName;
+                                if (@move_uploaded_file($tmp, $filePath)) {
+                                    $briAvatarUrl = '/public/uploads/logo/' . $fileName;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $request->setParam('layout_bri_avatar', $briAvatarUrl);
+            } catch (\Exception $e) {
+            }
+
             // Upload de banners do layout
             try {
                 $bannersLang = (string) $request->getParam('layout_banners_lang', 'pt');
@@ -4654,7 +4730,7 @@ HTML;
             // Mapeamento de configurações
             $configMap = [
                 'loja' => ['nome', 'descricao', 'email', 'telefone', 'endereco', 'logo', 'conversao_moeda_ativa'],
-                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon'],
+                'layout' => ['banners', 'banners_en', 'logo', 'logo_footer', 'logo_admin', 'favicon', 'bri_avatar'],
                 'email' => ['driver', 'host', 'port', 'username', 'password', 'encryption', 'from', 'from_name', 'test_to'],
                 'pagamentos' => ['asaas_enabled', 'asaas_ambiente', 'asaas_api_key', 'stripe_enabled', 'stripe_ambiente', 'stripe_publishable_key', 'stripe_secret_key', 'stripe_webhook_secret', 'appmax_enabled', 'appmax_client_id', 'appmax_client_secret', 'appmax_app_id', 'appmax_access_token', 'appmax_ambiente', 'appmax_base_url', 'mercadopago_enabled', 'mercadopago_access_token', 'mercadopago_public_key', 'mercadopago_client_id', 'mercadopago_client_secret', 'cambioreal_enabled', 'cambioreal_base_url', 'cambioreal_app_id', 'cambioreal_app_public', 'cambioreal_app_secret', 'cambioreal_taxas_app_id', 'cambioreal_taxas_app_public', 'cambioreal_taxas_app_secret', 'webhook_link_pagamento_pedido_manual_url', 'pix_desconto_taxa_servico_percent'],
                 'clube' => ['cashback_percent', 'rendimento_percent', 'rendimento_turbo_percent', 'rendimento_intervalo_valor', 'rendimento_intervalo_unidade', 'cron_secret'],
