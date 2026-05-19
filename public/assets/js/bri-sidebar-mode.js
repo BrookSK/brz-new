@@ -183,7 +183,7 @@ const BriSidebar = (() => {
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados! 👤\n\nAqui você edita nome, email, telefone, CPF e foto de perfil.' },
       { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos! 📦\n\nVeja o status de cada compra, rastreamento e detalhes.' },
       { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços! 📍\n\nAdicione ou edite endereços de entrega para agilizar suas compras.' },
-      { regex: /meus tickets|tickets|suporte|atendimento|abrir.*ticket|como.*abr.*ticket|criar ticket|novo ticket/, url: '/meus-tickets', reply: 'Abrindo a página de tickets! 💬\n\nAqui você pode abrir um novo ticket ou acompanhar os existentes. Clique em "Novo Ticket" para criar uma solicitação e descrever o que precisa.' },
+      { regex: /meus tickets|tickets|suporte|atendimento|abrir.*ticket|como.*abr.*ticket|criar ticket|novo ticket/, url: '/meus-tickets?embed=1', reply: 'Para abrir um ticket de suporte:\n\n1. Acesse a página "Meus Tickets" (vou abrir ao lado)\n2. Clique no botão "Novo Ticket"\n3. Escolha o assunto e descreva sua dúvida\n4. Envie e aguarde — o time responde em até 24h\n\nSe preferir, pode me dizer sua dúvida aqui que eu tento resolver agora! 😊' },
       // Clube
       { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana|me mostr.*clube)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎\n\nFaça recargas para ter saldo e aproveitar benefícios exclusivos.' },
       { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube! ℹ️\n\nVeja como funciona o sistema de recargas e benefícios.' },
@@ -487,12 +487,8 @@ const BriSidebar = (() => {
         }).catch(() => {});
       },
       criar_ticket_suporte: () => {
-        fetch('/api/copiloto/ticket', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ assunto: p.assunto || 'Suporte via BRI', mensagem: p.mensagem || '' })
-        }).catch(() => {});
+        // Não criar ticket automaticamente — apenas instruir o usuário
+        navigatePainel('/meus-tickets?embed=1');
       },
       trocar_moeda_brl: () => { /* handled by currency converter */ },
       trocar_moeda_usd: () => { /* handled by currency converter */ },

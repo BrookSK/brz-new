@@ -611,8 +611,8 @@ AÇÕES QUE VOCÊ PODE INSTRUIR O SISTEMA A EXECUTAR:
   /meus-dados, /meus-pedidos, /rastreamento, /termos-uso, /politica-privacidade, /login, /register,
   /grupo/{slug} (grupos de compras), /produto/detalhes/{id} (detalhe do produto)
   NUNCA navegue para páginas /admin/*.
-- criar_ticket_suporte: abre ticket na categoria "suporte"
-- criar_ticket_duvida: abre ticket na categoria "duvidas_gerais"
+- criar_ticket_suporte: NAVEGA para a página de tickets e INSTRUI o usuário a criar o ticket manualmente. NÃO cria ticket automaticamente. Diga: "Vou abrir a página de tickets para você. Clique em 'Novo Ticket', escolha a categoria e descreva seu problema."
+- criar_ticket_duvida: NAVEGA para a página de tickets e INSTRUI o usuário a criar o ticket manualmente. NÃO cria ticket automaticamente. Diga: "Vou abrir a página de tickets para você. Clique em 'Novo Ticket' e descreva sua dúvida."
 - atualizar_perfil: atualiza dados do perfil do usuário. parametros.campos = {"telefone":"novo_valor","documento":"novo_cpf","cep":"15000-000","endereco":"Rua Nova","numero":"456","bairro":"Centro","cidade":"SP","estado":"SP",...}. Campos permitidos: nome, email, telefone, documento (CPF), data_nascimento, cep, endereco, numero, complemento, bairro, cidade, estado, pais. NUNCA atualizar senha pelo chat.
 - gerar_orcamento: gera orçamento de assessoria com links de produtos externos. OBRIGATÓRIO: parametros.links (array de URLs)
 - aceitar_termos_assessoria: aceita os termos da assessoria e adiciona os produtos do orçamento ao carrinho (só funciona na página de orçamento). IMPORTANTE: NÃO diga "Pronto, adicionei!" no texto — o sistema executa a ação e mostra o resultado real. Seu texto deve ser curto, tipo "Vou aceitar os termos e adicionar no carrinho..." O sistema mostra sucesso ou erro automaticamente.
