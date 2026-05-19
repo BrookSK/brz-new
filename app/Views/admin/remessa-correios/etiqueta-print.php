@@ -107,14 +107,14 @@ body {
 .lbl-dest .dest-header .correios-sm { font-size: 8pt; letter-spacing: 0.5px; }
 .lbl-dest .dest-body {
   padding: 1.5mm 4mm; flex: 1;
-  display: flex; gap: 2mm;
+  display: flex; flex-direction: column;
 }
-.lbl-dest .dest-body .dest-text { flex: 1; }
+.lbl-dest .dest-body .dest-text { }
 .lbl-dest .dest-body .dest-text .dn { font-size: 9pt; font-weight: bold; margin-bottom: 0.3mm; }
 .lbl-dest .dest-body .dest-text .de { font-size: 8pt; line-height: 1.3; }
 .lbl-dest .dest-body .dest-text .db { font-size: 8pt; }
-.lbl-dest .dest-body .dest-text .dc { font-size: 10pt; font-weight: 900; margin-top: 0.5mm; }
-.lbl-dest .dest-body .dest-barcode { display: flex; flex-direction: column; justify-content: flex-end; }
+.lbl-dest .dest-body .dest-text .dc { font-size: 9pt; font-weight: bold; margin-top: 0.5mm; }
+.lbl-dest .dest-body .dest-barcode { margin-top: 1mm; }
 .lbl-dest .dest-body .dest-barcode svg { width: 35mm; height: 12mm; }
 
 /* ─── REMETENTE ─── */
