@@ -63,13 +63,10 @@ const BriSidebar = (() => {
     if (!frame) return;
     showLoader();
     frame.src = url;
-    if (window.innerWidth < 768) {
-      painel?.classList.add('aberto');
-    }
   }
 
   function fecharPainel() {
-    painel?.classList.remove('aberto');
+    // No-op on mobile (no sliding panel anymore)
   }
 
   // ── Renderizar mensagens ────────────────────────────

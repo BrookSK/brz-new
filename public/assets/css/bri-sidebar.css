@@ -343,50 +343,75 @@ body {
 }
 
 /* ─────────────────────────────────────────────────
-   MOBILE (< 768px)
+   MOBILE (< 768px) — Layout vertical: Navegação em cima, Chat embaixo
 ───────────────────────────────────────────────── */
 @media (max-width: 767px) {
-  #bri-sidebar {
-    width: 100vw;
-    position: absolute;
-    top: 0; left: 0;
-    height: 100vh;
-    z-index: 2;
+  #bri-fullscreen-mode {
+    flex-direction: column;
+  }
+
+  /* Painel de navegação ocupa o topo */
+  #bri-painel {
+    order: 1;
+    flex: 1;
+    width: 100%;
+    height: auto;
+    position: relative;
+    min-height: 0;
   }
 
   #bri-divider { display: none; }
+  #bri-back-btn { display: none !important; }
 
-  #bri-painel {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 3;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
+  /* Sidebar (chat) fica embaixo, com altura mínima mostrando ~3 mensagens */
+  #bri-sidebar {
+    order: 2;
+    width: 100%;
+    height: 220px;
+    min-height: 140px;
+    max-height: 85vh;
+    border-right: none;
+    border-top: 1px solid var(--color-border);
+    position: relative;
+    transition: height 0.05s linear;
+    flex-shrink: 0;
   }
 
-  #bri-painel.aberto {
-    transform: translateX(0);
+  /* Handle de arraste */
+  #bri-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: var(--color-border-input);
+    border-radius: 4px;
+    z-index: 5;
+    margin-top: 6px;
   }
 
-  #bri-back-btn {
-    display: flex;
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    z-index: 4;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-btn);
-    padding: 6px 12px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--color-text);
-    gap: 6px;
-    align-items: center;
-    cursor: pointer;
-    box-shadow: var(--shadow-hover);
+  #bri-sidebar-header {
+    padding: 14px 16px 8px;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  #bri-sidebar-header:active {
+    cursor: grabbing;
+  }
+
+  #bri-mensagens {
+    padding: 8px 12px;
+  }
+
+  #bri-input-area {
+    padding: 8px 12px;
+  }
+
+  #bri-input {
+    font-size: 16px; /* Previne zoom no iOS */
   }
 }
 

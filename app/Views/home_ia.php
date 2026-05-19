@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>BRI IA — Braziliana Shop</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/public/assets/css/bri-sidebar.css">
@@ -94,6 +94,53 @@
 </div>
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
+<script>
+// Mobile: drag-to-resize chat panel
+(function() {
+  if (window.innerWidth >= 768) return;
+
+  const sidebar = document.getElementById('bri-sidebar');
+  const header = document.getElementById('bri-sidebar-header');
+  if (!sidebar || !header) return;
+
+  let dragging = false;
+  let startY = 0;
+  let startH = 0;
+
+  function onStart(e) {
+    if (window.innerWidth >= 768) return;
+    dragging = true;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    startH = sidebar.offsetHeight;
+    sidebar.style.transition = 'none';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    e.preventDefault();
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const delta = startY - y; // dragging up = positive = bigger
+    const newH = Math.min(Math.max(startH + delta, 140), window.innerHeight * 0.85);
+    sidebar.style.height = newH + 'px';
+  }
+
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    sidebar.style.transition = '';
+    document.body.style.overflow = '';
+  }
+
+  header.addEventListener('touchstart', onStart, { passive: true });
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend', onEnd);
+
+  header.addEventListener('mousedown', onStart);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onEnd);
+})();
+</script>
 
 </body>
 </html>
