@@ -3037,7 +3037,7 @@ class PaymentService {
                         $mapped = $this->mapearStatusCambioRealParaInterno((string)$data['status']);
                         $valor = (float)($data['amount'] ?? ($data['value'] ?? ($data['valor'] ?? $subtotal)));
                         // Registrar como pagamento de produtos
-                        $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                        $this->registrarPedidoPagamentoSplit([
                             'pedido_id' => $pedidoId,
                             'componente' => 'produtos',
                             'gateway' => 'cambioreal',
@@ -3047,7 +3047,7 @@ class PaymentService {
                             'status' => (string)$mapped['internal'],
                             'gateway_status' => (string)$mapped['status_norm'],
                             'payment_id' => $paymentId,
-                        ], 'produtos', 'cambioreal');
+                        ]);
                         $recovered[] = ['payment_id' => $paymentId, 'componente' => 'produtos'];
                     }
                 } catch (\Exception $e) {
@@ -3072,7 +3072,7 @@ class PaymentService {
                                     $valor = (float)($data['amount'] ?? ($data['value'] ?? $subtotal));
                                     $comp = strpos(strtolower((string)$m['meta_key']), 'taxa') !== false ? 'taxa_servico' : 'produtos';
                                     $gw = $comp === 'taxa_servico' ? 'cambioreal_taxas' : 'cambioreal';
-                                    $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                                    $this->registrarPedidoPagamentoSplit([
                                         'pedido_id' => $pedidoId,
                                         'componente' => $comp,
                                         'gateway' => $gw,
@@ -3082,7 +3082,7 @@ class PaymentService {
                                         'status' => (string)$mapped['internal'],
                                         'gateway_status' => (string)$mapped['status_norm'],
                                         'payment_id' => $val,
-                                    ], $comp, $gw);
+                                    ]);
                                     $recovered[] = ['payment_id' => $val, 'componente' => $comp];
                                 }
                             } catch (\Exception $e) {}
@@ -3100,7 +3100,7 @@ class PaymentService {
                     $totalTaxas = $servicos + $impostos + $impostoLocal;
 
                     // Registrar produtos
-                    $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                    $this->registrarPedidoPagamentoSplit([
                         'pedido_id' => $pedidoId,
                         'componente' => 'produtos',
                         'gateway' => 'cambioreal',
@@ -3110,12 +3110,12 @@ class PaymentService {
                         'status' => 'approved',
                         'gateway_status' => 'PAID',
                         'payment_id' => '',
-                    ], 'produtos', 'cambioreal');
+                    ]);
                     $recovered[] = ['componente' => 'produtos', 'valor' => $subtotal, 'source' => 'pedido_fields'];
 
                     // Registrar taxas (se houver)
                     if ($totalTaxas > 0) {
-                        $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                        $this->registrarPedidoPagamentoSplit([
                             'pedido_id' => $pedidoId,
                             'componente' => 'taxa_servico',
                             'gateway' => 'cambioreal_taxas',
@@ -3125,7 +3125,7 @@ class PaymentService {
                             'status' => 'approved',
                             'gateway_status' => 'PAID',
                             'payment_id' => '',
-                        ], 'taxa_servico', 'cambioreal_taxas');
+                        ]);
                         $recovered[] = ['componente' => 'taxa_servico', 'valor' => $totalTaxas, 'source' => 'pedido_fields'];
                     }
                 }
