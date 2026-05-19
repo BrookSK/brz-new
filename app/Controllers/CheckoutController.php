@@ -5442,6 +5442,10 @@ class CheckoutController extends Controller {
 
         // Validar Carnê Braziliana
         if ($formaPag === 'carne_braziliana') {
+            // Bloquear carnê para pedidos de assessoria
+            if (!empty($_SESSION['checkout_assessoria_orcamento_id'])) {
+                $erros[] = 'O Carnê Braziliana não está disponível para pedidos de assessoria.';
+            }
             // Verificar se o método está ativo
             try {
                 $carneServiceVal = new \App\Services\CarneService();

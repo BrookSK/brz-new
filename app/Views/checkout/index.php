@@ -34,6 +34,7 @@
         ?>
         window.CARNE_BRAZILIANA_DISPONIVEL = <?= $carneDispCheck ? 'true' : 'false' ?>;
         window.CARNE_VALOR_MINIMO = <?= json_encode($carneValorMinimo) ?>;
+        window.IS_ASSESSORIA = <?= !empty($_SESSION['checkout_assessoria_orcamento_id']) ? 'true' : 'false' ?>;
         window.CAMBIOREAL_DIRECT = {
             appId: <?= json_encode((string) ($cambioreal_app_id ?? ''), JSON_UNESCAPED_UNICODE) ?>,
             appPublic: <?= json_encode((string) ($cambioreal_app_public ?? ''), JSON_UNESCAPED_UNICODE) ?>,
@@ -2875,8 +2876,8 @@ function updatePaymentMethodsForCurrency(currency) {
         select.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
         select.appendChild(new Option('PIX', 'pix'));
 
-        // Carnê Braziliana: só BRL + Brasil
-        if (isBRL && isBR && window.CARNE_BRAZILIANA_DISPONIVEL) {
+        // Carnê Braziliana: só BRL + Brasil + não assessoria
+        if (isBRL && isBR && window.CARNE_BRAZILIANA_DISPONIVEL && !window.IS_ASSESSORIA) {
             // Checar valor mínimo (total em BRL)
             const carneMin = window.CARNE_VALOR_MINIMO || 0;
             const rate = Number(window.CAMBIOREAL_RATE_BRL || 5.5);
