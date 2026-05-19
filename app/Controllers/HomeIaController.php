@@ -74,6 +74,13 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#F5F7FA;
 .tip:hover{background:#EEF2FF;border-color:#C7D2FE;transform:translateY(-1px);}
 .tip:active{transform:translateY(0);}
 .tip i{color:#18253D;font-size:16px;flex-shrink:0;}
+.tip .tip-arrow{margin-left:auto;color:#94A3B8;font-size:12px;transition:transform .2s;display:none;}
+.tip.open .tip-arrow{transform:rotate(180deg);}
+.tip-desc{display:none;padding:8px 16px 12px 42px;font-size:12px;line-height:1.5;color:#64748B;background:#F8FAFC;border:1px solid #EBF0F6;border-top:none;border-radius:0 0 10px 10px;margin-top:-10px;margin-bottom:0;}
+.tip-desc.open{display:block;}
+@media(max-width:767px){
+  .tip .tip-arrow{display:block;}
+}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head><body>
@@ -82,32 +89,65 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#F5F7FA;
 <h1>Olá! Eu sou a BRI</h1>
 <p>Sua assistente inteligente da Braziliana Shop. Posso te ajudar a encontrar produtos, calcular fretes, acompanhar pedidos e muito mais.</p>
 <div class="tips">
-<div class="tip" data-msg="Como funciona a BRI? Como usar o chat?"><i class="bi bi-info-circle"></i>Como funciona / Como usar o chat</div>
-<div class="tip" data-msg="Como pesquisar um produto?"><i class="bi bi-search"></i>Como pesquisar um produto</div>
-<div class="tip" data-msg="Como calcular o valor do frete e total do pedido?"><i class="bi bi-calculator"></i>Como calcular valores e frete</div>
-<div class="tip" data-msg="Como acompanhar o status do meu pedido?"><i class="bi bi-box-seam"></i>Acompanhar status de pedidos</div>
-<div class="tip" data-msg="Como adicionar itens ao carrinho?"><i class="bi bi-cart-plus"></i>Adicionar itens ao carrinho</div>
-<div class="tip" data-msg="Quais são as perguntas frequentes? FAQ"><i class="bi bi-question-circle"></i>Perguntas frequentes (FAQ)</div>
-<div class="tip" data-msg="Quero abrir um ticket de suporte"><i class="bi bi-ticket-perforated"></i>Abrir um ticket</div>
+<div class="tip" data-msg="Como funciona a BRI? Como usar o chat?" data-desc="Basta digitar sua pergunta no campo abaixo. Eu entendo português e posso buscar produtos, calcular fretes, abrir páginas e muito mais. Tudo por texto!"><i class="bi bi-info-circle"></i>Como funciona / Como usar o chat<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
+<div class="tip" data-msg="Como pesquisar um produto?" data-desc="Digite o nome do produto (ex: tineco, pipoca, vitamina) e eu busco no catálogo. Você verá os resultados no painel de navegação acima."><i class="bi bi-search"></i>Como pesquisar um produto<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
+<div class="tip" data-msg="Como calcular o valor do frete e total do pedido?" data-desc="Adicione produtos ao carrinho e depois digite &quot;carrinho&quot;. Lá você verá o valor total com frete e taxas inclusos."><i class="bi bi-calculator"></i>Como calcular valores e frete<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
+<div class="tip" data-msg="Como acompanhar o status do meu pedido?" data-desc="Digite &quot;meus pedidos&quot; para ver todos os seus pedidos e o status de cada um, incluindo código de rastreamento."><i class="bi bi-box-seam"></i>Acompanhar status de pedidos<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
+<div class="tip" data-msg="Como adicionar itens ao carrinho?" data-desc="Busque um produto, clique em &quot;Add to cart&quot; no painel de navegação. Repita quantas vezes quiser e depois diga &quot;carrinho&quot; para ver o total."><i class="bi bi-cart-plus"></i>Adicionar itens ao carrinho<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
+<div class="tip" data-msg="Quais são as perguntas frequentes? FAQ" data-desc="Temos respostas sobre envio, prazos, formas de pagamento, devoluções e mais. Clique para ver o FAQ completo."><i class="bi bi-question-circle"></i>Perguntas frequentes (FAQ)<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
+<div class="tip" data-msg="Quero abrir um ticket de suporte" data-desc="Precisa de ajuda personalizada? Abra um ticket e nossa equipe responderá em até 24h."><i class="bi bi-ticket-perforated"></i>Abrir um ticket<span class="tip-arrow"><i class="bi bi-chevron-down"></i></span></div>
+<div class="tip-desc"></div>
 </div>
 </div>
 <script>
-document.querySelectorAll(".tip[data-msg]").forEach(function(el) {
-  el.addEventListener("click", function() {
-    var msg = el.getAttribute("data-msg");
-    if (!msg) return;
-    try {
-      var parentDoc = window.parent.document;
-      var input = parentDoc.getElementById("bri-input");
-      var sendBtn = parentDoc.getElementById("bri-send-btn");
-      if (input) {
-        input.value = msg;
-        input.dispatchEvent(new Event("input", {bubbles:true}));
-        if (sendBtn) sendBtn.click();
+(function() {
+  var isMobile = window.innerWidth < 768;
+  var tips = document.querySelectorAll(".tip[data-msg]");
+
+  tips.forEach(function(el) {
+    el.addEventListener("click", function() {
+      if (isMobile) {
+        // Mobile: toggle dropdown com descrição
+        var desc = el.getAttribute("data-desc") || "";
+        var descEl = el.nextElementSibling;
+        if (!descEl || !descEl.classList.contains("tip-desc")) return;
+
+        var wasOpen = descEl.classList.contains("open");
+
+        // Fechar todos
+        document.querySelectorAll(".tip-desc.open").forEach(function(d) { d.classList.remove("open"); d.textContent = ""; });
+        document.querySelectorAll(".tip.open").forEach(function(t) { t.classList.remove("open"); });
+
+        // Abrir este se estava fechado
+        if (!wasOpen) {
+          descEl.textContent = desc;
+          descEl.classList.add("open");
+          el.classList.add("open");
+        }
+      } else {
+        // Desktop: enviar no chat
+        var msg = el.getAttribute("data-msg");
+        if (!msg) return;
+        try {
+          var parentDoc = window.parent.document;
+          var input = parentDoc.getElementById("bri-input");
+          var sendBtn = parentDoc.getElementById("bri-send-btn");
+          if (input) {
+            input.value = msg;
+            input.dispatchEvent(new Event("input", {bubbles:true}));
+            if (sendBtn) sendBtn.click();
+          }
+        } catch(e) {}
       }
-    } catch(e) { console.warn("Não foi possível enviar ao chat:", e); }
+    });
   });
-});
+})();
 </script>
 </body></html>';
         exit;

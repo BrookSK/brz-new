@@ -377,29 +377,36 @@ body {
     flex: 0 0 auto;
     height: var(--bri-chat-h, 30%);
     border-right: none;
-    border-top: 1px solid var(--color-border);
+    border-top: none;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     transition: height 0.25s ease;
+    background: var(--color-surface);
   }
 
-  /* Handle visual */
-  #bri-sidebar::before {
+  /* Header com hierarquia visual: bordas arredondadas, sombra, levemente mais estreito */
+  #bri-sidebar-header {
+    padding: 14px 14px 6px;
+    border-bottom: none;
+    flex-shrink: 0;
+    background: var(--color-surface);
+    border-radius: 12px 12px 0 0;
+    margin: 0 6px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Drag handle bar */
+  #bri-sidebar-header::before {
     content: '';
     display: block;
     width: 36px;
     height: 4px;
     background: #CBD5E1;
     border-radius: 4px;
-    margin: 6px auto 0;
-    flex-shrink: 0;
-  }
-
-  #bri-sidebar-header {
-    padding: 8px 14px 4px;
-    border-bottom: none;
-    flex-shrink: 0;
+    margin: 0 auto 8px;
   }
 
   #bri-mensagens {
@@ -413,6 +420,8 @@ body {
   #bri-input-area {
     padding: 6px 10px 10px;
     flex-shrink: 0;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
   }
 
   #bri-input {
