@@ -34,8 +34,11 @@ const BriSidebar = (() => {
 
       // Se a URL do iframe não tem embed=1, recarregar com embed=1
       const iframePath = iframeWin.location.pathname + iframeWin.location.search;
+      console.log('[BRI-FRAME] iframe loaded:', iframePath);
+      console.log('[BRI-FRAME] iframe title:', iframeDoc.title);
       if (!iframePath.includes('embed=1') && !iframePath.includes('/bri/inicio') && !iframePath.includes('/checkout') && !iframePath.includes('/carrinho/checkout')) {
         const sep = iframePath.includes('?') ? '&' : '?';
+        console.log('[BRI-FRAME] Recarregando com embed=1:', iframePath + sep + 'embed=1');
         frame.src = iframePath + sep + 'embed=1';
         return;
       }
@@ -61,6 +64,7 @@ const BriSidebar = (() => {
   // ── Navegação no iframe ──────────────────────────────
   function navigatePainel(url) {
     if (!frame) return;
+    console.log('[BRI-NAV] navigatePainel chamado com URL:', url);
     showLoader();
     frame.src = url;
   }
@@ -455,6 +459,7 @@ const BriSidebar = (() => {
   function handleAcao(acao) {
     if (!frame || !acao) return;
     const { tipo, parametros } = acao;
+    console.log('[BRI-ACAO] handleAcao chamado. tipo:', tipo, 'parametros:', parametros);
     if (!tipo || tipo === 'nenhuma') return;
 
     const p = parametros || {};
@@ -545,6 +550,9 @@ const BriSidebar = (() => {
           '/pedidos': '/meus-pedidos',
           '/enderecos': '/meus-enderecos',
           '/suporte': '/meus-tickets',
+          '/tickets': '/meus-tickets',
+          '/ticket': '/meus-tickets',
+          '/support': '/meus-tickets',
           '/clube': '/clube/recarga',
           '/cart': '/carrinho',
           '/products': '/produtos',
