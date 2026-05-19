@@ -350,19 +350,12 @@ body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    height: 100%;
   }
 
   #bri-fullscreen-mode {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     flex-direction: column;
     overflow: hidden;
-    /* Usar env(safe-area-inset-bottom) para iPhones com notch/home indicator */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* height será setado via JS com window.innerHeight */
   }
 
   /* Painel de navegação ocupa todo o espaço restante */
@@ -377,19 +370,18 @@ body {
   #bri-divider { display: none; }
   #bri-back-btn { display: none !important; }
 
-  /* Chat fixo embaixo — usa flex-basis fixo, não height */
+  /* Chat embaixo */
   #bri-sidebar {
     order: 2;
     width: 100%;
-    flex: 0 0 30%;
-    min-height: 96px;
-    max-height: 80%;
+    flex: 0 0 auto;
+    height: var(--bri-chat-h, 30%);
     border-right: none;
     border-top: 1px solid var(--color-border);
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: flex-basis 0.25s ease;
+    transition: height 0.25s ease;
   }
 
   /* Handle visual */
@@ -419,16 +411,14 @@ body {
   }
 
   #bri-input-area {
-    padding: 6px 10px;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 10px 10px;
     flex-shrink: 0;
   }
 
   #bri-input {
-    font-size: 16px; /* Previne zoom no iOS */
+    font-size: 16px;
   }
 
-  /* Esconder wizard no mobile */
   #bri-wizard {
     display: none !important;
   }

@@ -95,28 +95,41 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: toggle chat entre minimizado (header+input) e expandido
+// Mobile: setar altura real da viewport + toggle chat
 (function() {
   if (window.innerWidth >= 768) return;
 
+  var container = document.getElementById('bri-fullscreen-mode');
   var sidebar = document.getElementById('bri-sidebar');
   var header = document.getElementById('bri-sidebar-header');
-  if (!sidebar || !header) return;
+  if (!container || !sidebar || !header) return;
 
+  // Setar altura do container = viewport visual real
+  function setRealHeight() {
+    var vh = window.innerHeight;
+    container.style.height = vh + 'px';
+    // Chat = 30% da viewport
+    var chatH = Math.round(vh * 0.3);
+    sidebar.style.height = chatH + 'px';
+  }
+
+  setRealHeight();
+  window.addEventListener('resize', setRealHeight);
+
+  // Toggle expandir/minimizar
   var expanded = true;
-
   header.addEventListener('click', function(e) {
     if (e.target.closest('button, a')) return;
     expanded = !expanded;
     if (expanded) {
-      sidebar.style.flex = '0 0 30%';
+      var chatH = Math.round(window.innerHeight * 0.3);
+      sidebar.style.height = chatH + 'px';
     } else {
-      // Minimizar: header + input
       var headerH = header.offsetHeight || 48;
       var inputArea = document.getElementById('bri-input-area');
       var inputH = inputArea ? inputArea.offsetHeight : 48;
-      var handleH = 10; // ::before handle
-      sidebar.style.flex = '0 0 ' + (headerH + inputH + handleH) + 'px';
+      var handleH = 10;
+      sidebar.style.height = (headerH + inputH + handleH) + 'px';
     }
   });
 })();
