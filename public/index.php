@@ -5,16 +5,28 @@ date_default_timezone_set('America/Sao_Paulo');
 // DEBUG: verificar se o deploy está atualizado (remover após confirmar)
 if (isset($_GET['_deploy_check'])) {
     header('Content-Type: application/json');
-    echo json_encode(['deploy_ts' => '2026-05-19T14:30:00', 'GET' => $_GET, 'query' => $_SERVER['QUERY_STRING'] ?? '']);
+    echo json_encode(['deploy_ts' => '2026-05-19T15:00:00', 'GET' => $_GET, 'query' => $_SERVER['QUERY_STRING'] ?? '']);
     exit;
 }
 
-// Forçar invalidação do OPcache para o controller de pacotes WordPress
+// Forçar invalidação do OPcache para controllers modificados
 if (function_exists('opcache_invalidate')) {
-    $pacotesCtrl = __DIR__ . '/../app/Controllers/AdminPacotesWordpressController.php';
-    if (is_file($pacotesCtrl)) {
-        opcache_invalidate($pacotesCtrl, true);
+    $filesToInvalidate = [
+        __DIR__ . '/../app/Controllers/AdminPacotesWordpressController.php',
+        __DIR__ . '/../app/routes_admin.php',
+    ];
+    foreach ($filesToInvalidate as $f) {
+        if (is_file($f)) {
+            @opcache_invalidate($f, true);
+        }
     }
+}
+// Também tentar resetar todo o cache se possível
+if (function_exists('opcache_reset') && isset($_GET['_opcache_reset'])) {
+    @opcache_reset();
+    header('Content-Type: text/plain');
+    echo 'OPcache reset done';
+    exit;
 }
 
 // Iniciar sessão antes de qualquer output
