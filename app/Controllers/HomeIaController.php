@@ -64,13 +64,15 @@ class HomeIaController extends Controller {
 <title>BRI — Início</title>
 <style>
 body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#F5F7FA;display:flex;align-items:center;justify-content:center;min-height:100vh;color:#1F2937;}
-.welcome{text-align:center;padding:40px;max-width:480px;}
+.welcome{text-align:center;padding:40px;max-width:520px;}
 .welcome-icon{width:72px;height:72px;margin:0 auto 20px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;}
 .welcome-icon img,.welcome-icon video{width:72px;height:72px;object-fit:cover;border-radius:50%;}
 .welcome h1{font-size:22px;font-weight:700;color:#18253D;margin:0 0 8px;}
 .welcome p{font-size:14px;color:#64748B;line-height:1.6;margin:0 0 24px;}
 .tips{display:grid;gap:10px;text-align:left;}
-.tip{background:#fff;border:1px solid #EBF0F6;border-radius:10px;padding:12px 16px;font-size:13px;color:#374151;display:flex;align-items:center;gap:10px;}
+.tip{background:#fff;border:1px solid #EBF0F6;border-radius:10px;padding:12px 16px;font-size:13px;color:#374151;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s,border-color .15s,transform .1s;}
+.tip:hover{background:#EEF2FF;border-color:#C7D2FE;transform:translateY(-1px);}
+.tip:active{transform:translateY(0);}
 .tip i{color:#18253D;font-size:16px;flex-shrink:0;}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -80,13 +82,33 @@ body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#F5F7FA;
 <h1>Olá! Eu sou a BRI</h1>
 <p>Sua assistente inteligente da Braziliana Shop. Posso te ajudar a encontrar produtos, calcular fretes, acompanhar pedidos e muito mais.</p>
 <div class="tips">
-<div class="tip"><i class="bi bi-search"></i>Buscar produtos por nome ou categoria</div>
-<div class="tip"><i class="bi bi-calculator"></i>Calcular custo total de envio</div>
-<div class="tip"><i class="bi bi-box-seam"></i>Acompanhar status de pedidos</div>
-<div class="tip"><i class="bi bi-cart-plus"></i>Adicionar itens ao carrinho</div>
-<div class="tip"><i class="bi bi-chat-dots"></i>Tirar dúvidas sobre o processo</div>
+<div class="tip" data-msg="Como funciona a BRI? Como usar o chat?"><i class="bi bi-info-circle"></i>Como funciona / Como usar o chat</div>
+<div class="tip" data-msg="Como pesquisar um produto?"><i class="bi bi-search"></i>Como pesquisar um produto</div>
+<div class="tip" data-msg="Como calcular o valor do frete e total do pedido?"><i class="bi bi-calculator"></i>Como calcular valores e frete</div>
+<div class="tip" data-msg="Como acompanhar o status do meu pedido?"><i class="bi bi-box-seam"></i>Acompanhar status de pedidos</div>
+<div class="tip" data-msg="Como adicionar itens ao carrinho?"><i class="bi bi-cart-plus"></i>Adicionar itens ao carrinho</div>
+<div class="tip" data-msg="Quais são as perguntas frequentes? FAQ"><i class="bi bi-question-circle"></i>Perguntas frequentes (FAQ)</div>
+<div class="tip" data-msg="Quero abrir um ticket de suporte"><i class="bi bi-ticket-perforated"></i>Abrir um ticket</div>
 </div>
 </div>
+<script>
+document.querySelectorAll(".tip[data-msg]").forEach(function(el) {
+  el.addEventListener("click", function() {
+    var msg = el.getAttribute("data-msg");
+    if (!msg) return;
+    try {
+      var parentDoc = window.parent.document;
+      var input = parentDoc.getElementById("bri-input");
+      var sendBtn = parentDoc.getElementById("bri-send-btn");
+      if (input) {
+        input.value = msg;
+        input.dispatchEvent(new Event("input", {bubbles:true}));
+        if (sendBtn) sendBtn.click();
+      }
+    } catch(e) { console.warn("Não foi possível enviar ao chat:", e); }
+  });
+});
+</script>
 </body></html>';
         exit;
     }
