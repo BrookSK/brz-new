@@ -359,21 +359,7 @@ body {
     height: -webkit-fill-available;
   }
 
-  /* Painel de navegação ocupa o topo */
-  #bri-painel {
-    order: 1;
-    flex: 1;
-    width: 100%;
-    height: auto;
-    position: relative;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  #bri-divider { display: none; }
-  #bri-back-btn { display: none !important; }
-
-  /* Sidebar (chat) fica embaixo */
+  /* Sidebar (chat) fica embaixo — fixo na parte inferior */
   #bri-sidebar {
     order: 2;
     width: 100%;
@@ -382,9 +368,25 @@ body {
     max-height: 80dvh;
     border-right: none;
     border-top: 1px solid var(--color-border);
-    position: relative;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
     flex-shrink: 0;
     overflow: hidden;
+  }
+
+  /* Painel de navegação precisa de padding-bottom para não ficar atrás do chat */
+  #bri-painel {
+    order: 1;
+    flex: 1;
+    width: 100%;
+    height: auto;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 200px;
   }
 
   /* Handle de arraste */
@@ -431,6 +433,9 @@ body {
   #bri-wizard {
     display: none !important;
   }
+
+  #bri-divider { display: none; }
+  #bri-back-btn { display: none !important; }
 }
 
 @media (min-width: 768px) {

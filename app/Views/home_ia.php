@@ -102,15 +102,19 @@
   const sidebar = document.getElementById('bri-sidebar');
   const header = document.getElementById('bri-sidebar-header');
   const input = document.getElementById('bri-input');
+  const painel = document.getElementById('bri-painel');
   if (!sidebar || !header) return;
 
   let dragging = false;
   let startY = 0;
   let startH = 0;
 
+  function updatePainelPadding() {
+    if (painel) painel.style.paddingBottom = sidebar.offsetHeight + 'px';
+  }
+
   function onStart(e) {
     if (window.innerWidth >= 768) return;
-    // Não iniciar drag se clicou em botão ou link
     if (e.target.closest('button, a, .bri-icon-btn')) return;
     dragging = true;
     startY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -126,12 +130,14 @@
     const maxH = window.innerHeight * 0.8;
     const newH = Math.min(Math.max(startH + delta, 56), maxH);
     sidebar.style.height = newH + 'px';
+    updatePainelPadding();
   }
 
   function onEnd() {
     if (!dragging) return;
     dragging = false;
     sidebar.style.transition = '';
+    updatePainelPadding();
   }
 
   header.addEventListener('touchstart', onStart, { passive: true });
