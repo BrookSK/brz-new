@@ -2,6 +2,13 @@
 // Timezone padrão: São Paulo
 date_default_timezone_set('America/Sao_Paulo');
 
+// DEBUG: verificar se o deploy está atualizado (remover após confirmar)
+if (isset($_GET['_deploy_check'])) {
+    header('Content-Type: application/json');
+    echo json_encode(['deploy_ts' => '2026-05-19T14:30:00', 'GET' => $_GET, 'query' => $_SERVER['QUERY_STRING'] ?? '']);
+    exit;
+}
+
 // Iniciar sessão antes de qualquer output
 $sessionLifetime = 60 * 60 * 24 * 7;
 ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
