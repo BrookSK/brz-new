@@ -162,19 +162,20 @@ class CopilotoService {
         $precoUsd = (float) ($contexto['produto_preco_usd'] ?? 0);
         $pesoKg = (float) ($contexto['produto_peso_kg'] ?? 0);
         $impostoLocal = (float) ($contexto['imposto_local_pct'] ?? 0);
-        if ($precoUsd > 0 && $pesoKg > 0) {
-            $calc = $this->calcularCustoTotal($precoUsd, $pesoKg, $impostoLocal);
-            $calculoProduto = "
-CÁLCULO DO PRODUTO ATUAL (já feito):
-Produto: US\$ {$calc['produto_usd']}
-Imposto local EUA: US\$ {$calc['imposto_local_usd']}
-Taxa de serviço: US\$ {$calc['taxa_servico_usd']} (faixa {$calc['faixa_kg']}kg × \$39)
-II (Imposto de Importação): US\$ {$calc['ii_usd']}
-ICMS (17% por dentro): US\$ {$calc['icms_usd']}
-Total impostos BR: US\$ {$calc['impostos_br_usd']}
-TOTAL: US\$ {$calc['total_usd']} ≈ R\$ {$calc['total_brl']}
-Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
-        }
+        // DESATIVADO: BRI não deve calcular valores, apenas instruir o usuário a usar o carrinho
+        // if ($precoUsd > 0 && $pesoKg > 0 && ($contexto['pagina'] ?? '') !== 'home_ia') {
+        //     $calc = $this->calcularCustoTotal($precoUsd, $pesoKg, $impostoLocal);
+        //     $calculoProduto = "
+        // CÁLCULO DO PRODUTO ATUAL (já feito):
+        // Produto: US\$ {$calc['produto_usd']}
+        // Imposto local EUA: US\$ {$calc['imposto_local_usd']}
+        // Taxa de serviço: US\$ {$calc['taxa_servico_usd']} (faixa {$calc['faixa_kg']}kg × \$39)
+        // II (Imposto de Importação): US\$ {$calc['ii_usd']}
+        // ICMS (17% por dentro): US\$ {$calc['icms_usd']}
+        // Total impostos BR: US\$ {$calc['impostos_br_usd']}
+        // TOTAL: US\$ {$calc['total_usd']} ≈ R\$ {$calc['total_brl']}
+        // Espaço restante na faixa: {$calc['espaco_restante_kg']}kg";
+        // }
 
         // Buscar conteúdo de referência relevante
         $conteudoRef = $this->buscarConteudoRelevante($mensagemUsuario);
@@ -696,6 +697,7 @@ REGRAS ADICIONAIS DE COMPORTAMENTO:
 1. Se você não tem certeza da intenção do usuário, NÃO chute. Responda com uma pergunta curta e ofereça 2 ou 3 alternativas em texto simples (ex: "Você quer ver o catálogo geral, os produtos do clube, ou buscar algo específico?"). Nunca fique em silêncio, nunca devolva resposta vazia, nunca invente URL.
 2. Se a mensagem do usuário contém palavras de frustração ("não consigo", "não acho", "não funciona", "errado", "isso não", "já tentei"), NÃO repita a ação que falhou. Reconheça brevemente e ofereça três caminhos em texto: tentar de outra forma, abrir assessoria pra trazer dos EUA, ou falar com humano.
 3. Se a mensagem contém uma URL externa (http:// ou https://), retorne a ação ir_para_assessoria com a URL no parâmetro contexto. Não tente buscar o produto no catálogo.
+4. NUNCA calcule valores, impostos, taxas ou totais por conta própria. Quando o usuário perguntar "quanto fica" ou "quanto custa", NÃO faça cálculos. Instrua o usuário a adicionar o produto ao carrinho ("Add to cart") e depois dizer "carrinho" para ver o valor total calculado automaticamente pelo sistema. O carrinho mostra todos os valores corretos.
 
 FORMATO DE RESPOSTA — JSON OBRIGATÓRIO:
 {"texto":"resposta","acao":"nome_ou_nenhuma","parametros":{},"requer_confirmacao":false,"mensagem_confirmacao":null,"max_tentativas_problema":null,"oferecer_ticket":false,"sugestao_valor":null,"aprendizado":{"gerar_pendencia":false,"tipos":[],"resumo_problema":null,"impacto_estimado":null,"documento_afetado":null,"topico_afetado":null,"texto_sugerido":null,"justificativa_juridica":null,"etapa_processo_falhou":null,"sugestao_processo":null,"area_responsavel":null}}
