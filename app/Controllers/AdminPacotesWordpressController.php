@@ -284,30 +284,60 @@ class AdminPacotesWordpressController extends Controller {
     // ─── Rotas Públicas (Views) ────────────────────────────────────────────────
 
     public function index(Request $request) {
+        // DEBUG TEMPORÁRIO - remover após resolver
+        if (isset($_GET['debug_action'])) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'GET' => $_GET,
+                'action_from_request' => $request->getParam('action'),
+                'action_from_get' => $_GET['action'] ?? null,
+                'all_params' => $request->getParams(),
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+                'query_string' => $_SERVER['QUERY_STRING'] ?? '',
+            ], JSON_PRETTY_PRINT);
+            exit;
+        }
+
         // Dispatch por action (fallback caso a rota aponte direto para index)
         $action = trim((string) $request->getParam('action', ''));
+        
+        // Fallback: ler direto do $_GET caso o Request não tenha capturado
+        if ($action === '' && isset($_GET['action'])) {
+            $action = trim((string) $_GET['action']);
+        }
+        
         if ($action !== '') {
             switch ($action) {
                 case 'etiqueta-pdf':
-                    return $this->etiquetaPdf($request);
+                    $this->etiquetaPdf($request);
+                    return;
                 case 'containers':
-                    return $this->containers($request);
+                    $this->containers($request);
+                    return;
                 case 'container-novo':
-                    return $this->containerNovo($request);
+                    $this->containerNovo($request);
+                    return;
                 case 'container-detalhes':
-                    return $this->containerDetalhes($request);
+                    $this->containerDetalhes($request);
+                    return;
                 case 'faturas':
-                    return $this->faturas($request);
+                    $this->faturas($request);
+                    return;
                 case 'fatura-nova':
-                    return $this->faturaNova($request);
+                    $this->faturaNova($request);
+                    return;
                 case 'sincronizar':
-                    return $this->sincronizar($request);
+                    $this->sincronizar($request);
+                    return;
                 case 'container-criar':
-                    return $this->containerCriar($request);
+                    $this->containerCriar($request);
+                    return;
                 case 'container-deletar':
-                    return $this->containerDeletar($request);
+                    $this->containerDeletar($request);
+                    return;
                 case 'fatura-criar':
-                    return $this->faturaCriar($request);
+                    $this->faturaCriar($request);
+                    return;
             }
         }
 
