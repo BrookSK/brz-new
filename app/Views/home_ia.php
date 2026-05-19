@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>BRI IA — Braziliana Shop</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/public/assets/css/bri-sidebar.css">
@@ -95,7 +95,7 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: toggle chat entre minimizado (header+input) e expandido (30vh)
+// Mobile: toggle chat entre minimizado (header+input) e expandido
 (function() {
   if (window.innerWidth >= 768) return;
 
@@ -103,20 +103,20 @@
   var header = document.getElementById('bri-sidebar-header');
   if (!sidebar || !header) return;
 
-  var expanded = true; // inicia expandido
+  var expanded = true;
 
   header.addEventListener('click', function(e) {
-    // Ignorar se clicou em botão/link
     if (e.target.closest('button, a')) return;
     expanded = !expanded;
     if (expanded) {
-      sidebar.style.height = '30vh';
+      sidebar.style.flex = '0 0 30%';
     } else {
-      // Minimizar: apenas header + input visíveis
+      // Minimizar: header + input
       var headerH = header.offsetHeight || 48;
       var inputArea = document.getElementById('bri-input-area');
       var inputH = inputArea ? inputArea.offsetHeight : 48;
-      sidebar.style.height = (headerH + inputH) + 'px';
+      var handleH = 10; // ::before handle
+      sidebar.style.flex = '0 0 ' + (headerH + inputH + handleH) + 'px';
     }
   });
 })();
