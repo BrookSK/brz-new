@@ -108,7 +108,18 @@
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="/admin/wp-etiqueta?id=<?= $eid ?>" target="_blank" title="Baixar PDF"><i class="fas fa-file-pdf"></i></a>
+                                            <?php
+                                                // Link direto para o WordPress onde a etiqueta pode ser baixada
+                                                $wpOrigemUrl = '';
+                                                $origemLower = strtolower((string) ($e['origem'] ?? 'red'));
+                                                if ($origemLower === 'br') $wpOrigemUrl = 'https://br.brazilianashop.com.br';
+                                                elseif ($origemLower === 'red') $wpOrigemUrl = 'https://redirecionamento.brazilianashop.com.br';
+                                                elseif ($origemLower === 'us') $wpOrigemUrl = 'https://us.brazilianashop.com.br';
+                                                $wpPostId = (int) ($e['wp_post_id'] ?? 0);
+                                            ?>
+                                            <?php if ($wpPostId > 0 && $wpOrigemUrl !== ''): ?>
+                                                <a class="btn btn-sm btn-outline-primary" href="<?= $wpOrigemUrl ?>/wp-admin/post.php?post=<?= $wpPostId ?>&action=edit" target="_blank" title="Abrir no WordPress"><i class="fas fa-file-pdf"></i></a>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -143,7 +154,17 @@
                                     <?php endif; ?>
                                 </div>
                                 <?php if ($trk !== ''): ?>
-                                    <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="/admin/wp-etiqueta?id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                    <?php
+                                        $wpOrigemUrl2 = '';
+                                        $origemLower2 = strtolower((string) ($e['origem'] ?? 'red'));
+                                        if ($origemLower2 === 'br') $wpOrigemUrl2 = 'https://br.brazilianashop.com.br';
+                                        elseif ($origemLower2 === 'red') $wpOrigemUrl2 = 'https://redirecionamento.brazilianashop.com.br';
+                                        elseif ($origemLower2 === 'us') $wpOrigemUrl2 = 'https://us.brazilianashop.com.br';
+                                        $wpPostId2 = (int) ($e['wp_post_id'] ?? 0);
+                                    ?>
+                                    <?php if ($wpPostId2 > 0 && $wpOrigemUrl2 !== ''): ?>
+                                        <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="<?= $wpOrigemUrl2 ?>/wp-admin/post.php?post=<?= $wpPostId2 ?>&action=edit" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>

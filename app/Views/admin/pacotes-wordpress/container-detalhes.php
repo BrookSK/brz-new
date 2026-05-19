@@ -74,7 +74,17 @@
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="/admin/wp-etiqueta?id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                            <?php
+                                                $wpOrigemUrl3 = '';
+                                                $origemLower3 = strtolower((string) ($e['origem'] ?? 'red'));
+                                                if ($origemLower3 === 'br') $wpOrigemUrl3 = 'https://br.brazilianashop.com.br';
+                                                elseif ($origemLower3 === 'red') $wpOrigemUrl3 = 'https://redirecionamento.brazilianashop.com.br';
+                                                elseif ($origemLower3 === 'us') $wpOrigemUrl3 = 'https://us.brazilianashop.com.br';
+                                                $wpPostId3 = (int) ($e['wp_post_id'] ?? 0);
+                                            ?>
+                                            <?php if ($wpPostId3 > 0 && $wpOrigemUrl3 !== ''): ?>
+                                                <a class="btn btn-sm btn-outline-primary" href="<?= $wpOrigemUrl3 ?>/wp-admin/post.php?post=<?= $wpPostId3 ?>&action=edit" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
