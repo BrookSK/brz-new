@@ -95,43 +95,89 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: setar altura real da viewport + toggle chat
+// Mobile: drag para redimensionar + auto-expand quando BRI responde
 (function() {
   if (window.innerWidth >= 768) return;
 
   var container = document.getElementById('bri-fullscreen-mode');
   var sidebar = document.getElementById('bri-sidebar');
   var header = document.getElementById('bri-sidebar-header');
+  var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
+
+  var minH = 100; // será recalculado
+  var maxH = Math.round(window.innerHeight * 0.8);
 
   // Setar altura do container = viewport visual real
   function setRealHeight() {
     var vh = window.innerHeight;
     container.style.height = vh + 'px';
-    // Chat = 30% da viewport
-    var chatH = Math.round(vh * 0.3);
-    sidebar.style.height = chatH + 'px';
+    maxH = Math.round(vh * 0.8);
+    // Recalcular min
+    var inputArea = document.getElementById('bri-input-area');
+    var hH = header.offsetHeight || 48;
+    var iH = inputArea ? inputArea.offsetHeight : 48;
+    minH = hH + iH + 10; // +10 para handle
   }
 
   setRealHeight();
   window.addEventListener('resize', setRealHeight);
 
-  // Toggle expandir/minimizar
-  var expanded = true;
-  header.addEventListener('click', function(e) {
+  // Setar altura inicial = 30%
+  setTimeout(function() {
+    setRealHeight();
+    sidebar.style.height = Math.round(window.innerHeight * 0.3) + 'px';
+  }, 50);
+
+  // === DRAG ===
+  var isDragging = false;
+  var startY = 0;
+  var startH = 0;
+
+  header.addEventListener('touchstart', function(e) {
     if (e.target.closest('button, a')) return;
-    expanded = !expanded;
-    if (expanded) {
-      var chatH = Math.round(window.innerHeight * 0.3);
-      sidebar.style.height = chatH + 'px';
-    } else {
-      var headerH = header.offsetHeight || 48;
-      var inputArea = document.getElementById('bri-input-area');
-      var inputH = inputArea ? inputArea.offsetHeight : 48;
-      var handleH = 10;
-      sidebar.style.height = (headerH + inputH + handleH) + 'px';
-    }
+    isDragging = true;
+    startY = e.touches[0].clientY;
+    startH = sidebar.offsetHeight;
+    sidebar.style.transition = 'none';
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    var y = e.touches[0].clientY;
+    var diff = startY - y; // positivo = dedo subiu = chat maior
+    var newH = startH + diff;
+    if (newH < minH) newH = minH;
+    if (newH > maxH) newH = maxH;
+    sidebar.style.height = newH + 'px';
+  }, { passive: false });
+
+  document.addEventListener('touchend', function() {
+    if (!isDragging) return;
+    isDragging = false;
+    sidebar.style.transition = '';
   });
+
+  // === AUTO-EXPAND quando BRI responde ===
+  // Observar mudanças no container de mensagens
+  if (msgsEl && window.MutationObserver) {
+    var observer = new MutationObserver(function() {
+      // Quando uma nova mensagem aparece, expandir para 50% se está menor
+      var currentH = sidebar.offsetHeight;
+      var targetH = Math.round(window.innerHeight * 0.5);
+      if (currentH < targetH) {
+        sidebar.style.transition = 'height 0.3s ease';
+        sidebar.style.height = targetH + 'px';
+        setTimeout(function() { sidebar.style.transition = ''; }, 350);
+      }
+      // Scroll para baixo
+      setTimeout(function() {
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }, 100);
+    });
+    observer.observe(msgsEl, { childList: true, subtree: true });
+  }
 })();
 </script>
 
