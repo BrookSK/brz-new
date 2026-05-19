@@ -4,7 +4,7 @@ date_default_timezone_set('America/Sao_Paulo');
 
 // Endpoint direto para etiqueta PDF (contorna OPcache)
 $_uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-if ($_uri === '/wp-etiqueta') {
+if ($_uri === '/admin/wp-etiqueta') {
     // Parse query string direto do REQUEST_URI (nginx pode não passar $_GET)
     $_qs = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '';
     parse_str($_qs, $_qsParams);

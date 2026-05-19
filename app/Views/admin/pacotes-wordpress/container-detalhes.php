@@ -74,7 +74,7 @@
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="/wp-etiqueta?id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                            <a class="btn btn-sm btn-outline-primary" href="/admin/wp-etiqueta?id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
