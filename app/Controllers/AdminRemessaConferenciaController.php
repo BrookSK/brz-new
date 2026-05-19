@@ -337,6 +337,12 @@ class AdminRemessaConferenciaController extends Controller {
             $where = ['1=1'];
             $params = [];
 
+            // Excluir pedidos cancelados, deletados ou na lixeira
+            $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','canceled','excluido','deleted','lixeira','trash')";
+            if (is_array($colsPedidos) && in_array('deleted_at', $colsPedidos, true)) {
+                $where[] = 'p.deleted_at IS NULL';
+            }
+
             if (!empty($filtros['janela_id'])) {
                 $where[] = 'rjp.janela_id = :janela_id';
                 $params[':janela_id'] = (int)$filtros['janela_id'];
