@@ -167,7 +167,7 @@ class AdminPacotesWordpressController extends Controller {
         $postIds = array_column($packages, 'ID');
         $placeholders = implode(',', array_fill(0, count($postIds), '?'));
 
-        // Buscar todos os postmeta de uma vez
+        // Buscar todos os postmeta dos packages
         $metaSql = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$placeholders})";
         $stMeta = $wpPdo->prepare($metaSql);
         $stMeta->execute($postIds);
@@ -179,6 +179,36 @@ class AdminPacotesWordpressController extends Controller {
             $pid = (int) $m['post_id'];
             if (!isset($metaByPost[$pid])) $metaByPost[$pid] = [];
             $metaByPost[$pid][$m['meta_key']] = $m['meta_value'];
+        }
+
+        // Coletar order IDs para buscar dados de endereço
+        $orderIds = [];
+        foreach ($packages as $pkg) {
+            $wpId = (int) $pkg['ID'];
+            $meta = $metaByPost[$wpId] ?? [];
+            $oid = (int) ($meta['_package_order_id'] ?? 0);
+            if ($oid > 0) $orderIds[$oid] = true;
+        }
+        $orderIds = array_keys($orderIds);
+
+        // Buscar meta dos orders (endereço de entrega)
+        $orderMetaByPost = [];
+        if (!empty($orderIds)) {
+            $orderKeys = ['_shipping_first_name','_shipping_last_name','_shipping_address_1','_shipping_address_2',
+                '_shipping_number','_shipping_city','_shipping_state','_shipping_postcode','_shipping_country',
+                '_billing_email','_billing_phone','_billing_cpf','_billing_first_name','_billing_last_name',
+                '_billing_document_type'];
+            $oPlaceholders = implode(',', array_fill(0, count($orderIds), '?'));
+            $kPlaceholders = implode(',', array_fill(0, count($orderKeys), '?'));
+            $orderMetaSql = "SELECT post_id, meta_key, meta_value FROM {$prefix}postmeta WHERE post_id IN ({$oPlaceholders}) AND meta_key IN ({$kPlaceholders})";
+            $stOrderMeta = $wpPdo->prepare($orderMetaSql);
+            $stOrderMeta->execute(array_merge($orderIds, $orderKeys));
+            $allOrderMeta = $stOrderMeta->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            foreach ($allOrderMeta as $m) {
+                $pid = (int) $m['post_id'];
+                if (!isset($orderMetaByPost[$pid])) $orderMetaByPost[$pid] = [];
+                $orderMetaByPost[$pid][$m['meta_key']] = $m['meta_value'];
+            }
         }
 
         $synced = 0;
@@ -202,17 +232,30 @@ class AdminPacotesWordpressController extends Controller {
             $orderId = (int) ($meta['_package_order_id'] ?? 0);
             $tracking = (string) ($meta['_correios_tracking_code'] ?? '');
             $containerId = !empty($meta['_container_id']) ? (int) $meta['_container_id'] : null;
-            $clienteNome = (string) ($meta['_recipient_name'] ?? '');
 
-            // Se não tem recipient_name no meta, tentar buscar do pedido WooCommerce
-            if ($clienteNome === '' && $orderId > 0) {
-                $orderMeta = $metaByPost[$orderId] ?? [];
-                $firstName = (string) ($orderMeta['_shipping_first_name'] ?? ($orderMeta['_billing_first_name'] ?? ''));
-                $lastName = (string) ($orderMeta['_shipping_last_name'] ?? ($orderMeta['_billing_last_name'] ?? ''));
-                $clienteNome = trim($firstName . ' ' . $lastName);
-            }
+            // Buscar dados do order (endereço)
+            $orderMeta = ($orderId > 0) ? ($orderMetaByPost[$orderId] ?? []) : [];
 
-            $metaJson = json_encode($meta, JSON_UNESCAPED_UNICODE);
+            $firstName = (string) ($orderMeta['_shipping_first_name'] ?? ($orderMeta['_billing_first_name'] ?? ''));
+            $lastName = (string) ($orderMeta['_shipping_last_name'] ?? ($orderMeta['_billing_last_name'] ?? ''));
+            $clienteNome = trim($firstName . ' ' . $lastName);
+
+            // Montar meta completo com dados do order para o PDF
+            $fullMeta = $meta;
+            $fullMeta['_order_shipping_first_name'] = $firstName;
+            $fullMeta['_order_shipping_last_name'] = $lastName;
+            $fullMeta['_order_shipping_address_1'] = (string) ($orderMeta['_shipping_address_1'] ?? '');
+            $fullMeta['_order_shipping_address_2'] = (string) ($orderMeta['_shipping_address_2'] ?? '');
+            $fullMeta['_order_shipping_number'] = (string) ($orderMeta['_shipping_number'] ?? '');
+            $fullMeta['_order_shipping_city'] = (string) ($orderMeta['_shipping_city'] ?? '');
+            $fullMeta['_order_shipping_state'] = (string) ($orderMeta['_shipping_state'] ?? '');
+            $fullMeta['_order_shipping_postcode'] = (string) ($orderMeta['_shipping_postcode'] ?? '');
+            $fullMeta['_order_shipping_country'] = (string) ($orderMeta['_shipping_country'] ?? '');
+            $fullMeta['_order_billing_email'] = (string) ($orderMeta['_billing_email'] ?? '');
+            $fullMeta['_order_billing_phone'] = (string) ($orderMeta['_billing_phone'] ?? '');
+            $fullMeta['_order_billing_cpf'] = (string) ($orderMeta['_billing_cpf'] ?? '');
+
+            $metaJson = json_encode($fullMeta, JSON_UNESCAPED_UNICODE);
             $createdAt = $pkg['post_date'] ?? date('Y-m-d H:i:s');
 
             try {
