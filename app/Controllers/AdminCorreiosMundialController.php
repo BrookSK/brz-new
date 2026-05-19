@@ -2907,9 +2907,9 @@ class AdminCorreiosMundialController extends Controller {
             return;
         }
 
-        // Gerar IDs fictícios para wp_posts (começando de um número alto para evitar conflitos)
-        $postIdBase = 90000;
-        $metaIdBase = 1000000;
+        // Gerar IDs fictícios para wp_posts — buscar último ID usado no banco para nunca repetir
+        $postIdBase = $this->getNextWpExportPostId();
+        $metaIdBase = $this->getNextWpExportMetaId();
 
         $wpPosts = [];
         $wpPostmeta = [];
@@ -3029,12 +3029,83 @@ class AdminCorreiosMundialController extends Controller {
             $wpPostmeta
         );
 
+        // Salvar próximos IDs para nunca repetir em exportações futuras
+        $nextPostId = $postIdBase + count($etiquetas);
+        $nextMetaId = $metaIdCounter;
+        $this->saveWpExportCounter('wp_export_next_post_id', $nextPostId);
+        $this->saveWpExportCounter('wp_export_next_meta_id', $nextMetaId);
+
         $this->json([
             'success' => true,
             'wp_posts_csv' => $postsCsv,
             'wp_postmeta_csv' => $postmetaCsv,
             'total_etiquetas' => count($etiquetas),
         ]);
+    }
+
+    /**
+     * Busca o próximo post_id para exportação CSV (nunca repete).
+     * Começa em 91000 e incrementa a cada exportação.
+     */
+    private function getNextWpExportPostId(): int {
+        return $this->getWpExportCounter('wp_export_next_post_id', 91000);
+    }
+
+    /**
+     * Busca o próximo meta_id para exportação CSV (nunca repete).
+     */
+    private function getNextWpExportMetaId(): int {
+        return $this->getWpExportCounter('wp_export_next_meta_id', 1100000);
+    }
+
+    /**
+     * Lê um contador de exportação da tabela configuracoes_sistema.
+     */
+    private function getWpExportCounter(string $chave, int $default): int {
+        try {
+            if (!$this->tableExists('configuracoes_sistema')) {
+                return $default;
+            }
+            $cols = $this->getTableColumns('configuracoes_sistema');
+            if (!in_array('chave', $cols, true) || !in_array('valor', $cols, true)) {
+                return $default;
+            }
+            $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+            $st->execute([$chave]);
+            $val = (int) ($st->fetchColumn() ?: 0);
+            return $val > 0 ? $val : $default;
+        } catch (\Exception $e) {
+            return $default;
+        }
+    }
+
+    /**
+     * Salva um contador de exportação na tabela configuracoes_sistema.
+     */
+    private function saveWpExportCounter(string $chave, int $valor): void {
+        try {
+            if (!$this->tableExists('configuracoes_sistema')) {
+                return;
+            }
+            $cols = $this->getTableColumns('configuracoes_sistema');
+            if (!in_array('chave', $cols, true) || !in_array('valor', $cols, true)) {
+                return;
+            }
+            // Verificar se já existe
+            $st = $this->connection->prepare('SELECT COUNT(*) FROM configuracoes_sistema WHERE chave = ?');
+            $st->execute([$chave]);
+            $exists = (int) $st->fetchColumn() > 0;
+
+            if ($exists) {
+                $st = $this->connection->prepare('UPDATE configuracoes_sistema SET valor = ? WHERE chave = ?');
+                $st->execute([(string) $valor, $chave]);
+            } else {
+                $st = $this->connection->prepare('INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?)');
+                $st->execute([$chave, (string) $valor]);
+            }
+        } catch (\Exception $e) {
+            // Silenciar — não impedir a exportação por falha ao salvar contador
+        }
     }
 
     /**
