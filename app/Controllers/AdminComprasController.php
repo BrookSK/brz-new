@@ -1815,7 +1815,7 @@ class AdminComprasController extends Controller {
 
                                     $imgUrl = $this->resolveProdutoImagem($item);
                                     $imgTag = $imgUrl
-                                        ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06);">'
+                                        ? '<img src="' . htmlspecialchars($imgUrl) . '" alt="" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($imgUrl) . '" style="width:36px;height:36px;object-fit:cover;border-radius:10px; border: 1px solid rgba(148, 163, 184, 0.22); background: rgba(148, 163, 184, 0.06); cursor:pointer;" title="Clique para ampliar">'
                                         : '<div style="width:36px;height:36px;border-radius:10px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:center;color:#64748b;"><i class="fas fa-image"></i></div>';
 
                                     $lojaNome = '-';
@@ -1913,7 +1913,7 @@ class AdminComprasController extends Controller {
                             $mPrioClass = $mPrioridade == 'urgente' ? 'danger' : ($mPrioridade == 'alta' ? 'warning' : 'info');
                             $mImgUrl = $this->resolveProdutoImagem($mItem);
                             $mImgTag = $mImgUrl
-                                ? '<img src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;">'
+                                ? '<img src="' . htmlspecialchars($mImgUrl) . '" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" title="Clique para ampliar">'
                                 : '<div style="width:32px;height:32px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;"><i class="fas fa-image text-muted" style="font-size:12px;"></i></div>';
 
                             echo '<div class="border-bottom py-2">
@@ -2389,6 +2389,33 @@ class AdminComprasController extends Controller {
                 echo '</main>
         </div>
     </div>';
+
+    // Modal: Zoom da imagem do produto
+    echo '<div class="modal fade" id="modalImagemZoom" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background:transparent;border:none;box-shadow:none;">
+                <div class="modal-body text-center p-0 position-relative">
+                    <button type="button" class="btn-close position-absolute" data-bs-dismiss="modal" aria-label="Fechar" style="top:8px;right:8px;z-index:10;background-color:#fff;border-radius:50%;padding:8px;opacity:1;"></button>
+                    <img id="imgZoomFull" src="" alt="Imagem do produto" style="max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+                </div>
+            </div>
+        </div>
+    </div>';
+
+    echo '<script>
+    document.addEventListener("click", function(e) {
+        var trigger = e.target.closest(".img-zoom-trigger");
+        if (!trigger) return;
+        var src = trigger.getAttribute("data-img-src");
+        if (!src) return;
+        var imgEl = document.getElementById("imgZoomFull");
+        if (imgEl) imgEl.src = src;
+        var modal = document.getElementById("modalImagemZoom");
+        if (modal && window.bootstrap && window.bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        }
+    });
+    </script>';
 
     // Renderizar scripts
     renderAdminScripts();
