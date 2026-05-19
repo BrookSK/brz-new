@@ -105,29 +105,27 @@
   var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
 
-  var minH = 100; // será recalculado
+  var minH = 100;
   var maxH = Math.round(window.innerHeight * 0.8);
+  var userHasResized = false; // track se o usuario arrastou manualmente
 
-  // Setar altura do container = viewport visual real
-  function setRealHeight() {
-    var vh = window.innerHeight;
-    container.style.height = vh + 'px';
-    maxH = Math.round(vh * 0.8);
-    // Recalcular min
+  function updateContainerHeight() {
+    container.style.height = window.innerHeight + 'px';
+    maxH = Math.round(window.innerHeight * 0.8);
     var inputArea = document.getElementById('bri-input-area');
     var hH = header.offsetHeight || 48;
     var iH = inputArea ? inputArea.offsetHeight : 48;
-    minH = hH + iH + 10; // +10 para handle
+    minH = hH + iH + 10;
   }
 
-  setRealHeight();
-  window.addEventListener('resize', setRealHeight);
+  updateContainerHeight();
+  // Apenas atualizar o container height no resize, NÃO tocar no sidebar
+  window.addEventListener('resize', function() {
+    updateContainerHeight();
+  });
 
-  // Setar altura inicial = 30%
-  setTimeout(function() {
-    setRealHeight();
-    sidebar.style.height = Math.round(window.innerHeight * 0.3) + 'px';
-  }, 50);
+  // Altura inicial
+  sidebar.style.height = Math.round(window.innerHeight * 0.3) + 'px';
 
   // === DRAG ===
   var isDragging = false;
@@ -146,7 +144,7 @@
     if (!isDragging) return;
     e.preventDefault();
     var y = e.touches[0].clientY;
-    var diff = startY - y; // positivo = dedo subiu = chat maior
+    var diff = startY - y;
     var newH = startH + diff;
     if (newH < minH) newH = minH;
     if (newH > maxH) newH = maxH;
@@ -157,26 +155,30 @@
     if (!isDragging) return;
     isDragging = false;
     sidebar.style.transition = '';
+    userHasResized = true;
   });
 
   // === AUTO-EXPAND quando BRI responde ===
-  // Observar mudanças no container de mensagens
   if (msgsEl && window.MutationObserver) {
+    var expandTimeout = null;
     var observer = new MutationObserver(function() {
-      // Quando uma nova mensagem aparece, expandir para 50% se está menor
-      var currentH = sidebar.offsetHeight;
-      var targetH = Math.round(window.innerHeight * 0.5);
-      if (currentH < targetH) {
-        sidebar.style.transition = 'height 0.3s ease';
-        sidebar.style.height = targetH + 'px';
-        setTimeout(function() { sidebar.style.transition = ''; }, 350);
-      }
-      // Scroll para baixo
-      setTimeout(function() {
+      // Debounce: esperar 300ms após última mutação
+      if (expandTimeout) clearTimeout(expandTimeout);
+      expandTimeout = setTimeout(function() {
+        var currentH = sidebar.offsetHeight;
+        var targetH = Math.round(window.innerHeight * 0.5);
+        if (currentH < targetH) {
+          sidebar.style.transition = 'height 0.3s ease';
+          sidebar.style.height = targetH + 'px';
+          setTimeout(function() {
+            sidebar.style.transition = '';
+          }, 350);
+        }
+        // Scroll para baixo
         msgsEl.scrollTop = msgsEl.scrollHeight;
-      }, 100);
+      }, 300);
     });
-    observer.observe(msgsEl, { childList: true, subtree: true });
+    observer.observe(msgsEl, { childList: true });
   }
 })();
 </script>
