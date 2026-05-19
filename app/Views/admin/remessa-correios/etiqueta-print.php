@@ -17,7 +17,7 @@ $simbolo = $simboloEncaminhamento ?? 'sedex';
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Etiqueta <?= $h($codigo) ?></title>
+<title>etiqueta-<?= $h($codigo) ?></title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bwip-js@4.3.0/dist/bwip-js-min.js"></script>
 <style>
