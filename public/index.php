@@ -2,26 +2,6 @@
 // Timezone padrão: São Paulo
 date_default_timezone_set('America/Sao_Paulo');
 
-// Pacotes WordPress - dispatch direto (bypass OPcache do controller)
-$_pwpPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-if ($_pwpPath === '/admin/pacotes-wordpress' && isset($_GET['action']) && $_GET['action'] === 'etiqueta-pdf') {
-    // Carregar o controller fresh (sem OPcache)
-    $ctrlFile = __DIR__ . '/../app/Controllers/AdminPacotesWordpressController.php';
-    if (function_exists('opcache_invalidate') && is_file($ctrlFile)) {
-        @opcache_invalidate($ctrlFile, true);
-    }
-    // Incluir dependências mínimas
-    require_once __DIR__ . '/../config/database.php';
-    require_once __DIR__ . '/../app/Controllers/Controller.php';
-    require_once __DIR__ . '/../app/Core/Request.php';
-    require_once __DIR__ . '/../app/Services/AuthService.php';
-    require_once $ctrlFile;
-    $req = new \App\Core\Request();
-    $ctrl = new \App\Controllers\AdminPacotesWordpressController();
-    $ctrl->etiquetaPdf($req);
-    exit;
-}
-
 // Iniciar sessão antes de qualquer output
 $sessionLifetime = 60 * 60 * 24 * 7;
 ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
@@ -355,5 +335,21 @@ try {
 
 require_once __DIR__ . '/../app/routes.php';
 require_once __DIR__ . '/../app/routes_admin.php';
+
+// Pacotes WordPress: dispatch direto para ações via ?action= (bypass OPcache)
+if ($request->getPath() === '/admin/pacotes-wordpress' && isset($_GET['action']) && $_GET['action'] !== '') {
+    $ctrl = new \App\Controllers\AdminPacotesWordpressController();
+    $act = $_GET['action'];
+    if ($act === 'etiqueta-pdf') { $ctrl->etiquetaPdf($request); exit; }
+    if ($act === 'containers') { $ctrl->containers($request); exit; }
+    if ($act === 'container-novo') { $ctrl->containerNovo($request); exit; }
+    if ($act === 'container-detalhes') { $ctrl->containerDetalhes($request); exit; }
+    if ($act === 'faturas') { $ctrl->faturas($request); exit; }
+    if ($act === 'fatura-nova') { $ctrl->faturaNova($request); exit; }
+    if ($act === 'sincronizar') { $ctrl->sincronizar($request); exit; }
+    if ($act === 'container-criar') { $ctrl->containerCriar($request); exit; }
+    if ($act === 'container-deletar') { $ctrl->containerDeletar($request); exit; }
+    if ($act === 'fatura-criar') { $ctrl->faturaCriar($request); exit; }
+}
 
 $router->dispatch($request);
