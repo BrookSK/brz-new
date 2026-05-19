@@ -2,7 +2,7 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="page-title">Nova Fatura CN38 (Pacotes WP)</h1>
-        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress/faturas"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress?action=faturas"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
     </div>
 
     <div class="alert alert-danger" id="faturaError" style="display:none;"></div>
@@ -81,7 +81,7 @@ async function criarFatura() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando...';
 
     try {
-        const r = await fetch('/admin/pacotes-wordpress/faturas/criar', {
+        const r = await fetch('/admin/pacotes-wordpress?action=fatura-criar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ container_ids: containerIds })
@@ -90,7 +90,7 @@ async function criarFatura() {
         if (data.success) {
             successEl.textContent = 'Fatura ' + data.cn38_code + ' criada com ' + data.tracking_count + ' trackings!';
             successEl.style.display = '';
-            setTimeout(() => window.location.href = '/admin/pacotes-wordpress/faturas', 1500);
+            setTimeout(() => window.location.href = '/admin/pacotes-wordpress?action=faturas', 1500);
         } else {
             errorEl.textContent = data.error || 'Erro ao criar fatura.';
             errorEl.style.display = '';

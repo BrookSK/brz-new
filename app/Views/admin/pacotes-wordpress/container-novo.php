@@ -2,7 +2,7 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="page-title">Novo Container (Pacotes WP)</h1>
-        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress/containers"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress?action=containers"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
     </div>
 
     <div class="alert alert-danger" id="containerError" style="display:none;"></div>
@@ -134,7 +134,7 @@ async function criarContainer() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Criando...';
 
     try {
-        const r = await fetch('/admin/pacotes-wordpress/containers/criar', {
+        const r = await fetch('/admin/pacotes-wordpress?action=container-criar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ nome, trackings })
@@ -143,7 +143,7 @@ async function criarContainer() {
         if (data.success) {
             successEl.textContent = 'Container #' + data.container_id + ' criado com ' + data.tracking_count + ' trackings!';
             successEl.style.display = '';
-            setTimeout(() => window.location.href = '/admin/pacotes-wordpress/containers', 1500);
+            setTimeout(() => window.location.href = '/admin/pacotes-wordpress?action=containers', 1500);
         } else {
             errorEl.textContent = data.error || 'Erro ao criar container.';
             errorEl.style.display = '';

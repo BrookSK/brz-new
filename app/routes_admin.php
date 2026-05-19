@@ -459,14 +459,6 @@ $router->get('/admin/cart-recovery/detalhes', 'AdminCartRecoveryController', 'de
 $router->post('/admin/cart-recovery/status', 'AdminCartRecoveryController', 'atualizarStatus');
 
 // Pacotes WordPress (etiquetas puxadas do WP)
-$router->get('/admin/pacotes-wordpress', 'AdminPacotesWordpressController', 'index');
-$router->post('/admin/pacotes-wordpress/sincronizar', 'AdminPacotesWordpressController', 'sincronizar');
-$router->get('/admin/pacotes-wordpress/etiqueta-pdf', 'AdminPacotesWordpressController', 'etiquetaPdf');
-$router->get('/admin/pacotes-wordpress/containers', 'AdminPacotesWordpressController', 'containers');
-$router->get('/admin/pacotes-wordpress/containers/novo', 'AdminPacotesWordpressController', 'containerNovo');
-$router->post('/admin/pacotes-wordpress/containers/criar', 'AdminPacotesWordpressController', 'containerCriar');
-$router->get('/admin/pacotes-wordpress/container/{id}', 'AdminPacotesWordpressController', 'containerDetalhes');
-$router->post('/admin/pacotes-wordpress/container/{id}/deletar', 'AdminPacotesWordpressController', 'containerDeletar');
-$router->get('/admin/pacotes-wordpress/faturas', 'AdminPacotesWordpressController', 'faturas');
-$router->get('/admin/pacotes-wordpress/faturas/nova', 'AdminPacotesWordpressController', 'faturaNova');
-$router->post('/admin/pacotes-wordpress/faturas/criar', 'AdminPacotesWordpressController', 'faturaCriar');
+// Nota: todas as sub-rotas usam query param ?action= para compatibilidade com nginx
+$router->get('/admin/pacotes-wordpress', 'AdminPacotesWordpressController', 'dispatch');
+$router->post('/admin/pacotes-wordpress', 'AdminPacotesWordpressController', 'dispatchPost');

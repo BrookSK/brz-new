@@ -4,7 +4,7 @@
         <h1 class="page-title">Faturas CN38 (Pacotes WP)</h1>
         <div class="d-flex gap-2 align-items-center">
             <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
-            <a class="btn btn-sm btn-success" href="/admin/pacotes-wordpress/faturas/nova"><i class="fas fa-plus me-1"></i>Nova Fatura</a>
+            <a class="btn btn-sm btn-success" href="/admin/pacotes-wordpress?action=fatura-nova"><i class="fas fa-plus me-1"></i>Nova Fatura</a>
         </div>
     </div>
 

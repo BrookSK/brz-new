@@ -235,6 +235,52 @@ class AdminPacotesWordpressController extends Controller {
         return ['success' => true, 'synced' => $synced, 'total' => count($packages)];
     }
 
+    // ─── Dispatcher (nginx só repassa /admin/pacotes-wordpress) ───────────────
+
+    public function dispatch(Request $request) {
+        $action = trim((string) $request->getParam('action', ''));
+
+        switch ($action) {
+            case 'etiqueta-pdf':
+                return $this->etiquetaPdf($request);
+            case 'containers':
+                return $this->containers($request);
+            case 'container-novo':
+                return $this->containerNovo($request);
+            case 'container-detalhes':
+                return $this->containerDetalhes($request);
+            case 'faturas':
+                return $this->faturas($request);
+            case 'fatura-nova':
+                return $this->faturaNova($request);
+            default:
+                return $this->index($request);
+        }
+    }
+
+    public function dispatchPost(Request $request) {
+        $action = trim((string) $request->getParam('action', ''));
+
+        // Tentar ler do body JSON também
+        if ($action === '') {
+            $body = $request->getBody();
+            $action = trim((string) ($body['action'] ?? ''));
+        }
+
+        switch ($action) {
+            case 'sincronizar':
+                return $this->sincronizar($request);
+            case 'container-criar':
+                return $this->containerCriar($request);
+            case 'container-deletar':
+                return $this->containerDeletar($request);
+            case 'fatura-criar':
+                return $this->faturaCriar($request);
+            default:
+                $this->json(['success' => false, 'error' => 'Ação não reconhecida.'], 400);
+        }
+    }
+
     // ─── Rotas Públicas (Views) ────────────────────────────────────────────────
 
     public function index(Request $request) {

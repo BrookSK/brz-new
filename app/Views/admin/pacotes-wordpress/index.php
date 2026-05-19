@@ -6,8 +6,8 @@
             <button class="btn btn-sm btn-success" onclick="sincronizarPacotes()" id="btnSync">
                 <i class="fas fa-sync-alt me-1"></i>Sincronizar
             </button>
-            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/containers">Containers</a>
-            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/faturas">Faturas (CN38)</a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=containers">Containers</a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=faturas">Faturas (CN38)</a>
         </div>
     </div>
 
@@ -100,7 +100,7 @@
                                     </td>
                                     <td>
                                         <?php if ($contId > 0): ?>
-                                            <a href="/admin/pacotes-wordpress/container/<?= $contId ?>">#<?= $contId ?></a>
+                                            <a href="/admin/pacotes-wordpress?action=container-detalhes&id=<?= $contId ?>">#<?= $contId ?></a>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
@@ -108,7 +108,7 @@
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/etiqueta-pdf?id=<?= $eid ?>" target="_blank" title="Baixar PDF"><i class="fas fa-file-pdf"></i></a>
+                                            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=etiqueta-pdf&id=<?= $eid ?>" target="_blank" title="Baixar PDF"><i class="fas fa-file-pdf"></i></a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -143,7 +143,7 @@
                                     <?php endif; ?>
                                 </div>
                                 <?php if ($trk !== ''): ?>
-                                    <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="/admin/pacotes-wordpress/etiqueta-pdf?id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                    <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="/admin/pacotes-wordpress?action=etiqueta-pdf&id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -191,7 +191,7 @@ async function sincronizarPacotes() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sincronizando...';
 
     try {
-        const r = await fetch('/admin/pacotes-wordpress/sincronizar', {
+        const r = await fetch('/admin/pacotes-wordpress?action=sincronizar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
         });

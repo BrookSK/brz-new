@@ -2,7 +2,7 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="page-title">Container #<?= (int) ($container['id'] ?? 0) ?></h1>
-        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress/containers"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress?action=containers"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
     </div>
 
     <?php $container = isset($container) && is_array($container) ? $container : []; ?>
@@ -74,7 +74,7 @@
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/etiqueta-pdf?id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=etiqueta-pdf&id=<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>

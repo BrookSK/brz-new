@@ -4,7 +4,7 @@
         <h1 class="page-title">Containers (Pacotes WP)</h1>
         <div class="d-flex gap-2 align-items-center">
             <a class="btn btn-sm btn-outline-secondary" href="/admin/pacotes-wordpress"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
-            <a class="btn btn-sm btn-success" href="/admin/pacotes-wordpress/containers/novo"><i class="fas fa-plus me-1"></i>Novo Container</a>
+            <a class="btn btn-sm btn-success" href="/admin/pacotes-wordpress?action=container-novo"><i class="fas fa-plus me-1"></i>Novo Container</a>
         </div>
     </div>
 
@@ -50,14 +50,14 @@
                                     </td>
                                     <td>
                                         <?php if ($billId > 0): ?>
-                                            <a href="/admin/pacotes-wordpress/faturas">#<?= $billId ?></a>
+                                            <a href="/admin/pacotes-wordpress?action=faturas">#<?= $billId ?></a>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
                                     <td><?= !empty($c['created_at']) ? date('d/m/Y H:i', strtotime((string) $c['created_at'])) : '-' ?></td>
                                     <td>
-                                        <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/container/<?= $cid ?>"><i class="fas fa-eye"></i></a>
+                                        <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress?action=container-detalhes&id=<?= $cid ?>"><i class="fas fa-eye"></i></a>
                                         <?php if ($status !== 'billed'): ?>
                                             <button class="btn btn-sm btn-outline-danger" onclick="deletarContainer(<?= $cid ?>)" title="Excluir"><i class="fas fa-trash"></i></button>
                                         <?php endif; ?>
@@ -76,7 +76,7 @@
 async function deletarContainer(id) {
     if (!confirm('Tem certeza que deseja excluir este container? As etiquetas serão liberadas.')) return;
     try {
-        const r = await fetch('/admin/pacotes-wordpress/container/' + id + '/deletar', {
+        const r = await fetch('/admin/pacotes-wordpress?action=container-deletar&id=' + id, {
             method: 'POST',
             headers: { 'Accept': 'application/json' }
         });
