@@ -457,3 +457,16 @@ $router->post('/admin/mapa-calor-site/analise-ia', 'AdminMapaCalorSiteController
 $router->get('/admin/cart-recovery', 'AdminCartRecoveryController', 'index');
 $router->get('/admin/cart-recovery/detalhes', 'AdminCartRecoveryController', 'detalhes');
 $router->post('/admin/cart-recovery/status', 'AdminCartRecoveryController', 'atualizarStatus');
+
+// Pacotes WordPress (etiquetas puxadas do WP)
+$router->get('/admin/pacotes-wordpress', 'AdminPacotesWordpressController', 'index');
+$router->post('/admin/pacotes-wordpress/sincronizar', 'AdminPacotesWordpressController', 'sincronizar');
+$router->get('/admin/pacotes-wordpress/containers', 'AdminPacotesWordpressController', 'containers');
+$router->get('/admin/pacotes-wordpress/containers/novo', 'AdminPacotesWordpressController', 'containerNovo');
+$router->post('/admin/pacotes-wordpress/containers/criar', 'AdminPacotesWordpressController', 'containerCriar');
+$router->get('/admin/pacotes-wordpress/container/{id}', 'AdminPacotesWordpressController', 'containerDetalhes');
+$router->post('/admin/pacotes-wordpress/container/{id}/deletar', 'AdminPacotesWordpressController', 'containerDeletar');
+$router->get('/admin/pacotes-wordpress/faturas', 'AdminPacotesWordpressController', 'faturas');
+$router->get('/admin/pacotes-wordpress/faturas/nova', 'AdminPacotesWordpressController', 'faturaNova');
+$router->post('/admin/pacotes-wordpress/faturas/criar', 'AdminPacotesWordpressController', 'faturaCriar');
+$router->get('/admin/pacotes-wordpress/etiqueta/{id}/pdf', 'AdminPacotesWordpressController', 'etiquetaPdf');
