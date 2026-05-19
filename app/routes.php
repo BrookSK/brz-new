@@ -554,6 +554,7 @@ $router->get('/admin/estoque/relatorio-pdf', 'AdminRelatoriosController', 'gerar
 
 // Rotas de Remessa Internacional
 $router->get('/admin/remessa-internacional', 'AdminRemessaInternacionalController', 'index');
+$router->get('/admin/remessa-internacional/buscar-pedido/{id}', 'AdminRemessaInternacionalController', 'buscarPedido');
 $router->post('/admin/remessa-internacional/gerar/{id}', 'AdminRemessaInternacionalController', 'gerarRemessa');
 $router->post('/admin/remessa-internacional/reenviar-webhook/{id}', 'AdminRemessaInternacionalController', 'reenviarWebhook');
 $router->get('/admin/remessa-internacional/janela/{id}', 'AdminRemessaInternacionalController', 'verJanela');

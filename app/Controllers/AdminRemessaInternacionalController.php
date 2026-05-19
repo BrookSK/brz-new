@@ -488,12 +488,32 @@ class AdminRemessaInternacionalController extends Controller {
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="page-title">Remessa Internacional</h1>
-                    <div>
-                        <button type="button" class="btn btn-info" onclick="location.reload()">
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="input-group input-group-sm" style="width:220px">
+                            <input type="text" class="form-control" id="buscarPedidoNum" placeholder="Nº pedido..." onkeydown="if(event.key===\'Enter\'){irParaPedido();event.preventDefault();}">
+                            <button class="btn btn-outline-primary" type="button" onclick="irParaPedido()"><i class="fas fa-search"></i></button>
+                        </div>
+                        <button type="button" class="btn btn-info btn-sm" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
                         </button>
                     </div>
-                </div>';
+                </div>
+                <script>
+                function irParaPedido(){
+                    var v = document.getElementById("buscarPedidoNum").value.replace(/\D/g,"");
+                    if(v===""){alert("Digite o número do pedido");return;}
+                    fetch("/admin/remessa-internacional/buscar-pedido/"+parseInt(v,10))
+                        .then(r=>r.json())
+                        .then(data=>{
+                            if(data.success && data.url){
+                                window.location.href=data.url;
+                            } else {
+                                alert(data.error || "Pedido não encontrado em nenhuma janela");
+                            }
+                        })
+                        .catch(()=>alert("Erro ao buscar pedido"));
+                }
+                </script>';
 
         if (!empty($errorMsg)) {
             echo '<div class="alert alert-danger">'
@@ -1197,6 +1217,34 @@ class AdminRemessaInternacionalController extends Controller {
         unset($janela);
 
         return $janelas;
+    }
+
+    public function buscarPedido($request) {
+        $this->requireAdmin();
+        $pedidoId = (int) ($request->getParam('id') ?? 0);
+        if ($pedidoId <= 0) {
+            echo json_encode(['success' => false, 'error' => 'ID inválido']);
+            exit;
+        }
+
+        try {
+            // Buscar em qual janela o pedido está
+            $st = $this->connection->prepare('SELECT janela_id FROM remessa_janela_pedidos WHERE pedido_id = ? ORDER BY id DESC LIMIT 1');
+            $st->execute([$pedidoId]);
+            $janelaId = (int) ($st->fetchColumn() ?: 0);
+
+            if ($janelaId > 0) {
+                echo json_encode([
+                    'success' => true,
+                    'url' => '/admin/remessa-internacional/janela/' . $janelaId . '/pedido/' . $pedidoId,
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Pedido #' . $pedidoId . ' não encontrado em nenhuma janela de remessa']);
+            }
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Erro: ' . $e->getMessage()]);
+        }
+        exit;
     }
 
     public function verJanela($request, $id) {
