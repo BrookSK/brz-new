@@ -280,7 +280,7 @@ class AdminRemessaInternacionalController extends Controller {
                 }
                 if (is_array($colsEnd) && in_array('pais', $colsEnd, true)) {
                     $joinEndereco = ' LEFT JOIN enderecos e ON e.id = p.endereco_entrega_id ';
-                    $wherePais = "UPPER(COALESCE(e.pais,'BR')) = 'BR'";
+                    $wherePais = "UPPER(COALESCE(e.pais,'BR')) IN ('BR','BRASIL','BRAZIL')";
                 }
             } catch (\Exception $e) {
             }

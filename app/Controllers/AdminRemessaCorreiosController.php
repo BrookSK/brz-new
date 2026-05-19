@@ -1511,7 +1511,7 @@ class AdminRemessaCorreiosController extends Controller {
         $wherePais = '1=1';
         if (is_array($colsPedidos) && in_array('endereco_entrega_id', $colsPedidos, true) && $this->tableExists('enderecos')) {
             $joinEndereco = " LEFT JOIN enderecos e ON e.id = p.endereco_entrega_id ";
-            $wherePais = "UPPER(COALESCE(e.pais,'BR')) = 'BR'";
+            $wherePais = "UPPER(COALESCE(e.pais,'BR')) IN ('BR','BRASIL','BRAZIL')";
         }
 
         $totalExpr = (is_array($colsPedidos) && in_array('total', $colsPedidos, true)) ? 'p.total' : (in_array('valor_total', $colsPedidos, true) ? 'p.valor_total' : '0');
