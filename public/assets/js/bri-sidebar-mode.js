@@ -121,7 +121,9 @@ const BriSidebar = (() => {
     const _palavras = msgLower.trim().split(/\s+/).filter(Boolean);
     const _ehCurta = _palavras.length <= 3;
     const _ehConfirmacao = /^(sim|nao|não|ok|isso|esse|essa|aquele|aquela|o primeiro|o segundo|o terceiro|o ultimo|nenhum|todos|pode|vai|manda|beleza|fechou|uhum|isso ai|esse mesmo|nao quero|deixa pra la)$/i.test(msgLower.trim());
-    if (_ehCurta || _ehConfirmacao) {
+    // Não interceptar se contém palavras-chave de navegação
+    const _temNavKeyword = /ticket|carrinho|checkout|produtos|grupos|conta|pedidos|enderecos|clube|assessoria|rastreamento|como funciona/.test(msgLower);
+    if ((_ehCurta || _ehConfirmacao) && !_temNavKeyword) {
       const _ultimaBRI = [...historico].reverse().find(m => m.role === 'assistant');
       if (_ultimaBRI && /\?\s*$/.test((_ultimaBRI.content || _ultimaBRI.text || '').trim())) {
         // BRI fez pergunta no turno anterior — bypass cascata, manda pra IA com contexto
@@ -184,7 +186,7 @@ const BriSidebar = (() => {
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados! 👤\n\nAqui você edita nome, email, telefone, CPF e foto de perfil.' },
       { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos! 📦\n\nVeja o status de cada compra, rastreamento e detalhes.' },
       { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços! 📍\n\nAdicione ou edite endereços de entrega para agilizar suas compras.' },
-      { regex: /meus tickets|tickets|suporte|atendimento|abrir ticket|abrir um ticket|como abro.*ticket|criar ticket|novo ticket/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte! 💬\n\nAqui você pode abrir um novo ticket ou acompanhar os existentes. Clique em "Novo Ticket" para criar uma solicitação.' },
+      { regex: /meus tickets|tickets|suporte|atendimento|abrir ticket|abrir um ticket|como abro.*ticket|criar ticket|novo ticket/, url: '/meus-tickets', reply: 'Abrindo a página de tickets! 💬\n\nAqui você pode abrir um novo ticket ou acompanhar os existentes. Clique em "Novo Ticket" para criar uma solicitação e descrever o que precisa.' },
       // Clube
       { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana|me mostr.*clube)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎\n\nFaça recargas para ter saldo e aproveitar benefícios exclusivos.' },
       { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube! ℹ️\n\nVeja como funciona o sistema de recargas e benefícios.' },
