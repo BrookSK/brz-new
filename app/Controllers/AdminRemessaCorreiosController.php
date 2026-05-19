@@ -1263,9 +1263,29 @@ class AdminRemessaCorreiosController extends Controller {
                 $remCnpj = (string) ($dadosRemetente['cpfCnpj'] ?? ($dadosRemetente['cnpj'] ?? ''));
 
                 $servicosAdicionais = ['VD XX'];
-                $cepDestDigits = preg_replace('/\D+/', '', $destCep);
-                $cepRemDigits = preg_replace('/\D+/', '', $remCep);
-                $datamatrixContent = $cepDestDigits . $cepRemDigits . $codigo . ($pesoGramas !== '' ? '|' . $pesoGramas : '');
+                $cepDestDigits = str_pad(preg_replace('/\D+/', '', $destCep), 8, '0', STR_PAD_LEFT);
+                $cepRemDigits = str_pad(preg_replace('/\D+/', '', $remCep), 8, '0', STR_PAD_LEFT);
+
+                // Símbolo de encaminhamento
+                $simboloEncaminhamento = 'sedex';
+                $svcLower = strtolower($servicoLabel);
+                if (strpos($svcLower, 'pac') !== false) $simboloEncaminhamento = 'pac';
+                elseif (strpos($svcLower, 'sedex 10') !== false || strpos($svcLower, 'sedex hoje') !== false) $simboloEncaminhamento = 'sedex10';
+                elseif (strpos($svcLower, 'mini') !== false) $simboloEncaminhamento = 'mini';
+
+                // DataMatrix 160 chars conforme Guia Técnico
+                $complCepDest = '00000';
+                $complCepOrig = '00000';
+                $somaCep = 0;
+                for ($ci = 0; $ci < 8; $ci++) { $somaCep += (int) $cepDestDigits[$ci]; }
+                $validadorCep = (string) ((10 - ($somaCep % 10)) % 10);
+                $codigoRastreamento = str_pad($codigo, 13, ' ');
+                $dadosVariaveis = $codigoRastreamento . str_pad('25000000', 8, '0') . str_pad('', 10, ' ')
+                    . str_pad('', 5, '0') . '00' . str_pad('', 5, ' ') . str_pad('', 20, ' ')
+                    . '00000' . str_pad('', 12, '0') . '-00.000000' . '-00.000000' . '|' . str_pad('', 30, ' ');
+                $dadosVariaveis = substr(str_pad($dadosVariaveis, 131, ' '), 0, 131);
+                $datamatrixContent = $cepDestDigits . $complCepDest . $cepRemDigits . $complCepOrig
+                    . $validadorCep . '51' . $dadosVariaveis;
 
                 // Sufixo único para IDs dos elementos SVG/canvas
                 $uid = $idx;
@@ -2072,10 +2092,73 @@ class AdminRemessaCorreiosController extends Controller {
             // Serviços adicionais (VD = Valor Declarado)
             $servicosAdicionais = ['VD XX'];
 
-            // Conteúdo do DataMatrix (padrão Correios: CEP destino + CEP origem + código + serviços)
-            $cepDestDigits = preg_replace('/\D+/', '', $destCep);
-            $cepRemDigits = preg_replace('/\D+/', '', $remCep);
-            $datamatrixContent = $cepDestDigits . $cepRemDigits . $codigo . ($pesoGramas !== '' ? '|' . $pesoGramas : '');
+            // Determinar símbolo de encaminhamento conforme serviço
+            $simboloEncaminhamento = 'sedex'; // default
+            $svcLower = strtolower($servicoLabel);
+            if (strpos($svcLower, 'pac') !== false) {
+                $simboloEncaminhamento = 'pac';
+            } elseif (strpos($svcLower, 'sedex 10') !== false) {
+                $simboloEncaminhamento = 'sedex10';
+            } elseif (strpos($svcLower, 'sedex 12') !== false) {
+                $simboloEncaminhamento = 'sedex12';
+            } elseif (strpos($svcLower, 'sedex hoje') !== false) {
+                $simboloEncaminhamento = 'sedex10'; // mesma seta vermelha
+            } elseif (strpos($svcLower, 'mini') !== false) {
+                $simboloEncaminhamento = 'mini';
+            }
+
+            // Montar conteúdo do DataMatrix conforme Guia Técnico Correios (160 caracteres)
+            // Estrutura: CEP destino(8) + Complemento CEP dest(5) + CEP origem(8) + Complemento CEP orig(5)
+            //          + Validador CEP destino(1) + IDV(2) + Dados variáveis(131) = 160 total
+            $cepDestDigits = str_pad(preg_replace('/\D+/', '', $destCep), 8, '0', STR_PAD_LEFT);
+            $cepRemDigits = str_pad(preg_replace('/\D+/', '', $remCep), 8, '0', STR_PAD_LEFT);
+            $complCepDest = '00000'; // Complemento CEP destino (ponto de entrega DNE)
+            $complCepOrig = '00000'; // Complemento CEP origem
+
+            // Validador do CEP destino: soma dos 8 dígitos, subtrai do múltiplo de 10 superior
+            $somaCep = 0;
+            for ($i = 0; $i < 8; $i++) { $somaCep += (int) $cepDestDigits[$i]; }
+            $validadorCep = (string) ((10 - ($somaCep % 10)) % 10);
+
+            $idv = '51'; // 51 = Encomenda
+
+            // Dados variáveis (131 caracteres):
+            // Código de Rastreamento(13) + Serviços Adicionais(8) + Cartão Postagem(10)
+            // + Código Serviço(5) + Info Agrupamento(2) + Número Logradouro(5)
+            // + Complemento Logradouro(20) + Valor Declarado(5) + DDD+Telefone(12)
+            // + Latitude(10) + Longitude(10) + Pipe(1) + Reserva cliente(30) = 131
+            $codigoRastreamento = str_pad($codigo, 13, ' ');
+            $servicosAdicCodigo = str_pad('25000000', 8, '0'); // 025=Registro Nacional obrigatório
+            $cartaoPostagem = str_pad(($cfgSigep['cartao'] ?? ''), 10, ' ');
+
+            // Código do serviço (5 dígitos)
+            $codServico = '';
+            if (is_array($reqJson)) {
+                $codServico = (string) ($reqJson['codigoServico'] ?? '');
+            }
+            if ($codServico === '') {
+                $codServico = (string) ($cfgProvider['prepostagem_codigo_servico'] ?? '');
+            }
+            $codServicoPad = str_pad($codServico, 5, '0', STR_PAD_LEFT);
+
+            $infoAgrupamento = '00';
+            $numLogradouro = str_pad('', 5, ' ');
+            $complLogradouro = str_pad('', 20, ' ');
+            $valorDeclarado = '00000';
+            $dddTelefone = str_pad('', 12, '0');
+            $latitude = '-00.000000';
+            $longitude = '-00.000000';
+            $pipe = '|';
+            $reservaCliente = str_pad('', 30, ' ');
+
+            $dadosVariaveis = $codigoRastreamento . $servicosAdicCodigo . $cartaoPostagem
+                . $codServicoPad . $infoAgrupamento . $numLogradouro . $complLogradouro
+                . $valorDeclarado . $dddTelefone . $latitude . $longitude . $pipe . $reservaCliente;
+            // Garantir exatamente 131 caracteres
+            $dadosVariaveis = substr(str_pad($dadosVariaveis, 131, ' '), 0, 131);
+
+            $datamatrixContent = $cepDestDigits . $complCepDest . $cepRemDigits . $complCepOrig
+                . $validadorCep . $idv . $dadosVariaveis;
 
             // Renderizar view
             ob_start();

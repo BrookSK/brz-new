@@ -1,111 +1,127 @@
+<?php
+/**
+ * Template de etiqueta Correios Brasil - Layout padrão conforme
+ * Guia Técnico de Endereçamento de Encomendas dos Correios.
+ *
+ * Variáveis esperadas (definidas no controller antes do include):
+ *   $codigo, $codigoFormatado, $servicoLabel, $contrato, $pesoGramas,
+ *   $pedidoId, $destNome, $destEndereco, $destBairro, $destCidade,
+ *   $destUf, $destCep, $remNome, $remEndereco, $remCidade, $remUf,
+ *   $remCep, $remCnpj, $servicosAdicionais, $datamatrixContent,
+ *   $simboloEncaminhamento (sedex|pac|sedex10|mini)
+ */
+$h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+$simbolo = $simboloEncaminhamento ?? 'sedex';
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Etiqueta <?= htmlspecialchars($codigo ?? '', ENT_QUOTES, 'UTF-8') ?></title>
+<title>Etiqueta <?= $h($codigo) ?></title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bwip-js@4.3.0/dist/bwip-js-min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-@page { size: 100mm 140mm; margin: 0; }
+@page { size: 138mm 106mm; margin: 0; }
 body {
-  width: 100mm; min-height: 140mm;
+  width: 138mm; min-height: 106mm;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 8pt; background: #fff; color: #000;
+  font-size: 9pt; background: #fff; color: #000;
 }
 .label {
-  width: 100mm; min-height: 140mm;
+  width: 138mm; min-height: 106mm;
   border: 1.5px solid #000;
   display: flex; flex-direction: column;
 }
 
-/* ─── HEADER: Logo + DataMatrix + Símbolo ─── */
-.header {
+/* ─── HEADER: Logo/Marca + DataMatrix + Símbolo ─── */
+.lbl-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 3mm 4mm 2mm 4mm;
+  padding: 3mm 5mm 2mm 5mm;
   border-bottom: 1.5px solid #000;
+  min-height: 28mm;
 }
-.logo-correios svg { width: 28mm; height: auto; }
-.datamatrix-container { text-align: center; }
-.datamatrix-container canvas { width: 18mm; height: 18mm; }
-.simbolo-encaminhamento svg { width: 22mm; height: auto; }
+.lbl-header .logo-correios {
+  width: 25mm; display: flex; flex-direction: column; align-items: flex-start;
+}
+.lbl-header .logo-correios img { width: 25mm; height: auto; }
+.lbl-header .datamatrix { text-align: center; }
+.lbl-header .datamatrix canvas { width: 25mm; height: 25mm; }
+.lbl-header .simbolo { width: 20mm; text-align: right; }
+.lbl-header .simbolo img { width: 20mm; height: auto; }
 
 /* ─── INFO SERVIÇO ─── */
-.info-servico {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 1.5mm 4mm;
+.lbl-info {
+  display: flex; justify-content: space-between; align-items: stretch;
+  padding: 1.5mm 5mm;
   border-bottom: 1.5px solid #000;
-  font-size: 7pt; line-height: 1.3;
+  font-size: 8pt; line-height: 1.4;
 }
-.info-servico .contrato-label { font-weight: normal; }
-.info-servico .contrato-valor { font-weight: bold; }
-.info-servico .servico-tipo { font-weight: bold; font-size: 8pt; text-align: center; }
-.info-servico .peso-volume { text-align: right; font-size: 7pt; }
+.lbl-info .col-left { }
+.lbl-info .col-center { text-align: center; font-weight: bold; font-size: 9pt; }
+.lbl-info .col-right { text-align: right; }
+.lbl-info strong { font-weight: bold; }
 
-/* ─── CÓDIGO RASTREIO + BARCODE ─── */
-.tracking-section {
-  padding: 2mm 4mm;
+/* ─── CÓDIGO RASTREIO ─── */
+.lbl-tracking {
+  padding: 2mm 5mm;
   border-bottom: 1.5px solid #000;
-  text-align: center;
 }
-.tracking-code-text {
-  font-size: 11pt; font-weight: bold; letter-spacing: 1.5px;
-  margin-bottom: 1mm;
+.lbl-tracking .code-text {
+  font-size: 11pt; font-weight: bold; letter-spacing: 1px;
+  text-align: center; margin-bottom: 1mm;
 }
-.tracking-barcode { display: flex; align-items: center; justify-content: center; gap: 3mm; }
-.tracking-barcode svg { width: 70mm; height: 14mm; }
-.servicos-adicionais { font-size: 7pt; font-weight: bold; text-align: right; line-height: 1.4; }
+.lbl-tracking .barcode-row {
+  display: flex; align-items: center; gap: 3mm;
+}
+.lbl-tracking .barcode-row svg { flex: 1; height: 15mm; }
+.lbl-tracking .servicos-adic {
+  font-size: 9pt; font-weight: bold; text-align: right;
+  line-height: 1.3; white-space: nowrap;
+}
 
 /* ─── RECEBEDOR ─── */
-.recebedor-section {
-  padding: 2mm 4mm;
+.lbl-recebedor {
+  padding: 2mm 5mm;
   border-bottom: 1.5px solid #000;
-  font-size: 7.5pt; line-height: 1.8;
+  font-size: 8pt; line-height: 2;
 }
-.recebedor-section .field-line {
-  display: flex; align-items: baseline; gap: 1mm;
-}
-.recebedor-section .field-label { font-weight: bold; white-space: nowrap; }
-.recebedor-section .field-value { flex: 1; border-bottom: 0.5px solid #000; min-height: 4mm; }
-.recebedor-section .field-row {
-  display: flex; gap: 4mm;
-}
-.recebedor-section .field-row .field-line { flex: 1; }
+.lbl-recebedor .field { display: flex; align-items: baseline; gap: 1mm; }
+.lbl-recebedor .field .fl { font-weight: bold; white-space: nowrap; }
+.lbl-recebedor .field .fv { flex: 1; border-bottom: 0.5px solid #000; min-height: 4mm; }
+.lbl-recebedor .field-row { display: flex; gap: 5mm; }
+.lbl-recebedor .field-row .field { flex: 1; }
 
 /* ─── DESTINATÁRIO ─── */
-.destinatario-section {
-  padding: 0;
-  border-bottom: 1.5px dashed #000;
-  flex: 1;
+.lbl-dest {
+  border-bottom: 1.5px dashed #666;
+  flex: 1; display: flex; flex-direction: column;
 }
-.destinatario-header {
+.lbl-dest .dest-header {
   display: flex; align-items: center; justify-content: space-between;
   background: #000; color: #fff;
-  padding: 1mm 4mm; font-size: 8pt; font-weight: bold;
+  padding: 1mm 5mm; font-size: 9pt; font-weight: bold;
 }
-.destinatario-header .logo-correios-sm { font-size: 8pt; color: #fff; }
-.destinatario-body {
-  padding: 2mm 4mm 2mm 4mm;
+.lbl-dest .dest-header .correios-sm { font-size: 8pt; letter-spacing: 0.5px; }
+.lbl-dest .dest-body {
+  padding: 2mm 5mm; flex: 1;
+  display: flex; gap: 3mm;
 }
-.dest-nome { font-size: 9pt; font-weight: bold; line-height: 1.3; margin-bottom: 0.5mm; }
-.dest-endereco { font-size: 8pt; line-height: 1.4; }
-.dest-bairro { font-size: 8pt; margin-top: 0.5mm; }
-.dest-cep-cidade {
-  font-size: 10pt; font-weight: 900; margin-top: 1mm; letter-spacing: 0.5px;
-}
-.dest-barcode-cep { margin-top: 1.5mm; }
-.dest-barcode-cep svg { width: 40mm; height: 10mm; }
+.lbl-dest .dest-body .dest-text { flex: 1; }
+.lbl-dest .dest-body .dest-text .dn { font-size: 10pt; font-weight: bold; margin-bottom: 0.5mm; }
+.lbl-dest .dest-body .dest-text .de { font-size: 9pt; line-height: 1.4; }
+.lbl-dest .dest-body .dest-text .db { font-size: 9pt; }
+.lbl-dest .dest-body .dest-text .dc { font-size: 11pt; font-weight: 900; margin-top: 1mm; }
+.lbl-dest .dest-body .dest-barcode { display: flex; flex-direction: column; justify-content: flex-end; }
+.lbl-dest .dest-body .dest-barcode svg { width: 40mm; height: 15mm; }
 
 /* ─── REMETENTE ─── */
-.remetente-section {
-  padding: 2mm 4mm;
-  font-size: 7pt; line-height: 1.4;
+.lbl-rem {
+  padding: 2mm 5mm;
+  font-size: 8pt; line-height: 1.4;
 }
-.remetente-header {
-  font-weight: bold; font-size: 7.5pt; margin-bottom: 0.5mm;
-}
-.rem-nome { font-weight: bold; }
-.rem-cep { font-weight: bold; margin-top: 0.5mm; }
+.lbl-rem .rem-title { font-weight: bold; }
+.lbl-rem .rem-cep { font-weight: bold; margin-top: 0.5mm; }
 
 /* ─── PRINT ─── */
 @media print {
@@ -127,101 +143,93 @@ body {
 
 <div class="label">
 
-  <!-- HEADER: Logo Correios + DataMatrix + Símbolo Encaminhamento -->
-  <div class="header">
+  <!-- HEADER: Logo Correios + DataMatrix (25x25mm) + Símbolo Encaminhamento -->
+  <div class="lbl-header">
     <div class="logo-correios">
-      <svg viewBox="0 0 120 45" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="18,8 30,22 18,36 6,22" fill="#8c8c8c"/>
-        <polygon points="28,8 40,22 28,36 16,22" fill="#555"/>
-        <text x="0" y="44" font-family="Arial" font-weight="900" font-size="14" fill="#333">Correios</text>
-      </svg>
+      <img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="width:25mm;height:auto;">
     </div>
-    <div class="datamatrix-container">
+    <div class="datamatrix">
       <canvas id="datamatrix"></canvas>
     </div>
-    <div class="simbolo-encaminhamento">
-      <svg viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0,50 A40,40 0 0,1 80,50" fill="#f7a800" opacity="0.6"/>
-        <path d="M10,50 A30,30 0 0,1 70,50" fill="#f7a800"/>
-      </svg>
+    <div class="simbolo">
+      <img src="/assets/img/icones_guia_sedex_amarelo_130.png" alt="Símbolo" style="width:20mm;height:auto;">
     </div>
   </div>
 
-  <!-- INFO SERVIÇO: Contrato + Tipo + Peso -->
-  <div class="info-servico">
-    <div>
-      <span class="contrato-label">Contrato:</span> <span class="contrato-valor"><?= htmlspecialchars($contrato ?? '', ENT_QUOTES, 'UTF-8') ?></span><br>
-      <span class="contrato-label">Pedido:</span> <span class="contrato-valor"><?= $pedidoId > 0 ? $pedidoId : '' ?></span>
+  <!-- INFO SERVIÇO: NF + Contrato + Serviço + Pedido + Volume + Peso -->
+  <div class="lbl-info">
+    <div class="col-left">
+      NF:<br>
+      Pedido: <strong><?= $pedidoId > 0 ? $pedidoId : '0' ?></strong>
     </div>
-    <div class="servico-tipo"><?= htmlspecialchars($servicoLabel ?? '', ENT_QUOTES, 'UTF-8') ?> CONTRATO<br>AG</div>
-    <div class="peso-volume">
-      Peso(g): <?= htmlspecialchars($pesoGramas ?? '', ENT_QUOTES, 'UTF-8') ?><br>
-      Volume: 1/1
+    <div class="col-center">
+      Contrato: <strong><?= $h($contrato) ?></strong><br>
+      <strong><?= $h($servicoLabel) ?></strong>
+    </div>
+    <div class="col-right">
+      Volume: 1/1<br>
+      Peso (g): <strong><?= $h($pesoGramas) ?></strong>
     </div>
   </div>
 
-  <!-- CÓDIGO DE RASTREIO + BARCODE -->
-  <div class="tracking-section">
-    <div class="tracking-code-text"><?= htmlspecialchars($codigoFormatado ?? $codigo ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-    <div class="tracking-barcode">
+  <!-- CÓDIGO DE RASTREAMENTO + BARCODE (GS1-128, 90x15mm) -->
+  <div class="lbl-tracking">
+    <div class="code-text"><?= $h($codigoFormatado) ?></div>
+    <div class="barcode-row">
       <svg id="barcode-tracking"></svg>
-      <div class="servicos-adicionais">
-        <?php if (!empty($servicosAdicionais)): ?>
-          <?php foreach ($servicosAdicionais as $sa): ?>
-            <?= htmlspecialchars($sa, ENT_QUOTES, 'UTF-8') ?><br>
-          <?php endforeach; ?>
-        <?php else: ?>
-          VD XX
-        <?php endif; ?>
+      <div class="servicos-adic">
+        <?php foreach ($servicosAdicionais as $sa): ?>
+          <?= $h($sa) ?><br>
+        <?php endforeach; ?>
       </div>
     </div>
   </div>
 
-  <!-- RECEBEDOR / ASSINATURA / DOCUMENTO -->
-  <div class="recebedor-section">
-    <div class="field-line">
-      <span class="field-label">Recebedor:</span>
-      <span class="field-value"></span>
+  <!-- FORMULÁRIO RECEBEDOR -->
+  <div class="lbl-recebedor">
+    <div class="field">
+      <span class="fl">Recebedor:</span>
+      <span class="fv"></span>
     </div>
     <div class="field-row">
-      <div class="field-line">
-        <span class="field-label">Assinatura:</span>
-        <span class="field-value"></span>
+      <div class="field">
+        <span class="fl">Assinatura:</span>
+        <span class="fv"></span>
       </div>
-      <div class="field-line">
-        <span class="field-label">Documento:</span>
-        <span class="field-value"></span>
+      <div class="field">
+        <span class="fl">Documento:</span>
+        <span class="fv"></span>
       </div>
     </div>
   </div>
 
   <!-- DESTINATÁRIO -->
-  <div class="destinatario-section">
-    <div class="destinatario-header">
+  <div class="lbl-dest">
+    <div class="dest-header">
       <span>DESTINATÁRIO</span>
-      <span class="logo-correios-sm">✉ Correios</span>
+      <img src="/assets/img/correiosLogoDeitado.png" alt="Correios" style="height:4mm;width:auto;">
     </div>
-    <div class="destinatario-body">
-      <div class="dest-nome"><?= htmlspecialchars($destNome ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-      <div class="dest-endereco"><?= htmlspecialchars($destEndereco ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-      <div class="dest-bairro"><?= htmlspecialchars($destBairro ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-      <div class="dest-cep-cidade"><strong><?= htmlspecialchars($destCep ?? '', ENT_QUOTES, 'UTF-8') ?></strong> <?= htmlspecialchars(($destCidade ?? '') . '/' . ($destUf ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-      <div class="dest-barcode-cep">
+    <div class="dest-body">
+      <div class="dest-text">
+        <div class="dn"><?= $h($destNome) ?></div>
+        <div class="de"><?= $h($destEndereco) ?></div>
+        <div class="db"><?= $h($destBairro) ?></div>
+        <div class="dc"><?= $h($destCep) ?> <?= $h($destCidade . '/' . $destUf) ?></div>
+      </div>
+      <div class="dest-barcode">
         <svg id="barcode-cep"></svg>
       </div>
     </div>
   </div>
 
   <!-- REMETENTE -->
-  <div class="remetente-section">
-    <div class="remetente-header">REMETENTE: <?= htmlspecialchars($remNome ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-    <div class="remetente-body">
-      <div><?= htmlspecialchars($remEndereco ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-      <div class="rem-cep"><?= htmlspecialchars($remCep ?? '', ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars(($remCidade ?? '') . '/' . ($remUf ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-      <?php if (!empty($remCnpj)): ?>
-      <div>CNPJ: <?= htmlspecialchars($remCnpj, ENT_QUOTES, 'UTF-8') ?></div>
-      <?php endif; ?>
-    </div>
+  <div class="lbl-rem">
+    <div class="rem-title">Remetente: <?= $h($remNome) ?></div>
+    <div><?= $h($remEndereco) ?></div>
+    <div class="rem-cep"><?= $h($remCep) ?> <?= $h($remCidade . '/' . $remUf) ?></div>
+    <?php if (!empty($remCnpj)): ?>
+    <div>CNPJ: <?= $h($remCnpj) ?></div>
+    <?php endif; ?>
   </div>
 
 </div>
@@ -230,41 +238,43 @@ body {
 (function(){
   var trackingCode = <?= json_encode($codigo ?? '') ?>;
   var cep = <?= json_encode(preg_replace('/\D+/', '', $destCep ?? '')) ?>;
-  var datamatrixContent = <?= json_encode($datamatrixContent ?? $codigo ?? '') ?>;
+  var dmContent = <?= json_encode($datamatrixContent ?? '') ?>;
 
-  // Barcode de rastreio (Code 128)
+  // Barcode de rastreio - Code 128 (GS1-128), min 90x15mm
   try {
     JsBarcode('#barcode-tracking', trackingCode, {
       format: 'CODE128',
       displayValue: false,
-      margin: 0,
-      height: 50,
-      width: 1.8
+      margin: 5,
+      height: 55,
+      width: 2
     });
-  } catch(e){ console.error('Barcode tracking error:', e); }
+  } catch(e){ console.error('Barcode tracking:', e); }
 
-  // Barcode do CEP (Code 128)
+  // Barcode do CEP destino - Code 128C, min 40x15mm
   if (cep && cep.length >= 5) {
     try {
       JsBarcode('#barcode-cep', cep, {
-        format: 'CODE128',
+        format: 'CODE128C',
         displayValue: false,
-        margin: 0,
-        height: 35,
-        width: 1.5
+        margin: 5,
+        height: 50,
+        width: 1.8
       });
-    } catch(e){ console.error('Barcode CEP error:', e); }
+    } catch(e){ console.error('Barcode CEP:', e); }
   }
 
-  // DataMatrix (usando bwip-js)
-  try {
-    bwipjs.toCanvas('datamatrix', {
-      bcid: 'datamatrix',
-      text: datamatrixContent,
-      scale: 3,
-      padding: 2
-    });
-  } catch(e){ console.error('DataMatrix error:', e); }
+  // DataMatrix 25x25mm (usando bwip-js)
+  if (dmContent) {
+    try {
+      bwipjs.toCanvas('datamatrix', {
+        bcid: 'datamatrix',
+        text: dmContent,
+        scale: 3,
+        padding: 3
+      });
+    } catch(e){ console.error('DataMatrix:', e); }
+  }
 
   // Auto-print
   setTimeout(function(){ window.print(); }, 800);
