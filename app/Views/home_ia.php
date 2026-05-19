@@ -95,66 +95,56 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: drag-to-resize chat panel + iOS keyboard fix
+// Mobile: drag-to-resize chat panel
 (function() {
   if (window.innerWidth >= 768) return;
 
-  const sidebar = document.getElementById('bri-sidebar');
-  const header = document.getElementById('bri-sidebar-header');
-  const input = document.getElementById('bri-input');
-  const inputArea = document.getElementById('bri-input-area');
-  if (!sidebar || !header) return;
+  var sidebar = document.getElementById('bri-sidebar');
+  var handle = document.getElementById('bri-sidebar-header');
+  if (!sidebar || !handle) return;
 
-  let dragging = false;
-  let startY = 0;
-  let startH = 0;
-  let minH = 100; // fallback
+  // Calcular altura mínima: header + input
+  var headerEl = document.getElementById('bri-sidebar-header');
+  var inputEl = document.getElementById('bri-input-area');
+  var MIN_H = 100;
 
-  // Calcular min-height real após render (header + input area)
-  setTimeout(function() {
-    const hH = header.getBoundingClientRect().height;
-    const iH = inputArea ? inputArea.getBoundingClientRect().height : 50;
-    minH = Math.ceil(hH + iH) + 2; // +2 para border
-    sidebar.style.minHeight = minH + 'px';
-  }, 100);
-
-  function onStart(e) {
-    if (window.innerWidth >= 768) return;
-    if (e.target.closest('button, a, .bri-icon-btn')) return;
-    dragging = true;
-    startY = e.touches ? e.touches[0].clientY : e.clientY;
-    startH = sidebar.offsetHeight;
-    sidebar.style.transition = 'none';
+  function calcMinH() {
+    var hH = headerEl ? headerEl.offsetHeight : 48;
+    var iH = inputEl ? inputEl.offsetHeight : 48;
+    MIN_H = hH + iH + 2;
   }
+  setTimeout(calcMinH, 200);
 
-  function onMove(e) {
-    if (!dragging) return;
+  var MAX_H_RATIO = 0.8;
+  var isDragging = false;
+  var touchStartY = 0;
+  var heightAtStart = 0;
+
+  handle.addEventListener('touchstart', function(e) {
+    // Ignorar se tocou em botão/link
+    if (e.target.closest('button, a')) return;
+    isDragging = true;
+    touchStartY = e.touches[0].clientY;
+    heightAtStart = sidebar.offsetHeight;
     e.preventDefault();
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const delta = startY - y;
-    const maxH = window.innerHeight * 0.8;
-    const newH = Math.min(Math.max(startH + delta, minH), maxH);
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    var currentY = e.touches[0].clientY;
+    var diff = touchStartY - currentY; // positivo = dedo subiu = aumentar
+    var maxH = Math.floor(window.innerHeight * MAX_H_RATIO);
+    var newH = heightAtStart + diff;
+    // Clampar entre min e max
+    if (newH < MIN_H) newH = MIN_H;
+    if (newH > maxH) newH = maxH;
     sidebar.style.height = newH + 'px';
-  }
+  }, { passive: false });
 
-  function onEnd() {
-    if (!dragging) return;
-    dragging = false;
-    sidebar.style.transition = '';
-  }
-
-  header.addEventListener('touchstart', onStart, { passive: true });
-  document.addEventListener('touchmove', onMove, { passive: false });
-  document.addEventListener('touchend', onEnd);
-
-  // iOS: quando o teclado abre, ajustar
-  if (input) {
-    input.addEventListener('focus', function() {
-      setTimeout(function() {
-        sidebar.scrollIntoView({ block: 'end' });
-      }, 300);
-    });
-  }
+  document.addEventListener('touchend', function() {
+    isDragging = false;
+  });
 })();
 </script>
 
