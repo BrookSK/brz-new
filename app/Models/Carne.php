@@ -360,7 +360,8 @@ class Carne extends Model {
             SELECT c.*, u.nome as cliente_nome, u.email as cliente_email,
                 (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas,
                 (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('vencida','em_atraso')) as parcelas_atrasadas,
-                (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento
+                (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento,
+                (SELECT MAX(vencimento) FROM carne_parcelas WHERE carne_id = c.id) as ultimo_vencimento
             FROM carnes c
             JOIN usuarios u ON c.cliente_id = u.id
             LEFT JOIN pedidos p ON p.id = c.pedido_id

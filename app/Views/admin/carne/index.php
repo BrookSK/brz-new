@@ -245,18 +245,23 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                 <!-- Desktop: Table -->
                 <div class="d-none d-md-block">
                 <div class="table-responsive">
-                    <table class="table table-hover table-sm align-middle mb-0">
+                    <table class="table table-hover table-sm align-middle mb-0" id="carnesTable">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th><th>Pedido / Cliente</th><th class="text-end d-none d-lg-table-cell">Total</th>
-                                <th class="text-end d-none d-lg-table-cell">Pago / Saldo</th><th>Parcelas</th>
-                                <th class="d-none d-md-table-cell">Próx. Vencimento</th><th>Status</th>
+                                <th class="sortable" data-sort="id" style="cursor:pointer;">ID <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="sortable" data-sort="cliente" style="cursor:pointer;">Pedido / Cliente <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="text-end d-none d-lg-table-cell sortable" data-sort="total" style="cursor:pointer;">Total <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="text-end d-none d-lg-table-cell sortable" data-sort="pago" style="cursor:pointer;">Pago / Saldo <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="sortable" data-sort="parcelas" style="cursor:pointer;">Parcelas <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="d-none d-md-table-cell sortable" data-sort="proximo_vencimento" style="cursor:pointer;">Próx. Vencimento <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="d-none d-md-table-cell sortable" data-sort="ultimo_vencimento" style="cursor:pointer;">Último Venc. <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
+                                <th class="sortable" data-sort="status" style="cursor:pointer;">Status <i class="fas fa-sort text-muted ms-1" style="font-size:10px;"></i></th>
                                 <th class="d-none d-xl-table-cell">Compra</th><th class="d-none d-xl-table-cell">Envio</th><th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($carnes)): ?>
-                            <tr><td colspan="10" class="text-center text-muted py-4">Nenhum carnê encontrado.</td></tr>
+                            <tr><td colspan="11" class="text-center text-muted py-4">Nenhum carnê encontrado.</td></tr>
                             <?php else: ?>
                             <?php foreach ($carnes as $c):
                                 $st = $statusLabels[$c['status']] ?? ['label' => $c['status'], 'cor' => 'secondary'];
@@ -265,7 +270,14 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                 $pago = ($stats['total_financiado'] ?? 0) > 0 ? ($c['total_geral'] * $pagas / max($totalParcelas, 1)) : 0;
                                 $saldo = (float)$c['total_geral'] - $pago;
                             ?>
-                            <tr>
+                            <tr data-id="<?= $c['id'] ?>"
+                                data-cliente="<?= htmlspecialchars(strtolower($c['cliente_nome'] ?? '')) ?>"
+                                data-total="<?= (float)$c['total_geral'] ?>"
+                                data-pago="<?= (float)$pago ?>"
+                                data-parcelas="<?= $pagas ?>"
+                                data-proximo-vencimento="<?= $c['proximo_vencimento'] ?? '9999-12-31' ?>"
+                                data-ultimo-vencimento="<?= $c['ultimo_vencimento'] ?? '9999-12-31' ?>"
+                                data-status="<?= htmlspecialchars($c['status'] ?? '') ?>">
                                 <td class="fw-semibold"><?= $c['id'] ?></td>
                                 <td>
                                     <a href="/admin/pedidos/detalhes/<?= $c['pedido_id'] ?>" class="text-decoration-none fw-semibold">#<?= $c['pedido_id'] ?></a>
@@ -283,6 +295,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                                     <?php endif; ?>
                                 </td>
                                 <td class="d-none d-md-table-cell"><?= !empty($c['proximo_vencimento']) ? date('d/m/Y', strtotime($c['proximo_vencimento'])) : '-' ?></td>
+                                <td class="d-none d-md-table-cell"><?= !empty($c['ultimo_vencimento']) ? date('d/m/Y', strtotime($c['ultimo_vencimento'])) : '-' ?></td>
                                 <td><span class="badge bg-<?= $st['cor'] ?>"><?= $st['label'] ?></span></td>
                                 <td class="d-none d-xl-table-cell"><?= !empty($c['compra_interna_liberada']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-clock text-muted"></i>' ?></td>
                                 <td class="d-none d-xl-table-cell"><?= !empty($c['envio_liberado']) ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-lock text-muted"></i>' ?></td>
@@ -294,6 +307,83 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
                     </table>
                 </div>
                 </div>
+
+                <!-- Script de ordenação da tabela -->
+                <script>
+                (function(){
+                    var table = document.getElementById('carnesTable');
+                    if (!table) return;
+                    var headers = table.querySelectorAll('th.sortable');
+                    var currentSort = '';
+                    var currentDir = 'asc';
+
+                    headers.forEach(function(th) {
+                        th.addEventListener('click', function() {
+                            var sortKey = this.getAttribute('data-sort');
+                            if (currentSort === sortKey) {
+                                currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+                            } else {
+                                currentSort = sortKey;
+                                currentDir = 'asc';
+                            }
+
+                            // Update icons
+                            headers.forEach(function(h) {
+                                var icon = h.querySelector('i');
+                                if (icon) icon.className = 'fas fa-sort text-muted ms-1';
+                            });
+                            var activeIcon = this.querySelector('i');
+                            if (activeIcon) activeIcon.className = 'fas fa-sort-' + (currentDir === 'asc' ? 'up' : 'down') + ' text-primary ms-1';
+
+                            // Sort rows
+                            var tbody = table.querySelector('tbody');
+                            var rows = Array.from(tbody.querySelectorAll('tr[data-id]'));
+                            rows.sort(function(a, b) {
+                                var aVal, bVal;
+                                switch(sortKey) {
+                                    case 'id':
+                                        aVal = parseInt(a.getAttribute('data-id')) || 0;
+                                        bVal = parseInt(b.getAttribute('data-id')) || 0;
+                                        break;
+                                    case 'cliente':
+                                        aVal = a.getAttribute('data-cliente') || '';
+                                        bVal = b.getAttribute('data-cliente') || '';
+                                        return currentDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                                    case 'total':
+                                        aVal = parseFloat(a.getAttribute('data-total')) || 0;
+                                        bVal = parseFloat(b.getAttribute('data-total')) || 0;
+                                        break;
+                                    case 'pago':
+                                        aVal = parseFloat(a.getAttribute('data-pago')) || 0;
+                                        bVal = parseFloat(b.getAttribute('data-pago')) || 0;
+                                        break;
+                                    case 'parcelas':
+                                        aVal = parseInt(a.getAttribute('data-parcelas')) || 0;
+                                        bVal = parseInt(b.getAttribute('data-parcelas')) || 0;
+                                        break;
+                                    case 'proximo_vencimento':
+                                        aVal = a.getAttribute('data-proximo-vencimento') || '9999-12-31';
+                                        bVal = b.getAttribute('data-proximo-vencimento') || '9999-12-31';
+                                        return currentDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                                    case 'ultimo_vencimento':
+                                        aVal = a.getAttribute('data-ultimo-vencimento') || '9999-12-31';
+                                        bVal = b.getAttribute('data-ultimo-vencimento') || '9999-12-31';
+                                        return currentDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                                    case 'status':
+                                        aVal = a.getAttribute('data-status') || '';
+                                        bVal = b.getAttribute('data-status') || '';
+                                        return currentDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                                    default:
+                                        aVal = 0; bVal = 0;
+                                }
+                                if (currentDir === 'asc') return aVal - bVal;
+                                return bVal - aVal;
+                            });
+                            rows.forEach(function(row) { tbody.appendChild(row); });
+                        });
+                    });
+                })();
+                </script>
             </div>
         </div>
     </div>
