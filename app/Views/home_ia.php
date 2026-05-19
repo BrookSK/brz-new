@@ -95,7 +95,7 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: bottom-sheet com 3 estados fixos
+// Mobile: bottom-sheet com estados fixos (sem drag)
 (function() {
   if (window.innerWidth >= 768) return;
 
@@ -105,59 +105,65 @@
   var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
 
-  // 0=minimizado(header+input), 1=20%, 2=35%
+  // 0=minimizado, 1=20%, 2=35%
   var state = 1;
 
-  function vh() { return window.innerHeight; }
-
-  function getMinH() {
-    var inputArea = document.getElementById('bri-input-area');
-    return (header.offsetHeight || 52) + (inputArea ? inputArea.offsetHeight : 48);
-  }
-
   function applyState() {
+    var winH = window.innerHeight;
+    var inputArea = document.getElementById('bri-input-area');
+    var minH = (header.offsetHeight || 52) + (inputArea ? inputArea.offsetHeight : 48);
     var h;
-    if (state === 0) h = getMinH();
-    else if (state === 1) h = Math.round(vh() * 0.20);
-    else h = Math.round(vh() * 0.35);
-    // Garantir mínimo
-    var min = getMinH();
-    if (h < min) h = min;
+    if (state === 0) h = minH;
+    else if (state === 1) h = Math.max(Math.round(winH * 0.20), minH);
+    else h = Math.max(Math.round(winH * 0.35), minH);
     sidebar.style.height = h + 'px';
     sidebar.classList.toggle('bri-minimized', state === 0);
     if (msgsEl && state > 0) setTimeout(function() { msgsEl.scrollTop = msgsEl.scrollHeight; }, 150);
   }
 
   // Container = viewport real
-  container.style.height = vh() + 'px';
+  container.style.height = window.innerHeight + 'px';
   window.addEventListener('resize', function() {
-    container.style.height = vh() + 'px';
+    container.style.height = window.innerHeight + 'px';
     applyState();
   });
 
-  // Aplicar estado inicial (20%)
   applyState();
 
-  // Botão expandir: tap no header (exceto botões)
-  header.addEventListener('click', function(e) {
-    if (e.target.closest('.bri-minimize-btn') || e.target.closest('button') || e.target.closest('a')) return;
-    // Expandir: 0→1→2, se já em 2 volta pra 0
-    if (state < 2) state++;
-    else state = 0;
-    applyState();
-  });
-
-  // Botão minimizar
-  var minBtn = document.createElement('button');
-  minBtn.className = 'bri-icon-btn bri-minimize-btn';
-  minBtn.title = 'Minimizar';
-  minBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-  minBtn.addEventListener('click', function(e) {
+  // Botão expandir/minimizar — adicionado ao header
+  var toggleBtn = document.createElement('button');
+  toggleBtn.className = 'bri-icon-btn bri-toggle-btn';
+  toggleBtn.title = 'Expandir/Minimizar';
+  toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+  toggleBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    state = 0;
+    e.preventDefault();
+    if (state < 2) {
+      state++;
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+    } else {
+      state = 0;
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+    }
     applyState();
   });
-  header.appendChild(minBtn);
+  header.appendChild(toggleBtn);
+
+  // Tap no header também expande (exceto botões)
+  header.addEventListener('click', function(e) {
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    if (state === 0) {
+      state = 1;
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+    } else if (state < 2) {
+      state++;
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+    } else {
+      state = 0;
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+    }
+    applyState();
+  });
 
   // Auto-expand quando BRI responde
   if (msgsEl && window.MutationObserver) {
@@ -165,7 +171,11 @@
     new MutationObserver(function() {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(function() {
-        if (state === 0) { state = 1; applyState(); }
+        if (state === 0) {
+          state = 1;
+          toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+          applyState();
+        }
         if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
       }, 400);
     }).observe(msgsEl, { childList: true });

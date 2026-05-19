@@ -396,22 +396,12 @@ body {
 
   /* Header */
   #bri-sidebar-header {
-    padding: 14px 14px 6px;
+    padding: 10px 14px 6px;
     border-bottom: none;
     flex-shrink: 0;
     background: var(--color-surface);
     position: relative;
-  }
-
-  /* Drag handle bar */
-  #bri-sidebar-header::before {
-    content: '';
-    display: block;
-    width: 36px;
-    height: 4px;
-    background: #CBD5E1;
-    border-radius: 4px;
-    margin: 0 auto 8px;
+    cursor: pointer;
   }
 
   #bri-mensagens {
