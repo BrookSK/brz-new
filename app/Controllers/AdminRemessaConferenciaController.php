@@ -939,10 +939,22 @@ class AdminRemessaConferenciaController extends Controller {
             echo '<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
         } elseif ($totalBrl > 0) {
             echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl) . '</td></tr>';
-        } elseif ($totalPedido !== null && $totalPedido > 0) {
-            echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td>' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>';
         } else {
-            echo '<tr><td class="text-muted">Valor pago</td><td>-</td></tr>';
+            // Calcular total real: subtotal + servicos + impostos + imposto_local
+            $totalReal = 0;
+            if ($subtotal !== null) $totalReal += $subtotal;
+            $svcCalc = is_numeric($pedido['servicos'] ?? null) ? (float)$pedido['servicos'] : (is_numeric($pedido['taxa_servico'] ?? null) ? (float)$pedido['taxa_servico'] : 0);
+            $totalReal += $svcCalc;
+            $impCalc = is_numeric($pedido['impostos'] ?? null) ? (float)$pedido['impostos'] : 0;
+            $totalReal += $impCalc;
+            if ($impLocal !== null) $totalReal += $impLocal;
+            // Se o pedido tem campo 'total' e é maior, usar ele (pode incluir frete/desconto)
+            if ($totalPedido !== null && $totalPedido > $totalReal) $totalReal = $totalPedido;
+            if ($totalReal > 0) {
+                echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td><strong>' . $fmtMoeda($totalReal, $moeda) . '</strong></td></tr>';
+            } else {
+                echo '<tr><td class="text-muted">Valor pago</td><td>-</td></tr>';
+            }
         }
         echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
@@ -1089,9 +1101,14 @@ class AdminRemessaConferenciaController extends Controller {
         }
 
         // Câmbio Real card
+        $pedidoPago = in_array(strtolower(trim((string)($pedido['status'] ?? ''))), ['pago','paid','approved','aprovado','processando','em_transporte','enviado','entregue','produto_consolidado'], true);
         echo '<div class="col-md-6"><div class="card h-100"><div class="card-header bg-success text-white"><strong><i class="fas fa-exchange-alt me-1"></i>Câmbio Real</strong></div><div class="card-body">';
         if (empty($cambioRealPagamentos)) {
-            echo '<div class="text-muted">Nenhum pagamento Câmbio Real encontrado.</div>';
+            if ($pedidoPago && empty($appmaxPagamentos) && !$isPagdev) {
+                echo '<div class="alert alert-warning py-2 small mb-0"><i class="fas fa-exclamation-triangle me-1"></i><strong>Pagamento confirmado</strong> mas dados da transação Câmbio Real não foram sincronizados.<br><a href="/admin/pedidos/detalhes/' . $pid . '" target="_blank" class="mt-1 d-inline-block">Abrir pedido → Sincronizar pagamentos</a></div>';
+            } else {
+                echo '<div class="text-muted">Nenhum pagamento Câmbio Real encontrado.</div>';
+            }
         } else {
             echo '<div class="mb-2"><strong>Valor Câmbio Real (BRL):</strong> ' . $fmtBrl($cambioRealValorTotal > 0 ? $cambioRealValorTotal : null) . '</div>';
             foreach ($cambioRealPagamentos as $pg) {
