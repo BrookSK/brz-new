@@ -29,7 +29,13 @@
               }
           } catch (\Exception $e) {}
         ?>
-        <div class="bri-avatar-icon"><img src="<?= htmlspecialchars($briAvatarSrc, ENT_QUOTES, 'UTF-8') ?>" alt="BRI" style="width:32px;height:32px;border-radius:50%;object-fit:cover;"></div>
+        <div class="bri-avatar-icon">
+          <?php if (str_ends_with($briAvatarSrc, '.webm')): ?>
+            <video src="<?= htmlspecialchars($briAvatarSrc, ENT_QUOTES, 'UTF-8') ?>" autoplay loop muted playsinline style="width:32px;height:32px;border-radius:50%;object-fit:cover;"></video>
+          <?php else: ?>
+            <img src="<?= htmlspecialchars($briAvatarSrc, ENT_QUOTES, 'UTF-8') ?>" alt="BRI" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">
+          <?php endif; ?>
+        </div>
       </div>
       <div class="bri-header-info">
         <span class="bri-nome">BRI</span>

@@ -613,8 +613,8 @@ class AdminConfiguracoesController extends Controller {
                                             // --- Avatar BRI ---
                                             echo '
                                             <div class="mb-4">
-                                                <div class="mb-2 fw-semibold">Avatar BRI (GIF/PNG)</div>
-                                                <div class="text-muted small mb-3">Imagem do avatar da assistente BRI exibida no chat.</div>
+                                                <div class="mb-2 fw-semibold">Avatar BRI (GIF/WebM)</div>
+                                                <div class="text-muted small mb-3">Imagem ou vídeo do avatar da assistente BRI exibida no chat.</div>
                                                 ';
                                                 $existingBriAvatar = (string) $this->getConfigValue($config, 'layout', 'bri_avatar', '');
                                                 $existingBriAvatar = is_string($existingBriAvatar) ? trim($existingBriAvatar) : '';
@@ -625,14 +625,14 @@ class AdminConfiguracoesController extends Controller {
                                                         <div class="border rounded p-2" style="background: #fff;">
                                                             <div class="text-muted small mb-2">Pré-visualização</div>
                                                             <div style="height: 54px; display:flex; align-items:center; justify-content:flex-start; gap:10px;">
-                                                                ' . ($existingBriAvatarEsc !== '' ? '<img src="' . $existingBriAvatarEsc . '" alt="Avatar BRI" style="height: 40px; width: 40px; border-radius: 50%; object-fit: cover;"> <span class="text-muted small">' . $existingBriAvatarEsc . '</span>' : '<div class="text-muted">Nenhum avatar cadastrado (usando padrão)</div>') . '
+                                                                ' . ($existingBriAvatarEsc !== '' ? (str_ends_with($existingBriAvatar, '.webm') ? '<video src="' . $existingBriAvatarEsc . '" autoplay loop muted playsinline style="height: 40px; width: 40px; border-radius: 50%; object-fit: cover;"></video>' : '<img src="' . $existingBriAvatarEsc . '" alt="Avatar BRI" style="height: 40px; width: 40px; border-radius: 50%; object-fit: cover;">') . ' <span class="text-muted small">' . $existingBriAvatarEsc . '</span>' : '<div class="text-muted">Nenhum avatar cadastrado (usando padrão)</div>') . '
                                                             </div>
                                                         </div>
                                                         <input type="hidden" name="layout_bri_avatar_keep" value="' . $existingBriAvatarEsc . '">
                                                     </div>
                                                     <div class="col-12 col-md-7">
                                                         <label class="form-label">Upload do Avatar BRI</label>
-                                                        <input type="file" class="form-control" name="layout_bri_avatar" accept="image/gif,image/png,image/webp">
+                                                        <input type="file" class="form-control" name="layout_bri_avatar" accept="image/gif,video/webm">
                                                         <div class="mt-2">
                                                             <button type="button" class="btn btn-sm btn-outline-danger" id="btnRemoveLayoutBriAvatar">Remover avatar</button>
                                                         </div>
@@ -4524,7 +4524,7 @@ HTML;
                     $err = (int) ($_FILES['layout_bri_avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
                     if ($err === UPLOAD_ERR_OK && $tmp !== '' && $name !== '') {
                         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                        if (in_array($ext, ['gif','png','webp'], true)) {
+                        if (in_array($ext, ['gif','webm'], true)) {
                             $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
                             $uploadDir = $docRoot . '/public/uploads/logo/';
                             if (!is_dir($uploadDir)) {
