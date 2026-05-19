@@ -102,16 +102,11 @@
   const sidebar = document.getElementById('bri-sidebar');
   const header = document.getElementById('bri-sidebar-header');
   const input = document.getElementById('bri-input');
-  const painel = document.getElementById('bri-painel');
   if (!sidebar || !header) return;
 
   let dragging = false;
   let startY = 0;
   let startH = 0;
-
-  function updatePainelPadding() {
-    if (painel) painel.style.paddingBottom = sidebar.offsetHeight + 'px';
-  }
 
   function onStart(e) {
     if (window.innerWidth >= 768) return;
@@ -128,16 +123,19 @@
     const y = e.touches ? e.touches[0].clientY : e.clientY;
     const delta = startY - y;
     const maxH = window.innerHeight * 0.8;
-    const newH = Math.min(Math.max(startH + delta, 56), maxH);
+    // Min = header height + input area height (header ~50px + input ~50px = 100px)
+    const headerH = header.offsetHeight || 50;
+    const inputArea = document.getElementById('bri-input-area');
+    const inputH = inputArea ? inputArea.offsetHeight : 50;
+    const minH = headerH + inputH;
+    const newH = Math.min(Math.max(startH + delta, minH), maxH);
     sidebar.style.height = newH + 'px';
-    updatePainelPadding();
   }
 
   function onEnd() {
     if (!dragging) return;
     dragging = false;
     sidebar.style.transition = '';
-    updatePainelPadding();
   }
 
   header.addEventListener('touchstart', onStart, { passive: true });
