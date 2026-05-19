@@ -95,7 +95,7 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: drag para redimensionar + auto-expand quando BRI responde
+// Mobile: bottom-sheet com 3 estados fixos (minimizado, 20%, 35%)
 (function() {
   if (window.innerWidth >= 768) return;
 
@@ -105,77 +105,116 @@
   var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
 
-  var minH = 100;
-  var maxH = Math.round(window.innerHeight * 0.8);
-  var userHasResized = false; // track se o usuario arrastou manualmente
+  // Estados: 0=minimizado, 1=20%, 2=35%
+  var state = 1; // inicia em 20%
+  var STATES = [0, 0.20, 0.35];
 
-  function updateContainerHeight() {
-    container.style.height = window.innerHeight + 'px';
-    maxH = Math.round(window.innerHeight * 0.8);
+  function getHeaderInputHeight() {
     var inputArea = document.getElementById('bri-input-area');
-    var hH = header.offsetHeight || 48;
+    var hH = header.offsetHeight || 52;
     var iH = inputArea ? inputArea.offsetHeight : 48;
-    minH = hH + iH + 10;
+    return hH + iH;
   }
 
-  updateContainerHeight();
-  // Apenas atualizar o container height no resize, NÃO tocar no sidebar
+  function getHeightForState(s) {
+    if (s === 0) return getHeaderInputHeight();
+    return Math.round(window.innerHeight * STATES[s]);
+  }
+
+  function applyState() {
+    var h = getHeightForState(state);
+    sidebar.style.height = h + 'px';
+    // Scroll mensagens para baixo
+    if (msgsEl) setTimeout(function() { msgsEl.scrollTop = msgsEl.scrollHeight; }, 100);
+    // Toggle classe minimizado
+    sidebar.classList.toggle('bri-minimized', state === 0);
+  }
+
+  // Setar container height
+  function updateContainer() {
+    container.style.height = window.innerHeight + 'px';
+  }
+  updateContainer();
   window.addEventListener('resize', function() {
-    updateContainerHeight();
+    updateContainer();
+    applyState();
   });
 
-  // Altura inicial
-  sidebar.style.height = Math.round(window.innerHeight * 0.3) + 'px';
+  // Iniciar em state 1 (20%)
+  setTimeout(applyState, 50);
 
-  // === DRAG ===
-  var isDragging = false;
-  var startY = 0;
-  var startH = 0;
+  // === Clique no header para expandir (ciclo: min→20%→35%) ===
+  header.addEventListener('click', function(e) {
+    if (e.target.closest('.bri-minimize-btn, button, a')) return;
+    if (state < 2) {
+      state++;
+    } else {
+      state = 0;
+    }
+    applyState();
+  });
+
+  // === Botão minimizar ===
+  var minBtn = document.createElement('button');
+  minBtn.className = 'bri-icon-btn bri-minimize-btn';
+  minBtn.title = 'Minimizar';
+  minBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+  minBtn.style.cssText = 'margin-left:auto;';
+  minBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    state = 0;
+    applyState();
+  });
+  header.appendChild(minBtn);
+
+  // === Gesto magnético: swipe up/down encaixa no estado mais próximo ===
+  var touchStartY = 0;
+  var touchStartH = 0;
+  var swiping = false;
 
   header.addEventListener('touchstart', function(e) {
-    if (e.target.closest('button, a')) return;
-    isDragging = true;
-    startY = e.touches[0].clientY;
-    startH = sidebar.offsetHeight;
-    sidebar.style.transition = 'none';
+    if (e.target.closest('.bri-minimize-btn, button, a')) return;
+    swiping = true;
+    touchStartY = e.touches[0].clientY;
+    touchStartH = sidebar.offsetHeight;
   }, { passive: true });
 
   document.addEventListener('touchmove', function(e) {
-    if (!isDragging) return;
-    e.preventDefault();
-    var y = e.touches[0].clientY;
-    var diff = startY - y;
-    var newH = startH + diff;
-    if (newH < minH) newH = minH;
-    if (newH > maxH) newH = maxH;
-    sidebar.style.height = newH + 'px';
-  }, { passive: false });
+    if (!swiping) return;
+    // Não mover livremente — apenas detectar direção no touchend
+  }, { passive: true });
 
-  document.addEventListener('touchend', function() {
-    if (!isDragging) return;
-    isDragging = false;
-    sidebar.style.transition = '';
-    userHasResized = true;
+  document.addEventListener('touchend', function(e) {
+    if (!swiping) return;
+    swiping = false;
+    var endY = e.changedTouches[0].clientY;
+    var diff = touchStartY - endY; // positivo = swipe up
+
+    if (Math.abs(diff) < 20) return; // tap, não swipe — ignorar (click handler cuida)
+
+    if (diff > 0) {
+      // Swipe up → expandir
+      if (state < 2) state++;
+    } else {
+      // Swipe down → minimizar
+      if (state > 0) state--;
+    }
+    applyState();
   });
 
-  // === AUTO-EXPAND quando BRI responde ===
+  // === Auto-expand quando BRI responde ===
   if (msgsEl && window.MutationObserver) {
     var expandTimeout = null;
     var observer = new MutationObserver(function() {
-      // Debounce: esperar 300ms após última mutação
       if (expandTimeout) clearTimeout(expandTimeout);
       expandTimeout = setTimeout(function() {
-        var currentH = sidebar.offsetHeight;
-        var targetH = Math.round(window.innerHeight * 0.5);
-        if (currentH < targetH) {
-          sidebar.style.transition = 'height 0.3s ease';
-          sidebar.style.height = targetH + 'px';
-          setTimeout(function() {
-            sidebar.style.transition = '';
-          }, 350);
+        // Se minimizado, expandir para 20%
+        if (state === 0) {
+          state = 1;
+          applyState();
         }
         // Scroll para baixo
-        msgsEl.scrollTop = msgsEl.scrollHeight;
+        if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
       }, 300);
     });
     observer.observe(msgsEl, { childList: true });

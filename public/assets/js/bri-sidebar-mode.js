@@ -83,7 +83,38 @@ const BriSidebar = (() => {
       html += '<div class="bri-bubble ' + cls + '">' + escHtml(m.content) + (time ? '<span class="bri-bubble-time">' + time + '</span>' : '') + '</div>';
     });
     msgsEl.innerHTML = html;
+    truncateBubbles();
     scrollBottom();
+  }
+
+  // Truncar bolhas longas no mobile
+  function truncateBubbles() {
+    if (window.innerWidth >= 768) return;
+    msgsEl.querySelectorAll('.bri-bubble').forEach(function(bubble) {
+      // Remover ver-mais antigo
+      var next = bubble.nextElementSibling;
+      if (next && next.classList.contains('bri-ver-mais')) next.remove();
+      bubble.classList.remove('bri-truncated', 'bri-expanded');
+      // Checar se precisa truncar (scrollHeight > 80px)
+      if (bubble.scrollHeight > 84) {
+        bubble.classList.add('bri-truncated');
+        var btn = document.createElement('div');
+        btn.className = 'bri-ver-mais';
+        btn.textContent = 'ver mais ▾';
+        btn.addEventListener('click', function() {
+          if (bubble.classList.contains('bri-expanded')) {
+            bubble.classList.remove('bri-expanded');
+            bubble.classList.add('bri-truncated');
+            btn.textContent = 'ver mais ▾';
+          } else {
+            bubble.classList.add('bri-expanded');
+            bubble.classList.remove('bri-truncated');
+            btn.textContent = 'ver menos ▴';
+          }
+        });
+        bubble.after(btn);
+      }
+    });
   }
 
   function scrollBottom() {

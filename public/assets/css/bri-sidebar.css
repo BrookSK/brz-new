@@ -375,19 +375,23 @@ body {
     order: 2;
     width: 100%;
     flex: 0 0 auto;
-    height: var(--bri-chat-h, 30%);
+    height: 20vh; /* será controlado via JS */
     border-right: none;
     border-top: none;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: height 0.25s ease;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     background: var(--color-surface);
-    /* Sombra para cima — separa visualmente o chat do iframe acima */
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
     border-radius: 12px 12px 0 0;
     position: relative;
     z-index: 10;
+  }
+
+  /* Quando minimizado, esconder mensagens */
+  #bri-sidebar.bri-minimized #bri-mensagens {
+    display: none;
   }
 
   /* Header */
@@ -427,6 +431,42 @@ body {
 
   #bri-input {
     font-size: 16px;
+  }
+
+  /* Truncar mensagens longas no mobile */
+  #bri-mensagens .bri-bubble {
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #bri-mensagens .bri-bubble.bri-expanded {
+    max-height: none;
+    overflow: visible;
+  }
+
+  #bri-mensagens .bri-bubble.bri-truncated::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 24px;
+    background: linear-gradient(transparent, #fff);
+    pointer-events: none;
+  }
+
+  #bri-mensagens .bri-bubble.user.bri-truncated::after {
+    background: linear-gradient(transparent, var(--color-primary));
+  }
+
+  .bri-ver-mais {
+    font-size: 11px;
+    color: var(--color-primary);
+    cursor: pointer;
+    padding: 2px 0;
+    text-align: left;
+    font-weight: 500;
   }
 
   #bri-wizard {
