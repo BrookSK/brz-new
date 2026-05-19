@@ -432,7 +432,7 @@ class AdminRemessaInternacionalController extends Controller {
             $params = [];
 
             // Excluir pedidos cancelados, deletados ou na lixeira
-            $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','canceled','excluido','deleted','lixeira','trash')";
+            $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('cancelado','cancelled','canceled','excluido','deleted','lixeira','trash','entregue','entregue_ao_destinatario')";
             if (is_array($colsPedidos) && in_array('deleted_at', $colsPedidos, true)) {
                 $where[] = 'p.deleted_at IS NULL';
             }
