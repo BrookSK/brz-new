@@ -281,9 +281,7 @@ const BriSidebar = (() => {
       }
       historico.push({ role: 'user', content: msg, time: getTime() });
       const _isOrcamento = /quanto (fica|custa)|orcamento|orçamento/i.test(msg);
-      const _buscaReply = _isOrcamento
-        ? 'Buscando ' + searchTerm + '... 🔍\n\nQuando aparecer, clique em "Add to cart" para adicionar ao carrinho. Depois diga "carrinho" para ver o valor total com taxas e frete!'
-        : 'Buscando ' + searchTerm + '... 🔍';
+      const _buscaReply = 'Buscando ' + searchTerm + '... 🔍\n\nClique em "Add to cart" para adicionar ao carrinho.\nPode continuar buscando outros produtos — quando terminar, diga "carrinho" para ver o valor total do seu carrinho!\n\n✈️ Frete Grátis para o mundo todo';
       historico.push({ role: 'assistant', content: _buscaReply, time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
