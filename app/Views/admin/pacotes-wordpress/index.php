@@ -108,7 +108,7 @@
                                     <td><?= !empty($e['created_at']) ? date('d/m/Y H:i', strtotime((string) $e['created_at'])) : '-' ?></td>
                                     <td>
                                         <?php if ($trk !== ''): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/etiqueta/<?= $eid ?>/pdf" target="_blank" title="Baixar PDF"><i class="fas fa-file-pdf"></i></a>
+                                            <a class="btn btn-sm btn-outline-primary" href="/admin/pacotes-wordpress/etiqueta-pdf/<?= $eid ?>" target="_blank" title="Baixar PDF"><i class="fas fa-file-pdf"></i></a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -143,7 +143,7 @@
                                     <?php endif; ?>
                                 </div>
                                 <?php if ($trk !== ''): ?>
-                                    <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="/admin/pacotes-wordpress/etiqueta/<?= $eid ?>/pdf" target="_blank"><i class="fas fa-file-pdf"></i></a>
+                                    <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="/admin/pacotes-wordpress/etiqueta-pdf/<?= $eid ?>" target="_blank"><i class="fas fa-file-pdf"></i></a>
                                 <?php endif; ?>
                             </div>
                         </div>
