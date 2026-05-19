@@ -141,7 +141,7 @@ body {
 </style>
 </head>
 <body>
-<button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
+<button class="print-btn no-print" onclick="document.title='etiqueta-<?= $h($codigo) ?>';window.print()">🖨 Imprimir</button>
 
 <div class="label">
 
@@ -278,8 +278,11 @@ body {
     } catch(e){ console.error('DataMatrix:', e); }
   }
 
-  // Auto-print
-  setTimeout(function(){ window.print(); }, 800);
+  // Auto-print com nome do arquivo
+  setTimeout(function(){
+    document.title = 'etiqueta-' + trackingCode;
+    window.print();
+  }, 800);
 })();
 </script>
 </body>
