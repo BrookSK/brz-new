@@ -75,16 +75,22 @@
                                     <td>
                                         <?php if ($trk !== ''): ?>
                                             <?php
-                                                $wpOrigemUrl3 = '';
-                                                $origemLower3 = strtolower((string) ($e['origem'] ?? 'red'));
-                                                if ($origemLower3 === 'br') $wpOrigemUrl3 = 'https://br.brazilianashop.com.br';
-                                                elseif ($origemLower3 === 'red') $wpOrigemUrl3 = 'https://redirecionamento.brazilianashop.com.br';
-                                                elseif ($origemLower3 === 'us') $wpOrigemUrl3 = 'https://us.brazilianashop.com.br';
-                                                $wpPostId3 = (int) ($e['wp_post_id'] ?? 0);
+                                                $meta3 = json_decode((string) ($e['meta_json'] ?? '{}'), true) ?: [];
+                                                $pdfData3 = json_encode([
+                                                    'tracking' => $trk,
+                                                    'orderId' => (int) ($e['pedido_id'] ?? 0),
+                                                    'nome' => (string) ($e['cliente_nome'] ?? ''),
+                                                    'endereco' => (string) ($meta3['_recipient_address'] ?? ''),
+                                                    'numero' => (string) ($meta3['_recipient_address_number'] ?? ''),
+                                                    'complemento' => (string) ($meta3['_recipient_address_complement'] ?? ''),
+                                                    'cidade' => (string) ($meta3['_recipient_city_name'] ?? ''),
+                                                    'estado' => (string) ($meta3['_recipient_state'] ?? ''),
+                                                    'cep' => (string) ($meta3['_recipient_zip_code'] ?? ''),
+                                                    'documento' => (string) ($meta3['_recipient_document_number'] ?? ''),
+                                                    'origem' => strtoupper((string) ($e['origem'] ?? '')),
+                                                ], JSON_UNESCAPED_UNICODE);
                                             ?>
-                                            <?php if ($wpPostId3 > 0 && $wpOrigemUrl3 !== ''): ?>
-                                                <a class="btn btn-sm btn-outline-primary" href="<?= $wpOrigemUrl3 ?>/wp-admin/post.php?post=<?= $wpPostId3 ?>&action=edit" target="_blank"><i class="fas fa-file-pdf"></i></a>
-                                            <?php endif; ?>
+                                            <button class="btn btn-sm btn-outline-primary" onclick='gerarEtiquetaPdf(<?= htmlspecialchars($pdfData3, ENT_QUOTES) ?>)'><i class="fas fa-file-pdf"></i></button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -113,6 +119,48 @@
         </div>
     <?php endif; ?>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+function gerarEtiquetaPdf(d) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [100, 150] });
+    const tracking = d.tracking || '';
+    const orderId = d.orderId || '';
+    const nome = d.nome || '';
+    const endereco = d.endereco || '';
+    const numero = d.numero || '';
+    const complemento = d.complemento || '';
+    const cidade = d.cidade || '';
+    const estado = d.estado || '';
+    const cep = d.cep || '';
+    const documento = d.documento || '';
+    const origem = d.origem || 'US';
+    doc.setFontSize(8); doc.text('PACKET STANDARD', 60, 8);
+    doc.setFontSize(7); doc.text('Order #: ' + orderId, 5, 8); doc.text('DDU', 5, 12);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(tracking, 50, 25, { align: 'center' }); doc.setFont(undefined, 'normal');
+    doc.setFontSize(8); doc.text('||||| ' + tracking + ' |||||', 50, 32, { align: 'center' });
+    doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.text(origem, 90, 30); doc.setFont(undefined, 'normal');
+    doc.line(5, 38, 95, 38);
+    doc.setFontSize(7); doc.text('Recebedor: ___________________________________', 5, 43); doc.text('Assinatura: ___________________________________', 5, 48);
+    doc.setFillColor(0, 0, 0); doc.rect(5, 52, 90, 5, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.text('DESTINATÁRIO', 7, 56);
+    doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'normal');
+    doc.setFontSize(9); doc.text(nome, 7, 62);
+    doc.setFontSize(8); doc.text(endereco + (numero ? ', ' + numero : ''), 7, 67);
+    if (complemento) doc.text(complemento, 7, 72);
+    doc.text(cidade + '/' + estado, 7, complemento ? 77 : 72);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+    const cepF = cep.length === 8 ? cep.substring(0,5) + '-' + cep.substring(5) : cep;
+    doc.text(cepF, 75, 67); doc.setFont(undefined, 'normal');
+    doc.line(5, 80, 95, 80);
+    doc.setFontSize(7); doc.text('Instrução: Retorno à origem', 5, 85);
+    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.text('Remetente:', 60, 85); doc.setFont(undefined, 'normal');
+    doc.setFontSize(7); doc.text('Braziliana LLC', 60, 89); doc.text('United States', 60, 93);
+    if (documento) { doc.setFontSize(6); doc.text('CPF: ' + documento, 5, 145); }
+    doc.save('etiqueta-' + tracking + '.pdf');
+}
+</script>
 
 <?php
 $content = ob_get_clean();

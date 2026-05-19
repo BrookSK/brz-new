@@ -109,17 +109,22 @@
                                     <td>
                                         <?php if ($trk !== ''): ?>
                                             <?php
-                                                // Link direto para o WordPress onde a etiqueta pode ser baixada
-                                                $wpOrigemUrl = '';
-                                                $origemLower = strtolower((string) ($e['origem'] ?? 'red'));
-                                                if ($origemLower === 'br') $wpOrigemUrl = 'https://br.brazilianashop.com.br';
-                                                elseif ($origemLower === 'red') $wpOrigemUrl = 'https://redirecionamento.brazilianashop.com.br';
-                                                elseif ($origemLower === 'us') $wpOrigemUrl = 'https://us.brazilianashop.com.br';
-                                                $wpPostId = (int) ($e['wp_post_id'] ?? 0);
+                                                $meta = json_decode((string) ($e['meta_json'] ?? '{}'), true) ?: [];
+                                                $pdfData = json_encode([
+                                                    'tracking' => $trk,
+                                                    'orderId' => $pedidoId,
+                                                    'nome' => (string) ($e['cliente_nome'] ?? ''),
+                                                    'endereco' => (string) ($meta['_recipient_address'] ?? ''),
+                                                    'numero' => (string) ($meta['_recipient_address_number'] ?? ''),
+                                                    'complemento' => (string) ($meta['_recipient_address_complement'] ?? ''),
+                                                    'cidade' => (string) ($meta['_recipient_city_name'] ?? ''),
+                                                    'estado' => (string) ($meta['_recipient_state'] ?? ''),
+                                                    'cep' => (string) ($meta['_recipient_zip_code'] ?? ''),
+                                                    'documento' => (string) ($meta['_recipient_document_number'] ?? ''),
+                                                    'origem' => strtoupper((string) ($e['origem'] ?? '')),
+                                                ], JSON_UNESCAPED_UNICODE);
                                             ?>
-                                            <?php if ($wpPostId > 0 && $wpOrigemUrl !== ''): ?>
-                                                <a class="btn btn-sm btn-outline-primary" href="<?= $wpOrigemUrl ?>/wp-admin/post.php?post=<?= $wpPostId ?>&action=edit" target="_blank" title="Abrir no WordPress"><i class="fas fa-file-pdf"></i></a>
-                                            <?php endif; ?>
+                                            <button class="btn btn-sm btn-outline-primary" onclick='gerarEtiquetaPdf(<?= htmlspecialchars($pdfData, ENT_QUOTES) ?>)' title="Gerar PDF"><i class="fas fa-file-pdf"></i></button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -155,16 +160,22 @@
                                 </div>
                                 <?php if ($trk !== ''): ?>
                                     <?php
-                                        $wpOrigemUrl2 = '';
-                                        $origemLower2 = strtolower((string) ($e['origem'] ?? 'red'));
-                                        if ($origemLower2 === 'br') $wpOrigemUrl2 = 'https://br.brazilianashop.com.br';
-                                        elseif ($origemLower2 === 'red') $wpOrigemUrl2 = 'https://redirecionamento.brazilianashop.com.br';
-                                        elseif ($origemLower2 === 'us') $wpOrigemUrl2 = 'https://us.brazilianashop.com.br';
-                                        $wpPostId2 = (int) ($e['wp_post_id'] ?? 0);
+                                        $meta2 = json_decode((string) ($e['meta_json'] ?? '{}'), true) ?: [];
+                                        $pdfData2 = json_encode([
+                                            'tracking' => $trk,
+                                            'orderId' => $pedidoId,
+                                            'nome' => (string) ($e['cliente_nome'] ?? ''),
+                                            'endereco' => (string) ($meta2['_recipient_address'] ?? ''),
+                                            'numero' => (string) ($meta2['_recipient_address_number'] ?? ''),
+                                            'complemento' => (string) ($meta2['_recipient_address_complement'] ?? ''),
+                                            'cidade' => (string) ($meta2['_recipient_city_name'] ?? ''),
+                                            'estado' => (string) ($meta2['_recipient_state'] ?? ''),
+                                            'cep' => (string) ($meta2['_recipient_zip_code'] ?? ''),
+                                            'documento' => (string) ($meta2['_recipient_document_number'] ?? ''),
+                                            'origem' => strtoupper((string) ($e['origem'] ?? '')),
+                                        ], JSON_UNESCAPED_UNICODE);
                                     ?>
-                                    <?php if ($wpPostId2 > 0 && $wpOrigemUrl2 !== ''): ?>
-                                        <a class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" href="<?= $wpOrigemUrl2 ?>/wp-admin/post.php?post=<?= $wpPostId2 ?>&action=edit" target="_blank"><i class="fas fa-file-pdf"></i></a>
-                                    <?php endif; ?>
+                                    <button class="btn btn-sm btn-outline-primary py-0 px-2 ms-2" onclick='gerarEtiquetaPdf(<?= htmlspecialchars($pdfData2, ENT_QUOTES) ?>)'><i class="fas fa-file-pdf"></i></button>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -200,6 +211,145 @@
         </div>
     </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+function gerarEtiquetaPdf(d) {
+    const { jsPDF } = window.jspdf;
+    // Etiqueta 100mm x 150mm
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [100, 150] });
+
+    const tracking = d.tracking || '';
+    const orderId = d.orderId || '';
+    const nome = d.nome || '';
+    const endereco = d.endereco || '';
+    const numero = d.numero || '';
+    const complemento = d.complemento || '';
+    const cidade = d.cidade || '';
+    const estado = d.estado || '';
+    const cep = d.cep || '';
+    const documento = d.documento || '';
+    const origem = d.origem || 'US';
+
+    // Header
+    doc.setFontSize(8);
+    doc.text('PACKET STANDARD', 60, 8);
+    doc.setFontSize(7);
+    doc.text('Order #: ' + orderId, 5, 8);
+    doc.text('DDU', 5, 12);
+
+    // Tracking number
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(tracking, 50, 25, { align: 'center' });
+    doc.setFont(undefined, 'normal');
+
+    // Barcode (simulated with text)
+    doc.setFontSize(8);
+    doc.text('||||| ' + tracking + ' |||||', 50, 32, { align: 'center' });
+
+    // Origin country
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text(origem, 90, 30);
+    doc.setFont(undefined, 'normal');
+
+    // Separator
+    doc.setDrawColor(0);
+    doc.line(5, 38, 95, 38);
+
+    // Recebedor / Assinatura
+    doc.setFontSize(7);
+    doc.text('Recebedor: ___________________________________', 5, 43);
+    doc.text('Assinatura: ___________________________________', 5, 48);
+    doc.text('Documento: ____________', 65, 48);
+
+    // Destinatário box
+    doc.setFillColor(0, 0, 0);
+    doc.rect(5, 52, 90, 5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('DESTINATÁRIO', 7, 56);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+
+    doc.setFontSize(9);
+    doc.text(nome, 7, 62);
+    doc.setFontSize(8);
+    const enderecoFull = endereco + (numero ? ', ' + numero : '');
+    doc.text(enderecoFull, 7, 67);
+    if (complemento) doc.text(complemento, 7, 72);
+    doc.text(cidade + '/' + estado, 7, complemento ? 77 : 72);
+
+    // CEP grande
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    const cepFormatted = cep.length === 8 ? cep.substring(0,5) + '-' + cep.substring(5) : cep;
+    doc.text(cepFormatted, 75, 67);
+    doc.setFont(undefined, 'normal');
+
+    // CEP barcode (simulated)
+    doc.setFontSize(7);
+    doc.text('||||| ' + cep + ' |||||', 80, 73, { align: 'center' });
+
+    // Separator
+    doc.line(5, 80, 95, 80);
+
+    // Instrução de não nacionalização
+    doc.setFontSize(7);
+    doc.text('Instrução do Remetente no caso de não nacionalização:', 5, 85);
+    doc.rect(5, 87, 3, 3);
+    doc.text('X', 5.8, 89.5);
+    doc.text('Retorno à origem', 10, 89.5);
+
+    // Remetente
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('Remetente:', 60, 85);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7);
+    doc.text('Braziliana LLC', 60, 89);
+    doc.text('United States', 60, 93);
+
+    // Devolução
+    doc.setFontSize(6);
+    doc.text('--- DEVOLUÇÃO ---', 5, 97);
+    doc.text('(Em caso de não entrega ao remetente, entregar para:)', 5, 101);
+    doc.text('Braziliana', 5, 105);
+    doc.text('Rua Votuporanga 2276 / Eldorado', 5, 109);
+    doc.text('15043-040 - São José do Rio Preto/SP', 5, 113);
+
+    // Separator
+    doc.line(5, 116, 95, 116);
+
+    // Declaração para Alfândega
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'bold');
+    doc.text('Declaração para Alfândega', 5, 120);
+    doc.text('Pode ser aberto Ex Officio', 55, 120);
+    doc.setFont(undefined, 'normal');
+
+    // Table header
+    doc.setFontSize(6);
+    doc.text('Cod SH', 5, 125);
+    doc.text('Qtde', 25, 125);
+    doc.text('Descrição', 35, 125);
+    doc.text('Peso KG', 60, 125);
+    doc.text('Unit USD', 75, 125);
+    doc.text('Valor USD', 88, 125);
+    doc.line(5, 126, 95, 126);
+
+    // CPF/Documento
+    if (documento) {
+        doc.setFontSize(6);
+        doc.text('CPF: ' + documento, 5, 145);
+    }
+
+    // Save
+    doc.save('etiqueta-' + tracking + '.pdf');
+}
+</script>
 
 <script>
 async function sincronizarPacotes() {
