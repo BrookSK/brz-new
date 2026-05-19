@@ -17,6 +17,15 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 .total-row{font-weight:bold;background:#f1f1f1;}
 .highlight{color:red;font-weight:bold;}
 .no-print{margin-bottom:10px;}
+.carne-banner{background:#1a237e;color:#fff;text-align:center;padding:8px 12px;margin-bottom:15px;border-radius:4px;font-size:14px;font-weight:bold;letter-spacing:0.5px;}
+.carne-banner span{background:#ffc107;color:#1a237e;padding:2px 8px;border-radius:3px;margin-left:8px;font-size:11px;text-transform:uppercase;}
+.section-carne{border:2px solid #1a237e;border-radius:6px;padding:12px;margin-bottom:15px;page-break-inside:avoid;background:#f8f9ff;}
+.section-carne .section-title{background:#1a237e;color:#fff;border-left:none;border-radius:3px;padding:6px 10px;font-size:14px;margin:-12px -12px 12px -12px;border-radius:4px 4px 0 0;}
+.section-carne table{margin-bottom:0;}
+.section-carne th{background:#e8eaf6;width:35%;}
+.section-carne td{font-weight:bold;}
+.carne-progress{background:#e0e0e0;height:10px;border-radius:5px;overflow:hidden;margin:4px 0;}
+.carne-progress-bar{background:#1a237e;height:100%;border-radius:5px;}
 @media print{.no-print{display:none;} @page{margin:10mm;}}
 </style>
 </head>
@@ -33,6 +42,12 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
     Status: <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $pedido['status'] ?? ''))) ?> |
     Moeda: <?= $moeda ?>
 </div>
+
+<?php if (!empty($carneInfo)): ?>
+<div class="carne-banner">
+    &#128179; PEDIDO VIA CARNÊ BRAZILIANA <span><?= (int)($carneInfo['parcelas_pagas'] ?? 0) ?>/<?= (int)($carneInfo['quantidade_parcelas'] ?? 0) ?> parcelas pagas</span>
+</div>
+<?php endif; ?>
 
 <!-- Cliente -->
 <div class="section">
@@ -138,6 +153,7 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
     $cTotal = (int)($carneInfo['quantidade_parcelas'] ?? 0);
     $cValorPago = (float)($carneInfo['valor_pago'] ?? 0);
     $cTotalGeral = (float)($carneInfo['total_geral'] ?? 0);
+    $cProgresso = $cTotal > 0 ? round(($cPagas / $cTotal) * 100) : 0;
     $cStatusMap = [
         'aguardando_primeira_parcela' => 'Aguardando 1ª parcela',
         'ativo' => 'Ativo',
@@ -150,15 +166,22 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
     ];
     $cStatusLabel = $cStatusMap[$carneInfo['status']] ?? ucfirst(str_replace('_', ' ', $carneInfo['status'] ?? ''));
 ?>
-<div class="section">
-    <div class="section-title">Carnê Braziliana</div>
+<div class="section-carne">
+    <div class="section-title">&#128179; Carnê Braziliana</div>
     <table>
         <tr><th>Status do Carnê</th><td><?= htmlspecialchars($cStatusLabel) ?></td></tr>
-        <tr><th>Parcelas</th><td><?= $cPagas ?> / <?= $cTotal ?> pagas</td></tr>
-        <tr><th>Valor Pago</th><td>R$ <?= number_format($cValorPago, 2, ',', '.') ?></td></tr>
+        <tr><th>Parcelas</th><td><?= $cPagas ?> / <?= $cTotal ?> pagas (<?= $cProgresso ?>%)</td></tr>
+        <tr>
+            <th>Progresso</th>
+            <td>
+                <div class="carne-progress"><div class="carne-progress-bar" style="width:<?= $cProgresso ?>%"></div></div>
+            </td>
+        </tr>
+        <tr><th>Valor Pago</th><td style="color:#2e7d32;">R$ <?= number_format($cValorPago, 2, ',', '.') ?></td></tr>
         <tr><th>Total do Carnê</th><td>R$ <?= number_format($cTotalGeral, 2, ',', '.') ?></td></tr>
+        <tr><th>Restante</th><td style="color:#c62828;">R$ <?= number_format($cTotalGeral - $cValorPago, 2, ',', '.') ?></td></tr>
         <?php if (!empty($carneInfo['proximo_vencimento'])): ?>
-        <tr><th>Próximo Vencimento</th><td><?= date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) ?></td></tr>
+        <tr><th>Próximo Vencimento</th><td style="color:#e65100;"><?= date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) ?></td></tr>
         <?php endif; ?>
         <?php if (!empty($carneInfo['ultima_parcela_vencimento'])): ?>
         <tr><th>Última Parcela</th><td><?= date('d/m/Y', strtotime($carneInfo['ultima_parcela_vencimento'])) ?></td></tr>
