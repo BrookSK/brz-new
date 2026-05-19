@@ -678,7 +678,11 @@ class AdminRemessaCorreiosController extends Controller {
         }
         
         echo '</h1>
-                    <div class="d-none d-md-flex gap-2">
+                    <div class="d-none d-md-flex gap-2 align-items-center">
+                        <div class="input-group input-group-sm" style="width:180px">
+                            <input type="text" class="form-control" id="buscarPedidoCorreios" placeholder="Nº pedido..." onkeydown="if(event.key===\'Enter\'){irParaPedidoCorreios();event.preventDefault();}">
+                            <button class="btn btn-outline-primary" type="button" onclick="irParaPedidoCorreios()"><i class="fas fa-search"></i></button>
+                        </div>
                         <button type="button" class="btn btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
                         <button type="button" class="btn btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir Todas</button>
                         <button type="button" class="btn btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
@@ -687,11 +691,23 @@ class AdminRemessaCorreiosController extends Controller {
                 </div>
                 <div id="correiosActionsM" class="d-none d-md-none mb-3">
                     <div class="d-flex flex-wrap gap-2">
+                        <div class="input-group input-group-sm" style="width:180px">
+                            <input type="text" class="form-control" id="buscarPedidoCorreiosM" placeholder="Nº pedido..." onkeydown="if(event.key===\'Enter\'){irParaPedidoCorreios(\'M\');event.preventDefault();}">
+                            <button class="btn btn-outline-primary" type="button" onclick="irParaPedidoCorreios(\'M\')"><i class="fas fa-search"></i></button>
+                        </div>
                         <button type="button" class="btn btn-sm btn-success" onclick="gerarLoteEtiquetas()"><i class="fas fa-tags me-1"></i>Gerar Lote</button>
                         <button type="button" class="btn btn-sm btn-warning" onclick="imprimirTodasEtiquetas()"><i class="fas fa-print me-1"></i>Imprimir</button>
                         <button type="button" class="btn btn-sm btn-info" onclick="location.reload()"><i class="fas fa-sync me-1"></i>Atualizar</button>
                     </div>
                 </div>
+                <script>
+                function irParaPedidoCorreios(suffix){
+                    var el = document.getElementById("buscarPedidoCorreios"+(suffix||""));
+                    var v = el.value.replace(/\\D/g,"");
+                    if(v===""){alert("Digite o número do pedido");return;}
+                    window.location.href="/admin/pedidos/detalhes/"+parseInt(v,10);
+                }
+                </script>
 
                 <!-- Estatísticas -->
                 <div class="row g-2 mb-4">

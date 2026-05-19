@@ -2,7 +2,11 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="page-title">Correios Mundial (PACKET)</h1>
-        <div>
+        <div class="d-flex gap-2 align-items-center">
+            <div class="input-group input-group-sm" style="width:180px">
+                <input type="text" class="form-control" id="buscarPedidoPacket" placeholder="Nº pedido..." onkeydown="if(event.key==='Enter'){irParaPedidoPacket();event.preventDefault();}">
+                <button class="btn btn-outline-primary" type="button" onclick="irParaPedidoPacket()"><i class="fas fa-search"></i></button>
+            </div>
             <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/containers">Containers</a>
             <a class="btn btn-sm btn-outline-primary" href="/admin/correios-mundial/faturas">Faturas (CN38)</a>
         </div>
@@ -237,6 +241,12 @@
 
     document.addEventListener('DOMContentLoaded', loadBalance);
 })();
+
+function irParaPedidoPacket(){
+    var v = document.getElementById('buscarPedidoPacket').value.replace(/\D/g,'');
+    if(v===''){alert('Digite o número do pedido');return;}
+    window.location.href='/admin/correios-mundial/pedido/'+parseInt(v,10);
+}
 
 function toggleAllPacket(el) {
     document.querySelectorAll('.packet-check').forEach(cb => cb.checked = el.checked);
