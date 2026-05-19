@@ -95,7 +95,7 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: bottom-sheet com estados fixos (sem drag)
+// Mobile: bottom-sheet com 3 estados (minimizado ↔ 35% ↔ 60%)
 (function() {
   if (window.innerWidth >= 768) return;
 
@@ -105,8 +105,9 @@
   var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
 
-  // 0=minimizado, 1=35%
+  // 0=minimizado, 1=35%, 2=60%
   var state = 1;
+  var unreadCount = 0;
 
   function applyState() {
     var winH = window.innerHeight;
@@ -114,10 +115,20 @@
     var minH = (header.offsetHeight || 52) + (inputArea ? inputArea.offsetHeight : 48);
     var h;
     if (state === 0) h = minH;
-    else h = Math.max(Math.round(winH * 0.35), minH);
+    else if (state === 1) h = Math.max(Math.round(winH * 0.35), minH);
+    else h = Math.max(Math.round(winH * 0.60), minH);
     sidebar.style.height = h + 'px';
     sidebar.classList.toggle('bri-minimized', state === 0);
-    if (msgsEl && state > 0) setTimeout(function() { msgsEl.scrollTop = msgsEl.scrollHeight; }, 150);
+    // Atualizar ícone da seta
+    if (state === 2) {
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+    } else {
+      toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+    }
+    if (badge) toggleBtn.appendChild(badge);
+    updateToggleStyle();
+    if (msgsEl && state > 0) setTimeout(function() { msgsEl.scrollTop = msgsEl.scrollHeight; }, 200);
+    if (state > 0) { unreadCount = 0; updateBadge(); }
   }
 
   // Container = viewport real
@@ -127,55 +138,89 @@
     applyState();
   });
 
-  applyState();
-
-  // Botão expandir/minimizar — adicionado ao header
+  // --- Botão seta (expandir/colapsar) ---
   var toggleBtn = document.createElement('button');
   toggleBtn.className = 'bri-icon-btn bri-toggle-btn';
-  toggleBtn.title = 'Expandir/Minimizar';
-  toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-  // Estado visual: aberto (state=1) = fundo branco, borda navy, seta navy
-  // minimizado (state=0) = fundo navy, seta branca
+  toggleBtn.title = 'Expandir';
+  toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
   function updateToggleStyle() {
     if (state === 0) {
-      toggleBtn.style.cssText = 'background:#18253D;color:#fff;border:2px solid #18253D;border-radius:50%;width:28px;height:28px;';
+      toggleBtn.style.cssText = 'background:#18253D;color:#fff;border:2px solid #18253D;border-radius:50%;width:28px;height:28px;position:relative;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;';
     } else {
-      toggleBtn.style.cssText = 'background:#fff;color:#18253D;border:2px solid #18253D;border-radius:50%;width:28px;height:28px;';
+      toggleBtn.style.cssText = 'background:#fff;color:#18253D;border:2px solid #18253D;border-radius:50%;width:28px;height:28px;position:relative;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;';
     }
   }
   updateToggleStyle();
+
+  // Badge de notificação
+  var badge = null;
+  function updateBadge() {
+    if (unreadCount > 0 && state === 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'bri-badge';
+        toggleBtn.appendChild(badge);
+      }
+      badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+      badge.style.display = 'flex';
+      toggleBtn.classList.add('has-notification');
+    } else {
+      if (badge) badge.style.display = 'none';
+      toggleBtn.classList.remove('has-notification');
+    }
+  }
+
+  // Seta: clique expande (min→35%→60%) ou colapsa (60%→35%→min)
   toggleBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     e.preventDefault();
-    state = state === 0 ? 1 : 0;
-    toggleBtn.innerHTML = state === 0 ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
-    updateToggleStyle();
+    if (state < 2) {
+      state++;
+    } else {
+      state--;
+    }
     applyState();
   });
   header.appendChild(toggleBtn);
 
-  // Tap no header também toggle
-  header.addEventListener('click', function(e) {
-    if (e.target.closest('button') || e.target.closest('a')) return;
-    state = state === 0 ? 1 : 0;
-    toggleBtn.innerHTML = state === 0 ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
-    updateToggleStyle();
+  // --- Botão minimizar (traço vermelho) ---
+  var minBtn = document.createElement('button');
+  minBtn.className = 'bri-icon-btn bri-min-btn';
+  minBtn.title = 'Minimizar';
+  minBtn.innerHTML = '<span style="width:12px;height:2px;background:#DC2626;border-radius:1px;display:block;"></span>';
+  minBtn.style.cssText = 'background:#FEE2E2;border:1.5px solid #FECACA;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-left:4px;';
+  minBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    state = 0;
     applyState();
   });
+  header.appendChild(minBtn);
 
-  // Auto-expand quando BRI responde
+  // Tap no header expande se minimizado
+  header.addEventListener('click', function(e) {
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    if (state === 0) {
+      state = 1;
+      applyState();
+    }
+  });
+
+  // Aplicar estado inicial (35%)
+  applyState();
+
+  // Notificação quando BRI responde (NÃO auto-expand)
   if (msgsEl && window.MutationObserver) {
     var debounce = null;
     new MutationObserver(function() {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(function() {
         if (state === 0) {
-          state = 1;
-          toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-          updateToggleStyle();
-          applyState();
+          unreadCount++;
+          updateBadge();
+        } else {
+          if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
         }
-        if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
       }, 400);
     }).observe(msgsEl, { childList: true });
   }

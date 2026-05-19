@@ -370,21 +370,21 @@ body {
   #bri-divider { display: none; }
   #bri-back-btn { display: none !important; }
 
-  /* Chat embaixo */
+  /* Chat embaixo — bottom-sheet contextual */
   #bri-sidebar {
     order: 2;
     width: 100%;
     flex: 0 0 auto;
-    height: 20vh; /* será controlado via JS */
+    height: 20vh;
     border-right: none;
     border-top: none;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: height 0.45s cubic-bezier(0.32, 0.72, 0, 1);
     background: var(--color-surface);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
-    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.10);
+    border-radius: 14px 14px 0 0;
     position: relative;
     z-index: 10;
   }
@@ -392,6 +392,52 @@ body {
   /* Quando minimizado, esconder mensagens */
   #bri-sidebar.bri-minimized #bri-mensagens {
     display: none;
+  }
+
+  /* Notificação badge no botão toggle */
+  .bri-toggle-btn {
+    position: relative;
+  }
+
+  .bri-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: #fff;
+    color: #18253D;
+    font-size: 9px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    animation: bri-pulse-badge 2.5s ease-in-out infinite;
+  }
+
+  @keyframes bri-pulse-badge {
+    0%, 100% { transform: scale(1); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+    50% { transform: scale(1.08); box-shadow: 0 0 0 4px rgba(24, 37, 61, 0.06), 0 1px 4px rgba(0,0,0,0.15); }
+  }
+
+  /* Pulse ring ao redor do botão quando há notificação */
+  .bri-toggle-btn.has-notification::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(24, 37, 61, 0.15);
+    animation: bri-ring-pulse 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes bri-ring-pulse {
+    0%, 100% { opacity: 0; transform: scale(0.9); }
+    30% { opacity: 1; transform: scale(1); }
+    70% { opacity: 0.4; transform: scale(1.15); }
   }
 
   /* Header */
