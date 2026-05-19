@@ -2928,9 +2928,21 @@ class PaymentService {
 
         $this->garantirTabelaPedidoPagamentos();
         $db = \Config\Database::getConnection();
-        $st = $db->prepare("SELECT id, payment_id, gateway_status, status FROM pedido_pagamentos WHERE pedido_id = :p AND gateway = 'cambioreal' ORDER BY id ASC");
+        $st = $db->prepare("SELECT id, payment_id, gateway_status, status FROM pedido_pagamentos WHERE pedido_id = :p AND gateway IN ('cambioreal','cambioreal_taxas') ORDER BY id ASC");
         $st->execute([':p' => $pedidoId]);
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Se não há registros, tentar descobrir o payment_id a partir do pedido
+        if (empty($rows)) {
+            $recovered = $this->tentarRecuperarPagamentosCambioReal($db, $pedidoId);
+            if (!empty($recovered)) {
+                // Re-buscar após recuperação
+                $st = $db->prepare("SELECT id, payment_id, gateway_status, status FROM pedido_pagamentos WHERE pedido_id = :p AND gateway IN ('cambioreal','cambioreal_taxas') ORDER BY id ASC");
+                $st->execute([':p' => $pedidoId]);
+                $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            }
+        }
+
         if (empty($rows)) {
             return ['success' => true, 'skipped' => true, 'gateway' => 'cambioreal', 'message' => 'Sem pagamentos Câmbio Real neste pedido'];
         }
@@ -2942,11 +2954,21 @@ class PaymentService {
                 continue;
             }
             try {
-                $tx = $this->obterTransacaoCambioReal($pid);
+                $gateway = 'cambioreal';
+                // Detectar se é da conta taxas
+                $stGw = $db->prepare("SELECT gateway FROM pedido_pagamentos WHERE id = ? LIMIT 1");
+                $stGw->execute([(int)$r['id']]);
+                $gwRow = (string)($stGw->fetchColumn() ?: 'cambioreal');
+                if ($gwRow === 'cambioreal_taxas') {
+                    $tx = $this->obterTransacaoCambioRealTaxas($pid);
+                    $gateway = 'cambioreal_taxas';
+                } else {
+                    $tx = $this->obterTransacaoCambioReal($pid);
+                }
                 $data = is_array($tx['data'] ?? null) ? (array) $tx['data'] : [];
                 $stGateway = (string) ($data['status'] ?? ($data['payment_status'] ?? ($data['transaction_status'] ?? '')));
                 $mapped = $this->mapearStatusCambioRealParaInterno($stGateway);
-                $this->atualizarSplitPorGatewayPaymentId($pid, 'cambioreal', (string) $mapped['internal'], (string) $mapped['status_norm']);
+                $this->atualizarSplitPorGatewayPaymentId($pid, $gateway, (string) $mapped['internal'], (string) $mapped['status_norm']);
                 $results[] = ['payment_id' => $pid, 'internal' => $mapped['internal'], 'gateway_status' => $mapped['status_norm']];
             } catch (\Exception $e) {
                 $results[] = ['payment_id' => $pid, 'error' => $e->getMessage()];
@@ -2954,6 +2976,166 @@ class PaymentService {
         }
 
         return ['success' => true, 'gateway' => 'cambioreal', 'results' => $results];
+    }
+
+    /**
+     * Tenta recuperar pagamentos Câmbio Real quando não há registros em pedido_pagamentos.
+     * Busca payment_id do pedido ou pedido_meta e tenta consultar a API para criar os registros.
+     */
+    private function tentarRecuperarPagamentosCambioReal(\PDO $db, int $pedidoId): array {
+        $recovered = [];
+
+        try {
+            // 1. Buscar payment_id do campo pedidos.payment_id
+            $colsPed = [];
+            try { $stC = $db->query('DESCRIBE pedidos'); $colsPed = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+
+            $paymentId = '';
+            $email = '';
+            $subtotal = 0;
+            $servicos = 0;
+            $impostos = 0;
+            $impostoLocal = 0;
+            $moeda = 'BRL';
+            $formaPagamento = '';
+
+            $stPed = $db->prepare("SELECT * FROM pedidos WHERE id = ? LIMIT 1");
+            $stPed->execute([$pedidoId]);
+            $pedido = $stPed->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            if (empty($pedido)) return [];
+
+            $paymentId = trim((string)($pedido['payment_id'] ?? ''));
+            $email = trim((string)($pedido['cliente_email'] ?? ''));
+            $subtotal = (float)($pedido['subtotal'] ?? 0);
+            $servicos = (float)($pedido['servicos'] ?? ($pedido['taxa_servico'] ?? 0));
+            $impostos = (float)($pedido['impostos'] ?? 0);
+            $impostoLocal = (float)($pedido['imposto_local'] ?? 0);
+            $moeda = strtoupper(trim((string)($pedido['moeda'] ?? 'BRL')));
+            $formaPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? '')));
+
+            // Buscar email do usuario se não está no pedido
+            if ($email === '' && !empty($pedido['usuario_id'])) {
+                try {
+                    $stU = $db->prepare("SELECT email FROM usuarios WHERE id = ? LIMIT 1");
+                    $stU->execute([(int)$pedido['usuario_id']]);
+                    $email = trim((string)($stU->fetchColumn() ?: ''));
+                } catch (\Exception $e) {}
+            }
+
+            // Se não é pix/cartão/boleto via câmbio real, não tentar
+            if (!in_array($formaPagamento, ['pix', 'cartao_credito', 'cartao_debito', 'credit_card', 'boleto', ''], true)) {
+                return [];
+            }
+
+            // 2. Se tem payment_id no pedido, tentar consultar diretamente
+            if ($paymentId !== '' && !str_starts_with($paymentId, 'pi_')) {
+                try {
+                    $tx = $this->obterTransacaoCambioReal($paymentId);
+                    $data = is_array($tx['data'] ?? null) ? (array)$tx['data'] : [];
+                    if (!empty($data['status'])) {
+                        $mapped = $this->mapearStatusCambioRealParaInterno((string)$data['status']);
+                        $valor = (float)($data['amount'] ?? ($data['value'] ?? ($data['valor'] ?? $subtotal)));
+                        // Registrar como pagamento de produtos
+                        $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                            'pedido_id' => $pedidoId,
+                            'componente' => 'produtos',
+                            'gateway' => 'cambioreal',
+                            'metodo' => $formaPagamento,
+                            'moeda' => 'BRL',
+                            'valor' => $valor > 0 ? $valor : $subtotal,
+                            'status' => (string)$mapped['internal'],
+                            'gateway_status' => (string)$mapped['status_norm'],
+                            'payment_id' => $paymentId,
+                        ], 'produtos', 'cambioreal');
+                        $recovered[] = ['payment_id' => $paymentId, 'componente' => 'produtos'];
+                    }
+                } catch (\Exception $e) {
+                    // Pode não ser um token do Câmbio Real
+                }
+            }
+
+            // 3. Buscar payment_id em pedido_meta
+            if (empty($recovered)) {
+                try {
+                    $stMeta = $db->prepare("SELECT meta_key, meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key LIKE '%cambioreal%'");
+                    $stMeta->execute([$pedidoId]);
+                    $metas = $stMeta->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($metas as $m) {
+                        $val = trim((string)($m['meta_value'] ?? ''));
+                        if ($val !== '' && strlen($val) > 5) {
+                            try {
+                                $tx = $this->obterTransacaoCambioReal($val);
+                                $data = is_array($tx['data'] ?? null) ? (array)$tx['data'] : [];
+                                if (!empty($data['status'])) {
+                                    $mapped = $this->mapearStatusCambioRealParaInterno((string)$data['status']);
+                                    $valor = (float)($data['amount'] ?? ($data['value'] ?? $subtotal));
+                                    $comp = strpos(strtolower((string)$m['meta_key']), 'taxa') !== false ? 'taxa_servico' : 'produtos';
+                                    $gw = $comp === 'taxa_servico' ? 'cambioreal_taxas' : 'cambioreal';
+                                    $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                                        'pedido_id' => $pedidoId,
+                                        'componente' => $comp,
+                                        'gateway' => $gw,
+                                        'metodo' => $formaPagamento,
+                                        'moeda' => 'BRL',
+                                        'valor' => $valor > 0 ? $valor : $subtotal,
+                                        'status' => (string)$mapped['internal'],
+                                        'gateway_status' => (string)$mapped['status_norm'],
+                                        'payment_id' => $val,
+                                    ], $comp, $gw);
+                                    $recovered[] = ['payment_id' => $val, 'componente' => $comp];
+                                }
+                            } catch (\Exception $e) {}
+                        }
+                    }
+                } catch (\Exception $e) {}
+            }
+
+            // 4. Se ainda não recuperou e o pedido está pago, criar registros com os valores do pedido
+            // (sem payment_id — apenas para exibição na conferência)
+            if (empty($recovered)) {
+                $statusPedido = strtolower(trim((string)($pedido['status'] ?? '')));
+                $isPago = in_array($statusPedido, ['pago','paid','approved','aprovado','processando','em_transporte','enviado','produto_consolidado'], true);
+                if ($isPago && $subtotal > 0) {
+                    $totalTaxas = $servicos + $impostos + $impostoLocal;
+
+                    // Registrar produtos
+                    $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                        'pedido_id' => $pedidoId,
+                        'componente' => 'produtos',
+                        'gateway' => 'cambioreal',
+                        'metodo' => $formaPagamento ?: 'pix',
+                        'moeda' => $moeda,
+                        'valor' => $subtotal,
+                        'status' => 'approved',
+                        'gateway_status' => 'PAID',
+                        'payment_id' => '',
+                    ], 'produtos', 'cambioreal');
+                    $recovered[] = ['componente' => 'produtos', 'valor' => $subtotal, 'source' => 'pedido_fields'];
+
+                    // Registrar taxas (se houver)
+                    if ($totalTaxas > 0) {
+                        $this->registrarOuAtualizarPagamentoSplit($pedidoId, [
+                            'pedido_id' => $pedidoId,
+                            'componente' => 'taxa_servico',
+                            'gateway' => 'cambioreal_taxas',
+                            'metodo' => $formaPagamento ?: 'pix',
+                            'moeda' => $moeda,
+                            'valor' => $totalTaxas,
+                            'status' => 'approved',
+                            'gateway_status' => 'PAID',
+                            'payment_id' => '',
+                        ], 'taxa_servico', 'cambioreal_taxas');
+                        $recovered[] = ['componente' => 'taxa_servico', 'valor' => $totalTaxas, 'source' => 'pedido_fields'];
+                    }
+                }
+            }
+
+        } catch (\Exception $e) {
+            error_log('[SYNC_CR_RECOVERY] Erro ao tentar recuperar pagamentos CR para pedido ' . $pedidoId . ': ' . $e->getMessage());
+        }
+
+        return $recovered;
     }
 
     public function atualizarStatusPagamentoAppmaxSplitPorPedido(int $pedidoId): array {
