@@ -941,11 +941,98 @@ class AdminRemessaConferenciaController extends Controller {
         }
         echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
+        // Para pagdev (pagamento externo), usar valores do pedido diretamente
+        $isPagdev = (strtolower(trim($metodoPagamento)) === 'pagdev');
+        if ($isPagdev && $produtosValor <= 0 && $subtotal !== null && $subtotal > 0) {
+            $produtosValor = $subtotal;
+        }
+        if ($isPagdev && $taxaServico <= 0) {
+            $svc = is_numeric($pedido['servicos'] ?? null) ? (float)$pedido['servicos'] : (is_numeric($pedido['taxa_servico'] ?? null) ? (float)$pedido['taxa_servico'] : 0);
+            if ($svc > 0) $taxaServico = $svc;
+        }
+        if ($isPagdev && $impostoValor <= 0) {
+            $imp = is_numeric($pedido['impostos'] ?? null) ? (float)$pedido['impostos'] : 0;
+            if ($imp > 0) $impostoValor = $imp;
+        }
+        if ($isPagdev && $impostoLocal <= 0 && $impLocal !== null && $impLocal > 0) {
+            $impostoLocal = $impLocal;
+        }
         echo '<tr><td class="text-muted">Produtos</td><td>' . ($produtosValor > 0 ? $fmtMoeda($produtosValor, $moeda) : ($subtotal !== null ? $fmtMoeda($subtotal, $moeda) : '-')) . '</td></tr>';
         echo '<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtMoeda($taxaServico > 0 ? $taxaServico : null, $moeda) . '</td></tr>';
         echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtMoeda($impostoValor > 0 ? $impostoValor : null, $moeda) . '</td></tr>';
         echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impostoLocal > 0 ? $impostoLocal : null, $moeda) . '</td></tr>';
-        echo '</table></div></div></div>';
+        if ($isPagdev && $frete !== null) {
+            echo '<tr><td class="text-muted">Frete</td><td>' . ($frete > 0 ? $fmtMoeda($frete, $moeda) : '<span style="color:green">Frete grátis</span>') . '</td></tr>';
+        }
+        if ($isPagdev && $totalPedido !== null) {
+            echo '<tr><td class="text-muted fw-bold">Total</td><td class="fw-bold">' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>';
+        }
+        echo '</table>';
+
+        // Comprovantes de pagamento (pagdev) - buscar da tabela pedidos_pagamento_documentos
+        if ($isPagdev) {
+            $docProdutos = null;
+            $docTaxas = null;
+            try {
+                $stDocCheck = $this->connection->prepare('SHOW TABLES LIKE ?');
+                $stDocCheck->execute(['pedidos_pagamento_documentos']);
+                if ($stDocCheck->fetchColumn()) {
+                    $colsDoc = [];
+                    try { $stCD = $this->connection->query('DESCRIBE pedidos_pagamento_documentos'); $colsDoc = $stCD ? $stCD->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $temColTipo = in_array('tipo', $colsDoc, true);
+
+                    if ($temColTipo) {
+                        $stDoc = $this->connection->prepare("SELECT id, status, arquivo_path, uploaded_at, tipo FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo AND tipo = 'produtos' ORDER BY id DESC LIMIT 1");
+                        $stDoc->execute([':pid' => $pid, ':metodo' => 'pagdev']);
+                        $docProdutos = $stDoc->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+                        $stDoc2 = $this->connection->prepare("SELECT id, status, arquivo_path, uploaded_at, tipo FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo AND tipo = 'taxas' ORDER BY id DESC LIMIT 1");
+                        $stDoc2->execute([':pid' => $pid, ':metodo' => 'pagdev']);
+                        $docTaxas = $stDoc2->fetch(\PDO::FETCH_ASSOC) ?: null;
+                    } else {
+                        $stDoc = $this->connection->prepare("SELECT id, status, arquivo_path, uploaded_at FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = :metodo ORDER BY id DESC LIMIT 1");
+                        $stDoc->execute([':pid' => $pid, ':metodo' => 'pagdev']);
+                        $docProdutos = $stDoc->fetch(\PDO::FETCH_ASSOC) ?: null;
+                    }
+                }
+            } catch (\Exception $e) {}
+
+            $okProd = ($docProdutos && ($docProdutos['status'] ?? '') === 'ok' && !empty($docProdutos['arquivo_path']));
+            $okTaxas = ($docTaxas && ($docTaxas['status'] ?? '') === 'ok' && !empty($docTaxas['arquivo_path']));
+
+            echo '<div class="mt-3"><strong>Comprovantes de Pagamento</strong></div>';
+            echo '<div class="row mt-2">';
+
+            // Comprovante de Produtos
+            echo '<div class="col-md-6"><div class="card border-primary mb-2"><div class="card-body py-2">';
+            echo '<div class="fw-semibold small mb-1"><i class="fas fa-file-invoice text-primary me-1"></i>Comprovante de Produtos</div>';
+            if ($okProd) {
+                $atP = !empty($docProdutos['uploaded_at']) ? date('d/m/Y H:i', strtotime($docProdutos['uploaded_at'])) : '';
+                echo '<span class="badge bg-success">Recebido</span>';
+                if ($atP) echo ' <span class="text-muted small">Enviado em ' . $atP . '</span>';
+                echo '<div class="mt-1"><a href="/' . ltrim($docProdutos['arquivo_path'], '/') . '" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-download me-1"></i>Abrir arquivo</a></div>';
+            } else {
+                echo '<span class="badge bg-warning text-dark">Pendente</span>';
+            }
+            echo '</div></div></div>';
+
+            // Comprovante de Taxas
+            echo '<div class="col-md-6"><div class="card border-warning mb-2"><div class="card-body py-2">';
+            echo '<div class="fw-semibold small mb-1"><i class="fas fa-file-invoice text-warning me-1"></i>Comprovante de Taxas / Impostos</div>';
+            if ($okTaxas) {
+                $atT = !empty($docTaxas['uploaded_at']) ? date('d/m/Y H:i', strtotime($docTaxas['uploaded_at'])) : '';
+                echo '<span class="badge bg-success">Recebido</span>';
+                if ($atT) echo ' <span class="text-muted small">Enviado em ' . $atT . '</span>';
+                echo '<div class="mt-1"><a href="/' . ltrim($docTaxas['arquivo_path'], '/') . '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="fas fa-download me-1"></i>Abrir arquivo</a></div>';
+            } else {
+                echo '<span class="badge bg-warning text-dark">Pendente</span>';
+            }
+            echo '</div></div></div>';
+
+            echo '</div>'; // end row
+        }
+
+        echo '</div></div></div>';
 
         // Cards de pagamento lado a lado
         echo '<div class="row mb-3">';
