@@ -926,6 +926,7 @@ class AdminRemessaConferenciaController extends Controller {
         echo '</tbody></table></div></div></div>';
 
         // Pagamento - bloco principal + dois cards AppMax / Câmbio Real
+        $isPagdev = (strtolower(trim($metodoPagamento)) === 'pagdev');
         echo '<div class="row"><div class="col-md-6">
 <div class="card mb-3"><div class="card-header"><strong><i class="fas fa-credit-card me-1"></i>Pagamento</strong></div><div class="card-body">
 <table class="table table-sm mb-0">';
@@ -936,13 +937,14 @@ class AdminRemessaConferenciaController extends Controller {
         }
         if ($totalUsd > 0 && $totalBrl <= 0) {
             echo '<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
+        } elseif ($isPagdev && $totalPedido !== null && $totalPedido > 0) {
+            echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td>' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>';
         } else {
             echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl > 0 ? $totalBrl : null) . '</td></tr>';
         }
         echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
         // Para pagdev (pagamento externo), usar valores do pedido diretamente
-        $isPagdev = (strtolower(trim($metodoPagamento)) === 'pagdev');
         if ($isPagdev && $produtosValor <= 0 && $subtotal !== null && $subtotal > 0) {
             $produtosValor = $subtotal;
         }
@@ -961,12 +963,6 @@ class AdminRemessaConferenciaController extends Controller {
         echo '<tr><td class="text-muted">Taxa de serviço</td><td>' . $fmtMoeda($taxaServico > 0 ? $taxaServico : null, $moeda) . '</td></tr>';
         echo '<tr><td class="text-muted">Imposto</td><td>' . $fmtMoeda($impostoValor > 0 ? $impostoValor : null, $moeda) . '</td></tr>';
         echo '<tr><td class="text-muted">Imposto local</td><td>' . $fmtMoeda($impostoLocal > 0 ? $impostoLocal : null, $moeda) . '</td></tr>';
-        if ($isPagdev && $frete !== null) {
-            echo '<tr><td class="text-muted">Frete</td><td>' . ($frete > 0 ? $fmtMoeda($frete, $moeda) : '<span style="color:green">Frete grátis</span>') . '</td></tr>';
-        }
-        if ($isPagdev && $totalPedido !== null) {
-            echo '<tr><td class="text-muted fw-bold">Total</td><td class="fw-bold">' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>';
-        }
         echo '</table>';
 
         // Comprovantes de pagamento (pagdev) - buscar da tabela pedidos_pagamento_documentos
