@@ -408,6 +408,125 @@ class AdminRemessaInternacionalController extends Controller {
         $errorMsg = null;
         try {
             $this->ensureTables();
+            $this->ensureJanelaAtual();
+
+            // Filtros
+            $filtros = [
+                'janela_id' => $request->getParam('janela_id', ''),
+                'janela_status' => $request->getParam('janela_status', ''),
+                'etiqueta' => $request->getParam('etiqueta', ''),
+                'busca' => $request->getParam('busca', ''),
+            ];
+
+            // Buscar todas as janelas para o dropdown de filtro
+            $stJanelas = $this->connection->query("SELECT id, data_inicio, data_fim, status FROM remessa_janelas ORDER BY data_inicio DESC LIMIT 50");
+            $janelas = $stJanelas ? $stJanelas->fetchAll(\PDO::FETCH_ASSOC) : [];
+
+            // Buscar pedidos de todas as janelas com filtros
+            $colsPedidos = [];
+            try { $stC = $this->connection->query('DESCRIBE pedidos'); $colsPedidos = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $hasMoeda = is_array($colsPedidos) && in_array('moeda', $colsPedidos, true);
+            $hasCurrency = is_array($colsPedidos) && in_array('currency', $colsPedidos, true);
+
+            $where = ['1=1'];
+            $params = [];
+
+            if (!empty($filtros['janela_id'])) {
+                $where[] = 'rjp.janela_id = :janela_id';
+                $params[':janela_id'] = (int)$filtros['janela_id'];
+            }
+            if (!empty($filtros['janela_status'])) {
+                $where[] = 'j.status = :janela_status';
+                $params[':janela_status'] = $filtros['janela_status'];
+            }
+            if ($filtros['etiqueta'] === 'pendente') {
+                $where[] = 'rjp.etiqueta_gerada = 0';
+            } elseif ($filtros['etiqueta'] === 'gerada') {
+                $where[] = 'rjp.etiqueta_gerada = 1';
+            }
+            if (!empty($filtros['busca'])) {
+                $busca = '%' . $filtros['busca'] . '%';
+                $where[] = '(CAST(rjp.pedido_id AS CHAR) LIKE :busca OR u.nome LIKE :busca2 OR u.email LIKE :busca3)';
+                $params[':busca'] = $busca;
+                $params[':busca2'] = $busca;
+                $params[':busca3'] = $busca;
+            }
+
+            $sql = "SELECT rjp.pedido_id, rjp.janela_id, rjp.etiqueta_gerada, rjp.etiqueta_gerada_em,
+                        rjp.wexpress_shipping_id, rjp.wexpress_tracking_number, rjp.courier_tracking_number,
+                        rjp.wexpress_status, rjp.created_at AS entrou_janela_em,
+                        p.created_at AS pedido_criado_em, p.total, p.status AS pedido_status,
+                        " . ($hasMoeda ? 'p.moeda,' : "'' AS moeda,") . "
+                        " . ($hasCurrency ? 'p.currency,' : "'' AS currency,") . "
+                        u.nome AS cliente_nome, u.email AS cliente_email,
+                        j.status AS janela_status, j.data_inicio AS janela_inicio, j.data_fim AS janela_fim
+                    FROM remessa_janela_pedidos rjp
+                    LEFT JOIN pedidos p ON p.id = rjp.pedido_id
+                    LEFT JOIN usuarios u ON u.id = p.usuario_id
+                    LEFT JOIN remessa_janelas j ON j.id = rjp.janela_id
+                    WHERE " . implode(' AND ', $where) . "
+                    ORDER BY rjp.created_at DESC, rjp.pedido_id DESC
+                    LIMIT 200";
+
+            $st = $this->connection->prepare($sql);
+            $st->execute($params);
+            $pedidos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // Stats
+            $stStats = $this->connection->query("SELECT
+                COUNT(*) AS total_pedidos,
+                SUM(CASE WHEN rjp.etiqueta_gerada = 1 THEN 1 ELSE 0 END) AS etiquetas_geradas,
+                SUM(CASE WHEN rjp.etiqueta_gerada = 0 THEN 1 ELSE 0 END) AS etiquetas_pendentes
+                FROM remessa_janela_pedidos rjp");
+            $statsRow = $stStats ? $stStats->fetch(\PDO::FETCH_ASSOC) : [];
+            $stAtraso = $this->connection->query("SELECT COUNT(*) FROM remessa_janelas WHERE status = 'atraso'");
+            $janelasAtraso = $stAtraso ? (int)$stAtraso->fetchColumn() : 0;
+
+            $stats = [
+                'total_pedidos' => (int)($statsRow['total_pedidos'] ?? 0),
+                'etiquetas_geradas' => (int)($statsRow['etiquetas_geradas'] ?? 0),
+                'etiquetas_pendentes' => (int)($statsRow['etiquetas_pendentes'] ?? 0),
+                'janelas_atraso' => $janelasAtraso,
+            ];
+
+            $usdToBrl = $this->getUsdToBrlRate();
+
+        } catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
+            $pedidos = [];
+            $janelas = [];
+            $stats = ['total_pedidos' => 0, 'etiquetas_geradas' => 0, 'etiquetas_pendentes' => 0, 'janelas_atraso' => 0];
+            $usdToBrl = 5.5;
+        }
+
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remessa Internacional - Braziliana Admin</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">';
+        renderAdminSidebarStyles();
+        echo '</head><body><div class="container-fluid"><div class="row">';
+        renderAdminSidebar('remessa-internacional');
+        echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">';
+
+        if ($errorMsg) {
+            echo '<div class="alert alert-danger mt-3"><strong>Erro:</strong> ' . htmlspecialchars($errorMsg) . '</div>';
+        }
+
+        require __DIR__ . '/../Views/admin/remessa-internacional/index-flat.php';
+
+        echo '</main></div></div>';
+        renderAdminScripts();
+        echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script></body></html>';
+        exit;
+    }
+
+    public function indexLegacy($request) {
+        $this->requireAdmin();
+        $errorMsg = null;
+        try {
+            $this->ensureTables();
             $janelaAtual = $this->ensureJanelaAtual();
 
             $janelasAbertas = $this->getJanelasByStatus(['aberta']);
