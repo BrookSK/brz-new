@@ -1950,6 +1950,9 @@ class AdminRemessaCorreiosController extends Controller {
             $dadosRemetente    = json_decode((string)($etiqueta['dados_remetente'] ?? ''), true) ?: [];
             $dadosDestinatario = json_decode((string)($etiqueta['dados_destinatario'] ?? ''), true) ?: [];
             
+            $pedidoId = (int) ($etiqueta['pedido_id'] ?? 0);
+            $pedidoLabel = $pedidoId > 0 ? 'PEDIDO-' . $pedidoId : '';
+
             $codigo    = (string)($etiqueta['codigo_etiqueta'] ?? '');
             $codigoHtml = htmlspecialchars($codigo, ENT_QUOTES, 'UTF-8');
             $codigoJs   = json_encode($codigo);
@@ -2096,7 +2099,7 @@ class AdminRemessaCorreiosController extends Controller {
 
   <div class="logo-row">
     <div class="logo-correios">COR<span>REIOS</span></div>
-    <div class="servico">Encomenda Nacional</div>
+    <div class="servico">Encomenda Nacional<br><strong style="font-size:10pt;color:#000">{$pedidoLabel}</strong></div>
   </div>
 
   <div class="barcode-row">
