@@ -284,6 +284,33 @@ class AdminPacotesWordpressController extends Controller {
     // ─── Rotas Públicas (Views) ────────────────────────────────────────────────
 
     public function index(Request $request) {
+        // Dispatch por action (fallback caso a rota aponte direto para index)
+        $action = trim((string) $request->getParam('action', ''));
+        if ($action !== '') {
+            switch ($action) {
+                case 'etiqueta-pdf':
+                    return $this->etiquetaPdf($request);
+                case 'containers':
+                    return $this->containers($request);
+                case 'container-novo':
+                    return $this->containerNovo($request);
+                case 'container-detalhes':
+                    return $this->containerDetalhes($request);
+                case 'faturas':
+                    return $this->faturas($request);
+                case 'fatura-nova':
+                    return $this->faturaNova($request);
+                case 'sincronizar':
+                    return $this->sincronizar($request);
+                case 'container-criar':
+                    return $this->containerCriar($request);
+                case 'container-deletar':
+                    return $this->containerDeletar($request);
+                case 'fatura-criar':
+                    return $this->faturaCriar($request);
+            }
+        }
+
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
 
