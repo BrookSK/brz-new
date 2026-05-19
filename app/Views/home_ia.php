@@ -95,7 +95,7 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: bottom-sheet com 3 estados fixos (minimizado, 20%, 35%)
+// Mobile: bottom-sheet com 3 estados fixos
 (function() {
   if (window.innerWidth >= 768) return;
 
@@ -105,61 +105,53 @@
   var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
 
-  // Estados: 0=minimizado, 1=20%, 2=35%
-  var state = 1; // inicia em 20%
-  var STATES = [0, 0.20, 0.35];
+  // 0=minimizado(header+input), 1=20%, 2=35%
+  var state = 1;
 
-  function getHeaderInputHeight() {
+  function vh() { return window.innerHeight; }
+
+  function getMinH() {
     var inputArea = document.getElementById('bri-input-area');
-    var hH = header.offsetHeight || 52;
-    var iH = inputArea ? inputArea.offsetHeight : 48;
-    return hH + iH;
-  }
-
-  function getHeightForState(s) {
-    if (s === 0) return getHeaderInputHeight();
-    return Math.round(window.innerHeight * STATES[s]);
+    return (header.offsetHeight || 52) + (inputArea ? inputArea.offsetHeight : 48);
   }
 
   function applyState() {
-    var h = getHeightForState(state);
+    var h;
+    if (state === 0) h = getMinH();
+    else if (state === 1) h = Math.round(vh() * 0.20);
+    else h = Math.round(vh() * 0.35);
+    // Garantir mínimo
+    var min = getMinH();
+    if (h < min) h = min;
     sidebar.style.height = h + 'px';
-    // Scroll mensagens para baixo
-    if (msgsEl) setTimeout(function() { msgsEl.scrollTop = msgsEl.scrollHeight; }, 100);
-    // Toggle classe minimizado
     sidebar.classList.toggle('bri-minimized', state === 0);
+    if (msgsEl && state > 0) setTimeout(function() { msgsEl.scrollTop = msgsEl.scrollHeight; }, 150);
   }
 
-  // Setar container height
-  function updateContainer() {
-    container.style.height = window.innerHeight + 'px';
-  }
-  updateContainer();
+  // Container = viewport real
+  container.style.height = vh() + 'px';
   window.addEventListener('resize', function() {
-    updateContainer();
+    container.style.height = vh() + 'px';
     applyState();
   });
 
-  // Iniciar em state 1 (20%)
-  setTimeout(applyState, 50);
+  // Aplicar estado inicial (20%)
+  applyState();
 
-  // === Clique no header para expandir (ciclo: min→20%→35%) ===
+  // Botão expandir: tap no header (exceto botões)
   header.addEventListener('click', function(e) {
-    if (e.target.closest('.bri-minimize-btn, button, a')) return;
-    if (state < 2) {
-      state++;
-    } else {
-      state = 0;
-    }
+    if (e.target.closest('.bri-minimize-btn') || e.target.closest('button') || e.target.closest('a')) return;
+    // Expandir: 0→1→2, se já em 2 volta pra 0
+    if (state < 2) state++;
+    else state = 0;
     applyState();
   });
 
-  // === Botão minimizar ===
+  // Botão minimizar
   var minBtn = document.createElement('button');
   minBtn.className = 'bri-icon-btn bri-minimize-btn';
   minBtn.title = 'Minimizar';
   minBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-  minBtn.style.cssText = 'margin-left:auto;';
   minBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     state = 0;
@@ -167,57 +159,16 @@
   });
   header.appendChild(minBtn);
 
-  // === Gesto magnético: swipe up/down encaixa no estado mais próximo ===
-  var touchStartY = 0;
-  var touchStartH = 0;
-  var swiping = false;
-
-  header.addEventListener('touchstart', function(e) {
-    if (e.target.closest('.bri-minimize-btn, button, a')) return;
-    swiping = true;
-    touchStartY = e.touches[0].clientY;
-    touchStartH = sidebar.offsetHeight;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', function(e) {
-    if (!swiping) return;
-    // Não mover livremente — apenas detectar direção no touchend
-  }, { passive: true });
-
-  document.addEventListener('touchend', function(e) {
-    if (!swiping) return;
-    swiping = false;
-    var endY = e.changedTouches[0].clientY;
-    var diff = touchStartY - endY; // positivo = swipe up
-
-    if (Math.abs(diff) < 20) return; // tap, não swipe — ignorar (click handler cuida)
-
-    if (diff > 0) {
-      // Swipe up → expandir
-      if (state < 2) state++;
-    } else {
-      // Swipe down → minimizar
-      if (state > 0) state--;
-    }
-    applyState();
-  });
-
-  // === Auto-expand quando BRI responde ===
+  // Auto-expand quando BRI responde
   if (msgsEl && window.MutationObserver) {
-    var expandTimeout = null;
-    var observer = new MutationObserver(function() {
-      if (expandTimeout) clearTimeout(expandTimeout);
-      expandTimeout = setTimeout(function() {
-        // Se minimizado, expandir para 20%
-        if (state === 0) {
-          state = 1;
-          applyState();
-        }
-        // Scroll para baixo
+    var debounce = null;
+    new MutationObserver(function() {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(function() {
+        if (state === 0) { state = 1; applyState(); }
         if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
-      }, 300);
-    });
-    observer.observe(msgsEl, { childList: true });
+      }, 400);
+    }).observe(msgsEl, { childList: true });
   }
 })();
 </script>
