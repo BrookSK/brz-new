@@ -383,19 +383,20 @@ body {
     flex-direction: column;
     transition: height 0.25s ease;
     background: var(--color-surface);
+    /* Sombra para cima — separa visualmente o chat do iframe acima */
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    border-radius: 12px 12px 0 0;
+    position: relative;
+    z-index: 10;
   }
 
-  /* Header com hierarquia visual: bordas arredondadas, sombra, levemente mais estreito */
+  /* Header */
   #bri-sidebar-header {
     padding: 14px 14px 6px;
     border-bottom: none;
     flex-shrink: 0;
     background: var(--color-surface);
-    border-radius: 12px 12px 0 0;
-    margin: 0 6px;
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
     position: relative;
-    z-index: 2;
   }
 
   /* Drag handle bar */
