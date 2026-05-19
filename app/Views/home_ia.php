@@ -105,7 +105,7 @@
   var msgsEl = document.getElementById('bri-mensagens');
   if (!container || !sidebar || !header) return;
 
-  // 0=minimizado, 1=20%, 2=35%
+  // 0=minimizado, 1=35%
   var state = 1;
 
   function applyState() {
@@ -114,7 +114,6 @@
     var minH = (header.offsetHeight || 52) + (inputArea ? inputArea.offsetHeight : 48);
     var h;
     if (state === 0) h = minH;
-    else if (state === 1) h = Math.max(Math.round(winH * 0.20), minH);
     else h = Math.max(Math.round(winH * 0.35), minH);
     sidebar.style.height = h + 'px';
     sidebar.classList.toggle('bri-minimized', state === 0);
@@ -134,34 +133,33 @@
   var toggleBtn = document.createElement('button');
   toggleBtn.className = 'bri-icon-btn bri-toggle-btn';
   toggleBtn.title = 'Expandir/Minimizar';
-  toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+  toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+  // Estado visual: aberto (state=1) = fundo branco, borda navy, seta navy
+  // minimizado (state=0) = fundo navy, seta branca
+  function updateToggleStyle() {
+    if (state === 0) {
+      toggleBtn.style.cssText = 'background:#18253D;color:#fff;border:2px solid #18253D;border-radius:50%;width:28px;height:28px;';
+    } else {
+      toggleBtn.style.cssText = 'background:#fff;color:#18253D;border:2px solid #18253D;border-radius:50%;width:28px;height:28px;';
+    }
+  }
+  updateToggleStyle();
   toggleBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     e.preventDefault();
-    if (state < 2) {
-      state++;
-      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-    } else {
-      state = 0;
-      toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
-    }
+    state = state === 0 ? 1 : 0;
+    toggleBtn.innerHTML = state === 0 ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
+    updateToggleStyle();
     applyState();
   });
   header.appendChild(toggleBtn);
 
-  // Tap no header também expande (exceto botões)
+  // Tap no header também toggle
   header.addEventListener('click', function(e) {
     if (e.target.closest('button') || e.target.closest('a')) return;
-    if (state === 0) {
-      state = 1;
-      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-    } else if (state < 2) {
-      state++;
-      toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
-    } else {
-      state = 0;
-      toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
-    }
+    state = state === 0 ? 1 : 0;
+    toggleBtn.innerHTML = state === 0 ? '<i class="bi bi-chevron-up"></i>' : '<i class="bi bi-chevron-down"></i>';
+    updateToggleStyle();
     applyState();
   });
 
@@ -174,6 +172,7 @@
         if (state === 0) {
           state = 1;
           toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+          updateToggleStyle();
           applyState();
         }
         if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
