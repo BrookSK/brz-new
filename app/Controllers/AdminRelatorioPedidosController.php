@@ -379,6 +379,23 @@ class AdminRelatorioPedidosController extends Controller {
             return 'US$ ' . number_format((float)$v, 2, '.', ',');
         };
 
+        // Buscar dados do Carnê (se for pedido de carnê)
+        $carneInfo = null;
+        try {
+            $stCarne = $this->db->prepare("
+                SELECT c.id, c.status, c.quantidade_parcelas, c.total_geral, c.created_at,
+                    (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas,
+                    (SELECT SUM(COALESCE(valor_produtos,0) + COALESCE(valor_taxas,0)) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as valor_pago,
+                    (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento,
+                    (SELECT MAX(vencimento) FROM carne_parcelas WHERE carne_id = c.id) as ultima_parcela_vencimento
+                FROM carnes c WHERE c.pedido_id = ? LIMIT 1
+            ");
+            $stCarne->execute([(int)$id]);
+            $carneInfo = $stCarne->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Exception $e) {
+            // tabela carnes pode não existir
+        }
+
         require __DIR__ . '/../Views/admin/relatorio-pedidos/imprimir.php';
         exit;
     }

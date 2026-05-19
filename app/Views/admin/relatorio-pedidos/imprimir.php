@@ -131,6 +131,42 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
     </table>
 </div>
 
+<!-- Carnê Braziliana -->
+<?php if (!empty($carneInfo)): ?>
+<?php
+    $cPagas = (int)($carneInfo['parcelas_pagas'] ?? 0);
+    $cTotal = (int)($carneInfo['quantidade_parcelas'] ?? 0);
+    $cValorPago = (float)($carneInfo['valor_pago'] ?? 0);
+    $cTotalGeral = (float)($carneInfo['total_geral'] ?? 0);
+    $cStatusMap = [
+        'aguardando_primeira_parcela' => 'Aguardando 1ª parcela',
+        'ativo' => 'Ativo',
+        'em_andamento' => 'Em andamento',
+        'com_atraso' => 'Com atraso',
+        'quitado' => 'Quitado',
+        'liberado_envio' => 'Liberado p/ envio',
+        'encerrado' => 'Encerrado',
+        'cancelada' => 'Cancelado',
+    ];
+    $cStatusLabel = $cStatusMap[$carneInfo['status']] ?? ucfirst(str_replace('_', ' ', $carneInfo['status'] ?? ''));
+?>
+<div class="section">
+    <div class="section-title">Carnê Braziliana</div>
+    <table>
+        <tr><th>Status do Carnê</th><td><?= htmlspecialchars($cStatusLabel) ?></td></tr>
+        <tr><th>Parcelas</th><td><?= $cPagas ?> / <?= $cTotal ?> pagas</td></tr>
+        <tr><th>Valor Pago</th><td>R$ <?= number_format($cValorPago, 2, ',', '.') ?></td></tr>
+        <tr><th>Total do Carnê</th><td>R$ <?= number_format($cTotalGeral, 2, ',', '.') ?></td></tr>
+        <?php if (!empty($carneInfo['proximo_vencimento'])): ?>
+        <tr><th>Próximo Vencimento</th><td><?= date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) ?></td></tr>
+        <?php endif; ?>
+        <?php if (!empty($carneInfo['ultima_parcela_vencimento'])): ?>
+        <tr><th>Última Parcela</th><td><?= date('d/m/Y', strtotime($carneInfo['ultima_parcela_vencimento'])) ?></td></tr>
+        <?php endif; ?>
+    </table>
+</div>
+<?php endif; ?>
+
 <!-- Observações -->
 <?php if (!empty($pedido['observacoes'])): ?>
 <div class="section">
