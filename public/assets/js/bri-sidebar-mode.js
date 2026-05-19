@@ -115,10 +115,64 @@ const BriSidebar = (() => {
     // === MODO NAVEGAÇÃO RÁPIDA ===
     // Mapa completo de comandos diretos → URLs
     const msgLower = msg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // === CAMADA 0: resposta curta em contexto ===
+    // Se a BRI fez uma pergunta e o usuário responde curto, manda direto pra IA
+    const _palavras = msgLower.trim().split(/\s+/).filter(Boolean);
+    const _ehCurta = _palavras.length <= 3;
+    const _ehConfirmacao = /^(sim|nao|não|ok|isso|esse|essa|aquele|aquela|o primeiro|o segundo|o terceiro|o ultimo|nenhum|todos|pode|vai|manda|beleza|fechou|uhum|isso ai|esse mesmo|nao quero|deixa pra la)$/i.test(msgLower.trim());
+    if (_ehCurta || _ehConfirmacao) {
+      const _ultimaBRI = [...historico].reverse().find(m => m.role === 'assistant');
+      if (_ultimaBRI && /\?\s*$/.test((_ultimaBRI.content || _ultimaBRI.text || '').trim())) {
+        // BRI fez pergunta no turno anterior — bypass cascata, manda pra IA com contexto
+        historico.push({ role: 'user', content: msg, time: getTime() });
+        addMsg(msg, 'user');
+        const typing = document.createElement('div');
+        typing.className = 'bri-typing';
+        typing.innerHTML = '<span></span><span></span><span></span>';
+        msgsEl.appendChild(typing);
+        scrollBottom();
+        enviando = true;
+        sendBtn.disabled = true;
+        fetch('/api/copiloto/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            mensagem: msg,
+            historico: historico.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10),
+            contexto: {
+              pagina: 'home_ia',
+              url_atual: '/home-ia',
+              usuario_logado: !!(document.querySelector('meta[name="bri-user-id"]')?.content > '0'),
+              usuario_id_meta: parseInt(document.querySelector('meta[name="bri-user-id"]')?.content || '0'),
+              moeda_atual: 'USD',
+              iframe_url: frame ? frame.src : '',
+              modo_sidebar: true,
+              resposta_curta_contexto: true
+            }
+          })
+        }).then(r => r.json()).then(data => {
+          typing.remove();
+          enviando = false;
+          sendBtn.disabled = false;
+          if (data && data.resposta) {
+            historico.push({ role: 'assistant', content: data.resposta, time: getTime() });
+            addMsg(data.resposta, 'bot');
+            if (data.acao && acoes[data.acao]) {
+              const url = acoes[data.acao](data);
+              if (url) navigatePainel(url);
+            }
+          }
+        }).catch(() => { typing.remove(); enviando = false; sendBtn.disabled = false; });
+        return;
+      }
+    }
+    // === FIM CAMADA 0 ===
     
     const navMap = [
       // Carrinho & Checkout
-      { regex: /carrinho|meu carrinho|ver carrinho|cart/, url: () => '/carrinho?embed=1&_=' + Date.now(), reply: 'Ok, vamos lá! 🛒\n\nNo carrinho você vê todos os itens, valores com taxas e frete. Pode alterar quantidades ou remover itens.' },
+      { regex: /^(carrinho|meu carrinho|ver(?: o| meu)? carrinho|abrir(?: o)? carrinho|mostra(?:r)?(?: o)? carrinho|cart)\??$/, url: () => '/carrinho?embed=1&_=' + Date.now(), reply: 'Ok, vamos lá! 🛒\n\nNo carrinho você vê todos os itens, valores com taxas e frete. Pode alterar quantidades ou remover itens.' },
       { regex: /^(checkout|finalizar compra|ir pro checkout|fechar pedido|finalizar)$/, url: '/carrinho/checkout?embed=1', reply: 'Te levo pro checkout! 🔒\n\nPreencha seus dados e escolha a forma de pagamento para finalizar.' },
       // Produtos & Catálogo
       { regex: /^(produtos|catalogo|ver produtos|todos os produtos|me mostr.*produtos)$/, url: '/produtos?embed=1', reply: 'Aqui estão os produtos! 🛍️\n\nNavegue, use o campo de busca ou filtre por categoria. Clique em "Add to cart" para adicionar.' },
@@ -134,7 +188,7 @@ const BriSidebar = (() => {
       { regex: /produtos do clube|produtos clube/, url: '/produtos-clube?embed=1', reply: 'Produtos exclusivos do Clube! ⭐' },
       // Informações
       { regex: /^(faq|perguntas frequentes|duvidas)$/, url: '/faq?embed=1', reply: 'Aqui está o FAQ! ❓\n\nRespostas para as dúvidas mais comuns sobre compras, envio e pagamento.' },
-      { regex: /como funciona|como comprar/, url: '/como-funciona?embed=1', reply: 'Veja como funciona! 📖\n\nPasso a passo de como comprar e receber seus produtos dos EUA.' },
+      { regex: /^(como funciona|como comprar)\??$/, url: '/como-funciona?embed=1', reply: 'Veja como funciona! 📖\n\nPasso a passo de como comprar e receber seus produtos dos EUA.' },
       { regex: /^(contato|falar com alguem|fale conosco)$/, url: '/contato?embed=1', reply: 'Página de contato! 📞' },
       { regex: /rastreamento|rastrear|rastreio|tracking/, url: '/rastreamento?embed=1', reply: 'Rastreamento de pedidos! 🚚\n\nCole seu código de rastreio para acompanhar a entrega.' },
       { regex: /status.*(pedido|compra)|acompanhar pedido/, url: '/status-pedido?embed=1', reply: 'Status dos pedidos!' },
@@ -146,7 +200,7 @@ const BriSidebar = (() => {
       // Assessoria / Redirecionamento
       { regex: /assessoria|redirecionamento|redirecionar|compra por link/, url: '/assessoria?embed=1', reply: 'Abrindo a assessoria! 📦\n\nAqui você cola os links de produtos de qualquer loja dos EUA e nós calculamos o orçamento completo (produto + frete + impostos).' },
       // Orçamento - instrução de como fazer
-      { regex: /orcamento|orçamento|quanto fica|quanto custa tudo|simular|simulacao/, url: null, reply: 'Para montar seu orçamento é simples! 📋\n\n1. Me diga o produto que procura (ex: "tineco", "pipoca")\n2. Vou buscar pra você no painel ao lado\n3. Clique em "Add to cart" nos itens que quiser\n4. Repita até adicionar tudo\n5. Quando terminar, diga "carrinho" — lá terá o valor total com taxas e frete!\n\nQual produto quer buscar primeiro?' },
+      { regex: /orcamento|orçamento|quanto fica|quanto custa tudo|simular|simulacao/, url: null, reply: 'Para montar seu orçamento é simples! 📋\n\n1. Me diga o produto que procura (ex: "tineco", "pipoca")\n2. Vou buscar pra você no painel ao lado\n3. Clique em "Add to cart" nos itens que quiser\n4. Repita até adicionar tudo\n5. Quando terminar, diga "carrinho" — lá terá o valor total com taxas e frete!\n\nQual produto quer buscar primeiro?', guard: (m) => /^(orcamento|orçamento|quanto fica\??|quanto custa tudo|simular|simulacao)$/.test(m) },
       // Políticas
       { regex: /politica.*(privacidade)|privacidade/, url: '/politica-privacidade?embed=1', reply: 'Política de privacidade.' },
       { regex: /termos.*(uso)|termos/, url: '/termos-uso?embed=1', reply: 'Termos de uso.' },
@@ -155,7 +209,7 @@ const BriSidebar = (() => {
     ];
 
     for (const nav of navMap) {
-      if (nav.regex.test(msgLower)) {
+      if (nav.regex.test(msgLower) && (!nav.guard || nav.guard(msgLower))) {
         historico.push({ role: 'user', content: msg, time: getTime() });
         historico.push({ role: 'assistant', content: nav.reply, time: getTime() });
         salvarHistorico(); renderMensagens();
@@ -221,7 +275,11 @@ const BriSidebar = (() => {
         if (searchTerm.toLowerCase().includes(pt)) { searchTerm = en; break; }
       }
       historico.push({ role: 'user', content: msg, time: getTime() });
-      historico.push({ role: 'assistant', content: 'Buscando ' + searchTerm + '... 🔍', time: getTime() });
+      const _isOrcamento = /quanto (fica|custa)|orcamento|orçamento/i.test(msg);
+      const _buscaReply = _isOrcamento
+        ? 'Buscando ' + searchTerm + '... 🔍\n\nQuando aparecer, clique em "Add to cart" para adicionar ao carrinho. Depois diga "carrinho" para ver o valor total com taxas e frete!'
+        : 'Buscando ' + searchTerm + '... 🔍';
+      historico.push({ role: 'assistant', content: _buscaReply, time: getTime() });
       salvarHistorico(); renderMensagens();
       navigatePainel('/produtos?search=' + encodeURIComponent(searchTerm) + '&ver_todos=1&embed=1');
 
