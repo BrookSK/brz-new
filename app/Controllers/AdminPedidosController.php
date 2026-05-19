@@ -4707,7 +4707,8 @@ LINKSCRIPT;
                                 SELECT c.id, c.status, c.quantidade_parcelas, c.total_geral, c.created_at,
                                     (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as parcelas_pagas,
                                     (SELECT SUM(COALESCE(valor_produtos,0) + COALESCE(valor_taxas,0)) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') as valor_pago,
-                                    (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento
+                                    (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) as proximo_vencimento,
+                                    (SELECT MAX(vencimento) FROM carne_parcelas WHERE carne_id = c.id) as ultima_parcela_vencimento
                                 FROM carnes c WHERE c.pedido_id = ? LIMIT 1
                             ");
                             $stCarne->execute([(int) $pedido['id']]);
@@ -4756,6 +4757,9 @@ LINKSCRIPT;
                                 </div>';
                                 if (!empty($carneInfo['proximo_vencimento'])) {
                                     echo '<p class="small text-muted mb-2"><i class="fas fa-calendar me-1"></i>Próximo vencimento: <strong>' . date('d/m/Y', strtotime($carneInfo['proximo_vencimento'])) . '</strong></p>';
+                                }
+                                if (!empty($carneInfo['ultima_parcela_vencimento'])) {
+                                    echo '<p class="small text-muted mb-2"><i class="fas fa-calendar-check me-1"></i>Última parcela: <strong>' . date('d/m/Y', strtotime($carneInfo['ultima_parcela_vencimento'])) . '</strong></p>';
                                 }
                                 echo '<a href="/admin/carnes/detalhes/' . (int) $carneInfo['id'] . '" class="btn btn-outline-primary btn-sm w-100">
                                     <i class="fas fa-external-link-alt me-1"></i>Ver detalhes do Carnê
