@@ -5,6 +5,10 @@ date_default_timezone_set('America/Sao_Paulo');
 // Endpoint direto para etiqueta PDF (contorna OPcache)
 $_uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 if ($_uri === '/wp-etiqueta') {
+    // Parse query string direto do REQUEST_URI (nginx pode não passar $_GET)
+    $_qs = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '';
+    parse_str($_qs, $_qsParams);
+    
     // Incluir apenas o config de DB e executar inline
     $sessionLifetime = 60 * 60 * 24 * 7;
     ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
@@ -17,8 +21,8 @@ if ($_uri === '/wp-etiqueta') {
     $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['perfil'] ?? ''))));
     if (!in_array($perfil, ['admin', 'vendedor', 'suporte'], true)) { http_response_code(403); echo 'Acesso negado.'; exit; }
     
-    $id = (int) ($_GET['id'] ?? 0);
-    if ($id <= 0) { http_response_code(400); echo 'id obrigatório.'; exit; }
+    $id = (int) ($_qsParams['id'] ?? ($_GET['id'] ?? 0));
+    if ($id <= 0) { http_response_code(400); echo 'id obrigatório. URI=' . ($_SERVER['REQUEST_URI'] ?? '') . ' QS=' . $_qs; exit; }
     
     require_once __DIR__ . '/../config/Database.php';
     $pdo = \Config\Database::getConnection();
