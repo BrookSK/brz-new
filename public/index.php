@@ -2,30 +2,23 @@
 // Timezone padrão: São Paulo
 date_default_timezone_set('America/Sao_Paulo');
 
-// DEBUG: verificar se o deploy está atualizado (remover após confirmar)
-if (isset($_GET['_deploy_check'])) {
-    header('Content-Type: application/json');
-    echo json_encode(['deploy_ts' => '2026-05-19T15:00:00', 'GET' => $_GET, 'query' => $_SERVER['QUERY_STRING'] ?? '']);
-    exit;
-}
-
-// Forçar invalidação do OPcache para controllers modificados
-if (function_exists('opcache_invalidate')) {
-    $filesToInvalidate = [
-        __DIR__ . '/../app/Controllers/AdminPacotesWordpressController.php',
-        __DIR__ . '/../app/routes_admin.php',
-    ];
-    foreach ($filesToInvalidate as $f) {
-        if (is_file($f)) {
-            @opcache_invalidate($f, true);
-        }
+// Pacotes WordPress - dispatch direto (bypass OPcache do controller)
+$_pwpPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($_pwpPath === '/admin/pacotes-wordpress' && isset($_GET['action']) && $_GET['action'] === 'etiqueta-pdf') {
+    // Carregar o controller fresh (sem OPcache)
+    $ctrlFile = __DIR__ . '/../app/Controllers/AdminPacotesWordpressController.php';
+    if (function_exists('opcache_invalidate') && is_file($ctrlFile)) {
+        @opcache_invalidate($ctrlFile, true);
     }
-}
-// Também tentar resetar todo o cache se possível
-if (function_exists('opcache_reset') && isset($_GET['_opcache_reset'])) {
-    @opcache_reset();
-    header('Content-Type: text/plain');
-    echo 'OPcache reset done';
+    // Incluir dependências mínimas
+    require_once __DIR__ . '/../config/database.php';
+    require_once __DIR__ . '/../app/Controllers/Controller.php';
+    require_once __DIR__ . '/../app/Core/Request.php';
+    require_once __DIR__ . '/../app/Services/AuthService.php';
+    require_once $ctrlFile;
+    $req = new \App\Core\Request();
+    $ctrl = new \App\Controllers\AdminPacotesWordpressController();
+    $ctrl->etiquetaPdf($req);
     exit;
 }
 
