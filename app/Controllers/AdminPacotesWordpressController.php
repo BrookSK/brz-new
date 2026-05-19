@@ -635,8 +635,9 @@ class AdminPacotesWordpressController extends Controller {
         $id = (int) $request->getParam('id');
         if ($id <= 0) {
             http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
             echo 'ID de etiqueta inválido.';
-            return;
+            exit;
         }
 
         $this->ensureTables();
@@ -647,8 +648,9 @@ class AdminPacotesWordpressController extends Controller {
 
         if (!$etiqueta) {
             http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
             echo 'Etiqueta #' . $id . ' não encontrada na tabela local. Sincronize os pacotes primeiro.';
-            return;
+            exit;
         }
 
         // Tentar buscar o PDF diretamente do WordPress
@@ -658,8 +660,9 @@ class AdminPacotesWordpressController extends Controller {
 
         if ($tracking === '') {
             http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
             echo 'Etiqueta #' . $id . ' não possui tracking number.';
-            return;
+            exit;
         }
 
         // Tentar buscar o PDF do WordPress via conexão direta
@@ -680,7 +683,7 @@ class AdminPacotesWordpressController extends Controller {
                     header('Content-Disposition: inline; filename="etiqueta-' . $tracking . '.pdf"');
                     header('Content-Length: ' . strlen($pdfContent));
                     echo $pdfContent;
-                    return;
+                    exit;
                 }
             }
 
@@ -696,7 +699,7 @@ class AdminPacotesWordpressController extends Controller {
                     header('Content-Disposition: inline; filename="etiqueta-' . $tracking . '.pdf"');
                     header('Content-Length: ' . strlen($pdfContent));
                     echo $pdfContent;
-                    return;
+                    exit;
                 }
             }
         } catch (\Exception $e) {
@@ -714,7 +717,7 @@ class AdminPacotesWordpressController extends Controller {
                 header('Content-Disposition: inline; filename="etiqueta-' . $tracking . '.pdf"');
                 header('Content-Length: ' . strlen($pdfContent));
                 echo $pdfContent;
-                return;
+                exit;
             }
         }
 
@@ -726,6 +729,8 @@ class AdminPacotesWordpressController extends Controller {
         }
 
         http_response_code(404);
+        header('Content-Type: text/plain; charset=utf-8');
         echo 'PDF da etiqueta não disponível para tracking ' . htmlspecialchars($tracking) . '. Gere a etiqueta no WordPress primeiro.';
+        exit;
     }
 }
