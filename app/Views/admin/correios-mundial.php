@@ -104,6 +104,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Etiquetas geradas (PACKET)</strong>
             <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-success" onclick="exportarCsvSelecionadas()" id="btnExportarCsv" disabled><i class="fas fa-file-csv me-1"></i>Exportar selecionadas</button>
                 <button class="btn btn-sm btn-warning" onclick="regerarSelecionadas()" id="btnRegerarMassa" disabled><i class="fas fa-redo me-1"></i>Regerar selecionadas</button>
             </div>
         </div>
@@ -256,9 +257,16 @@ function toggleAllPacket(el) {
 function updateBtnMassa() {
     const checked = document.querySelectorAll('.packet-check:checked').length;
     const btn = document.getElementById('btnRegerarMassa');
+    const btnExport = document.getElementById('btnExportarCsv');
     if (btn) {
         btn.disabled = checked === 0;
         btn.textContent = checked > 0 ? 'Regerar selecionadas (' + checked + ')' : 'Regerar selecionadas';
+    }
+    if (btnExport) {
+        btnExport.disabled = checked === 0;
+        btnExport.innerHTML = checked > 0
+            ? '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas (' + checked + ')'
+            : '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas';
     }
 }
 
@@ -312,6 +320,52 @@ async function regerarSelecionadas() {
     if (erros.length > 0) msg += '\n\nErros:\n' + erros.join('\n');
     alert(msg);
     location.reload();
+}
+
+async function exportarCsvSelecionadas() {
+    const checks = document.querySelectorAll('.packet-check:checked');
+    if (checks.length === 0) return;
+    const ids = Array.from(checks).map(cb => parseInt(cb.value));
+
+    const btn = document.getElementById('btnExportarCsv');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Exportando...'; }
+
+    try {
+        const r = await fetch('/admin/correios-mundial/exportar-csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        });
+        const data = await r.json();
+        if (data && data.success) {
+            // Download wp_posts.csv
+            downloadCsvFile('wp_posts.csv', data.wp_posts_csv);
+            // Pequeno delay para não conflitar downloads
+            setTimeout(function() {
+                downloadCsvFile('wp_postmeta.csv', data.wp_postmeta_csv);
+            }, 500);
+            alert('Exportação concluída! ' + data.total_etiquetas + ' etiqueta(s) exportada(s).\nOs arquivos wp_posts.csv e wp_postmeta.csv foram baixados.');
+        } else {
+            alert('Erro: ' + (data.error || data.message || 'Falha ao exportar'));
+        }
+    } catch (e) {
+        alert('Erro de rede: ' + e.message);
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas'; }
+    updateBtnMassa();
+}
+
+function downloadCsvFile(filename, csvContent) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 }
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../layouts/admin.php'; ?>

@@ -125,6 +125,9 @@ $router->get('/admin/correios-mundial/faturas/nova', 'AdminCorreiosMundialContro
 $router->post('/admin/correios-mundial/faturas/criar', 'AdminCorreiosMundialController', 'faturaCriar');
 $router->get('/admin/correios-mundial/fatura/{id}.pdf', 'AdminCorreiosMundialController', 'faturaPdf');
 
+// Exportar etiquetas selecionadas como CSV (wp_posts + wp_postmeta) para migração WordPress
+$router->post('/admin/correios-mundial/exportar-csv', 'AdminCorreiosMundialController', 'exportarCsv');
+
 // Download PDF da etiqueta (gerada localmente)
 $router->get('/admin/correios-mundial/etiqueta/{tracking}.pdf', 'AdminCorreiosMundialController', 'etiquetaPdf');
 

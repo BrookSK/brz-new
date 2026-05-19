@@ -2871,4 +2871,228 @@ class AdminCorreiosMundialController extends Controller {
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         echo $dompdf->output();
     }
+
+    /**
+     * Exportar etiquetas selecionadas como CSV (wp_posts.csv + wp_postmeta.csv)
+     * para importação no WordPress via plugin woocommerce-package-redirect.
+     */
+    public function exportarCsv(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $this->ensurePacketEtiquetasTable();
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode((string) $raw, true);
+        $ids = isset($data['ids']) && is_array($data['ids']) ? array_map('intval', $data['ids']) : [];
+
+        if (empty($ids)) {
+            $this->json(['success' => false, 'error' => 'Nenhuma etiqueta selecionada'], 400);
+            return;
+        }
+
+        // Buscar etiquetas selecionadas
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $st = $this->connection->prepare("
+            SELECT cpe.*
+            FROM correios_packet_etiquetas cpe
+            WHERE cpe.pedido_id IN ($placeholders)
+            ORDER BY cpe.created_at ASC
+        ");
+        $st->execute($ids);
+        $etiquetas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        if (empty($etiquetas)) {
+            $this->json(['success' => false, 'error' => 'Nenhuma etiqueta encontrada para os pedidos selecionados'], 404);
+            return;
+        }
+
+        // Gerar IDs fictícios para wp_posts (começando de um número alto para evitar conflitos)
+        $postIdBase = 90000;
+        $metaIdBase = 1000000;
+
+        $wpPosts = [];
+        $wpPostmeta = [];
+        $metaIdCounter = $metaIdBase;
+
+        foreach ($etiquetas as $idx => $etiqueta) {
+            $postId = $postIdBase + $idx;
+            $createdAt = $etiqueta['created_at'] ?? date('Y-m-d H:i:s');
+            $createdAtGmt = date('Y-m-d H:i:s', strtotime($createdAt) + (3 * 3600)); // UTC (BR = UTC-3)
+
+            // Decodificar o request JSON para extrair dados do pacote
+            $requestData = json_decode((string) ($etiqueta['last_request_json'] ?? ''), true);
+            $package = [];
+            if (is_array($requestData) && isset($requestData['packageList'][0])) {
+                $package = $requestData['packageList'][0];
+            }
+
+            // Decodificar o response JSON
+            $responseData = json_decode((string) ($etiqueta['last_response_json'] ?? ''), true);
+
+            // wp_posts row
+            $postName = 'rascunho-automatico-' . ($postIdBase + $idx);
+            $guid = 'https://redirecionamento.brazilianashop.com.br/?post_type=package&#038;p=' . $postId;
+
+            $wpPosts[] = [
+                'ID' => $postId,
+                'post_author' => '53932',
+                'post_date' => $createdAt,
+                'post_date_gmt' => $createdAtGmt,
+                'post_content' => '',
+                'post_title' => 'Rascunho automático',
+                'post_excerpt' => '',
+                'post_status' => 'publish',
+                'comment_status' => 'closed',
+                'ping_status' => 'closed',
+                'post_password' => '',
+                'post_name' => $postName,
+                'to_ping' => '',
+                'pinged' => '',
+                'post_modified' => $createdAt,
+                'post_modified_gmt' => $createdAtGmt,
+                'post_content_filtered' => '',
+                'post_parent' => '0',
+                'guid' => $guid,
+                'menu_order' => '0',
+                'post_type' => 'package',
+                'post_mime_type' => '',
+                'comment_count' => '0',
+            ];
+
+            // wp_postmeta rows
+            $trackingNumber = (string) ($etiqueta['tracking_number'] ?? '');
+            $pedidoId = (int) ($etiqueta['pedido_id'] ?? 0);
+            $customerControlCode = (string) ($etiqueta['customer_control_code'] ?? $pedidoId);
+
+            // Extrair dimensões e dados do package request
+            $packageWidth = (string) ($package['packagingWidth'] ?? '');
+            $packageHeight = (string) ($package['packagingHeight'] ?? '');
+            $packageLength = (string) ($package['packagingLength'] ?? '');
+            $distributionModality = (string) ($package['distributionModality'] ?? '33162');
+            $taxPaymentMethod = (string) ($package['taxPaymentMethod'] ?? 'DDU');
+            $currency = (string) ($package['currency'] ?? 'USD');
+            $nonNationalizationInstruction = (string) ($package['nonNationalizationInstruction'] ?? 'RETURNTOORIGIN');
+            $totalWeight = (string) ($package['totalWeight'] ?? '');
+            $freightPaidValue = (string) ($package['freightPaidValue'] ?? '0.01');
+            $insurancePaidValue = isset($package['insurancePaidValue']) && $package['insurancePaidValue'] !== null
+                ? (string) $package['insurancePaidValue'] : '';
+
+            // Serializar request body no formato PHP serialize (como o WordPress faz)
+            $debugRequestBody = serialize($requestData);
+            // Serializar response body
+            $debugResponseBody = $this->serializeResponseForWp($responseData);
+
+            // _edit_lock e _edit_last (padrão WordPress)
+            $editLockTime = time();
+            $metaRows = [
+                ['_edit_lock', $editLockTime . ':53932'],
+                ['_edit_last', '53932'],
+                ['_package_width', $packageWidth],
+                ['_package_height', $packageHeight],
+                ['_package_length', $packageLength],
+                ['_distribution_modality', $distributionModality],
+                ['_tax_payment_method', $taxPaymentMethod],
+                ['_currency', $currency],
+                ['_non_nationalization_instruction', $nonNationalizationInstruction],
+                ['_total_weight', $totalWeight],
+                ['_freight_paid_value', $freightPaidValue],
+                ['_package_order_id', (string) $customerControlCode],
+                ['_debug_request_body', $debugRequestBody],
+                ['_debug_response_body', $debugResponseBody],
+                ['_correios_tracking_code', $trackingNumber],
+            ];
+
+            if ($insurancePaidValue !== '') {
+                // Inserir antes de _debug_request_body
+                array_splice($metaRows, 11, 0, [['_insurance_paid_value', $insurancePaidValue]]);
+            }
+
+            foreach ($metaRows as $meta) {
+                $wpPostmeta[] = [
+                    'meta_id' => $metaIdCounter++,
+                    'post_id' => $postId,
+                    'meta_key' => $meta[0],
+                    'meta_value' => $meta[1],
+                ];
+            }
+        }
+
+        // Gerar CSVs
+        $postsCsv = $this->generateCsv(
+            ['ID', 'post_author', 'post_date', 'post_date_gmt', 'post_content', 'post_title', 'post_excerpt', 'post_status', 'comment_status', 'ping_status', 'post_password', 'post_name', 'to_ping', 'pinged', 'post_modified', 'post_modified_gmt', 'post_content_filtered', 'post_parent', 'guid', 'menu_order', 'post_type', 'post_mime_type', 'comment_count'],
+            $wpPosts
+        );
+
+        $postmetaCsv = $this->generateCsv(
+            ['meta_id', 'post_id', 'meta_key', 'meta_value'],
+            $wpPostmeta
+        );
+
+        $this->json([
+            'success' => true,
+            'wp_posts_csv' => $postsCsv,
+            'wp_postmeta_csv' => $postmetaCsv,
+            'total_etiquetas' => count($etiquetas),
+        ]);
+    }
+
+    /**
+     * Serializa a resposta da API no formato que o WordPress salva (PHP serialize com stdClass).
+     */
+    private function serializeResponseForWp($responseData): string {
+        if (!is_array($responseData)) {
+            return serialize($responseData);
+        }
+
+        // O WordPress salva como array de stdClass objects
+        $result = [];
+        if (isset($responseData['packageResponseList']) && is_array($responseData['packageResponseList'])) {
+            foreach ($responseData['packageResponseList'] as $item) {
+                $obj = new \stdClass();
+                if (is_array($item)) {
+                    foreach ($item as $k => $v) {
+                        $obj->$k = $v;
+                    }
+                }
+                $result[] = $obj;
+            }
+        } else {
+            // Fallback: tentar converter diretamente
+            foreach ($responseData as $item) {
+                if (is_array($item)) {
+                    $obj = new \stdClass();
+                    foreach ($item as $k => $v) {
+                        $obj->$k = $v;
+                    }
+                    $result[] = $obj;
+                } else {
+                    $result[] = $item;
+                }
+            }
+        }
+
+        return serialize($result);
+    }
+
+    /**
+     * Gera string CSV a partir de headers e rows.
+     */
+    private function generateCsv(array $headers, array $rows): string {
+        $output = fopen('php://temp', 'r+');
+        // Header
+        fputcsv($output, $headers, ',', '"');
+        // Rows
+        foreach ($rows as $row) {
+            $line = [];
+            foreach ($headers as $h) {
+                $line[] = (string) ($row[$h] ?? '');
+            }
+            fputcsv($output, $line, ',', '"');
+        }
+        rewind($output);
+        $csv = stream_get_contents($output);
+        fclose($output);
+        return $csv;
+    }
 }
