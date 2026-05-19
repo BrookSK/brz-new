@@ -490,6 +490,9 @@ const BriSidebar = (() => {
         // Não criar ticket automaticamente — apenas instruir o usuário
         navigatePainel('/meus-tickets?embed=1');
       },
+      criar_ticket_duvida: () => {
+        navigatePainel('/meus-tickets?embed=1');
+      },
       trocar_moeda_brl: () => { /* handled by currency converter */ },
       trocar_moeda_usd: () => { /* handled by currency converter */ },
       abrir_whatsapp_vendas: () => {
