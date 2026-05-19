@@ -169,6 +169,9 @@ const BriSidebar = (() => {
       }
     }
     // === FIM CAMADA 0 ===
+
+    // Safety: se enviando ficou true por mais de 30s, resetar
+    if (enviando) { enviando = false; sendBtn.disabled = false; }
     
     const navMap = [
       // Carrinho & Checkout
@@ -181,7 +184,7 @@ const BriSidebar = (() => {
       { regex: /minha conta|meus dados|me mostr[ea] minha conta|me mostr[ea] meus dados|dados da minha conta|perfil/, url: '/meus-dados?embed=1', reply: 'Abrindo seus dados! 👤\n\nAqui você edita nome, email, telefone, CPF e foto de perfil.' },
       { regex: /meus pedidos|ver pedidos|historico de pedidos|meus compras|me mostr.*pedidos/, url: '/meus-pedidos?embed=1', reply: 'Aqui estão seus pedidos! 📦\n\nVeja o status de cada compra, rastreamento e detalhes.' },
       { regex: /meus enderecos|enderecos|ver enderecos/, url: '/meus-enderecos?embed=1', reply: 'Seus endereços! 📍\n\nAdicione ou edite endereços de entrega para agilizar suas compras.' },
-      { regex: /meus tickets|tickets|suporte|atendimento/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte! 💬\n\nAqui você acompanha suas solicitações de atendimento.' },
+      { regex: /meus tickets|tickets|suporte|atendimento|abrir ticket|abrir um ticket|como abro.*ticket|criar ticket|novo ticket/, url: '/meus-tickets?embed=1', reply: 'Seus tickets de suporte! 💬\n\nAqui você pode abrir um novo ticket ou acompanhar os existentes. Clique em "Novo Ticket" para criar uma solicitação.' },
       // Clube
       { regex: /^(clube|recarga|meu saldo|ver clube|clube brasiliana|me mostr.*clube)$/, url: '/clube/recarga?embed=1', reply: 'Vamos pro Clube! 💎\n\nFaça recargas para ter saldo e aproveitar benefícios exclusivos.' },
       { regex: /como funciona o clube|sobre o clube/, url: '/como-funciona-clube?embed=1', reply: 'Explicando o Clube! ℹ️\n\nVeja como funciona o sistema de recargas e benefícios.' },
