@@ -95,55 +95,29 @@
 
 <script src="/public/assets/js/bri-sidebar-mode.js"></script>
 <script>
-// Mobile: drag-to-resize chat panel
+// Mobile: toggle chat entre minimizado (header+input) e expandido (30vh)
 (function() {
   if (window.innerWidth >= 768) return;
 
   var sidebar = document.getElementById('bri-sidebar');
-  var handle = document.getElementById('bri-sidebar-header');
-  if (!sidebar || !handle) return;
+  var header = document.getElementById('bri-sidebar-header');
+  if (!sidebar || !header) return;
 
-  // Calcular altura mínima: header + input
-  var headerEl = document.getElementById('bri-sidebar-header');
-  var inputEl = document.getElementById('bri-input-area');
-  var MIN_H = 100;
+  var expanded = true; // inicia expandido
 
-  function calcMinH() {
-    var hH = headerEl ? headerEl.offsetHeight : 48;
-    var iH = inputEl ? inputEl.offsetHeight : 48;
-    MIN_H = hH + iH + 2;
-  }
-  setTimeout(calcMinH, 200);
-
-  var MAX_H_RATIO = 0.8;
-  var isDragging = false;
-  var touchStartY = 0;
-  var heightAtStart = 0;
-
-  handle.addEventListener('touchstart', function(e) {
-    // Ignorar se tocou em botão/link
+  header.addEventListener('click', function(e) {
+    // Ignorar se clicou em botão/link
     if (e.target.closest('button, a')) return;
-    isDragging = true;
-    touchStartY = e.touches[0].clientY;
-    heightAtStart = sidebar.offsetHeight;
-    e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('touchmove', function(e) {
-    if (!isDragging) return;
-    e.preventDefault();
-    var currentY = e.touches[0].clientY;
-    var diff = touchStartY - currentY; // positivo = dedo subiu = aumentar
-    var maxH = Math.floor(window.innerHeight * MAX_H_RATIO);
-    var newH = heightAtStart + diff;
-    // Clampar entre min e max
-    if (newH < MIN_H) newH = MIN_H;
-    if (newH > maxH) newH = maxH;
-    sidebar.style.height = newH + 'px';
-  }, { passive: false });
-
-  document.addEventListener('touchend', function() {
-    isDragging = false;
+    expanded = !expanded;
+    if (expanded) {
+      sidebar.style.height = '30vh';
+    } else {
+      // Minimizar: apenas header + input visíveis
+      var headerH = header.offsetHeight || 48;
+      var inputArea = document.getElementById('bri-input-area');
+      var inputH = inputArea ? inputArea.offsetHeight : 48;
+      sidebar.style.height = (headerH + inputH) + 'px';
+    }
   });
 })();
 </script>
