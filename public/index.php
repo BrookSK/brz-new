@@ -2,6 +2,78 @@
 // Timezone padrão: São Paulo
 date_default_timezone_set('America/Sao_Paulo');
 
+// Endpoint direto para etiqueta PDF (contorna OPcache)
+$_uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($_uri === '/wp-etiqueta') {
+    // Incluir apenas o config de DB e executar inline
+    $sessionLifetime = 60 * 60 * 24 * 7;
+    ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
+    ini_set('session.cookie_lifetime', (string) $sessionLifetime);
+    if (session_status() === PHP_SESSION_NONE) { session_start(); }
+    
+    $usuarioId = (int) ($_SESSION['usuario_id'] ?? 0);
+    if ($usuarioId <= 0) { http_response_code(401); echo 'Login necessário.'; exit; }
+    
+    $perfil = strtolower(trim((string) ($_SESSION['usuario_perfil'] ?? ($_SESSION['perfil'] ?? ''))));
+    if (!in_array($perfil, ['admin', 'vendedor', 'suporte'], true)) { http_response_code(403); echo 'Acesso negado.'; exit; }
+    
+    $id = (int) ($_GET['id'] ?? 0);
+    if ($id <= 0) { http_response_code(400); echo 'id obrigatório.'; exit; }
+    
+    require_once __DIR__ . '/../config/Database.php';
+    $pdo = \Config\Database::getConnection();
+    
+    $st = $pdo->prepare("SELECT * FROM wp_packet_etiquetas WHERE id = ? LIMIT 1");
+    $st->execute([$id]);
+    $etiqueta = $st->fetch(\PDO::FETCH_ASSOC);
+    if (!$etiqueta) { http_response_code(404); echo 'Etiqueta #'.$id.' não encontrada.'; exit; }
+    
+    $origem = strtolower(trim((string)($etiqueta['origem'] ?? 'br')));
+    $wpPostId = (int)($etiqueta['wp_post_id'] ?? 0);
+    $tracking = (string)($etiqueta['tracking_number'] ?? '');
+    if ($tracking === '') { http_response_code(404); echo 'Sem tracking.'; exit; }
+    
+    // Conectar WP
+    if (!in_array($origem, ['br','red','us'], true)) $origem = 'br';
+    $cat = 'wordpress_' . $origem;
+    $wpCfg = ['table_prefix'=>'wp_'];
+    $cols = []; $stC = $pdo->query('DESCRIBE configuracoes_sistema'); $cols = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN)?:[]) : [];
+    $hasCategoria = in_array('categoria',$cols,true) && in_array('chave',$cols,true) && in_array('valor',$cols,true);
+    if ($hasCategoria) {
+        $stCfg = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE categoria=? AND chave=? LIMIT 1');
+        foreach (['db_host','db_name','db_user','db_pass','table_prefix'] as $k) {
+            $stCfg->execute([$cat,$k]); $v=$stCfg->fetchColumn();
+            if ($v!==false&&$v!==null) $wpCfg[$k]=(string)$v;
+            elseif ($origem==='br') { $stCfg->execute(['wordpress',$k]); $v2=$stCfg->fetchColumn(); if($v2!==false&&$v2!==null) $wpCfg[$k]=(string)$v2; }
+        }
+    } else {
+        $stCfg = $pdo->prepare('SELECT valor FROM configuracoes_sistema WHERE chave=? LIMIT 1');
+        foreach (['db_host','db_name','db_user','db_pass','table_prefix'] as $k) {
+            $stCfg->execute([$cat.'_'.$k]); $v=$stCfg->fetchColumn();
+            if ($v!==false&&$v!==null) $wpCfg[$k]=(string)$v;
+            elseif ($origem==='br') { $stCfg->execute(['wordpress_'.$k]); $v2=$stCfg->fetchColumn(); if($v2!==false&&$v2!==null) $wpCfg[$k]=(string)$v2; }
+        }
+    }
+    $host=trim((string)($wpCfg['db_host']??'')); $dbname=trim((string)($wpCfg['db_name']??'')); $user=trim((string)($wpCfg['db_user']??'')); $pass=(string)($wpCfg['db_pass']??''); $prefix=trim((string)($wpCfg['table_prefix']??'wp_'));
+    if($prefix==='')$prefix='wp_';
+    $port=null; if($host!==''&&strpos($host,':')!==false){$parts=explode(':',$host,2);$host=trim($parts[0]);$pp=trim($parts[1]??'');if($pp!==''&&ctype_digit($pp))$port=(int)$pp;}
+    if($host===''||$dbname===''||$user===''){http_response_code(500);echo 'WP('.$origem.') não configurado.';exit;}
+    $dsn='mysql:host='.$host.';'.($port?('port='.$port.';'):'').'dbname='.$dbname.';charset=utf8mb4';
+    try{$wpPdo=new \PDO($dsn,$user,$pass,[\PDO::ATTR_ERRMODE=>\PDO::ERRMODE_EXCEPTION,\PDO::ATTR_DEFAULT_FETCH_MODE=>\PDO::FETCH_ASSOC]);}catch(\Exception $e){http_response_code(500);echo 'Falha WP: '.$e->getMessage();exit;}
+    
+    foreach(['_label_data','_correios_label_data'] as $mk){
+        $stL=$wpPdo->prepare("SELECT meta_value FROM {$prefix}postmeta WHERE post_id=? AND meta_key=? LIMIT 1");
+        $stL->execute([$wpPostId,$mk]); $ld=(string)($stL->fetchColumn()?:'');
+        if($ld!==''){$pdf=base64_decode($ld);if($pdf!==false&&strlen($pdf)>100){header('Content-Type: application/pdf');header('Content-Disposition: inline; filename="etiqueta-'.$tracking.'.pdf"');header('Content-Length: '.strlen($pdf));echo $pdf;exit;}}
+    }
+    // Fallback meta_json
+    $meta=json_decode((string)($etiqueta['meta_json']??'{}'),true)?:[];
+    $ll=$meta['_label_data']??($meta['_correios_label_data']??'');
+    if($ll!==''){$pdf=base64_decode($ll);if($pdf!==false&&strlen($pdf)>100){header('Content-Type: application/pdf');header('Content-Disposition: inline; filename="etiqueta-'.$tracking.'.pdf"');header('Content-Length: '.strlen($pdf));echo $pdf;exit;}}
+    
+    http_response_code(404); echo 'PDF não disponível para '.$tracking; exit;
+}
+
 // Iniciar sessão antes de qualquer output
 $sessionLifetime = 60 * 60 * 24 * 7;
 ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
