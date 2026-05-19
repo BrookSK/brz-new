@@ -1197,31 +1197,87 @@ class AdminRemessaCorreiosController extends Controller {
             } catch (\Exception $e) {
             }
 
-            echo '<!DOCTYPE html><html><head><title>Etiquetas Correios</title><style>body{font-family:Arial,sans-serif;margin:20px}.etiqueta{border:2px solid #000;padding:20px;width:400px;margin:0 auto 20px}.header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.codigo{font-size:18px;font-weight:bold;text-align:center;margin-bottom:20px}.section{margin-bottom:15px}.label{font-weight:bold}@media print{body{margin:0}}</style></head><body>';
+            // Buscar configurações uma vez
+            $cfgProvider = $this->getCorreiosProviderConfig();
+            $cfgSigep = $this->getSigepConfig();
+            $contratoGlobal = (string) ($cfgSigep['contrato'] ?? '');
 
+            // Renderizar cada etiqueta usando o template novo
+            echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Etiquetas Correios</title>';
+            echo '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>';
+            echo '<script src="https://cdn.jsdelivr.net/npm/bwip-js@4.3.0/dist/bwip-js-min.js"></script>';
+            echo '<style>@page{size:100mm 140mm;margin:0}body{margin:0;padding:0}.page-break{page-break-after:always}@media print{.no-print{display:none!important}}</style>';
+            echo '</head><body>';
+            echo '<button class="no-print" style="position:fixed;top:10px;right:10px;background:#003087;color:#fff;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;z-index:9999" onclick="window.print()">🖨 Imprimir Todas</button>';
+
+            $idx = 0;
             foreach ($etiquetas as $etiqueta) {
-                $dadosRemetente = json_decode((string) ($etiqueta['dados_remetente'] ?? ''), true);
-                $dadosDestinatario = json_decode((string) ($etiqueta['dados_destinatario'] ?? ''), true);
-                if (!is_array($dadosRemetente)) $dadosRemetente = [];
-                if (!is_array($dadosDestinatario)) $dadosDestinatario = [];
+                $idx++;
+                $dadosRemetente = json_decode((string) ($etiqueta['dados_remetente'] ?? ''), true) ?: [];
+                $dadosDestinatario = json_decode((string) ($etiqueta['dados_destinatario'] ?? ''), true) ?: [];
 
-                echo '<div class="etiqueta">'
-                    . '<div class="header"><h3>CORREIOS - ETIQUETA DE POSTAGEM</h3></div>'
-                    . '<div class="codigo">CÓDIGO: ' . htmlspecialchars((string) ($etiqueta['codigo_etiqueta'] ?? '')) . '</div>'
-                    . '<div class="section"><div class="label">REMETENTE:</div>'
-                    . '<div>' . htmlspecialchars((string) ($dadosRemetente['nome'] ?? '')) . '</div>'
-                    . '<div>' . htmlspecialchars((string) ($dadosRemetente['endereco'] ?? '')) . '</div>'
-                    . '<div>' . htmlspecialchars((string) (($dadosRemetente['cidade'] ?? '') . '/' . ($dadosRemetente['estado'] ?? ''))) . ' - CEP: ' . htmlspecialchars((string) ($dadosRemetente['cep'] ?? '')) . '</div>'
-                    . '</div>'
-                    . '<div class="section"><div class="label">DESTINATÁRIO:</div>'
-                    . '<div>' . htmlspecialchars((string) ($dadosDestinatario['nome'] ?? '')) . '</div>'
-                    . '<div>' . htmlspecialchars((string) ($dadosDestinatario['endereco'] ?? '')) . '</div>'
-                    . '<div>' . htmlspecialchars((string) (($dadosDestinatario['cidade'] ?? '') . '/' . ($dadosDestinatario['estado'] ?? ''))) . ' - CEP: ' . htmlspecialchars((string) ($dadosDestinatario['cep'] ?? '')) . '</div>'
-                    . '</div>'
-                    . '</div>';
+                $pedidoId = (int) ($etiqueta['pedido_id'] ?? 0);
+                $codigo = (string) ($etiqueta['codigo_etiqueta'] ?? '');
+                $codigoFormatado = $codigo;
+                if (preg_match('/^([A-Z]{2})(\d{3})(\d{3})(\d{3})([A-Z]{2})$/', $codigo, $m)) {
+                    $codigoFormatado = $m[1] . ' ' . $m[2] . ' ' . $m[3] . ' ' . $m[4] . ' ' . $m[5];
+                }
+
+                $servicoLabel = $this->detectarServicoEtiqueta($etiqueta);
+                $contrato = $contratoGlobal;
+
+                $pesoGramas = '';
+                $reqJson = json_decode((string) ($etiqueta['prepostagem_last_request_json'] ?? ($etiqueta['sigep_last_request_json'] ?? '')), true);
+                if (is_array($reqJson)) {
+                    $pesoGramas = (string) ($reqJson['pesoInformado'] ?? '');
+                }
+
+                $destNome = (string) ($dadosDestinatario['nome'] ?? '');
+                $destEndParts = [];
+                $logr = (string) ($dadosDestinatario['endereco'] ?? '');
+                $numD = (string) ($dadosDestinatario['numero'] ?? '');
+                $complD = (string) ($dadosDestinatario['complemento'] ?? '');
+                if ($logr !== '') $destEndParts[] = $logr;
+                if ($numD !== '') $destEndParts[] = $numD;
+                if ($complD !== '') $destEndParts[] = $complD;
+                $destEndereco = implode(', ', $destEndParts);
+                $destBairro = (string) ($dadosDestinatario['bairro'] ?? '');
+                $destCidade = (string) ($dadosDestinatario['cidade'] ?? '');
+                $destUf = (string) ($dadosDestinatario['estado'] ?? '');
+                $destCep = (string) ($dadosDestinatario['cep'] ?? '');
+
+                $remNome = (string) ($dadosRemetente['nome'] ?? '');
+                $remEndParts = [];
+                $rLogr = (string) ($dadosRemetente['endereco'] ?? '');
+                $rNum = (string) ($dadosRemetente['numero'] ?? '');
+                $rCompl = (string) ($dadosRemetente['complemento'] ?? '');
+                $rBairro = (string) ($dadosRemetente['bairro'] ?? '');
+                if ($rLogr !== '') $remEndParts[] = $rLogr;
+                if ($rNum !== '') $remEndParts[] = $rNum;
+                if ($rCompl !== '') $remEndParts[] = $rCompl;
+                if ($rBairro !== '') $remEndParts[] = $rBairro;
+                $remEndereco = implode(', ', $remEndParts);
+                $remCidade = (string) ($dadosRemetente['cidade'] ?? '');
+                $remUf = (string) ($dadosRemetente['estado'] ?? '');
+                $remCep = (string) ($dadosRemetente['cep'] ?? '');
+                $remCnpj = (string) ($dadosRemetente['cpfCnpj'] ?? ($dadosRemetente['cnpj'] ?? ''));
+
+                $servicosAdicionais = ['VD XX'];
+                $cepDestDigits = preg_replace('/\D+/', '', $destCep);
+                $cepRemDigits = preg_replace('/\D+/', '', $remCep);
+                $datamatrixContent = $cepDestDigits . $cepRemDigits . $codigo . ($pesoGramas !== '' ? '|' . $pesoGramas : '');
+
+                // Sufixo único para IDs dos elementos SVG/canvas
+                $uid = $idx;
+
+                echo '<div class="' . ($idx < count($etiquetas) ? 'page-break' : '') . '">';
+                ob_start();
+                include __DIR__ . '/../Views/admin/remessa-correios/etiqueta-print-inline.php';
+                echo ob_get_clean();
+                echo '</div>';
             }
 
-            echo '<script>window.onload=function(){window.print();}</script></body></html>';
+            echo '<script>setTimeout(function(){ window.print(); }, 1000);</script></body></html>';
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
@@ -1951,205 +2007,80 @@ class AdminRemessaCorreiosController extends Controller {
             $dadosDestinatario = json_decode((string)($etiqueta['dados_destinatario'] ?? ''), true) ?: [];
             
             $pedidoId = (int) ($etiqueta['pedido_id'] ?? 0);
-            $pedidoLabel = $pedidoId > 0 ? 'PEDIDO-' . $pedidoId : '';
+            $codigo   = (string)($etiqueta['codigo_etiqueta'] ?? '');
 
-            $codigo    = (string)($etiqueta['codigo_etiqueta'] ?? '');
-            $codigoHtml = htmlspecialchars($codigo, ENT_QUOTES, 'UTF-8');
-            $codigoJs   = json_encode($codigo);
+            // Formatar código: AB 123 456 789 BR
+            $codigoFormatado = $codigo;
+            if (preg_match('/^([A-Z]{2})(\d{3})(\d{3})(\d{3})([A-Z]{2})$/', $codigo, $m)) {
+                $codigoFormatado = $m[1] . ' ' . $m[2] . ' ' . $m[3] . ' ' . $m[4] . ' ' . $m[5];
+            }
 
-            $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+            // Detectar serviço (SEDEX, PAC, etc.)
+            $servicoLabel = $this->detectarServicoEtiqueta($etiqueta);
 
-            $remNome  = $h($dadosRemetente['nome'] ?? '');
-            $remEnd   = $h($dadosRemetente['endereco'] ?? '');
-            $remNum   = $h($dadosRemetente['numero'] ?? '');
-            $remCompl = $h($dadosRemetente['complemento'] ?? '');
-            $remBairro= $h($dadosRemetente['bairro'] ?? '');
-            $remCidade= $h($dadosRemetente['cidade'] ?? '');
-            $remUf    = $h($dadosRemetente['estado'] ?? '');
-            $remCep   = $h($dadosRemetente['cep'] ?? '');
-            $remCnpj  = $h($dadosRemetente['cpfCnpj'] ?? ($dadosRemetente['cnpj'] ?? ''));
+            // Buscar número do contrato
+            $cfgProvider = $this->getCorreiosProviderConfig();
+            $cfgSigep = $this->getSigepConfig();
+            $contrato = (string) ($cfgSigep['contrato'] ?? '');
+            if ($contrato === '') {
+                // Tentar extrair do request JSON da pré-postagem
+                $reqJson = json_decode((string) ($etiqueta['prepostagem_last_request_json'] ?? ''), true);
+                if (is_array($reqJson) && !empty($reqJson['remetente']['cpfCnpj'])) {
+                    $contrato = (string) ($reqJson['idCorreios'] ?? '');
+                }
+            }
 
-            $destNome  = $h($dadosDestinatario['nome'] ?? '');
-            $destEnd   = $h($dadosDestinatario['endereco'] ?? '');
-            $destNum   = $h($dadosDestinatario['numero'] ?? '');
-            $destCompl = $h($dadosDestinatario['complemento'] ?? '');
-            $destBairro= $h($dadosDestinatario['bairro'] ?? '');
-            $destCidade= $h($dadosDestinatario['cidade'] ?? '');
-            $destUf    = $h($dadosDestinatario['estado'] ?? '');
-            $destCep   = $h($dadosDestinatario['cep'] ?? '');
-            $destCpf   = $h($dadosDestinatario['cpf'] ?? ($dadosDestinatario['documento'] ?? ''));
+            // Peso
+            $pesoGramas = '';
+            $reqJson = json_decode((string) ($etiqueta['prepostagem_last_request_json'] ?? ($etiqueta['sigep_last_request_json'] ?? '')), true);
+            if (is_array($reqJson)) {
+                $pesoGramas = (string) ($reqJson['pesoInformado'] ?? '');
+            }
 
-            $destCpfHtml = $destCpf !== '' ? '<div style="font-size:8pt;margin-top:1mm">CPF/Doc: ' . $destCpf . '</div>' : '';
-            $remCnpjHtml = $remCnpj !== '' ? '<div>CNPJ: ' . $remCnpj . '</div>' : '';
+            // Dados destinatário
+            $destNome = (string) ($dadosDestinatario['nome'] ?? '');
+            $destEndParts = [];
+            $logr = (string) ($dadosDestinatario['endereco'] ?? '');
+            $num = (string) ($dadosDestinatario['numero'] ?? '');
+            $compl = (string) ($dadosDestinatario['complemento'] ?? '');
+            if ($logr !== '') $destEndParts[] = $logr;
+            if ($num !== '') $destEndParts[] = $num;
+            if ($compl !== '') $destEndParts[] = $compl;
+            $destEndereco = implode(', ', $destEndParts);
+            $destBairro = (string) ($dadosDestinatario['bairro'] ?? '');
+            $destCidade = (string) ($dadosDestinatario['cidade'] ?? '');
+            $destUf = (string) ($dadosDestinatario['estado'] ?? '');
+            $destCep = (string) ($dadosDestinatario['cep'] ?? '');
 
-            $html = <<<HTML
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Etiqueta {$codigoHtml}</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  @page {
-    size: 4in 6in;
-    margin: 0;
-  }
-  body {
-    width: 4in;
-    height: 6in;
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 9pt;
-    background: #fff;
-    color: #000;
-    overflow: hidden;
-  }
-  .label {
-    width: 4in;
-    height: 6in;
-    padding: 6mm 5mm;
-    display: flex;
-    flex-direction: column;
-    gap: 3mm;
-    border: 1px solid #000;
-  }
-  .logo-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1.5px solid #000;
-    padding-bottom: 2mm;
-  }
-  .logo-correios {
-    font-size: 16pt;
-    font-weight: 900;
-    letter-spacing: -0.5px;
-    color: #003087;
-  }
-  .logo-correios span { color: #f7a800; }
-  .servico {
-    font-size: 8pt;
-    font-weight: bold;
-    text-align: right;
-    color: #333;
-  }
-  .barcode-row {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1mm;
-  }
-  .barcode-row svg { width: 100%; max-height: 18mm; }
-  .tracking-code {
-    font-size: 11pt;
-    font-weight: bold;
-    letter-spacing: 2px;
-    text-align: center;
-  }
-  .divider {
-    border: none;
-    border-top: 1px solid #000;
-  }
-  .section-title {
-    font-size: 7pt;
-    font-weight: bold;
-    text-transform: uppercase;
-    color: #555;
-    margin-bottom: 1mm;
-  }
-  .dest-nome {
-    font-size: 11pt;
-    font-weight: bold;
-    line-height: 1.2;
-  }
-  .dest-end {
-    font-size: 9pt;
-    line-height: 1.4;
-  }
-  .dest-cep {
-    font-size: 13pt;
-    font-weight: 900;
-    letter-spacing: 1px;
-    margin-top: 1mm;
-  }
-  .rem-block {
-    border-top: 1px dashed #999;
-    padding-top: 2mm;
-    font-size: 7.5pt;
-    color: #333;
-    line-height: 1.4;
-  }
-  .rem-block .section-title { color: #777; }
-  @media print {
-    body { margin: 0; }
-    .no-print { display: none; }
-  }
-  .print-btn {
-    position: fixed; top: 8px; right: 8px;
-    background: #003087; color: #fff;
-    border: none; padding: 8px 18px;
-    border-radius: 6px; cursor: pointer;
-    font-size: 13px; font-weight: bold;
-  }
-</style>
-</head>
-<body>
-<button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
-<div class="label">
+            // Dados remetente
+            $remNome = (string) ($dadosRemetente['nome'] ?? '');
+            $remEndParts = [];
+            $rLogr = (string) ($dadosRemetente['endereco'] ?? '');
+            $rNum = (string) ($dadosRemetente['numero'] ?? '');
+            $rCompl = (string) ($dadosRemetente['complemento'] ?? '');
+            $rBairro = (string) ($dadosRemetente['bairro'] ?? '');
+            if ($rLogr !== '') $remEndParts[] = $rLogr;
+            if ($rNum !== '') $remEndParts[] = $rNum;
+            if ($rCompl !== '') $remEndParts[] = $rCompl;
+            if ($rBairro !== '') $remEndParts[] = $rBairro;
+            $remEndereco = implode(', ', $remEndParts);
+            $remCidade = (string) ($dadosRemetente['cidade'] ?? '');
+            $remUf = (string) ($dadosRemetente['estado'] ?? '');
+            $remCep = (string) ($dadosRemetente['cep'] ?? '');
+            $remCnpj = (string) ($dadosRemetente['cpfCnpj'] ?? ($dadosRemetente['cnpj'] ?? ''));
 
-  <div class="logo-row">
-    <div class="logo-correios">COR<span>REIOS</span></div>
-    <div class="servico">Encomenda Nacional<br><strong style="font-size:10pt;color:#000">{$pedidoLabel}</strong></div>
-  </div>
+            // Serviços adicionais (VD = Valor Declarado)
+            $servicosAdicionais = ['VD XX'];
 
-  <div class="barcode-row">
-    <svg id="barcode"></svg>
-    <div class="tracking-code">{$codigoHtml}</div>
-  </div>
+            // Conteúdo do DataMatrix (padrão Correios: CEP destino + CEP origem + código + serviços)
+            $cepDestDigits = preg_replace('/\D+/', '', $destCep);
+            $cepRemDigits = preg_replace('/\D+/', '', $remCep);
+            $datamatrixContent = $cepDestDigits . $cepRemDigits . $codigo . ($pesoGramas !== '' ? '|' . $pesoGramas : '');
 
-  <hr class="divider">
-
-  <div>
-    <div class="section-title">Destinatário</div>
-    <div class="dest-nome">{$destNome}</div>
-    <div class="dest-end">
-      {$destEnd} {$destNum} {$destCompl}<br>
-      {$destBairro}<br>
-      {$destCidade} - {$destUf}
-    </div>
-    <div class="dest-cep">CEP: {$destCep}</div>
-    {$destCpfHtml}
-  </div>
-
-  <div class="rem-block">
-    <div class="section-title">Remetente</div>
-    <div><strong>{$remNome}</strong></div>
-    <div>{$remEnd} {$remNum} {$remCompl} - {$remBairro}</div>
-    <div>{$remCidade}/{$remUf} - CEP: {$remCep}</div>
-    {$remCnpjHtml}
-  </div>
-
-</div>
-<script>
-(function(){
-  var code = {$codigoJs};
-  try {
-    JsBarcode('#barcode', code, {
-      format: 'CODE128',
-      displayValue: false,
-      margin: 2,
-      height: 60,
-      width: 2
-    });
-  } catch(e){}
-  setTimeout(function(){ window.print(); }, 600);
-})();
-</script>
-</body>
-</html>
-HTML;
-
-            echo $html;
+            // Renderizar view
+            ob_start();
+            include __DIR__ . '/../Views/admin/remessa-correios/etiqueta-print.php';
+            echo ob_get_clean();
             
         } catch (\Exception $e) {
             echo '<p>Erro: ' . htmlspecialchars($e->getMessage()) . '</p>';
