@@ -917,8 +917,8 @@ class AdminRemessaConferenciaController extends Controller {
                     <td>' . ($foto !== '' ? '<img src="' . $h($foto) . '" style="width:48px;height:48px;object-fit:cover;border-radius:6px">' : '<span class="text-muted">-</span>') . '</td>
                     <td>' . $h($it['produto_nome'] ?? $it['nome_produto'] ?? '') . '</td>
                     <td>' . $qtdIt . '</td>
-                    <td>' . $fmtMoeda($pu, 'USD') . '</td>
-                    <td>' . $fmtMoeda($totIt, 'USD') . '</td>
+                    <td>' . $fmtMoeda($pu, $moeda) . '</td>
+                    <td>' . $fmtMoeda($totIt, $moeda) . '</td>
                 </tr>';
                 $idx++;
             }
@@ -937,26 +937,28 @@ class AdminRemessaConferenciaController extends Controller {
         }
         if ($totalUsd > 0 && $totalBrl <= 0) {
             echo '<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
-        } elseif ($isPagdev && $totalPedido !== null && $totalPedido > 0) {
+        } elseif ($totalBrl > 0) {
+            echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl) . '</td></tr>';
+        } elseif ($totalPedido !== null && $totalPedido > 0) {
             echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td>' . $fmtMoeda($totalPedido, $moeda) . '</td></tr>';
         } else {
-            echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl > 0 ? $totalBrl : null) . '</td></tr>';
+            echo '<tr><td class="text-muted">Valor pago</td><td>-</td></tr>';
         }
         echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
-        // Para pagdev (pagamento externo), usar valores do pedido diretamente
-        if ($isPagdev && $produtosValor <= 0 && $subtotal !== null && $subtotal > 0) {
+        // Quando não há dados de componentes nos pagamentos, usar valores diretos do pedido
+        if ($produtosValor <= 0 && $subtotal !== null && $subtotal > 0) {
             $produtosValor = $subtotal;
         }
-        if ($isPagdev && $taxaServico <= 0) {
+        if ($taxaServico <= 0) {
             $svc = is_numeric($pedido['servicos'] ?? null) ? (float)$pedido['servicos'] : (is_numeric($pedido['taxa_servico'] ?? null) ? (float)$pedido['taxa_servico'] : 0);
             if ($svc > 0) $taxaServico = $svc;
         }
-        if ($isPagdev && $impostoValor <= 0) {
+        if ($impostoValor <= 0) {
             $imp = is_numeric($pedido['impostos'] ?? null) ? (float)$pedido['impostos'] : 0;
             if ($imp > 0) $impostoValor = $imp;
         }
-        if ($isPagdev && $impostoLocal <= 0 && $impLocal !== null && $impLocal > 0) {
+        if ($impostoLocal <= 0 && $impLocal !== null && $impLocal > 0) {
             $impostoLocal = $impLocal;
         }
         echo '<tr><td class="text-muted">Produtos</td><td>' . ($produtosValor > 0 ? $fmtMoeda($produtosValor, $moeda) : ($subtotal !== null ? $fmtMoeda($subtotal, $moeda) : '-')) . '</td></tr>';
