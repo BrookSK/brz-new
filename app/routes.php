@@ -500,6 +500,10 @@ $router->post('/webhook/carne/cambioreal', 'WebhookCarneController', 'cambioReal
 $router->post('/webhook/carne/cambioreal-taxas', 'WebhookCarneController', 'cambiorealTaxas');
 $router->post('/webhook/carne/appmax', 'WebhookCarneController', 'appmax');
 
+// Webhook Ticket (WhatsApp → criar ticket)
+$router->post('/webhook/criar-ticket', 'WebhookTicketController', 'criarTicket');
+$router->get('/admin/documentacao/webhook-ticket', 'AdminDocumentacaoController', 'webhookTicket');
+
 // API
 $router->get('/api/produtos/buscar', 'ApiController', 'buscarProdutos');
 $router->get('/api/produtos/buscar-todos', 'ApiController', 'buscarProdutosTodos');

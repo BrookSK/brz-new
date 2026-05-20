@@ -258,6 +258,7 @@ function renderAdminSidebar($activePage = '') {
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
         'email-logs' => ['icon' => 'fas fa-envelope', 'label' => 'Log de Emails', 'url' => '/admin/emails', 'roles' => ['admin']],
         'descontos' => ['icon' => 'fas fa-tag', 'label' => 'Autorizações Desconto', 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],
+        'documentacao-webhook' => ['icon' => 'fas fa-book', 'label' => 'Documentação API', 'url' => '/admin/documentacao/webhook-ticket', 'roles' => ['admin']],
         'promocoes-auditoria' => ['icon' => 'fas fa-percent', 'label' => 'Auditoria Promoções', 'url' => '/admin/promocoes-auditoria', 'roles' => ['admin']],
         'descricao-produtos' => ['icon' => 'fas fa-pen-fancy', 'label' => 'Descrição de Produtos', 'url' => '/admin/descricao-produtos', 'roles' => ['admin','vendedor']],
         'promocoes-agendadas' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Promoções Agendadas', 'url' => '/admin/promocoes-agendadas', 'roles' => ['admin', 'vendedor']],
@@ -444,7 +445,7 @@ function renderAdminSidebar($activePage = '') {
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
                 'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['email-marketing', 'cart-recovery', 'mapa-calor-site']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
-                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup']],
+                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];
 
             foreach ($menuGroups as $groupName => $group) {

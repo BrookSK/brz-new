@@ -1,0 +1,21 @@
+<?php
+namespace App\Controllers;
+
+use App\Core\Request;
+use App\Core\Services\AuthService;
+
+class AdminDocumentacaoController {
+
+    public function webhookTicket(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $title = 'Documentação - Webhook Ticket';
+        $sidebarActive = 'configuracoes';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        require __DIR__ . '/../Views/admin/documentacao/webhook-ticket.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+}
