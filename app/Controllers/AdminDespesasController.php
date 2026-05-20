@@ -323,6 +323,80 @@ class AdminDespesasController extends Controller {
         $this->redirect('/admin/despesas?tab=todas');
     }
 
+    public function pagarRecorrencia(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        $this->ensureTables();
+        $this->materializarRecorrencia((int)$id, 'paga');
+    }
+
+    public function cancelarRecorrencia(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        $this->ensureTables();
+        $this->materializarRecorrencia((int)$id, 'cancelada');
+    }
+
+    private function materializarRecorrencia(int $recId, string $status): void {
+        // Buscar dados da recorrência
+        $st = $this->db->prepare("SELECT * FROM despesa_recorrencias WHERE id = ? AND ativa = 1");
+        $st->execute([$recId]);
+        $rec = $st->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$rec) {
+            $_SESSION['message'] = 'Recorrência não encontrada.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
+        $vencimento = $rec['proxima_geracao'] ?? date('Y-m-d');
+        $competencia = date('Y-m-01', strtotime($vencimento));
+
+        // Criar despesa real na tabela despesas
+        $stmt = $this->db->prepare("INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, recorrencia_id, origem, data_pagamento, criado_por) VALUES (?, ?, 'recorrente', ?, ?, ?, ?, ?, ?, ?, ?, 'recorrencia', ?, ?)");
+        $stmt->execute([
+            $rec['descricao'],
+            $rec['categoria_id'],
+            (float)$rec['valor'],
+            $rec['moeda'] ?? 'BRL',
+            $competencia,
+            $vencimento,
+            $status,
+            $rec['forma_pagamento'],
+            $rec['favorecido'],
+            $recId,
+            $status === 'paga' ? date('Y-m-d') : null,
+            $_SESSION['usuario_id'] ?? null,
+        ]);
+
+        // Avançar proxima_geracao para o próximo período
+        $freq = $rec['frequencia'] ?? 'mensal';
+        $dia = (int)($rec['dia_vencimento'] ?? 1);
+        $proxima = $vencimento;
+        switch ($freq) {
+            case 'semanal': $proxima = date('Y-m-d', strtotime($vencimento . ' +1 week')); break;
+            case 'quinzenal': $proxima = date('Y-m-d', strtotime($vencimento . ' +2 weeks')); break;
+            case 'mensal': $proxima = date('Y-m-' . str_pad($dia, 2, '0', STR_PAD_LEFT), strtotime($vencimento . ' +1 month')); break;
+            case 'anual': $proxima = date('Y-m-' . str_pad($dia, 2, '0', STR_PAD_LEFT), strtotime($vencimento . ' +1 year')); break;
+            default: $proxima = date('Y-m-' . str_pad($dia, 2, '0', STR_PAD_LEFT), strtotime($vencimento . ' +1 month'));
+        }
+
+        // Verificar se atingiu data_fim
+        $dataFim = $rec['data_fim'] ?? null;
+        if ($dataFim && $proxima > $dataFim) {
+            // Desativar recorrência
+            $this->db->prepare("UPDATE despesa_recorrencias SET ativa = 0, updated_at = NOW() WHERE id = ?")->execute([$recId]);
+        } else {
+            $this->db->prepare("UPDATE despesa_recorrencias SET proxima_geracao = ?, updated_at = NOW() WHERE id = ?")->execute([$proxima, $recId]);
+        }
+
+        $msg = $status === 'paga' ? 'Despesa marcada como paga e próxima geração avançada.' : 'Despesa cancelada para este período.';
+        $_SESSION['message'] = $msg;
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/despesas?tab=todas');
+    }
+
     // === PRIVATE ===
 
     private function criarRecorrencia(array $body) {

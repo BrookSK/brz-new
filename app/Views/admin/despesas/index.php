@@ -281,6 +281,8 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <?php endif; ?>
                             <?php else: ?>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-editar-despesa" title="Editar recorrência" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>" data-virtual="1"><i class="fas fa-edit"></i></button>
+                            <form method="POST" action="/admin/despesas/pagar-recorrencia/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga este mês?')"><button type="submit" class="btn btn-sm btn-outline-success" title="Pagar"><i class="fas fa-check"></i></button></form>
+                            <form method="POST" action="/admin/despesas/cancelar-recorrencia/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Cancelar este mês?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar"><i class="fas fa-times"></i></button></form>
                             <?php endif; ?>
                         </td>
                     </tr>
