@@ -34,19 +34,8 @@
     <!-- Container para alertas -->
     <div id="alert-container" class="mb-4"></div>
     
-    <div class="row mb-4 align-items-center">
+    <div class="row mb-3 g-2 align-items-center">
         <div class="col">
-            <h2><i class="fas fa-box"></i> <?= __('products.title', 'Produtos Disponíveis') ?></h2>
-        </div>
-        <div class="col-auto">
-            <a href="/carrinho<?= !empty($_GET['embed']) ? '?embed=1' : '' ?>" class="btn btn-sm btn-outline-primary">
-                <i class="fas fa-shopping-cart"></i> <?= __('products.view_cart', 'Ver Carrinho') ?>
-            </a>
-        </div>
-    </div>
-
-    <div class="row mb-4 g-2">
-        <div class="col-7 col-lg-4">
             <form method="GET" class="d-flex">
                 <?php if (!empty($_GET['embed'])): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
                 <input type="text" name="search" class="form-control me-1" placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
@@ -55,11 +44,11 @@
                 </button>
             </form>
         </div>
-        <div class="col-5 col-lg-4">
+        <div class="col-auto">
             <form method="GET">
                 <?php if (!empty($_GET['embed'])): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
-                <select name="categoria" class="form-select" onchange="this.form.submit()">
-                    <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
+                <select name="categoria" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value=""><?= __('products.all_categories', 'Todas') ?></option>
                     <?php foreach ($categorias as $cat): ?>
                         <option value="<?= htmlspecialchars($cat) ?>" <?= ($categoriaSelecionada ?? '') === $cat ? 'selected' : '' ?>>
                             <?= htmlspecialchars($cat) ?>
@@ -67,6 +56,11 @@
                     <?php endforeach; ?>
                 </select>
             </form>
+        </div>
+        <div class="col-auto">
+            <a href="/carrinho<?= !empty($_GET['embed']) ? '?embed=1' : '' ?>" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-shopping-cart"></i>
+            </a>
         </div>
     </div>
 

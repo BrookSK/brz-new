@@ -785,14 +785,14 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 border-color: rgba(29, 78, 216, 0.22);
             }
 
-            /* Actions section (currency/login/cart) — compact icon row at top */
+            /* Actions section (currency/login/cart) — inline icons at top, no separator */
             .navbar-collapse > .navbar-nav.align-items-center {
                 margin-top: 0;
-                padding: 12px 8px;
-                border-top: none;
-                border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+                margin-bottom: 8px;
+                padding: 0;
+                border: none;
                 align-items: center !important;
-                gap: 6px;
+                gap: 8px;
                 flex-direction: row !important;
                 flex-wrap: nowrap;
                 justify-content: space-evenly;
