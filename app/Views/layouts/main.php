@@ -726,8 +726,20 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-toggler {
-                border-radius: 12px;
-                padding: 0.5rem 0.65rem;
+                border-radius: 8px;
+                padding: 6px 8px;
+                border: 1px solid #18253D;
+                box-shadow: none;
+            }
+
+            .navbar-toggler:focus {
+                box-shadow: none;
+                outline: none;
+            }
+
+            .navbar-toggler-icon {
+                width: 20px;
+                height: 20px;
             }
 
             .navbar-collapse {
