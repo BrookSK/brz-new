@@ -935,26 +935,16 @@ class AdminRemessaConferenciaController extends Controller {
             $pgM = strtoupper(trim((string)($pg['moeda'] ?? '')));
             if ($pgM === 'USD') $totalUsd += (float)($pg['valor'] ?? 0);
         }
-        if ($totalUsd > 0 && $totalBrl <= 0) {
+        // Usar o total do pedido como valor pago (valor real cobrado do cliente)
+        $valorPagoExibir = $totalPedido !== null && $totalPedido > 0 ? $totalPedido : null;
+        if ($valorPagoExibir !== null) {
+            echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td><strong>' . $fmtMoeda($valorPagoExibir, $moeda) . '</strong></td></tr>';
+        } elseif ($totalUsd > 0 && $totalBrl <= 0) {
             echo '<tr><td class="text-muted">Valor pago (USD)</td><td>' . $fmtMoeda($totalUsd, 'USD') . '</td></tr>';
         } elseif ($totalBrl > 0) {
             echo '<tr><td class="text-muted">Valor pago (BRL)</td><td>' . $fmtBrl($totalBrl) . '</td></tr>';
         } else {
-            // Calcular total real: subtotal + servicos + impostos + imposto_local
-            $totalReal = 0;
-            if ($subtotal !== null) $totalReal += $subtotal;
-            $svcCalc = is_numeric($pedido['servicos'] ?? null) ? (float)$pedido['servicos'] : (is_numeric($pedido['taxa_servico'] ?? null) ? (float)$pedido['taxa_servico'] : 0);
-            $totalReal += $svcCalc;
-            $impCalc = is_numeric($pedido['impostos'] ?? null) ? (float)$pedido['impostos'] : 0;
-            $totalReal += $impCalc;
-            if ($impLocal !== null) $totalReal += $impLocal;
-            // Se o pedido tem campo 'total' e é maior, usar ele (pode incluir frete/desconto)
-            if ($totalPedido !== null && $totalPedido > $totalReal) $totalReal = $totalPedido;
-            if ($totalReal > 0) {
-                echo '<tr><td class="text-muted">Valor pago (' . $h($moeda) . ')</td><td><strong>' . $fmtMoeda($totalReal, $moeda) . '</strong></td></tr>';
-            } else {
-                echo '<tr><td class="text-muted">Valor pago</td><td>-</td></tr>';
-            }
+            echo '<tr><td class="text-muted">Valor pago</td><td>-</td></tr>';
         }
         echo '<tr><td class="text-muted">Data de crédito</td><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
         echo '<tr><td class="text-muted">Método</td><td>' . $h($metodoPagamento) . '</td></tr>';
