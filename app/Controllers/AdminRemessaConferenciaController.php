@@ -1571,25 +1571,59 @@ th{background:#f5f5f5}
         echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
 
         echo '<h2>Resumo de Pagamento</h2><table>';
-        $cambioRealPagamentos = array_filter($pagamentos, fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === 'cambioreal');
-        $totalBrl = 0.0;
-        $metodoPagamento = 'Câmbio Real';
+        // Detectar método de pagamento e calcular totais de TODOS os pagamentos
+        $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''))));
         $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
-        foreach ($cambioRealPagamentos as $pg) {
+        $totalBrl = 0.0;
+        $totalUsd = 0.0;
+        foreach ($pagamentos as $pg) {
             $v = (float)($pg['valor'] ?? 0);
             $m = strtolower((string)($pg['moeda'] ?? 'BRL'));
-            if ($m === 'brl') {
+            if ($m === 'usd') {
+                $totalUsd += $v;
+            } else {
                 $totalBrl += $v;
             }
             if ($dataPagamento === '' && !empty($pg['created_at'])) {
                 $dataPagamento = (string) $pg['created_at'];
             }
+            if ($metodoPagamento === '' && !empty($pg['gateway'])) {
+                $metodoPagamento = strtolower(trim((string)$pg['gateway']));
+            }
         }
+
+        // Fallback: se não há registros em pedido_pagamentos, usar o total do pedido
+        if ($totalBrl <= 0 && $totalUsd <= 0) {
+            $totalPedido = (float)($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+            if ($totalPedido > 0) {
+                $moedaPedido = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+                if ($moedaPedido === 'BRL') {
+                    $totalBrl = $totalPedido;
+                } else {
+                    $totalUsd = $totalPedido;
+                }
+            }
+        }
+
+        // Nomes amigáveis dos gateways
+        $gwNames = ['cambioreal' => 'Câmbio Real', 'appmax' => 'AppMax', 'stripe' => 'Stripe', 'pagdev' => 'PagDev', 'mercadopago' => 'Mercado Pago', 'asaas' => 'Asaas'];
+        $metodoLabel = $gwNames[$metodoPagamento] ?? ($metodoPagamento !== '' ? ucfirst($metodoPagamento) : 'N/A');
+
+        // Calcular equivalências
         $totalUsdEq = $taxaUsdBrl > 0 ? ($totalBrl / $taxaUsdBrl) : 0.0;
-        echo '<tr><th>Método</th><td>' . $h($metodoPagamento) . '</td></tr>';
+        $totalBrlEq = $totalUsd * $taxaUsdBrl;
+
+        echo '<tr><th>Método</th><td>' . $h($metodoLabel) . '</td></tr>';
         echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
-        echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
-        echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        if ($totalUsd > 0) {
+            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+        } elseif ($totalBrl > 0) {
+            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        } else {
+            echo '<tr><th>Total pago</th><td><strong>-</strong></td></tr>';
+        }
         echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
 
