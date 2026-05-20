@@ -231,9 +231,11 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <div class="text-muted" style="font-size:10px;">Venc: <?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></div>
                         </div>
                         <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                            <?php if (empty($d['is_virtual'])): ?>
                             <button type="button" class="btn btn-outline-primary py-0 px-1 btn-editar-despesa" style="font-size:11px;" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-outline-success py-0 px-1" style="font-size:11px;"><i class="fas fa-check"></i></button></form>
+                            <?php endif; ?>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -270,6 +272,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
                         <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
                         <td>
+                            <?php if (empty($d['is_virtual'])): ?>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-editar-despesa" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-sm btn-outline-success" title="Pagar"><i class="fas fa-check"></i></button></form>
@@ -277,6 +280,9 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <?php endif; ?>
                             <?php if ($d['status'] === 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/excluir/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Excluir permanentemente?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button></form>
+                            <?php endif; ?>
+                            <?php else: ?>
+                            <span class="badge bg-light text-muted border" style="font-size:9px;"><i class="fas fa-sync-alt me-1"></i>Recorrência</span>
                             <?php endif; ?>
                         </td>
                     </tr>

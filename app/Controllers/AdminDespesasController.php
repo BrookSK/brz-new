@@ -62,7 +62,7 @@ class AdminDespesasController extends Controller {
                     r.id AS recorrencia_id, NULL AS parcelamento_id, NULL AS parcela_numero,
                     'recorrencia' AS origem, r.created_at, r.updated_at, NULL AS deleted_at,
                     c.nome AS categoria_nome, c.cor AS categoria_cor, c.icone AS categoria_icone,
-                    r.categoria_id
+                    r.categoria_id, 1 AS is_virtual
                     FROM despesa_recorrencias r
                     LEFT JOIN despesa_categorias c ON c.id = r.categoria_id
                     WHERE r.ativa = 1";
@@ -481,7 +481,7 @@ class AdminDespesasController extends Controller {
             $params[':comp_ate'] = $filtros['competencia_ate'] . '-31';
         }
 
-        $sql = "SELECT d.id, d.descricao, d.categoria_id, d.tipo, d.valor, d.moeda, d.competencia, d.vencimento, d.data_pagamento, d.status, d.forma_pagamento, d.favorecido, d.observacoes, d.comprovante_path, d.recorrencia_id, d.parcelamento_id, d.parcela_numero, d.comissao_pedido_id, d.comissao_usuario_id, d.comissao_regra, d.comissao_base, d.origem, d.criado_por, d.created_at, d.updated_at, d.deleted_at, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
+        $sql = "SELECT d.id, d.descricao, d.categoria_id, d.tipo, d.valor, d.moeda, d.competencia, d.vencimento, d.data_pagamento, d.status, d.forma_pagamento, d.favorecido, d.observacoes, d.comprovante_path, d.recorrencia_id, d.parcelamento_id, d.parcela_numero, d.comissao_pedido_id, d.comissao_usuario_id, d.comissao_regra, d.comissao_base, d.origem, d.criado_por, d.created_at, d.updated_at, d.deleted_at, 0 as is_virtual, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
         try {
             $st = $this->db->prepare($sql);
             $st->execute($params);
