@@ -242,19 +242,7 @@ class AdminDespesasController extends Controller {
         $observacoes = !empty($body['observacoes']) ? $body['observacoes'] : null;
 
         if (empty($descricao)) {
-            $_SESSION['message'] = 'Descrição não pode ser vazia. POST recebido: ' . json_encode(array_keys($body));
-            $_SESSION['message_type'] = 'danger';
-            $this->redirect('/admin/despesas?tab=todas');
-            return;
-        }
-
-        // Debug: verificar estado atual do registro
-        $check = $this->db->prepare("SELECT id, descricao, deleted_at FROM despesas WHERE id = ?");
-        $check->execute([$despesaId]);
-        $atual = $check->fetch(\PDO::FETCH_ASSOC);
-
-        if (!$atual) {
-            $_SESSION['message'] = 'Despesa ID #' . $despesaId . ' não encontrada no banco.';
+            $_SESSION['message'] = 'Descrição não pode ser vazia.';
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/admin/despesas?tab=todas');
             return;
@@ -275,13 +263,8 @@ class AdminDespesasController extends Controller {
             $despesaId,
         ]);
 
-        // Verificar se realmente mudou
-        $check2 = $this->db->prepare("SELECT descricao FROM despesas WHERE id = ?");
-        $check2->execute([$despesaId]);
-        $novo = $check2->fetchColumn();
-
-        $_SESSION['message'] = 'ID #' . $despesaId . ' | Antes: "' . mb_substr($atual['descricao'], 0, 40) . '" | Agora no banco: "' . mb_substr($novo, 0, 40) . '" | deleted_at: ' . ($atual['deleted_at'] ?? 'NULL');
-        $_SESSION['message_type'] = 'info';
+        $_SESSION['message'] = 'Despesa atualizada com sucesso.';
+        $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
 
@@ -498,7 +481,7 @@ class AdminDespesasController extends Controller {
             $params[':comp_ate'] = $filtros['competencia_ate'] . '-31';
         }
 
-        $sql = "SELECT d.*, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
+        $sql = "SELECT d.*, d.id as despesa_id, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
         try {
             $st = $this->db->prepare($sql);
             $st->execute($params);
