@@ -954,11 +954,7 @@ class AdminNotificacoesController extends Controller {
             $webhook = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
 
             if (empty($webhook['id']) || empty($webhook['url'])) {
-                $this->json(['success' => false, 'error' => 'Webhook não configurado para este evento'], 404);
-            }
-
-            if ((string) ($webhook['ativo'] ?? '1') === '0') {
-                $this->json(['success' => false, 'error' => 'Webhook está desativado'], 400);
+                $this->json(['success' => false, 'error' => 'Webhook não configurado para este evento. Salve a URL primeiro.'], 404);
             }
 
             $url = (string) $webhook['url'];
