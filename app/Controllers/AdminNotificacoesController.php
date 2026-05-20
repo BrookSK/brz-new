@@ -440,6 +440,7 @@ class AdminNotificacoesController extends Controller {
                 'nome' => (string)($row['cliente_nome'] ?? ''),
                 'email' => (string)($row['cliente_email'] ?? ''),
                 'telefone' => (string)($row['cliente_telefone'] ?? ''),
+                'telefone_limpo' => preg_replace('/\D/', '', (string)($row['cliente_telefone'] ?? '')),
                 'quantidade_parcelas' => (string)$total_parcelas,
                 'total_parcelas' => (string)$total_parcelas,
                 'parcelas_pagas' => (string)$parcelas_pagas,

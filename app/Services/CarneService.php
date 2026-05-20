@@ -833,6 +833,10 @@ class CarneService {
             'carne_id' => $carneId,
             'pedido_id' => $carne['pedido_id'],
             'cliente' => $carne['cliente_nome'],
+            'cliente_nome' => $carne['cliente_nome'] ?? '',
+            'cliente_email' => $carne['cliente_email'] ?? '',
+            'telefone' => (string)($carne['cliente_telefone'] ?? ''),
+            'telefone_limpo' => preg_replace('/\D/', '', (string)($carne['cliente_telefone'] ?? '')),
             'status' => $carne['status'],
             'parcela' => $parcela
         ];
