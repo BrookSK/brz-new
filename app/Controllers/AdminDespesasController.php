@@ -263,7 +263,7 @@ class AdminDespesasController extends Controller {
             $despesaId,
         ]);
 
-        $_SESSION['message'] = 'Despesa atualizada com sucesso.';
+        $_SESSION['message'] = 'Despesa atualizada com sucesso. [DEBUG: ID=' . $despesaId . ', desc_enviada="' . mb_substr($descricao, 0, 40) . '"]';
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
