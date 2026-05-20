@@ -201,6 +201,16 @@
                                                 <option value="pedido_enviado"><?= __('admin.settings.webhook.events.order_shipped', 'Pedido Enviado') ?></option>
                                                 <option value="pedido_entregue"><?= __('admin.settings.webhook.events.order_delivered', 'Pedido Entregue') ?></option>
                                                 <option value="pedido_cancelado"><?= __('admin.settings.webhook.events.order_cancelled', 'Pedido Cancelado') ?></option>
+                                                <optgroup label="Carnê Braziliana">
+                                                    <option value="carne_criado">Carnê Criado</option>
+                                                    <option value="carne_cobranca">Carnê Cobrança (parcela em atraso)</option>
+                                                    <option value="carne_parcela_proxima_vencimento">Carnê Parcela Próxima do Vencimento</option>
+                                                    <option value="carne_pagamento_confirmado">Carnê Pagamento Confirmado</option>
+                                                    <option value="carne_quitado">Carnê Quitado</option>
+                                                    <option value="carne_envio_liberado">Carnê Envio Liberado</option>
+                                                    <option value="carne_aviso_cancelamento">Carnê Aviso de Cancelamento</option>
+                                                    <option value="carne_cancelado">Carnê Cancelado</option>
+                                                </optgroup>
                                             </select>
                                         </div>
                                         
