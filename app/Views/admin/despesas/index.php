@@ -583,7 +583,9 @@ function exportarDespesas() {
 const DESP_TAXA = <?= (float)($taxaUsdBrl ?? 5.85) ?>;
 
 function abrirEditarDespesa(btn) {
-    document.getElementById('formEditarDespesa').action = '/admin/despesas/editar/' + btn.dataset.id;
+    var actionUrl = '/admin/despesas/editar/' + btn.dataset.id;
+    console.log('Editando despesa ID:', btn.dataset.id, 'Action:', actionUrl);
+    document.getElementById('formEditarDespesa').action = actionUrl;
     document.getElementById('edit-descricao').value = btn.dataset.descricao || '';
     document.getElementById('edit-categoria').value = btn.dataset.categoria || '';
     document.getElementById('edit-valor').value = btn.dataset.valor || '';

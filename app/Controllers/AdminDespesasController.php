@@ -212,7 +212,27 @@ class AdminDespesasController extends Controller {
         $body = $request->getBody();
         if (empty($body)) $body = $_POST;
 
-        $stmt = $this->db->prepare("UPDATE despesas SET descricao = :desc, categoria_id = :cat, valor = :valor, moeda = :moeda, competencia = :comp, vencimento = :venc, status = :status, forma_pagamento = :fp, favorecido = :fav, observacoes = :obs WHERE id = :id AND deleted_at IS NULL");
+        // Garantir que temos o ID correto
+        $despesaId = (int)$id;
+        if ($despesaId <= 0) {
+            $despesaId = (int)$request->getParam('id', 0);
+        }
+        if ($despesaId <= 0) {
+            // Tentar extrair da URL
+            $path = $_SERVER['REQUEST_URI'] ?? '';
+            if (preg_match('/\/editar\/(\d+)/', $path, $m)) {
+                $despesaId = (int)$m[1];
+            }
+        }
+
+        if ($despesaId <= 0) {
+            $_SESSION['message'] = 'ID da despesa não encontrado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
+        $stmt = $this->db->prepare("UPDATE despesas SET descricao = :desc, categoria_id = :cat, valor = :valor, moeda = :moeda, competencia = :comp, vencimento = :venc, status = :status, forma_pagamento = :fp, favorecido = :fav, observacoes = :obs, updated_at = NOW() WHERE id = :id");
         $stmt->execute([
             ':desc' => $body['descricao'] ?? '',
             ':cat' => !empty($body['categoria_id']) ? (int)$body['categoria_id'] : null,
@@ -224,11 +244,16 @@ class AdminDespesasController extends Controller {
             ':fp' => !empty($body['forma_pagamento']) ? $body['forma_pagamento'] : null,
             ':fav' => $body['favorecido'] ?? null,
             ':obs' => $body['observacoes'] ?? null,
-            ':id' => (int)$id,
+            ':id' => $despesaId,
         ]);
 
-        $_SESSION['message'] = 'Despesa atualizada com sucesso.';
-        $_SESSION['message_type'] = 'success';
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['message'] = 'Despesa atualizada com sucesso.';
+            $_SESSION['message_type'] = 'success';
+        } else {
+            $_SESSION['message'] = 'Nenhuma alteração realizada (ID: ' . $despesaId . ').';
+            $_SESSION['message_type'] = 'warning';
+        }
         $this->redirect('/admin/despesas?tab=todas');
     }
 
