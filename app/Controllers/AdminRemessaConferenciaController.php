@@ -1582,19 +1582,14 @@ th{background:#f5f5f5}
         }
 
         echo '<h2>Resumo de Pagamento</h2><table>';
-        // Detectar método de pagamento e calcular totais de TODOS os pagamentos
+        // Detectar método de pagamento
         $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''))));
         $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
         $totalBrl = 0.0;
         $totalUsd = 0.0;
+
+        // Buscar data e método dos pagamentos
         foreach ($pagamentos as $pg) {
-            $v = (float)($pg['valor'] ?? 0);
-            $m = strtolower((string)($pg['moeda'] ?? 'BRL'));
-            if ($m === 'usd') {
-                $totalUsd += $v;
-            } else {
-                $totalBrl += $v;
-            }
             if ($dataPagamento === '' && !empty($pg['created_at'])) {
                 $dataPagamento = (string) $pg['created_at'];
             }
@@ -1603,15 +1598,23 @@ th{background:#f5f5f5}
             }
         }
 
-        // Fallback: se não há registros em pedido_pagamentos, usar o total do pedido
-        if ($totalBrl <= 0 && $totalUsd <= 0) {
-            $totalPedido = (float)($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
-            if ($totalPedido > 0) {
-                $moedaPedido = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
-                if ($moedaPedido === 'BRL') {
-                    $totalBrl = $totalPedido;
+        // Usar o campo total do pedido como fonte primária (valor real cobrado do cliente)
+        $totalPedido = (float)($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+        if ($totalPedido > 0) {
+            if ($moeda === 'BRL') {
+                $totalBrl = $totalPedido;
+            } else {
+                $totalUsd = $totalPedido;
+            }
+        } else {
+            // Fallback: somar pagamentos quando não há total no pedido
+            foreach ($pagamentos as $pg) {
+                $v = (float)($pg['valor'] ?? 0);
+                $m = strtolower((string)($pg['moeda'] ?? 'BRL'));
+                if ($m === 'usd') {
+                    $totalUsd += $v;
                 } else {
-                    $totalUsd = $totalPedido;
+                    $totalBrl += $v;
                 }
             }
         }
