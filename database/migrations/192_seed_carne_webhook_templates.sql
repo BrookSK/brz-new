@@ -83,7 +83,7 @@ WHERE NOT EXISTS (SELECT 1 FROM eventos_sistema WHERE nome = 'carne_cancelado');
 -- carne_criado
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_criado', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_criado","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","quantidade_parcelas":"{{quantidade_parcelas}}","total_geral":"{{total_geral}}","data_criacao":"{{data_criacao}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_criado",\n  "message": "Novo carnê #{{carne_id}} criado para {{cliente_nome}} - {{quantidade_parcelas}}x de {{valor_parcela}}",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "quantidade_parcelas": "{{quantidade_parcelas}}",\n    "total_geral": "{{total_geral}}",\n    "valor_parcela": "{{valor_parcela}}",\n    "primeiro_vencimento": "{{primeiro_vencimento}}",\n    "data_criacao": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_criado'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -91,7 +91,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_cobranca
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_cobranca', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_cobranca","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","numero_parcela":"{{numero_parcela}}","total_parcelas":"{{total_parcelas}}","valor_parcela":"{{valor_parcela}}","valor_produtos":"{{valor_produtos}}","valor_taxas":"{{valor_taxas}}","vencimento":"{{vencimento}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_cobranca",\n  "message": "Cobrança: Parcela {{numero_parcela}}/{{total_parcelas}} do Carnê #{{carne_id}} - {{cliente_nome}} - Vencimento: {{vencimento}}",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "numero_parcela": "{{numero_parcela}}",\n    "total_parcelas": "{{total_parcelas}}",\n    "parcelas_pagas": "{{parcelas_pagas}}",\n    "valor_parcela": "{{valor_parcela}}",\n    "valor_produtos": "{{valor_produtos}}",\n    "valor_taxas": "{{valor_taxas}}",\n    "vencimento": "{{vencimento}}",\n    "dias_atraso": "{{dias_atraso}}",\n    "total_geral": "{{total_geral}}",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_cobranca'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -99,7 +99,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_parcela_proxima_vencimento
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_parcela_proxima_vencimento', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_parcela_proxima_vencimento","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","numero_parcela":"{{numero_parcela}}","valor_parcela":"{{valor_parcela}}","vencimento":"{{vencimento}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_parcela_proxima_vencimento",\n  "message": "Lembrete: Parcela {{numero_parcela}}/{{total_parcelas}} do Carnê #{{carne_id}} vence em {{vencimento}} - {{cliente_nome}}",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "numero_parcela": "{{numero_parcela}}",\n    "total_parcelas": "{{total_parcelas}}",\n    "parcelas_pagas": "{{parcelas_pagas}}",\n    "valor_parcela": "{{valor_parcela}}",\n    "vencimento": "{{vencimento}}",\n    "total_geral": "{{total_geral}}",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_parcela_proxima_vencimento'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -107,7 +107,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_pagamento_confirmado
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_pagamento_confirmado', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_pagamento_confirmado","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","numero_parcela":"{{numero_parcela}}","valor_parcela":"{{valor_parcela}}","parcelas_pagas":"{{parcelas_pagas}}","total_parcelas":"{{total_parcelas}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_pagamento_confirmado",\n  "message": "Pagamento confirmado: Parcela {{numero_parcela}}/{{total_parcelas}} do Carnê #{{carne_id}} - {{cliente_nome}} - {{valor_parcela}}",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "numero_parcela": "{{numero_parcela}}",\n    "total_parcelas": "{{total_parcelas}}",\n    "parcelas_pagas": "{{parcelas_pagas}}",\n    "valor_parcela": "{{valor_parcela}}",\n    "valor_produtos": "{{valor_produtos}}",\n    "valor_taxas": "{{valor_taxas}}",\n    "total_geral": "{{total_geral}}",\n    "valor_pago_total": "{{valor_pago_total}}",\n    "valor_restante": "{{valor_restante}}",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_pagamento_confirmado'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -115,7 +115,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_quitado
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_quitado', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_quitado","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","total_geral":"{{total_geral}}","quantidade_parcelas":"{{quantidade_parcelas}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_quitado",\n  "message": "Carnê #{{carne_id}} QUITADO! {{cliente_nome}} - {{quantidade_parcelas}} parcelas pagas - Total: {{total_geral}}",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "quantidade_parcelas": "{{quantidade_parcelas}}",\n    "total_geral": "{{total_geral}}",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_quitado'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -123,7 +123,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_envio_liberado
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_envio_liberado', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_envio_liberado","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_envio_liberado",\n  "message": "Envio liberado! Carnê #{{carne_id}} - Pedido #{{pedido_id}} - {{cliente_nome}}",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "quantidade_parcelas": "{{quantidade_parcelas}}",\n    "total_geral": "{{total_geral}}",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_envio_liberado'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -131,7 +131,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_aviso_cancelamento
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_aviso_cancelamento', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_aviso_cancelamento","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","parcelas_atrasadas":"{{parcelas_atrasadas}}","dias_atraso":"{{dias_atraso}}"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_aviso_cancelamento",\n  "message": "AVISO CANCELAMENTO: Carnê #{{carne_id}} - {{cliente_nome}} - {{parcelas_atrasadas}} parcelas em atraso ({{dias_atraso}} dias)",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "parcelas_atrasadas": "{{parcelas_atrasadas}}",\n    "dias_atraso": "{{dias_atraso}}",\n    "total_parcelas": "{{total_parcelas}}",\n    "parcelas_pagas": "{{parcelas_pagas}}",\n    "total_geral": "{{total_geral}}",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_aviso_cancelamento'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
@@ -139,7 +139,7 @@ AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
 -- carne_cancelado
 INSERT INTO webhooks (nome, url, evento_id, metodo, headers, payload_template, ativo, retry_count, created_at, updated_at)
 SELECT 'carne_cancelado', '', e.id, 'POST', '{"Content-Type":"application/json"}',
-'{"evento":"carne_cancelado","carne_id":"{{carne_id}}","pedido_id":"{{pedido_id}}","cliente_nome":"{{cliente_nome}}","cliente_email":"{{cliente_email}}","motivo":"inadimplencia"}',
+'{\n  "channel": "webhook",\n  "evento": "carne_cancelado",\n  "message": "CANCELADO: Carnê #{{carne_id}} - {{cliente_nome}} - Motivo: inadimplência",\n  "vars": {\n    "carne_id": "{{carne_id}}",\n    "pedido_id": "{{pedido_id}}",\n    "cliente_nome": "{{cliente_nome}}",\n    "cliente_email": "{{cliente_email}}",\n    "parcelas_pagas": "{{parcelas_pagas}}",\n    "total_parcelas": "{{total_parcelas}}",\n    "total_geral": "{{total_geral}}",\n    "motivo": "inadimplencia",\n    "data": "{{data}}"\n  }\n}',
 0, 3, NOW(), NOW()
 FROM eventos_sistema e WHERE e.nome = 'carne_cancelado'
 AND NOT EXISTS (SELECT 1 FROM webhooks w WHERE w.evento_id = e.id);
