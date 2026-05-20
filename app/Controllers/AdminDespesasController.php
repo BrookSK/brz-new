@@ -49,39 +49,11 @@ class AdminDespesasController extends Controller {
         // Stats do mês
         $stats = $this->getStats($filtros);
 
+        // Gerar despesas automáticas das recorrências ativas (até o mês atual)
+        $this->gerarDespesasRecorrentes();
+
         // Despesas
         $despesas = $this->listarDespesas($filtros);
-
-        // Na aba "todas", incluir também recorrências ativas e parcelas em andamento que não estão na tabela despesas
-        if ($tab === 'todas') {
-            // Incluir recorrências ativas como despesas virtuais (se não já existem na listagem)
-            $recorrIdsNaLista = array_filter(array_map(fn($d) => (int)($d['recorrencia_id'] ?? 0), $despesas));
-            try {
-                $sqlRec = "SELECT r.id, r.descricao, r.valor, r.moeda, r.proxima_geracao AS vencimento, r.proxima_geracao AS competencia,
-                    'recorrente' AS tipo, 'prevista' AS status, r.forma_pagamento, r.favorecido, NULL AS observacoes,
-                    r.id AS recorrencia_id, NULL AS parcelamento_id, NULL AS parcela_numero,
-                    'recorrencia' AS origem, r.created_at, r.updated_at, NULL AS deleted_at,
-                    c.nome AS categoria_nome, c.cor AS categoria_cor, c.icone AS categoria_icone,
-                    r.categoria_id, 1 AS is_virtual
-                    FROM despesa_recorrencias r
-                    LEFT JOIN despesa_categorias c ON c.id = r.categoria_id
-                    WHERE r.ativa = 1";
-                if (!empty($recorrIdsNaLista)) {
-                    $sqlRec .= " AND r.id NOT IN (" . implode(',', array_map('intval', $recorrIdsNaLista)) . ")";
-                }
-                $sqlRec .= " ORDER BY r.proxima_geracao ASC";
-                $stRec = $this->db->query($sqlRec);
-                $recorrVirtuais = $stRec ? $stRec->fetchAll(\PDO::FETCH_ASSOC) : [];
-                $despesas = array_merge($despesas, $recorrVirtuais);
-            } catch (\Exception $e) {}
-
-            // Ordenar tudo por vencimento
-            usort($despesas, function($a, $b) {
-                $va = $a['vencimento'] ?? '9999-12-31';
-                $vb = $b['vencimento'] ?? '9999-12-31';
-                return strcmp($va, $vb);
-            });
-        }
 
         // Recorrências
         $recorrencias = [];
@@ -398,6 +370,82 @@ class AdminDespesasController extends Controller {
     }
 
     // === PRIVATE ===
+
+    /**
+     * Gera despesas reais na tabela `despesas` para todas as recorrências ativas
+     * cujo `proxima_geracao` já passou ou é o mês atual.
+     * Gera até o final do mês seguinte para dar previsibilidade.
+     */
+    private function gerarDespesasRecorrentes(): void {
+        try {
+            // Gerar até o final do próximo mês
+            $limiteGeracao = date('Y-m-t', strtotime('+1 month'));
+
+            $stRec = $this->db->query("SELECT * FROM despesa_recorrencias WHERE ativa = 1");
+            $recorrencias = $stRec ? $stRec->fetchAll(\PDO::FETCH_ASSOC) : [];
+
+            foreach ($recorrencias as $rec) {
+                $proxima = $rec['proxima_geracao'] ?? null;
+                if (!$proxima) continue;
+
+                $dataFim = $rec['data_fim'] ?? null;
+                $dia = (int)($rec['dia_vencimento'] ?? 1);
+                $freq = $rec['frequencia'] ?? 'mensal';
+                $recId = (int)$rec['id'];
+
+                // Gerar despesas enquanto proxima_geracao <= limite
+                $maxIteracoes = 12; // segurança contra loop infinito
+                $iteracao = 0;
+                while ($proxima <= $limiteGeracao && $iteracao < $maxIteracoes) {
+                    $iteracao++;
+
+                    // Verificar se atingiu data_fim
+                    if ($dataFim && $proxima > $dataFim) {
+                        $this->db->prepare("UPDATE despesa_recorrencias SET ativa = 0, updated_at = NOW() WHERE id = ?")->execute([$recId]);
+                        break;
+                    }
+
+                    // Verificar se já existe despesa para esta recorrência neste vencimento
+                    $stCheck = $this->db->prepare("SELECT COUNT(*) FROM despesas WHERE recorrencia_id = ? AND vencimento = ? AND deleted_at IS NULL");
+                    $stCheck->execute([$recId, $proxima]);
+                    $existe = (int)$stCheck->fetchColumn() > 0;
+
+                    if (!$existe) {
+                        $competencia = date('Y-m-01', strtotime($proxima));
+                        $status = ($proxima < date('Y-m-d')) ? 'vencida' : (($proxima === date('Y-m-d')) ? 'a_vencer' : 'prevista');
+
+                        $stIns = $this->db->prepare("INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, recorrencia_id, origem, criado_por) VALUES (?, ?, 'recorrente', ?, ?, ?, ?, ?, ?, ?, ?, 'recorrencia', ?)");
+                        $stIns->execute([
+                            $rec['descricao'],
+                            $rec['categoria_id'],
+                            (float)$rec['valor'],
+                            $rec['moeda'] ?? 'BRL',
+                            $competencia,
+                            $proxima,
+                            $status,
+                            $rec['forma_pagamento'],
+                            $rec['favorecido'],
+                            $recId,
+                            $rec['criado_por'],
+                        ]);
+                    }
+
+                    // Avançar para o próximo período
+                    switch ($freq) {
+                        case 'semanal': $proxima = date('Y-m-d', strtotime($proxima . ' +1 week')); break;
+                        case 'quinzenal': $proxima = date('Y-m-d', strtotime($proxima . ' +2 weeks')); break;
+                        case 'anual': $proxima = date('Y-m-' . str_pad($dia, 2, '0', STR_PAD_LEFT), strtotime($proxima . ' +1 year')); break;
+                        default: $proxima = date('Y-m-' . str_pad($dia, 2, '0', STR_PAD_LEFT), strtotime($proxima . ' +1 month'));
+                    }
+                }
+
+                // Atualizar proxima_geracao na recorrência
+                $this->db->prepare("UPDATE despesa_recorrencias SET proxima_geracao = ?, updated_at = NOW() WHERE id = ? AND ativa = 1")->execute([$proxima, $recId]);
+            }
+        } catch (\Exception $e) {
+            // Silenciar erros para não quebrar a listagem
+        }
+    }
 
     private function criarRecorrencia(array $body) {
         $stmt = $this->db->prepare("INSERT INTO despesa_recorrencias (descricao, categoria_id, valor, moeda, frequencia, dia_vencimento, forma_pagamento, favorecido, data_inicio, data_fim, observacoes, proxima_geracao, criado_por) VALUES (:desc, :cat, :valor, :moeda, :freq, :dia, :fp, :fav, :inicio, :fim, :obs, :prox, :uid)");
