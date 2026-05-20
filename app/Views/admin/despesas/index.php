@@ -261,7 +261,6 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td>
                             <div class="fw-semibold"><?= htmlspecialchars($d['descricao'] ?? '') ?></div>
                             <?php if ($d['favorecido']): ?><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($d['favorecido']) ?></div><?php endif; ?>
-                            <div class="text-muted" style="font-size:9px;color:#999;">ID: <?= $d['id'] ?></div>
                         </td>
                         <td><?php if ($d['categoria_nome']): ?><span class="badge" style="background:<?= $d['categoria_cor'] ?? '#6b7280' ?>;font-size:10px;"><?= htmlspecialchars($d['categoria_nome']) ?></span><?php else: ?>-<?php endif; ?></td>
                         <td><span class="badge bg-light text-dark border" style="font-size:10px;"><?= $tipoBadge[$d['tipo'] ?? ''] ?? $d['tipo'] ?></span></td>

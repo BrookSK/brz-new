@@ -263,7 +263,7 @@ class AdminDespesasController extends Controller {
             $despesaId,
         ]);
 
-        $_SESSION['message'] = 'Despesa atualizada com sucesso. [DEBUG: ID=' . $despesaId . ', desc_enviada="' . mb_substr($descricao, 0, 40) . '"]';
+        $_SESSION['message'] = 'Despesa atualizada com sucesso.';
         $_SESSION['message_type'] = 'success';
         $this->redirect('/admin/despesas?tab=todas');
     }
@@ -481,7 +481,7 @@ class AdminDespesasController extends Controller {
             $params[':comp_ate'] = $filtros['competencia_ate'] . '-31';
         }
 
-        $sql = "SELECT d.*, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone, d.id as id FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
+        $sql = "SELECT d.id, d.descricao, d.categoria_id, d.tipo, d.valor, d.moeda, d.competencia, d.vencimento, d.data_pagamento, d.status, d.forma_pagamento, d.favorecido, d.observacoes, d.comprovante_path, d.recorrencia_id, d.parcelamento_id, d.parcela_numero, d.comissao_pedido_id, d.comissao_usuario_id, d.comissao_regra, d.comissao_base, d.origem, d.criado_por, d.created_at, d.updated_at, d.deleted_at, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
         try {
             $st = $this->db->prepare($sql);
             $st->execute($params);
