@@ -403,6 +403,66 @@ class AdminNotificacoesController extends Controller {
         }
     }
 
+    private function getCarneTestData(\PDO $pdo): array {
+        try {
+            $st = $pdo->prepare("
+                SELECT c.id AS carne_id, c.pedido_id, c.quantidade_parcelas, c.total_geral, c.status AS carne_status,
+                    c.created_at,
+                    u.nome AS cliente_nome, u.email AS cliente_email, u.telefone AS cliente_telefone,
+                    (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status = 'paga') AS parcelas_pagas,
+                    (SELECT COUNT(*) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('vencida','em_atraso')) AS parcelas_atrasadas,
+                    (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente')) AS proximo_vencimento,
+                    (SELECT MAX(vencimento) FROM carne_parcelas WHERE carne_id = c.id) AS ultimo_vencimento,
+                    (SELECT numero_parcela FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente') ORDER BY numero_parcela ASC LIMIT 1) AS numero_parcela,
+                    (SELECT COALESCE(valor_produtos,0) + COALESCE(valor_taxas,0) FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente') ORDER BY numero_parcela ASC LIMIT 1) AS valor_parcela,
+                    (SELECT valor_produtos FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente') ORDER BY numero_parcela ASC LIMIT 1) AS valor_produtos,
+                    (SELECT valor_taxas FROM carne_parcelas WHERE carne_id = c.id AND status IN ('aguardando_pagamento','pendente') ORDER BY numero_parcela ASC LIMIT 1) AS valor_taxas,
+                    (SELECT MIN(vencimento) FROM carne_parcelas WHERE carne_id = c.id) AS primeiro_vencimento
+                FROM carnes c
+                JOIN usuarios u ON u.id = c.cliente_id
+                WHERE c.status IN ('em_andamento','ativo','com_atraso','aguardando_primeira_parcela')
+                ORDER BY c.id DESC LIMIT 1
+            ");
+            $st->execute();
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$row) return [];
+
+            $parcelas_pagas = (int)($row['parcelas_pagas'] ?? 0);
+            $total_parcelas = (int)($row['quantidade_parcelas'] ?? 0);
+            $total_geral = (float)($row['total_geral'] ?? 0);
+            $valor_pago_total = $total_parcelas > 0 ? round($total_geral * $parcelas_pagas / $total_parcelas, 2) : 0;
+
+            return [
+                'carne_id' => (string)($row['carne_id'] ?? ''),
+                'pedido_id' => (string)($row['pedido_id'] ?? ''),
+                'cliente_nome' => (string)($row['cliente_nome'] ?? ''),
+                'cliente_email' => (string)($row['cliente_email'] ?? ''),
+                'nome' => (string)($row['cliente_nome'] ?? ''),
+                'email' => (string)($row['cliente_email'] ?? ''),
+                'telefone' => (string)($row['cliente_telefone'] ?? ''),
+                'quantidade_parcelas' => (string)$total_parcelas,
+                'total_parcelas' => (string)$total_parcelas,
+                'parcelas_pagas' => (string)$parcelas_pagas,
+                'parcelas_atrasadas' => (string)($row['parcelas_atrasadas'] ?? '0'),
+                'total_geral' => 'R$ ' . number_format($total_geral, 2, ',', '.'),
+                'valor_parcela' => 'R$ ' . number_format((float)($row['valor_parcela'] ?? 0), 2, ',', '.'),
+                'valor_produtos' => 'R$ ' . number_format((float)($row['valor_produtos'] ?? 0), 2, ',', '.'),
+                'valor_taxas' => 'R$ ' . number_format((float)($row['valor_taxas'] ?? 0), 2, ',', '.'),
+                'valor_pago_total' => 'R$ ' . number_format($valor_pago_total, 2, ',', '.'),
+                'valor_restante' => 'R$ ' . number_format($total_geral - $valor_pago_total, 2, ',', '.'),
+                'numero_parcela' => (string)($row['numero_parcela'] ?? '1'),
+                'vencimento' => !empty($row['proximo_vencimento']) ? date('d/m/Y', strtotime($row['proximo_vencimento'])) : date('d/m/Y'),
+                'primeiro_vencimento' => !empty($row['primeiro_vencimento']) ? date('d/m/Y', strtotime($row['primeiro_vencimento'])) : '',
+                'ultimo_vencimento' => !empty($row['ultimo_vencimento']) ? date('d/m/Y', strtotime($row['ultimo_vencimento'])) : '',
+                'dias_atraso' => '0',
+                'data' => date('Y-m-d H:i:s'),
+                'status' => (string)($row['carne_status'] ?? ''),
+            ];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
     private function ensureEventosSistemaTable(\PDO $pdo): void {
         try {
             $pdo->query('SELECT 1 FROM eventos_sistema LIMIT 1');
@@ -955,6 +1015,30 @@ class AdminNotificacoesController extends Controller {
                     'data' => date('Y-m-d H:i:s'),
                 ],
             ], $campos);
+
+            // Para eventos de carnê, buscar dados reais de um carnê ativo
+            if (str_starts_with($evento, 'carne_')) {
+                $carneVars = $this->getCarneTestData($pdo);
+                if (!empty($carneVars)) {
+                    $payload['vars'] = array_merge($payload['vars'], $carneVars);
+                    // Substituir variáveis {{...}} na mensagem
+                    $msg = (string)($payload['message'] ?? '');
+                    foreach ($carneVars as $k => $v) {
+                        $msg = str_replace('{{' . $k . '}}', (string)$v, $msg);
+                    }
+                    $payload['message'] = $msg;
+                    // Substituir variáveis nos campos personalizados
+                    if (is_array($payload) && !empty($campos)) {
+                        array_walk_recursive($payload, function(&$val) use ($carneVars) {
+                            if (is_string($val)) {
+                                foreach ($carneVars as $k => $v) {
+                                    $val = str_replace('{{' . $k . '}}', (string)$v, $val);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
 
             $body = json_encode($payload);
 
