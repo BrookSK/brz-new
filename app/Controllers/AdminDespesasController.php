@@ -209,8 +209,7 @@ class AdminDespesasController extends Controller {
         $auth->requerPerfis(['admin']);
         $this->ensureTables();
 
-        $body = $request->getBody();
-        if (empty($body)) $body = $_POST;
+        $body = $_POST;
 
         // Garantir que temos o ID correto
         $despesaId = (int)$id;
@@ -218,7 +217,6 @@ class AdminDespesasController extends Controller {
             $despesaId = (int)$request->getParam('id', 0);
         }
         if ($despesaId <= 0) {
-            // Tentar extrair da URL
             $path = $_SERVER['REQUEST_URI'] ?? '';
             if (preg_match('/\/editar\/(\d+)/', $path, $m)) {
                 $despesaId = (int)$m[1];
@@ -232,26 +230,44 @@ class AdminDespesasController extends Controller {
             return;
         }
 
-        $stmt = $this->db->prepare("UPDATE despesas SET descricao = :desc, categoria_id = :cat, valor = :valor, moeda = :moeda, competencia = :comp, vencimento = :venc, status = :status, forma_pagamento = :fp, favorecido = :fav, observacoes = :obs, updated_at = NOW() WHERE id = :id");
+        $descricao = trim((string)($body['descricao'] ?? ''));
+        $categoriaId = !empty($body['categoria_id']) ? (int)$body['categoria_id'] : null;
+        $valor = (float)($body['valor'] ?? 0);
+        $moeda = $body['moeda'] ?? 'BRL';
+        $competencia = !empty($body['competencia']) ? $body['competencia'] . '-01' : null;
+        $vencimento = !empty($body['vencimento']) ? $body['vencimento'] : null;
+        $status = $body['status'] ?? 'prevista';
+        $formaPagamento = !empty($body['forma_pagamento']) ? $body['forma_pagamento'] : null;
+        $favorecido = !empty($body['favorecido']) ? $body['favorecido'] : null;
+        $observacoes = !empty($body['observacoes']) ? $body['observacoes'] : null;
+
+        if (empty($descricao)) {
+            $_SESSION['message'] = 'Descrição não pode ser vazia. POST recebido: ' . json_encode(array_keys($body));
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
+        $stmt = $this->db->prepare("UPDATE despesas SET descricao = ?, categoria_id = ?, valor = ?, moeda = ?, competencia = ?, vencimento = ?, status = ?, forma_pagamento = ?, favorecido = ?, observacoes = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([
-            ':desc' => $body['descricao'] ?? '',
-            ':cat' => !empty($body['categoria_id']) ? (int)$body['categoria_id'] : null,
-            ':valor' => (float)($body['valor'] ?? 0),
-            ':moeda' => $body['moeda'] ?? 'BRL',
-            ':comp' => !empty($body['competencia']) ? $body['competencia'] . '-01' : date('Y-m-01'),
-            ':venc' => !empty($body['vencimento']) ? $body['vencimento'] : null,
-            ':status' => $body['status'] ?? 'prevista',
-            ':fp' => !empty($body['forma_pagamento']) ? $body['forma_pagamento'] : null,
-            ':fav' => $body['favorecido'] ?? null,
-            ':obs' => $body['observacoes'] ?? null,
-            ':id' => $despesaId,
+            $descricao,
+            $categoriaId,
+            $valor,
+            $moeda,
+            $competencia,
+            $vencimento,
+            $status,
+            $formaPagamento,
+            $favorecido,
+            $observacoes,
+            $despesaId,
         ]);
 
         if ($stmt->rowCount() > 0) {
-            $_SESSION['message'] = 'Despesa atualizada com sucesso.';
+            $_SESSION['message'] = 'Despesa #' . $despesaId . ' atualizada: "' . mb_substr($descricao, 0, 50) . '"';
             $_SESSION['message_type'] = 'success';
         } else {
-            $_SESSION['message'] = 'Nenhuma alteração realizada (ID: ' . $despesaId . ').';
+            $_SESSION['message'] = 'Nenhuma linha afetada. ID=' . $despesaId . ', desc="' . mb_substr($descricao, 0, 30) . '"';
             $_SESSION['message_type'] = 'warning';
         }
         $this->redirect('/admin/despesas?tab=todas');
