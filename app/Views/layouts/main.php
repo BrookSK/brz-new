@@ -830,7 +830,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 border-radius: 8px;
                 background: none;
                 border: none;
-                font-size: 20px;
+                font-size: 0; /* Hide text */
                 gap: 0;
             }
 
@@ -839,7 +839,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link i {
-                font-size: 20px;
+                font-size: 18px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .dropdown.me-3 {
