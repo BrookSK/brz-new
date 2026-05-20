@@ -231,7 +231,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <div class="text-muted" style="font-size:10px;">Venc: <?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></div>
                         </div>
                         <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
-                            <button type="button" class="btn btn-outline-primary py-0 px-1" style="font-size:11px;" title="Editar" onclick="abrirEditarDespesa(<?= $d['id'] ?>, <?= htmlspecialchars(json_encode($d['descricao'] ?? ''), ENT_QUOTES) ?>, <?= (int)($d['categoria_id'] ?? 0) ?>, <?= (float)($d['valor'] ?? 0) ?>, '<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>', '<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>', '<?= htmlspecialchars($d['vencimento'] ?? '') ?>', '<?= htmlspecialchars($d['status'] ?? 'prevista') ?>', '<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>', <?= htmlspecialchars(json_encode($d['favorecido'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($d['observacoes'] ?? ''), ENT_QUOTES) ?>)"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-outline-primary py-0 px-1 btn-editar-despesa" style="font-size:11px;" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-outline-success py-0 px-1" style="font-size:11px;"><i class="fas fa-check"></i></button></form>
                             <?php endif; ?>
@@ -270,10 +270,13 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
                         <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary" title="Editar" onclick="abrirEditarDespesa(<?= $d['id'] ?>, <?= htmlspecialchars(json_encode($d['descricao'] ?? ''), ENT_QUOTES) ?>, <?= (int)($d['categoria_id'] ?? 0) ?>, <?= (float)($d['valor'] ?? 0) ?>, '<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>', '<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>', '<?= htmlspecialchars($d['vencimento'] ?? '') ?>', '<?= htmlspecialchars($d['status'] ?? 'prevista') ?>', '<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>', <?= htmlspecialchars(json_encode($d['favorecido'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($d['observacoes'] ?? ''), ENT_QUOTES) ?>)"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-editar-despesa" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-sm btn-outline-success" title="Pagar"><i class="fas fa-check"></i></button></form>
                             <form method="POST" action="/admin/despesas/cancelar/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Cancelar?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar"><i class="fas fa-times"></i></button></form>
+                            <?php endif; ?>
+                            <?php if ($d['status'] === 'cancelada'): ?>
+                            <form method="POST" action="/admin/despesas/excluir/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Excluir permanentemente?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button></form>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -579,20 +582,26 @@ function exportarDespesas() {
 // Visualização moeda/idioma (apenas visual, não altera dados)
 const DESP_TAXA = <?= (float)($taxaUsdBrl ?? 5.85) ?>;
 
-function abrirEditarDespesa(id, descricao, categoriaId, valor, moeda, competencia, vencimento, status, formaPagamento, favorecido, observacoes) {
-    document.getElementById('formEditarDespesa').action = '/admin/despesas/editar/' + id;
-    document.getElementById('edit-descricao').value = descricao || '';
-    document.getElementById('edit-categoria').value = categoriaId || '';
-    document.getElementById('edit-valor').value = valor || '';
-    document.getElementById('edit-moeda').value = moeda || 'BRL';
-    document.getElementById('edit-competencia').value = competencia || '';
-    document.getElementById('edit-vencimento').value = vencimento || '';
-    document.getElementById('edit-status').value = status || 'prevista';
-    document.getElementById('edit-forma-pagamento').value = formaPagamento || '';
-    document.getElementById('edit-favorecido').value = favorecido || '';
-    document.getElementById('edit-observacoes').value = observacoes || '';
+function abrirEditarDespesa(btn) {
+    document.getElementById('formEditarDespesa').action = '/admin/despesas/editar/' + btn.dataset.id;
+    document.getElementById('edit-descricao').value = btn.dataset.descricao || '';
+    document.getElementById('edit-categoria').value = btn.dataset.categoria || '';
+    document.getElementById('edit-valor').value = btn.dataset.valor || '';
+    document.getElementById('edit-moeda').value = btn.dataset.moeda || 'BRL';
+    document.getElementById('edit-competencia').value = btn.dataset.competencia || '';
+    document.getElementById('edit-vencimento').value = btn.dataset.vencimento || '';
+    document.getElementById('edit-status').value = btn.dataset.status || 'prevista';
+    document.getElementById('edit-forma-pagamento').value = btn.dataset.formaPagamento || '';
+    document.getElementById('edit-favorecido').value = btn.dataset.favorecido || '';
+    document.getElementById('edit-observacoes').value = btn.dataset.observacoes || '';
     new bootstrap.Modal(document.getElementById('modalEditarDespesa')).show();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.btn-editar-despesa').forEach(function(btn) {
+        btn.addEventListener('click', function() { abrirEditarDespesa(this); });
+    });
+});
 function applyDespView() {
     const cur = document.getElementById('desp-view-currency').value;
     const lang = document.getElementById('desp-view-lang').value;
