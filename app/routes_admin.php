@@ -149,6 +149,7 @@ $router->post('/admin/despesas/pagar/{id}', 'AdminDespesasController', 'marcarPa
 $router->post('/admin/despesas/cancelar/{id}', 'AdminDespesasController', 'cancelar');
 $router->post('/admin/despesas/excluir/{id}', 'AdminDespesasController', 'excluir');
 $router->post('/admin/despesas/editar/{id}', 'AdminDespesasController', 'editar');
+$router->post('/admin/despesas/editar-recorrencia/{id}', 'AdminDespesasController', 'editarRecorrencia');
 
 // DRE Completo (API JSON)
 $router->get('/admin/dre-completo/dados', 'AdminDreCompletoController', 'dados');

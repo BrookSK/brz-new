@@ -268,6 +268,61 @@ class AdminDespesasController extends Controller {
         $this->redirect('/admin/despesas?tab=todas');
     }
 
+    public function editarRecorrencia(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        $this->ensureTables();
+
+        $body = $_POST;
+
+        $recId = (int)$id;
+        if ($recId <= 0) {
+            $recId = (int)$request->getParam('id', 0);
+        }
+        if ($recId <= 0) {
+            $path = $_SERVER['REQUEST_URI'] ?? '';
+            if (preg_match('/\/editar-recorrencia\/(\d+)/', $path, $m)) {
+                $recId = (int)$m[1];
+            }
+        }
+
+        if ($recId <= 0) {
+            $_SESSION['message'] = 'ID da recorrência não encontrado.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
+        $descricao = trim((string)($body['descricao'] ?? ''));
+        $categoriaId = !empty($body['categoria_id']) ? (int)$body['categoria_id'] : null;
+        $valor = (float)($body['valor'] ?? 0);
+        $moeda = $body['moeda'] ?? 'BRL';
+        $formaPagamento = !empty($body['forma_pagamento']) ? $body['forma_pagamento'] : null;
+        $favorecido = !empty($body['favorecido']) ? $body['favorecido'] : null;
+
+        if (empty($descricao)) {
+            $_SESSION['message'] = 'Descrição não pode ser vazia.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
+        $stmt = $this->db->prepare("UPDATE despesa_recorrencias SET descricao = ?, categoria_id = ?, valor = ?, moeda = ?, forma_pagamento = ?, favorecido = ?, updated_at = NOW() WHERE id = ?");
+        $stmt->execute([
+            $descricao,
+            $categoriaId,
+            $valor,
+            $moeda,
+            $formaPagamento,
+            $favorecido,
+            $recId,
+        ]);
+
+        $_SESSION['message'] = 'Recorrência atualizada com sucesso.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/despesas?tab=todas');
+    }
+
     // === PRIVATE ===
 
     private function criarRecorrencia(array $body) {
