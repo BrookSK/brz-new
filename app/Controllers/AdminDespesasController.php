@@ -204,6 +204,34 @@ class AdminDespesasController extends Controller {
         $this->redirect('/admin/despesas?tab=todas');
     }
 
+    public function editar(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+        $this->ensureTables();
+
+        $body = $request->getBody();
+        if (empty($body)) $body = $_POST;
+
+        $stmt = $this->db->prepare("UPDATE despesas SET descricao = :desc, categoria_id = :cat, valor = :valor, moeda = :moeda, competencia = :comp, vencimento = :venc, status = :status, forma_pagamento = :fp, favorecido = :fav, observacoes = :obs WHERE id = :id AND deleted_at IS NULL");
+        $stmt->execute([
+            ':desc' => $body['descricao'] ?? '',
+            ':cat' => !empty($body['categoria_id']) ? (int)$body['categoria_id'] : null,
+            ':valor' => (float)($body['valor'] ?? 0),
+            ':moeda' => $body['moeda'] ?? 'BRL',
+            ':comp' => !empty($body['competencia']) ? $body['competencia'] . '-01' : date('Y-m-01'),
+            ':venc' => !empty($body['vencimento']) ? $body['vencimento'] : null,
+            ':status' => $body['status'] ?? 'prevista',
+            ':fp' => !empty($body['forma_pagamento']) ? $body['forma_pagamento'] : null,
+            ':fav' => $body['favorecido'] ?? null,
+            ':obs' => $body['observacoes'] ?? null,
+            ':id' => (int)$id,
+        ]);
+
+        $_SESSION['message'] = 'Despesa atualizada com sucesso.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/despesas?tab=todas');
+    }
+
     // === PRIVATE ===
 
     private function criarRecorrencia(array $body) {

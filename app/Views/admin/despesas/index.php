@@ -231,6 +231,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                             <div class="text-muted" style="font-size:10px;">Venc: <?= $d['vencimento'] ? date('d/m/Y', strtotime($d['vencimento'])) : '-' ?></div>
                         </div>
                         <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                            <button type="button" class="btn btn-outline-primary py-0 px-1" style="font-size:11px;" title="Editar" onclick="abrirEditarDespesa(<?= $d['id'] ?>, <?= htmlspecialchars(json_encode($d['descricao'] ?? ''), ENT_QUOTES) ?>, <?= (int)($d['categoria_id'] ?? 0) ?>, <?= (float)($d['valor'] ?? 0) ?>, '<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>', '<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>', '<?= htmlspecialchars($d['vencimento'] ?? '') ?>', '<?= htmlspecialchars($d['status'] ?? 'prevista') ?>', '<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>', <?= htmlspecialchars(json_encode($d['favorecido'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($d['observacoes'] ?? ''), ENT_QUOTES) ?>)"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-outline-success py-0 px-1" style="font-size:11px;"><i class="fas fa-check"></i></button></form>
                             <?php endif; ?>
@@ -269,6 +270,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><span class="badge <?= $stClass ?>" style="font-size:10px;"><?= ucfirst(str_replace('_', ' ', $d['status'] ?? '')) ?></span></td>
                         <td><span class="text-muted" style="font-size:10px;"><?= ucfirst($d['origem'] ?? 'manual') ?></span></td>
                         <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" title="Editar" onclick="abrirEditarDespesa(<?= $d['id'] ?>, <?= htmlspecialchars(json_encode($d['descricao'] ?? ''), ENT_QUOTES) ?>, <?= (int)($d['categoria_id'] ?? 0) ?>, <?= (float)($d['valor'] ?? 0) ?>, '<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>', '<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>', '<?= htmlspecialchars($d['vencimento'] ?? '') ?>', '<?= htmlspecialchars($d['status'] ?? 'prevista') ?>', '<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>', <?= htmlspecialchars(json_encode($d['favorecido'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($d['observacoes'] ?? ''), ENT_QUOTES) ?>)"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
                             <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-sm btn-outline-success" title="Pagar"><i class="fas fa-check"></i></button></form>
                             <form method="POST" action="/admin/despesas/cancelar/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Cancelar?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar"><i class="fas fa-times"></i></button></form>
@@ -510,6 +512,32 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     </div>
 </div>
 
+<!-- Modal Editar Despesa -->
+<div class="modal fade" id="modalEditarDespesa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" id="formEditarDespesa" action="">
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Despesa</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-8"><label class="form-label small fw-semibold">Descrição</label><input type="text" name="descricao" id="edit-descricao" class="form-control" required></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Categoria</label><select name="categoria_id" id="edit-categoria" class="form-select"><option value="">Selecione</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" id="edit-moeda" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Valor</label><input type="number" name="valor" id="edit-valor" class="form-control" step="0.01" min="0" required></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Competência</label><input type="month" name="competencia" id="edit-competencia" class="form-control"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Vencimento</label><input type="date" name="vencimento" id="edit-vencimento" class="form-control"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Status</label><select name="status" id="edit-status" class="form-select"><option value="prevista">Prevista</option><option value="a_vencer">A vencer</option><option value="vencida">Vencida</option><option value="paga">Paga</option><option value="cancelada">Cancelada</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Forma de pagamento</label><select name="forma_pagamento" id="edit-forma-pagamento" class="form-select"><option value="">Selecione</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito">Cartão de crédito</option><option value="transferencia">Transferência</option><option value="debito_automatico">Débito automático</option></select></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold">Favorecido</label><input type="text" name="favorecido" id="edit-favorecido" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold">Observações</label><textarea name="observacoes" id="edit-observacoes" class="form-control" rows="2"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-dark btn-sm px-4"><i class="fas fa-save me-1"></i>Salvar</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleTipoFields() {
     const tipo = document.getElementById('despesa-tipo').value;
@@ -550,6 +578,21 @@ function exportarDespesas() {
 
 // Visualização moeda/idioma (apenas visual, não altera dados)
 const DESP_TAXA = <?= (float)($taxaUsdBrl ?? 5.85) ?>;
+
+function abrirEditarDespesa(id, descricao, categoriaId, valor, moeda, competencia, vencimento, status, formaPagamento, favorecido, observacoes) {
+    document.getElementById('formEditarDespesa').action = '/admin/despesas/editar/' + id;
+    document.getElementById('edit-descricao').value = descricao || '';
+    document.getElementById('edit-categoria').value = categoriaId || '';
+    document.getElementById('edit-valor').value = valor || '';
+    document.getElementById('edit-moeda').value = moeda || 'BRL';
+    document.getElementById('edit-competencia').value = competencia || '';
+    document.getElementById('edit-vencimento').value = vencimento || '';
+    document.getElementById('edit-status').value = status || 'prevista';
+    document.getElementById('edit-forma-pagamento').value = formaPagamento || '';
+    document.getElementById('edit-favorecido').value = favorecido || '';
+    document.getElementById('edit-observacoes').value = observacoes || '';
+    new bootstrap.Modal(document.getElementById('modalEditarDespesa')).show();
+}
 function applyDespView() {
     const cur = document.getElementById('desp-view-currency').value;
     const lang = document.getElementById('desp-view-lang').value;
