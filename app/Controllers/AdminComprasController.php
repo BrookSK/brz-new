@@ -1916,6 +1916,44 @@ class AdminComprasController extends Controller {
                                 ? '<img src="' . htmlspecialchars($mImgUrl) . '" class="img-zoom-trigger" data-img-src="' . htmlspecialchars($mImgUrl) . '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;cursor:pointer;" title="Clique para ampliar">'
                                 : '<div style="width:32px;height:32px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;"><i class="fas fa-image text-muted" style="font-size:12px;"></i></div>';
 
+                            // Mobile action buttons
+                            $mLojaIdRow = (int) ($mItem['loja_id'] ?? 0);
+                            if ($mLojaIdRow <= 0) $mLojaIdRow = (int) ($mItem['produto_loja_id'] ?? 0);
+                            $mMissingLoja = ($mLojaIdRow <= 0);
+
+                            $mBtnVerPedidos = '<button type="button" class="btn btn-sm btn-outline-dark"'
+                                . ' data-bs-toggle="modal" data-bs-target="#modalPedidosItem"'
+                                . ' data-produto-id="' . (int) $mItem['produto_id'] . '"'
+                                . ' data-loja-id="' . (int) $mLojaIdRow . '"'
+                                . ' data-sem-loja="' . ($mMissingLoja ? '1' : '0') . '"'
+                                . ' data-produto-nome="' . htmlspecialchars($mProdNome) . '"'
+                                . '><i class="fas fa-eye"></i></button>';
+                            $mBtnConcluirItem = '<button type="button" class="btn btn-sm btn-outline-success"'
+                                . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
+                                . ' data-produto-id="' . (int) $mItem['produto_id'] . '"'
+                                . ' data-loja-id="' . (int) $mLojaIdRow . '"'
+                                . ' data-produto-nome="' . htmlspecialchars($mProdNome) . '"'
+                                . ' data-quantidade="' . (int) $mQf . '"'
+                                . '><i class="fas fa-check"></i></button>';
+                            $mBtnRemoverItem = '<button type="button" class="btn btn-sm btn-outline-danger"'
+                                . ' data-bs-toggle="modal" data-bs-target="#modalRemoverItem"'
+                                . ' data-produto-id="' . (int) $mItem['produto_id'] . '"'
+                                . ' data-loja-id="' . (int) $mLojaIdRow . '"'
+                                . ' data-produto-nome="' . htmlspecialchars($mProdNome) . '"'
+                                . '><i class="fas fa-trash"></i></button>';
+                            $mBtnReabrirItem = '<button type="button" class="btn btn-sm btn-outline-secondary"'
+                                . ' data-bs-toggle="modal" data-bs-target="#modalReabrirItem"'
+                                . ' data-produto-id="' . (int) $mItem['produto_id'] . '"'
+                                . ' data-loja-id="' . (int) $mLojaIdRow . '"'
+                                . ' data-produto-nome="' . htmlspecialchars($mProdNome) . '"'
+                                . '><i class="fas fa-rotate-left"></i></button>';
+
+                            $mActionsHtml = '<div class="btn-group btn-group-sm mt-2">'
+                                . $mBtnVerPedidos
+                                . ($statusView === 'pendente' ? $mBtnConcluirItem : $mBtnReabrirItem)
+                                . ($statusView === 'pendente' ? $mBtnRemoverItem : '')
+                                . '</div>';
+
                             echo '<div class="border-bottom py-2">
                                 <div class="d-flex gap-2 align-items-start">
                                     ' . $mImgTag . '
@@ -1927,6 +1965,7 @@ class AdminComprasController extends Controller {
                                             <span class="badge bg-' . $mStatusClass . '">' . ucfirst($mStatus) . '</span>
                                             <span class="badge bg-' . $mPrioClass . '">' . ucfirst($mPrioridade) . '</span>
                                         </div>
+                                        ' . $mActionsHtml . '
                                     </div>
                                 </div>
                             </div>';
