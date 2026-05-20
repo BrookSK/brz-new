@@ -850,18 +850,43 @@ class CarneService {
         $ativo = $stmt->fetchColumn();
         if (!$ativo) return;
 
+        // Tentar primeiro pelo sistema de webhooks (tabela webhooks + eventos_sistema)
+        $urlSistema = '';
+        $webhookId = 0;
+        try {
+            $stEv = $this->db->prepare("SELECT e.id FROM eventos_sistema e WHERE e.nome = ? LIMIT 1");
+            $stEv->execute([$evento]);
+            $eventoId = (int)($stEv->fetchColumn() ?: 0);
+            if ($eventoId > 0) {
+                $stW = $this->db->prepare("SELECT id, url, metodo, headers FROM webhooks WHERE evento_id = ? AND ativo = 1 ORDER BY id DESC LIMIT 1");
+                $stW->execute([$eventoId]);
+                $wh = $stW->fetch(\PDO::FETCH_ASSOC);
+                if ($wh && !empty($wh['url'])) {
+                    $urlSistema = (string)$wh['url'];
+                    $webhookId = (int)$wh['id'];
+                }
+            }
+        } catch (\Exception $e) {}
+
+        // Fallback: usar carne_webhook_url das configurações
         $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_webhook_url'");
         $stmt->execute();
-        $url = $stmt->fetchColumn();
+        $urlConfig = (string)($stmt->fetchColumn() ?: '');
+
+        // Usar URL do sistema de webhooks se disponível, senão a config legada
+        $url = $urlSistema !== '' ? $urlSistema : $urlConfig;
         if (empty($url)) return;
 
         $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_eventos_webhook'");
         $stmt->execute();
         $eventos = explode(',', $stmt->fetchColumn() ?: '');
-        if (!in_array($evento, $eventos)) return;
+        // Se está usando o sistema de webhooks (evento configurado lá), não precisa checar a lista legada
+        if ($urlSistema === '' && !in_array($evento, $eventos)) return;
 
         $status = 'pendente';
         $erro = null;
+        $httpCode = 0;
+        $response = '';
 
         try {
             $ch = curl_init($url);
@@ -883,14 +908,36 @@ class CarneService {
             $erro = $e->getMessage();
         }
 
-        $stmt = $this->db->prepare("
-            INSERT INTO carne_notificacoes (carne_id, parcela_id, evento, canal, payload, status, erro_mensagem)
-            VALUES (:cid, :pid, :ev, 'webhook', :pay, :st, :err)
-        ");
-        $stmt->execute([
-            ':cid' => $carneId, ':pid' => $parcelaId, ':ev' => $evento,
-            ':pay' => json_encode($payload), ':st' => $status, ':err' => $erro
-        ]);
+        // Log na tabela carne_notificacoes (legado)
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO carne_notificacoes (carne_id, parcela_id, evento, canal, payload, status, erro_mensagem)
+                VALUES (:cid, :pid, :ev, 'webhook', :pay, :st, :err)
+            ");
+            $stmt->execute([
+                ':cid' => $carneId, ':pid' => $parcelaId, ':ev' => $evento,
+                ':pay' => json_encode($payload), ':st' => $status, ':err' => $erro
+            ]);
+        } catch (\Exception $e) {}
+
+        // Log na tabela webhook_disparos (sistema unificado de logs)
+        if ($webhookId > 0) {
+            try {
+                $stLog = $this->db->prepare("
+                    INSERT INTO webhook_disparos (webhook_id, pedido_id, payload, response_code, response_body, status, disparado_em)
+                    VALUES (:wid, :pid, :pay, :code, :resp, :st, NOW())
+                ");
+                $pedidoId = (int)($payload['pedido_id'] ?? 0);
+                $stLog->execute([
+                    ':wid' => $webhookId,
+                    ':pid' => $pedidoId > 0 ? $pedidoId : null,
+                    ':pay' => json_encode($payload),
+                    ':code' => $httpCode > 0 ? $httpCode : null,
+                    ':resp' => $response !== '' ? $response : null,
+                    ':st' => $status === 'enviado' ? 'sucesso' : 'erro',
+                ]);
+            } catch (\Exception $e) {}
+        }
     }
 
     private function registrarNotificacaoEmail($carneId, $parcelaId, $evento, $email, $payload) {
