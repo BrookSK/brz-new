@@ -734,9 +734,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 margin-top: 10px;
                 padding: 14px;
                 border-radius: var(--radius-md);
-                background: rgba(255, 255, 255, 0.95);
-                border: 1px solid rgba(148, 163, 184, 0.35);
-                box-shadow: var(--shadow-md);
+                background: transparent;
+                border: none;
+                box-shadow: none;
                 max-height: calc(100vh - var(--navbar-height) - 16px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
@@ -826,12 +826,12 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 10px 14px;
-                border-radius: 10px;
-                background: rgba(15, 23, 42, 0.03);
-                border: 1px solid rgba(148, 163, 184, 0.15);
-                font-size: 13px;
-                gap: 4px;
+                padding: 8px 12px;
+                border-radius: 8px;
+                background: none;
+                border: none;
+                font-size: 20px;
+                gap: 0;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link span:not(.cart-badge) {
@@ -839,7 +839,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link i {
-                font-size: 16px;
+                font-size: 20px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .dropdown.me-3 {
@@ -852,9 +852,22 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .btn {
-                padding: 6px 12px;
+                padding: 6px 14px;
                 border-radius: 8px;
-                font-size: 11px;
+                font-size: 12px;
+                background: none;
+                border: none;
+                color: inherit;
+            }
+
+            /* Sign Up keeps its primary style */
+            .navbar-collapse > .navbar-nav.align-items-center .btn.btn-primary {
+                background: var(--color-primary, #18253D);
+                color: #fff;
+                border: none;
+                padding: 8px 16px;
+                font-size: 12px;
+                border-radius: 8px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link.position-relative {

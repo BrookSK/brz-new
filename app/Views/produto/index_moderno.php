@@ -2,31 +2,31 @@
 <div class="container py-4">
 
     <!-- Search and Filters -->
-    <div class="row mb-4">
-        <div class="col-lg-6">
+    <div class="row mb-3 g-2 align-items-center">
+        <div class="col-12 col-lg-6">
             <form method="GET" class="d-flex">
                 <?php if (!empty($categoriaSelecionada)): ?>
                     <input type="hidden" name="categoria" value="<?= htmlspecialchars((string) $categoriaSelecionada, ENT_QUOTES, 'UTF-8') ?>">
                 <?php endif; ?>
-                <div class="input-group input-group-lg">
+                <div class="input-group">
                     <span class="input-group-text bg-white border-end-0">
                         <i class="fas fa-search text-muted"></i>
                     </span>
                     <input type="text" name="search" class="form-control border-start-0" 
                            placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
-                    <button type="submit" class="btn btn-primary btn-lg">
+                    <button type="submit" class="btn btn-primary">
                         <?= __('products.search_button', 'Buscar') ?>
                     </button>
                 </div>
             </form>
         </div>
-        <div class="col-lg-3">
+        <div class="col col-lg-3">
             <form method="GET">
                 <?php if (!empty($search)): ?>
                     <input type="hidden" name="search" value="<?= htmlspecialchars((string) $search, ENT_QUOTES, 'UTF-8') ?>">
                 <?php endif; ?>
-                <select name="categoria" class="form-select form-select-lg" onchange="this.form.submit()">
-                    <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
+                <select name="categoria" class="form-select" onchange="this.form.submit()">
+                    <option value=""><?= __('products.all_categories', 'Todas') ?></option>
                     <?php foreach ($categorias as $cat): ?>
                         <option value="<?= htmlspecialchars($cat['id']) ?>" 
                                 <?= ($categoriaSelecionada ?? '') == $cat['id'] ? 'selected' : '' ?>>
@@ -36,11 +36,10 @@
                 </select>
             </form>
         </div>
-        <div class="col-lg-3 text-end">
-            <a href="/carrinho" class="btn btn-success btn-lg">
-                <i class="fas fa-shopping-cart me-2"></i>
-                <?= __('products.view_cart', 'Ver Carrinho') ?>
-                <span class="badge bg-white text-success ms-2 cart-badge">0</span>
+        <div class="col-auto col-lg-3 text-end">
+            <a href="/carrinho" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-shopping-cart"></i>
+                <span class="d-none d-lg-inline ms-1"><?= __('products.view_cart', 'Ver Carrinho') ?></span>
             </a>
         </div>
     </div>
