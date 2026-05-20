@@ -740,6 +740,12 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 max-height: calc(100vh - var(--navbar-height) - 16px);
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
+                display: flex !important;
+                flex-direction: column;
+            }
+
+            .navbar-collapse:not(.show) {
+                display: none !important;
             }
 
             .navbar-collapse .navbar-nav {
@@ -776,29 +782,49 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 border-color: rgba(29, 78, 216, 0.22);
             }
 
-            /* Actions section (currency/login/cart) */
+            /* Actions section (currency/login/cart) — compact icon row at top */
             .navbar-collapse > .navbar-nav.align-items-center {
-                margin-top: 14px;
-                padding-top: 14px;
-                border-top: 1px solid rgba(148, 163, 184, 0.25);
-                align-items: stretch !important;
-                gap: 10px;
+                margin-top: 0;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                border-top: none;
+                border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+                align-items: center !important;
+                gap: 0;
+                flex-direction: row !important;
+                flex-wrap: nowrap;
+                justify-content: center;
+                order: -1;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-item,
             .navbar-collapse > .navbar-nav.align-items-center .nav-link,
             .navbar-collapse > .navbar-nav.align-items-center .btn {
-                width: 100%;
+                width: auto;
+            }
+
+            .navbar-collapse > .navbar-nav.align-items-center .nav-item {
+                flex: 0 0 auto;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 0.85rem 0.95rem;
-                border-radius: 14px;
-                background: rgba(15, 23, 42, 0.03);
-                border: 1px solid rgba(148, 163, 184, 0.26);
+                padding: 8px 12px;
+                border-radius: 10px;
+                background: transparent;
+                border: none;
+                font-size: 13px;
+                gap: 4px;
+            }
+
+            .navbar-collapse > .navbar-nav.align-items-center .nav-link span:not(.cart-badge) {
+                display: none;
+            }
+
+            .navbar-collapse > .navbar-nav.align-items-center .nav-link i {
+                font-size: 18px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .dropdown.me-3 {
@@ -806,32 +832,39 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .dropdown-menu {
-                width: 100%;
+                width: auto;
+                min-width: 120px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .btn {
-                padding: 0.85rem 0.95rem;
-                border-radius: 14px;
+                padding: 8px 14px;
+                border-radius: 10px;
+                font-size: 12px;
             }
 
-            .navbar-collapse > .navbar-nav.align-items-center .btn.btn-primary,
-            .navbar-collapse > .navbar-nav.align-items-center .btn.btn-outline-danger {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
+            .navbar-collapse > .navbar-nav.align-items-center .btn span,
+            .navbar-collapse > .navbar-nav.align-items-center .btn .d-none {
+                display: none !important;
+            }
+
+            .navbar-collapse > .navbar-nav.align-items-center .btn i {
+                margin: 0 !important;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link.position-relative {
                 justify-content: center;
-                gap: 10px;
+                gap: 0;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .cart-badge {
-                position: relative;
-                top: auto;
-                right: auto;
-                margin-left: 8px;
+                position: absolute;
+                top: 2px;
+                right: 2px;
+                margin-left: 0;
+                font-size: 9px;
+                min-width: 14px;
+                height: 14px;
+                padding: 0 3px;
             }
 
             .navbar .nav-link {
@@ -1183,7 +1216,12 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
     <?php endif; ?>
 
     <?php if (!empty($_GET['embed'])): ?>
-    <style>body{padding-top:0 !important;}</style>
+    <style>
+    body{padding-top:0 !important;}
+    .navbar{display:none !important;}
+    .site-footer{display:none !important;}
+    .floating-cart{display:none !important;}
+    </style>
     <?php endif; ?>
 
     <!-- Main Content -->
@@ -1865,5 +1903,14 @@ if ($__copilotoMostrar):
 }
 </style>
 <?php endif; /* embed whatsapp */ ?>
+<script>
+// Auto-detect iframe and hide nav elements
+if (window.self !== window.top) {
+  document.documentElement.classList.add('in-iframe');
+  var s = document.createElement('style');
+  s.textContent = '.in-iframe .navbar,.in-iframe .site-footer,.in-iframe .floating-cart,.in-iframe #whatsapp-float{display:none!important}.in-iframe body{padding-top:0!important}';
+  document.head.appendChild(s);
+}
+</script>
 <script src="/assets/js/heatmap-tracker.js" defer></script>
 </html>

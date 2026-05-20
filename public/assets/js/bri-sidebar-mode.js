@@ -36,7 +36,7 @@ const BriSidebar = (() => {
       const iframePath = iframeWin.location.pathname + iframeWin.location.search;
       console.log('[BRI-FRAME] iframe loaded:', iframePath);
       console.log('[BRI-FRAME] iframe title:', iframeDoc.title);
-      if (!iframePath.includes('embed=1') && !iframePath.includes('/bri/inicio') && !iframePath.includes('/checkout') && !iframePath.includes('/carrinho/checkout')) {
+      if (!iframePath.includes('embed=1') && !iframePath.includes('/bri/inicio')) {
         const sep = iframePath.includes('?') ? '&' : '?';
         console.log('[BRI-FRAME] Recarregando com embed=1:', iframePath + sep + 'embed=1');
         frame.src = iframePath + sep + 'embed=1';

@@ -1,30 +1,63 @@
 <?php ob_start(); ?>
+<?php if (!empty($_GET['embed'])): ?>
+<style>
+/* Compact layout for embed mode (inside BRI iframe) */
+.container.py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+.row.mb-4:first-of-type { margin-bottom: 0.5rem !important; }
+.row.mb-4:first-of-type h2 { font-size: 1rem; margin: 0; }
+.row.mb-4:first-of-type .col-lg-4.text-end { display: none; }
+.row.mb-4:nth-of-type(2) { margin-bottom: 0.5rem !important; }
+.row.mb-4:nth-of-type(2) .col-lg-4 { flex: 1; max-width: none; }
+.row.mb-4:nth-of-type(2) .col-lg-4:first-child { flex: 2; }
+.row.mb-4:nth-of-type(2) { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; }
+.row.mb-4:nth-of-type(2) .form-control,
+.row.mb-4:nth-of-type(2) .form-select { font-size: 12px; padding: 6px 8px; height: auto; }
+.row.mb-4:nth-of-type(2) .btn { font-size: 12px; padding: 6px 10px; }
+.col-lg-4.col-md-6.mb-4 { margin-bottom: 0.75rem !important; }
+.product-card .card-body { padding: 8px 12px; }
+.product-card .card-body h5 { font-size: 13px; margin-bottom: 2px; }
+.product-card .card-body .text-muted.small { font-size: 10px !important; margin-bottom: 2px; }
+.product-card .card-body .card-text { display: none; }
+.product-card .card-footer { padding: 6px 10px; }
+.product-image-container { aspect-ratio: 4/3; }
+@media (max-width: 767px) {
+  .container.py-4 { padding-left: 8px !important; padding-right: 8px !important; }
+  .row.mb-4:first-of-type h2 { font-size: 14px; }
+  .col-lg-4.col-md-6.mb-4 { flex: 0 0 50%; max-width: 50%; padding: 0 4px; }
+  .product-card .card-footer .input-group { flex-wrap: nowrap; gap: 0; }
+  .product-card .card-footer .quantidade-input { max-width: 44px; padding: 4px; font-size: 12px; border-radius: 6px 0 0 6px !important; }
+  .product-card .card-footer .btn-adicionar { font-size: 11px; padding: 6px 8px; border-radius: 0 6px 6px 0 !important; white-space: nowrap; }
+}
+</style>
+<?php endif; ?>
 <div class="container py-4">
     <!-- Container para alertas -->
     <div id="alert-container" class="mb-4"></div>
     
-    <div class="row mb-4">
-        <div class="col-lg-8">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
             <h2><i class="fas fa-box"></i> <?= __('products.title', 'Produtos Disponíveis') ?></h2>
         </div>
-        <div class="col-lg-4 text-end">
-            <a href="/carrinho" class="btn btn-outline-primary">
+        <div class="col-auto">
+            <a href="/carrinho<?= !empty($_GET['embed']) ? '?embed=1' : '' ?>" class="btn btn-sm btn-outline-primary">
                 <i class="fas fa-shopping-cart"></i> <?= __('products.view_cart', 'Ver Carrinho') ?>
             </a>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-lg-4">
+    <div class="row mb-4 g-2">
+        <div class="col-7 col-lg-4">
             <form method="GET" class="d-flex">
-                <input type="text" name="search" class="form-control me-2" placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+                <?php if (!empty($_GET['embed'])): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
+                <input type="text" name="search" class="form-control me-1" placeholder="<?= htmlspecialchars(__('products.search_placeholder', 'Buscar produtos...'), ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($search ?? '') ?>">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search"></i>
                 </button>
             </form>
         </div>
-        <div class="col-lg-4">
+        <div class="col-5 col-lg-4">
             <form method="GET">
+                <?php if (!empty($_GET['embed'])): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
                 <select name="categoria" class="form-select" onchange="this.form.submit()">
                     <option value=""><?= __('products.all_categories', 'Todas as Categorias') ?></option>
                     <?php foreach ($categorias as $cat): ?>
