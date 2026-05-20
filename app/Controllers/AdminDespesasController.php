@@ -481,7 +481,7 @@ class AdminDespesasController extends Controller {
             $params[':comp_ate'] = $filtros['competencia_ate'] . '-31';
         }
 
-        $sql = "SELECT d.*, d.id as despesa_id, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
+        $sql = "SELECT d.*, c.nome as categoria_nome, c.cor as categoria_cor, c.icone as categoria_icone, d.id as id FROM despesas d LEFT JOIN despesa_categorias c ON c.id = d.categoria_id WHERE " . implode(' AND ', $where) . " ORDER BY d.vencimento ASC, d.created_at DESC LIMIT 200";
         try {
             $st = $this->db->prepare($sql);
             $st->execute($params);
