@@ -20,12 +20,19 @@ class AdminDespesasController extends Controller {
             'status' => $request->getParam('status', ''),
             'categoria' => $request->getParam('categoria', ''),
             'tipo' => $request->getParam('tipo', ''),
-            'competencia_de' => $request->getParam('competencia_de', date('Y-m-01')),
-            'competencia_ate' => $request->getParam('competencia_ate', date('Y-m-t')),
+            'competencia_de' => $request->getParam('competencia_de', ''),
+            'competencia_ate' => $request->getParam('competencia_ate', ''),
             'forma_pagamento' => $request->getParam('forma_pagamento', ''),
             'busca' => $request->getParam('busca', ''),
             'rapido' => $request->getParam('rapido', ''),
         ];
+
+        // Na aba "todas", só aplicar filtro de data se o usuário explicitamente filtrou
+        // Nas outras abas, manter o padrão do mês atual
+        if ($tab !== 'todas' && $filtros['competencia_de'] === '' && $filtros['competencia_ate'] === '') {
+            $filtros['competencia_de'] = date('Y-m-01');
+            $filtros['competencia_ate'] = date('Y-m-t');
+        }
 
         $this->ensureTables();
 
