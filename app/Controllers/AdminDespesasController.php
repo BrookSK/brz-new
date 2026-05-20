@@ -52,6 +52,37 @@ class AdminDespesasController extends Controller {
         // Despesas
         $despesas = $this->listarDespesas($filtros);
 
+        // Na aba "todas", incluir também recorrências ativas e parcelas em andamento que não estão na tabela despesas
+        if ($tab === 'todas') {
+            // Incluir recorrências ativas como despesas virtuais (se não já existem na listagem)
+            $recorrIdsNaLista = array_filter(array_map(fn($d) => (int)($d['recorrencia_id'] ?? 0), $despesas));
+            try {
+                $sqlRec = "SELECT r.id, r.descricao, r.valor, r.moeda, r.proxima_geracao AS vencimento, r.proxima_geracao AS competencia,
+                    'recorrente' AS tipo, 'prevista' AS status, r.forma_pagamento, r.favorecido, NULL AS observacoes,
+                    r.id AS recorrencia_id, NULL AS parcelamento_id, NULL AS parcela_numero,
+                    'recorrencia' AS origem, r.created_at, r.updated_at, NULL AS deleted_at,
+                    c.nome AS categoria_nome, c.cor AS categoria_cor, c.icone AS categoria_icone,
+                    r.categoria_id
+                    FROM despesa_recorrencias r
+                    LEFT JOIN despesa_categorias c ON c.id = r.categoria_id
+                    WHERE r.ativa = 1";
+                if (!empty($recorrIdsNaLista)) {
+                    $sqlRec .= " AND r.id NOT IN (" . implode(',', array_map('intval', $recorrIdsNaLista)) . ")";
+                }
+                $sqlRec .= " ORDER BY r.proxima_geracao ASC";
+                $stRec = $this->db->query($sqlRec);
+                $recorrVirtuais = $stRec ? $stRec->fetchAll(\PDO::FETCH_ASSOC) : [];
+                $despesas = array_merge($despesas, $recorrVirtuais);
+            } catch (\Exception $e) {}
+
+            // Ordenar tudo por vencimento
+            usort($despesas, function($a, $b) {
+                $va = $a['vencimento'] ?? '9999-12-31';
+                $vb = $b['vencimento'] ?? '9999-12-31';
+                return strcmp($va, $vb);
+            });
+        }
+
         // Recorrências
         $recorrencias = [];
         try { $st = $this->db->query("SELECT r.*, c.nome as categoria_nome, c.cor as categoria_cor FROM despesa_recorrencias r LEFT JOIN despesa_categorias c ON c.id = r.categoria_id WHERE r.ativa = 1 ORDER BY r.proxima_geracao ASC"); $recorrencias = $st->fetchAll(\PDO::FETCH_ASSOC) ?: []; } catch (\Exception $e) {}
