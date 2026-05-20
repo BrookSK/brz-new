@@ -1567,6 +1567,15 @@ th{background:#f5f5f5}
             echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
             $idx++;
         }
+        $somaItens = array_sum(array_map(function($it) {
+            $pu = null;
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
+                if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
+            }
+            $qtd = (int)($it['quantidade'] ?? 0);
+            return $pu !== null ? $pu * $qtd : 0;
+        }, $itens));
+        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">Total</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
         echo '</tbody></table>';
         echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
 
