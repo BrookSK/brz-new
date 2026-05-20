@@ -248,6 +248,18 @@ class AdminDespesasController extends Controller {
             return;
         }
 
+        // Debug: verificar estado atual do registro
+        $check = $this->db->prepare("SELECT id, descricao, deleted_at FROM despesas WHERE id = ?");
+        $check->execute([$despesaId]);
+        $atual = $check->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$atual) {
+            $_SESSION['message'] = 'Despesa ID #' . $despesaId . ' não encontrada no banco.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/admin/despesas?tab=todas');
+            return;
+        }
+
         $stmt = $this->db->prepare("UPDATE despesas SET descricao = ?, categoria_id = ?, valor = ?, moeda = ?, competencia = ?, vencimento = ?, status = ?, forma_pagamento = ?, favorecido = ?, observacoes = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([
             $descricao,
@@ -263,13 +275,13 @@ class AdminDespesasController extends Controller {
             $despesaId,
         ]);
 
-        if ($stmt->rowCount() > 0) {
-            $_SESSION['message'] = 'Despesa #' . $despesaId . ' atualizada: "' . mb_substr($descricao, 0, 50) . '"';
-            $_SESSION['message_type'] = 'success';
-        } else {
-            $_SESSION['message'] = 'Nenhuma linha afetada. ID=' . $despesaId . ', desc="' . mb_substr($descricao, 0, 30) . '"';
-            $_SESSION['message_type'] = 'warning';
-        }
+        // Verificar se realmente mudou
+        $check2 = $this->db->prepare("SELECT descricao FROM despesas WHERE id = ?");
+        $check2->execute([$despesaId]);
+        $novo = $check2->fetchColumn();
+
+        $_SESSION['message'] = 'ID #' . $despesaId . ' | Antes: "' . mb_substr($atual['descricao'], 0, 40) . '" | Agora no banco: "' . mb_substr($novo, 0, 40) . '" | deleted_at: ' . ($atual['deleted_at'] ?? 'NULL');
+        $_SESSION['message_type'] = 'info';
         $this->redirect('/admin/despesas?tab=todas');
     }
 
