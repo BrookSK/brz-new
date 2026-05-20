@@ -754,6 +754,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
 
             .navbar-collapse .navbar-nav.mx-auto {
                 margin: 0 !important;
+                gap: 6px;
             }
 
             .navbar-collapse .navbar-nav.mx-auto .nav-item {
@@ -764,17 +765,19 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 width: 100%;
                 display: flex;
                 align-items: center;
-                gap: 12px;
-                padding: 0.85rem 0.95rem;
-                border-radius: 14px;
-                background: rgba(15, 23, 42, 0.03);
-                border: 1px solid rgba(148, 163, 184, 0.26);
+                gap: 10px;
+                padding: 0.6rem 0.85rem;
+                border-radius: 10px;
+                background: rgba(15, 23, 42, 0.02);
+                border: 1px solid rgba(148, 163, 184, 0.18);
+                font-size: 14px;
             }
 
             .navbar-collapse .navbar-nav.mx-auto .nav-link i {
-                width: 18px;
+                width: 16px;
                 text-align: center;
-                opacity: 0.9;
+                opacity: 0.8;
+                font-size: 14px;
             }
 
             .navbar-collapse .navbar-nav.mx-auto .nav-link:hover {
@@ -785,16 +788,28 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             /* Actions section (currency/login/cart) — compact icon row at top */
             .navbar-collapse > .navbar-nav.align-items-center {
                 margin-top: 0;
-                padding-top: 10px;
-                padding-bottom: 10px;
+                padding: 12px 8px;
                 border-top: none;
-                border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+                border-bottom: 1px solid rgba(148, 163, 184, 0.15);
                 align-items: center !important;
-                gap: 0;
+                gap: 6px;
                 flex-direction: row !important;
                 flex-wrap: nowrap;
-                justify-content: center;
+                justify-content: space-evenly;
                 order: -1;
+            }
+
+            /* Reorder: Cart(1) - Language(2) - Login(3) - SignUp(4) */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item:last-child { order: 1; } /* Cart */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item.dropdown:first-child { order: 2; } /* Language */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item.dropdown:nth-child(2) { order: 3; } /* Currency - hide on mobile */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item:has(> a[href="/login"]) { order: 4; } /* Login */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item:has(> a[href="/register"]) { order: 5; } /* Sign Up */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item.dropdown.user-menu { order: 4; } /* User menu when logged in */
+
+            /* Hide currency selector on mobile nav (redundant) */
+            .navbar-collapse > .navbar-nav.align-items-center > .nav-item.dropdown:nth-child(2):not(:first-child) {
+                display: none;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-item,
@@ -811,10 +826,10 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 8px 12px;
+                padding: 10px 14px;
                 border-radius: 10px;
-                background: transparent;
-                border: none;
+                background: rgba(15, 23, 42, 0.03);
+                border: 1px solid rgba(148, 163, 184, 0.15);
                 font-size: 13px;
                 gap: 4px;
             }
@@ -824,7 +839,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link i {
-                font-size: 18px;
+                font-size: 16px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .dropdown.me-3 {
@@ -837,18 +852,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .btn {
-                padding: 8px 14px;
-                border-radius: 10px;
-                font-size: 12px;
-            }
-
-            .navbar-collapse > .navbar-nav.align-items-center .btn span,
-            .navbar-collapse > .navbar-nav.align-items-center .btn .d-none {
-                display: none !important;
-            }
-
-            .navbar-collapse > .navbar-nav.align-items-center .btn i {
-                margin: 0 !important;
+                padding: 6px 12px;
+                border-radius: 8px;
+                font-size: 11px;
             }
 
             .navbar-collapse > .navbar-nav.align-items-center .nav-link.position-relative {

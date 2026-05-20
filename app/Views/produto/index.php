@@ -167,23 +167,51 @@
 }
 
 @media (max-width: 575.98px) {
+    /* Header compacto: título + carrinho na mesma linha */
+    .container.py-4 > .row.mb-4:first-child {
+        margin-bottom: 0.5rem !important;
+    }
+    .container.py-4 > .row.mb-4:first-child h2 {
+        font-size: 1.1rem;
+        margin: 0;
+    }
+    .container.py-4 > .row.mb-4:first-child .btn {
+        font-size: 12px;
+        padding: 5px 10px;
+    }
+
+    /* Busca + Categorias compactos */
+    .container.py-4 > .row.mb-4.g-2 {
+        margin-bottom: 0.5rem !important;
+    }
+    .container.py-4 > .row.mb-4.g-2 .form-control,
+    .container.py-4 > .row.mb-4.g-2 .form-select {
+        font-size: 13px;
+        padding: 6px 10px;
+    }
+    .container.py-4 > .row.mb-4.g-2 .btn {
+        font-size: 13px;
+        padding: 6px 10px;
+    }
+
     .product-card .card-footer .input-group {
-        flex-wrap: wrap;
-        gap: 10px;
+        flex-wrap: nowrap;
+        gap: 0;
     }
 
     .product-card .card-footer .quantidade-input {
-        flex: 1 1 100px;
-        min-width: 96px;
-        border-radius: 12px !important;
+        max-width: 50px;
+        padding: 6px;
+        font-size: 13px;
+        border-radius: 8px 0 0 8px !important;
     }
 
     .product-card .card-footer .btn-adicionar {
-        flex: 1 1 100%;
-        width: 100%;
-        border-radius: 12px !important;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        flex: 1;
+        font-size: 12px;
+        padding: 8px 10px;
+        border-radius: 0 8px 8px 0 !important;
+        white-space: nowrap;
     }
 }
 </style>
