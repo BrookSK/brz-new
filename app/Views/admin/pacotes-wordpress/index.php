@@ -190,23 +190,20 @@
             ?>
             <?php if ($totalPages > 1): ?>
                 <nav class="mt-3">
-                    <ul class="pagination pagination-sm justify-content-center mb-0">
-                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                            <?php
-                                $queryParams = array_filter([
-                                    'origem' => $filtroOrigem ?? '',
-                                    'pedido' => $filtroPedido ?? '',
-                                    'tracking' => $filtroTracking ?? '',
-                                    'page' => $i,
-                                ]);
-                                $url = '/admin/pacotes-wordpress?' . http_build_query($queryParams);
-                            ?>
-                            <li class="page-item <?= $i === $currentPage ? 'active' : '' ?>">
-                                <a class="page-link" href="<?= htmlspecialchars($url) ?>"><?= $i ?></a>
-                            </li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php
+                $paginacao_atual = (int)$currentPage;
+                $paginacao_total = (int)$totalPages;
+                $paginacao_url_fn = function($p) use ($filtroOrigem, $filtroPedido, $filtroTracking) {
+                    $queryParams = array_filter([
+                        'origem' => $filtroOrigem ?? '',
+                        'pedido' => $filtroPedido ?? '',
+                        'tracking' => $filtroTracking ?? '',
+                        'page' => $p,
+                    ]);
+                    return '/admin/pacotes-wordpress?' . http_build_query($queryParams);
+                };
+                include __DIR__ . '/../../partials/pagination.php';
+                ?>
             <?php endif; ?>
         </div>
     </div>

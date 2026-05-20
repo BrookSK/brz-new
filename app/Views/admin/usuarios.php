@@ -165,17 +165,17 @@ function getUserStatusLabel($status) {
 
             <!-- Paginação -->
             <?php if (($totalPaginas ?? 0) > 1): ?>
-                <nav aria-label="<?= htmlspecialchars(__('common.pagination', 'Paginação'), ENT_QUOTES, 'UTF-8') ?>">
-                    <ul class="pagination justify-content-center">
-                        <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                            <li class="page-item <?= $i == ($pagina ?? 1) ? 'active' : '' ?>">
-                                <a class="page-link" href="/admin/usuarios?pagina=<?= $i ?><?= ($status ?? '') ? '&status=' . $status : '' ?><?= ($perfil ?? '') ? '&perfil=' . $perfil : '' ?><?= ($busca ?? '') ? '&busca=' . urlencode($busca) : '' ?>">
-                                    <?= $i ?>
-                                </a>
-                            </li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php
+                $paginacao_atual = (int)($pagina ?? 1);
+                $paginacao_total = (int)$totalPaginas;
+                $paginacao_url_fn = function($p) use ($status, $perfil, $busca) {
+                    return '/admin/usuarios?pagina=' . $p
+                        . (($status ?? '') ? '&status=' . $status : '')
+                        . (($perfil ?? '') ? '&perfil=' . $perfil : '')
+                        . (($busca ?? '') ? '&busca=' . urlencode($busca) : '');
+                };
+                include __DIR__ . '/../partials/pagination.php';
+                ?>
             <?php endif; ?>
         </div>
     </div>

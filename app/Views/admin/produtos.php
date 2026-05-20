@@ -161,17 +161,17 @@
 
             <!-- Paginação -->
             <?php if ($total_paginas > 1): ?>
-                <nav aria-label="<?= htmlspecialchars(__('common.pagination', 'Paginação'), ENT_QUOTES, 'UTF-8') ?>">
-                    <ul class="pagination justify-content-center">
-                        <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
-                            <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                <a class="page-link" href="/admin/produtos?pagina=<?= $i ?><?= $categoria_id ? '&categoria_id=' . $categoria_id : '' ?><?= $status ? '&status=' . $status : '' ?><?= $busca ? '&busca=' . urlencode($busca) : '' ?>">
-                                    <?= $i ?>
-                                </a>
-                            </li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php
+                $paginacao_atual = (int)$pagina;
+                $paginacao_total = (int)$total_paginas;
+                $paginacao_url_fn = function($p) use ($categoria_id, $status, $busca) {
+                    return '/admin/produtos?pagina=' . $p
+                        . ($categoria_id ? '&categoria_id=' . $categoria_id : '')
+                        . ($status ? '&status=' . $status : '')
+                        . ($busca ? '&busca=' . urlencode($busca) : '');
+                };
+                include __DIR__ . '/../partials/pagination.php';
+                ?>
             <?php endif; ?>
         </div>
     </div>

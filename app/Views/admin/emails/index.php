@@ -109,15 +109,14 @@
 
         <?php if ($totalPaginas > 1): ?>
         <div class="card-footer">
-            <nav>
-                <ul class="pagination pagination-sm justify-content-center mb-0">
-                    <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                    <li class="page-item <?= $i === $pagina ? 'active' : '' ?>">
-                        <a class="page-link" href="?<?= http_build_query(array_merge($filtros, ['pagina' => $i])) ?>"><?= $i ?></a>
-                    </li>
-                    <?php endfor; ?>
-                </ul>
-            </nav>
+            <?php
+                $paginacao_atual = (int)$pagina;
+                $paginacao_total = (int)$totalPaginas;
+                $paginacao_url_fn = function($p) use ($filtros) {
+                    return '?' . http_build_query(array_merge($filtros, ['pagina' => $p]));
+                };
+                include __DIR__ . '/../../partials/pagination.php';
+            ?>
         </div>
         <?php endif; ?>
     </div>

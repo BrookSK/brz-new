@@ -292,19 +292,16 @@ $urlAutofill = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge(
             </div>
 
             <?php if ($autofillPages > 1): ?>
-                <nav>
-                    <ul class="pagination justify-content-center mb-0">
-                        <?php
-                        $params = $_GET;
-                        for ($i = 1; $i <= $autofillPages; $i++):
-                            $params['page'] = $i;
-                            $url = '/admin/pedidos-wp/estatisticas?' . http_build_query($params);
-                            $active = ($i === (int) $page) ? 'active' : '';
-                        ?>
-                            <li class="page-item <?= $active ?>"><a class="page-link" href="<?= htmlspecialchars($url) ?>"><?= (int) $i ?></a></li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php
+                $paginacao_atual = (int)$page;
+                $paginacao_total = (int)$autofillPages;
+                $paginacao_url_fn = function($p) {
+                    $params = $_GET;
+                    $params['page'] = $p;
+                    return '/admin/pedidos-wp/estatisticas?' . http_build_query($params);
+                };
+                include __DIR__ . '/../partials/pagination.php';
+                ?>
             <?php endif; ?>
         </div>
     </div>
@@ -400,19 +397,16 @@ $urlAutofill = '/admin/pedidos-wp/estatisticas?' . http_build_query(array_merge(
             </div>
 
             <?php if ($missingPages > 1): ?>
-                <nav>
-                    <ul class="pagination justify-content-center mb-0">
-                        <?php
-                        $params = $_GET;
-                        for ($i = 1; $i <= $missingPages; $i++):
-                            $params['page'] = $i;
-                            $url = '/admin/pedidos-wp/estatisticas?' . http_build_query($params);
-                            $active = ($i === (int) $page) ? 'active' : '';
-                        ?>
-                            <li class="page-item <?= $active ?>"><a class="page-link" href="<?= htmlspecialchars($url) ?>"><?= (int) $i ?></a></li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php
+                $paginacao_atual = (int)$page;
+                $paginacao_total = (int)$missingPages;
+                $paginacao_url_fn = function($p) {
+                    $params = $_GET;
+                    $params['page'] = $p;
+                    return '/admin/pedidos-wp/estatisticas?' . http_build_query($params);
+                };
+                include __DIR__ . '/../partials/pagination.php';
+                ?>
             <?php endif; ?>
         </div>
     </div>

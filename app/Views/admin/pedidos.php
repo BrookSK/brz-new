@@ -145,17 +145,18 @@ function getOrderStatusLabel($status) {
 
             <!-- Paginação -->
             <?php if ($totalPaginas > 1): ?>
-                <nav aria-label="<?= htmlspecialchars(__('common.pagination', 'Paginação'), ENT_QUOTES, 'UTF-8') ?>">
-                    <ul class="pagination justify-content-center">
-                        <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                            <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                <a class="page-link" href="/admin/pedidos?pagina=<?= $i ?><?= $status ? '&status=' . $status : '' ?><?= $data_inicio ? '&data_inicio=' . $data_inicio : '' ?><?= $data_fim ? '&data_fim=' . $data_fim : '' ?><?= $busca ? '&busca=' . urlencode($busca) : '' ?>">
-                                    <?= $i ?>
-                                </a>
-                            </li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
+                <?php
+                $paginacao_atual = (int)$pagina;
+                $paginacao_total = (int)$totalPaginas;
+                $paginacao_url_fn = function($p) use ($status, $data_inicio, $data_fim, $busca) {
+                    return '/admin/pedidos?pagina=' . $p
+                        . ($status ? '&status=' . $status : '')
+                        . ($data_inicio ? '&data_inicio=' . $data_inicio : '')
+                        . ($data_fim ? '&data_fim=' . $data_fim : '')
+                        . ($busca ? '&busca=' . urlencode($busca) : '');
+                };
+                include __DIR__ . '/../partials/pagination.php';
+                ?>
             <?php endif; ?>
         </div>
     </div>

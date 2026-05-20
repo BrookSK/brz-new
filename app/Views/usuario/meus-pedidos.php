@@ -370,29 +370,12 @@
                                 <?php if ($total_paginas > 1): ?>
                                 <nav aria-label="<?= htmlspecialchars(__('user_orders.pagination.aria', 'Navegação de páginas'), ENT_QUOTES, 'UTF-8') ?>" class="mt-4">
                                     <ul class="pagination justify-content-center">
-                                        <?php if ($pagina > 1): ?>
-                                        <li class="page-item">
-                                            <a class="page-link" href="/meus-pedidos?pagina=<?= $pagina - 1 ?>">
-                                                <i class="fas fa-chevron-left"></i>
-                                            </a>
-                                        </li>
-                                        <?php endif; ?>
-                                        
-                                        <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
-                                        <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                            <a class="page-link" href="/meus-pedidos?pagina=<?= $i ?>"><?= $i ?></a>
-                                        </li>
-                                        <?php endfor; ?>
-                                        
-                                        <?php if ($pagina < $total_paginas): ?>
-                                        <li class="page-item">
-                                            <a class="page-link" href="/meus-pedidos?pagina=<?= $pagina + 1 ?>">
-                                                <i class="fas fa-chevron-right"></i>
-                                            </a>
-                                        </li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </nav>
+                                        <?php
+                                        $paginacao_atual = (int)$pagina;
+                                        $paginacao_total = (int)$total_paginas;
+                                        $paginacao_url_fn = function($p) { return '/meus-pedidos?pagina=' . $p; };
+                                        include __DIR__ . '/../partials/pagination.php';
+                                        ?>
                                 <?php endif; ?>
                             <?php endif; ?>
                 </div>
