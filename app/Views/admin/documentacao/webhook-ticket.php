@@ -163,7 +163,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
   "message": "Ticket criado com sucesso",
   "usuario_id": 123,
   "usuario_nome": "Ana Silva",
-  "usuario_email": "ana.silva@gmail.com"
+  "usuario_email": "ana.silva@gmail.com",
+  "nome_informado": "Ana Silva",
+  "telefone_informado": "5519998980873"
 }</code></pre>
 
             <hr>
@@ -174,7 +176,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
   "error": "usuario_nao_encontrado",
   "message": "Nenhum usuário encontrado com a suite 99999",
   "suite_informada": "99999",
-  "email_informado": ""
+  "email_informado": "",
+  "nome_informado": "Ana Silva",
+  "telefone_informado": "5519998980873"
 }</code></pre>
             <p class="text-muted small">→ Neste caso, o bot deve pedir o email e enviar novamente.</p>
 

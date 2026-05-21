@@ -56,14 +56,14 @@ class WebhookTicketController {
         }
 
         if ($mensagem === '') {
-            $resp = ['success' => false, 'error' => 'mensagem_vazia', 'message' => 'A mensagem é obrigatória'];
+            $resp = ['success' => false, 'error' => 'mensagem_vazia', 'message' => 'A mensagem é obrigatória', 'nome_informado' => $nome, 'telefone_informado' => $telefone];
             echo json_encode($resp);
             $this->enviarCallback($callbackUrl, $resp);
             return;
         }
 
         if ($suite === '' && $email === '') {
-            $resp = ['success' => false, 'error' => 'identificacao_ausente', 'message' => 'Informe a suite ou o email do cliente'];
+            $resp = ['success' => false, 'error' => 'identificacao_ausente', 'message' => 'Informe a suite ou o email do cliente', 'nome_informado' => $nome, 'telefone_informado' => $telefone];
             echo json_encode($resp);
             $this->enviarCallback($callbackUrl, $resp);
             return;
@@ -90,6 +90,8 @@ class WebhookTicketController {
                 'message' => $motivo,
                 'suite_informada' => $suite,
                 'email_informado' => $email,
+                'nome_informado' => $nome,
+                'telefone_informado' => $telefone,
             ];
             echo json_encode($resp);
             $this->enviarCallback($callbackUrl, $resp);
@@ -142,6 +144,8 @@ class WebhookTicketController {
                 'usuario_id' => $usuarioId,
                 'usuario_nome' => (string)($usuario['nome'] ?? ''),
                 'usuario_email' => (string)($usuario['email'] ?? ''),
+                'nome_informado' => $nome,
+                'telefone_informado' => $telefone,
             ];
             echo json_encode($resp);
             $this->enviarCallback($callbackUrl, $resp);
@@ -151,6 +155,8 @@ class WebhookTicketController {
                 'success' => false,
                 'error' => 'erro_interno',
                 'message' => 'Erro ao criar ticket: ' . $e->getMessage(),
+                'nome_informado' => $nome,
+                'telefone_informado' => $telefone,
             ];
             echo json_encode($resp);
             $this->enviarCallback($callbackUrl, $resp);
