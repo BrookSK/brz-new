@@ -363,23 +363,35 @@ class AdminDescricaoProdutosController extends Controller {
         $validFiltros = ['sem_descricao','pendente_revisao','aprovado','reprovado','erro'];
         if (!in_array($filtro, $validFiltros)) $filtro = 'sem_descricao';
 
+        // Search
+        $busca = trim((string) $request->getParam('busca', ''));
+
         // Query products
         $fotoCol = $colInfo['hasFoto'] ? ", p.{$colInfo['hasFoto']} AS foto" : ", NULL AS foto";
         $catJoin = $colInfo['hasCategoria'] ? "LEFT JOIN categorias c ON c.id = p.categoria_id" : "";
         $catSelect = $colInfo['hasCategoria'] ? ", c.nome AS categoria" : ", NULL AS categoria";
 
+        $buscaWhere = '';
+        $buscaParams = [];
+        if ($busca !== '') {
+            $buscaWhere = " AND p.{$colInfo['nameCol']} LIKE :busca";
+            $buscaParams[':busca'] = '%' . $busca . '%';
+        }
+
         if ($filtro === 'sem_descricao') {
             $sql = "SELECT p.id, p.{$colInfo['nameCol']} AS nome {$catSelect} {$fotoCol}, COALESCE(d.status_revisao, 'sem_descricao') AS status_revisao
                     FROM produtos p {$catJoin} LEFT JOIN produto_descricoes_ia d ON d.produto_id = p.id
-                    WHERE ({$colInfo['descCol']} IS NULL OR {$colInfo['descCol']} = '')
+                    WHERE ({$colInfo['descCol']} IS NULL OR {$colInfo['descCol']} = ''){$buscaWhere}
                     ORDER BY p.id DESC LIMIT 200";
         } else {
             $sql = "SELECT p.id, p.{$colInfo['nameCol']} AS nome {$catSelect} {$fotoCol}, d.status_revisao
                     FROM produtos p {$catJoin} INNER JOIN produto_descricoes_ia d ON d.produto_id = p.id
-                    WHERE d.status_revisao = '{$filtro}'
+                    WHERE d.status_revisao = '{$filtro}'{$buscaWhere}
                     ORDER BY d.updated_at DESC LIMIT 200";
         }
-        $produtos = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $st = $pdo->prepare($sql);
+        $st->execute($buscaParams);
+        $produtos = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         // Render page
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -441,6 +453,20 @@ class AdminDescricaoProdutosController extends Controller {
             'reprovado' => 'Reprovados',
             'erro' => 'Com erro'
         ];
+
+        // Search filter
+        $busca = trim((string) ($_GET['busca'] ?? ''));
+        echo '<div class="mb-3">
+<form method="GET" class="d-flex gap-2 align-items-center">
+<input type="hidden" name="filtro" value="' . htmlspecialchars($filtro) . '">
+<div class="input-group" style="max-width:400px;">
+<span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+<input type="text" name="busca" class="form-control border-start-0" placeholder="Buscar por nome do produto..." value="' . htmlspecialchars($busca) . '">
+</div>
+<button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
+' . ($busca !== '' ? '<a href="?filtro=' . htmlspecialchars($filtro) . '" class="btn btn-sm btn-outline-secondary"><i class="fas fa-times me-1"></i>Limpar</a>' : '') . '
+</form></div>';
+
         // Mobile: dropdown filter | Desktop: nav tabs
         echo '<div class="d-md-none mb-3"><select class="form-select" onchange="window.location.href=\'?filtro=\'+this.value">';
         foreach ($tabs as $key => $label) {
