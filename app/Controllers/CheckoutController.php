@@ -5703,6 +5703,12 @@ class CheckoutController extends Controller {
                 ];
             }
 
+            // Garantir que documento venha do formulário se a sessão estiver vazia
+            // Priorizar SEMPRE o que veio do checkout (a pessoa pode ter corrigido)
+            if (!empty($dados['documento'])) {
+                $usuario['documento'] = $dados['documento'];
+            }
+
             $usuario['documento'] = preg_replace('/\D+/', '', (string) ($usuario['documento'] ?? ''));
             if (($usuario['documento'] ?? '') === '') {
                 $usuario['documento'] = null;
@@ -5901,7 +5907,7 @@ class CheckoutController extends Controller {
                 $stmt->execute([
                     $usuarioId,
                     $usuario['nome'] ?? 'Cliente',
-                    $usuario['documento'],
+                    $usuario['documento'] ?? '',
                     $usuario['telefone'] ?? '',
                     $usuario['email']
                 ]);
