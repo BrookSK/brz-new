@@ -1010,7 +1010,9 @@ class AdminRemessaConferenciaController extends Controller {
                 $atP = !empty($docProdutos['uploaded_at']) ? date('d/m/Y H:i', strtotime($docProdutos['uploaded_at'])) : '';
                 echo '<span class="badge bg-success">Recebido</span>';
                 if ($atP) echo ' <span class="text-muted small">Enviado em ' . $atP . '</span>';
-                echo '<div class="mt-1"><a href="/' . ltrim($docProdutos['arquivo_path'], '/') . '" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-download me-1"></i>Abrir arquivo</a></div>';
+                $prodFilePath = '/' . ltrim($docProdutos['arquivo_path'], '/');
+                echo '<div class="mt-1"><a href="' . $prodFilePath . '" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i>Abrir arquivo</a>';
+                echo ' <a href="' . $prodFilePath . '" download class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i>Baixar</a></div>';
             } else {
                 echo '<span class="badge bg-warning text-dark">Pendente</span>';
             }
@@ -1023,7 +1025,9 @@ class AdminRemessaConferenciaController extends Controller {
                 $atT = !empty($docTaxas['uploaded_at']) ? date('d/m/Y H:i', strtotime($docTaxas['uploaded_at'])) : '';
                 echo '<span class="badge bg-success">Recebido</span>';
                 if ($atT) echo ' <span class="text-muted small">Enviado em ' . $atT . '</span>';
-                echo '<div class="mt-1"><a href="/' . ltrim($docTaxas['arquivo_path'], '/') . '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="fas fa-download me-1"></i>Abrir arquivo</a></div>';
+                $taxasFilePath = '/' . ltrim($docTaxas['arquivo_path'], '/');
+                echo '<div class="mt-1"><a href="' . $taxasFilePath . '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="fas fa-external-link-alt me-1"></i>Abrir arquivo</a>';
+                echo ' <a href="' . $taxasFilePath . '" download class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i>Baixar</a></div>';
             } else {
                 echo '<span class="badge bg-warning text-dark">Pendente</span>';
             }
