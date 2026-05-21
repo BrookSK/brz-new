@@ -1503,6 +1503,10 @@ th{background:#f5f5f5}
             foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
                 if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
             }
+            // Converter para USD se o valor está em BRL
+            if ($pu !== null && $moeda === 'BRL' && $taxaUsdBrl > 0) {
+                $pu = $pu / $taxaUsdBrl;
+            }
             $qtdIt = (int)($it['quantidade'] ?? 0);
             $totIt = $pu !== null ? $pu * $qtdIt : null;
             $foto = trim((string)($it['foto_produto'] ?? ''));
@@ -1554,22 +1558,24 @@ th{background:#f5f5f5}
                     }
                 }
             }
-            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, $moeda) . '</td><td>' . $fmtMoeda($totIt, $moeda) . '</td></tr>';
+            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
             $idx++;
         }
-        $somaItens = array_sum(array_map(function($it) {
+        $somaItens = array_sum(array_map(function($it) use ($moeda, $taxaUsdBrl) {
             $pu = null;
             foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
                 if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
             }
+            // Converter para USD se o valor está em BRL
+            if ($pu !== null && $moeda === 'BRL' && $taxaUsdBrl > 0) {
+                $pu = $pu / $taxaUsdBrl;
+            }
             $qtd = (int)($it['quantidade'] ?? 0);
             return $pu !== null ? $pu * $qtd : 0;
         }, $itens));
-        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">Total</td><td>' . $fmtMoeda($somaItens, $moeda) . '</td></tr>';
+        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">Total</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
         echo '</tbody></table>';
-        if ($moeda === 'USD') {
-            echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
-        }
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">Valores dos itens exibidos em USD. Taxa de câmbio utilizada: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
 
         echo '<h2>Resumo de Pagamento</h2><table>';
         // Detectar método de pagamento
