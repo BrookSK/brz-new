@@ -1,18 +1,21 @@
 <link rel="stylesheet" href="/public/assets/css/bri-sidebar.css">
 <meta name="bri-user-id" content="<?= (int) ($jsUserId ?? 0) ?>">
 <style>
-  /* Desktop: BRI ocupa o espaço abaixo do navbar */
-  #bri-fullscreen-mode { height: calc(100vh - 80px); }
+  /* Desktop: BRI ocupa o espaço abaixo do navbar, sem scroll */
+  body { overflow: hidden !important; }
+  main { padding: 0 !important; margin: 0 !important; }
+  #bri-fullscreen-mode { height: calc(100vh - 72px); overflow: hidden; }
   /* Esconder WhatsApp e copiloto nesta página */
-  #whatsapp-float, #adminCopiloto, .copiloto-widget, [id*="copiloto"] { display: none !important; }
-  /* Esconder footer nesta página (BRI ocupa tudo) */
+  #whatsapp-float, #adminCopiloto, .copiloto-widget { display: none !important; }
+  /* Esconder footer nesta página */
   .site-footer { display: none !important; }
   
   @media (max-width: 767px) {
-    /* Mobile: fullscreen */
-    #bri-fullscreen-mode { height: 100vh; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; }
-    /* Esconder navbar no mobile (BRI é fullscreen) */
+    /* Mobile: fullscreen cobrindo tudo */
     .navbar { display: none !important; }
+    body { overflow: hidden !important; }
+    main { padding: 0 !important; }
+    #bri-fullscreen-mode { height: 100vh; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; }
   }
 </style>
 
