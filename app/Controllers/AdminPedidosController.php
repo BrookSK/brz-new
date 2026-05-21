@@ -464,7 +464,8 @@ class AdminPedidosController extends Controller {
             $colNumero = $pickCol($colsPedidos, ['numero_pedido', 'order_number', 'numero', 'codigo']);
             $temDeletedAt = in_array('deleted_at', $colsPedidos, true);
 
-            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
+            $nomeAltSelect = ($colUserName !== 'nome' && in_array('nome', $colsUsuarios, true)) ? ", u.nome as cliente_nome_alt" : "";
+            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email" . $nomeAltSelect . " FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
             $params = [];
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
@@ -1954,7 +1955,8 @@ JS;
             } catch (\Exception $e) {
             }
             
-            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
+            $nomeAltSelect = ($colUserName !== 'nome' && in_array('nome', $colsUsuarios, true)) ? ", u.nome as cliente_nome_alt" : "";
+            $sql = "SELECT p.*, u." . $colUserName . " as cliente_nome, u." . $colUserEmail . " as cliente_email" . $nomeAltSelect . " FROM pedidos p LEFT JOIN usuarios u ON p." . (in_array("usuario_id", $colsPedidos, true) ? "usuario_id" : "cliente_id") . " = u.id WHERE 1=1";
             $params = [];
 
             if ($temDeletedAt) {
@@ -1979,6 +1981,9 @@ JS;
                 }
                 $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
                 $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
+                if ($colUserName !== 'nome' && in_array('nome', $colsUsuarios, true)) {
+                    $searchParts[] = 'u.nome LIKE :busca';
+                }
                 $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
                 if ($colNumero) {
                     $searchParts[] = 'p.' . $colNumero . ' LIKE :busca';
@@ -1988,6 +1993,9 @@ JS;
                 }
                 if (in_array('numero_pedido', $colsPedidos, true)) {
                     $searchParts[] = 'p.numero_pedido LIKE :busca';
+                }
+                if (in_array('cliente_nome', $colsPedidos, true)) {
+                    $searchParts[] = 'p.cliente_nome LIKE :busca';
                 }
 
                 $sql .= ' AND (' . implode(' OR ', $searchParts) . ')';
@@ -2033,7 +2041,7 @@ JS;
             if (is_array($pedidos)) {
                 foreach ($pedidos as &$_p) {
                     if (empty($_p['cliente_nome']) || trim((string)$_p['cliente_nome']) === '') {
-                        foreach (['cliente_nome','nome','customer_name'] as $_nc) {
+                        foreach (['cliente_nome_alt','cliente_nome','nome','customer_name'] as $_nc) {
                             if (!empty($_p[$_nc]) && trim((string)$_p[$_nc]) !== '') {
                                 $_p['cliente_nome'] = (string)$_p[$_nc];
                                 break;
@@ -2285,6 +2293,9 @@ JS;
                 }
                 $searchParts[] = 'CAST(p.id AS CHAR) LIKE :busca';
                 $searchParts[] = 'u.' . $colUserName . ' LIKE :busca';
+                if ($colUserName !== 'nome' && in_array('nome', $colsUsuarios, true)) {
+                    $searchParts[] = 'u.nome LIKE :busca';
+                }
                 $searchParts[] = 'u.' . $colUserEmail . ' LIKE :busca';
                 if ($colNumero) {
                     $searchParts[] = 'p.' . $colNumero . ' LIKE :busca';
@@ -2294,6 +2305,9 @@ JS;
                 }
                 if (in_array('numero_pedido', $colsPedidos, true)) {
                     $searchParts[] = 'p.numero_pedido LIKE :busca';
+                }
+                if (in_array('cliente_nome', $colsPedidos, true)) {
+                    $searchParts[] = 'p.cliente_nome LIKE :busca';
                 }
 
                 $sqlTotal .= ' AND (' . implode(' OR ', $searchParts) . ')';
