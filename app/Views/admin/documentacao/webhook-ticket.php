@@ -2,6 +2,36 @@
 /**
  * Documentação - Webhook Criar Ticket (WhatsApp)
  */
+
+// Buscar URL de callback atual
+$callbackUrlAtual = '';
+try {
+    $pdo = \Config\Database::getConnection();
+    $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'webhook_ticket_callback_url' LIMIT 1");
+    $st->execute();
+    $callbackUrlAtual = (string)($st->fetchColumn() ?: '');
+} catch (\Exception $e) {}
+
+// Salvar se enviou formulário
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
+    try {
+        $novaUrl = trim((string)$_POST['callback_url']);
+        $pdo = \Config\Database::getConnection();
+        $st = $pdo->prepare("SELECT COUNT(*) FROM configuracoes_sistema WHERE chave = 'webhook_ticket_callback_url'");
+        $st->execute();
+        if ((int)$st->fetchColumn() > 0) {
+            $st = $pdo->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'webhook_ticket_callback_url'");
+            $st->execute([$novaUrl]);
+        } else {
+            $st = $pdo->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('webhook_ticket_callback_url', ?)");
+            $st->execute([$novaUrl]);
+        }
+        $callbackUrlAtual = $novaUrl;
+        $salvoOk = true;
+    } catch (\Exception $e) {
+        $salvoErro = $e->getMessage();
+    }
+}
 ?>
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -10,6 +40,28 @@
             <p class="text-muted mb-0">Integração WhatsApp → Sistema de Tickets</p>
         </div>
         <a href="/admin" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+    </div>
+
+    <!-- Configuração da URL de Callback -->
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white"><strong><i class="fas fa-link me-2"></i>URL de Callback (Resposta)</strong></div>
+        <div class="card-body">
+            <p class="small text-muted mb-3">Após processar a criação do ticket, o sistema envia a resposta (sucesso ou erro) para esta URL. Configure aqui a URL da sua automação que vai receber o resultado.</p>
+            <?php if (!empty($salvoOk)): ?>
+                <div class="alert alert-success py-2">URL de callback salva com sucesso!</div>
+            <?php endif; ?>
+            <?php if (!empty($salvoErro)): ?>
+                <div class="alert alert-danger py-2">Erro ao salvar: <?= htmlspecialchars($salvoErro) ?></div>
+            <?php endif; ?>
+            <form method="POST">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-globe"></i></span>
+                    <input type="url" name="callback_url" class="form-control" value="<?= htmlspecialchars($callbackUrlAtual) ?>" placeholder="https://sua-automacao.com/webhook/resposta-ticket">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar</button>
+                </div>
+                <div class="form-text">A resposta será enviada via POST com JSON contendo success, ticket_id, error, message, etc.</div>
+            </form>
+        </div>
     </div>
 
     <!-- Visão Geral -->
