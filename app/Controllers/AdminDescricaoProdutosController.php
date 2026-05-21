@@ -28,6 +28,9 @@ class AdminDescricaoProdutosController extends Controller {
         // Ensure EN columns exist (for upgrades)
         try { $pdo->exec("ALTER TABLE produto_descricoes_ia ADD COLUMN descricao_gerada_en TEXT AFTER descricao_gerada"); } catch (\Exception $e) {}
         try { $pdo->exec("ALTER TABLE produto_descricoes_ia ADD COLUMN descricao_editada_en TEXT AFTER descricao_editada"); } catch (\Exception $e) {}
+        // Ensure benefits columns exist
+        try { $pdo->exec("ALTER TABLE produto_descricoes_ia ADD COLUMN benefits_gerados JSON NULL AFTER descricao_editada_en"); } catch (\Exception $e) {}
+        try { $pdo->exec("ALTER TABLE produto_descricoes_ia ADD COLUMN benefits_gerados_en JSON NULL AFTER benefits_gerados"); } catch (\Exception $e) {}
     }
 
     private function getChatGPTApiKey(\PDO $pdo): ?string {
@@ -165,7 +168,58 @@ class AdminDescricaoProdutosController extends Controller {
 
         $pdo->prepare("UPDATE produto_descricoes_ia SET descricao_gerada=?, descricao_gerada_en=?, status_revisao='pendente_revisao', erro_geracao=NULL, data_geracao=NOW() WHERE produto_id=?")->execute([$descPt, $descEn, $produtoId]);
 
+        // Step 3: Generate benefits (4 product highlights)
+        $benefitsEn = $this->generateBenefits($pdo, $produto['nome'] ?? '', $descEn);
+        if (!empty($benefitsEn)) {
+            // Translate benefits to PT
+            $benefitsPt = [];
+            foreach ($benefitsEn as $b) {
+                $benefitsPt[] = [
+                    'icon' => $b['icon'],
+                    'title' => $b['title'],
+                    'description' => $b['description']
+                ];
+            }
+            // Try to translate titles and descriptions
+            $benefitsTextEn = implode("\n", array_map(fn($b) => $b['title'] . ': ' . $b['description'], $benefitsEn));
+            $trResult = $this->callChatGPT($pdo, $benefitsTextEn, 'translate_to_pt');
+            if (!empty($trResult['text'])) {
+                $lines = array_filter(explode("\n", $trResult['text']));
+                foreach ($lines as $i => $line) {
+                    if (isset($benefitsPt[$i])) {
+                        $parts = explode(':', $line, 2);
+                        if (count($parts) === 2) {
+                            $benefitsPt[$i]['title'] = trim($parts[0]);
+                            $benefitsPt[$i]['description'] = trim($parts[1]);
+                        }
+                    }
+                }
+            }
+            $pdo->prepare("UPDATE produto_descricoes_ia SET benefits_gerados=?, benefits_gerados_en=? WHERE produto_id=?")->execute([
+                json_encode($benefitsPt, JSON_UNESCAPED_UNICODE),
+                json_encode($benefitsEn, JSON_UNESCAPED_UNICODE),
+                $produtoId
+            ]);
+        }
+
         echo json_encode(['success' => true, 'descricao' => $descPt, 'descricao_en' => $descEn, 'produto_id' => $produtoId]);
+    }
+
+    private function generateBenefits(\PDO $pdo, string $productName, string $description): array {
+        $prompt = "Based on this product, generate exactly 4 key benefits/highlights. For each benefit provide a Font Awesome 6 icon class, a short title (2-4 words), and a brief description (1 sentence max 12 words).\n\nProduct: {$productName}\nDescription: {$description}\n\nRespond ONLY with a JSON array of 4 objects with keys: icon, title, description. Use icons like: fa-solid fa-bolt, fa-solid fa-shield, fa-solid fa-droplet, fa-solid fa-layer-group, fa-solid fa-film, fa-solid fa-leaf, fa-solid fa-heart, fa-solid fa-star, fa-solid fa-fire, fa-solid fa-gem. No explanation, just the JSON array.";
+
+        $result = $this->callChatGPT($pdo, $prompt, 'en');
+        if (isset($result['error']) || empty($result['text'])) return [];
+
+        $text = trim($result['text']);
+        // Extract JSON from response
+        if (preg_match('/\[.*\]/s', $text, $m)) {
+            $decoded = json_decode($m[0], true);
+            if (is_array($decoded) && count($decoded) >= 4) {
+                return array_slice($decoded, 0, 4);
+            }
+        }
+        return [];
     }
 
     public function gerarLote(Request $request) {
