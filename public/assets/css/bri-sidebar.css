@@ -35,6 +35,7 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
+  overflow: hidden;
 }
 
 /* ─────────────────────────────────────────────────
@@ -42,8 +43,12 @@ body {
 ───────────────────────────────────────────────── */
 #bri-fullscreen-mode {
   display: flex;
-  height: 100%;
-  width: 100%;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
   background: var(--color-bg);
 }
 

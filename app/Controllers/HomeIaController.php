@@ -39,13 +39,7 @@ class HomeIaController extends Controller {
         }
         
         $jsUserId = (int) ($_SESSION['usuario_id'] ?? 0);
-        
-        // Render inside main layout (navbar + footer from site)
-        ob_start();
-        include __DIR__ . '/../Views/home_ia_content.php';
-        $content = ob_get_clean();
-        $title = 'BRI IA — Braziliana Shop';
-        include __DIR__ . '/../Views/layouts/main.php';
+        include __DIR__ . '/../Views/home_ia.php';
     }
 
     /**

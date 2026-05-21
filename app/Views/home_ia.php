@@ -4,58 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>BRI IA — Braziliana Shop</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/public/assets/css/bri-sidebar.css">
   <meta name="bri-user-id" content="<?= (int) ($jsUserId ?? 0) ?>">
-  <style>
-    .bri-page-nav { display: none; }
-    .bri-page-footer { display: none; }
-    @media (min-width: 768px) {
-      .bri-page-nav { display: block; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 12px 24px; }
-      .bri-page-nav .nav-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
-      .bri-page-nav .nav-logo img { height: 32px; }
-      .bri-page-nav .nav-links { display: flex; gap: 20px; align-items: center; }
-      .bri-page-nav .nav-links a { color: #374151; text-decoration: none; font-size: 14px; font-weight: 500; }
-      .bri-page-nav .nav-links a:hover { color: #18253D; }
-      .bri-page-footer { display: block; background: #18253D; color: #94a3b8; padding: 20px 24px; text-align: center; font-size: 13px; }
-      #bri-fullscreen-mode { height: calc(100vh - 57px - 60px); position: relative; }
-    }
-  </style>
 </head>
 <body>
-
-<?php
-// Load site logo
-$siteLogo = '';
-try {
-    $pdoNav = \Config\Database::getConnection();
-    $stNav = $pdoNav->prepare("SELECT valor FROM configuracoes_sistema WHERE categoria = 'layout' AND chave = 'logo' LIMIT 1");
-    $stNav->execute();
-    $siteLogo = trim((string)($stNav->fetchColumn() ?: ''));
-} catch (\Exception $e) {}
-?>
-
-<!-- Desktop Navbar -->
-<nav class="bri-page-nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">
-      <?php if ($siteLogo): ?>
-        <img src="<?= htmlspecialchars($siteLogo) ?>" alt="Braziliana">
-      <?php else: ?>
-        <strong style="font-size:18px;color:#18253D;">BRAZILIANA</strong>
-      <?php endif; ?>
-    </a>
-    <div class="nav-links">
-      <a href="/">Home</a>
-      <a href="/produtos">Produtos</a>
-      <a href="/grupos-compras">Grupos</a>
-      <a href="/carrinho"><i class="fas fa-shopping-cart"></i></a>
-      <a href="/minha-conta"><i class="fas fa-user"></i></a>
-    </div>
-  </div>
-</nav>
 
 <div id="bri-fullscreen-mode">
 
@@ -273,11 +226,6 @@ try {
   }
 })();
 </script>
-
-<!-- Desktop Footer -->
-<footer class="bri-page-footer">
-  &copy; <?= date('Y') ?> Braziliana Shop — Todos os direitos reservados
-</footer>
 
 </body>
 </html>
