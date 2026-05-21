@@ -38,7 +38,8 @@ class WebhookTicketController {
         $data = json_decode($raw, true);
 
         if (!is_array($data)) {
-            echo json_encode(['success' => false, 'error' => 'payload_invalido', 'message' => 'Payload JSON inválido']);
+            $resp = ['success' => false, 'error' => 'payload_invalido', 'message' => 'Payload JSON inválido'];
+            echo json_encode($resp);
             return;
         }
 
@@ -48,18 +49,23 @@ class WebhookTicketController {
         $assunto = trim((string)($data['assunto'] ?? ''));
         $telefone = trim((string)($data['telefone'] ?? ''));
         $nome = trim((string)($data['nome'] ?? ''));
+        $callbackUrl = trim((string)($data['callback_url'] ?? ''));
 
         if ($assunto === '') {
             $assunto = 'Suporte via WhatsApp';
         }
 
         if ($mensagem === '') {
-            echo json_encode(['success' => false, 'error' => 'mensagem_vazia', 'message' => 'A mensagem é obrigatória']);
+            $resp = ['success' => false, 'error' => 'mensagem_vazia', 'message' => 'A mensagem é obrigatória'];
+            echo json_encode($resp);
+            $this->enviarCallback($callbackUrl, $resp);
             return;
         }
 
         if ($suite === '' && $email === '') {
-            echo json_encode(['success' => false, 'error' => 'identificacao_ausente', 'message' => 'Informe a suite ou o email do cliente']);
+            $resp = ['success' => false, 'error' => 'identificacao_ausente', 'message' => 'Informe a suite ou o email do cliente'];
+            echo json_encode($resp);
+            $this->enviarCallback($callbackUrl, $resp);
             return;
         }
 
@@ -78,13 +84,15 @@ class WebhookTicketController {
 
         if (!$usuario) {
             $motivo = $suite !== '' ? 'Nenhum usuário encontrado com a suite ' . $suite : 'Nenhum usuário encontrado com o email ' . $email;
-            echo json_encode([
+            $resp = [
                 'success' => false,
                 'error' => 'usuario_nao_encontrado',
                 'message' => $motivo,
                 'suite_informada' => $suite,
                 'email_informado' => $email,
-            ]);
+            ];
+            echo json_encode($resp);
+            $this->enviarCallback($callbackUrl, $resp);
             return;
         }
 
@@ -127,22 +135,57 @@ class WebhookTicketController {
                 $stMsg->execute([$ticketId, $usuarioId, $mensagem]);
             }
 
-            echo json_encode([
+            $resp = [
                 'success' => true,
                 'ticket_id' => $ticketId,
                 'message' => 'Ticket criado com sucesso',
                 'usuario_id' => $usuarioId,
                 'usuario_nome' => (string)($usuario['nome'] ?? ''),
                 'usuario_email' => (string)($usuario['email'] ?? ''),
-            ]);
+            ];
+            echo json_encode($resp);
+            $this->enviarCallback($callbackUrl, $resp);
 
         } catch (\Exception $e) {
-            echo json_encode([
+            $resp = [
                 'success' => false,
                 'error' => 'erro_interno',
                 'message' => 'Erro ao criar ticket: ' . $e->getMessage(),
-            ]);
+            ];
+            echo json_encode($resp);
+            $this->enviarCallback($callbackUrl, $resp);
         }
+    }
+
+    /**
+     * Envia a resposta para a URL de callback (webhook de retorno)
+     */
+    private function enviarCallback(string $url, array $payload): void {
+        if ($url === '') {
+            // Tentar buscar URL configurada no sistema
+            try {
+                $st = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'webhook_ticket_callback_url' LIMIT 1");
+                $st->execute();
+                $url = trim((string)($st->fetchColumn() ?: ''));
+            } catch (\Exception $e) {}
+        }
+
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return;
+        }
+
+        try {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) {}
     }
 
     private function buscarUsuarioPorSuite(string $suite): ?array {
