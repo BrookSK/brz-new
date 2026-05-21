@@ -2264,7 +2264,7 @@ function regerarEtiqueta() {
         }
         $pesoTotal = max(0.001, (float) $pesoTotal);
 
-        $freteDeclarado = 1.80;
+        $freteDeclarado = round(max(0.01, 1.80 * $pesoTotal), 2);
 
         $packages = [[
             'weight' => round($pesoTotal * 1000, 2),
