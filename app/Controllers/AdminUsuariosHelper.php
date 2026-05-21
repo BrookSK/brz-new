@@ -367,6 +367,11 @@ class AdminUsuariosHelper {
             $this->setIfColumnExists($setParts, $params, $colunas, 'email', $dados['email'] ?? null);
             $this->setIfColumnExists($setParts, $params, $colunas, 'telefone', $dados['telefone'] ?? null);
 
+            if (in_array('data_nascimento', $colunas) && array_key_exists('data_nascimento', $dados)) {
+                $dataNasc = trim((string)($dados['data_nascimento'] ?? ''));
+                $this->setIfColumnExists($setParts, $params, $colunas, 'data_nascimento', $dataNasc !== '' ? $dataNasc : null);
+            }
+
             if (in_array('cpf', $colunas)) {
                 $cpfNorm = isset($dados['cpf']) ? preg_replace('/\D+/', '', (string) $dados['cpf']) : null;
                 $this->setIfColumnExists($setParts, $params, $colunas, 'cpf', $cpfNorm !== '' ? $cpfNorm : null);

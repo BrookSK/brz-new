@@ -542,6 +542,10 @@ class AdminUsuariosController extends Controller {
                                 <input type="text" class="form-control" name="telefone" value="' . htmlspecialchars($usuario['telefone'] ?? '') . '">
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label">Data de Nascimento</label>
+                                <input type="date" class="form-control" name="data_nascimento" value="' . htmlspecialchars($usuario['data_nascimento'] ?? '') . '">
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label">Nova Senha (opcional)</label>
                                 <input type="password" class="form-control" name="senha" placeholder="Deixe em branco para manter">
                             </div>
@@ -742,6 +746,7 @@ class AdminUsuariosController extends Controller {
                 'email' => $request->getParam('email'),
                 'cpf' => $request->getParam('cpf'),
                 'telefone' => $request->getParam('telefone'),
+                'data_nascimento' => $request->getParam('data_nascimento'),
                 'ativo' => $request->getParam('ativo', 1),
                 'senha' => $request->getParam('senha'),
                 'perfil' => $request->getParam('perfil', 'cliente')
