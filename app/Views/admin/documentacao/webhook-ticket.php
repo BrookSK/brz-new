@@ -125,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
             <h6 class="mt-4">Exemplo - Busca por Suite:</h6>
             <pre class="bg-dark text-light p-3 rounded"><code>{
   "suite": "16013",
+  "nome": "Ana Silva",
   "mensagem": "Meu pedido não chegou, já faz 30 dias",
   "assunto": "Pedido atrasado",
   "telefone": "5519998980873"
@@ -133,6 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
             <h6 class="mt-4">Exemplo - Busca por Email (quando suite não encontrou):</h6>
             <pre class="bg-dark text-light p-3 rounded"><code>{
   "email": "ana.silva@gmail.com",
+  "nome": "Ana Silva",
   "mensagem": "Meu pedido não chegou, já faz 30 dias",
   "assunto": "Pedido atrasado",
   "telefone": "5519998980873"
@@ -142,6 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
             <pre class="bg-dark text-light p-3 rounded"><code>{
   "suite": "16013",
   "email": "ana.silva@gmail.com",
+  "nome": "Ana Silva",
   "mensagem": "Preciso de ajuda com minha compra",
   "telefone": "5519998980873"
 }</code></pre>
