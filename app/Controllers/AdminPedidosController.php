@@ -24,9 +24,14 @@ class AdminPedidosController extends Controller {
             return;
         }
 
+        $debugLog = [];
+
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
+            $debugLog['pedidos_cols_endereco'] = array_values(array_filter($cols, function($c) {
+                return stripos($c, 'endereco') !== false || stripos($c, 'cep') !== false || stripos($c, 'cidade') !== false || stripos($c, 'estado') !== false || stripos($c, 'bairro') !== false || stripos($c, 'numero') !== false || stripos($c, 'complemento') !== false || stripos($c, 'pais') !== false || stripos($c, 'address') !== false || stripos($c, 'zip') !== false;
+            }));
 
             $usuarioLogado = $auth->getUsuarioLogado();
             $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
@@ -61,6 +66,26 @@ class AdminPedidosController extends Controller {
             $colBairro = $pickCol(['bairro', 'province', 'district', 'customer_province']);
             $colCidade = $pickCol(['cidade', 'city', 'customer_city']);
             $colEstado = $pickCol(['estado', 'state', 'customer_state']);
+
+            $debugLog['cols_detectadas'] = [
+                'nome' => $colNome, 'email' => $colEmail, 'telefone' => $colTelefone, 'doc' => $colDoc,
+                'pais' => $colPais, 'cep' => $colCep, 'endereco' => $colEndereco, 'numero' => $colNumero,
+                'complemento' => $colComplemento, 'bairro' => $colBairro, 'cidade' => $colCidade, 'estado' => $colEstado
+            ];
+            $debugLog['request_params'] = [
+                'nome' => trim((string) $request->getParam('nome')),
+                'email' => trim((string) $request->getParam('email')),
+                'telefone' => trim((string) $request->getParam('telefone')),
+                'documento' => trim((string) $request->getParam('documento')),
+                'pais' => trim((string) $request->getParam('pais')),
+                'cep' => trim((string) $request->getParam('cep')),
+                'endereco' => trim((string) $request->getParam('endereco')),
+                'numero' => trim((string) $request->getParam('numero')),
+                'complemento' => trim((string) $request->getParam('complemento')),
+                'bairro' => trim((string) $request->getParam('bairro')),
+                'cidade' => trim((string) $request->getParam('cidade')),
+                'estado' => trim((string) $request->getParam('estado')),
+            ];
 
             $set = [];
             $params = [];
@@ -104,6 +129,8 @@ class AdminPedidosController extends Controller {
             $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?';
             $st = $pdo->prepare($sql);
             $st->execute($params);
+            $debugLog['update_pedidos_sql'] = $sql;
+            $debugLog['update_pedidos_rows_affected'] = $st->rowCount();
 
             // Atualizar também a tabela usuarios (telefone, nome, email, documento) se o pedido tem usuario_id
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
@@ -159,8 +186,14 @@ class AdminPedidosController extends Controller {
             // Se o pedido usa endereco_entrega_id (endereço em tabela separada), atualizar lá também
             $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
             $enderecoIdAtualizado = 0;
+            $debugLog['endereco_entrega_id_col'] = $endEntregaIdCol;
+            $debugLog['endereco_entrega_id_val'] = ($endEntregaIdCol !== '') ? ($oldRow[$endEntregaIdCol] ?? 'NULL') : 'col_not_found';
+            $debugLog['usuario_id_pedido'] = $usuarioIdPedido;
+            $debugLog['tabela_enderecos_existe'] = $this->tableExistsPdo($pdo, 'enderecos');
+
             if ($endEntregaIdCol !== '' && !empty($oldRow[$endEntregaIdCol])) {
                 $enderecoId = (int) $oldRow[$endEntregaIdCol];
+                $debugLog['endereco_path'] = 'via_endereco_entrega_id=' . $enderecoId;
                 if ($enderecoId > 0) {
                     try {
                         $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
@@ -204,8 +237,14 @@ class AdminPedidosController extends Controller {
 
             // Fallback: se o pedido NÃO tem endereco_entrega_id, atualizar o endereço principal do usuário na tabela enderecos
             if ($enderecoIdAtualizado <= 0 && $usuarioIdPedido > 0 && $this->tableExistsPdo($pdo, 'enderecos')) {
+                $debugLog['endereco_path'] = $debugLog['endereco_path'] ?? 'fallback_usuario';
+                if (!isset($debugLog['endereco_path']) || $debugLog['endereco_path'] === 'fallback_usuario') {
+                    $debugLog['endereco_path'] = 'fallback_usuario_id=' . $usuarioIdPedido;
+                }
                 try {
                     $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
+                    $debugLog['enderecos_cols'] = $colsEnd;
+                    $debugLog['enderecos_has_usuario_id'] = in_array('usuario_id', $colsEnd, true);
                     if (in_array('usuario_id', $colsEnd, true)) {
                         // Buscar o endereço principal do usuário (mesmo critério do getComDetalhes)
                         $orderBy = 'id DESC';
@@ -215,6 +254,7 @@ class AdminPedidosController extends Controller {
                         $stFindEnd = $pdo->prepare('SELECT id FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
                         $stFindEnd->execute([$usuarioIdPedido]);
                         $enderecoUsuarioId = (int) ($stFindEnd->fetchColumn() ?: 0);
+                        $debugLog['endereco_usuario_encontrado_id'] = $enderecoUsuarioId;
 
                         if ($enderecoUsuarioId > 0) {
                             // Atualizar o endereço existente do usuário
@@ -248,6 +288,10 @@ class AdminPedidosController extends Controller {
                                 $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
                                 $stEnd = $pdo->prepare($sqlEnd);
                                 $stEnd->execute($paramsEnd);
+                                $debugLog['endereco_update_sql'] = $sqlEnd;
+                                $debugLog['endereco_update_rows'] = $stEnd->rowCount();
+                            } else {
+                                $debugLog['endereco_update_skip'] = 'setEnd vazio - nenhuma coluna encontrada na tabela enderecos';
                             }
                         } else {
                             // Usuário não tem endereço cadastrado — criar um novo
@@ -292,6 +336,11 @@ class AdminPedidosController extends Controller {
                     }
                 } catch (\Throwable $e) {
                     // Silenciar erro — o update principal no pedido já foi feito
+                    $debugLog['endereco_fallback_error'] = $e->getMessage();
+                }
+            } else {
+                if ($enderecoIdAtualizado <= 0) {
+                    $debugLog['endereco_fallback_skip'] = 'enderecoIdAtualizado=' . $enderecoIdAtualizado . ' usuarioIdPedido=' . $usuarioIdPedido . ' tableExists=' . ($this->tableExistsPdo($pdo, 'enderecos') ? 'yes' : 'no');
                 }
             }
 
@@ -317,9 +366,9 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            $this->json(['success' => true]);
+            $this->json(['success' => true, 'debug' => $debugLog]);
         } catch (\Exception $e) {
-            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
+            $this->json(['success' => false, 'error' => $e->getMessage(), 'debug' => $debugLog ?? []], 500);
         }
     }
 
@@ -4373,10 +4422,13 @@ document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); })
             .then(function(j){
                 if(!j || !j.success){
                     setAlert((j && j.error) ? j.error : 'Falha ao salvar', 'alert-warning');
+                    if(j && j.debug) console.log('DEBUG atualizarCliente:', JSON.stringify(j.debug, null, 2));
                     btnSave.disabled = false;
                     return;
                 }
+                var debugInfo = (j.debug) ? '\n\nDEBUG: ' + JSON.stringify(j.debug, null, 2) : '';
                 setAlert('Dados atualizados. Recarregue a página para ver tudo refletido.', 'alert-success');
+                if(j.debug) console.log('DEBUG atualizarCliente:', JSON.stringify(j.debug, null, 2));
                 btnSave.disabled = false;
             })
             .catch(function(){
