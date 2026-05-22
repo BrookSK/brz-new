@@ -329,6 +329,8 @@ $router->get('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutoriz
 $router->post('/admin/configuracoes/desconto/configuracao', 'AdminDescontoAutorizacaoController', 'configuracao');
 $router->get('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoController', 'painel');
 $router->post('/admin/configuracoes/desconto/painel', 'AdminDescontoAutorizacaoController', 'painel');
+$router->post('/admin/configuracoes/pagdev/solicitar', 'AdminDescontoAutorizacaoController', 'solicitarPagdev');
+$router->get('/admin/configuracoes/pagdev/verificar', 'AdminDescontoAutorizacaoController', 'verificarPagdev');
 
 // QuickBooks
 $router->get('/admin/quickbooks', 'AdminQuickBooksController', 'index');

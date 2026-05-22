@@ -61,6 +61,7 @@ class AdminDescontoAutorizacaoController
                 `status` ENUM('pendente','aprovado','negado','expirado') NOT NULL DEFAULT 'pendente',
                 `aprovado_por` VARCHAR(191) DEFAULT NULL,
                 `motivo` VARCHAR(500) DEFAULT NULL,
+                `tipo_solicitacao` VARCHAR(30) NOT NULL DEFAULT 'desconto',
                 `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (`id`),
@@ -69,6 +70,11 @@ class AdminDescontoAutorizacaoController
                 KEY `idx_status` (`status`),
                 KEY `idx_created` (`created_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Exception $e) {}
+
+        // Garantir coluna tipo_solicitacao (pode não existir em tabelas já criadas)
+        try {
+            $pdo->exec("ALTER TABLE `desconto_autorizacoes` ADD COLUMN `tipo_solicitacao` VARCHAR(30) NOT NULL DEFAULT 'desconto' AFTER `motivo`");
         } catch (\Exception $e) {}
     }
 
@@ -580,5 +586,117 @@ class AdminDescontoAutorizacaoController
         }
         echo '</body></html>';
         exit;
+    }
+
+    /** API: vendedor solicita autorização para usar PagDev */
+    public function solicitarPagdev(Request $request)
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $auth = new AuthService();
+            $auth->requerPerfis(['admin', 'vendedor']);
+            $u = $auth->getUsuarioLogado();
+
+            $pdo = Database::getConnection();
+            $this->garantirTabela($pdo);
+
+            $vendedorId   = (int) ($u['id'] ?? 0);
+            $vendedorNome = trim((string) ($u['nome'] ?? ($u['name'] ?? '')));
+            $clienteNome  = trim((string) $request->getParam('cliente_nome', ''));
+            $valorTotal   = (float) str_replace(',', '.', (string) $request->getParam('valor_total', '0'));
+            $moeda        = strtoupper(trim((string) $request->getParam('moeda', 'USD')));
+
+            $token = bin2hex(random_bytes(32));
+
+            $st = $pdo->prepare("INSERT INTO desconto_autorizacoes
+                (token, vendedor_id, vendedor_nome, produto_id, produto_nome, desconto_tipo, desconto_valor, preco_original, preco_final, moeda, status, tipo_solicitacao)
+                VALUES (?, ?, ?, 0, ?, 'fixo', 0, ?, ?, ?, 'pendente', 'pagdev')");
+            $st->execute([$token, $vendedorId, $vendedorNome, $clienteNome, $valorTotal, $valorTotal, $moeda]);
+
+            // Enviar email para autorizadores
+            $this->enviarEmailSolicitacaoPagdev($token, $vendedorNome, $clienteNome, $valorTotal, $moeda);
+
+            echo json_encode(['ok' => true, 'token' => $token]);
+        } catch (\Exception $e) {
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** API: polling — vendedor verifica status da solicitação PagDev */
+    public function verificarPagdev(Request $request)
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $auth = new AuthService();
+            $auth->requerPerfis(['admin', 'vendedor']);
+
+            $token = trim((string) $request->getParam('token', ''));
+            if ($token === '') {
+                echo json_encode(['ok' => false, 'error' => 'Token inválido']);
+                exit;
+            }
+
+            $pdo = Database::getConnection();
+            $this->garantirTabela($pdo);
+
+            $st = $pdo->prepare("SELECT status, aprovado_por, motivo FROM desconto_autorizacoes WHERE token = ? AND tipo_solicitacao = 'pagdev' LIMIT 1");
+            $st->execute([$token]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                echo json_encode(['ok' => false, 'error' => 'Solicitação não encontrada']);
+                exit;
+            }
+
+            echo json_encode([
+                'ok' => true,
+                'status' => $row['status'],
+                'aprovado_por' => $row['aprovado_por'] ?? '',
+                'motivo' => $row['motivo'] ?? '',
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function enviarEmailSolicitacaoPagdev(string $token, string $vendedor, string $clienteNome, float $valorTotal, string $moeda): void
+    {
+        $emails = $this->getEmailsAutorizadores();
+        if (empty($emails)) return;
+
+        try {
+            $baseUrl = rtrim((string) ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? ''), '/');
+            $urlAprovar = $baseUrl . '/admin/configuracoes/desconto/email-autorizar?token=' . urlencode($token) . '&acao=aprovar';
+            $urlNegar   = $baseUrl . '/admin/configuracoes/desconto/email-autorizar?token=' . urlencode($token) . '&acao=negar';
+            $urlPainel  = $baseUrl . '/admin/configuracoes/desconto/autorizar?token=' . urlencode($token);
+
+            $sym = $moeda === 'BRL' ? 'R$' : '$';
+
+            $subject = 'Solicitação de PagDev - ' . ($clienteNome !== '' ? $clienteNome : 'Pedido Manual');
+            $html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:#333;">Solicitação de Pagamento PagDev</h2>
+                <p>O vendedor <strong>' . htmlspecialchars($vendedor) . '</strong> está solicitando autorização para usar o método de pagamento <strong>PagDev (offline)</strong>:</p>
+                <table style="width:100%;border-collapse:collapse;margin:15px 0;">
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Vendedor</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($vendedor) . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Cliente</strong></td><td style="padding:8px;border:1px solid #ddd;">' . htmlspecialchars($clienteNome !== '' ? $clienteNome : '—') . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Valor Total</strong></td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">' . $sym . ' ' . number_format($valorTotal, 2, ',', '.') . '</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f8f9fa;"><strong>Método</strong></td><td style="padding:8px;border:1px solid #ddd;">PagDev (offline)</td></tr>
+                </table>
+                <div style="margin:20px 0;text-align:center;">
+                    <a href="' . htmlspecialchars($urlAprovar) . '" style="display:inline-block;padding:12px 30px;background:#28a745;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">✅ Aprovar</a>
+                    <a href="' . htmlspecialchars($urlNegar) . '" style="display:inline-block;padding:12px 30px;background:#dc3545;color:#fff;text-decoration:none;border-radius:5px;margin:5px;font-weight:bold;">❌ Negar</a>
+                </div>
+                <p style="color:#666;font-size:12px;">Ou acesse o painel: <a href="' . htmlspecialchars($urlPainel) . '">' . htmlspecialchars($urlPainel) . '</a></p>
+            </div>';
+
+            $emailService = new \App\Services\EmailService();
+            foreach ($emails as $to) {
+                $emailService->send($to, $subject, $html, 'pagdev:' . $token . ':' . strtolower($to));
+            }
+        } catch (\Exception $e) {
+            error_log('[PAGDEV] Falha ao enviar email: ' . $e->getMessage());
+        }
     }
 }

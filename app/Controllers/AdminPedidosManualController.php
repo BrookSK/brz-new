@@ -148,6 +148,11 @@ class AdminPedidosManualController extends Controller {
             @session_start();
         }
 
+        // Detectar perfil do usuário logado para controle de PagDev
+        $usuarioLogado = $auth->getUsuarioLogado();
+        $perfilUsuario = strtolower(trim((string) ($usuarioLogado['perfil'] ?? '')));
+        $isAdmin = ($perfilUsuario === 'admin');
+
         // Reutilizar token existente para evitar "Formulário expirado" quando a página
         // é aberta em outra aba ou quando o usuário aguarda aprovação de desconto.
         $formToken = $_SESSION['pedido_manual_form_token'] ?? '';
@@ -527,6 +532,18 @@ class AdminPedidosManualController extends Controller {
                                 <label class="form-label">Instruções</label>
                                 <div class="alert alert-warning mb-0" id="offlineInfoBox"></div>
                             </div>
+                            <div class="col-12" id="pagdevAuthWrap" style="display:none;">
+                                <div class="alert alert-warning d-flex align-items-center gap-3" id="pagdevAuthBox">
+                                    <div>
+                                        <i class="fas fa-lock me-1"></i>
+                                        <strong>PagDev requer autorização.</strong> Solicite aprovação para usar este método de pagamento.
+                                    </div>
+                                    <button type="button" class="btn btn-warning btn-sm" id="btnSolicitarPagdev" onclick="solicitarPagdev()">
+                                        <i class="fas fa-paper-plane me-1"></i>Solicitar
+                                    </button>
+                                    <span id="pagdevAuthStatus"></span>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-check mt-3">
                             <input class="form-check-input" type="checkbox" value="1" id="sem_comissao" name="sem_comissao">
@@ -702,6 +719,10 @@ class AdminPedidosManualController extends Controller {
         echo 'let PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
         echo 'const EXISTING_PEDIDO = ' . json_encode($existingPedido, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
+        echo 'const IS_ADMIN = ' . ($isAdmin ? 'true' : 'false') . ';' . "\n";
+        echo 'let PAGDEV_APROVADO = false;' . "\n";
+        echo 'let PAGDEV_TOKEN = "";' . "\n";
+        echo 'let PAGDEV_POLL = null;' . "\n";
 
         // NCM options para o select de NCM no pedido manual
         $ncmOptions = (new \App\Controllers\AdminProdutosController())->getPublicNcmOptions();
@@ -2079,6 +2100,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     const offlineWrap = document.getElementById('offlineInfoWrap');
     const offlineBox = document.getElementById('offlineInfoBox');
+    const pagdevAuthWrap = document.getElementById('pagdevAuthWrap');
     const refreshOffline = function(){
         const v = fpSel ? String(fpSel.value || '') : '';
         if (!offlineWrap || !offlineBox) return;
@@ -2090,6 +2112,15 @@ document.addEventListener('DOMContentLoaded', function(){
         } else {
             offlineWrap.style.display = 'none';
             offlineBox.textContent = '';
+        }
+
+        // PagDev autorização: mostrar para vendedores (não admin)
+        if (pagdevAuthWrap) {
+            if (isOffline && !IS_ADMIN && !PAGDEV_APROVADO) {
+                pagdevAuthWrap.style.display = 'block';
+            } else {
+                pagdevAuthWrap.style.display = 'none';
+            }
         }
 
         // Delegar visibilidade do link para a regra central (updateLinkVisibility)
@@ -2160,6 +2191,14 @@ document.addEventListener('DOMContentLoaded', function(){
             if (!validateProdutosObrigatorios()) {
                 return false;
             }
+
+            // Verificar se PagDev precisa de autorização
+            const fpVal = fpSel ? String(fpSel.value || '') : '';
+            if (fpVal === 'pagdev' && !IS_ADMIN && !PAGDEV_APROVADO) {
+                alert('O método de pagamento PagDev requer autorização. Solicite a aprovação antes de criar o pedido.');
+                return false;
+            }
+
             try { calcTotal(); } catch (err) {}
 
             const btn = document.getElementById('btnCriarPedidoManual');
@@ -2228,6 +2267,105 @@ document.addEventListener('DOMContentLoaded', function(){
         }
     });
 });
+
+// === SISTEMA DE AUTORIZAÇÃO PAGDEV ===
+function solicitarPagdev() {
+    const btn = document.getElementById('btnSolicitarPagdev');
+    const statusEl = document.getElementById('pagdevAuthStatus');
+    if (!btn) return;
+
+    // Pegar nome do cliente selecionado
+    const clienteBusca = document.getElementById('cliente_busca');
+    const clienteNome = clienteBusca ? String(clienteBusca.value || '') : '';
+    const moeda = typeof getSelectedMoeda === 'function' ? getSelectedMoeda() : 'USD';
+
+    // Calcular valor total atual
+    const totalEl = document.getElementById('resumoTotal');
+    const valorTotal = totalEl ? String(totalEl.textContent || '0') : '0';
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Solicitando...';
+    if (statusEl) statusEl.innerHTML = '<span class="text-muted">Enviando solicitação...</span>';
+
+    const fd = new FormData();
+    fd.append('cliente_nome', clienteNome);
+    fd.append('valor_total', valorTotal.replace(/[^\d.,]/g, '').replace(',', '.'));
+    fd.append('moeda', moeda);
+
+    fetch('/admin/configuracoes/pagdev/solicitar', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) throw new Error(data.error || 'Erro ao solicitar');
+
+            PAGDEV_TOKEN = data.token;
+            btn.innerHTML = '<i class="fas fa-clock me-1"></i>Aguardando...';
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-info');
+            if (statusEl) statusEl.innerHTML = '<span class="text-warning"><i class="fas fa-hourglass-half me-1"></i>Aguardando autorização...</span>';
+
+            iniciarPollingPagdev();
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Solicitar';
+            if (statusEl) statusEl.innerHTML = '<span class="text-danger">' + (err.message || 'Erro') + '</span>';
+        });
+}
+
+function iniciarPollingPagdev() {
+    if (PAGDEV_POLL) {
+        clearInterval(PAGDEV_POLL);
+    }
+
+    PAGDEV_POLL = setInterval(() => {
+        if (!PAGDEV_TOKEN) return;
+
+        fetch('/admin/configuracoes/pagdev/verificar?token=' + encodeURIComponent(PAGDEV_TOKEN))
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+
+                const btn = document.getElementById('btnSolicitarPagdev');
+                const statusEl = document.getElementById('pagdevAuthStatus');
+                const pagdevAuthWrap = document.getElementById('pagdevAuthWrap');
+
+                if (data.status === 'aprovado') {
+                    clearInterval(PAGDEV_POLL);
+                    PAGDEV_POLL = null;
+                    PAGDEV_APROVADO = true;
+
+                    if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Aprovado!</span>';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-check me-1"></i>Aprovado';
+                        btn.classList.remove('btn-info', 'btn-warning');
+                        btn.classList.add('btn-success');
+                        btn.disabled = true;
+                    }
+
+                    // Esconder o alerta após 3s
+                    setTimeout(() => {
+                        if (pagdevAuthWrap) pagdevAuthWrap.style.display = 'none';
+                    }, 3000);
+
+                } else if (data.status === 'negado') {
+                    clearInterval(PAGDEV_POLL);
+                    PAGDEV_POLL = null;
+                    PAGDEV_APROVADO = false;
+
+                    const motivo = data.motivo ? ' — ' + data.motivo : '';
+                    if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Negado' + motivo + '</span>';
+                    if (btn) {
+                        btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Solicitar novamente';
+                        btn.classList.remove('btn-info', 'btn-success');
+                        btn.classList.add('btn-warning');
+                        btn.disabled = false;
+                    }
+                    PAGDEV_TOKEN = '';
+                }
+            })
+            .catch(() => {});
+    }, 3000);
+}
 
 // === SISTEMA DE DESCONTO COM AUTORIZAÇÃO ===
 window.__DESCONTO_POLLS__ = {};
@@ -2745,6 +2883,24 @@ JS;
             $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
             if (!in_array($tipoCompra, ['online', 'offline'], true)) {
                 throw new \Exception('Selecione o tipo de compra (online/offline)');
+            }
+
+            // Verificar autorização PagDev para vendedores (não admin)
+            if (strtolower(trim($formaPagamento)) === 'pagdev') {
+                $uPagdev = $auth->getUsuarioLogado();
+                $perfilPagdev = strtolower(trim((string) ($uPagdev['perfil'] ?? '')));
+                if ($perfilPagdev !== 'admin') {
+                    $pdoPagdev = \Config\Database::getConnection();
+                    $vendedorIdPagdev = (int) ($uPagdev['id'] ?? 0);
+                    $stCheckPagdev = $pdoPagdev->prepare("SELECT id FROM desconto_autorizacoes WHERE vendedor_id = ? AND tipo_solicitacao = 'pagdev' AND status = 'aprovado' ORDER BY updated_at DESC LIMIT 1");
+                    $stCheckPagdev->execute([$vendedorIdPagdev]);
+                    $aprovadoPagdev = $stCheckPagdev->fetch(\PDO::FETCH_ASSOC);
+                    if (!$aprovadoPagdev) {
+                        throw new \Exception('O método de pagamento PagDev requer autorização. Solicite a aprovação antes de criar o pedido.');
+                    }
+                    // Marcar como utilizado para que precise solicitar novamente no próximo pedido
+                    $pdoPagdev->prepare("UPDATE desconto_autorizacoes SET status = 'expirado' WHERE id = ?")->execute([(int) $aprovadoPagdev['id']]);
+                }
             }
 
             $enderecoEntrega = [
