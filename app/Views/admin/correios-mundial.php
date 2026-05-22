@@ -104,7 +104,7 @@
                             <th>Pedido</th>
                             <th>Cliente</th>
                             <th>Peso (kg)</th>
-                            <th>C×L×A (cm)</th>
+                            <th>L×A×C (cm)</th>
                             <th>Frete USD</th>
                             <th>Dados OK</th>
                             <th>Status</th>
@@ -134,7 +134,7 @@
                                     <td><a href="/admin/correios-mundial/pedido/<?= $pid ?>" target="_blank">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></a></td>
                                     <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
                                     <td class="<?= $temPeso ? '' : 'text-danger fw-bold' ?>"><?= $temPeso ? number_format($peso, 2, ',', '.') : '⚠ 0' ?></td>
-                                    <td class="<?= $temDim ? '' : 'text-danger' ?>"><?= ($comp > 0 ? (int)$comp : '?') ?>×<?= ($larg > 0 ? (int)$larg : '?') ?>×<?= ($alt > 0 ? (int)$alt : '?') ?></td>
+                                    <td class="<?= $temDim ? '' : 'text-danger' ?>"><?= ($larg > 0 ? (int)$larg : '?') ?>×<?= ($alt > 0 ? (int)$alt : '?') ?>×<?= ($comp > 0 ? (int)$comp : '?') ?></td>
                                     <td><?= $frete > 0 ? number_format($frete, 2, '.', '') : '-' ?></td>
                                     <td>
                                         <?php if ($dadosOk): ?>
