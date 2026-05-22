@@ -83,19 +83,85 @@ class WebhookTicketController {
         }
 
         if (!$usuario) {
-            $motivo = $suite !== '' ? 'Nenhum usuário encontrado com a suite ' . $suite : 'Nenhum usuário encontrado com o email ' . $email;
-            $resp = [
-                'success' => false,
-                'error' => 'usuario_nao_encontrado',
-                'message' => $motivo,
-                'suite_informada' => $suite,
-                'email_informado' => $email,
-                'nome_informado' => $nome,
-                'telefone_informado' => $telefone,
-            ];
-            echo json_encode($resp);
-            $this->enviarCallback($callbackUrl, $resp);
-            return;
+            // Usuário não encontrado — criar ticket "órfão" para análise manual
+            try {
+                $colsT = [];
+                try { $st = $this->db->query('DESCRIBE support_tickets'); $colsT = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+
+                // Usar usuario_id = 0 ou o primeiro admin como fallback
+                $adminId = 0;
+                try {
+                    $stAdmin = $this->db->prepare("SELECT id FROM usuarios WHERE perfil = 'admin' ORDER BY id ASC LIMIT 1");
+                    $stAdmin->execute();
+                    $adminId = (int)($stAdmin->fetchColumn() ?: 0);
+                } catch (\Exception $e) {}
+
+                $assuntoOrfao = '[WhatsApp - Usuário não identificado] ' . $assunto;
+                $mensagemCompleta = "ATENÇÃO: Ticket criado automaticamente via WhatsApp. Usuário NÃO encontrado no sistema.\n\n"
+                    . "--- Dados informados ---\n"
+                    . "Nome: " . ($nome ?: '(não informado)') . "\n"
+                    . "Telefone: " . ($telefone ?: '(não informado)') . "\n"
+                    . "Suite informada: " . ($suite ?: '(não informada)') . "\n"
+                    . "Email informado: " . ($email ?: '(não informado)') . "\n\n"
+                    . "--- Mensagem do cliente ---\n"
+                    . $mensagem;
+
+                $cols = ['usuario_id', 'assunto', 'status'];
+                $vals = ['?', '?', '?'];
+                $params = [$adminId > 0 ? $adminId : 1, $assuntoOrfao, 'open'];
+
+                if (in_array('motivo', $colsT, true)) {
+                    $cols[] = 'motivo';
+                    $vals[] = '?';
+                    $params[] = $mensagemCompleta;
+                }
+                if (in_array('origem', $colsT, true)) {
+                    $cols[] = 'origem';
+                    $vals[] = '?';
+                    $params[] = 'whatsapp';
+                }
+                if (in_array('telefone_contato', $colsT, true) && $telefone !== '') {
+                    $cols[] = 'telefone_contato';
+                    $vals[] = '?';
+                    $params[] = $telefone;
+                }
+
+                $sql = 'INSERT INTO support_tickets (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
+                $st = $this->db->prepare($sql);
+                $st->execute($params);
+                $ticketId = (int)$this->db->lastInsertId();
+
+                if ($ticketId > 0) {
+                    $stMsg = $this->db->prepare("INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, 'cliente', NULL, ?)");
+                    $stMsg->execute([$ticketId, $mensagemCompleta]);
+                }
+
+                $resp = [
+                    'success' => true,
+                    'ticket_id' => $ticketId,
+                    'message' => 'Ticket criado para análise manual (usuário não encontrado)',
+                    'usuario_encontrado' => false,
+                    'nome_informado' => $nome,
+                    'telefone_informado' => $telefone,
+                    'suite_informada' => $suite,
+                    'email_informado' => $email,
+                ];
+                echo json_encode($resp);
+                $this->enviarCallback($callbackUrl, $resp);
+                return;
+
+            } catch (\Exception $e) {
+                $resp = [
+                    'success' => false,
+                    'error' => 'erro_interno',
+                    'message' => 'Erro ao criar ticket órfão: ' . $e->getMessage(),
+                    'nome_informado' => $nome,
+                    'telefone_informado' => $telefone,
+                ];
+                echo json_encode($resp);
+                $this->enviarCallback($callbackUrl, $resp);
+                return;
+            }
         }
 
         // Criar ticket
