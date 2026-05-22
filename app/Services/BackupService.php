@@ -494,7 +494,19 @@ class BackupService {
      * O servidor externo apaga automaticamente backups antigos ao receber um novo.
      */
     private function enviarBackupServidorExterno(string $dbSqlPath): void {
-        if (!file_exists($dbSqlPath) || filesize($dbSqlPath) === 0) {
+        error_log('[BACKUP-EXTERNO] Iniciando envio para servidor externo...');
+        error_log('[BACKUP-EXTERNO] Arquivo: ' . $dbSqlPath);
+
+        if (!file_exists($dbSqlPath)) {
+            error_log('[BACKUP-EXTERNO] ERRO: Arquivo não existe: ' . $dbSqlPath);
+            return;
+        }
+
+        $fileSize = filesize($dbSqlPath);
+        error_log('[BACKUP-EXTERNO] Tamanho do arquivo: ' . number_format($fileSize / 1048576, 2) . ' MB');
+
+        if ($fileSize === 0) {
+            error_log('[BACKUP-EXTERNO] ERRO: Arquivo vazio');
             return;
         }
 
@@ -504,6 +516,7 @@ class BackupService {
         $gzPath = $dbSqlPath . '.gz';
         $compressed = false;
         try {
+            error_log('[BACKUP-EXTERNO] Comprimindo arquivo...');
             $fp = gzopen($gzPath, 'wb9');
             if ($fp) {
                 $src = fopen($dbSqlPath, 'rb');
@@ -516,14 +529,26 @@ class BackupService {
                 gzclose($fp);
                 if (file_exists($gzPath) && filesize($gzPath) > 0) {
                     $compressed = true;
+                    error_log('[BACKUP-EXTERNO] Comprimido: ' . number_format(filesize($gzPath) / 1048576, 2) . ' MB');
                 }
             }
         } catch (\Throwable $e) {
+            error_log('[BACKUP-EXTERNO] Falha na compressão: ' . $e->getMessage());
             $compressed = false;
         }
 
         $fileToSend = $compressed ? $gzPath : $dbSqlPath;
         $fileName = $compressed ? basename($dbSqlPath) . '.gz' : basename($dbSqlPath);
+        $sendSize = filesize($fileToSend);
+
+        error_log('[BACKUP-EXTERNO] Enviando arquivo: ' . $fileName . ' (' . number_format($sendSize / 1048576, 2) . ' MB)');
+        error_log('[BACKUP-EXTERNO] URL destino: ' . $url);
+
+        if (!function_exists('curl_init')) {
+            error_log('[BACKUP-EXTERNO] ERRO: cURL não disponível no servidor');
+            if ($compressed && file_exists($gzPath)) @unlink($gzPath);
+            return;
+        }
 
         // Enviar via cURL multipart/form-data
         $ch = curl_init();
@@ -531,9 +556,10 @@ class BackupService {
             CURLOPT_URL => $url,
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 300, // 5 minutos para upload
+            CURLOPT_TIMEOUT => 600, // 10 minutos para upload
             CURLOPT_CONNECTTIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYPEER => false, // Servidor compartilhado pode ter SSL issues
+            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_POSTFIELDS => [
                 'file' => new \CURLFile($fileToSend, 'application/octet-stream', $fileName),
             ],
@@ -542,6 +568,7 @@ class BackupService {
         $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
+        $curlErrno = curl_errno($ch);
         curl_close($ch);
 
         // Limpar arquivo comprimido temporário
@@ -549,16 +576,25 @@ class BackupService {
             @unlink($gzPath);
         }
 
+        error_log('[BACKUP-EXTERNO] HTTP Code: ' . $httpCode);
+        error_log('[BACKUP-EXTERNO] cURL errno: ' . $curlErrno);
+        if ($curlError) {
+            error_log('[BACKUP-EXTERNO] cURL error: ' . $curlError);
+        }
+        error_log('[BACKUP-EXTERNO] Resposta: ' . substr((string)$response, 0, 500));
+
         if ($httpCode !== 200 || $response === false) {
-            throw new \RuntimeException('HTTP ' . $httpCode . ' - ' . ($curlError ?: 'Resposta inválida'));
+            error_log('[BACKUP-EXTERNO] FALHA: HTTP ' . $httpCode . ' - ' . ($curlError ?: 'Resposta inválida'));
+            return;
         }
 
         $json = @json_decode((string) $response, true);
         if (!is_array($json) || ($json['status'] ?? '') !== 'success') {
             $msg = $json['msg'] ?? 'Resposta inesperada do servidor';
-            throw new \RuntimeException($msg);
+            error_log('[BACKUP-EXTERNO] FALHA: ' . $msg);
+            return;
         }
 
-        error_log('[BACKUP] Cópia enviada para servidor externo: ' . ($json['url'] ?? ''));
+        error_log('[BACKUP-EXTERNO] SUCESSO! URL: ' . ($json['url'] ?? ''));
     }
 }

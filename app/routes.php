@@ -459,6 +459,7 @@ $router->post('/admin/backup/agora', 'AdminBackupController', 'agora');
 $router->get('/admin/backup/download/{id}/{tipo}', 'AdminBackupController', 'download');
 $router->post('/admin/backup/restaurar/{id}', 'AdminBackupController', 'restaurar');
 $router->post('/admin/backup/excluir/{id}', 'AdminBackupController', 'excluir');
+$router->post('/admin/backup/enviar-externo/{id}', 'AdminBackupController', 'enviarExterno');
 
 // Log de Emails do sistema
 $router->get('/admin/emails', 'AdminEmailLogsController', 'index');

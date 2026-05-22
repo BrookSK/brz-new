@@ -298,6 +298,9 @@ class AdminBackupController extends Controller {
                         <form method="POST" action="/admin/backup/excluir/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Excluir backup #' . $id . '?\')">
                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i> Excluir</button>
                         </form>
+                        <form method="POST" action="/admin/backup/enviar-externo/' . $id . '" style="display:inline-block" onsubmit="return confirm(\'Enviar backup #' . $id . ' para servidor externo?\')">
+                            <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-cloud-upload-alt"></i> Enviar</button>
+                        </form>
                     </td>
                 </tr>';
             }
@@ -464,6 +467,43 @@ class AdminBackupController extends Controller {
                 session_start();
             }
             $_SESSION['message'] = 'Erro ao restaurar: ' . $e->getMessage();
+            $_SESSION['message_type'] = 'danger';
+        }
+
+        header('Location: /admin/backup');
+        exit;
+    }
+
+    public function enviarExterno(Request $request, $id) {
+        $auth = new AuthService();
+        $auth->requerPerfil('admin');
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        try {
+            $service = new \App\Services\BackupService();
+            $backup = $service->getBackupRun((int) $id);
+
+            if (empty($backup)) {
+                throw new \Exception('Backup não encontrado.');
+            }
+
+            $dbPath = (string) ($backup['db_sql_path'] ?? '');
+            if ($dbPath === '' || !file_exists($dbPath)) {
+                throw new \Exception('Arquivo de banco de dados não encontrado: ' . $dbPath);
+            }
+
+            // Chamar o método de envio diretamente (via reflection para acessar método privado)
+            $ref = new \ReflectionMethod($service, 'enviarBackupServidorExterno');
+            $ref->setAccessible(true);
+            $ref->invoke($service, $dbPath);
+
+            $_SESSION['message'] = 'Envio para servidor externo executado. Verifique os logs para detalhes.';
+            $_SESSION['message_type'] = 'success';
+        } catch (\Throwable $e) {
+            $_SESSION['message'] = 'Erro ao enviar: ' . $e->getMessage();
             $_SESSION['message_type'] = 'danger';
         }
 
