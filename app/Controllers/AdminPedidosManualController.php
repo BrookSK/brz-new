@@ -719,7 +719,7 @@ class AdminPedidosManualController extends Controller {
         echo 'let PEDIDO_ID = ' . (int) $pedidoId . ';' . "\n";
         echo 'const EXISTING_PEDIDO = ' . json_encode($existingPedido, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
         echo 'const EXISTING_ITENS = ' . json_encode($existingItens, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';' . "\n";
-        echo 'const IS_ADMIN = ' . ($isAdmin ? 'true' : 'false') . ';' . "\n";
+        echo 'const IS_ADMIN = false;' . "\n";
         echo 'let PAGDEV_APROVADO = false;' . "\n";
         echo 'let PAGDEV_TOKEN = "";' . "\n";
         echo 'let PAGDEV_POLL = null;' . "\n";
@@ -2114,9 +2114,9 @@ document.addEventListener('DOMContentLoaded', function(){
             offlineBox.textContent = '';
         }
 
-        // PagDev autorização: mostrar para vendedores (não admin)
+        // PagDev autorização: mostrar para todos
         if (pagdevAuthWrap) {
-            if (isOffline && !IS_ADMIN && !PAGDEV_APROVADO) {
+            if (isOffline && !PAGDEV_APROVADO) {
                 pagdevAuthWrap.style.display = 'block';
             } else {
                 pagdevAuthWrap.style.display = 'none';
@@ -2194,7 +2194,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
             // Verificar se PagDev precisa de autorização
             const fpVal = fpSel ? String(fpSel.value || '') : '';
-            if (fpVal === 'pagdev' && !IS_ADMIN && !PAGDEV_APROVADO) {
+            if (fpVal === 'pagdev' && !PAGDEV_APROVADO) {
                 alert('O método de pagamento PagDev requer autorização. Solicite a aprovação antes de criar o pedido.');
                 return false;
             }
@@ -2885,22 +2885,19 @@ JS;
                 throw new \Exception('Selecione o tipo de compra (online/offline)');
             }
 
-            // Verificar autorização PagDev para vendedores (não admin)
+            // Verificar autorização PagDev para todos os usuários
             if (strtolower(trim($formaPagamento)) === 'pagdev') {
                 $uPagdev = $auth->getUsuarioLogado();
-                $perfilPagdev = strtolower(trim((string) ($uPagdev['perfil'] ?? '')));
-                if ($perfilPagdev !== 'admin') {
-                    $pdoPagdev = \Config\Database::getConnection();
-                    $vendedorIdPagdev = (int) ($uPagdev['id'] ?? 0);
-                    $stCheckPagdev = $pdoPagdev->prepare("SELECT id FROM desconto_autorizacoes WHERE vendedor_id = ? AND tipo_solicitacao = 'pagdev' AND status = 'aprovado' ORDER BY updated_at DESC LIMIT 1");
-                    $stCheckPagdev->execute([$vendedorIdPagdev]);
-                    $aprovadoPagdev = $stCheckPagdev->fetch(\PDO::FETCH_ASSOC);
-                    if (!$aprovadoPagdev) {
-                        throw new \Exception('O método de pagamento PagDev requer autorização. Solicite a aprovação antes de criar o pedido.');
-                    }
-                    // Marcar como utilizado para que precise solicitar novamente no próximo pedido
-                    $pdoPagdev->prepare("UPDATE desconto_autorizacoes SET status = 'expirado' WHERE id = ?")->execute([(int) $aprovadoPagdev['id']]);
+                $pdoPagdev = \Config\Database::getConnection();
+                $vendedorIdPagdev = (int) ($uPagdev['id'] ?? 0);
+                $stCheckPagdev = $pdoPagdev->prepare("SELECT id FROM desconto_autorizacoes WHERE vendedor_id = ? AND tipo_solicitacao = 'pagdev' AND status = 'aprovado' ORDER BY updated_at DESC LIMIT 1");
+                $stCheckPagdev->execute([$vendedorIdPagdev]);
+                $aprovadoPagdev = $stCheckPagdev->fetch(\PDO::FETCH_ASSOC);
+                if (!$aprovadoPagdev) {
+                    throw new \Exception('O método de pagamento PagDev requer autorização. Solicite a aprovação antes de criar o pedido.');
                 }
+                // Marcar como utilizado para que precise solicitar novamente no próximo pedido
+                $pdoPagdev->prepare("UPDATE desconto_autorizacoes SET status = 'expirado' WHERE id = ?")->execute([(int) $aprovadoPagdev['id']]);
             }
 
             $enderecoEntrega = [
