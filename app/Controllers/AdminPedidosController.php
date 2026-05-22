@@ -267,6 +267,15 @@ class AdminPedidosController extends Controller {
                                     $insertPlaceholders[] = '?';
                                 }
 
+                                // Campo 'nome' é obrigatório na tabela enderecos
+                                if (in_array('nome', $colsEnd, true)) {
+                                    $nomeEnd = trim((string) $request->getParam('nome'));
+                                    if ($nomeEnd === '') $nomeEnd = 'Endereco Principal';
+                                    $insertCols[] = 'nome';
+                                    $insertVals[] = $nomeEnd;
+                                    $insertPlaceholders[] = '?';
+                                }
+
                                 $addIns = function(string $col, $val) use (&$insertCols, &$insertVals, &$insertPlaceholders): void {
                                     if ($col === '') return;
                                     $insertCols[] = $col;
@@ -367,6 +376,16 @@ class AdminPedidosController extends Controller {
                                 $stEnd->execute($paramsEnd);
                                 $debugLog['endereco_update_sql'] = $sqlEnd;
                                 $debugLog['endereco_update_rows'] = $stEnd->rowCount();
+
+                                // Corrigir o endereco_entrega_id do pedido para apontar para o endereço correto
+                                if ($endEntregaIdCol !== '') {
+                                    try {
+                                        $pdo->prepare('UPDATE pedidos SET ' . $endEntregaIdCol . ' = ? WHERE id = ?')->execute([$enderecoUsuarioId, $pedidoId]);
+                                        $debugLog['pedido_endereco_id_corrigido'] = $enderecoUsuarioId;
+                                    } catch (\Throwable $e2) {
+                                        $debugLog['pedido_endereco_id_correcao_erro'] = $e2->getMessage();
+                                    }
+                                }
                             } else {
                                 $debugLog['endereco_update_skip'] = 'setEnd vazio - nenhuma coluna encontrada na tabela enderecos';
                             }
