@@ -178,6 +178,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Etiquetas geradas (PACKET)</strong>
             <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-primary" onclick="downloadSelecionadas()" id="btnDownloadMassa" disabled><i class="fas fa-download me-1"></i>Baixar selecionadas</button>
                 <button class="btn btn-sm btn-success" onclick="exportarCsvSelecionadas()" id="btnExportarCsv" disabled><i class="fas fa-file-csv me-1"></i>Exportar selecionadas</button>
                 <button class="btn btn-sm btn-warning" onclick="regerarSelecionadas()" id="btnRegerarMassa" disabled><i class="fas fa-redo me-1"></i>Regerar selecionadas</button>
             </div>
@@ -332,6 +333,7 @@ function updateBtnMassa() {
     const checked = document.querySelectorAll('.packet-check:checked').length;
     const btn = document.getElementById('btnRegerarMassa');
     const btnExport = document.getElementById('btnExportarCsv');
+    const btnDownload = document.getElementById('btnDownloadMassa');
     if (btn) {
         btn.disabled = checked === 0;
         btn.textContent = checked > 0 ? 'Regerar selecionadas (' + checked + ')' : 'Regerar selecionadas';
@@ -341,6 +343,12 @@ function updateBtnMassa() {
         btnExport.innerHTML = checked > 0
             ? '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas (' + checked + ')'
             : '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas';
+    }
+    if (btnDownload) {
+        btnDownload.disabled = checked === 0;
+        btnDownload.innerHTML = checked > 0
+            ? '<i class="fas fa-download me-1"></i>Baixar selecionadas (' + checked + ')'
+            : '<i class="fas fa-download me-1"></i>Baixar selecionadas';
     }
 }
 
@@ -440,6 +448,46 @@ function downloadCsvFile(filename, csvContent) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
+}
+
+async function downloadSelecionadas() {
+    const checks = document.querySelectorAll('.packet-check:checked');
+    if (checks.length === 0) return;
+    const ids = Array.from(checks).map(cb => parseInt(cb.value));
+
+    const btn = document.getElementById('btnDownloadMassa');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...'; }
+
+    try {
+        const r = await fetch('/admin/correios-mundial/download-etiquetas-massa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        });
+
+        if (!r.ok) {
+            const errData = await r.json().catch(() => ({}));
+            alert('Erro: ' + (errData.error || 'Falha ao gerar ZIP'));
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
+            updateBtnMassa();
+            return;
+        }
+
+        const blob = await r.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'etiquetas_packet_' + new Date().toISOString().slice(0,10) + '.zip';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    } catch (e) {
+        alert('Erro de rede: ' + e.message);
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
+    updateBtnMassa();
 }
 
 // ===== MODO MASSA - Gerar etiquetas em massa =====

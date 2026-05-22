@@ -111,6 +111,7 @@ $router->get('/admin/correios-mundial/pedido/{id}', 'AdminCorreiosMundialControl
 $router->post('/admin/correios-mundial/pedido/{id}/gerar-etiqueta', 'AdminCorreiosMundialController', 'gerarEtiqueta');
 $router->post('/admin/correios-mundial/pedido/{id}/regerar-etiqueta', 'AdminCorreiosMundialController', 'regerarEtiqueta');
 $router->post('/admin/correios-mundial/gerar-etiquetas-massa', 'AdminCorreiosMundialController', 'gerarEtiquetasMassa');
+$router->post('/admin/correios-mundial/download-etiquetas-massa', 'AdminCorreiosMundialController', 'downloadEtiquetasMassa');
 
 // Containers / Unitizadores
 $router->get('/admin/correios-mundial/containers', 'AdminCorreiosMundialController', 'containers');
