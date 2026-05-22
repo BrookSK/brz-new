@@ -500,9 +500,11 @@ class AdminCorreiosMundialController extends Controller {
         }
         $this->ensurePacketEtiquetasTable();
 
+        $colsP = $this->getTableColumns('pedidos');
+        $colsU = $this->getTableColumns('usuarios');
+
         $extraWhere = '';
         if ($apenasRedirecionamento) {
-            $colsP = $this->getTableColumns('pedidos');
             $colOrigem = $this->pickColumn($colsP, ['origem_pedido', 'origem', 'tipo']);
             $colMoeda = $this->pickColumn($colsP, ['moeda', 'currency', 'moeda_original', 'moeda_origem']);
             if ($colOrigem !== '') {
@@ -513,10 +515,26 @@ class AdminCorreiosMundialController extends Controller {
             }
         }
 
+        // Construir SELECT com colunas que existem
+        $extraSelect = '';
+        if (in_array('peso_total', $colsP, true)) $extraSelect .= ', p.peso_total';
+        else $extraSelect .= ', NULL AS peso_total';
+        if (in_array('altura', $colsP, true)) $extraSelect .= ', p.altura';
+        else $extraSelect .= ', NULL AS altura';
+        if (in_array('largura', $colsP, true)) $extraSelect .= ', p.largura';
+        else $extraSelect .= ', NULL AS largura';
+        if (in_array('comprimento', $colsP, true)) $extraSelect .= ', p.comprimento';
+        else $extraSelect .= ', NULL AS comprimento';
+
+        $colUserNome = in_array('nome', $colsU, true) ? 'u.nome' : (in_array('name', $colsU, true) ? 'u.name' : 'NULL');
+        $colUserEmail = in_array('email', $colsU, true) ? 'u.email' : 'NULL';
+        $colUserTel = in_array('telefone', $colsU, true) ? 'u.telefone' : (in_array('phone', $colsU, true) ? 'u.phone' : 'NULL');
+        $colUserCpf = in_array('cpf', $colsU, true) ? 'u.cpf' : (in_array('documento', $colsU, true) ? 'u.documento' : 'NULL');
+
         $sql = "
-            SELECT p.id AS pedido_id, u.nome AS cliente_nome, p.usuario_id, p.created_at,
-                   p.peso_total, p.altura, p.largura, p.comprimento,
-                   u.email AS cliente_email, u.telefone AS cliente_telefone, u.cpf AS cliente_cpf
+            SELECT p.id AS pedido_id, {$colUserNome} AS cliente_nome, p.usuario_id, p.created_at
+                   {$extraSelect},
+                   {$colUserEmail} AS cliente_email, {$colUserTel} AS cliente_telefone, {$colUserCpf} AS cliente_cpf
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             LEFT JOIN correios_packet_etiquetas cpe ON cpe.pedido_id = p.id
@@ -537,6 +555,7 @@ class AdminCorreiosMundialController extends Controller {
             unset($r);
             return $rows;
         } catch (\Exception $e) {
+            error_log('[CORREIOS_MUNDIAL] getPedidosCaixaFechadaSemEtiqueta error: ' . $e->getMessage());
             return [];
         }
     }
