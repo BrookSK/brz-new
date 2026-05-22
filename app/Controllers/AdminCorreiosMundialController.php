@@ -1275,7 +1275,7 @@ class AdminCorreiosMundialController extends Controller {
                     $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
                     $val = (float) ($it['preco_unitario'] ?? 0);
                     if ($moedaPedido === 'BRL' && $val > 0) $val = $val * $brlToUsdRate;
-                    if ($val < 0.01) { $itemError = 'Item #' . ($idx+1) . ' valor inválido'; break; }
+                    if ($val < 0.01) $val = 0.01;
                     $sumItems += ($val * $qtd);
                     $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', '')];
                 }
