@@ -1003,8 +1003,7 @@ class AdminCorreiosMundialController extends Controller {
                 $val = $val * $brlToUsdRate;
             }
             if ($val < 0.01) {
-                $this->json(['success' => false, 'error' => 'Item #' . $idx . ' com valor inválido'], 400);
-                return;
+                $val = 0.01;
             }
             $sumItems += ($val * $qtd);
 
