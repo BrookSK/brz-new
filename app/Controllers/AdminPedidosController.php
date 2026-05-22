@@ -197,6 +197,7 @@ class AdminPedidosController extends Controller {
                 if ($enderecoId > 0) {
                     try {
                         $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
+                        $debugLog['enderecos_cols_all'] = $colsEnd;
                         $pickEnd = function(array $candidates) use ($colsEnd): string {
                             foreach ($candidates as $c) {
                                 if (is_array($colsEnd) && in_array($c, $colsEnd, true)) return $c;
@@ -212,25 +213,45 @@ class AdminPedidosController extends Controller {
                             $paramsEnd[] = $val;
                         };
 
-                        $addSetEnd($pickEnd(['pais', 'country', 'country_code', 'pais_code']), trim((string) $request->getParam('pais')));
-                        $addSetEnd($pickEnd(['cep', 'zip_code', 'zipcode']), trim((string) $request->getParam('cep')));
-                        $addSetEnd($pickEnd(['endereco', 'logradouro', 'address']), trim((string) $request->getParam('endereco')));
-                        $addSetEnd($pickEnd(['numero', 'number']), trim((string) $request->getParam('numero')));
-                        $addSetEnd($pickEnd(['complemento']), trim((string) $request->getParam('complemento')));
-                        $addSetEnd($pickEnd(['bairro', 'neighborhood']), trim((string) $request->getParam('bairro')));
-                        $addSetEnd($pickEnd(['cidade', 'city']), trim((string) $request->getParam('cidade')));
-                        $addSetEnd($pickEnd(['estado', 'uf', 'state']), trim((string) $request->getParam('estado')));
+                        $colEndPais = $pickEnd(['pais', 'country', 'country_code', 'pais_code']);
+                        $colEndCep = $pickEnd(['cep', 'zip_code', 'zipcode']);
+                        $colEndEndereco = $pickEnd(['endereco', 'logradouro', 'address']);
+                        $colEndNumero = $pickEnd(['numero', 'number']);
+                        $colEndComplemento = $pickEnd(['complemento']);
+                        $colEndBairro = $pickEnd(['bairro', 'neighborhood']);
+                        $colEndCidade = $pickEnd(['cidade', 'city']);
+                        $colEndEstado = $pickEnd(['estado', 'uf', 'state']);
+
+                        $debugLog['enderecos_cols_detectadas'] = [
+                            'pais' => $colEndPais, 'cep' => $colEndCep, 'endereco' => $colEndEndereco,
+                            'numero' => $colEndNumero, 'complemento' => $colEndComplemento,
+                            'bairro' => $colEndBairro, 'cidade' => $colEndCidade, 'estado' => $colEndEstado
+                        ];
+
+                        $addSetEnd($colEndPais, trim((string) $request->getParam('pais')));
+                        $addSetEnd($colEndCep, trim((string) $request->getParam('cep')));
+                        $addSetEnd($colEndEndereco, trim((string) $request->getParam('endereco')));
+                        $addSetEnd($colEndNumero, trim((string) $request->getParam('numero')));
+                        $addSetEnd($colEndComplemento, trim((string) $request->getParam('complemento')));
+                        $addSetEnd($colEndBairro, trim((string) $request->getParam('bairro')));
+                        $addSetEnd($colEndCidade, trim((string) $request->getParam('cidade')));
+                        $addSetEnd($colEndEstado, trim((string) $request->getParam('estado')));
 
                         $setEnd = array_values(array_filter($setEnd, static function($x){ return is_string($x) && trim($x) !== ''; }));
+                        $debugLog['enderecos_set_clauses'] = $setEnd;
                         if (!empty($setEnd)) {
                             $paramsEnd[] = $enderecoId;
                             $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
                             $stEnd = $pdo->prepare($sqlEnd);
                             $stEnd->execute($paramsEnd);
                             $enderecoIdAtualizado = $enderecoId;
+                            $debugLog['enderecos_update_sql'] = $sqlEnd;
+                            $debugLog['enderecos_update_rows'] = $stEnd->rowCount();
+                        } else {
+                            $debugLog['enderecos_update_skip'] = 'nenhuma coluna de endereco encontrada na tabela enderecos';
                         }
                     } catch (\Throwable $e) {
-                        // Silenciar erro na tabela enderecos — o update principal já foi feito
+                        $debugLog['enderecos_error'] = $e->getMessage();
                     }
                 }
             }
