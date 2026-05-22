@@ -4342,8 +4342,8 @@ function onEditPaisChange() {
     var lEstado = document.getElementById('editLabelEstado');
 
     if (lCep) lCep.textContent = isBR ? 'CEP' : 'ZIP / Postal Code';
-    if (lEnd) lEnd.textContent = isBR ? 'Endereço' : 'Address line 1';
-    if (lNum) lNum.textContent = isBR ? 'Número' : 'Number';
+    if (lEnd) lEnd.textContent = isBR ? 'Endere\u00e7o' : 'Address line 1';
+    if (lNum) lNum.textContent = isBR ? 'N\u00famero' : 'Number';
     if (lComp) lComp.textContent = isBR ? 'Complemento' : 'Address line 2';
     if (lBairro) lBairro.textContent = isBR ? 'Bairro' : 'District';
     if (lCidade) lCidade.textContent = isBR ? 'Cidade' : 'City';
@@ -4354,7 +4354,7 @@ function onEditPaisChange() {
     if (wBairro) wBairro.style.display = isBR ? '' : 'none';
     if (wNumero) wNumero.style.display = isBR ? '' : 'none';
 }
-// Executar ao carregar para adaptar se já vier com país != BR
+// Executar ao carregar para adaptar se ja vier com pais != BR
 document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); });
 </script>
 <script>(function(){
@@ -4426,8 +4426,7 @@ document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); })
                     btnSave.disabled = false;
                     return;
                 }
-                var debugInfo = (j.debug) ? '\n\nDEBUG: ' + JSON.stringify(j.debug, null, 2) : '';
-                setAlert('Dados atualizados. Recarregue a página para ver tudo refletido.', 'alert-success');
+                setAlert('Dados atualizados. Recarregue a pagina para ver tudo refletido.', 'alert-success');
                 if(j.debug) console.log('DEBUG atualizarCliente:', JSON.stringify(j.debug, null, 2));
                 btnSave.disabled = false;
             })
