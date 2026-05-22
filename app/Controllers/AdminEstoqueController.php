@@ -533,6 +533,74 @@ class AdminEstoqueController extends Controller {
         return null;
     }
 
+    /**
+     * Verifica pedidos cujos itens na lista de compras foram todos marcados como 'comprado'
+     * e atualiza o status do pedido para 'itens_comprados'.
+     * Prioriza pedidos mais antigos (ORDER BY id/created_at ASC).
+     */
+    private function atualizarStatusPedidosComprados(): void {
+        try {
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            if (!$temPedidoEmLista) {
+                return;
+            }
+
+            $colsPedidos = [];
+            try {
+                $stmtCols = $this->connection->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                return;
+            }
+
+            if (!in_array('status', $colsPedidos, true)) {
+                return;
+            }
+
+            $orderCol = in_array('created_at', $colsPedidos, true) ? 'p.created_at' : 'p.id';
+
+            $sql = "SELECT DISTINCT lc.pedido_id
+                    FROM lista_compras lc
+                    INNER JOIN pedidos p ON p.id = lc.pedido_id
+                    WHERE lc.pedido_id IS NOT NULL
+                      AND lc.pedido_id > 0
+                      AND p.status = 'pago'
+                      AND lc.status = 'comprado'
+                    ORDER BY {$orderCol} ASC";
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute();
+            $pedidoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            if (empty($pedidoIds)) {
+                return;
+            }
+
+            $stmtCheck = $this->connection->prepare(
+                "SELECT COUNT(*) FROM lista_compras
+                 WHERE pedido_id = :pedido_id AND status = 'pendente'"
+            );
+
+            $stmtUpdate = $this->connection->prepare(
+                "UPDATE pedidos SET status = 'itens_comprados' WHERE id = :pedido_id AND status = 'pago' LIMIT 1"
+            );
+
+            foreach ($pedidoIds as $pedidoId) {
+                $pedidoId = (int) $pedidoId;
+                if ($pedidoId <= 0) continue;
+
+                $stmtCheck->execute([':pedido_id' => $pedidoId]);
+                $pendentes = (int) $stmtCheck->fetchColumn();
+
+                if ($pendentes === 0) {
+                    $stmtUpdate->execute([':pedido_id' => $pedidoId]);
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('Erro ao atualizar status pedidos comprados: ' . $e->getMessage());
+        }
+    }
+
     private function findUltimoPedidoDoProduto(int $produtoId): int {
         $itensTable = $this->findPedidoItensTable();
         if (!$itensTable) {
@@ -2013,6 +2081,9 @@ class AdminEstoqueController extends Controller {
 
             $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
+
+            // Verificar se pedidos tiveram todos os itens comprados e atualizar status
+            $this->atualizarStatusPedidosComprados();
 
             echo json_encode(['success' => true, 'message' => 'Item(s) marcado(s) como comprado.']);
             return;

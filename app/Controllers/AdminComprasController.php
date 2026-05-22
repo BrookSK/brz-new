@@ -2781,6 +2781,84 @@ class AdminComprasController extends Controller {
         echo json_encode(['success' => false, 'message' => 'Funcionalidade em desenvolvimento']);
     }
 
+    /**
+     * Verifica pedidos cujos itens na lista de compras foram todos marcados como 'comprado'
+     * e atualiza o status do pedido para 'itens_comprados'.
+     * Prioriza pedidos mais antigos (ORDER BY pedido_id ASC / created_at ASC).
+     *
+     * Lógica: para cada pedido vinculado na lista_compras, se NÃO existir nenhum item
+     * com status 'pendente' para aquele pedido, então todos foram comprados → muda status.
+     * Só altera pedidos que estejam em status 'pago' (ainda não avançaram no fluxo).
+     */
+    private function atualizarStatusPedidosComprados(): void {
+        try {
+            $temPedidoEmLista = $this->columnExists('lista_compras', 'pedido_id');
+            if (!$temPedidoEmLista) {
+                return;
+            }
+
+            // Buscar pedidos distintos que têm pelo menos um item 'comprado' na lista
+            // e que ainda estão com status 'pago' (elegíveis para avançar)
+            $colsPedidos = [];
+            try {
+                $stmtCols = $this->connection->query('DESCRIBE pedidos');
+                $colsPedidos = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                return;
+            }
+
+            if (!in_array('status', $colsPedidos, true)) {
+                return;
+            }
+
+            // Pedidos com status 'pago' que possuem itens na lista de compras marcados como 'comprado'
+            // ordenados do mais antigo para o mais novo
+            $orderCol = in_array('created_at', $colsPedidos, true) ? 'p.created_at' : 'p.id';
+
+            $sql = "SELECT DISTINCT lc.pedido_id
+                    FROM lista_compras lc
+                    INNER JOIN pedidos p ON p.id = lc.pedido_id
+                    WHERE lc.pedido_id IS NOT NULL
+                      AND lc.pedido_id > 0
+                      AND p.status = 'pago'
+                      AND lc.status = 'comprado'
+                    ORDER BY {$orderCol} ASC";
+
+            $stmt = $this->connection->prepare($sql);
+            $stmt->execute();
+            $pedidoIds = $stmt->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+
+            if (empty($pedidoIds)) {
+                return;
+            }
+
+            // Para cada pedido candidato, verificar se ainda tem itens pendentes
+            $stmtCheck = $this->connection->prepare(
+                "SELECT COUNT(*) FROM lista_compras
+                 WHERE pedido_id = :pedido_id AND status = 'pendente'"
+            );
+
+            $stmtUpdate = $this->connection->prepare(
+                "UPDATE pedidos SET status = 'itens_comprados' WHERE id = :pedido_id AND status = 'pago' LIMIT 1"
+            );
+
+            foreach ($pedidoIds as $pedidoId) {
+                $pedidoId = (int) $pedidoId;
+                if ($pedidoId <= 0) continue;
+
+                $stmtCheck->execute([':pedido_id' => $pedidoId]);
+                $pendentes = (int) $stmtCheck->fetchColumn();
+
+                if ($pendentes === 0) {
+                    // Todos os itens deste pedido foram comprados → atualizar status
+                    $stmtUpdate->execute([':pedido_id' => $pedidoId]);
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('Erro ao atualizar status pedidos comprados: ' . $e->getMessage());
+        }
+    }
+
     public function concluirCompras($request) {
         if (session_status() !== PHP_SESSION_ACTIVE) {
             @session_start();
@@ -2903,6 +2981,7 @@ class AdminComprasController extends Controller {
 
                 $_SESSION['message'] = 'Compra parcial registrada. O restante continua pendente.';
                 $_SESSION['message_type'] = 'success';
+                $this->atualizarStatusPedidosComprados();
                 header('Location: ' . $redirectUrl);
                 exit;
             }
@@ -2945,6 +3024,7 @@ class AdminComprasController extends Controller {
             if ($affected > 0) {
                 $_SESSION['message'] = 'Compras concluídas.';
                 $_SESSION['message_type'] = 'success';
+                $this->atualizarStatusPedidosComprados();
             } else {
                 $_SESSION['message'] = 'Nenhum item pendente encontrado para concluir.';
                 $_SESSION['message_type'] = 'warning';
