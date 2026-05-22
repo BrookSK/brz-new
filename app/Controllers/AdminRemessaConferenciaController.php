@@ -571,12 +571,14 @@ class AdminRemessaConferenciaController extends Controller {
     <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">Etiquetas geradas</div><div class="h4 mb-0">' . $geradas . '</div></div></div></div>
     <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted">Pendentes</div><div class="h4 mb-0">' . $pendentes . '</div></div></div></div>
 </div>
-<div class="card"><div class="card-header"><strong>Pedidos desta janela</strong></div><div class="card-body">
+<div class="card"><div class="card-header d-flex justify-content-between align-items-center"><strong>Pedidos desta janela</strong>
+<button type="button" class="btn btn-sm btn-outline-success" id="btnBaixarMassa" disabled onclick="baixarDocumentosMassa(' . $janelaId . ')"><i class="fas fa-file-archive me-1"></i>Baixar documentos</button>
+</div><div class="card-body">
 <div class="table-responsive"><table class="table table-hover align-middle table-sm">
-<thead><tr><th>Pedido</th><th>Data/Hora</th><th>Cliente</th><th>ZIP/CEP</th><th>Qtd</th><th>Etiqueta</th><th>Ações</th></tr></thead><tbody>';
+<thead><tr><th style="width:30px"><input type="checkbox" id="checkAll" onclick="toggleAll(this)"></th><th>Pedido</th><th>Data/Hora</th><th>Cliente</th><th>ZIP/CEP</th><th>Qtd</th><th>Etiqueta</th><th>Ações</th></tr></thead><tbody>';
 
         if (!$pedidos) {
-            echo '<tr><td colspan="7" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
+            echo '<tr><td colspan="8" class="text-center text-muted">Nenhum pedido nesta janela.</td></tr>';
         } else {
             foreach ($pedidos as $p) {
                 $pid = (int)($p['pedido_id'] ?? 0);
@@ -614,6 +616,7 @@ class AdminRemessaConferenciaController extends Controller {
                 }
 
                 echo '<tr>
+                    <td><input type="checkbox" class="pedido-check" value="' . $pid . '" onchange="updateBtnBaixar()"></td>
                     <td><strong>' . $pedidoLabel . '</strong>' . ($isRedir ? ' <span class="badge bg-info" style="font-size:.6rem">REDIR</span>' : '') . '</td>
                     <td>' . $dt . '</td>
                     <td>' . htmlspecialchars($clienteNome) . '</td>
@@ -629,7 +632,33 @@ class AdminRemessaConferenciaController extends Controller {
             }
         }
         echo '</tbody></table></div></div></div></main></div></div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script></body></html>';
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleAll(el) {
+    document.querySelectorAll(".pedido-check").forEach(cb => cb.checked = el.checked);
+    updateBtnBaixar();
+}
+function updateBtnBaixar() {
+    const checked = document.querySelectorAll(".pedido-check:checked");
+    const btn = document.getElementById("btnBaixarMassa");
+    if (btn) {
+        btn.disabled = checked.length === 0;
+        btn.innerHTML = checked.length > 0
+            ? \'<i class="fas fa-file-archive me-1"></i>Baixar documentos (\' + checked.length + \')\'
+            : \'<i class="fas fa-file-archive me-1"></i>Baixar documentos\';
+    }
+}
+function baixarDocumentosMassa(janelaId) {
+    const checked = document.querySelectorAll(".pedido-check:checked");
+    if (checked.length === 0) { alert("Selecione ao menos um pedido."); return; }
+    const ids = Array.from(checked).map(cb => cb.value).join(",");
+    const btn = document.getElementById("btnBaixarMassa");
+    if (btn) { btn.disabled = true; btn.innerHTML = \'<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...\'; }
+    window.location.href = "/admin/remessa-conferencia/janela/" + janelaId + "/exportar-documentos?pedidos=" + encodeURIComponent(ids);
+    setTimeout(() => { if (btn) { btn.disabled = false; updateBtnBaixar(); } }, 5000);
+}
+</script>
+</body></html>';
         exit;
     }
 
@@ -1668,5 +1697,280 @@ th{background:#f5f5f5}
         header('Content-Disposition: attachment; filename="' . $htmlFilename . '"');
         header('Cache-Control: private, max-age=0, must-revalidate');
         echo $html;
+    }
+
+    /**
+     * Gera o conteúdo PDF (ou HTML fallback) como string para uso em ZIP.
+     */
+    private function renderPdfToString(string $html): string {
+        $dompdfClass = 'Dompdf\\Dompdf';
+        if (class_exists($dompdfClass)) {
+            try {
+                $dompdf = new $dompdfClass(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true]);
+                $dompdf->loadHtml($html, 'UTF-8');
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                return $dompdf->output();
+            } catch (\Throwable $e) {}
+        }
+        return $html;
+    }
+
+    /**
+     * Gera o HTML do comprovante para um pedido/gateway (reutiliza lógica de gerarComprovante).
+     */
+    private function buildComprovanteHtml(int $pedidoId, string $gateway): ?string {
+        $pid = $pedidoId;
+        $isRedir = ($pid >= 900000);
+        if ($isRedir) {
+            $pedido = $this->getEnvioRedirecionamentoComoPedido($pid - 900000);
+        } else {
+            $pedido = $this->getPedidoCompleto($pid);
+        }
+        if (!$pedido) return null;
+
+        $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moeda === '') $moeda = 'USD';
+        $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
+
+        $taxaUsdBrl = $this->getUsdToBrlRate();
+
+        $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
+        if (empty($pagamentos)) return null;
+
+        $gwLabel = match($gateway) { 'appmax' => 'AppMax', 'cambioreal' => 'Câmbio Real', 'cambioreal_taxas' => 'Câmbio Real Taxas', 'stripe' => 'Stripe', default => strtoupper($gateway) };
+        $itens = $pedido['itens'] ?? [];
+        $dataHoje = date('d/m/Y H:i');
+
+        ob_start();
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Comprovante ' . $h($gwLabel) . ' - Pedido #' . $pid . '</title>
+<style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f5f5f5;width:160px}.itens th,.itens td{font-size:11px}.wrap{word-break:break-word;overflow-wrap:anywhere;white-space:normal}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}.logo{font-size:22px;font-weight:bold;color:#1a5276}</style></head><body>
+<div class="header"><div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div><div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div></div>
+<h2>Dados do Pedido</h2><table>
+<tr><th>Pedido</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>Data</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
+<tr><th>Cliente</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr></table>
+<h2>Dados do Pagamento - ' . $h($gwLabel) . '</h2>';
+        $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
+        foreach ($pagamentos as $i => $pg) {
+            if (count($pagamentos) > 1) echo '<p><strong>Registro #' . ($i + 1) . '</strong></p>';
+            echo '<table>';
+            foreach ($allFields as $f) {
+                if (!isset($pg[$f]) || $pg[$f] === null || $pg[$f] === '') continue;
+                $val = (string)$pg[$f];
+                if ($f === 'pix_payload' && strlen($val) > 50) $val = substr($val, 0, 50) . '...';
+                echo '<tr><th>' . $h($f) . '</th><td>' . $h($val) . '</td></tr>';
+            }
+            echo '</table>';
+        }
+        echo '<h2>Itens</h2><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
+        $idx = 1;
+        foreach ($itens as $it) {
+            $pu = null;
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) { if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; } }
+            $qtdIt = (int)($it['quantidade'] ?? 0);
+            $totIt = $pu !== null ? $pu * $qtdIt : null;
+            echo '<tr><td>' . $idx . '</td><td class="wrap">' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
+            $idx++;
+        }
+        echo '</tbody></table></body></html>';
+        return ob_get_clean();
+    }
+
+    /**
+     * Gera o HTML da invoice para um pedido (reutiliza lógica de gerarInvoice).
+     */
+    private function buildInvoiceHtml(int $pedidoId): ?string {
+        $pid = $pedidoId;
+        $isRedir = ($pid >= 900000);
+        if ($isRedir) {
+            $pedido = $this->getEnvioRedirecionamentoComoPedido($pid - 900000);
+        } else {
+            $pedido = $this->getPedidoCompleto($pid);
+        }
+        if (!$pedido) return null;
+
+        $h = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+        if ($moeda === '') $moeda = 'USD';
+        $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
+        $taxaUsdBrl = $this->getUsdToBrlRate();
+        $itens = $pedido['itens'] ?? [];
+        $pagamentos = $pedido['pagamentos'] ?? [];
+        $endereco = $pedido['endereco'] ?? null;
+
+        ob_start();
+        echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Invoice - Pedido #' . $pid . '</title>
+<style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f5f5f5}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}.logo{font-size:22px;font-weight:bold;color:#1a5276}</style></head><body>
+<div class="header"><div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div><div style="text-align:right"><div><strong>Pedido:</strong> #' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</div><div><strong>Data:</strong> ' . (!empty($pedido['created_at']) ? date('d/m/Y', strtotime((string)$pedido['created_at'])) : date('d/m/Y')) . '</div></div></div>';
+
+        echo '<h2>Dados do Cliente</h2><table>
+<tr><th>Nome</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
+<tr><th>CPF/Doc</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>Telefone</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr></table>';
+
+        if ($endereco) {
+            echo '<h2>Endereço de Entrega</h2><table>
+<tr><th>Endereço</th><td colspan="3">' . $h(($endereco['endereco'] ?? ($endereco['logradouro'] ?? '')) . ', ' . ($endereco['numero'] ?? '') . ' ' . ($endereco['complemento'] ?? '')) . '</td></tr>
+<tr><th>Bairro</th><td>' . $h($endereco['bairro'] ?? '') . '</td><th>Cidade/UF</th><td>' . $h(($endereco['cidade'] ?? '') . '/' . ($endereco['estado'] ?? '')) . '</td></tr>
+<tr><th>CEP</th><td>' . $h($endereco['cep'] ?? '') . '</td><th>País</th><td>' . $h($endereco['pais'] ?? 'BR') . '</td></tr></table>';
+        }
+
+        echo '<h2>Itens</h2><table><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit. (USD)</th><th>Total (USD)</th></tr></thead><tbody>';
+        $subtotal = 0; $idx = 1;
+        foreach ($itens as $it) {
+            $pu = null;
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) { if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; } }
+            $qtdIt = (int)($it['quantidade'] ?? 0);
+            $totIt = $pu !== null ? $pu * $qtdIt : 0;
+            $subtotal += $totIt;
+            echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
+            $idx++;
+        }
+        echo '</tbody></table>';
+
+        // Resumo financeiro
+        $totalUsd = 0; $totalBrl = 0;
+        $totalPedido = (float)($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
+        if ($totalPedido > 0) { if ($moeda === 'BRL') $totalBrl = $totalPedido; else $totalUsd = $totalPedido; }
+        else { foreach ($pagamentos as $pg) { $v = (float)($pg['valor'] ?? 0); $m = strtolower((string)($pg['moeda'] ?? 'BRL')); if ($m === 'usd') $totalUsd += $v; else $totalBrl += $v; } }
+
+        $metodoPagamento = '';
+        foreach ($pagamentos as $pg) { if (!empty($pg['gateway'])) { $metodoPagamento = strtolower((string)$pg['gateway']); break; } }
+        if ($metodoPagamento === '') { $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ''))); }
+        $gwNames = ['cambioreal' => 'Câmbio Real', 'appmax' => 'AppMax', 'stripe' => 'Stripe', 'pagdev' => 'PagDev'];
+        $metodoLabel = $gwNames[$metodoPagamento] ?? ucfirst($metodoPagamento);
+        $dataPagamento = '';
+        foreach (['paid_at','data_pagamento','data_confirmacao'] as $c) { if (!empty($pedido[$c])) { $dataPagamento = (string)$pedido[$c]; break; } }
+
+        echo '<h2>Pagamento</h2><table>';
+        echo '<tr><th>Método</th><td>' . $h($metodoLabel) . '</td></tr>';
+        echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
+        if ($totalUsd > 0) { echo '<tr><th>Total (USD)</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>'; }
+        elseif ($totalBrl > 0) { echo '<tr><th>Total (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>'; }
+        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
+        echo '</table></body></html>';
+        return ob_get_clean();
+    }
+
+    /**
+     * Exportar documentos em massa (ZIP) para pedidos selecionados.
+     */
+    public function exportarDocumentos($request, $id) {
+        $this->requireAccess();
+        $janelaId = (int)$id;
+
+        $pedidoIdsRaw = (string)($request->getParam('pedidos', ''));
+        $pedidoIds = array_filter(array_map('intval', explode(',', $pedidoIdsRaw)), fn($v) => $v > 0);
+
+        if (empty($pedidoIds)) {
+            echo 'Nenhum pedido selecionado.';
+            exit;
+        }
+
+        $zipFile = tempnam(sys_get_temp_dir(), 'remessa_docs_') . '.zip';
+        $zip = new \ZipArchive();
+        if ($zip->open($zipFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            echo 'Erro ao criar arquivo ZIP.';
+            exit;
+        }
+
+        foreach ($pedidoIds as $pid) {
+            $isRedir = ($pid >= 900000);
+            if ($isRedir) {
+                $pedido = $this->getEnvioRedirecionamentoComoPedido($pid - 900000);
+            } else {
+                $pedido = $this->getPedidoCompleto($pid);
+            }
+            if (!$pedido) continue;
+
+            $clienteNome = trim((string)($pedido['cliente_nome'] ?? ''));
+            $clienteNome = preg_replace('/[^a-zA-Z0-9\x{00C0}-\x{017F} _\-]/u', '', $clienteNome);
+            $clienteNome = trim($clienteNome);
+            if ($clienteNome === '') $clienteNome = 'Cliente';
+            $folderName = str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . ' - ' . $clienteNome;
+
+            // Detectar método de pagamento
+            $metodoPagamento = '';
+            foreach (($pedido['pagamentos'] ?? []) as $pg) {
+                if (!empty($pg['gateway'])) { $metodoPagamento = strtolower((string)$pg['gateway']); break; }
+            }
+            if ($metodoPagamento === '') {
+                $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? '')));
+            }
+
+            $isPagdev = ($metodoPagamento === 'pagdev');
+
+            // 1. Invoice (sempre)
+            $invoiceHtml = $this->buildInvoiceHtml($pid);
+            if ($invoiceHtml) {
+                $invoicePdf = $this->renderPdfToString($invoiceHtml);
+                $ext = class_exists('Dompdf\\Dompdf') ? 'pdf' : 'html';
+                $zip->addFromString($folderName . '/invoice.' . $ext, $invoicePdf);
+            }
+
+            // 2. Comprovante
+            if ($isPagdev) {
+                // PagDev: buscar arquivo de comprovante de produtos enviado pelo vendedor
+                try {
+                    $stDoc = $this->connection->prepare("SELECT arquivo_path FROM pedidos_pagamento_documentos WHERE pedido_id = :pid AND metodo = 'pagdev' AND tipo = 'produtos' AND status = 'ok' ORDER BY id DESC LIMIT 1");
+                    $stDoc->execute([':pid' => $pid]);
+                    $docRow = $stDoc->fetch(\PDO::FETCH_ASSOC);
+                    if ($docRow && !empty($docRow['arquivo_path'])) {
+                        $filePath = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/') . '/' . ltrim($docRow['arquivo_path'], '/');
+                        if (!file_exists($filePath)) {
+                            // Tentar caminho relativo ao projeto
+                            $filePath = dirname(__DIR__, 2) . '/public/' . ltrim($docRow['arquivo_path'], '/');
+                        }
+                        if (file_exists($filePath)) {
+                            $ext = pathinfo($filePath, PATHINFO_EXTENSION) ?: 'pdf';
+                            $zip->addFile($filePath, $folderName . '/comprovante_pagamento.' . $ext);
+                        }
+                    }
+                } catch (\Exception $e) {}
+            } else {
+                // Detectar gateway principal do pedido (stripe para USD, cambioreal para BRL)
+                $gatewayComprovante = 'cambioreal';
+                foreach (($pedido['pagamentos'] ?? []) as $pg) {
+                    $gw = strtolower(trim((string)($pg['gateway'] ?? '')));
+                    if ($gw !== '' && $gw !== 'cambioreal_taxas' && $gw !== 'appmax') {
+                        $gatewayComprovante = $gw;
+                        break;
+                    }
+                }
+                // Se não encontrou nos pagamentos, inferir pela moeda
+                if ($gatewayComprovante === 'cambioreal') {
+                    $moedaPedido = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? ''))));
+                    if ($moedaPedido === 'USD') {
+                        $gatewayComprovante = 'stripe';
+                    }
+                }
+
+                $comprovanteHtml = $this->buildComprovanteHtml($pid, $gatewayComprovante);
+                if ($comprovanteHtml) {
+                    $comprovantePdf = $this->renderPdfToString($comprovanteHtml);
+                    $ext = class_exists('Dompdf\\Dompdf') ? 'pdf' : 'html';
+                    $zip->addFromString($folderName . '/comprovante_' . $gatewayComprovante . '.' . $ext, $comprovantePdf);
+                }
+            }
+        }
+
+        $zip->close();
+
+        if (!file_exists($zipFile) || filesize($zipFile) === 0) {
+            echo 'Nenhum documento encontrado para os pedidos selecionados.';
+            exit;
+        }
+
+        $downloadName = 'documentos_janela_' . $janelaId . '_' . date('Ymd_His') . '.zip';
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+        header('Content-Length: ' . filesize($zipFile));
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        readfile($zipFile);
+        @unlink($zipFile);
+        exit;
     }
 }
