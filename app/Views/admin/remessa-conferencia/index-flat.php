@@ -93,12 +93,16 @@ $filtroBusca = $filtros['busca'] ?? '';
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <strong><i class="fas fa-list me-2"></i>Pedidos (<?= count($pedidos) ?>)</strong>
+        <button type="button" class="btn btn-sm btn-outline-success" id="btnBaixarMassa" disabled onclick="baixarDocumentosMassa()">
+            <i class="fas fa-file-archive me-1"></i>Baixar documentos
+        </button>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover table-sm align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th style="width:30px"><input type="checkbox" id="checkAll" onclick="toggleAll(this)"></th>
                         <th>Pedido</th>
                         <th>Data/Hora</th>
                         <th>Cliente</th>
@@ -112,7 +116,7 @@ $filtroBusca = $filtros['busca'] ?? '';
                 </thead>
                 <tbody>
                     <?php if (empty($pedidos)): ?>
-                    <tr><td colspan="9" class="text-center text-muted py-4">Nenhum pedido encontrado.</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-4">Nenhum pedido encontrado.</td></tr>
                     <?php else: ?>
                     <?php foreach ($pedidos as $p):
                         $pid = (int)($p['pedido_id'] ?? 0);
@@ -129,6 +133,7 @@ $filtroBusca = $filtros['busca'] ?? '';
                         $wxShipId = (string)($p['wexpress_shipping_id'] ?? '');
                     ?>
                     <tr>
+                        <td><input type="checkbox" class="pedido-check" value="<?= $pid ?>" data-janela="<?= $jId ?>" onchange="updateBtnBaixar()"></td>
                         <td><a href="/admin/pedidos/detalhes/<?= $pid ?>" class="fw-bold text-decoration-none">#<?= str_pad((string)$pid, 6, '0', STR_PAD_LEFT) ?></a></td>
                         <td class="small"><?= $dt ?></td>
                         <td>
@@ -164,3 +169,34 @@ $filtroBusca = $filtros['busca'] ?? '';
         </div>
     </div>
 </div>
+
+<script>
+function toggleAll(el) {
+    document.querySelectorAll('.pedido-check').forEach(function(cb) { cb.checked = el.checked; });
+    updateBtnBaixar();
+}
+function updateBtnBaixar() {
+    var checked = document.querySelectorAll('.pedido-check:checked');
+    var btn = document.getElementById('btnBaixarMassa');
+    if (btn) {
+        btn.disabled = checked.length === 0;
+        btn.innerHTML = checked.length > 0
+            ? '<i class="fas fa-file-archive me-1"></i>Baixar documentos (' + checked.length + ')'
+            : '<i class="fas fa-file-archive me-1"></i>Baixar documentos';
+    }
+}
+function baixarDocumentosMassa() {
+    var checked = document.querySelectorAll('.pedido-check:checked');
+    if (checked.length === 0) { alert('Selecione ao menos um pedido.'); return; }
+    var ids = [];
+    var janelaId = 0;
+    checked.forEach(function(cb) {
+        ids.push(cb.value);
+        if (!janelaId) janelaId = cb.getAttribute('data-janela') || '0';
+    });
+    var btn = document.getElementById('btnBaixarMassa');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...'; }
+    window.location.href = '/admin/remessa-conferencia/exportar-documentos?pedidos=' + encodeURIComponent(ids.join(','));
+    setTimeout(function() { if (btn) { btn.disabled = false; updateBtnBaixar(); } }, 8000);
+}
+</script>

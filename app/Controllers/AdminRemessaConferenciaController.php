@@ -1856,6 +1856,15 @@ th{background:#f5f5f5}
     }
 
     /**
+     * Exportar documentos em massa (ZIP) para pedidos selecionados (sem janela específica).
+     */
+    public function exportarDocumentosGlobal($request) {
+        $this->requireAccess();
+        // Reutilizar o mesmo método passando janela_id = 0
+        $this->exportarDocumentos($request, 0);
+    }
+
+    /**
      * Exportar documentos em massa (ZIP) para pedidos selecionados.
      */
     public function exportarDocumentos($request, $id) {
@@ -1964,7 +1973,7 @@ th{background:#f5f5f5}
             exit;
         }
 
-        $downloadName = 'documentos_janela_' . $janelaId . '_' . date('Ymd_His') . '.zip';
+        $downloadName = 'documentos_remessa_' . ($janelaId > 0 ? 'janela_' . $janelaId . '_' : '') . date('Ymd_His') . '.zip';
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="' . $downloadName . '"');
         header('Content-Length: ' . filesize($zipFile));
