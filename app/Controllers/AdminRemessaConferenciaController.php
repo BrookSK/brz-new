@@ -1717,10 +1717,11 @@ th{background:#f5f5f5}
     }
 
     /**
-     * Gera o HTML do comprovante para um pedido/gateway (reutiliza lógica de gerarComprovante).
+     * Gera o HTML do comprovante para um pedido/gateway (cópia exata de gerarComprovante).
      */
     private function buildComprovanteHtml(int $pedidoId, string $gateway): ?string {
         $pid = $pedidoId;
+        $gateway = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', (string)$gateway));
         $isRedir = ($pid >= 900000);
         if ($isRedir) {
             $pedido = $this->getEnvioRedirecionamentoComoPedido($pid - 900000);
@@ -1734,25 +1735,57 @@ th{background:#f5f5f5}
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
 
-        $taxaUsdBrl = $this->getUsdToBrlRate();
+        $taxaUsdBrl = 5.85;
+        try {
+            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                try {
+                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $st->execute([$k]);
+                    $val = $st->fetchColumn();
+                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
+                    if ($v > 0.0001) { $taxaUsdBrl = $v; break; }
+                } catch (\Throwable $e) {}
+            }
+        } catch (\Throwable $e) {}
 
         $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
         if (empty($pagamentos)) return null;
 
         $gwLabel = match($gateway) { 'appmax' => 'AppMax', 'cambioreal' => 'Câmbio Real', 'cambioreal_taxas' => 'Câmbio Real Taxas', 'stripe' => 'Stripe', default => strtoupper($gateway) };
+        $totalGw = array_sum(array_map(fn($pg) => (float)($pg['valor'] ?? 0), $pagamentos));
         $itens = $pedido['itens'] ?? [];
         $dataHoje = date('d/m/Y H:i');
 
         ob_start();
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Comprovante ' . $h($gwLabel) . ' - Pedido #' . $pid . '</title>
-<style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f5f5f5;width:160px}.itens th,.itens td{font-size:11px}.wrap{word-break:break-word;overflow-wrap:anywhere;white-space:normal}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}.logo{font-size:22px;font-weight:bold;color:#1a5276}</style></head><body>
-<div class="header"><div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div><div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div></div>
-<h2>Dados do Pedido</h2><table>
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
+h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
+th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}
+th{background:#f5f5f5;width:160px}
+.itens th,.itens td{font-size:11px}
+.itens th:nth-child(1),.itens td:nth-child(1){width:24px}
+.itens th:nth-child(3),.itens td:nth-child(3){width:30px;text-align:center}
+.itens th:nth-child(4),.itens td:nth-child(4){width:90px;text-align:right}
+.itens th:nth-child(5),.itens td:nth-child(5){width:90px;text-align:right}
+.wrap{word-break:break-word;overflow-wrap:anywhere;white-space:normal}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.logo{font-size:22px;font-weight:bold;color:#1a5276}
+</style></head><body>
+<div class="header">
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Comprovante de Pagamento</div></div>
+    <div style="text-align:right"><div><strong>Data:</strong> ' . $dataHoje . '</div><div><strong>Gateway:</strong> ' . $h($gwLabel) . '</div></div>
+</div>
+<h2>Dados do Pedido</h2>
+<table>
 <tr><th>Pedido</th><td>#' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</td><th>Data</th><td>' . (!empty($pedido['created_at']) ? date('d/m/Y H:i', strtotime((string)$pedido['created_at'])) : '-') . '</td></tr>
 <tr><th>Cliente</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
-<tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr></table>
+<tr><th>Moeda</th><td>' . $h($moeda) . '</td><th>Status</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+</table>
 <h2>Dados do Pagamento - ' . $h($gwLabel) . '</h2>';
+
         $allFields = ['componente','gateway','metodo','moeda','valor','status','gateway_status','payment_id','invoice_url','bank_slip_url','digitable_line','pix_payload'];
         foreach ($pagamentos as $i => $pg) {
             if (count($pagamentos) > 1) echo '<p><strong>Registro #' . ($i + 1) . '</strong></p>';
@@ -1765,17 +1798,40 @@ th{background:#f5f5f5}
             }
             echo '</table>';
         }
-        echo '<h2>Itens</h2><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead><tbody>';
+
+        echo '<h2>Itens</h2><table class="itens"><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit. (USD)</th><th>Total (USD)</th></tr></thead><tbody>';
         $idx = 1;
         foreach ($itens as $it) {
             $pu = null;
-            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) { if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; } }
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
+                if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
+            }
             $qtdIt = (int)($it['quantidade'] ?? 0);
             $totIt = $pu !== null ? $pu * $qtdIt : null;
             echo '<tr><td>' . $idx . '</td><td class="wrap">' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
             $idx++;
         }
-        echo '</tbody></table></body></html>';
+        echo '</tbody></table>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">Os valores dos itens estão em USD. Conversão estimada para BRL usando a taxa configurada no sistema: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
+        echo '<h2>Total ' . $h($gwLabel) . '</h2><table>';
+
+        $pgMoeda = 'BRL';
+        foreach ($pagamentos as $pg) {
+            if (!empty($pg['moeda'])) { $pgMoeda = strtoupper(trim((string)$pg['moeda'])); break; }
+        }
+        if ($pgMoeda === '' || $moeda === 'USD') $pgMoeda = $moeda;
+
+        if ($pgMoeda === 'USD') {
+            $totalBrlEq = $totalGw * $taxaUsdBrl;
+            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+        } else {
+            $totalUsdEq = $taxaUsdBrl > 0 ? ($totalGw / $taxaUsdBrl) : 0.0;
+            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalGw, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        }
+        echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
+        echo '</table></body></html>';
         return ob_get_clean();
     }
 
