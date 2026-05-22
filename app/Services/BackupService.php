@@ -383,6 +383,13 @@ class BackupService {
             throw new \RuntimeException($err ?: 'Falha ao gerar backup');
         }
 
+        // Enviar cópia do backup do banco para servidor externo
+        try {
+            $this->enviarBackupServidorExterno($dbSqlPath);
+        } catch (\Throwable $e) {
+            error_log('[BACKUP] Falha ao enviar para servidor externo: ' . $e->getMessage());
+        }
+
         return $id;
     }
 
@@ -480,5 +487,78 @@ class BackupService {
         if ($ret !== 0) {
             throw new \RuntimeException('Falha ao restaurar via mysql: ' . $out);
         }
+    }
+
+    /**
+     * Envia uma cópia do backup do banco de dados para o servidor externo.
+     * O servidor externo apaga automaticamente backups antigos ao receber um novo.
+     */
+    private function enviarBackupServidorExterno(string $dbSqlPath): void {
+        if (!file_exists($dbSqlPath) || filesize($dbSqlPath) === 0) {
+            return;
+        }
+
+        $url = 'https://media.onsolutionsbrasil.com.br/backup.php';
+
+        // Comprimir o .sql em .gz para reduzir tamanho de upload
+        $gzPath = $dbSqlPath . '.gz';
+        $compressed = false;
+        try {
+            $fp = gzopen($gzPath, 'wb9');
+            if ($fp) {
+                $src = fopen($dbSqlPath, 'rb');
+                if ($src) {
+                    while (!feof($src)) {
+                        gzwrite($fp, fread($src, 524288)); // 512KB chunks
+                    }
+                    fclose($src);
+                }
+                gzclose($fp);
+                if (file_exists($gzPath) && filesize($gzPath) > 0) {
+                    $compressed = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            $compressed = false;
+        }
+
+        $fileToSend = $compressed ? $gzPath : $dbSqlPath;
+        $fileName = $compressed ? basename($dbSqlPath) . '.gz' : basename($dbSqlPath);
+
+        // Enviar via cURL multipart/form-data
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 300, // 5 minutos para upload
+            CURLOPT_CONNECTTIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_POSTFIELDS => [
+                'file' => new \CURLFile($fileToSend, 'application/octet-stream', $fileName),
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        // Limpar arquivo comprimido temporário
+        if ($compressed && file_exists($gzPath)) {
+            @unlink($gzPath);
+        }
+
+        if ($httpCode !== 200 || $response === false) {
+            throw new \RuntimeException('HTTP ' . $httpCode . ' - ' . ($curlError ?: 'Resposta inválida'));
+        }
+
+        $json = @json_decode((string) $response, true);
+        if (!is_array($json) || ($json['status'] ?? '') !== 'success') {
+            $msg = $json['msg'] ?? 'Resposta inesperada do servidor';
+            throw new \RuntimeException($msg);
+        }
+
+        error_log('[BACKUP] Cópia enviada para servidor externo: ' . ($json['url'] ?? ''));
     }
 }
