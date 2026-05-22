@@ -128,7 +128,7 @@ class WebhookTicketController {
                 if (in_array('motivo', $colsT, true)) {
                     $cols[] = 'motivo';
                     $vals[] = '?';
-                    $params[] = $mensagemCompleta;
+                    $params[] = mb_substr($mensagemCompleta, 0, 250);
                 }
                 if (in_array('origem', $colsT, true)) {
                     $cols[] = 'origem';
