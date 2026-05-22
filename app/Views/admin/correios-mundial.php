@@ -456,35 +456,65 @@ async function downloadSelecionadas() {
     const ids = Array.from(checks).map(cb => parseInt(cb.value));
 
     const btn = document.getElementById('btnDownloadMassa');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Baixando 0/' + ids.length + '...'; }
 
-    try {
-        const r = await fetch('/admin/correios-mundial/download-etiquetas-massa', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: ids })
-        });
-
-        if (!r.ok) {
-            const errData = await r.json().catch(() => ({}));
-            alert('Erro: ' + (errData.error || 'Falha ao gerar ZIP'));
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
-            updateBtnMassa();
-            return;
+    // Coletar tracking numbers e nomes dos clientes das linhas selecionadas
+    const items = [];
+    checks.forEach(function(cb) {
+        const row = cb.closest('tr');
+        if (!row) return;
+        const cells = row.querySelectorAll('td');
+        const pedidoId = cb.value;
+        const clienteNome = cells[2] ? cells[2].textContent.trim() : '';
+        const tracking = cells[3] ? cells[3].textContent.trim() : '';
+        if (tracking) {
+            items.push({ pedidoId: pedidoId, clienteNome: clienteNome, tracking: tracking });
         }
+    });
 
-        const blob = await r.blob();
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'etiquetas_packet_' + new Date().toISOString().slice(0,10) + '.zip';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-    } catch (e) {
-        alert('Erro de rede: ' + e.message);
+    if (items.length === 0) {
+        alert('Nenhuma etiqueta com tracking encontrada nas selecionadas.');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
+        updateBtnMassa();
+        return;
     }
+
+    // Carregar JSZip dinamicamente
+    if (typeof JSZip === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+        document.head.appendChild(script);
+        await new Promise(function(resolve) { script.onload = resolve; });
+    }
+
+    const zip = new JSZip();
+    let downloaded = 0;
+
+    for (const item of items) {
+        try {
+            const r = await fetch('/admin/correios-mundial/etiqueta/' + encodeURIComponent(item.tracking) + '.pdf');
+            if (r.ok) {
+                const blob = await r.blob();
+                const safeName = item.clienteNome.replace(/[\\\/\:\*\?\"\<\>\|]/g, '');
+                const filename = '#' + item.pedidoId + ' - ' + safeName + '.pdf';
+                zip.file(filename, blob);
+            }
+        } catch (e) {}
+        downloaded++;
+        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Baixando ' + downloaded + '/' + items.length + '...'; }
+    }
+
+    // Gerar e baixar o ZIP
+    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...'; }
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = 'etiquetas_packet_' + new Date().toISOString().slice(0,10) + '.zip';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
     updateBtnMassa();
