@@ -1780,7 +1780,7 @@ th{background:#f5f5f5}
     }
 
     /**
-     * Gera o HTML da invoice para um pedido (reutiliza lógica de gerarInvoice).
+     * Gera o HTML da invoice para um pedido (reutiliza exatamente a mesma lógica de gerarInvoice).
      */
     private function buildInvoiceHtml(int $pedidoId): ?string {
         $pid = $pedidoId;
@@ -1796,60 +1796,125 @@ th{background:#f5f5f5}
         $moeda = strtoupper(trim((string)($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
-        $taxaUsdBrl = $this->getUsdToBrlRate();
+
+        $taxaUsdBrl = 5.85;
+        try {
+            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
+                try {
+                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
+                    $st->execute([$k]);
+                    $val = $st->fetchColumn();
+                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
+                    if ($v > 0.0001) { $taxaUsdBrl = $v; break; }
+                } catch (\Throwable $e) {}
+            }
+        } catch (\Throwable $e) {}
+
         $itens = $pedido['itens'] ?? [];
         $pagamentos = $pedido['pagamentos'] ?? [];
-        $endereco = $pedido['endereco'] ?? null;
+        $end = $pedido['endereco'] ?? null;
+        $logr   = is_array($end) ? trim((string)($end['endereco'] ?? ($end['logradouro'] ?? ''))) : '';
+        $num    = is_array($end) ? trim((string)($end['numero'] ?? '')) : '';
+        $compl  = is_array($end) ? trim((string)($end['complemento'] ?? '')) : '';
+        $bairro = is_array($end) ? trim((string)($end['bairro'] ?? '')) : '';
+        $cidade = is_array($end) ? trim((string)($end['cidade'] ?? '')) : '';
+        $estado = is_array($end) ? trim((string)($end['estado'] ?? '')) : '';
+        $cep    = is_array($end) ? trim((string)($end['cep'] ?? ($end['zip_code'] ?? ''))) : '';
+        $pais   = is_array($end) ? trim((string)($end['pais'] ?? ($end['country'] ?? 'BR'))) : 'BR';
+        $dataHoje = date('d/m/Y H:i');
 
         ob_start();
         echo '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Invoice - Pedido #' . $pid . '</title>
-<style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f5f5f5}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}.logo{font-size:22px;font-weight:bold;color:#1a5276}</style></head><body>
-<div class="header"><div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div><div style="text-align:right"><div><strong>Pedido:</strong> #' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</div><div><strong>Data:</strong> ' . (!empty($pedido['created_at']) ? date('d/m/Y', strtotime((string)$pedido['created_at'])) : date('d/m/Y')) . '</div></div></div>';
+<style>
+body{font-family:Arial,sans-serif;font-size:13px;color:#222;margin:30px}
+h1{font-size:22px;margin-bottom:4px}
+h2{font-size:15px;color:#555;margin-top:20px;border-bottom:1px solid #ccc;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}
+th{background:#f5f5f5}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.logo{font-size:24px;font-weight:bold;color:#1a5276}
+.totals td:last-child{text-align:right}
+</style></head><body>
+<div class="header">
+    <div><div class="logo">Braziliana</div><div style="color:#888;font-size:12px">Invoice / Fatura</div></div>
+    <div style="text-align:right">
+        <div><strong>Invoice #:</strong> ' . str_pad((string)$pid, 6, '0', STR_PAD_LEFT) . '</div>
+        <div><strong>Data:</strong> ' . $dataHoje . '</div>
+        <div><strong>Moeda:</strong> ' . $h($moeda) . '</div>
+    </div>
+</div>
 
-        echo '<h2>Dados do Cliente</h2><table>
+<h2>Dados do Cliente</h2>
+<table>
 <tr><th>Nome</th><td>' . $h($pedido['cliente_nome'] ?? '') . '</td><th>E-mail</th><td>' . $h($pedido['cliente_email'] ?? '') . '</td></tr>
-<tr><th>CPF/Doc</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>Telefone</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr></table>';
+<tr><th>CPF/Doc</th><td>' . $h($pedido['cliente_cpf'] ?? '') . '</td><th>Telefone</th><td>' . $h($pedido['cliente_telefone'] ?? '') . '</td></tr>
+<tr><th>Suíte</th><td>' . $h($pedido['cliente_suite'] ?? '') . '</td><th>Status pedido</th><td>' . $h($pedido['status'] ?? '') . '</td></tr>
+</table>
 
-        if ($endereco) {
-            echo '<h2>Endereço de Entrega</h2><table>
-<tr><th>Endereço</th><td colspan="3">' . $h(($endereco['endereco'] ?? ($endereco['logradouro'] ?? '')) . ', ' . ($endereco['numero'] ?? '') . ' ' . ($endereco['complemento'] ?? '')) . '</td></tr>
-<tr><th>Bairro</th><td>' . $h($endereco['bairro'] ?? '') . '</td><th>Cidade/UF</th><td>' . $h(($endereco['cidade'] ?? '') . '/' . ($endereco['estado'] ?? '')) . '</td></tr>
-<tr><th>CEP</th><td>' . $h($endereco['cep'] ?? '') . '</td><th>País</th><td>' . $h($endereco['pais'] ?? 'BR') . '</td></tr></table>';
-        }
+<h2>Endereço de Entrega</h2>
+<table>
+<tr><th>Logradouro</th><td>' . $h($logr . ($num !== '' ? ', ' . $num : '') . ($compl !== '' ? ' - ' . $compl : '')) . '</td><th>Bairro</th><td>' . $h($bairro) . '</td></tr>
+<tr><th>Cidade</th><td>' . $h($cidade) . '</td><th>Estado</th><td>' . $h($estado) . '</td></tr>
+<tr><th>CEP</th><td>' . $h($cep) . '</td><th>País</th><td>' . $h($pais) . '</td></tr>
+</table>
 
-        echo '<h2>Itens</h2><table><thead><tr><th>#</th><th>Produto</th><th>Qtd</th><th>Preço Unit. (USD)</th><th>Total (USD)</th></tr></thead><tbody>';
-        $subtotal = 0; $idx = 1;
+<h2>Itens</h2>
+<table>
+<thead><tr><th>#</th><th>Produto / Declaração</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
+<tbody>';
+        $idx = 1;
         foreach ($itens as $it) {
             $pu = null;
-            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) { if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; } }
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) {
+                if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; }
+            }
+            if ($pu !== null && $moeda === 'BRL' && $taxaUsdBrl > 0) { $pu = $pu / $taxaUsdBrl; }
             $qtdIt = (int)($it['quantidade'] ?? 0);
-            $totIt = $pu !== null ? $pu * $qtdIt : 0;
-            $subtotal += $totIt;
+            $totIt = $pu !== null ? $pu * $qtdIt : null;
             echo '<tr><td>' . $idx . '</td><td>' . $h($it['produto_nome'] ?? '') . '</td><td>' . $qtdIt . '</td><td>' . $fmtMoeda($pu, 'USD') . '</td><td>' . $fmtMoeda($totIt, 'USD') . '</td></tr>';
             $idx++;
         }
+        $somaItens = array_sum(array_map(function($it) use ($moeda, $taxaUsdBrl) {
+            $pu = null;
+            foreach (['preco_unitario','valor_unitario','preco','price'] as $c) { if (isset($it[$c]) && is_numeric($it[$c])) { $pu = (float)$it[$c]; break; } }
+            if ($pu !== null && $moeda === 'BRL' && $taxaUsdBrl > 0) { $pu = $pu / $taxaUsdBrl; }
+            $qtd = (int)($it['quantidade'] ?? 0);
+            return $pu !== null ? $pu * $qtd : 0;
+        }, $itens));
+        echo '<tr style="font-weight:bold;background:#f5f5f5"><td colspan="4" style="text-align:right">Total</td><td>' . $fmtMoeda($somaItens, 'USD') . '</td></tr>';
         echo '</tbody></table>';
+        echo '<div style="margin-top:6px;color:#666;font-size:12px">Valores dos itens exibidos em USD. Taxa de câmbio utilizada: 1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '.</div>';
 
-        // Resumo financeiro
-        $totalUsd = 0; $totalBrl = 0;
+        echo '<h2>Resumo de Pagamento</h2><table>';
+        $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ($pedido['pagamento_metodo'] ?? ''))));
+        $dataPagamento = (string)($pedido['pago_em'] ?? ($pedido['pagamento_data'] ?? ($pedido['paid_at'] ?? '')));
+        $totalBrl = 0.0; $totalUsd = 0.0;
+        foreach ($pagamentos as $pg) {
+            if ($dataPagamento === '' && !empty($pg['created_at'])) $dataPagamento = (string)$pg['created_at'];
+            if ($metodoPagamento === '' && !empty($pg['gateway'])) $metodoPagamento = strtolower(trim((string)$pg['gateway']));
+        }
         $totalPedido = (float)($pedido['total'] ?? ($pedido['valor_total'] ?? 0));
         if ($totalPedido > 0) { if ($moeda === 'BRL') $totalBrl = $totalPedido; else $totalUsd = $totalPedido; }
         else { foreach ($pagamentos as $pg) { $v = (float)($pg['valor'] ?? 0); $m = strtolower((string)($pg['moeda'] ?? 'BRL')); if ($m === 'usd') $totalUsd += $v; else $totalBrl += $v; } }
 
-        $metodoPagamento = '';
-        foreach ($pagamentos as $pg) { if (!empty($pg['gateway'])) { $metodoPagamento = strtolower((string)$pg['gateway']); break; } }
-        if ($metodoPagamento === '') { $metodoPagamento = strtolower(trim((string)($pedido['forma_pagamento'] ?? ''))); }
-        $gwNames = ['cambioreal' => 'Câmbio Real', 'appmax' => 'AppMax', 'stripe' => 'Stripe', 'pagdev' => 'PagDev'];
-        $metodoLabel = $gwNames[$metodoPagamento] ?? ucfirst($metodoPagamento);
-        $dataPagamento = '';
-        foreach (['paid_at','data_pagamento','data_confirmacao'] as $c) { if (!empty($pedido[$c])) { $dataPagamento = (string)$pedido[$c]; break; } }
+        $gwNames = ['cambioreal' => 'Câmbio Real', 'appmax' => 'AppMax', 'stripe' => 'Stripe', 'pagdev' => 'PagDev', 'mercadopago' => 'Mercado Pago', 'asaas' => 'Asaas'];
+        $metodoLabel = $gwNames[$metodoPagamento] ?? ($metodoPagamento !== '' ? ucfirst($metodoPagamento) : 'N/A');
+        $totalUsdEq = $taxaUsdBrl > 0 ? ($totalBrl / $taxaUsdBrl) : 0.0;
+        $totalBrlEq = $totalUsd * $taxaUsdBrl;
 
-        echo '<h2>Pagamento</h2><table>';
         echo '<tr><th>Método</th><td>' . $h($metodoLabel) . '</td></tr>';
         echo '<tr><th>Data de crédito</th><td>' . ($dataPagamento !== '' ? date('d/m/Y H:i', strtotime($dataPagamento)) : '-') . '</td></tr>';
-        if ($totalUsd > 0) { echo '<tr><th>Total (USD)</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>'; }
-        elseif ($totalBrl > 0) { echo '<tr><th>Total (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>'; }
+        if ($totalUsd > 0) {
+            echo '<tr><th>Total pago (USD)</th><td><strong>US$ ' . number_format($totalUsd, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (BRL)</th><td><strong>R$ ' . number_format($totalBrlEq, 2, ',', '.') . '</strong></td></tr>';
+        } elseif ($totalBrl > 0) {
+            echo '<tr><th>Total pago (BRL)</th><td><strong>R$ ' . number_format($totalBrl, 2, ',', '.') . '</strong></td></tr>';
+            echo '<tr><th>Equivalente (USD)</th><td><strong>US$ ' . number_format($totalUsdEq, 2, ',', '.') . '</strong></td></tr>';
+        } else {
+            echo '<tr><th>Total pago</th><td><strong>-</strong></td></tr>';
+        }
         echo '<tr><th>Taxa de câmbio</th><td>1 USD = R$ ' . number_format($taxaUsdBrl, 4, ',', '.') . '</td></tr>';
         echo '</table></body></html>';
         return ob_get_clean();
