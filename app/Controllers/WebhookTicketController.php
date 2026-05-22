@@ -83,12 +83,27 @@ class WebhookTicketController {
         }
 
         if (!$usuario) {
-            // Usuário não encontrado — criar ticket "órfão" para análise manual
+            // Se só tentou pela suite (sem email), retorna erro para a automação pedir o email
+            if ($email === '') {
+                $resp = [
+                    'success' => false,
+                    'error' => 'usuario_nao_encontrado',
+                    'message' => 'Nenhum usuário encontrado com a suite ' . $suite,
+                    'suite_informada' => $suite,
+                    'email_informado' => '',
+                    'nome_informado' => $nome,
+                    'telefone_informado' => $telefone,
+                ];
+                echo json_encode($resp);
+                $this->enviarCallback($callbackUrl, $resp);
+                return;
+            }
+
+            // Já tentou com email e não encontrou — criar ticket órfão para análise manual
             try {
                 $colsT = [];
                 try { $st = $this->db->query('DESCRIBE support_tickets'); $colsT = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
 
-                // Usar usuario_id = 0 ou o primeiro admin como fallback
                 $adminId = 0;
                 try {
                     $stAdmin = $this->db->prepare("SELECT id FROM usuarios WHERE perfil = 'admin' ORDER BY id ASC LIMIT 1");
@@ -137,14 +152,15 @@ class WebhookTicketController {
                 }
 
                 $resp = [
-                    'success' => true,
+                    'success' => false,
+                    'error' => 'usuario_nao_encontrado',
+                    'message' => 'Usuário não encontrado. Ticket criado para análise manual.',
                     'ticket_id' => $ticketId,
-                    'message' => 'Ticket criado para análise manual (usuário não encontrado)',
                     'usuario_encontrado' => false,
-                    'nome_informado' => $nome,
-                    'telefone_informado' => $telefone,
                     'suite_informada' => $suite,
                     'email_informado' => $email,
+                    'nome_informado' => $nome,
+                    'telefone_informado' => $telefone,
                 ];
                 echo json_encode($resp);
                 $this->enviarCallback($callbackUrl, $resp);
@@ -154,7 +170,9 @@ class WebhookTicketController {
                 $resp = [
                     'success' => false,
                     'error' => 'erro_interno',
-                    'message' => 'Erro ao criar ticket órfão: ' . $e->getMessage(),
+                    'message' => 'Erro ao criar ticket: ' . $e->getMessage(),
+                    'suite_informada' => $suite,
+                    'email_informado' => $email,
                     'nome_informado' => $nome,
                     'telefone_informado' => $telefone,
                 ];
