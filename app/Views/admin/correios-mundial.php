@@ -178,7 +178,6 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Etiquetas geradas (PACKET)</strong>
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-primary" onclick="downloadSelecionadas()" id="btnDownloadMassa" disabled><i class="fas fa-download me-1"></i>Baixar selecionadas</button>
                 <button class="btn btn-sm btn-success" onclick="exportarCsvSelecionadas()" id="btnExportarCsv" disabled><i class="fas fa-file-csv me-1"></i>Exportar selecionadas</button>
                 <button class="btn btn-sm btn-warning" onclick="regerarSelecionadas()" id="btnRegerarMassa" disabled><i class="fas fa-redo me-1"></i>Regerar selecionadas</button>
             </div>
@@ -333,7 +332,6 @@ function updateBtnMassa() {
     const checked = document.querySelectorAll('.packet-check:checked').length;
     const btn = document.getElementById('btnRegerarMassa');
     const btnExport = document.getElementById('btnExportarCsv');
-    const btnDownload = document.getElementById('btnDownloadMassa');
     if (btn) {
         btn.disabled = checked === 0;
         btn.textContent = checked > 0 ? 'Regerar selecionadas (' + checked + ')' : 'Regerar selecionadas';
@@ -343,12 +341,6 @@ function updateBtnMassa() {
         btnExport.innerHTML = checked > 0
             ? '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas (' + checked + ')'
             : '<i class="fas fa-file-csv me-1"></i>Exportar selecionadas';
-    }
-    if (btnDownload) {
-        btnDownload.disabled = checked === 0;
-        btnDownload.innerHTML = checked > 0
-            ? '<i class="fas fa-download me-1"></i>Baixar selecionadas (' + checked + ')'
-            : '<i class="fas fa-download me-1"></i>Baixar selecionadas';
     }
 }
 
@@ -448,76 +440,6 @@ function downloadCsvFile(filename, csvContent) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-}
-
-async function downloadSelecionadas() {
-    const checks = document.querySelectorAll('.packet-check:checked');
-    if (checks.length === 0) return;
-    const ids = Array.from(checks).map(cb => parseInt(cb.value));
-
-    const btn = document.getElementById('btnDownloadMassa');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Baixando 0/' + ids.length + '...'; }
-
-    // Coletar tracking numbers e nomes dos clientes das linhas selecionadas
-    const items = [];
-    checks.forEach(function(cb) {
-        const row = cb.closest('tr');
-        if (!row) return;
-        const cells = row.querySelectorAll('td');
-        const pedidoId = cb.value;
-        const clienteNome = cells[2] ? cells[2].textContent.trim() : '';
-        const tracking = cells[3] ? cells[3].textContent.trim() : '';
-        if (tracking) {
-            items.push({ pedidoId: pedidoId, clienteNome: clienteNome, tracking: tracking });
-        }
-    });
-
-    if (items.length === 0) {
-        alert('Nenhuma etiqueta com tracking encontrada nas selecionadas.');
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
-        updateBtnMassa();
-        return;
-    }
-
-    // Carregar JSZip dinamicamente
-    if (typeof JSZip === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
-        document.head.appendChild(script);
-        await new Promise(function(resolve) { script.onload = resolve; });
-    }
-
-    const zip = new JSZip();
-    let downloaded = 0;
-
-    for (const item of items) {
-        try {
-            const r = await fetch('/admin/correios-mundial/etiqueta/' + encodeURIComponent(item.tracking) + '.pdf');
-            if (r.ok) {
-                const blob = await r.blob();
-                const safeName = item.clienteNome.replace(/[\\\/\:\*\?\"\<\>\|]/g, '');
-                const filename = '#' + item.pedidoId + ' - ' + safeName + '.pdf';
-                zip.file(filename, blob);
-            }
-        } catch (e) {}
-        downloaded++;
-        if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Baixando ' + downloaded + '/' + items.length + '...'; }
-    }
-
-    // Gerar e baixar o ZIP
-    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando ZIP...'; }
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(zipBlob);
-    link.download = 'etiquetas_packet_' + new Date().toISOString().slice(0,10) + '.zip';
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-download me-1"></i>Baixar selecionadas'; }
-    updateBtnMassa();
 }
 
 // ===== MODO MASSA - Gerar etiquetas em massa =====
