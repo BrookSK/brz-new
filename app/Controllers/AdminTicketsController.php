@@ -915,6 +915,26 @@ class AdminTicketsController extends Controller {
             } catch (\Exception $e) {
             }
 
+            // Email: notificar cliente que o admin respondeu
+            try {
+                $stCli = $pdo->prepare("SELECT t.usuario_id, u.nome, u.email FROM support_tickets t LEFT JOIN usuarios u ON u.id = t.usuario_id WHERE t.id = ? LIMIT 1");
+                $stCli->execute([$id]);
+                $cliData = $stCli->fetch(\PDO::FETCH_ASSOC);
+                if ($cliData && !empty($cliData['email'])) {
+                    $adminNome = '';
+                    try { $stAdm = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $stAdm->execute([$adminUid]); $adminNome = (string)($stAdm->fetchColumn() ?: 'Equipe Braziliana'); } catch (\Exception $e) { $adminNome = 'Equipe Braziliana'; }
+                    SupportTicketNotificationService::enviarEmailTicket(
+                        (string)$cliData['email'],
+                        'Nova resposta no Ticket #' . $id . ' - Braziliana',
+                        (string)($cliData['nome'] ?? 'Cliente'),
+                        (int)$id,
+                        $msg,
+                        $adminNome,
+                        'admin'
+                    );
+                }
+            } catch (\Exception $e) {}
+
             // Webhook: notificar automação que o ticket recebeu primeira resposta (dentro de 30 min)
             try {
                 $stWh = $pdo->prepare("SELECT webhook_aguardando_resposta, webhook_resposta_deadline, webhook_resposta_enviada, webhook_resposta_url FROM support_tickets WHERE id = ? LIMIT 1");

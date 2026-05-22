@@ -445,6 +445,30 @@ class SupportTicketsController extends Controller {
 
             $pdo->prepare('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?')->execute([(int) $id]);
             $pdo->commit();
+
+            // Email: notificar admins que o cliente respondeu
+            try {
+                $clienteNome = '';
+                try { $stN = $pdo->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $stN->execute([$uid]); $clienteNome = (string)($stN->fetchColumn() ?: 'Cliente'); } catch (\Exception $e) { $clienteNome = 'Cliente'; }
+
+                // Buscar emails dos admins
+                $stAdmins = $pdo->prepare("SELECT email, nome FROM usuarios WHERE perfil IN ('admin','suporte') AND email IS NOT NULL AND email != '' LIMIT 10");
+                $stAdmins->execute();
+                $admins = $stAdmins->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($admins as $adm) {
+                    if (!empty($adm['email'])) {
+                        \App\Services\SupportTicketNotificationService::enviarEmailTicket(
+                            (string)$adm['email'],
+                            'Cliente respondeu no Ticket #' . $id . ' - Braziliana',
+                            (string)($adm['nome'] ?? 'Admin'),
+                            (int)$id,
+                            $msg,
+                            $clienteNome,
+                            'cliente'
+                        );
+                    }
+                }
+            } catch (\Exception $e) {}
         } catch (\Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
         }
