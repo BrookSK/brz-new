@@ -158,6 +158,7 @@ class AdminPedidosController extends Controller {
 
             // Se o pedido usa endereco_entrega_id (endereço em tabela separada), atualizar lá também
             $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
+            $enderecoIdAtualizado = 0;
             if ($endEntregaIdCol !== '' && !empty($oldRow[$endEntregaIdCol])) {
                 $enderecoId = (int) $oldRow[$endEntregaIdCol];
                 if ($enderecoId > 0) {
@@ -193,10 +194,104 @@ class AdminPedidosController extends Controller {
                             $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
                             $stEnd = $pdo->prepare($sqlEnd);
                             $stEnd->execute($paramsEnd);
+                            $enderecoIdAtualizado = $enderecoId;
                         }
                     } catch (\Throwable $e) {
                         // Silenciar erro na tabela enderecos — o update principal já foi feito
                     }
+                }
+            }
+
+            // Fallback: se o pedido NÃO tem endereco_entrega_id, atualizar o endereço principal do usuário na tabela enderecos
+            if ($enderecoIdAtualizado <= 0 && $usuarioIdPedido > 0 && $this->tableExistsPdo($pdo, 'enderecos')) {
+                try {
+                    $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
+                    if (in_array('usuario_id', $colsEnd, true)) {
+                        // Buscar o endereço principal do usuário (mesmo critério do getComDetalhes)
+                        $orderBy = 'id DESC';
+                        if (in_array('principal', $colsEnd, true)) {
+                            $orderBy = 'principal DESC, id DESC';
+                        }
+                        $stFindEnd = $pdo->prepare('SELECT id FROM enderecos WHERE usuario_id = ? ORDER BY ' . $orderBy . ' LIMIT 1');
+                        $stFindEnd->execute([$usuarioIdPedido]);
+                        $enderecoUsuarioId = (int) ($stFindEnd->fetchColumn() ?: 0);
+
+                        if ($enderecoUsuarioId > 0) {
+                            // Atualizar o endereço existente do usuário
+                            $pickEnd = function(array $candidates) use ($colsEnd): string {
+                                foreach ($candidates as $c) {
+                                    if (is_array($colsEnd) && in_array($c, $colsEnd, true)) return $c;
+                                }
+                                return '';
+                            };
+
+                            $setEnd = [];
+                            $paramsEnd = [];
+                            $addSetEnd = function(string $col, $val) use (&$setEnd, &$paramsEnd): void {
+                                if ($col === '') return;
+                                $setEnd[] = $col . ' = ?';
+                                $paramsEnd[] = $val;
+                            };
+
+                            $addSetEnd($pickEnd(['pais', 'country', 'country_code', 'pais_code']), trim((string) $request->getParam('pais')));
+                            $addSetEnd($pickEnd(['cep', 'zip_code', 'zipcode']), trim((string) $request->getParam('cep')));
+                            $addSetEnd($pickEnd(['endereco', 'logradouro', 'address']), trim((string) $request->getParam('endereco')));
+                            $addSetEnd($pickEnd(['numero', 'number']), trim((string) $request->getParam('numero')));
+                            $addSetEnd($pickEnd(['complemento']), trim((string) $request->getParam('complemento')));
+                            $addSetEnd($pickEnd(['bairro', 'neighborhood']), trim((string) $request->getParam('bairro')));
+                            $addSetEnd($pickEnd(['cidade', 'city']), trim((string) $request->getParam('cidade')));
+                            $addSetEnd($pickEnd(['estado', 'uf', 'state']), trim((string) $request->getParam('estado')));
+
+                            $setEnd = array_values(array_filter($setEnd, static function($x){ return is_string($x) && trim($x) !== ''; }));
+                            if (!empty($setEnd)) {
+                                $paramsEnd[] = $enderecoUsuarioId;
+                                $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
+                                $stEnd = $pdo->prepare($sqlEnd);
+                                $stEnd->execute($paramsEnd);
+                            }
+                        } else {
+                            // Usuário não tem endereço cadastrado — criar um novo
+                            $pickEnd = function(array $candidates) use ($colsEnd): string {
+                                foreach ($candidates as $c) {
+                                    if (is_array($colsEnd) && in_array($c, $colsEnd, true)) return $c;
+                                }
+                                return '';
+                            };
+
+                            $insertCols = ['usuario_id'];
+                            $insertVals = [$usuarioIdPedido];
+                            $insertPlaceholders = ['?'];
+
+                            $addInsert = function(string $col, $val) use (&$insertCols, &$insertVals, &$insertPlaceholders): void {
+                                if ($col === '' || trim((string) $val) === '') return;
+                                $insertCols[] = $col;
+                                $insertVals[] = $val;
+                                $insertPlaceholders[] = '?';
+                            };
+
+                            $addInsert($pickEnd(['pais', 'country', 'country_code', 'pais_code']), trim((string) $request->getParam('pais')));
+                            $addInsert($pickEnd(['cep', 'zip_code', 'zipcode']), trim((string) $request->getParam('cep')));
+                            $addInsert($pickEnd(['endereco', 'logradouro', 'address']), trim((string) $request->getParam('endereco')));
+                            $addInsert($pickEnd(['numero', 'number']), trim((string) $request->getParam('numero')));
+                            $addInsert($pickEnd(['complemento']), trim((string) $request->getParam('complemento')));
+                            $addInsert($pickEnd(['bairro', 'neighborhood']), trim((string) $request->getParam('bairro')));
+                            $addInsert($pickEnd(['cidade', 'city']), trim((string) $request->getParam('cidade')));
+                            $addInsert($pickEnd(['estado', 'uf', 'state']), trim((string) $request->getParam('estado')));
+
+                            if (count($insertCols) > 1) {
+                                if (in_array('principal', $colsEnd, true)) {
+                                    $insertCols[] = 'principal';
+                                    $insertVals[] = 1;
+                                    $insertPlaceholders[] = '?';
+                                }
+                                $sqlIns = 'INSERT INTO enderecos (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertPlaceholders) . ')';
+                                $stIns = $pdo->prepare($sqlIns);
+                                $stIns->execute($insertVals);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Silenciar erro — o update principal no pedido já foi feito
                 }
             }
 
