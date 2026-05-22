@@ -5522,7 +5522,11 @@ class CheckoutController extends Controller {
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
         if ($pais === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
         if ($pais === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
-        if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
+        if (empty($dados['cidade'])) {
+            $erros[] = 'Cidade é obrigatório';
+        } elseif (mb_strlen(trim((string) $dados['cidade'])) < 3) {
+            $erros[] = 'Cidade deve ter no mínimo 3 caracteres';
+        }
         if (in_array($pais, ['BR','US','CA'], true) && empty($dados['estado'])) $erros[] = 'Estado é obrigatório';
 
         // Destinatário (quando entregar para outra pessoa)

@@ -640,7 +640,7 @@ class AdminUsuariosController extends Controller {
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Cidade</label>
-                                <input type="text" class="form-control" name="end_cidade" value="' . htmlspecialchars((string) ($endereco['cidade'] ?? '')) . '">
+                                <input type="text" class="form-control" name="end_cidade" minlength="3" value="' . htmlspecialchars((string) ($endereco['cidade'] ?? '')) . '">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label" id="lbl_estado">Estado</label>
@@ -784,6 +784,11 @@ class AdminUsuariosController extends Controller {
 
                     // Só salvar se pelo menos um campo de endereço foi preenchido
                     $temDados = ($endCep !== '' || $endEndereco !== '' || $endCidade !== '');
+
+                    // Validar cidade: mínimo 3 caracteres
+                    if ($endCidade !== '' && mb_strlen($endCidade) < 3) {
+                        throw new \Exception('Cidade deve ter no mínimo 3 caracteres');
+                    }
 
                     if ($temDados && in_array('usuario_id', $colsEnd, true)) {
                         $endData = [];

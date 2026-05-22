@@ -269,7 +269,7 @@
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label"><?= __('auth.city', 'Cidade') ?> / <?= __('checkout.city_en', 'City') ?> *</label>
-                                        <input type="text" class="form-control" name="cidade" required id="cidade"
+                                        <input type="text" class="form-control" name="cidade" required minlength="3" id="cidade"
                                                value="<?= htmlspecialchars((string) ($endereco_prefill['cidade'] ?? '')) ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
@@ -497,6 +497,7 @@
                             var k = 'data-' + addrFields[i];
                             var v = (opt.getAttribute(k) || '').toString().trim();
                             if (!v) { hasAll = false; break; }
+                            if (addrFields[i] === 'cidade' && v.length < 3) { hasAll = false; break; }
                         }
                         if (hasAll) {
                             missing = missing.filter(function(it) { return addrFields.indexOf((it || '').toString()) === -1; });
@@ -3192,6 +3193,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var k = required[i];
                 var v = (selectedOption.dataset[k] || '').toString().trim();
                 if (!v) return true;
+                if (k === 'cidade' && v.length < 3) return true;
             }
             return false;
         }

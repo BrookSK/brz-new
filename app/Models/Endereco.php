@@ -58,6 +58,11 @@ class Endereco extends Model {
             return false;
         }
 
+        // Validar cidade: mínimo 3 caracteres
+        if (isset($insert['cidade']) && $insert['cidade'] !== '' && mb_strlen(trim((string) $insert['cidade'])) < 3) {
+            throw new \Exception('Cidade deve ter no mínimo 3 caracteres');
+        }
+
         $columns = implode(', ', array_keys($insert));
         $placeholders = ':' . implode(', :', array_keys($insert));
         $sql = "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
@@ -92,6 +97,11 @@ class Endereco extends Model {
         // Normalizar estado para UF de 2 letras
         if (isset($data['estado'])) {
             $data['estado'] = \App\Models\Usuario::normalizeEstado((string) $data['estado']);
+        }
+
+        // Validar cidade: mínimo 3 caracteres
+        if (isset($data['cidade']) && $data['cidade'] !== '' && mb_strlen(trim((string) $data['cidade'])) < 3) {
+            throw new \Exception('Cidade deve ter no mínimo 3 caracteres');
         }
 
         $sql = "UPDATE {$this->table} SET 

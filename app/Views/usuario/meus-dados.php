@@ -474,7 +474,7 @@
                                 <label for="cidade" class="form-label"><?= __('auth.city', 'Cidade') ?> *</label>
                                 <input type="text" class="form-control" id="cidade" name="cidade" 
                                        value="<?= htmlspecialchars((string) ($ee['cidade'] ?? ($usuario['cidade'] ?? ''))) ?>" 
-                                       placeholder="<?= htmlspecialchars(__('auth.city_example', 'São Paulo'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                       placeholder="<?= htmlspecialchars(__('auth.city_example', 'São Paulo'), ENT_QUOTES, 'UTF-8') ?>" required minlength="3">
                             </div>
                             <div class="col-md-4">
                                 <label for="estado" class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?></label>

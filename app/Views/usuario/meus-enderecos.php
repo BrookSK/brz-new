@@ -151,7 +151,7 @@ ob_start();
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label"><?= __('auth.city', 'Cidade') ?> / <?= __('checkout.city_en', 'City') ?> *</label>
-                                <input type="text" class="form-control" name="cidade" id="cidade" required value="">
+                                <input type="text" class="form-control" name="cidade" id="cidade" required minlength="3" value="">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label" id="label-estado"><?= __('auth.state', 'Estado') ?> / <?= __('checkout.state_en', 'State') ?></label>

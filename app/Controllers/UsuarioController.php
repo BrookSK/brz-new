@@ -956,6 +956,12 @@ class UsuarioController extends Controller {
             $payload['tipo'] = 'entrega';
         }
 
+        // Validar cidade: mínimo 3 caracteres
+        $cidadeCol = in_array('cidade', $cols, true) ? 'cidade' : '';
+        if ($cidadeCol !== '' && isset($payload[$cidadeCol]) && $payload[$cidadeCol] !== '' && mb_strlen($payload[$cidadeCol]) < 3) {
+            return; // Não salvar endereço com cidade inválida
+        }
+
         try {
             $stmt = $db->prepare('SELECT id FROM enderecos WHERE ' . $usuarioCol . ' = :uid' . ($principalCol !== '' ? (' AND ' . $principalCol . ' = 1') : '') . ' ORDER BY id DESC LIMIT 1');
             $stmt->bindValue(':uid', $usuarioId, \PDO::PARAM_INT);
@@ -1089,6 +1095,16 @@ class UsuarioController extends Controller {
 
             if (empty($payload['pais']) && in_array('pais', $cols, true)) {
                 $payload['pais'] = 'BR';
+            }
+
+            // Validar cidade: mínimo 3 caracteres
+            $cidadeCol = in_array('cidade', $cols, true) ? 'cidade' : '';
+            if ($cidadeCol !== '' && isset($payload[$cidadeCol]) && $payload[$cidadeCol] !== '' && mb_strlen($payload[$cidadeCol]) < 3) {
+                if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+                $_SESSION['message'] = 'Cidade deve ter no mínimo 3 caracteres';
+                $_SESSION['message_type'] = 'danger';
+                $this->redirect('/meus-enderecos');
+                return;
             }
 
             // Garantir tipo válido (coluna pode ser ENUM)
@@ -1883,7 +1899,11 @@ class UsuarioController extends Controller {
         if (empty($dados['endereco'])) $erros[] = 'Endereço é obrigatório';
         if ($paisResidencia === 'BR' && empty($dados['numero'])) $erros[] = 'Número é obrigatório';
         if ($paisResidencia === 'BR' && empty($dados['bairro'])) $erros[] = 'Bairro é obrigatório';
-        if (empty($dados['cidade'])) $erros[] = 'Cidade é obrigatório';
+        if (empty($dados['cidade'])) {
+            $erros[] = 'Cidade é obrigatório';
+        } elseif (mb_strlen(trim((string) $dados['cidade'])) < 3) {
+            $erros[] = 'Cidade deve ter no mínimo 3 caracteres';
+        }
 
         $estado = '';
         if (isset($dados['estado']) && trim((string) $dados['estado']) !== '') {
