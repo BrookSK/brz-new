@@ -514,7 +514,9 @@ class AdminCorreiosMundialController extends Controller {
         }
 
         $sql = "
-            SELECT p.id AS pedido_id, u.nome AS cliente_nome, p.usuario_id, p.created_at
+            SELECT p.id AS pedido_id, u.nome AS cliente_nome, p.usuario_id, p.created_at,
+                   p.peso_total, p.altura, p.largura, p.comprimento,
+                   u.email AS cliente_email, u.telefone AS cliente_telefone, u.cpf AS cliente_cpf
             FROM pedidos p
             LEFT JOIN usuarios u ON u.id = p.usuario_id
             LEFT JOIN correios_packet_etiquetas cpe ON cpe.pedido_id = p.id
@@ -1089,6 +1091,254 @@ class AdminCorreiosMundialController extends Controller {
             'pedido_id' => $id,
             'tracking_number' => $tracking,
         ]);
+    }
+
+    /**
+     * Gerar etiquetas PACKET em massa para múltiplos pedidos
+     */
+    public function gerarEtiquetasMassa(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $ids = $body['ids'] ?? [];
+
+        if (!is_array($ids) || empty($ids)) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum pedido selecionado']);
+            exit;
+        }
+
+        $ids = array_filter(array_map('intval', $ids), fn($v) => $v > 0);
+        if (empty($ids)) {
+            echo json_encode(['success' => false, 'error' => 'IDs inválidos']);
+            exit;
+        }
+
+        $this->ensurePacketEtiquetasTable();
+        $pedidoModel = new PedidoEcommerce();
+        $results = [];
+
+        foreach ($ids as $pid) {
+            $result = ['pedido_id' => $pid, 'success' => false, 'error' => '', 'tracking_number' => ''];
+
+            try {
+                // Verificar se já tem etiqueta
+                $stCheck = $this->connection->prepare('SELECT id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                $stCheck->execute([$pid]);
+                if ((int) ($stCheck->fetchColumn() ?: 0) > 0) {
+                    $result['error'] = 'Já possui etiqueta';
+                    $results[] = $result;
+                    continue;
+                }
+
+                $pedido = $pedidoModel->getComDetalhes($pid);
+                if (!is_array($pedido) || empty($pedido['id'])) {
+                    $result['error'] = 'Pedido não encontrado';
+                    $results[] = $result;
+                    continue;
+                }
+
+                $status = strtolower(trim((string) ($pedido['status'] ?? '')));
+                if (!in_array($status, ['produto_consolidado', 'consolidado'], true)) {
+                    $result['error'] = 'Não está em Caixa Fechada';
+                    $results[] = $result;
+                    continue;
+                }
+
+                // Pegar medidas do pedido
+                $pesoKg = isset($pedido['peso_total']) ? (float) $pedido['peso_total'] : 0.0;
+                $alturaCm = isset($pedido['altura']) ? (float) $pedido['altura'] : 0.0;
+                $larguraCm = isset($pedido['largura']) ? (float) $pedido['largura'] : 0.0;
+                $comprimentoCm = isset($pedido['comprimento']) ? (float) $pedido['comprimento'] : 0.0;
+
+                $totalWeight = (int) max(0, round($pesoKg * 1000));
+                $packagingLength = $comprimentoCm > 0 ? $comprimentoCm : 16;
+                $packagingWidth = $larguraCm > 0 ? $larguraCm : 11;
+                $packagingHeight = $alturaCm > 0 ? $alturaCm : 2;
+
+                if ($totalWeight <= 0) {
+                    $result['error'] = 'Peso não informado';
+                    $results[] = $result;
+                    continue;
+                }
+                if ($totalWeight > 30000) {
+                    $result['error'] = 'Peso excede 30kg';
+                    $results[] = $result;
+                    continue;
+                }
+                if ($packagingLength < 16 || $packagingLength > 100) {
+                    $result['error'] = 'Comprimento inválido (16-100cm)';
+                    $results[] = $result;
+                    continue;
+                }
+                if ($packagingWidth < 11 || $packagingWidth > 100) {
+                    $result['error'] = 'Largura inválida (11-100cm)';
+                    $results[] = $result;
+                    continue;
+                }
+                if ($packagingHeight < 2 || $packagingHeight > 100) {
+                    $result['error'] = 'Altura inválida (2-100cm)';
+                    $results[] = $result;
+                    continue;
+                }
+                if (($packagingLength + $packagingWidth + $packagingHeight) > 200) {
+                    $result['error'] = 'Soma dimensões > 200cm';
+                    $results[] = $result;
+                    continue;
+                }
+
+                // Frete: 1.80 por kg
+                $freightPaidValue = round(max(0.01, 1.80 * $pesoKg), 2);
+
+                // Destinatário
+                $destinatario = $this->buildRecipientFromPedido($pedido);
+                $sender = $this->buildSenderFromConfig();
+
+                // Validar destinatário
+                $phoneDigits = $this->onlyDigits((string) ($destinatario['recipientPhoneNumber'] ?? ''));
+                if ($phoneDigits === '' || !in_array(strlen($phoneDigits), [10, 11], true)) {
+                    $result['error'] = 'Telefone destinatário inválido';
+                    $results[] = $result;
+                    continue;
+                }
+                $destEmail = trim((string) ($destinatario['recipientEmail'] ?? ''));
+                if ($destEmail === '' || filter_var($destEmail, FILTER_VALIDATE_EMAIL) === false) {
+                    $result['error'] = 'E-mail destinatário inválido';
+                    $results[] = $result;
+                    continue;
+                }
+                $docType = strtoupper(trim((string) ($destinatario['recipientDocumentType'] ?? '')));
+                $docNum = $this->onlyDigits((string) ($destinatario['recipientDocumentNumber'] ?? ''));
+                if ($docType === 'CPF' && strlen($docNum) !== 11) {
+                    $result['error'] = 'CPF inválido';
+                    $results[] = $result;
+                    continue;
+                }
+                if ($docType === 'CNPJ' && strlen($docNum) !== 14) {
+                    $result['error'] = 'CNPJ inválido';
+                    $results[] = $result;
+                    continue;
+                }
+
+                // Itens
+                $itemsIn = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
+                if (empty($itemsIn)) {
+                    $result['error'] = 'Sem itens';
+                    $results[] = $result;
+                    continue;
+                }
+                if (count($itemsIn) > 20) {
+                    $result['error'] = 'Mais de 20 itens';
+                    $results[] = $result;
+                    continue;
+                }
+
+                $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
+                $brlToUsdRate = 1.0;
+                if ($moedaPedido === 'BRL') {
+                    $usdRate = $this->getUsdToBrlRate();
+                    $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+                }
+
+                $items = [];
+                $sumItems = 0.0;
+                $itemError = '';
+                foreach ($itemsIn as $idx => $it) {
+                    if (!is_array($it)) continue;
+                    $qtd = (int) ($it['quantidade'] ?? 0);
+                    if ($qtd <= 0) { $itemError = 'Item #' . ($idx+1) . ' qtd inválida'; break; }
+                    $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
+                    if ($desc === '') $desc = 'Item ' . ($idx+1);
+                    $ncmDigits = $this->onlyDigits((string) ($it['ncm'] ?? ''));
+                    if ($ncmDigits === '' || strlen($ncmDigits) < 6) { $itemError = 'Item #' . ($idx+1) . ' sem NCM'; break; }
+                    $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
+                    $val = (float) ($it['preco_unitario'] ?? 0);
+                    if ($moedaPedido === 'BRL' && $val > 0) $val = $val * $brlToUsdRate;
+                    if ($val < 0.01) { $itemError = 'Item #' . ($idx+1) . ' valor inválido'; break; }
+                    $sumItems += ($val * $qtd);
+                    $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', '')];
+                }
+                if ($itemError !== '') {
+                    $result['error'] = $itemError;
+                    $results[] = $result;
+                    continue;
+                }
+                if (empty($items)) {
+                    $result['error'] = 'Sem itens válidos';
+                    $results[] = $result;
+                    continue;
+                }
+
+                $sumAduaneiro = $freightPaidValue + $sumItems;
+                if ($sumAduaneiro > 3000.0) {
+                    $result['error'] = 'Valor total > USD 3000';
+                    $results[] = $result;
+                    continue;
+                }
+
+                $customerControlCode = (string) ($pedido['codigo_pedido'] ?? ('PED-' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT)));
+                if (trim($customerControlCode) === '') $customerControlCode = 'PED-' . str_pad((string) $pid, 6, '0', STR_PAD_LEFT);
+
+                $package = array_merge([
+                    'customerControlCode' => substr($customerControlCode, 0, 100),
+                    'totalWeight' => $totalWeight,
+                    'packagingLength' => (float) number_format($packagingLength, 2, '.', ''),
+                    'packagingWidth' => (float) number_format($packagingWidth, 2, '.', ''),
+                    'packagingHeight' => (float) number_format($packagingHeight, 2, '.', ''),
+                    'distributionModality' => 33162,
+                    'taxPaymentMethod' => 'DDU',
+                    'currency' => 'USD',
+                    'nonNationalizationInstruction' => 'RETURNTOORIGIN',
+                    'packageRfidCode' => '',
+                    'freightPaidValue' => (float) number_format($freightPaidValue, 2, '.', ''),
+                ], $sender, $destinatario);
+                $package['items'] = $items;
+
+                $resp = $this->svc->createPackages([$package]);
+                if (empty($resp['success'])) {
+                    $friendly = $this->packetFriendlyError((string) ($resp['error'] ?? ''), $resp['raw'] ?? null);
+                    $result['error'] = $friendly;
+                    $results[] = $result;
+                    continue;
+                }
+
+                $rawResp = $resp['raw'] ?? null;
+                $tracking = '';
+                if (is_array($rawResp) && isset($rawResp['packageResponseList']) && is_array($rawResp['packageResponseList']) && !empty($rawResp['packageResponseList'][0])) {
+                    $first = $rawResp['packageResponseList'][0];
+                    if (is_array($first) && !empty($first['trackingNumber'])) {
+                        $tracking = (string) $first['trackingNumber'];
+                    }
+                }
+                if (trim($tracking) === '') {
+                    $result['error'] = 'API não retornou tracking';
+                    $results[] = $result;
+                    continue;
+                }
+
+                // Salvar
+                $stIns = $this->connection->prepare('INSERT INTO correios_packet_etiquetas (pedido_id, customer_control_code, tracking_number, status, last_request_json, last_response_json, last_http_code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+                $stIns->execute([$pid, $customerControlCode, $tracking, 'gerada', json_encode(['packageList' => [$package]]), json_encode($rawResp), (int) ($resp['http_code'] ?? 200)]);
+
+                try { $pedidoModel->atualizarStatus($pid, 'etiqueta_gerada', 'Etiqueta PACKET gerada em massa - Rastreio: ' . $tracking, $_SESSION['usuario_id'] ?? null); } catch (\Exception $e) {}
+                try { $notif = new \App\Services\NotificationService(); $notif->notificarEventoPedido('correios_packet_label_created', $pid, ['tracking_number' => $tracking, 'customer_control_code' => $customerControlCode]); } catch (\Exception $e) {}
+
+                $result['success'] = true;
+                $result['tracking_number'] = $tracking;
+            } catch (\Exception $e) {
+                $result['error'] = $e->getMessage();
+            }
+
+            $results[] = $result;
+        }
+
+        $successCount = count(array_filter($results, fn($r) => $r['success']));
+        $failCount = count($results) - $successCount;
+
+        echo json_encode(['success' => true, 'results' => $results, 'generated' => $successCount, 'failed' => $failCount]);
+        exit;
     }
 
     /**

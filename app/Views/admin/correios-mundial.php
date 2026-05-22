@@ -41,10 +41,15 @@
     ?>
 
     <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header"><strong>Pedidos (Caixa Fechada) - prontos para etiqueta</strong></div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Pedidos (Caixa Fechada) - prontos para etiqueta</strong>
+            <?php if (!empty($pedidos)): ?>
+                <button class="btn btn-sm btn-warning" id="btnToggleMassa" onclick="toggleModoMassa()"><i class="fas fa-bolt me-1"></i>Gerar em Massa</button>
+            <?php endif; ?>
+        </div>
         <div class="card-body">
-            <!-- Desktop: Table -->
-            <div class="table-responsive d-none d-md-block">
+            <!-- Desktop: Table Normal -->
+            <div class="table-responsive d-none d-md-block" id="tabelaNormal">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
@@ -77,6 +82,75 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Desktop: Table Modo Massa (hidden by default) -->
+            <div class="table-responsive d-none" id="tabelaMassa">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <input type="checkbox" id="checkAllMassa" onclick="toggleAllMassaCf(this)" class="form-check-input me-2">
+                        <label for="checkAllMassa" class="form-check-label small">Selecionar todos</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-success" id="btnGerarMassa" onclick="gerarEtiquetasMassa()" disabled>
+                            <i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">0</span>)
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleModoMassa()">Voltar</button>
+                    </div>
+                </div>
+                <table class="table table-sm align-middle table-bordered" style="font-size:.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:30px;"></th>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Peso (kg)</th>
+                            <th>C×L×A (cm)</th>
+                            <th>Frete USD</th>
+                            <th>Dados OK</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($pedidos)): ?>
+                            <tr><td colspan="8" class="text-muted">Nenhum pedido.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($pedidos as $p): ?>
+                                <?php
+                                    $pid = (int) ($p['pedido_id'] ?? 0);
+                                    $peso = isset($p['peso_total']) ? (float) $p['peso_total'] : 0;
+                                    $alt = isset($p['altura']) ? (float) $p['altura'] : 0;
+                                    $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
+                                    $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
+                                    $frete = $peso > 0 ? round(1.80 * $peso, 2) : 0;
+                                    $temPeso = $peso > 0;
+                                    $temDim = ($alt >= 2 && $larg >= 11 && $comp >= 16);
+                                    $temEmail = !empty($p['cliente_email']);
+                                    $temTel = !empty($p['cliente_telefone']);
+                                    $temCpf = !empty($p['cliente_cpf']);
+                                    $dadosOk = $temPeso && $temDim && $temEmail && $temTel && $temCpf;
+                                ?>
+                                <tr data-pid="<?= $pid ?>" data-ok="<?= $dadosOk ? '1' : '0' ?>">
+                                    <td><input type="checkbox" class="form-check-input massa-check" value="<?= $pid ?>" onchange="updateMassaCount()" <?= !$dadosOk ? 'disabled title="Dados incompletos"' : '' ?>></td>
+                                    <td><a href="/admin/correios-mundial/pedido/<?= $pid ?>" target="_blank">#<?= str_pad((string) $pid, 6, '0', STR_PAD_LEFT) ?></a></td>
+                                    <td><?= htmlspecialchars((string) ($p['cliente_nome'] ?? '-')) ?></td>
+                                    <td class="<?= $temPeso ? '' : 'text-danger fw-bold' ?>"><?= $temPeso ? number_format($peso, 2, ',', '.') : '⚠ 0' ?></td>
+                                    <td class="<?= $temDim ? '' : 'text-danger' ?>"><?= ($comp > 0 ? (int)$comp : '?') ?>×<?= ($larg > 0 ? (int)$larg : '?') ?>×<?= ($alt > 0 ? (int)$alt : '?') ?></td>
+                                    <td><?= $frete > 0 ? number_format($frete, 2, '.', '') : '-' ?></td>
+                                    <td>
+                                        <?php if ($dadosOk): ?>
+                                            <span class="badge bg-success">OK</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger" title="<?= implode(', ', array_filter([!$temPeso?'Peso':'', !$temDim?'Dimensões':'', !$temEmail?'Email':'', !$temTel?'Telefone':'', !$temCpf?'CPF':''])) ?>">Incompleto</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><span class="massa-status text-muted">-</span></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
             <!-- Mobile: Cards -->
             <div class="d-md-none">
                 <?php if (empty($pedidos)): ?>
@@ -366,6 +440,121 @@ function downloadCsvFile(filename, csvContent) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
+}
+
+// ===== MODO MASSA - Gerar etiquetas em massa =====
+function toggleModoMassa() {
+    var normal = document.getElementById('tabelaNormal');
+    var massa = document.getElementById('tabelaMassa');
+    var btn = document.getElementById('btnToggleMassa');
+    if (!normal || !massa) return;
+    var isActive = !massa.classList.contains('d-none');
+    if (isActive) {
+        massa.classList.add('d-none');
+        normal.classList.remove('d-none');
+        if (btn) btn.innerHTML = '<i class="fas fa-bolt me-1"></i>Gerar em Massa';
+    } else {
+        normal.classList.add('d-none');
+        massa.classList.remove('d-none');
+        if (btn) btn.innerHTML = '<i class="fas fa-arrow-left me-1"></i>Voltar ao Normal';
+    }
+}
+
+function toggleAllMassaCf(el) {
+    document.querySelectorAll('.massa-check:not(:disabled)').forEach(function(cb) { cb.checked = el.checked; });
+    updateMassaCount();
+}
+
+function updateMassaCount() {
+    var checked = document.querySelectorAll('.massa-check:checked').length;
+    var countEl = document.getElementById('massaCount');
+    var btn = document.getElementById('btnGerarMassa');
+    if (countEl) countEl.textContent = checked;
+    if (btn) btn.disabled = (checked === 0);
+}
+
+async function gerarEtiquetasMassa() {
+    var checks = document.querySelectorAll('.massa-check:checked');
+    if (checks.length === 0) return;
+    var ids = Array.from(checks).map(function(cb) { return parseInt(cb.value); });
+    if (!confirm('Gerar etiquetas PACKET para ' + ids.length + ' pedido(s) selecionados?\n\nO sistema fará todas as validações automaticamente.')) return;
+
+    var btn = document.getElementById('btnGerarMassa');
+    var tabelaMassa = document.getElementById('tabelaMassa');
+
+    // Bloquear toda a interface
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Gerando... 0/' + ids.length; }
+    // Desabilitar todos os checkboxes e botões dentro da tabela
+    tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = 'none'; el.style.opacity = '0.5'; });
+    // Overlay de loading
+    var overlay = document.createElement('div');
+    overlay.id = 'massaOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px 48px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2);"><div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div><div id="massaOverlayText" style="font-size:1.1rem;font-weight:600;color:#333;">Gerando etiquetas... 0/' + ids.length + '</div><div class="text-muted small mt-2">Não feche esta página</div></div>';
+    document.body.appendChild(overlay);
+
+    // Marcar todos como "processando"
+    ids.forEach(function(pid) {
+        var row = document.querySelector('tr[data-pid="' + pid + '"]');
+        if (row) {
+            var st = row.querySelector('.massa-status');
+            if (st) { st.textContent = '⏳'; st.className = 'massa-status text-warning'; }
+        }
+    });
+
+    try {
+        var r = await fetch('/admin/correios-mundial/gerar-etiquetas-massa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        });
+        var data = await r.json();
+
+        // Remover overlay
+        var ov = document.getElementById('massaOverlay');
+        if (ov) ov.remove();
+
+        if (data && data.results) {
+            var ok = 0, erros = [];
+            data.results.forEach(function(res) {
+                var row = document.querySelector('tr[data-pid="' + res.pedido_id + '"]');
+                var st = row ? row.querySelector('.massa-status') : null;
+                if (res.success) {
+                    ok++;
+                    if (st) { st.innerHTML = '✅ ' + res.tracking_number; st.className = 'massa-status text-success fw-bold'; }
+                } else {
+                    erros.push('#' + res.pedido_id + ': ' + res.error);
+                    if (st) { st.innerHTML = '❌ ' + res.error; st.className = 'massa-status text-danger'; }
+                }
+            });
+
+            if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>' + ok + ' gerada(s)'; }
+
+            var msg = ok + ' etiqueta(s) gerada(s) com sucesso.';
+            if (erros.length > 0) msg += '\n\n' + erros.length + ' erro(s):\n' + erros.join('\n');
+            alert(msg);
+
+            if (ok > 0) {
+                setTimeout(function() { location.reload(); }, 1500);
+            } else {
+                // Desbloquear interface
+                tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = ''; el.style.opacity = ''; });
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">' + ids.length + '</span>)'; }
+            }
+        } else {
+            alert('Erro: ' + (data.error || 'Falha desconhecida'));
+            var ov2 = document.getElementById('massaOverlay');
+            if (ov2) ov2.remove();
+            tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = ''; el.style.opacity = ''; });
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">' + ids.length + '</span>)'; }
+        }
+    } catch (e) {
+        alert('Erro de rede: ' + e.message);
+        var ov3 = document.getElementById('massaOverlay');
+        if (ov3) ov3.remove();
+        tabelaMassa.querySelectorAll('input, button, a').forEach(function(el) { el.style.pointerEvents = ''; el.style.opacity = ''; });
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tags me-1"></i>Gerar Etiquetas (<span id="massaCount">' + ids.length + '</span>)'; }
+    }
 }
 </script>
 <?php $content = ob_get_clean(); include __DIR__ . '/../layouts/admin.php'; ?>
