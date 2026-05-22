@@ -105,6 +105,57 @@ class AdminPedidosController extends Controller {
             $st = $pdo->prepare($sql);
             $st->execute($params);
 
+            // Atualizar também a tabela usuarios (telefone, nome, email, documento) se o pedido tem usuario_id
+            $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
+            $usuarioIdPedido = ($colUsuarioId !== '') ? (int) ($oldRow[$colUsuarioId] ?? 0) : 0;
+            if ($usuarioIdPedido > 0 && $this->tableExistsPdo($pdo, 'usuarios')) {
+                try {
+                    $colsUsu = $this->getTableColumnsPdo($pdo, 'usuarios');
+                    $pickUsu = function(array $candidates) use ($colsUsu): string {
+                        foreach ($candidates as $c) {
+                            if (is_array($colsUsu) && in_array($c, $colsUsu, true)) return $c;
+                        }
+                        return '';
+                    };
+
+                    $setUsu = [];
+                    $paramsUsu = [];
+                    $addSetUsu = function(string $col, $val) use (&$setUsu, &$paramsUsu): void {
+                        if ($col === '') return;
+                        $setUsu[] = $col . ' = ?';
+                        $paramsUsu[] = $val;
+                    };
+
+                    $telefoneVal = trim((string) $request->getParam('telefone'));
+                    $nomeVal = trim((string) $request->getParam('nome'));
+                    $emailVal = trim((string) $request->getParam('email'));
+                    $docVal = trim((string) $request->getParam('documento'));
+
+                    if ($telefoneVal !== '') {
+                        $addSetUsu($pickUsu(['telefone', 'phone', 'celular', 'mobile', 'whatsapp']), $telefoneVal);
+                    }
+                    if ($nomeVal !== '') {
+                        $addSetUsu($pickUsu(['nome', 'name', 'full_name']), $nomeVal);
+                    }
+                    if ($emailVal !== '') {
+                        $addSetUsu($pickUsu(['email']), $emailVal);
+                    }
+                    if ($docVal !== '') {
+                        $addSetUsu($pickUsu(['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf']), $docVal);
+                    }
+
+                    $setUsu = array_values(array_filter($setUsu, static function($x){ return is_string($x) && trim($x) !== ''; }));
+                    if (!empty($setUsu)) {
+                        $paramsUsu[] = $usuarioIdPedido;
+                        $sqlUsu = 'UPDATE usuarios SET ' . implode(', ', $setUsu) . ' WHERE id = ?';
+                        $stUsu = $pdo->prepare($sqlUsu);
+                        $stUsu->execute($paramsUsu);
+                    }
+                } catch (\Throwable $e) {
+                    // Silenciar erro na tabela usuarios — o update principal no pedido já foi feito
+                }
+            }
+
             // Se o pedido usa endereco_entrega_id (endereço em tabela separada), atualizar lá também
             $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
             if ($endEntregaIdCol !== '' && !empty($oldRow[$endEntregaIdCol])) {
