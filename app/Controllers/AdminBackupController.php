@@ -478,6 +478,10 @@ class AdminBackupController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfil('admin');
 
+        // Aumentar timeout para upload de arquivo grande
+        @set_time_limit(600);
+        @ini_set('max_execution_time', '600');
+
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }

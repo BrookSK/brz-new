@@ -7,6 +7,11 @@ use App\Services\BackupService;
 class CronBackupController extends Controller {
 
     public function run(Request $request) {
+        // Cron não tem limite de tempo do browser
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        ignore_user_abort(true);
+
         $service = new BackupService();
         $cfg = $service->getConfig();
 

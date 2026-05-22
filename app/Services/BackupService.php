@@ -383,11 +383,14 @@ class BackupService {
             throw new \RuntimeException($err ?: 'Falha ao gerar backup');
         }
 
-        // Enviar cópia do backup do banco para servidor externo
-        try {
-            $this->enviarBackupServidorExterno($dbSqlPath);
-        } catch (\Throwable $e) {
-            error_log('[BACKUP] Falha ao enviar para servidor externo: ' . $e->getMessage());
+        // Enviar cópia do backup do banco para servidor externo (apenas via cron, não no manual)
+        // No manual, o envio é feito pelo botão "Enviar" separadamente para evitar timeout
+        if ($trigger === 'cron') {
+            try {
+                $this->enviarBackupServidorExterno($dbSqlPath);
+            } catch (\Throwable $e) {
+                error_log('[BACKUP] Falha ao enviar para servidor externo: ' . $e->getMessage());
+            }
         }
 
         return $id;
