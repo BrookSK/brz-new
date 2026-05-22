@@ -121,7 +121,7 @@
                                     $alt = isset($p['altura']) ? (float) $p['altura'] : 0;
                                     $larg = isset($p['largura']) ? (float) $p['largura'] : 0;
                                     $comp = isset($p['comprimento']) ? (float) $p['comprimento'] : 0;
-                                    $frete = $peso > 0 ? round(1.80 * $peso, 2) : 0;
+                                    $frete = 0.01;
                                     $temPeso = $peso > 0;
                                     $temDim = ($alt >= 2 && $larg >= 11 && $comp >= 16);
                                     $temEmail = !empty($p['cliente_email']);

@@ -1208,8 +1208,8 @@ class AdminCorreiosMundialController extends Controller {
                     continue;
                 }
 
-                // Frete: 1.80 por kg
-                $freightPaidValue = round(max(0.01, 1.80 * $pesoKg), 2);
+                // Frete: 0.01 (valor mínimo simbólico para PACKET)
+                $freightPaidValue = 0.01;
 
                 // Destinatário
                 $destinatario = $this->buildRecipientFromPedido($pedido);
