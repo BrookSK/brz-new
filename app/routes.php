@@ -420,6 +420,7 @@ $router->get('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir')
 $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir');
 $router->post('/admin/pedidos/{id}/criar-ticket', 'AdminPedidosController', 'criarTicket');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
+$router->post('/admin/pedidos/atualizar-status-massa', 'AdminPedidosController', 'atualizarStatusMassa');
 
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');

@@ -2985,6 +2985,125 @@ HTML;
                 }
             } catch(e){}
         })();
+
+        // ===== AÇÃO EM MASSA =====
+        (function(){
+            var STORAGE_KEY = "brz_pedidos_selecao_massa";
+            function getSelecao() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch(e){ return {}; } }
+            function setSelecao(obj) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); } catch(e){} }
+            function getCount() { return Object.keys(getSelecao()).length; }
+
+            // Criar barra flutuante
+            var bar = document.createElement("div");
+            bar.id = "bulkBar";
+            bar.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:#1a5276;color:#fff;padding:12px 24px;display:none;align-items:center;justify-content:space-between;z-index:9999;box-shadow:0 -4px 16px rgba(0,0,0,.2);gap:12px;flex-wrap:wrap;";
+            bar.innerHTML = \'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span id="bulkCount" style="font-weight:600;font-size:1rem;"></span><button type="button" id="bulkClearBtn" class="btn btn-sm btn-outline-light">Limpar seleção</button></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><select id="bulkStatusSelect" class="form-select form-select-sm" style="width:auto;min-width:180px;"><option value="">Alterar status para...</option>\' + document.querySelector("[name=status]").innerHTML + \'</select><button type="button" id="bulkApplyBtn" class="btn btn-sm btn-warning fw-bold" disabled><i class="fas fa-check-double me-1"></i>Aplicar em massa</button></div>\';
+            document.body.appendChild(bar);
+
+            var bulkCount = document.getElementById("bulkCount");
+            var bulkClearBtn = document.getElementById("bulkClearBtn");
+            var bulkApplyBtn = document.getElementById("bulkApplyBtn");
+            var bulkStatusSelect = document.getElementById("bulkStatusSelect");
+
+            function updateBar() {
+                var n = getCount();
+                if (n > 0) {
+                    bar.style.display = "flex";
+                    bulkCount.textContent = n + " pedido" + (n > 1 ? "s" : "") + " selecionado" + (n > 1 ? "s" : "");
+                } else {
+                    bar.style.display = "none";
+                }
+                bulkApplyBtn.disabled = (bulkStatusSelect.value === "" || n === 0);
+                // Atualizar checkboxes na página
+                document.querySelectorAll(".bulk-check").forEach(function(cb){
+                    var sel = getSelecao();
+                    cb.checked = !!sel[cb.dataset.pid];
+                    cb.closest(".card.order-card").style.outline = cb.checked ? "2px solid #1a5276" : "";
+                });
+            }
+
+            // Injetar checkboxes nos cards
+            document.querySelectorAll(".card.order-card").forEach(function(card){
+                var h6 = card.querySelector("h6[class*=mb-0]");
+                if (!h6) return;
+                var match = h6.textContent.match(/#(\\d+)/);
+                if (!match) return;
+                var pid = parseInt(match[1], 10);
+                if (!pid) return;
+
+                var wrapper = h6.closest(".text-center");
+                if (!wrapper) return;
+
+                var cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.className = "form-check-input bulk-check";
+                cb.dataset.pid = pid;
+                cb.style.cssText = "width:20px;height:20px;cursor:pointer;margin-bottom:6px;";
+                cb.title = "Selecionar pedido #" + pid;
+                wrapper.insertBefore(cb, wrapper.firstChild);
+
+                var sel = getSelecao();
+                cb.checked = !!sel[pid];
+                if (cb.checked) card.style.outline = "2px solid #1a5276";
+
+                cb.addEventListener("change", function(){
+                    var s = getSelecao();
+                    if (cb.checked) {
+                        s[pid] = (h6.closest(".card-body").querySelector("h6.mb-1") || {}).textContent || "Pedido #" + pid;
+                    } else {
+                        delete s[pid];
+                    }
+                    setSelecao(s);
+                    updateBar();
+                });
+            });
+
+            bulkClearBtn.addEventListener("click", function(){
+                if (!confirm("Limpar toda a seleção em massa?")) return;
+                setSelecao({});
+                updateBar();
+            });
+
+            bulkStatusSelect.addEventListener("change", function(){
+                bulkApplyBtn.disabled = (bulkStatusSelect.value === "" || getCount() === 0);
+            });
+
+            bulkApplyBtn.addEventListener("click", function(){
+                var sel = getSelecao();
+                var ids = Object.keys(sel).map(Number);
+                var status = bulkStatusSelect.value;
+                if (!ids.length || !status) return;
+                if (!confirm("Alterar o status de " + ids.length + " pedido(s) para \\"" + bulkStatusSelect.options[bulkStatusSelect.selectedIndex].text + "\\"?")) return;
+
+                bulkApplyBtn.disabled = true;
+                bulkApplyBtn.innerHTML = \'<span class="spinner-border spinner-border-sm me-1"></span>Aplicando...\';
+
+                fetch("/admin/pedidos/atualizar-status-massa", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ids: ids, status: status})
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    if (data.success) {
+                        setSelecao({});
+                        sessionStorage.setItem("brz_pedidos_flash", "Status atualizado com sucesso para " + data.affected + " pedido(s).");
+                        location.reload();
+                    } else {
+                        alert("Erro: " + (data.error || "Falha desconhecida"));
+                        bulkApplyBtn.disabled = false;
+                        bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>Aplicar em massa\';
+                    }
+                })
+                .catch(function(err){
+                    alert("Erro de rede: " + err.message);
+                    bulkApplyBtn.disabled = false;
+                    bulkApplyBtn.innerHTML = \'<i class="fas fa-check-double me-1"></i>Aplicar em massa\';
+                });
+            });
+
+            updateBar();
+        })();
     </script>
 </body>
 </html>';
@@ -6846,6 +6965,96 @@ HTML;
             echo '<a href="/admin/pedidos/detalhes/' . $id . '" class="btn btn-secondary">Voltar</a>';
             exit;
         }
+    }
+
+    public function atualizarStatusMassa(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $ids = $body['ids'] ?? [];
+        $novoStatus = trim((string) ($body['status'] ?? ''));
+
+        if (!is_array($ids) || empty($ids) || $novoStatus === '') {
+            echo json_encode(['success' => false, 'error' => 'Parâmetros inválidos (ids e status são obrigatórios)']);
+            exit;
+        }
+
+        // Sanitizar IDs
+        $ids = array_filter(array_map('intval', $ids), fn($v) => $v > 0);
+        if (empty($ids)) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum ID válido informado']);
+            exit;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+
+            $cols = [];
+            try {
+                $stmtCols = $pdo->query('DESCRIBE pedidos');
+                $cols = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) { $cols = []; }
+
+            $statusCol = 'status';
+            if (is_array($cols) && !in_array('status', $cols, true)) {
+                foreach (['status_pedido', 'pedido_status'] as $cand) {
+                    if (in_array($cand, $cols, true)) { $statusCol = $cand; break; }
+                }
+            }
+
+            $set = [$statusCol . ' = ?'];
+            $baseParams = [$novoStatus];
+
+            if (in_array('updated_at', $cols, true)) {
+                $set[] = 'updated_at = NOW()';
+            }
+
+            // Atualizar pagamento_status para exibição
+            if (in_array('pagamento_status', $cols, true)) {
+                $statusLabelMap = self::getStatusList();
+                $label = $statusLabelMap[strtolower($novoStatus)] ?? ucfirst(str_replace('_', ' ', $novoStatus));
+                $set[] = 'pagamento_status = ?';
+                $baseParams[] = $label;
+            }
+
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id IN (' . $placeholders . ')';
+            $params = array_merge($baseParams, $ids);
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $affected = $stmt->rowCount();
+
+            // Registrar no histórico
+            try {
+                $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT->execute(['pedido_status_history']);
+                $temHist = ((int) ($stT->fetchColumn() ?: 0) > 0);
+                if ($temHist) {
+                    $uid = null;
+                    try {
+                        if (session_status() === PHP_SESSION_NONE) session_start();
+                        $uSess = (int) ($_SESSION['usuario_id'] ?? 0);
+                        if ($uSess > 0) $uid = $uSess;
+                    } catch (\Exception $e) {}
+
+                    foreach ($ids as $pid) {
+                        try {
+                            $stH = $pdo->prepare('INSERT INTO pedido_status_history (pedido_id, status_novo, alterado_por, observacao, created_at) VALUES (?, ?, ?, ?, NOW())');
+                            $stH->execute([$pid, $novoStatus, $uid, 'Alteração em massa']);
+                        } catch (\Exception $e) {}
+                    }
+                }
+            } catch (\Exception $e) {}
+
+            echo json_encode(['success' => true, 'affected' => $affected, 'total' => count($ids)]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
     }
 
     public function excluir(Request $request, $id = null) {
