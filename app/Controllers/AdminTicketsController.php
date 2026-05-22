@@ -914,6 +914,65 @@ class AdminTicketsController extends Controller {
                 $not->notificarRespostaAdmin($pedidoId, (int) $id, (int) $adminUid, (string) $msg);
             } catch (\Exception $e) {
             }
+
+            // Webhook: notificar automação que o ticket recebeu primeira resposta (dentro de 30 min)
+            try {
+                $stWh = $pdo->prepare("SELECT webhook_aguardando_resposta, webhook_resposta_deadline, webhook_resposta_enviada, webhook_resposta_url FROM support_tickets WHERE id = ? LIMIT 1");
+                $stWh->execute([$id]);
+                $whData = $stWh->fetch(\PDO::FETCH_ASSOC);
+
+                if ($whData
+                    && (int)($whData['webhook_aguardando_resposta'] ?? 0) === 1
+                    && (int)($whData['webhook_resposta_enviada'] ?? 0) === 0
+                    && !empty($whData['webhook_resposta_url'])
+                ) {
+                    $deadline = (string)($whData['webhook_resposta_deadline'] ?? '');
+                    $dentroDoDeadline = ($deadline === '' || strtotime($deadline) >= time());
+
+                    if ($dentroDoDeadline) {
+                        $whUrl = (string)$whData['webhook_resposta_url'];
+                        $whPayload = [
+                            'evento' => 'ticket_respondido',
+                            'ticket_id' => (int)$id,
+                            'mensagem_resposta' => $msg,
+                            'respondido_por' => (int)$adminUid,
+                            'respondido_em' => date('Y-m-d H:i:s'),
+                        ];
+
+                        // Buscar dados do cliente do ticket
+                        try {
+                            $stCli = $pdo->prepare("SELECT t.usuario_id, u.nome, u.email, u.telefone, u.suite FROM support_tickets t LEFT JOIN usuarios u ON u.id = t.usuario_id WHERE t.id = ? LIMIT 1");
+                            $stCli->execute([$id]);
+                            $cli = $stCli->fetch(\PDO::FETCH_ASSOC);
+                            if ($cli) {
+                                $whPayload['usuario_id'] = (int)($cli['usuario_id'] ?? 0);
+                                $whPayload['cliente_nome'] = (string)($cli['nome'] ?? '');
+                                $whPayload['cliente_email'] = (string)($cli['email'] ?? '');
+                                $whPayload['cliente_telefone'] = (string)($cli['telefone'] ?? '');
+                                $whPayload['telefone_limpo'] = preg_replace('/\D/', '', (string)($cli['telefone'] ?? ''));
+                                $whPayload['cliente_suite'] = (string)($cli['suite'] ?? '');
+                            }
+                        } catch (\Exception $e) {}
+
+                        // Enviar webhook
+                        if (function_exists('curl_init')) {
+                            $ch = curl_init($whUrl);
+                            curl_setopt_array($ch, [
+                                CURLOPT_POST => true,
+                                CURLOPT_POSTFIELDS => json_encode($whPayload),
+                                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 10,
+                            ]);
+                            curl_exec($ch);
+                            curl_close($ch);
+                        }
+
+                        // Marcar como enviada
+                        $pdo->prepare("UPDATE support_tickets SET webhook_resposta_enviada = 1 WHERE id = ?")->execute([$id]);
+                    }
+                }
+            } catch (\Exception $e) {}
         } catch (\Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
         }

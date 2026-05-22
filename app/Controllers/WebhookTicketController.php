@@ -219,6 +219,33 @@ class WebhookTicketController {
             if ($ticketId > 0) {
                 $stMsg = $this->db->prepare("INSERT INTO support_ticket_messages (ticket_id, autor_tipo, autor_usuario_id, mensagem) VALUES (?, 'cliente', ?, ?)");
                 $stMsg->execute([$ticketId, $usuarioId, $mensagem]);
+
+                // Marcar para monitorar primeira resposta (30 min)
+                try {
+                    $colsT2 = [];
+                    try { $st2 = $this->db->query('DESCRIBE support_tickets'); $colsT2 = $st2 ? $st2->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    if (in_array('webhook_aguardando_resposta', $colsT2, true)) {
+                        $webhookRespostaUrl = $callbackUrl;
+                        if ($webhookRespostaUrl === '') {
+                            try {
+                                $stUrl = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'webhook_ticket_resposta_url' LIMIT 1");
+                                $stUrl->execute();
+                                $webhookRespostaUrl = trim((string)($stUrl->fetchColumn() ?: ''));
+                            } catch (\Exception $e) {}
+                        }
+                        if ($webhookRespostaUrl === '') {
+                            try {
+                                $stUrl = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'webhook_ticket_callback_url' LIMIT 1");
+                                $stUrl->execute();
+                                $webhookRespostaUrl = trim((string)($stUrl->fetchColumn() ?: ''));
+                            } catch (\Exception $e) {}
+                        }
+
+                        $deadline = date('Y-m-d H:i:s', strtotime('+30 minutes'));
+                        $stMark = $this->db->prepare("UPDATE support_tickets SET webhook_aguardando_resposta = 1, webhook_resposta_deadline = ?, webhook_resposta_url = ? WHERE id = ?");
+                        $stMark->execute([$deadline, $webhookRespostaUrl, $ticketId]);
+                    }
+                } catch (\Exception $e) {}
             }
 
             $resp = [

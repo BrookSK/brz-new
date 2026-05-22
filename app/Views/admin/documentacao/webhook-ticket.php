@@ -61,6 +61,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['callback_url'])) {
                 </div>
                 <div class="form-text">A resposta será enviada via POST com JSON contendo success, ticket_id, error, message, etc.</div>
             </form>
+
+            <?php
+            // Buscar URL de resposta de ticket
+            $respostaUrlAtual = '';
+            try {
+                $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'webhook_ticket_resposta_url' LIMIT 1");
+                $st->execute();
+                $respostaUrlAtual = (string)($st->fetchColumn() ?: '');
+            } catch (\Exception $e) {}
+
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resposta_url'])) {
+                try {
+                    $novaRespostaUrl = trim((string)$_POST['resposta_url']);
+                    $st = $pdo->prepare("SELECT COUNT(*) FROM configuracoes_sistema WHERE chave = 'webhook_ticket_resposta_url'");
+                    $st->execute();
+                    if ((int)$st->fetchColumn() > 0) {
+                        $st = $pdo->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = 'webhook_ticket_resposta_url'");
+                        $st->execute([$novaRespostaUrl]);
+                    } else {
+                        $st = $pdo->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('webhook_ticket_resposta_url', ?)");
+                        $st->execute([$novaRespostaUrl]);
+                    }
+                    $respostaUrlAtual = $novaRespostaUrl;
+                    $salvoRespostaOk = true;
+                } catch (\Exception $e) { $salvoRespostaErro = $e->getMessage(); }
+            }
+            ?>
+
+            <hr class="my-3">
+            <p class="small text-muted mb-2"><strong>URL de Notificação de Resposta:</strong> Quando um especialista responder o ticket dentro de 30 minutos, o sistema envia um webhook para esta URL com a resposta.</p>
+            <?php if (!empty($salvoRespostaOk)): ?>
+                <div class="alert alert-success py-2">URL de resposta salva com sucesso!</div>
+            <?php endif; ?>
+            <form method="POST">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-reply"></i></span>
+                    <input type="url" name="resposta_url" class="form-control" value="<?= htmlspecialchars($respostaUrlAtual) ?>" placeholder="https://sua-automacao.com/webhook/ticket-respondido">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i>Salvar</button>
+                </div>
+                <div class="form-text">Recebe: evento, ticket_id, mensagem_resposta, cliente_nome, telefone_limpo, etc. Só dispara na primeira resposta e dentro de 30 min.</div>
+            </form>
         </div>
     </div>
 
