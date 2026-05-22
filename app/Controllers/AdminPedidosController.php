@@ -240,13 +240,69 @@ class AdminPedidosController extends Controller {
                         $setEnd = array_values(array_filter($setEnd, static function($x){ return is_string($x) && trim($x) !== ''; }));
                         $debugLog['enderecos_set_clauses'] = $setEnd;
                         if (!empty($setEnd)) {
-                            $paramsEnd[] = $enderecoId;
-                            $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
-                            $stEnd = $pdo->prepare($sqlEnd);
-                            $stEnd->execute($paramsEnd);
-                            $enderecoIdAtualizado = $enderecoId;
-                            $debugLog['enderecos_update_sql'] = $sqlEnd;
-                            $debugLog['enderecos_update_rows'] = $stEnd->rowCount();
+                            // Verificar se o registro existe antes de tentar atualizar
+                            $stCheck = $pdo->prepare('SELECT id FROM enderecos WHERE id = ? LIMIT 1');
+                            $stCheck->execute([$enderecoId]);
+                            $existeEndereco = (bool) $stCheck->fetchColumn();
+                            $debugLog['endereco_id_existe'] = $existeEndereco;
+
+                            if ($existeEndereco) {
+                                $paramsEnd[] = $enderecoId;
+                                $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
+                                $stEnd = $pdo->prepare($sqlEnd);
+                                $stEnd->execute($paramsEnd);
+                                $enderecoIdAtualizado = $enderecoId;
+                                $debugLog['enderecos_update_sql'] = $sqlEnd;
+                                $debugLog['enderecos_update_rows'] = $stEnd->rowCount();
+                            } else {
+                                // O endereco_entrega_id aponta para registro inexistente — criar um novo
+                                $insertCols = [];
+                                $insertVals = [];
+                                $insertPlaceholders = [];
+
+                                // Adicionar usuario_id se disponível
+                                if ($usuarioIdPedido > 0) {
+                                    $insertCols[] = 'usuario_id';
+                                    $insertVals[] = $usuarioIdPedido;
+                                    $insertPlaceholders[] = '?';
+                                }
+
+                                $addIns = function(string $col, $val) use (&$insertCols, &$insertVals, &$insertPlaceholders): void {
+                                    if ($col === '') return;
+                                    $insertCols[] = $col;
+                                    $insertVals[] = $val;
+                                    $insertPlaceholders[] = '?';
+                                };
+
+                                $addIns($colEndPais, trim((string) $request->getParam('pais')));
+                                $addIns($colEndCep, trim((string) $request->getParam('cep')));
+                                $addIns($colEndEndereco, trim((string) $request->getParam('endereco')));
+                                $addIns($colEndNumero, trim((string) $request->getParam('numero')));
+                                $addIns($colEndComplemento, trim((string) $request->getParam('complemento')));
+                                $addIns($colEndBairro, trim((string) $request->getParam('bairro')));
+                                $addIns($colEndCidade, trim((string) $request->getParam('cidade')));
+                                $addIns($colEndEstado, trim((string) $request->getParam('estado')));
+
+                                if (in_array('principal', $colsEnd, true)) {
+                                    $insertCols[] = 'principal';
+                                    $insertVals[] = 1;
+                                    $insertPlaceholders[] = '?';
+                                }
+
+                                if (!empty($insertCols)) {
+                                    $sqlIns = 'INSERT INTO enderecos (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertPlaceholders) . ')';
+                                    $stIns = $pdo->prepare($sqlIns);
+                                    $stIns->execute($insertVals);
+                                    $newEndId = (int) $pdo->lastInsertId();
+
+                                    // Atualizar o pedido para apontar para o novo endereço
+                                    if ($newEndId > 0) {
+                                        $pdo->prepare('UPDATE pedidos SET endereco_entrega_id = ? WHERE id = ?')->execute([$newEndId, $pedidoId]);
+                                        $enderecoIdAtualizado = $newEndId;
+                                    }
+                                    $debugLog['enderecos_action'] = 'created_new_id=' . $newEndId;
+                                }
+                            }
                         } else {
                             $debugLog['enderecos_update_skip'] = 'nenhuma coluna de endereco encontrada na tabela enderecos';
                         }
