@@ -1347,11 +1347,11 @@ class CheckoutController extends Controller {
                     'metodo' => $metodoSecundario,
                     'moeda' => 'BRL',
                     'valor' => $valorCR1,
-                    'status' => $cr1['status'] ?? 'pending',
-                    'payment_id' => $cr1['payment_id'] ?? '',
-                    'invoice_url' => $cr1['invoice_url'] ?? '',
-                    'pix_payload' => $cr1['pix_payload'] ?? ($cr1['pix'] ?? ''),
-                    'pix_encoded_image' => $cr1['pix_encoded_image'] ?? ($cr1['qr_code'] ?? ''),
+                    'status' => (string) ($cr1['status'] ?? 'pending'),
+                    'payment_id' => (string) ($cr1['payment_id'] ?? ''),
+                    'invoice_url' => (string) ($cr1['invoice_url'] ?? ''),
+                    'pix_payload' => (string) ($cr1['pix_payload'] ?? ($cr1['pix'] ?? '')),
+                    'pix_encoded_image' => (string) ($cr1['pix_encoded_image'] ?? ($cr1['qr_code'] ?? '')),
                 ]);
             }
 
@@ -3302,7 +3302,7 @@ class CheckoutController extends Controller {
                         $colsPedW = [];
                         try { $stColsW = $dbWallet->query('DESCRIBE pedidos'); $colsPedW = $stColsW ? ($stColsW->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) { $colsPedW = []; }
                         $selW = ['id'];
-                        foreach (['subtotal', 'subtotal_produtos', 'servicos', 'taxa_servico', 'impostos', 'valor_impostos', 'imposto_local', 'total'] as $c) {
+                        foreach (['subtotal', 'subtotal_produtos', 'servicos', 'taxa_servico', 'impostos', 'valor_impostos', 'imposto_local', 'total', 'moeda'] as $c) {
                             if (in_array($c, $colsPedW, true)) $selW[] = $c;
                         }
                         $stPedW = $dbWallet->prepare('SELECT ' . implode(', ', array_unique($selW)) . ' FROM pedidos WHERE id = ? LIMIT 1');
@@ -3326,12 +3326,22 @@ class CheckoutController extends Controller {
                     // 2. Calcular wallet eligible amount
                     $walletEligible = $this->calcularWalletEligibleAmount($pedidoDataWallet);
 
-                    // Taxa de conversão USD->BRL
+                    // Taxa de conversão USD->BRL (usada apenas se valores do pedido estão em USD)
                     $exchangeRateW = 1.0;
                     if ($moedaPedidoWallet === 'BRL') {
                         $exchangeRateW = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
                         if ($exchangeRateW <= 1.01) $exchangeRateW = 5.85;
-                        $walletEligible = $walletEligible * $exchangeRateW;
+                        
+                        // Verificar se os valores do pedido já estão em BRL
+                        // Se o pedido tem moeda=BRL, os valores no banco JÁ estão em BRL — não converter
+                        $moedaPedidoBanco = strtoupper(trim((string) ($pedidoDataWallet['moeda'] ?? '')));
+                        if ($moedaPedidoBanco === 'BRL' || $walletEligible > 500) {
+                            // Valores já em BRL — não multiplicar pela taxa
+                            // Heurística: se eligible > 500, provavelmente já está em BRL
+                        } else {
+                            // Valores em USD no banco — converter para BRL
+                            $walletEligible = $walletEligible * $exchangeRateW;
+                        }
                     }
 
                     // 3. Debitar carteira (parcial ou total do eligible)
@@ -3356,13 +3366,18 @@ class CheckoutController extends Controller {
                     $impostosRaw = (float) ($pedidoDataWallet['impostos'] ?? 0);
                     $impostoLocalRaw = (float) ($pedidoDataWallet['imposto_local'] ?? 0);
 
-                    // Converter para BRL se necessário
-                    if ($moedaPedidoWallet === 'BRL') {
+                    // Verificar se valores do pedido já estão em BRL
+                    $moedaPedidoBancoCheck = strtoupper(trim((string) ($pedidoDataWallet['moeda'] ?? '')));
+                    $valoresJaEmBrl = ($moedaPedidoBancoCheck === 'BRL') || ($subtotalProdutosRaw + $taxaServicoRaw > 500);
+
+                    // Converter para BRL apenas se valores estão em USD
+                    if ($moedaPedidoWallet === 'BRL' && !$valoresJaEmBrl) {
                         $subtotalProdutosBrl = $subtotalProdutosRaw * $exchangeRateW;
                         $taxaServicoBrl = $taxaServicoRaw * $exchangeRateW;
                         $impostosBrl = $impostosRaw * $exchangeRateW;
                         $impostoLocalBrl = $impostoLocalRaw * $exchangeRateW;
                     } else {
+                        // Valores já estão na moeda correta (BRL ou USD)
                         $subtotalProdutosBrl = $subtotalProdutosRaw;
                         $taxaServicoBrl = $taxaServicoRaw;
                         $impostosBrl = $impostosRaw;
