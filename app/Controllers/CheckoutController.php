@@ -1380,20 +1380,8 @@ class CheckoutController extends Controller {
                 }
                 $results['charges'][] = ['componente' => 'produto', 'gateway' => 'cambioreal', 'result' => $cr1];
 
-                // Registrar split de produto
-                $this->paymentService->registrarPedidoPagamentoSplit([
-                    'pedido_id' => $pedidoId,
-                    'componente' => 'produto',
-                    'gateway' => 'cambioreal',
-                    'metodo' => $metodoSecundario,
-                    'moeda' => 'BRL',
-                    'valor' => $valorCR1,
-                    'status' => (string) ($cr1['status'] ?? 'pending'),
-                    'payment_id' => (string) ($cr1['payment_id'] ?? ''),
-                    'invoice_url' => (string) ($cr1['invoice_url'] ?? ''),
-                    'pix_payload' => (string) ($cr1['pix_payload'] ?? ($cr1['pix'] ?? '')),
-                    'pix_encoded_image' => (string) ($cr1['pix_encoded_image'] ?? ($cr1['qr_code'] ?? '')),
-                ]);
+                // Nota: o PaymentService já registra o split internamente via registrarPedidoPagamentoSplit
+                // Não duplicar o registro aqui.
             }
 
             // ── Cobrança 2: Câmbio Real Taxas (taxa_servico + impostos) ──
