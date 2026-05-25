@@ -1432,9 +1432,7 @@ class CheckoutController extends Controller {
                 $result = $this->paymentService->createStripePaymentIntent(
                     $pedidoId,
                     $valorRestante,
-                    'usd',
-                    $descricao,
-                    ['componente' => 'taxa_gateway', 'tipo' => 'wallet_remainder']
+                    $descricao
                 );
                 return $result;
             } catch (\Exception $e) {
@@ -4746,6 +4744,13 @@ class CheckoutController extends Controller {
                     'stripe_required' => ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'cartao_credito' && $formaSelecionada !== 'carteira'),
                     'stripe_pix' => ($moedaPedidoPay !== 'BRL' && $formaSelecionada === 'pix'),
                 ];
+
+                // Carteira parcial com USD: se o gateway retornou client_secret do Stripe, passar para o frontend
+                if ($formaSelecionada === 'carteira' && $moedaPedidoPay !== 'BRL' && isset($gwResult) && !empty($gwResult['client_secret'])) {
+                    $response['stripe_required'] = true;
+                    $response['stripe_client_secret'] = $gwResult['client_secret'];
+                    $response['stripe_payment_intent_id'] = $gwResult['payment_intent_id'] ?? '';
+                }
 
                 // Carnê Braziliana: redirecionar para a conclusão específica do carnê
                 if ($formaSelecionada === 'carne_braziliana') {
