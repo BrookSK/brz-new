@@ -1281,6 +1281,7 @@ class CheckoutController extends Controller {
                 $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
                 if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
                 $amountUsd = round($valorCR1 / $exchangeRate, 2);
+                if ($amountUsd <= 0) $amountUsd = 0.01;
 
                 $client = [
                     'name' => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
@@ -1299,27 +1300,38 @@ class CheckoutController extends Controller {
                     ],
                 ];
 
-                if ($billingType === 'PIX') {
-                    $cr1 = $this->paymentService->createCambioRealPixPaymentProduto(
-                        $pedidoId, $amountUsd, $valorCR1, $descProduto, $client
-                    );
-                } elseif ($billingType === 'CREDIT_CARD') {
-                    $card = [
-                        'token'        => (string) ($dadosCheckout['cambioreal_card_token'] ?? ''),
-                        'brand'        => (string) ($dadosCheckout['cambioreal_card_brand'] ?? ''),
-                        'bin'          => (string) ($dadosCheckout['cambioreal_card_bin'] ?? ''),
-                        'dfp_id'       => (string) ($dadosCheckout['cambioreal_card_dfp_id'] ?? ''),
-                        'holder'       => (string) ($dadosCheckout['card_holder_name'] ?? ''),
-                        'installments' => (int) ($dadosCheckout['installments'] ?? 1),
-                        'type'         => (string) ($dadosCheckout['cambioreal_card_type'] ?? 'credit'),
-                    ];
-                    $cr1 = $this->paymentService->createCambioRealDirectPaymentProdutoCartao(
-                        $pedidoId, $valorCR1, $amountUsd, $descProduto, $client, $card
-                    );
-                } else {
-                    $cr1 = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto(
-                        $pedidoId, $valorCR1, $descProduto, $client
-                    );
+                $cr1 = null;
+                try {
+                    ob_start();
+                    if ($billingType === 'PIX') {
+                        $cr1 = $this->paymentService->createCambioRealPixPaymentProduto(
+                            $pedidoId, $amountUsd, $valorCR1, $descProduto, $client
+                        );
+                    } elseif ($billingType === 'CREDIT_CARD') {
+                        $card = [
+                            'token'        => (string) ($dadosCheckout['cambioreal_card_token'] ?? ''),
+                            'brand'        => (string) ($dadosCheckout['cambioreal_card_brand'] ?? ''),
+                            'bin'          => (string) ($dadosCheckout['cambioreal_card_bin'] ?? ''),
+                            'dfp_id'       => (string) ($dadosCheckout['cambioreal_card_dfp_id'] ?? ''),
+                            'holder'       => (string) ($dadosCheckout['card_holder_name'] ?? ''),
+                            'installments' => (int) ($dadosCheckout['installments'] ?? 1),
+                            'type'         => (string) ($dadosCheckout['cambioreal_card_type'] ?? 'credit'),
+                        ];
+                        $cr1 = $this->paymentService->createCambioRealDirectPaymentProdutoCartao(
+                            $pedidoId, $valorCR1, $amountUsd, $descProduto, $client, $card
+                        );
+                    } else {
+                        $cr1 = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto(
+                            $pedidoId, $valorCR1, $descProduto, $client
+                        );
+                    }
+                    $phpOutput = ob_get_clean();
+                    if ($phpOutput !== '' && $phpOutput !== false) {
+                        error_log('[WALLET SPLIT CR1] PHP output capturado: ' . substr($phpOutput, 0, 500));
+                    }
+                } catch (\Exception $e) {
+                    ob_end_clean();
+                    return ['success' => false, 'error' => 'Falha Câmbio Real (produtos): ' . $e->getMessage()];
                 }
 
                 if (empty($cr1['success'])) {
@@ -1347,15 +1359,26 @@ class CheckoutController extends Controller {
             if ($valorCR2 > 0.01) {
                 $descTaxa = 'Pedido #' . $pedidoId . ' (taxas e impostos - complemento carteira)';
 
-                $cr2 = $this->gerarCobrancaCambioRealTaxasSplit(
-                    $pedidoId,
-                    $billingType,
-                    $valorCR2,
-                    $usuario,
-                    $descTaxa,
-                    'taxa_gateway',
-                    $valorCR2
-                );
+                $cr2 = null;
+                try {
+                    ob_start();
+                    $cr2 = $this->gerarCobrancaCambioRealTaxasSplit(
+                        $pedidoId,
+                        $billingType,
+                        $valorCR2,
+                        $usuario,
+                        $descTaxa,
+                        'taxa_gateway',
+                        $valorCR2
+                    );
+                    $phpOutput2 = ob_get_clean();
+                    if ($phpOutput2 !== '' && $phpOutput2 !== false) {
+                        error_log('[WALLET SPLIT CR2] PHP output capturado: ' . substr($phpOutput2, 0, 500));
+                    }
+                } catch (\Exception $e) {
+                    ob_end_clean();
+                    return ['success' => false, 'error' => 'Falha Câmbio Real Taxas: ' . $e->getMessage()];
+                }
 
                 if (empty($cr2['success'])) {
                     return ['success' => false, 'error' => 'Falha Câmbio Real Taxas: ' . ($cr2['error'] ?? 'erro desconhecido')];
@@ -3269,6 +3292,8 @@ class CheckoutController extends Controller {
                     // =====================================================
                     // PAGAMENTO PARCIAL VIA CARTEIRA
                     // =====================================================
+                    // Suprimir qualquer output PHP que possa vazar antes do JSON
+                    ob_start();
 
                     // 1. Buscar dados do pedido para calcular eligible amount
                     $pedidoDataWallet = [];
@@ -3318,6 +3343,7 @@ class CheckoutController extends Controller {
                     );
 
                     if (empty($walletResult['success'])) {
+                        ob_end_clean();
                         $this->json(['error' => $walletResult['error'] ?? 'Falha ao debitar carteira'], 400);
                         return;
                     }
@@ -3375,6 +3401,7 @@ class CheckoutController extends Controller {
 
                         // Validação server-side: método secundário obrigatório
                         if ($metodoSecundario === '') {
+                            ob_end_clean();
                             $this->reverterDebitoCarteira((int) ($usuario['id'] ?? 0), (int) $pedidoId, $debitAmount, $moedaPedidoWallet);
                             $this->json(['error' => 'Selecione uma forma de pagamento secundária para os impostos e diferença.'], 400);
                             return;
@@ -3455,6 +3482,7 @@ class CheckoutController extends Controller {
 
                         if (empty($gwResult['success'])) {
                             // Rollback: reverter débito da carteira
+                            ob_end_clean();
                             $this->reverterDebitoCarteira((int) ($usuario['id'] ?? 0), (int) $pedidoId, $debitAmount, $moedaPedidoWallet);
                             $errorMsg = $gwResult['error'] ?? 'Falha no pagamento do gateway';
                             $this->json(['error' => 'Falha no pagamento: ' . $errorMsg . '. Seu saldo foi restaurado.'], 400);
@@ -3477,6 +3505,7 @@ class CheckoutController extends Controller {
                     }
 
                     // 7. Atualizar status do pedido
+                    ob_end_clean(); // Limpar qualquer output PHP capturado
                     $payResult = $walletResult;
                     $gateway = 'carteira';
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
