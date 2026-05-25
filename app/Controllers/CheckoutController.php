@@ -3248,12 +3248,72 @@ class CheckoutController extends Controller {
                             return;
                         }
 
+                        // Mesclar dados do formulário com dados do usuário para o gateway
+                        $usuarioParaGateway = array_merge($usuario ?? [], $dados ?? []);
+
+                        // Buscar dados completos do usuário do banco (sessão pode ter dados incompletos)
+                        try {
+                            $uid = (int) ($usuario['id'] ?? 0);
+                            if ($uid > 0) {
+                                $dbUsr = \Config\Database::getConnection();
+                                $stUsr = $dbUsr->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                                $stUsr->execute([$uid]);
+                                $usrCompleto = $stUsr->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                if (!empty($usrCompleto)) {
+                                    // Mesclar: dados do banco < dados da sessão < dados do formulário
+                                    $usuarioParaGateway = array_merge($usrCompleto, $usuario ?? [], $dados ?? []);
+                                }
+                            }
+                        } catch (\Exception $e) {}
+
+                        // Garantir que birth_date esteja preenchido (Câmbio Real exige)
+                        if (empty($usuarioParaGateway['birth_date'])) {
+                            $usuarioParaGateway['birth_date'] = $usuarioParaGateway['data_nascimento'] ?? '';
+                        }
+                        // Garantir endereço a partir do endereço selecionado no checkout
+                        if (empty($usuarioParaGateway['endereco']) || empty($usuarioParaGateway['cep'])) {
+                            $endSel = (int) ($dados['endereco_selecionado'] ?? 0);
+                            if ($endSel > 0) {
+                                try {
+                                    $addrRow = $this->enderecoModel->find($endSel);
+                                    if (is_array($addrRow) && !empty($addrRow)) {
+                                        if (empty($usuarioParaGateway['endereco'])) $usuarioParaGateway['endereco'] = $addrRow['endereco'] ?? ($addrRow['logradouro'] ?? '');
+                                        if (empty($usuarioParaGateway['numero'])) $usuarioParaGateway['numero'] = $addrRow['numero'] ?? '';
+                                        if (empty($usuarioParaGateway['bairro'])) $usuarioParaGateway['bairro'] = $addrRow['bairro'] ?? '';
+                                        if (empty($usuarioParaGateway['cidade'])) $usuarioParaGateway['cidade'] = $addrRow['cidade'] ?? '';
+                                        if (empty($usuarioParaGateway['estado'])) $usuarioParaGateway['estado'] = $addrRow['estado'] ?? '';
+                                        if (empty($usuarioParaGateway['cep'])) $usuarioParaGateway['cep'] = $addrRow['cep'] ?? '';
+                                    }
+                                } catch (\Exception $e) {}
+                            }
+                        }
+                        // Fallback: buscar primeiro endereço do usuário se ainda vazio
+                        if (empty($usuarioParaGateway['endereco']) || empty($usuarioParaGateway['cep'])) {
+                            try {
+                                $uid = (int) ($usuario['id'] ?? 0);
+                                if ($uid > 0) {
+                                    $dbAddr = \Config\Database::getConnection();
+                                    $stAddr = $dbAddr->prepare('SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY id DESC LIMIT 1');
+                                    $stAddr->execute([$uid]);
+                                    $addrFallback = $stAddr->fetch(\PDO::FETCH_ASSOC) ?: [];
+                                    if (!empty($addrFallback)) {
+                                        if (empty($usuarioParaGateway['endereco'])) $usuarioParaGateway['endereco'] = $addrFallback['endereco'] ?? ($addrFallback['logradouro'] ?? '');
+                                        if (empty($usuarioParaGateway['numero'])) $usuarioParaGateway['numero'] = $addrFallback['numero'] ?? '';
+                                        if (empty($usuarioParaGateway['bairro'])) $usuarioParaGateway['bairro'] = $addrFallback['bairro'] ?? '';
+                                        if (empty($usuarioParaGateway['cidade'])) $usuarioParaGateway['cidade'] = $addrFallback['cidade'] ?? '';
+                                        if (empty($usuarioParaGateway['estado'])) $usuarioParaGateway['estado'] = $addrFallback['estado'] ?? '';
+                                        if (empty($usuarioParaGateway['cep'])) $usuarioParaGateway['cep'] = $addrFallback['cep'] ?? '';
+                                    }
+                                }
+                            } catch (\Exception $e) {}
+                        }
+
                         $gwResult = $this->gerarCobrancaGatewayRestante(
                             (int) $pedidoId,
                             $gatewayCharge,
                             $moedaPedidoWallet,
                             $metodoSecundario,
-                            $usuario,
+                            $usuarioParaGateway,
                             $dados
                         );
 
