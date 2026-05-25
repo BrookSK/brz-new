@@ -1149,19 +1149,43 @@ class CheckoutController extends Controller {
                 return ['success' => false, 'error' => 'Saldo insuficiente na carteira'];
             }
 
-            // Debitar da coluna correspondente à moeda
-            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
-            $stmtUpd->execute([':valor' => $debit, ':uid' => $usuarioId]);
+            // Para BRL: o saldo real está em USD, precisamos debitar de saldo_usd
+            // convertendo o valor BRL de volta para USD
+            if ($moeda === 'BRL') {
+                // $debit está em BRL. Converter para USD para debitar da coluna correta.
+                $debitUsd = round($debit / $exchangeRate, 2);
+                
+                // Debitar de saldo_usd (onde o saldo realmente está)
+                $stmtUpd = $db->prepare('UPDATE carteiras SET saldo_usd = saldo_usd - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $debitUsd, ':uid' => $usuarioId]);
 
-            // Registrar transação
-            try {
-                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, modalidade, created_at) VALUES (:uid, \'debito\', :valor, :desc, \'normal\', NOW())');
-                $stmtTx->execute([
-                    ':uid' => $usuarioId,
-                    ':valor' => $debit,
-                    ':desc' => 'Uso parcial de saldo da carteira — Pedido #' . $pedidoId,
-                ]);
-            } catch (\Exception $e) {
+                // Registrar transação em BRL (valor que o cliente "pagou")
+                try {
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, valor_brl, valor_usd, taxa_conversao, descricao, modalidade, created_at) VALUES (:uid, \'debito\', :valor_brl, :valor_usd, :taxa, :desc, \'normal\', NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor_brl' => $debit,
+                        ':valor_usd' => $debitUsd,
+                        ':taxa' => $exchangeRate,
+                        ':desc' => 'Uso parcial de saldo da carteira — Pedido #' . $pedidoId,
+                    ]);
+                } catch (\Exception $e) {
+                }
+            } else {
+                // USD: debitar direto de saldo_usd
+                $stmtUpd = $db->prepare('UPDATE carteiras SET saldo_usd = saldo_usd - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $debit, ':uid' => $usuarioId]);
+
+                // Registrar transação
+                try {
+                    $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) VALUES (:uid, \'debito\', :valor, :desc, \'normal\', NOW())');
+                    $stmtTx->execute([
+                        ':uid' => $usuarioId,
+                        ':valor' => $debit,
+                        ':desc' => 'Uso parcial de saldo da carteira — Pedido #' . $pedidoId,
+                    ]);
+                } catch (\Exception $e) {
+                }
             }
 
             $db->commit();
@@ -1201,23 +1225,40 @@ class CheckoutController extends Controller {
             return;
         }
 
-        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
-        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
-
         try {
             $db = \Config\Database::getConnection();
 
-            // Re-creditar o valor na carteira
-            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
-            $stmtUpd->execute([':valor' => $valorDebitado, ':uid' => $usuarioId]);
+            if ($moeda === 'BRL') {
+                // O débito BRL foi feito em saldo_usd (convertido). Reverter em USD.
+                $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
+                if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
+                $valorUsd = round($valorDebitado / $exchangeRate, 2);
 
-            // Registrar transação de estorno
-            $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, modalidade, created_at) VALUES (:uid, \'credito\', :valor, :desc, \'normal\', NOW())');
-            $stmtTx->execute([
-                ':uid' => $usuarioId,
-                ':valor' => $valorDebitado,
-                ':desc' => 'Estorno de débito — Pedido #' . $pedidoId . ' (falha no gateway)',
-            ]);
+                $stmtUpd = $db->prepare('UPDATE carteiras SET saldo_usd = saldo_usd + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $valorUsd, ':uid' => $usuarioId]);
+
+                // Registrar transação de estorno
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, valor_brl, valor_usd, taxa_conversao, descricao, modalidade, created_at) VALUES (:uid, \'credito\', :valor_brl, :valor_usd, :taxa, :desc, \'normal\', NOW())');
+                $stmtTx->execute([
+                    ':uid' => $usuarioId,
+                    ':valor_brl' => $valorDebitado,
+                    ':valor_usd' => $valorUsd,
+                    ':taxa' => $exchangeRate,
+                    ':desc' => 'Estorno de débito — Pedido #' . $pedidoId . ' (falha no gateway)',
+                ]);
+            } else {
+                // USD: reverter direto em saldo_usd
+                $stmtUpd = $db->prepare('UPDATE carteiras SET saldo_usd = saldo_usd + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+                $stmtUpd->execute([':valor' => $valorDebitado, ':uid' => $usuarioId]);
+
+                // Registrar transação de estorno
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) VALUES (:uid, \'credito\', :valor, :desc, \'normal\', NOW())');
+                $stmtTx->execute([
+                    ':uid' => $usuarioId,
+                    ':valor' => $valorDebitado,
+                    ':desc' => 'Estorno de débito — Pedido #' . $pedidoId . ' (falha no gateway)',
+                ]);
+            }
         } catch (\Exception $e) {
             // Log but don't throw — best effort reversal
             error_log('[WALLET ROLLBACK] Erro ao reverter débito: ' . $e->getMessage());
@@ -3527,6 +3568,7 @@ class CheckoutController extends Controller {
                     // Se há gateway charge pendente, o pedido NÃO está totalmente pago
                     if ($gatewayCharge > 0.01) {
                         $payResult['status'] = 'PENDING';
+                        unset($payResult['paid_at']);
                     }
 
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
