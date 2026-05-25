@@ -11,6 +11,21 @@
             $statusPagamentoHeader = strtoupper($statusPagamentoHeader);
         }
         $isPagoHeader = !empty($statusPagamentoHeader) && in_array($statusPagamentoHeader, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true);
+        
+        // Se é pagamento via carteira com splits pendentes, não considerar como "confirmado"
+        $splitPagamentosHeaderCheck = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
+        if ($isPagoHeader && isset($splitPagamentosHeaderCheck['carteira'])) {
+            foreach ($splitPagamentosHeaderCheck as $comp => $spRow) {
+                if ($comp === 'carteira') continue;
+                if (is_array($spRow)) {
+                    $spSt = strtoupper(trim((string) ($spRow['status'] ?? '')));
+                    if (!in_array($spSt, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                        $isPagoHeader = false;
+                        break;
+                    }
+                }
+            }
+        }
         ?>
         <h1 class="display-4 fw-bold" style="color: var(--primary-color);"><?= $isPagoHeader ? __('checkout_done.order_confirmed', 'Pedido Confirmado!') : __('checkout_done.order_placed', 'Pedido realizado!') ?></h1>
         <p class="lead text-muted"><?= $isPagoHeader ? __('checkout_done.confirmed_subtitle', 'Seu pedido foi processado com sucesso e está sendo preparado.') : __('checkout_done.placed_subtitle', 'Seu pedido foi criado. Finalize o pagamento para confirmar.') ?></p>
@@ -329,6 +344,26 @@
                     </p>
 
                     <?php
+                    // Correção: se há wallet split com componentes pendentes no gateway, forçar exibição dos splits
+                    $splitPagamentosCheck = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
+                    $hasWalletWithPending = false;
+                    if (isset($splitPagamentosCheck['carteira'])) {
+                        foreach ($splitPagamentosCheck as $comp => $spRow) {
+                            if ($comp === 'carteira') continue;
+                            if (is_array($spRow)) {
+                                $spStatus = strtoupper(trim((string) ($spRow['status'] ?? '')));
+                                if (!in_array($spStatus, ['APPROVED', 'CONFIRMED', 'RECEIVED', 'PAID', 'SUCCEEDED', 'SUCCESS'], true)) {
+                                    $hasWalletWithPending = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if ($hasWalletWithPending && $isPago) {
+                        $isPago = false;
+                        $statusLabel = __('checkout_done.partial_paid', 'Parcialmente pago');
+                    }
+                    ?>                    <?php
                     $splitPagamentos = (isset($splitPagamentos) && is_array($splitPagamentos)) ? $splitPagamentos : [];
 
                     // Detectar se é split real (tem componentes produto + taxa_servico)

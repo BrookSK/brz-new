@@ -3523,12 +3523,18 @@ class CheckoutController extends Controller {
                     ob_end_clean(); // Limpar qualquer output PHP capturado
                     $payResult = $walletResult;
                     $gateway = 'carteira';
+
+                    // Se há gateway charge pendente, o pedido NÃO está totalmente pago
+                    if ($gatewayCharge > 0.01) {
+                        $payResult['status'] = 'PENDING';
+                    }
+
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                     $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
 
                     // Se carteira cobriu tudo e não há gateway charge, pedido está PAID
                     try {
-                        if ($gatewayCharge <= 0.01 && strtoupper((string) ($payResult['status'] ?? '')) === 'PAID') {
+                        if ($gatewayCharge <= 0.01 && strtoupper((string) ($walletResult['status'] ?? '')) === 'PAID') {
                             $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
                         }
                     } catch (\Exception $e) {
