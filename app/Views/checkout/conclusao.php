@@ -470,6 +470,10 @@
                                     <div class="text-center my-3">
                                         <img src="<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
                                     </div>
+                                    <?php elseif (str_starts_with($pixImg, 'data:')): ?>
+                                    <div class="text-center my-3">
+                                        <img src="<?= htmlspecialchars($pixImg) ?>" alt="QR Code PIX" style="max-width: 220px; width: 100%; height: auto;" />
+                                    </div>
                                     <?php else: ?>
                                     <?php
                                     $mime = 'image/png';
