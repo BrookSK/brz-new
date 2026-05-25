@@ -344,10 +344,15 @@
                         }
                     }
                     // Split real: tem componentes produto + taxa_servico (qualquer gateway)
-                    $hasSplit = !empty($splitPagamentos) && (isset($splitPagamentos['produto']) || isset($splitPagamentos['taxa_servico']) || isset($splitPagamentos['taxa']));
+                    $hasSplit = !empty($splitPagamentos) && (isset($splitPagamentos['produto']) || isset($splitPagamentos['taxa_servico']) || isset($splitPagamentos['taxa']) || isset($splitPagamentos['taxa_gateway']));
                     // Stripe pagamento único (componente 'pagamento') não é split
                     if ($isStripePagamento && !$isStripeSplit) {
                         $hasSplit = false;
+                    }
+                    // Pagamento parcial via carteira: considerar como split se tem carteira + gateway
+                    $hasWalletSplit = isset($splitPagamentos['carteira']) && (isset($splitPagamentos['produto']) || isset($splitPagamentos['taxa_gateway']));
+                    if ($hasWalletSplit) {
+                        $hasSplit = true;
                     }
                     $billingType = strtoupper((string) ((is_array($paymentDetails) ? ($paymentDetails['billingType'] ?? '') : '') ?: ($pedido['forma_pagamento'] ?? '')));
                     $invoiceUrl = (is_array($paymentDetails) ? ($paymentDetails['invoiceUrl'] ?? null) : null);
@@ -360,8 +365,9 @@
                     $splitPagoParcial = false;
                     if ($hasSplit) {
                         $pProduto = (isset($splitPagamentos['produto']) && is_array($splitPagamentos['produto'])) ? $splitPagamentos['produto'] : null;
-                        $pTaxa = (isset($splitPagamentos['taxa_servico']) && is_array($splitPagamentos['taxa_servico'])) ? $splitPagamentos['taxa_servico'] : ((isset($splitPagamentos['taxa']) && is_array($splitPagamentos['taxa'])) ? $splitPagamentos['taxa'] : null);
+                        $pTaxa = (isset($splitPagamentos['taxa_servico']) && is_array($splitPagamentos['taxa_servico'])) ? $splitPagamentos['taxa_servico'] : ((isset($splitPagamentos['taxa']) && is_array($splitPagamentos['taxa'])) ? $splitPagamentos['taxa'] : ((isset($splitPagamentos['taxa_gateway']) && is_array($splitPagamentos['taxa_gateway'])) ? $splitPagamentos['taxa_gateway'] : null));
                         $pImposto = (isset($splitPagamentos['imposto']) && is_array($splitPagamentos['imposto'])) ? $splitPagamentos['imposto'] : null;
+                        $pCarteira = (isset($splitPagamentos['carteira']) && is_array($splitPagamentos['carteira'])) ? $splitPagamentos['carteira'] : null;
                         $splitProdutoStatus = strtoupper(trim((string) (is_array($pProduto) ? ($pProduto['status'] ?? '') : '')));
                         $splitTaxaStatus = strtoupper(trim((string) (is_array($pTaxa) ? ($pTaxa['status'] ?? '') : '')));
                         $splitImpostoStatus = strtoupper(trim((string) (is_array($pImposto) ? ($pImposto['status'] ?? '') : '')));
@@ -386,8 +392,9 @@
                     <?php if (!$isPago && $hasSplit): ?>
                         <?php
                         $pProduto = $splitPagamentos['produto'] ?? null;
-                        $pTaxa = $splitPagamentos['taxa_servico'] ?? ($splitPagamentos['taxa'] ?? null);
+                        $pTaxa = $splitPagamentos['taxa_servico'] ?? ($splitPagamentos['taxa'] ?? ($splitPagamentos['taxa_gateway'] ?? null));
                         $pImposto = $splitPagamentos['imposto'] ?? null;
+                        $pCarteira = $splitPagamentos['carteira'] ?? null;
 
                         $renderSplitBox = function (string $titulo, ?array $row) {
                             if (empty($row)) {
@@ -459,6 +466,22 @@
                         $gwLabelProduto = $gwProduto === 'stripe' ? 'Stripe' : ($gwProduto === 'cambioreal' ? 'Câmbio Real' : strtoupper($gwProduto));
                         $gwLabelTaxa = $gwTaxa === 'stripe' ? 'Stripe' : ($gwTaxa === 'cambioreal_taxas' ? 'Câmbio Real Taxas' : ($gwTaxa === 'appmax' ? 'Câmbio Real Taxas' : strtoupper($gwTaxa)));
                         ?>
+
+                        <?php if (!empty($pCarteira)): ?>
+                        <div class="border rounded p-3 mb-3" style="background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.3) !important;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong><i class="fas fa-wallet me-1"></i> Crédito da Carteira</strong>
+                                    <span class="badge bg-success ms-2">Pago</span>
+                                </div>
+                                <div class="fw-bold">
+                                    <?= (strtoupper((string) ($pCarteira['moeda'] ?? '')) === 'BRL') ? 'R$' : '$' ?> <?= number_format((float) ($pCarteira['valor'] ?? 0), 2, ',', '.') ?>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-1">Debitado automaticamente da sua carteira.</div>
+                        </div>
+                        <?php endif; ?>
+
                         <?php $renderSplitBox('Pagamento 1: Produtos (' . $gwLabelProduto . ')', is_array($pProduto) ? $pProduto : null); ?>
                         <?php $renderSplitBox('Pagamento 2: Taxas e impostos (' . $gwLabelTaxa . ')', is_array($pTaxa) ? $pTaxa : null); ?>
 

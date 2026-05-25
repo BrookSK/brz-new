@@ -1225,7 +1225,13 @@ class CheckoutController extends Controller {
     }
 
     /**
-     * Gera a cobrança do gateway secundário para o valor restante (diferença + impostos).
+     * Gera a(s) cobrança(s) do gateway para o valor restante não coberto pela carteira.
+     * 
+     * Para BRL: respeita o split de duas contas bancárias:
+     *   - Câmbio Real (conta 1): subtotal de produtos não coberto
+     *   - Câmbio Real Taxas (conta 2): taxa_servico não coberta + impostos + imposto_local
+     * 
+     * Para USD: Stripe PaymentIntent separado para o total restante.
      */
     private function gerarCobrancaGatewayRestante(
         int $pedidoId,
@@ -1233,7 +1239,11 @@ class CheckoutController extends Controller {
         string $moeda,
         string $metodoSecundario,
         array $usuario,
-        array $dadosCartao = []
+        array $dadosCheckout = [],
+        float $uncoveredSubtotal = 0.0,
+        float $uncoveredTaxaServico = 0.0,
+        float $impostos = 0.0,
+        float $impostoLocal = 0.0
     ): array {
         $pedidoId = (int) $pedidoId;
         $valorRestante = (float) $valorRestante;
@@ -1244,10 +1254,11 @@ class CheckoutController extends Controller {
             return ['success' => true, 'skipped' => true, 'status' => 'PAID', 'payment_id' => ''];
         }
 
-        $descricao = 'Complemento pedido #' . $pedidoId . ' (impostos + diferença carteira)';
-
         if ($moeda === 'BRL') {
-            // Rotear para Câmbio Real Taxas
+            // ═══════════════════════════════════════════════════════════════
+            // BRL: Split em duas contas bancárias
+            // ═══════════════════════════════════════════════════════════════
+
             $billingType = 'PIX';
             if (in_array($metodoSecundario, ['cartao_credito', 'cartao_debito'], true)) {
                 $billingType = 'CREDIT_CARD';
@@ -1255,18 +1266,116 @@ class CheckoutController extends Controller {
                 $billingType = 'BOLETO';
             }
 
-            $result = $this->gerarCobrancaCambioRealTaxasSplit(
-                $pedidoId,
-                $billingType,
-                $valorRestante,
-                $usuario,
-                $descricao,
-                'taxa_gateway'
-            );
+            // Valor para Câmbio Real (conta 1): subtotal de produtos não coberto
+            $valorCR1 = round(max(0.0, $uncoveredSubtotal), 2);
+            // Valor para Câmbio Real Taxas (conta 2): taxa_servico não coberta + impostos
+            $valorCR2 = round(max(0.0, $uncoveredTaxaServico + $impostos + $impostoLocal), 2);
 
-            return $result;
+            $results = ['success' => true, 'charges' => []];
+
+            // ── Cobrança 1: Câmbio Real (produtos) ──
+            if ($valorCR1 > 0.01) {
+                $descProduto = 'Pedido #' . $pedidoId . ' (produtos - complemento carteira)';
+
+                // Calcular valor em USD para o Câmbio Real (precisa do amount_usd)
+                $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
+                if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
+                $amountUsd = round($valorCR1 / $exchangeRate, 2);
+
+                $client = [
+                    'name' => (string) ($usuario['nome'] ?? ($usuario['name'] ?? 'Cliente')),
+                    'email' => (string) ($usuario['email'] ?? ''),
+                    'document' => (string) ($usuario['documento'] ?? ($usuario['document'] ?? '')),
+                    'birth_date' => (string) ($usuario['birth_date'] ?? ($usuario['data_nascimento'] ?? '')),
+                    'phone' => (string) ($usuario['telefone'] ?? ($usuario['phone'] ?? '')),
+                    'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                    'address' => is_array($usuario['address'] ?? null) ? $usuario['address'] : [
+                        'street'   => (string) ($usuario['endereco'] ?? ''),
+                        'number'   => (string) ($usuario['numero'] ?? ''),
+                        'district' => (string) ($usuario['bairro'] ?? ''),
+                        'city'     => (string) ($usuario['cidade'] ?? ''),
+                        'state'    => (string) ($usuario['estado'] ?? ''),
+                        'zip_code' => (string) ($usuario['cep'] ?? ''),
+                    ],
+                ];
+
+                if ($billingType === 'PIX') {
+                    $cr1 = $this->paymentService->createCambioRealPixPaymentProduto(
+                        $pedidoId, $amountUsd, $valorCR1, $descProduto, $client
+                    );
+                } elseif ($billingType === 'CREDIT_CARD') {
+                    $card = [
+                        'token'        => (string) ($dadosCheckout['cambioreal_card_token'] ?? ''),
+                        'brand'        => (string) ($dadosCheckout['cambioreal_card_brand'] ?? ''),
+                        'bin'          => (string) ($dadosCheckout['cambioreal_card_bin'] ?? ''),
+                        'dfp_id'       => (string) ($dadosCheckout['cambioreal_card_dfp_id'] ?? ''),
+                        'holder'       => (string) ($dadosCheckout['card_holder_name'] ?? ''),
+                        'installments' => (int) ($dadosCheckout['installments'] ?? 1),
+                        'type'         => (string) ($dadosCheckout['cambioreal_card_type'] ?? 'credit'),
+                    ];
+                    $cr1 = $this->paymentService->createCambioRealDirectPaymentProdutoCartao(
+                        $pedidoId, $valorCR1, $amountUsd, $descProduto, $client, $card
+                    );
+                } else {
+                    $cr1 = $this->paymentService->createCambioRealDirectPaymentProdutoBoleto(
+                        $pedidoId, $valorCR1, $descProduto, $client
+                    );
+                }
+
+                if (empty($cr1['success'])) {
+                    return ['success' => false, 'error' => 'Falha Câmbio Real (produtos): ' . ($cr1['error'] ?? 'erro desconhecido')];
+                }
+                $results['charges'][] = ['componente' => 'produto', 'gateway' => 'cambioreal', 'result' => $cr1];
+
+                // Registrar split de produto
+                $this->paymentService->registrarPedidoPagamentoSplit([
+                    'pedido_id' => $pedidoId,
+                    'componente' => 'produto',
+                    'gateway' => 'cambioreal',
+                    'metodo' => $metodoSecundario,
+                    'moeda' => 'BRL',
+                    'valor' => $valorCR1,
+                    'status' => $cr1['status'] ?? 'pending',
+                    'payment_id' => $cr1['payment_id'] ?? '',
+                    'invoice_url' => $cr1['invoice_url'] ?? '',
+                    'pix_payload' => $cr1['pix_payload'] ?? ($cr1['pix'] ?? ''),
+                    'pix_encoded_image' => $cr1['pix_encoded_image'] ?? ($cr1['qr_code'] ?? ''),
+                ]);
+            }
+
+            // ── Cobrança 2: Câmbio Real Taxas (taxa_servico + impostos) ──
+            if ($valorCR2 > 0.01) {
+                $descTaxa = 'Pedido #' . $pedidoId . ' (taxas e impostos - complemento carteira)';
+
+                $cr2 = $this->gerarCobrancaCambioRealTaxasSplit(
+                    $pedidoId,
+                    $billingType,
+                    $valorCR2,
+                    $usuario,
+                    $descTaxa,
+                    'taxa_gateway',
+                    $valorCR2
+                );
+
+                if (empty($cr2['success'])) {
+                    return ['success' => false, 'error' => 'Falha Câmbio Real Taxas: ' . ($cr2['error'] ?? 'erro desconhecido')];
+                }
+                $results['charges'][] = ['componente' => 'taxa_gateway', 'gateway' => 'cambioreal_taxas', 'result' => $cr2];
+            }
+
+            // Retornar sucesso com dados da primeira cobrança (para compatibilidade)
+            $firstCharge = $results['charges'][0]['result'] ?? [];
+            return [
+                'success' => true,
+                'status' => $firstCharge['status'] ?? 'pending',
+                'payment_id' => $firstCharge['payment_id'] ?? '',
+                'charges' => $results['charges'],
+            ];
         } else {
+            // ═══════════════════════════════════════════════════════════════
             // USD: Stripe PaymentIntent separado
+            // ═══════════════════════════════════════════════════════════════
+            $descricao = 'Complemento pedido #' . $pedidoId . ' (impostos + diferença carteira)';
             try {
                 $result = $this->paymentService->createStripePaymentIntent(
                     $pedidoId,
@@ -3192,7 +3301,8 @@ class CheckoutController extends Controller {
                     // 2. Calcular wallet eligible amount
                     $walletEligible = $this->calcularWalletEligibleAmount($pedidoDataWallet);
 
-                    // Se moeda é BRL, converter eligible para BRL
+                    // Taxa de conversão USD->BRL
+                    $exchangeRateW = 1.0;
                     if ($moedaPedidoWallet === 'BRL') {
                         $exchangeRateW = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
                         if ($exchangeRateW <= 1.01) $exchangeRateW = 5.85;
@@ -3214,16 +3324,38 @@ class CheckoutController extends Controller {
 
                     $debitAmount = (float) ($walletResult['debit_amount'] ?? 0);
 
-                    // 4. Calcular valor restante para gateway
-                    $impostos = (float) ($pedidoDataWallet['impostos'] ?? 0);
-                    $impostoLocal = (float) ($pedidoDataWallet['imposto_local'] ?? 0);
+                    // 4. Calcular valor restante para gateway (separado por componente)
+                    $subtotalProdutosRaw = (float) ($pedidoDataWallet['subtotal_produtos'] ?? 0);
+                    $taxaServicoRaw = (float) ($pedidoDataWallet['taxa_servico'] ?? 0);
+                    $impostosRaw = (float) ($pedidoDataWallet['impostos'] ?? 0);
+                    $impostoLocalRaw = (float) ($pedidoDataWallet['imposto_local'] ?? 0);
+
+                    // Converter para BRL se necessário
                     if ($moedaPedidoWallet === 'BRL') {
-                        $impostos = $impostos * $exchangeRateW;
-                        $impostoLocal = $impostoLocal * $exchangeRateW;
+                        $subtotalProdutosBrl = $subtotalProdutosRaw * $exchangeRateW;
+                        $taxaServicoBrl = $taxaServicoRaw * $exchangeRateW;
+                        $impostosBrl = $impostosRaw * $exchangeRateW;
+                        $impostoLocalBrl = $impostoLocalRaw * $exchangeRateW;
+                    } else {
+                        $subtotalProdutosBrl = $subtotalProdutosRaw;
+                        $taxaServicoBrl = $taxaServicoRaw;
+                        $impostosBrl = $impostosRaw;
+                        $impostoLocalBrl = $impostoLocalRaw;
                     }
-                    $uncoveredDiff = $walletEligible - $debitAmount;
-                    if ($uncoveredDiff < 0.01) $uncoveredDiff = 0.0;
-                    $gatewayCharge = $uncoveredDiff + $impostos + $impostoLocal;
+
+                    // Calcular quanto da carteira cobriu de cada componente
+                    // A carteira cobre primeiro o subtotal de produtos, depois a taxa de serviço
+                    $restanteDebit = $debitAmount;
+                    $cobriuSubtotal = min($restanteDebit, $subtotalProdutosBrl);
+                    $restanteDebit -= $cobriuSubtotal;
+                    $cobriuTaxaServico = min($restanteDebit, $taxaServicoBrl);
+
+                    // Valores não cobertos pela carteira
+                    $uncoveredSubtotal = round(max(0.0, $subtotalProdutosBrl - $cobriuSubtotal), 2);
+                    $uncoveredTaxaServico = round(max(0.0, $taxaServicoBrl - $cobriuTaxaServico), 2);
+
+                    $gatewayCharge = $uncoveredSubtotal + $uncoveredTaxaServico + $impostosBrl + $impostoLocalBrl;
+                    if ($gatewayCharge < 0.01) $gatewayCharge = 0.0;
 
                     // 5. Registrar split da carteira
                     $this->paymentService->registrarPedidoPagamentoSplit([
@@ -3314,7 +3446,11 @@ class CheckoutController extends Controller {
                             $moedaPedidoWallet,
                             $metodoSecundario,
                             $usuarioParaGateway,
-                            $dados
+                            $dados,
+                            $uncoveredSubtotal,
+                            $uncoveredTaxaServico,
+                            $impostosBrl,
+                            $impostoLocalBrl
                         );
 
                         if (empty($gwResult['success'])) {
@@ -3325,17 +3461,19 @@ class CheckoutController extends Controller {
                             return;
                         }
 
-                        // Registrar split do gateway
-                        $this->paymentService->registrarPedidoPagamentoSplit([
-                            'pedido_id' => $pedidoId,
-                            'componente' => 'taxa_gateway',
-                            'gateway' => ($moedaPedidoWallet === 'BRL') ? 'cambioreal_taxas' : 'stripe',
-                            'metodo' => $metodoSecundario,
-                            'moeda' => $moedaPedidoWallet,
-                            'valor' => $gatewayCharge,
-                            'status' => $gwResult['status'] ?? 'pending',
-                            'payment_id' => $gwResult['payment_id'] ?? '',
-                        ]);
+                        // Para USD (Stripe), registrar split do gateway (BRL já registra internamente)
+                        if ($moedaPedidoWallet !== 'BRL') {
+                            $this->paymentService->registrarPedidoPagamentoSplit([
+                                'pedido_id' => $pedidoId,
+                                'componente' => 'taxa_gateway',
+                                'gateway' => 'stripe',
+                                'metodo' => $metodoSecundario,
+                                'moeda' => $moedaPedidoWallet,
+                                'valor' => $gatewayCharge,
+                                'status' => $gwResult['status'] ?? 'pending',
+                                'payment_id' => $gwResult['payment_id'] ?? '',
+                            ]);
+                        }
                     }
 
                     // 7. Atualizar status do pedido
