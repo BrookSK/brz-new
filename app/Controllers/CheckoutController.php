@@ -1033,6 +1033,255 @@ class CheckoutController extends Controller {
         }
     }
 
+    /**
+     * Calcula o valor elegível para pagamento via carteira (subtotal_produtos + taxa_servico).
+     * Impostos e imposto_local são EXCLUÍDOS — sempre cobrados via gateway.
+     */
+    private function calcularWalletEligibleAmount(array $pedido): float
+    {
+        $subtotalProdutos = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
+        $taxaServico = (float) ($pedido['taxa_servico'] ?? ($pedido['servicos'] ?? 0));
+        return $subtotalProdutos + $taxaServico;
+    }
+
+    /**
+     * Debita parcialmente a carteira do usuário para um pedido.
+     * O valor debitado é min(saldo_disponivel, walletEligibleAmount).
+     */
+    private function debitarCarteiraParaPedidoParcial(
+        int $usuarioId,
+        int $pedidoId,
+        float $walletEligibleAmount,
+        string $moeda
+    ): array {
+        $usuarioId = (int) $usuarioId;
+        $pedidoId = (int) $pedidoId;
+        $walletEligibleAmount = (float) $walletEligibleAmount;
+        $moeda = strtoupper(trim((string) $moeda));
+
+        if ($usuarioId <= 0) {
+            return ['success' => false, 'error' => 'Usuário inválido para pagamento via carteira'];
+        }
+        if ($pedidoId <= 0) {
+            return ['success' => false, 'error' => 'Pedido inválido para pagamento via carteira'];
+        }
+        if ($walletEligibleAmount <= 0) {
+            return ['success' => false, 'error' => 'Valor elegível inválido'];
+        }
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            return ['success' => false, 'error' => 'Moeda inválida para carteira'];
+        }
+
+        $db = \Config\Database::getConnection();
+
+        $this->garantirCarteiraUsuario($db, $usuarioId);
+        $this->garantirTabelaTransacoesCarteira($db);
+
+        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $bloqueadoCol = ($moeda === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+        $db->beginTransaction();
+        try {
+            // Desbloquear recargas do checkout rápido que já passaram da carência
+            try {
+                $stmtUnlock = $db->prepare("SELECT id, moeda, valor
+                    FROM carteira_recargas
+                    WHERE usuario_id = :uid
+                      AND origem = 'clube_quick_checkout'
+                      AND LOWER(COALESCE(status,'')) IN ('paid','approved','credited')
+                      AND unlocked_at IS NULL
+                      AND locked_until IS NOT NULL
+                      AND locked_until <= NOW()");
+                $stmtUnlock->execute([':uid' => $usuarioId]);
+                $unlockRows = $stmtUnlock->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($unlockRows as $ur) {
+                    $rid = (int) ($ur['id'] ?? 0);
+                    if ($rid <= 0) continue;
+                    $m = strtoupper(trim((string) ($ur['moeda'] ?? 'USD')));
+                    $v = (float) ($ur['valor'] ?? 0);
+                    if ($v <= 0) continue;
+                    $saldoBloqColTmp = ($m === 'BRL') ? 'saldo_brl_bloqueado' : 'saldo_usd_bloqueado';
+                    $stmtDec = $db->prepare('UPDATE carteiras SET ' . $saldoBloqColTmp . ' = GREATEST(' . $saldoBloqColTmp . ' - :v, 0), updated_at = NOW() WHERE usuario_id = :uid');
+                    $stmtDec->execute([':v' => $v, ':uid' => $usuarioId]);
+                    $stmtMark = $db->prepare('UPDATE carteira_recargas SET unlocked_at = NOW(), updated_at = NOW() WHERE id = :id AND unlocked_at IS NULL');
+                    $stmtMark->execute([':id' => $rid]);
+                }
+            } catch (\Exception $e) {
+            }
+
+            $stmt = $db->prepare('SELECT saldo_usd, saldo_brl, saldo_usd_bloqueado, saldo_brl_bloqueado FROM carteiras WHERE usuario_id = ? FOR UPDATE');
+            $stmt->execute([$usuarioId]);
+            $carteira = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            $saldoAtual = (float) ($carteira[$saldoCol] ?? 0);
+            $saldoBloqueado = (float) ($carteira[$bloqueadoCol] ?? 0);
+            if ($saldoBloqueado < 0) $saldoBloqueado = 0.0;
+            $saldoDisponivel = $saldoAtual - $saldoBloqueado;
+            if ($saldoDisponivel < 0) $saldoDisponivel = 0.0;
+
+            // Para BRL: converter saldo USD disponível para BRL usando a taxa do sistema
+            if ($moeda === 'BRL') {
+                $saldoUsd = (float) ($carteira['saldo_usd'] ?? 0);
+                $bloqUsd = (float) ($carteira['saldo_usd_bloqueado'] ?? 0);
+                if ($bloqUsd < 0) $bloqUsd = 0.0;
+                $dispUsd = $saldoUsd - $bloqUsd;
+                if ($dispUsd < 0) $dispUsd = 0.0;
+
+                // Obter taxa de conversão
+                $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
+                if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
+
+                // Saldo disponível em BRL = saldo_brl disponível + (saldo_usd disponível * taxa)
+                $saldoDisponivelBrl = $saldoDisponivel + ($dispUsd * $exchangeRate);
+                $saldoDisponivel = $saldoDisponivelBrl;
+            }
+
+            if ($saldoDisponivel <= 0.001) {
+                $db->rollBack();
+                return ['success' => false, 'error' => 'Saldo insuficiente na carteira'];
+            }
+
+            // Calcular valor a debitar: min(saldo_disponivel, walletEligibleAmount)
+            $debit = min($saldoDisponivel, $walletEligibleAmount);
+            if ($debit <= 0.001) {
+                $db->rollBack();
+                return ['success' => false, 'error' => 'Saldo insuficiente na carteira'];
+            }
+
+            // Debitar da coluna correspondente à moeda
+            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' - :valor, updated_at = NOW() WHERE usuario_id = :uid');
+            $stmtUpd->execute([':valor' => $debit, ':uid' => $usuarioId]);
+
+            // Registrar transação
+            try {
+                $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, modalidade, created_at) VALUES (:uid, \'debito\', :valor, :desc, \'normal\', NOW())');
+                $stmtTx->execute([
+                    ':uid' => $usuarioId,
+                    ':valor' => $debit,
+                    ':desc' => 'Uso parcial de saldo da carteira — Pedido #' . $pedidoId,
+                ]);
+            } catch (\Exception $e) {
+            }
+
+            $db->commit();
+
+            return [
+                'success' => true,
+                'debit_amount' => round($debit, 2),
+                'status' => 'PAID',
+                'paid_at' => date('Y-m-d H:i:s'),
+                'billingType' => 'WALLET',
+                'payment_id' => 'WALLET_' . $pedidoId,
+            ];
+        } catch (\Exception $e) {
+            $db->rollBack();
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Reverte um débito parcial da carteira (rollback quando gateway falha).
+     */
+    private function reverterDebitoCarteira(
+        int $usuarioId,
+        int $pedidoId,
+        float $valorDebitado,
+        string $moeda
+    ): void {
+        $usuarioId = (int) $usuarioId;
+        $pedidoId = (int) $pedidoId;
+        $valorDebitado = (float) $valorDebitado;
+        $moeda = strtoupper(trim((string) $moeda));
+
+        if ($usuarioId <= 0 || $valorDebitado <= 0) {
+            return;
+        }
+        if (!in_array($moeda, ['BRL', 'USD'], true)) {
+            return;
+        }
+
+        $saldoCol = ($moeda === 'BRL') ? 'saldo_brl' : 'saldo_usd';
+        $valorCol = ($moeda === 'BRL') ? 'valor_brl' : 'valor_usd';
+
+        try {
+            $db = \Config\Database::getConnection();
+
+            // Re-creditar o valor na carteira
+            $stmtUpd = $db->prepare('UPDATE carteiras SET ' . $saldoCol . ' = ' . $saldoCol . ' + :valor, updated_at = NOW() WHERE usuario_id = :uid');
+            $stmtUpd->execute([':valor' => $valorDebitado, ':uid' => $usuarioId]);
+
+            // Registrar transação de estorno
+            $stmtTx = $db->prepare('INSERT INTO transacoes_carteira (usuario_id, tipo, ' . $valorCol . ', descricao, modalidade, created_at) VALUES (:uid, \'credito\', :valor, :desc, \'normal\', NOW())');
+            $stmtTx->execute([
+                ':uid' => $usuarioId,
+                ':valor' => $valorDebitado,
+                ':desc' => 'Estorno de débito — Pedido #' . $pedidoId . ' (falha no gateway)',
+            ]);
+        } catch (\Exception $e) {
+            // Log but don't throw — best effort reversal
+            error_log('[WALLET ROLLBACK] Erro ao reverter débito: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Gera a cobrança do gateway secundário para o valor restante (diferença + impostos).
+     */
+    private function gerarCobrancaGatewayRestante(
+        int $pedidoId,
+        float $valorRestante,
+        string $moeda,
+        string $metodoSecundario,
+        array $usuario,
+        array $dadosCartao = []
+    ): array {
+        $pedidoId = (int) $pedidoId;
+        $valorRestante = (float) $valorRestante;
+        $moeda = strtoupper(trim((string) $moeda));
+        $metodoSecundario = strtolower(trim((string) $metodoSecundario));
+
+        if ($valorRestante <= 0.01) {
+            return ['success' => true, 'skipped' => true, 'status' => 'PAID', 'payment_id' => ''];
+        }
+
+        $descricao = 'Complemento pedido #' . $pedidoId . ' (impostos + diferença carteira)';
+
+        if ($moeda === 'BRL') {
+            // Rotear para Câmbio Real Taxas
+            $billingType = 'PIX';
+            if (in_array($metodoSecundario, ['cartao_credito', 'cartao_debito'], true)) {
+                $billingType = 'CREDIT_CARD';
+            } elseif ($metodoSecundario === 'boleto') {
+                $billingType = 'BOLETO';
+            }
+
+            $result = $this->gerarCobrancaCambioRealTaxasSplit(
+                $pedidoId,
+                $billingType,
+                $valorRestante,
+                $usuario,
+                $descricao,
+                'taxa_gateway'
+            );
+
+            return $result;
+        } else {
+            // USD: Stripe PaymentIntent separado
+            try {
+                $result = $this->paymentService->createStripePaymentIntent(
+                    $pedidoId,
+                    $valorRestante,
+                    'usd',
+                    $descricao,
+                    ['componente' => 'taxa_gateway', 'tipo' => 'wallet_remainder']
+                );
+                return $result;
+            } catch (\Exception $e) {
+                return ['success' => false, 'error' => $e->getMessage()];
+            }
+        }
+    }
+
     private function getIdempotencySignature(array $dados, array $carrinho, array $usuario, float $total, string $moeda): string {
         $uid = (int) ($usuario['id'] ?? 0);
         $email = strtolower(trim((string) ($usuario['email'] ?? ($dados['email'] ?? ''))));
@@ -2438,6 +2687,7 @@ class CheckoutController extends Controller {
             'cambioreal_rate_brl' => $rateBRL,
             'pix_desconto_taxa_servico_percent' => $this->getPixDescontoTaxaServicoPercent(),
             'free_offer_info' => $this->calcularFreeOfferInfo($items),
+            'wallet_eligible_amount' => ($subtotal + $taxaServico),
         ]);
     }
 
@@ -2871,7 +3121,6 @@ class CheckoutController extends Controller {
                 $formaSelecionada = strtolower(trim((string) ($dados['forma_pagamento'] ?? '')));
 
                 if (!$reused && $formaSelecionada === 'carteira') {
-                    $valorPedido = (float) ($pedidoRowPay['total'] ?? 0);
                     $moedaPedidoWallet = strtoupper(trim((string) ($dados['moeda'] ?? ($pedidoRowPay['moeda'] ?? 'BRL'))));
                     if (!in_array($moedaPedidoWallet, ['BRL', 'USD'], true)) {
                         $moedaPedidoWallet = strtoupper(trim((string) ($pedidoRowPay['moeda'] ?? 'BRL')));
@@ -2898,7 +3147,6 @@ class CheckoutController extends Controller {
                             $pCur[] = $moedaPedidoWallet;
                         }
                         if (is_array($colsPedCur) && in_array('taxa_conversao', $colsPedCur, true)) {
-                            // Se está pagando em USD, considerar taxa 1 como padrão; BRL também.
                             $setCur[] = 'taxa_conversao = COALESCE(taxa_conversao, 1)';
                         }
                         if (!empty($setCur)) {
@@ -2908,13 +3156,137 @@ class CheckoutController extends Controller {
                         }
                     } catch (\Exception $e) {
                     }
-                    $payResult = $this->debitarCarteiraParaPedido((int) ($usuario['id'] ?? 0), (int) $pedidoId, $valorPedido, $moedaPedidoWallet);
+
+                    // =====================================================
+                    // PAGAMENTO PARCIAL VIA CARTEIRA
+                    // =====================================================
+
+                    // 1. Buscar dados do pedido para calcular eligible amount
+                    $pedidoDataWallet = [];
+                    try {
+                        $dbWallet = \Config\Database::getConnection();
+                        $colsPedW = [];
+                        try { $stColsW = $dbWallet->query('DESCRIBE pedidos'); $colsPedW = $stColsW ? ($stColsW->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) { $colsPedW = []; }
+                        $selW = ['id'];
+                        foreach (['subtotal', 'subtotal_produtos', 'servicos', 'taxa_servico', 'impostos', 'valor_impostos', 'imposto_local', 'total'] as $c) {
+                            if (in_array($c, $colsPedW, true)) $selW[] = $c;
+                        }
+                        $stPedW = $dbWallet->prepare('SELECT ' . implode(', ', array_unique($selW)) . ' FROM pedidos WHERE id = ? LIMIT 1');
+                        $stPedW->execute([(int) $pedidoId]);
+                        $pedidoDataWallet = $stPedW->fetch(\PDO::FETCH_ASSOC) ?: [];
+                    } catch (\Exception $e) {
+                        $pedidoDataWallet = [];
+                    }
+
+                    // Normalizar campos
+                    if (!isset($pedidoDataWallet['subtotal_produtos']) && isset($pedidoDataWallet['subtotal'])) {
+                        $pedidoDataWallet['subtotal_produtos'] = $pedidoDataWallet['subtotal'];
+                    }
+                    if (!isset($pedidoDataWallet['taxa_servico']) && isset($pedidoDataWallet['servicos'])) {
+                        $pedidoDataWallet['taxa_servico'] = $pedidoDataWallet['servicos'];
+                    }
+                    if (!isset($pedidoDataWallet['impostos']) && isset($pedidoDataWallet['valor_impostos'])) {
+                        $pedidoDataWallet['impostos'] = $pedidoDataWallet['valor_impostos'];
+                    }
+
+                    // 2. Calcular wallet eligible amount
+                    $walletEligible = $this->calcularWalletEligibleAmount($pedidoDataWallet);
+
+                    // Se moeda é BRL, converter eligible para BRL
+                    if ($moedaPedidoWallet === 'BRL') {
+                        $exchangeRateW = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
+                        if ($exchangeRateW <= 1.01) $exchangeRateW = 5.85;
+                        $walletEligible = $walletEligible * $exchangeRateW;
+                    }
+
+                    // 3. Debitar carteira (parcial ou total do eligible)
+                    $walletResult = $this->debitarCarteiraParaPedidoParcial(
+                        (int) ($usuario['id'] ?? 0),
+                        (int) $pedidoId,
+                        $walletEligible,
+                        $moedaPedidoWallet
+                    );
+
+                    if (empty($walletResult['success'])) {
+                        $this->json(['error' => $walletResult['error'] ?? 'Falha ao debitar carteira'], 400);
+                        return;
+                    }
+
+                    $debitAmount = (float) ($walletResult['debit_amount'] ?? 0);
+
+                    // 4. Calcular valor restante para gateway
+                    $impostos = (float) ($pedidoDataWallet['impostos'] ?? 0);
+                    $impostoLocal = (float) ($pedidoDataWallet['imposto_local'] ?? 0);
+                    if ($moedaPedidoWallet === 'BRL') {
+                        $impostos = $impostos * $exchangeRateW;
+                        $impostoLocal = $impostoLocal * $exchangeRateW;
+                    }
+                    $uncoveredDiff = $walletEligible - $debitAmount;
+                    if ($uncoveredDiff < 0.01) $uncoveredDiff = 0.0;
+                    $gatewayCharge = $uncoveredDiff + $impostos + $impostoLocal;
+
+                    // 5. Registrar split da carteira
+                    $this->paymentService->registrarPedidoPagamentoSplit([
+                        'pedido_id' => $pedidoId,
+                        'componente' => 'carteira',
+                        'gateway' => 'carteira',
+                        'metodo' => 'carteira',
+                        'moeda' => $moedaPedidoWallet,
+                        'valor' => $debitAmount,
+                        'status' => 'paid',
+                        'payment_id' => 'WALLET_' . $pedidoId,
+                    ]);
+
+                    // 6. Cobrar gateway secundário (se gatewayCharge > 0)
+                    if ($gatewayCharge > 0.01) {
+                        $metodoSecundario = strtolower(trim((string) ($dados['forma_pagamento_secundaria'] ?? '')));
+
+                        // Validação server-side: método secundário obrigatório
+                        if ($metodoSecundario === '') {
+                            $this->reverterDebitoCarteira((int) ($usuario['id'] ?? 0), (int) $pedidoId, $debitAmount, $moedaPedidoWallet);
+                            $this->json(['error' => 'Selecione uma forma de pagamento secundária para os impostos e diferença.'], 400);
+                            return;
+                        }
+
+                        $gwResult = $this->gerarCobrancaGatewayRestante(
+                            (int) $pedidoId,
+                            $gatewayCharge,
+                            $moedaPedidoWallet,
+                            $metodoSecundario,
+                            $usuario,
+                            $dados
+                        );
+
+                        if (empty($gwResult['success'])) {
+                            // Rollback: reverter débito da carteira
+                            $this->reverterDebitoCarteira((int) ($usuario['id'] ?? 0), (int) $pedidoId, $debitAmount, $moedaPedidoWallet);
+                            $errorMsg = $gwResult['error'] ?? 'Falha no pagamento do gateway';
+                            $this->json(['error' => 'Falha no pagamento: ' . $errorMsg . '. Seu saldo foi restaurado.'], 400);
+                            return;
+                        }
+
+                        // Registrar split do gateway
+                        $this->paymentService->registrarPedidoPagamentoSplit([
+                            'pedido_id' => $pedidoId,
+                            'componente' => 'taxa_gateway',
+                            'gateway' => ($moedaPedidoWallet === 'BRL') ? 'cambioreal_taxas' : 'stripe',
+                            'metodo' => $metodoSecundario,
+                            'moeda' => $moedaPedidoWallet,
+                            'valor' => $gatewayCharge,
+                            'status' => $gwResult['status'] ?? 'pending',
+                            'payment_id' => $gwResult['payment_id'] ?? '',
+                        ]);
+                    }
+
+                    // 7. Atualizar status do pedido
+                    $payResult = $walletResult;
                     $gateway = 'carteira';
                     $this->atualizarPagamentoNoPedido((int) $pedidoId, $payResult, $gateway);
                     $this->atualizarPagamentoNaTabelaPagamentos((int) $pedidoId, $payResult, $gateway);
 
+                    // Se carteira cobriu tudo e não há gateway charge, pedido está PAID
                     try {
-                        if (strtoupper((string) ($payResult['status'] ?? '')) === 'PAID') {
+                        if ($gatewayCharge <= 0.01 && strtoupper((string) ($payResult['status'] ?? '')) === 'PAID') {
                             $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
                         }
                     } catch (\Exception $e) {

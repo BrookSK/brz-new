@@ -18,6 +18,7 @@
         window.CARTEIRA_SALDO_DISPONIVEL = <?= json_encode((float) ($carteira_saldo_disponivel ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CARTEIRA_TURBO_BLOQUEADO = <?= json_encode((float) ($carteira_turbo_bloqueado ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         window.CARTEIRA_TURBO_LIBERACAO_DATA = <?= json_encode((string) ($carteira_turbo_liberacao_data ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+        window.WALLET_ELIGIBLE_AMOUNT = <?= json_encode((float) ($wallet_eligible_amount ?? 0), JSON_UNESCAPED_UNICODE) ?>;
         <?php
         // Carnê Braziliana: verificar disponibilidade server-side e expor para o JS
         // Nota: a checagem de moeda/país é feita pelo JS em tempo real; aqui só verificamos se está ativo nas configs
@@ -745,7 +746,7 @@
                                                 <option value=""><?= __('common.select', 'Selecione...') ?></option>
                                                 <?php
                                                 $saldoDispLabel = number_format(($carteira_saldo_disponivel ?? 0), 2, ',', '.');
-                                                $saldoSuficiente = (($carteira_saldo_disponivel ?? 0) + 0.001 >= ($total ?? 0));
+                                                $saldoSuficiente = (($carteira_saldo_disponivel ?? 0) > 0.001);
                                                 $turboBloqLabel = (float) ($carteira_turbo_bloqueado ?? 0);
                                                 $turboLibLabel = (string) ($carteira_turbo_liberacao_data ?? '');
                                                 ?>
@@ -815,6 +816,31 @@
                                                 }
                                             }, 100);
                                             </script>
+                                        </div>
+
+                                        <!-- Pagamento Parcial via Carteira: Seletor Secundário + Breakdown -->
+                                        <div class="col-12" id="pagamento-secundario-container" style="display:none;">
+                                            <div class="card border-info mt-2 mb-2">
+                                                <div class="card-body py-2 px-3">
+                                                    <div class="small fw-bold text-info mb-2">
+                                                        <i class="fas fa-wallet me-1"></i> Pagamento Parcial via Carteira
+                                                    </div>
+                                                    <div id="wallet-breakdown" class="small mb-2">
+                                                        <div><strong>Carteira:</strong> <span id="wallet-debit-display">-</span> <span class="text-muted">(produtos + taxa de serviço)</span></div>
+                                                        <div><strong>Gateway:</strong> <span id="wallet-gateway-display">-</span> <span class="text-muted">(impostos + diferença)</span></div>
+                                                    </div>
+                                                    <label class="form-label small">Forma de pagamento para o restante:</label>
+                                                    <select name="forma_pagamento_secundaria" id="forma_pagamento_secundaria" class="form-select form-select-sm">
+                                                        <option value="">Selecione...</option>
+                                                        <option value="cartao_credito">Cartão de Crédito</option>
+                                                        <option value="cartao_debito">Cartão de Débito</option>
+                                                        <option value="pix">PIX</option>
+                                                    </select>
+                                                    <div id="wallet-secondary-error" class="text-danger small mt-1" style="display:none;">
+                                                        Selecione uma forma de pagamento para os impostos e diferença.
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <!-- Carnê Braziliana -->
@@ -1783,6 +1809,15 @@ async function processarPedidoDireto() {
             if (carneTermosEl) formData.append('carne_termos_aceitos', carneTermosEl.checked ? '1' : '');
         }
 
+        // Carteira: adicionar método de pagamento secundário
+        if (formaPagamento === 'carteira') {
+            const secSelect = document.getElementById('forma_pagamento_secundaria');
+            if (secSelect && secSelect.value) {
+                formData.append('forma_pagamento_secundaria', secSelect.value);
+                console.log(`🔍 [DIRETO] forma_pagamento_secundaria: ${secSelect.value}`);
+            }
+        }
+
         // Garantir coleta explícita dos campos do cartão quando selecionado (apenas BRL)
         if ((formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito') && currentCurrency === 'BRL') {
             const camposCartao = document.getElementById('campos-cartao');
@@ -2217,6 +2252,11 @@ function atualizarFormaPagamento() {
         camposPagamentoEntrega.style.display = 'none';
         console.log('🔍 [DEBUG] Campos de pagamento na entrega escondidos');
     }
+    // Esconder seletor secundário da carteira
+    var secContainerHide = document.getElementById('pagamento-secundario-container');
+    if (secContainerHide) {
+        secContainerHide.style.display = 'none';
+    }
     
     console.log('🔍 [DEBUG] Todos os campos foram escondidos');
     
@@ -2224,6 +2264,13 @@ function atualizarFormaPagamento() {
     switch(formaPagamento) {
         case 'carteira':
             console.log('🔍 [PAGAMENTO] Pagamento via carteira selecionado');
+            // Mostrar seletor de pagamento secundário
+            var secContainer = document.getElementById('pagamento-secundario-container');
+            if (secContainer) {
+                secContainer.style.display = 'block';
+            }
+            // Atualizar breakdown de valores
+            try { atualizarWalletBreakdown(); } catch(e) {}
             break;
         case 'cartao_credito':
             if (camposCartao) {
@@ -2854,8 +2901,15 @@ function updatePaymentMethodsForCurrency(currency) {
     var turboBloq = Number(window.CARTEIRA_TURBO_BLOQUEADO || 0);
     var turboLibData = (window.CARTEIRA_TURBO_LIBERACAO_DATA || '').toString();
     var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
-    var saldoSuficiente = (saldoDisp + 0.001 >= totalUsd);
-    var saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
+    var saldoSuficiente = (saldoDisp > 0.001);
+    var rate = Number(window.CAMBIOREAL_RATE_BRL || 5.85);
+    var saldoLabel;
+    if (isBRL) {
+        var saldoBrlConvertido = saldoDisp * rate;
+        saldoLabel = 'Crédito da Carteira (R$ ' + saldoBrlConvertido.toFixed(2).replace('.', ',') + ')';
+    } else {
+        saldoLabel = 'Crédito da Carteira ($ ' + saldoDisp.toFixed(2).replace('.', ',') + ')';
+    }
     if (turboBloq > 0.01) {
         saldoLabel += ' | Turbo bloqueado: $ ' + turboBloq.toFixed(2).replace('.', ',');
         if (turboLibData) saldoLabel += ' (lib. ' + turboLibData + ')';
@@ -2925,6 +2979,104 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     } catch (e) {
+    }
+});
+
+// =====================================================
+// PAGAMENTO PARCIAL VIA CARTEIRA — Breakdown + Validação
+// =====================================================
+function atualizarWalletBreakdown() {
+    var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
+    var walletEligible = Number(window.WALLET_ELIGIBLE_AMOUNT || 0);
+    var rate = Number(window.CAMBIOREAL_RATE_BRL || 5.85);
+    var moedaHidden = document.getElementById('moeda_hidden');
+    var cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
+    var isBRL = (cur === 'BRL');
+
+    // Calcular eligible na moeda do pedido
+    var eligibleInCur = isBRL ? (walletEligible * rate) : walletEligible;
+
+    // Saldo disponível na moeda do pedido
+    var saldoInCur = isBRL ? (saldoDisp * rate) : saldoDisp;
+
+    // Valor que a carteira vai cobrir
+    var debit = Math.min(saldoInCur, eligibleInCur);
+
+    // Impostos (sempre via gateway)
+    var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
+    var impostosUsd = totalUsd - walletEligible;
+    if (impostosUsd < 0) impostosUsd = 0;
+    var impostosInCur = isBRL ? (impostosUsd * rate) : impostosUsd;
+
+    // Diferença não coberta
+    var uncovered = eligibleInCur - debit;
+    if (uncovered < 0.01) uncovered = 0;
+
+    // Total gateway
+    var gatewayTotal = uncovered + impostosInCur;
+
+    // Formatar valores
+    var prefix = isBRL ? 'R$ ' : '$ ';
+    var debitDisplay = document.getElementById('wallet-debit-display');
+    var gatewayDisplay = document.getElementById('wallet-gateway-display');
+    if (debitDisplay) {
+        debitDisplay.textContent = prefix + debit.toFixed(2).replace('.', ',');
+    }
+    if (gatewayDisplay) {
+        if (gatewayTotal < 0.01) {
+            gatewayDisplay.textContent = prefix + '0,00 (nenhuma cobrança adicional)';
+        } else {
+            gatewayDisplay.textContent = prefix + gatewayTotal.toFixed(2).replace('.', ',');
+        }
+    }
+
+    // Se não há cobrança de gateway, esconder o seletor secundário
+    var secSelect = document.getElementById('forma_pagamento_secundaria');
+    if (secSelect) {
+        if (gatewayTotal < 0.01) {
+            secSelect.closest('.card') && (secSelect.parentElement.querySelector('label').style.display = 'none');
+            secSelect.style.display = 'none';
+            secSelect.required = false;
+        } else {
+            secSelect.style.display = '';
+            secSelect.required = true;
+            var lbl = secSelect.parentElement.querySelector('label');
+            if (lbl) lbl.style.display = '';
+        }
+    }
+}
+
+// Validação do formulário: exigir método secundário quando carteira selecionada
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('checkout-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            var formaPag = document.getElementById('forma_pagamento');
+            if (formaPag && formaPag.value === 'carteira') {
+                var secSelect = document.getElementById('forma_pagamento_secundaria');
+                var secContainer = document.getElementById('pagamento-secundario-container');
+                // Verificar se há cobrança de gateway
+                var gatewayDisplay = document.getElementById('wallet-gateway-display');
+                var hasGatewayCharge = gatewayDisplay && gatewayDisplay.textContent.indexOf('0,00') === -1 && gatewayDisplay.textContent.indexOf('nenhuma') === -1;
+
+                if (hasGatewayCharge && secSelect && secSelect.value === '') {
+                    e.preventDefault();
+                    var errDiv = document.getElementById('wallet-secondary-error');
+                    if (errDiv) errDiv.style.display = 'block';
+                    secSelect.focus();
+                    return false;
+                }
+            }
+        }, true);
+    }
+
+    // Esconder erro quando selecionar método secundário
+    var secSelect = document.getElementById('forma_pagamento_secundaria');
+    if (secSelect) {
+        secSelect.addEventListener('change', function() {
+            var errDiv = document.getElementById('wallet-secondary-error');
+            if (errDiv && this.value !== '') errDiv.style.display = 'none';
+        });
     }
 });
 

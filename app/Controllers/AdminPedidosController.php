@@ -4726,6 +4726,55 @@ HTML;
                                         $stSplit->execute([':p' => (int) $pedido['id']]);
                                         $rowsSplit = $stSplit->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+                                        // Verificar se há pagamento parcial via carteira
+                                        $walletSplitRow = null;
+                                        $gatewaySplitRow = null;
+                                        foreach ($rowsSplit as $r) {
+                                            if (strtolower(trim((string) ($r['gateway'] ?? ''))) === 'carteira') {
+                                                $walletSplitRow = $r;
+                                            }
+                                            if (strtolower(trim((string) ($r['componente'] ?? ''))) === 'taxa_gateway') {
+                                                $gatewaySplitRow = $r;
+                                            }
+                                        }
+
+                                        if ($walletSplitRow) {
+                                            $walletVal = (float) ($walletSplitRow['valor'] ?? 0);
+                                            $walletMoeda = strtoupper((string) ($walletSplitRow['moeda'] ?? 'USD'));
+                                            $walletPrefix = ($walletMoeda === 'BRL') ? 'R$ ' : '$ ';
+                                            $gwVal = $gatewaySplitRow ? (float) ($gatewaySplitRow['valor'] ?? 0) : 0;
+                                            $gwMetodo = $gatewaySplitRow ? ucfirst(str_replace('_', ' ', (string) ($gatewaySplitRow['metodo'] ?? ''))) : '';
+                                            $gwGateway = $gatewaySplitRow ? strtoupper((string) ($gatewaySplitRow['gateway'] ?? '')) : '';
+
+                                            echo '<div class="alert alert-info py-2 px-3 mt-2 mb-2">';
+                                            echo '<div class="fw-bold mb-1"><i class="fas fa-wallet me-1"></i> Pagamento Parcial via Carteira</div>';
+                                            echo '<div class="small">';
+                                            echo '<div><strong>Carteira:</strong> ' . $walletPrefix . number_format($walletVal, 2, ',', '.') . '</div>';
+                                            if ($gatewaySplitRow) {
+                                                echo '<div><strong>Gateway (' . htmlspecialchars($gwMetodo) . '):</strong> ' . $walletPrefix . number_format($gwVal, 2, ',', '.') . '</div>';
+                                                // Verificar se carteira cobriu tudo (gateway = apenas impostos)
+                                                $walletEligibleCheck = $walletVal;
+                                                $totalPedidoCheck = $walletVal + $gwVal;
+                                                $impostosCheck = $totalPedidoCheck - $walletVal - ($gwVal - $gwVal); // simplificado
+                                                if ($gwVal > 0 && $walletVal > 0) {
+                                                    // Se o gateway charge é menor que o eligible, carteira cobriu tudo do eligible
+                                                    $subtotalPedido = (float) ($pedido['subtotal'] ?? ($pedido['subtotal_produtos'] ?? 0));
+                                                    $taxaServicoPedido = (float) ($pedido['servicos'] ?? ($pedido['taxa_servico'] ?? 0));
+                                                    $eligiblePedido = $subtotalPedido + $taxaServicoPedido;
+                                                    if ($walletMoeda === 'BRL') {
+                                                        $rateCheck = (float) ($pedido['taxa_conversao'] ?? 5.85);
+                                                        if ($rateCheck > 1.01) $eligiblePedido = $eligiblePedido * $rateCheck;
+                                                    }
+                                                    if ($walletVal >= ($eligiblePedido - 0.01)) {
+                                                        echo '<div class="text-muted mt-1"><em>Apenas impostos cobrados via gateway</em></div>';
+                                                    }
+                                                }
+                                            } else {
+                                                echo '<div class="text-muted"><em>Carteira cobriu 100% — sem cobrança de gateway</em></div>';
+                                            }
+                                            echo '</div></div>';
+                                        }
+
                                         if (!empty($rowsSplit)) {
                                             echo '<hr><div class="mb-2"><strong>Split (por conta/gateway):</strong></div>';
                                             echo '<div class="table-responsive"><table class="table table-sm table-bordered">'
@@ -4736,11 +4785,13 @@ HTML;
                                             foreach ($rowsSplit as $r) {
                                                 $comp = strtoupper((string) ($r['componente'] ?? ''));
                                                 $compLabel = $comp;
-                                                $compMap = ['PRODUTO' => 'Produtos', 'TAXA_SERVICO' => 'Taxa de Serviço', 'IMPOSTO' => 'Impostos', 'PAGAMENTO' => 'Pagamento Total', 'TAXA' => 'Taxa de Serviço'];
+                                                $compMap = ['PRODUTO' => 'Produtos', 'TAXA_SERVICO' => 'Taxa de Serviço', 'IMPOSTO' => 'Impostos', 'PAGAMENTO' => 'Pagamento Total', 'TAXA' => 'Taxa de Serviço', 'CARTEIRA' => 'Carteira (Wallet)', 'TAXA_GATEWAY' => 'Gateway (Impostos + Diferença)'];
                                                 if (isset($compMap[$comp])) $compLabel = $compMap[$comp];
                                                 $gw = strtolower(trim((string) ($r['gateway'] ?? '')));
                                                 $gwLabel = $gw !== '' ? strtoupper($gw) : 'N/A';
                                                 if ($gw === 'cambioreal') $gwLabel = 'Câmbio Real';
+                                                if ($gw === 'cambioreal_taxas') $gwLabel = 'Câmbio Real Taxas';
+                                                if ($gw === 'carteira') $gwLabel = 'Carteira';
                                                 if ($gw === 'appmax') $gwLabel = 'AppMax';
                                                 if ($gw === 'stripe') $gwLabel = 'Stripe';
                                                 $met = (string) ($r['metodo'] ?? '');
