@@ -3369,12 +3369,39 @@ JS;
                 $stCli->execute([$carneId]);
                 $clienteData = $stCli->fetch(\PDO::FETCH_ASSOC) ?: [];
 
+                // Buscar endereço do cliente (tabela enderecos ou do pedido)
+                $enderecoCliente = [];
+                try {
+                    // Primeiro: endereço vinculado ao pedido
+                    $stEnd = $pdo->prepare("SELECT e.* FROM enderecos e JOIN pedidos p ON p.endereco_entrega_id = e.id WHERE p.id = ? LIMIT 1");
+                    $stEnd->execute([$pedidoId]);
+                    $enderecoCliente = $stEnd->fetch(\PDO::FETCH_ASSOC) ?: [];
+                } catch (\Exception $e) {}
+
+                if (empty($enderecoCliente)) {
+                    // Fallback: endereço principal do cliente
+                    try {
+                        $clienteId = (int) ($clienteData['id'] ?? 0);
+                        if ($clienteId > 0) {
+                            $stEnd2 = $pdo->prepare("SELECT * FROM enderecos WHERE usuario_id = ? ORDER BY principal DESC, id DESC LIMIT 1");
+                            $stEnd2->execute([$clienteId]);
+                            $enderecoCliente = $stEnd2->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        }
+                    } catch (\Exception $e) {}
+                }
+
                 $dadosCliente = [
                     'nome' => (string) ($clienteData['nome'] ?? ($clienteData['name'] ?? '')),
                     'email' => (string) ($clienteData['email'] ?? ''),
                     'documento' => (string) ($clienteData['documento'] ?? ($clienteData['cpf'] ?? '')),
-                    'data_nascimento' => (string) ($clienteData['data_nascimento'] ?? ''),
-                    'telefone' => (string) ($clienteData['telefone'] ?? ($clienteData['phone'] ?? '')),
+                    'data_nascimento' => (string) ($clienteData['data_nascimento'] ?? ($clienteData['birth_date'] ?? '')),
+                    'telefone' => (string) ($clienteData['telefone'] ?? ($clienteData['phone'] ?? ($clienteData['celular'] ?? ''))),
+                    'cep' => (string) ($enderecoCliente['cep'] ?? ($enderecoCliente['zip_code'] ?? ($clienteData['cep'] ?? ''))),
+                    'endereco' => (string) ($enderecoCliente['endereco'] ?? ($enderecoCliente['logradouro'] ?? ($enderecoCliente['street'] ?? ($clienteData['endereco'] ?? '')))),
+                    'numero' => (string) ($enderecoCliente['numero'] ?? ($enderecoCliente['number'] ?? ($clienteData['numero'] ?? ''))),
+                    'bairro' => (string) ($enderecoCliente['bairro'] ?? ($enderecoCliente['district'] ?? ($clienteData['bairro'] ?? ''))),
+                    'cidade' => (string) ($enderecoCliente['cidade'] ?? ($enderecoCliente['city'] ?? ($clienteData['cidade'] ?? ''))),
+                    'estado' => (string) ($enderecoCliente['estado'] ?? ($enderecoCliente['uf'] ?? ($enderecoCliente['state'] ?? ($clienteData['estado'] ?? '')))),
                 ];
 
                 // Verificar se já tem links gerados para esta parcela
