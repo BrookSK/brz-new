@@ -1962,10 +1962,6 @@ function gerarLinkPagamento(){
 
                     const linkProd = String(p.link_produtos || '').trim();
                     const linkTaxas = String(p.link_taxas || '').trim();
-                    const pixProd = String(p.pix_produtos_payload || '').trim();
-                    const pixTaxas = String(p.pix_taxas_payload || '').trim();
-                    const pixProdQr = String(p.pix_produtos_qrcode || '').trim();
-                    const pixTaxasQr = String(p.pix_taxas_qrcode || '').trim();
 
                     let html = `<div class="alert alert-success"><strong><i class="fas fa-file-invoice-dollar me-1"></i>Link da 1ª parcela do Carnê gerado.</strong> Copie e envie para o cliente. As demais parcelas o cliente gera na área "Meus Carnês".</div>`;
 
@@ -1976,39 +1972,29 @@ function gerarLinkPagamento(){
                         </div>
                         <div class="card-body py-2">`;
 
-                    // Link/PIX Produtos
-                    const prodDisplay = linkProd || pixProd;
-                    if (prodDisplay) {
+                    if (linkProd) {
                         html += `<div class="mb-2">
                             <small class="text-muted fw-bold">Produtos (Câmbio Real):</small>
                             <div class="input-group input-group-sm mt-1">
-                                <input type="text" class="form-control form-control-sm" value="${escapeHtml(prodDisplay)}" readonly>
-                                <button class="btn btn-outline-dark btn-sm" type="button" onclick="copiarTexto('${escapeHtml(prodDisplay).replace(/'/g, "\\'")}')"><i class="fas fa-copy"></i></button>
-                                ${linkProd ? '<a class="btn btn-outline-primary btn-sm" href="' + escapeHtml(linkProd) + '" target="_blank"><i class="fas fa-external-link-alt"></i></a>' : ''}
-                            </div>`;
-                        if (pixProdQr) {
-                            html += `<div class="mt-1"><img alt="QR PIX Produtos" style="max-width:180px" src="data:image/png;base64,${escapeHtml(pixProdQr)}" /></div>`;
-                        }
-                        html += `</div>`;
+                                <input type="text" class="form-control form-control-sm" value="${escapeHtml(linkProd)}" readonly>
+                                <button class="btn btn-outline-dark btn-sm" type="button" onclick="copiarTexto('${escapeHtml(linkProd).replace(/'/g, "\\'")}')"><i class="fas fa-copy"></i></button>
+                                <a class="btn btn-outline-primary btn-sm" href="${escapeHtml(linkProd)}" target="_blank"><i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>`;
                     }
 
-                    // Link/PIX Taxas
-                    const taxaDisplay = linkTaxas || pixTaxas;
-                    if (taxaDisplay) {
+                    if (linkTaxas) {
                         html += `<div class="mb-1">
                             <small class="text-muted fw-bold">Taxas e Impostos (Câmbio Real Taxas):</small>
                             <div class="input-group input-group-sm mt-1">
-                                <input type="text" class="form-control form-control-sm" value="${escapeHtml(taxaDisplay)}" readonly>
-                                <button class="btn btn-outline-dark btn-sm" type="button" onclick="copiarTexto('${escapeHtml(taxaDisplay).replace(/'/g, "\\'")}')"><i class="fas fa-copy"></i></button>
-                                ${linkTaxas ? '<a class="btn btn-outline-primary btn-sm" href="' + escapeHtml(linkTaxas) + '" target="_blank"><i class="fas fa-external-link-alt"></i></a>' : ''}
-                            </div>`;
-                        if (pixTaxasQr) {
-                            html += `<div class="mt-1"><img alt="QR PIX Taxas" style="max-width:180px" src="data:image/png;base64,${escapeHtml(pixTaxasQr)}" /></div>`;
-                        }
-                        html += `</div>`;
+                                <input type="text" class="form-control form-control-sm" value="${escapeHtml(linkTaxas)}" readonly>
+                                <button class="btn btn-outline-dark btn-sm" type="button" onclick="copiarTexto('${escapeHtml(linkTaxas).replace(/'/g, "\\'")}')"><i class="fas fa-copy"></i></button>
+                                <a class="btn btn-outline-primary btn-sm" href="${escapeHtml(linkTaxas)}" target="_blank"><i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>`;
                     }
 
-                    if (!prodDisplay && !taxaDisplay) {
+                    if (!linkProd && !linkTaxas) {
                         html += `<div class="alert alert-warning small mb-0"><i class="fas fa-exclamation-circle me-1"></i>Não foi possível gerar os links. Verifique os dados do cliente e tente novamente.</div>`;
                     }
 
@@ -3405,22 +3391,114 @@ JS;
                 ];
 
                 // Verificar se já tem links gerados para esta parcela
-                $temLinkProdutos = !empty($primeiraPendente['boleto_produtos_url']) || !empty($primeiraPendente['pix_produtos_payload']);
-                $temLinkTaxas = !empty($primeiraPendente['boleto_taxas_url']) || !empty($primeiraPendente['pix_taxas_payload']);
+                $temLinkProdutos = !empty($primeiraPendente['boleto_produtos_url']);
+                $temLinkTaxas = !empty($primeiraPendente['boleto_taxas_url']);
 
                 if (!$temLinkProdutos || !$temLinkTaxas) {
-                    // Gerar links para esta parcela
-                    $carneService->gerarBoletosParcela($primeiraPendente, $pedidoId, $dadosCliente);
+                    // Gerar LINKS DE PAGAMENTO (não PIX) — igual ao pedido manual normal
+                    // O cliente abre o link e escolhe como pagar
+                    $paymentService = new \App\Services\PaymentService();
+                    $base = \App\Core\Url::base();
+                    $codigoPedido = '';
+                    try {
+                        $stCod = $pdo->prepare("SELECT codigo_pedido FROM pedidos WHERE id = ? LIMIT 1");
+                        $stCod->execute([$pedidoId]);
+                        $codigoPedido = (string) ($stCod->fetchColumn() ?: $pedidoId);
+                    } catch (\Exception $e) { $codigoPedido = (string) $pedidoId; }
+
+                    $numParcela = (int) ($primeiraPendente['numero_parcela'] ?? 1);
+                    $descBase = "Carnê Braziliana - Pedido #{$codigoPedido} - Parcela {$numParcela}";
+
+                    // Link Produtos via Câmbio Real Checkout
+                    if ((float) ($primeiraPendente['valor_produtos'] ?? 0) > 0) {
+                        $valorProd = (float) $primeiraPendente['valor_produtos'];
+                        $clientForCR = [
+                            'name' => $dadosCliente['nome'] ?: 'Cliente',
+                            'email' => $dadosCliente['email'] ?? '',
+                            'document' => $dadosCliente['documento'] ?? '',
+                            'phone' => $dadosCliente['telefone'] ?? '',
+                            'phone_number' => $dadosCliente['telefone'] ?? '',
+                            'cpf' => $dadosCliente['documento'] ?? '',
+                            'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                        ];
+
+                        $successUrl = rtrim($base, '/') . '/carne/detalhe/' . $carneId . '?pagamento=success';
+                        $errorUrl = rtrim($base, '/') . '/carne/detalhe/' . $carneId . '?pagamento=error';
+
+                        $crResult = $paymentService->createCambioRealCheckoutRequestProduto(
+                            (int) $pedidoId,
+                            (float) $valorProd,
+                            $descBase . ' - Produtos',
+                            $clientForCR,
+                            $successUrl,
+                            $errorUrl
+                        );
+
+                        if (!empty($crResult['success'])) {
+                            $linkProdutos = (string) ($crResult['invoice_url'] ?? ($crResult['invoiceUrl'] ?? ''));
+                            $paymentIdProd = (string) ($crResult['payment_id'] ?? '');
+                            $carneModel->atualizarParcela($primeiraPendente['id'], [
+                                'boleto_produtos_url' => $linkProdutos,
+                                'boleto_produtos_id_externo' => $paymentIdProd,
+                            ]);
+                            $carneModel->registrarLog($carneId, (int) $pedidoId, $primeiraPendente['id'], 'link_gerado', "Link Produtos gerado para parcela #{$numParcela}", json_encode(['payment_id' => $paymentIdProd, 'valor' => $valorProd]));
+                        } else {
+                            error_log('[CARNE MANUAL] Erro link produtos: ' . ($crResult['error'] ?? 'desconhecido'));
+                        }
+                    }
+
+                    // Link Taxas via Câmbio Real Taxas Checkout
+                    if ((float) ($primeiraPendente['valor_taxas'] ?? 0) > 0) {
+                        $valorTaxas = (float) $primeiraPendente['valor_taxas'];
+
+                        $clientDataTaxas = [
+                            'name' => $dadosCliente['nome'] ?: 'Cliente',
+                            'email' => $dadosCliente['email'] ?? '',
+                            'document' => $dadosCliente['documento'] ?? '',
+                            'birth_date' => $dadosCliente['data_nascimento'] ?? '1990-01-01',
+                            'phone' => $dadosCliente['telefone'] ?? '',
+                            'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'),
+                            'address' => [
+                                'street' => $dadosCliente['endereco'] ?: 'Rua Exemplo',
+                                'number' => $dadosCliente['numero'] ?: '1',
+                                'district' => $dadosCliente['bairro'] ?: 'Centro',
+                                'city' => $dadosCliente['cidade'] ?: 'São Paulo',
+                                'state' => $dadosCliente['estado'] ?: 'SP',
+                                'zip_code' => $dadosCliente['cep'] ?: '01001-000',
+                            ],
+                        ];
+
+                        $successUrlTaxas = rtrim($base, '/') . '/carne/detalhe/' . $carneId . '?cambioreal_taxas=success';
+                        $errorUrlTaxas = rtrim($base, '/') . '/carne/detalhe/' . $carneId . '?cambioreal_taxas=error';
+
+                        $taxaResult = $paymentService->createCambioRealTaxasCheckoutRequest(
+                            (int) $pedidoId,
+                            (float) $valorTaxas,
+                            $descBase . ' - Taxas',
+                            $clientDataTaxas,
+                            $successUrlTaxas,
+                            $errorUrlTaxas
+                        );
+
+                        if (!empty($taxaResult['success'])) {
+                            $linkTaxasUrl = (string) ($taxaResult['invoice_url'] ?? ($taxaResult['invoiceUrl'] ?? ''));
+                            $paymentIdTaxa = (string) ($taxaResult['payment_id'] ?? '');
+                            $carneModel->atualizarParcela($primeiraPendente['id'], [
+                                'boleto_taxas_url' => $linkTaxasUrl,
+                                'boleto_taxas_id_externo' => $paymentIdTaxa,
+                            ]);
+                            $carneModel->registrarLog($carneId, (int) $pedidoId, $primeiraPendente['id'], 'link_gerado', "Link Taxas gerado para parcela #{$numParcela}", json_encode(['payment_id' => $paymentIdTaxa, 'valor' => $valorTaxas]));
+                        } else {
+                            error_log('[CARNE MANUAL] Erro link taxas: ' . ($taxaResult['error'] ?? 'desconhecido'));
+                        }
+                    }
+
                     // Recarregar parcela com os links gerados
                     $primeiraPendente = $carneModel->getParcela($primeiraPendente['id']);
                 }
 
                 $linkProd = (string) ($primeiraPendente['boleto_produtos_url'] ?? '');
                 $linkTaxas = (string) ($primeiraPendente['boleto_taxas_url'] ?? '');
-                $pixProdPayload = (string) ($primeiraPendente['pix_produtos_payload'] ?? '');
-                $pixTaxasPayload = (string) ($primeiraPendente['pix_taxas_payload'] ?? '');
-                $pixProdQr = (string) ($primeiraPendente['pix_produtos_qrcode'] ?? '');
-                $pixTaxasQr = (string) ($primeiraPendente['pix_taxas_qrcode'] ?? '');
 
                 $this->json([
                     'success' => true,
@@ -3437,10 +3515,6 @@ JS;
                         'status' => (string) ($primeiraPendente['status'] ?? ''),
                         'link_produtos' => $linkProd,
                         'link_taxas' => $linkTaxas,
-                        'pix_produtos_payload' => $pixProdPayload,
-                        'pix_taxas_payload' => $pixTaxasPayload,
-                        'pix_produtos_qrcode' => $pixProdQr,
-                        'pix_taxas_qrcode' => $pixTaxasQr,
                     ],
                 ]);
                 return;
