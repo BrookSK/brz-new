@@ -523,6 +523,7 @@ class AdminPedidosManualController extends Controller {
                                     <!-- <option value="boleto">Boleto (Câmbio Real + Câmbio Real Taxas)</option> <!-- OCULTO TEMPORARIAMENTE -->
                                     <option value="cartao_credito">Cartão de Crédito</option>
                                     <option value="cartao_debito">Cartão de Débito</option>
+                                    <option value="carne_braziliana">Carnê Braziliana (parcelado)</option>
                                     <option value="carteira">Carteira</option>
                                     <option value="pagdev">PagDev (offline)</option>
                                 </select>
@@ -542,6 +543,47 @@ class AdminPedidosManualController extends Controller {
                                         <i class="fas fa-paper-plane me-1"></i>Solicitar
                                     </button>
                                     <span id="pagdevAuthStatus"></span>
+                                </div>
+                            </div>
+                            <div class="col-12" id="carneParcelasWrap" style="display:none;">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white py-2">
+                                        <h6 class="mb-0"><i class="fas fa-file-invoice-dollar me-1"></i> Carnê Braziliana</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="carneAvisoMinimo" class="alert alert-warning mb-0" style="display:none;">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            <span id="carneAvisoMinimoTexto"></span>
+                                        </div>
+                                        <div id="carneConteudo" style="display:none;">
+                                            <p class="small text-muted mb-3">
+                                                Parcele a compra do cliente em até 12x. Cada parcela gera dois links de pagamento: um para produtos (Câmbio Real) e outro para taxas (Câmbio Real Taxas).
+                                                <strong>O envio ocorre somente após a quitação total.</strong>
+                                            </p>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Quantidade de Parcelas</label>
+                                                <select name="carne_parcelas" id="carneParcelasSelect" class="form-select">
+                                                </select>
+                                            </div>
+                                            <div id="carneResumo" class="border rounded p-3 bg-light mb-3" style="display:none;">
+                                                <div class="row text-center">
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Link Produtos (Câmbio Real)</small>
+                                                        <p class="fw-bold text-primary mb-0" id="carneValorProdutos">R$ 0,00</p>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <small class="text-muted">Link Taxas (Câmbio Real Taxas)</small>
+                                                        <p class="fw-bold text-primary mb-0" id="carneValorTaxas">R$ 0,00</p>
+                                                    </div>
+                                                </div>
+                                                <hr class="my-2">
+                                                <p class="text-center mb-0"><strong>Total por parcela: <span id="carneValorTotal">R$ 0,00</span></strong></p>
+                                            </div>
+                                            <div class="alert alert-info small mb-0">
+                                                <i class="fas fa-info-circle me-1"></i> Disponível apenas para pedidos em Reais (BRL) com entrega no Brasil. Após criar o pedido, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links das parcelas e enviar ao cliente.
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1228,9 +1270,11 @@ function updateLinkVisibility(){
     const v = fpSel ? String(fpSel.value || '') : '';
     const isOffline = (v === 'pagdev');
     const isCarteira = (v === 'carteira');
+    const isCarne = (v === 'carne_braziliana');
 
     // Regras:
     // - Offline (PagDev) ou Carteira: não gera link
+    // - Carnê: gera links de pagamento das parcelas
     // - BRL: Câmbio Real (link checkout produtos) + AppMax PIX (taxas) - gera link split
     // - BRL cartao: também gera link (Câmbio Real checkout aceita cartão)
     // - USD: Stripe (gera link de checkout)
@@ -1240,7 +1284,9 @@ function updateLinkVisibility(){
 
     // Atualizar gateway label
     if (gatewayLabel) {
-        if (moeda === 'BRL') {
+        if (isCarne) {
+            gatewayLabel.textContent = 'Carnê Braziliana — Links de Pagamento';
+        } else if (moeda === 'BRL') {
             gatewayLabel.textContent = 'Câmbio Real + AppMax';
         } else {
             gatewayLabel.textContent = 'Stripe';
@@ -1259,7 +1305,11 @@ function updateLinkVisibility(){
             linkInfo.style.display = 'none';
         } else {
             linkInfo.style.display = '';
-            linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento Câmbio Real Taxas (taxas/impostos). Copie e envie para o cliente.</small>';
+            if (isCarne) {
+                linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de pagamento das parcelas do carnê.<br><small class="text-muted">Cada parcela terá dois links: um para produtos (Câmbio Real) e outro para taxas (Câmbio Real Taxas). Copie e envie para o cliente.</small>';
+            } else {
+                linkInfo.innerHTML = 'Após criar o pedido manual, clique em <strong>Gerar Link de Pagamento</strong> para gerar os links de cobrança.<br><small class="text-muted">BRL: link de checkout Câmbio Real (produtos) + link de pagamento Câmbio Real Taxas (taxas/impostos). Copie e envie para o cliente.</small>';
+            }
         }
     }
     if (linkResult && !canShowLinkCard) {
@@ -1505,6 +1555,12 @@ function calcTotal(){
                     pixBox.style.display = 'none';
                 }
             }
+
+            // Atualizar carnê parcelas se visível
+            const fpAtual = document.getElementById('forma_pagamento');
+            if (fpAtual && fpAtual.value === 'carne_braziliana') {
+                try { atualizarCarneParcelas(); } catch(e) {}
+            }
         })
         .catch(_err => {
             // fallback simples (não quebra o formulário)
@@ -1618,6 +1674,24 @@ function gerarMensagemOrcamento(){
     }
     msg += `- Frete: ${Number(frete || 0) <= 0 ? 'Frete grátis' : formatBRL(frete)}\n`;
     msg += `- Total: ${formatBRL(total)}\n\n`;
+
+    // Se carnê selecionado, incluir info de parcelamento
+    const fpOrcamento = document.getElementById('forma_pagamento');
+    if (fpOrcamento && fpOrcamento.value === 'carne_braziliana') {
+        const carneSelect = document.getElementById('carneParcelasSelect');
+        if (carneSelect && carneSelect.value) {
+            const opt = carneSelect.options[carneSelect.selectedIndex];
+            const numParcelas = carneSelect.value;
+            const valorParcela = opt ? opt.dataset.total : '0';
+            const valorProd = opt ? opt.dataset.produtos : '0';
+            const valorTaxa = opt ? opt.dataset.taxas : '0';
+            msg += `Opção de parcelamento (Carnê Braziliana):\n`;
+            msg += `- ${numParcelas}x de ${formatBRL(valorParcela)}\n`;
+            msg += `  (Produtos: ${formatBRL(valorProd)} + Taxas: ${formatBRL(valorTaxa)} por parcela)\n`;
+            msg += `- Envio somente após quitação total\n\n`;
+        }
+    }
+
     msg += `Se desejar, posso gerar o link de pagamento e te enviar aqui.\n`;
 
     const out = document.getElementById('orcamentoResult');
@@ -1742,6 +1816,107 @@ function copiarLinkPagamento(){
     copyFallback();
 }
 
+function atualizarCarneParcelas(){
+    const avisoBox = document.getElementById('carneAvisoMinimo');
+    const avisoTexto = document.getElementById('carneAvisoMinimoTexto');
+    const conteudo = document.getElementById('carneConteudo');
+    const select = document.getElementById('carneParcelasSelect');
+    const resumo = document.getElementById('carneResumo');
+    const valProds = document.getElementById('carneValorProdutos');
+    const valTaxas = document.getElementById('carneValorTaxas');
+    const valTotal = document.getElementById('carneValorTotal');
+
+    if (!avisoBox || !conteudo || !select) return;
+
+    // Pegar valores do resumo atual
+    const subtotal = parseFloat(document.getElementById('subtotal_produtos')?.value || '0');
+    const taxaServico = parseFloat(document.getElementById('taxa_servico')?.value || '0');
+    const impostos = parseFloat(document.getElementById('valor_impostos')?.value || '0');
+    const impostoLocal = parseFloat(document.getElementById('imposto_local')?.value || '0');
+    const frete = parseFloat(document.getElementById('valor_frete')?.value || '0');
+
+    const totalProdutos = subtotal;
+    const totalTaxas = taxaServico + impostos + impostoLocal + frete;
+    const totalGeral = totalProdutos + totalTaxas;
+
+    if (totalGeral <= 0) {
+        avisoBox.style.display = 'block';
+        avisoTexto.textContent = 'Adicione produtos ao pedido para ver as opções de parcelamento.';
+        conteudo.style.display = 'none';
+        return;
+    }
+
+    // Mínimo por boleto: R$ 20,00
+    const minimoBoleto = 20.00;
+    const opcoes = [];
+
+    for (let i = 2; i <= 12; i++) {
+        const vProd = Math.round((totalProdutos / i) * 100) / 100;
+        const vTaxa = Math.round((totalTaxas / i) * 100) / 100;
+        const vTotal = Math.round((totalGeral / i) * 100) / 100;
+
+        const prodOk = (vProd <= 0 || vProd >= minimoBoleto);
+        const taxaOk = (vTaxa <= 0 || vTaxa >= minimoBoleto);
+
+        if (prodOk && taxaOk) {
+            opcoes.push({ parcelas: i, produtos: vProd, taxas: vTaxa, total: vTotal });
+        }
+    }
+
+    if (opcoes.length === 0) {
+        const faltaProd = Math.max(0, (minimoBoleto * 2) - totalProdutos);
+        const faltaTaxa = Math.max(0, (minimoBoleto * 2) - totalTaxas);
+        const falta = Math.max(faltaProd, faltaTaxa);
+        avisoBox.style.display = 'block';
+        if (falta > 0.01) {
+            avisoTexto.textContent = 'Adicione R$ ' + formatBRL(falta).replace('R$', '').trim() + ' ao pedido para usar o Carnê Braziliana (cada parcela precisa ter no mínimo R$ 20,00 por link).';
+        } else {
+            avisoTexto.textContent = 'O valor do pedido não permite parcelamento via carnê.';
+        }
+        conteudo.style.display = 'none';
+        return;
+    }
+
+    // Mostrar parcelas
+    avisoBox.style.display = 'none';
+    conteudo.style.display = 'block';
+
+    select.innerHTML = '';
+    opcoes.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.parcelas;
+        opt.textContent = p.parcelas + 'x de R$ ' + formatBRL(p.total).replace('R$', '').trim();
+        opt.dataset.produtos = p.produtos;
+        opt.dataset.taxas = p.taxas;
+        opt.dataset.total = p.total;
+        select.appendChild(opt);
+    });
+
+    atualizarCarneResumo();
+}
+
+function atualizarCarneResumo(){
+    const select = document.getElementById('carneParcelasSelect');
+    const resumo = document.getElementById('carneResumo');
+    const valProds = document.getElementById('carneValorProdutos');
+    const valTaxas = document.getElementById('carneValorTaxas');
+    const valTotal = document.getElementById('carneValorTotal');
+
+    if (!select || !resumo) return;
+    const opt = select.options[select.selectedIndex];
+    if (!opt || !opt.dataset.total) { resumo.style.display = 'none'; return; }
+    resumo.style.display = 'block';
+    valProds.textContent = 'R$ ' + formatBRL(opt.dataset.produtos).replace('R$', '').trim();
+    valTaxas.textContent = 'R$ ' + formatBRL(opt.dataset.taxas).replace('R$', '').trim();
+    valTotal.textContent = 'R$ ' + formatBRL(opt.dataset.total).replace('R$', '').trim();
+}
+
+// Listener para mudança de parcelas
+document.addEventListener('DOMContentLoaded', function(){
+    const sel = document.getElementById('carneParcelasSelect');
+    if (sel) sel.addEventListener('change', atualizarCarneResumo);
+});
+
 function gerarLinkPagamento(){
     const moeda = getSelectedMoeda();
     let bt = 'CREDIT_CARD';
@@ -1777,6 +1952,72 @@ function gerarLinkPagamento(){
         .then(r => r.json())
         .then(data => {
             if (data && data.success) {
+                // Carnê: exibir links da primeira parcela
+                if (data.carne) {
+                    const p = data.parcela;
+                    const numParcelas = data.quantidade_parcelas || '?';
+                    const num = p.numero || 1;
+                    const venc = p.vencimento ? new Date(p.vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+                    const valorTotal = Number(p.valor_total || 0).toFixed(2).replace('.', ',');
+
+                    const linkProd = String(p.link_produtos || '').trim();
+                    const linkTaxas = String(p.link_taxas || '').trim();
+                    const pixProd = String(p.pix_produtos_payload || '').trim();
+                    const pixTaxas = String(p.pix_taxas_payload || '').trim();
+                    const pixProdQr = String(p.pix_produtos_qrcode || '').trim();
+                    const pixTaxasQr = String(p.pix_taxas_qrcode || '').trim();
+
+                    let html = `<div class="alert alert-success"><strong><i class="fas fa-file-invoice-dollar me-1"></i>Link da 1ª parcela do Carnê gerado.</strong> Copie e envie para o cliente. As demais parcelas o cliente gera na área "Meus Carnês".</div>`;
+
+                    html += `<div class="card mb-2">
+                        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                            <strong>Parcela ${num} de ${numParcelas} — R$ ${valorTotal}</strong>
+                            <div>${venc ? '<small class="text-muted">Vencimento: ' + escapeHtml(venc) + '</small>' : ''}</div>
+                        </div>
+                        <div class="card-body py-2">`;
+
+                    // Link/PIX Produtos
+                    const prodDisplay = linkProd || pixProd;
+                    if (prodDisplay) {
+                        html += `<div class="mb-2">
+                            <small class="text-muted fw-bold">Produtos (Câmbio Real):</small>
+                            <div class="input-group input-group-sm mt-1">
+                                <input type="text" class="form-control form-control-sm" value="${escapeHtml(prodDisplay)}" readonly>
+                                <button class="btn btn-outline-dark btn-sm" type="button" onclick="copiarTexto('${escapeHtml(prodDisplay).replace(/'/g, "\\'")}')"><i class="fas fa-copy"></i></button>
+                                ${linkProd ? '<a class="btn btn-outline-primary btn-sm" href="' + escapeHtml(linkProd) + '" target="_blank"><i class="fas fa-external-link-alt"></i></a>' : ''}
+                            </div>`;
+                        if (pixProdQr) {
+                            html += `<div class="mt-1"><img alt="QR PIX Produtos" style="max-width:180px" src="data:image/png;base64,${escapeHtml(pixProdQr)}" /></div>`;
+                        }
+                        html += `</div>`;
+                    }
+
+                    // Link/PIX Taxas
+                    const taxaDisplay = linkTaxas || pixTaxas;
+                    if (taxaDisplay) {
+                        html += `<div class="mb-1">
+                            <small class="text-muted fw-bold">Taxas e Impostos (Câmbio Real Taxas):</small>
+                            <div class="input-group input-group-sm mt-1">
+                                <input type="text" class="form-control form-control-sm" value="${escapeHtml(taxaDisplay)}" readonly>
+                                <button class="btn btn-outline-dark btn-sm" type="button" onclick="copiarTexto('${escapeHtml(taxaDisplay).replace(/'/g, "\\'")}')"><i class="fas fa-copy"></i></button>
+                                ${linkTaxas ? '<a class="btn btn-outline-primary btn-sm" href="' + escapeHtml(linkTaxas) + '" target="_blank"><i class="fas fa-external-link-alt"></i></a>' : ''}
+                            </div>`;
+                        if (pixTaxasQr) {
+                            html += `<div class="mt-1"><img alt="QR PIX Taxas" style="max-width:180px" src="data:image/png;base64,${escapeHtml(pixTaxasQr)}" /></div>`;
+                        }
+                        html += `</div>`;
+                    }
+
+                    if (!prodDisplay && !taxaDisplay) {
+                        html += `<div class="alert alert-warning small mb-0"><i class="fas fa-exclamation-circle me-1"></i>Não foi possível gerar os links. Verifique os dados do cliente e tente novamente.</div>`;
+                    }
+
+                    html += `</div></div>`;
+                    html += `<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Envie estes links para o cliente pagar a 1ª parcela. As parcelas seguintes o cliente gera na conta dele em "Meus Carnês".</div>`;
+                    el.innerHTML = html;
+                    return;
+                }
+
                 const isSplit = !!data.split;
 
                 const buildSection = function(title, obj){
@@ -2046,6 +2287,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 // fpSel.appendChild(new Option('Boleto (Câmbio Real + Câmbio Real Taxas)', 'boleto')); // OCULTO TEMPORARIAMENTE
                 fpSel.appendChild(new Option('Cartão de Crédito', 'cartao_credito'));
                 fpSel.appendChild(new Option('Cartão de Débito', 'cartao_debito'));
+                fpSel.appendChild(new Option('Carnê Braziliana (parcelado)', 'carne_braziliana'));
             } else {
                 fpSel.appendChild(new Option('Online (Stripe)', ''));
             }
@@ -2101,11 +2343,13 @@ document.addEventListener('DOMContentLoaded', function(){
     const offlineWrap = document.getElementById('offlineInfoWrap');
     const offlineBox = document.getElementById('offlineInfoBox');
     const pagdevAuthWrap = document.getElementById('pagdevAuthWrap');
+    const carneWrap = document.getElementById('carneParcelasWrap');
     const refreshOffline = function(){
         const v = fpSel ? String(fpSel.value || '') : '';
         if (!offlineWrap || !offlineBox) return;
 
         const isOffline = (v === 'pagdev');
+        const isCarne = (v === 'carne_braziliana');
         if (isOffline) {
             offlineWrap.style.display = 'block';
             offlineBox.textContent = 'Pagamento offline (PagDev). Após o pagamento, anexe o comprovante no pedido para que possamos alterar o status para pago.';
@@ -2120,6 +2364,23 @@ document.addEventListener('DOMContentLoaded', function(){
                 pagdevAuthWrap.style.display = 'block';
             } else {
                 pagdevAuthWrap.style.display = 'none';
+            }
+        }
+
+        // Carnê Braziliana: mostrar seção de parcelas
+        if (carneWrap) {
+            const pais = getSelectedPais();
+            const isBR = (pais === 'BR' || pais === 'BRASIL' || pais === 'BRAZIL');
+            if (isCarne && getSelectedMoeda() === 'BRL' && isBR) {
+                carneWrap.style.display = 'block';
+                atualizarCarneParcelas();
+            } else if (isCarne && (getSelectedMoeda() !== 'BRL' || !isBR)) {
+                carneWrap.style.display = 'block';
+                document.getElementById('carneAvisoMinimo').style.display = 'block';
+                document.getElementById('carneAvisoMinimoTexto').textContent = 'Carnê Braziliana disponível apenas para pedidos em Reais (BRL) com entrega no Brasil.';
+                document.getElementById('carneConteudo').style.display = 'none';
+            } else {
+                carneWrap.style.display = 'none';
             }
         }
 
@@ -2847,6 +3108,42 @@ JS;
             $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
             $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao);
 
+            // Se forma de pagamento é Carnê Braziliana, criar o carnê
+            if (strtolower(trim($formaPagamento)) === 'carne_braziliana') {
+                $carneParcelas = (int) $request->getParam('carne_parcelas', 2);
+                if ($carneParcelas < 2) $carneParcelas = 2;
+                if ($carneParcelas > 12) $carneParcelas = 12;
+
+                $carneService = new \App\Services\CarneService();
+                $subtotalProdutos = (float) ($resumo['subtotal_produtos'] ?? 0);
+                $totalTaxas = (float) ($resumo['taxa_servico'] ?? 0) + (float) ($resumo['valor_impostos'] ?? 0) + (float) ($resumo['imposto_local'] ?? 0) + (float) ($resumo['valor_frete'] ?? 0);
+                if ($subtotalProdutos <= 0) { $subtotalProdutos = (float) ($resumo['valor_total'] ?? 0); $totalTaxas = 0; }
+
+                $pdo = \Config\Database::getConnection();
+                $stCli = $pdo->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                $stCli->execute([$clienteId]);
+                $clienteData = $stCli->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $carneService->criarCarne(
+                    (int) $pedidoId, $clienteId, $subtotalProdutos, $totalTaxas, $carneParcelas,
+                    [
+                        'nome' => (string) ($clienteData['nome'] ?? ($clienteData['name'] ?? '')),
+                        'email' => (string) ($clienteData['email'] ?? ''),
+                        'documento' => (string) ($clienteData['documento'] ?? ($clienteData['cpf'] ?? '')),
+                        'data_nascimento' => (string) ($clienteData['data_nascimento'] ?? ''),
+                        'telefone' => (string) ($clienteData['telefone'] ?? ($clienteData['phone'] ?? '')),
+                        'cep' => (string) ($enderecoEntrega['cep'] ?? ''),
+                        'endereco' => (string) ($enderecoEntrega['endereco'] ?? ''),
+                        'numero' => (string) ($enderecoEntrega['numero'] ?? ''),
+                        'bairro' => (string) ($enderecoEntrega['bairro'] ?? ''),
+                        'cidade' => (string) ($enderecoEntrega['cidade'] ?? ''),
+                        'estado' => (string) ($enderecoEntrega['estado'] ?? ''),
+                    ],
+                    false // Não gerar PIX/boletos automaticamente — admin gera via "Gerar Link"
+                );
+                try { $pdo->prepare("UPDATE pedidos SET status = 'carne_pagando', forma_pagamento = 'carne_braziliana' WHERE id = ?")->execute([(int) $pedidoId]); } catch (\Exception $e) {}
+            }
+
             $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
             $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
             unset($_SESSION['pedido_manual_form_token']);
@@ -2968,6 +3265,58 @@ JS;
             $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
             $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao);
 
+            // Se forma de pagamento é Carnê Braziliana, criar o carnê
+            if (strtolower(trim($formaPagamento)) === 'carne_braziliana') {
+                $carneParcelas = (int) $request->getParam('carne_parcelas', 2);
+                if ($carneParcelas < 2) $carneParcelas = 2;
+                if ($carneParcelas > 12) $carneParcelas = 12;
+
+                $carneService = new \App\Services\CarneService();
+
+                // Separar valores: produtos vs taxas (mesma lógica do checkout)
+                $subtotalProdutos = (float) ($resumo['subtotal_produtos'] ?? 0);
+                $totalTaxas = (float) ($resumo['taxa_servico'] ?? 0) + (float) ($resumo['valor_impostos'] ?? 0) + (float) ($resumo['imposto_local'] ?? 0) + (float) ($resumo['valor_frete'] ?? 0);
+
+                if ($subtotalProdutos <= 0) {
+                    $subtotalProdutos = (float) ($resumo['valor_total'] ?? 0);
+                    $totalTaxas = 0;
+                }
+
+                // Buscar dados do cliente para o carnê
+                $pdo = \Config\Database::getConnection();
+                $stCli = $pdo->prepare('SELECT * FROM usuarios WHERE id = ? LIMIT 1');
+                $stCli->execute([$clienteId]);
+                $clienteData = $stCli->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $carneId = $carneService->criarCarne(
+                    (int) $pedidoId,
+                    $clienteId,
+                    $subtotalProdutos,
+                    $totalTaxas,
+                    $carneParcelas,
+                    [
+                        'nome' => (string) ($clienteData['nome'] ?? ($clienteData['name'] ?? '')),
+                        'email' => (string) ($clienteData['email'] ?? ''),
+                        'documento' => (string) ($clienteData['documento'] ?? ($clienteData['cpf'] ?? '')),
+                        'data_nascimento' => (string) ($clienteData['data_nascimento'] ?? ''),
+                        'telefone' => (string) ($clienteData['telefone'] ?? ($clienteData['phone'] ?? '')),
+                        'cep' => (string) ($enderecoEntrega['cep'] ?? ''),
+                        'endereco' => (string) ($enderecoEntrega['endereco'] ?? ''),
+                        'numero' => (string) ($enderecoEntrega['numero'] ?? ''),
+                        'bairro' => (string) ($enderecoEntrega['bairro'] ?? ''),
+                        'cidade' => (string) ($enderecoEntrega['cidade'] ?? ''),
+                        'estado' => (string) ($enderecoEntrega['estado'] ?? ''),
+                    ],
+                    false // Não gerar PIX/boletos automaticamente — admin gera via "Gerar Link"
+                );
+
+                // Atualizar status do pedido para indicar carnê
+                try {
+                    $pdo->prepare("UPDATE pedidos SET status = 'carne_pagando', forma_pagamento = 'carne_braziliana' WHERE id = ?")
+                        ->execute([(int) $pedidoId]);
+                } catch (\Exception $e) {}
+            }
+
             $_SESSION['pedido_manual_form_token_used'] = $_SESSION['pedido_manual_form_token_used'] ?? [];
             $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
             unset($_SESSION['pedido_manual_form_token']);
@@ -2982,6 +3331,95 @@ JS;
             $pedidoId = (int) $request->getParam('pedido_id', 0);
             $billingType = (string) $request->getParam('billingType', 'PIX');
 
+            // Verificar se o pedido é um carnê — se for, gerar links das parcelas
+            $pdo = \Config\Database::getConnection();
+            $stCarne = $pdo->prepare("SELECT id, quantidade_parcelas, total_produtos, total_taxas, status FROM carnes WHERE pedido_id = ? LIMIT 1");
+            $stCarne->execute([$pedidoId]);
+            $carne = $stCarne->fetch(\PDO::FETCH_ASSOC);
+
+            if ($carne) {
+                // É um carnê — gerar links de pagamento apenas da PRIMEIRA parcela pendente
+                // (as demais o cliente gera na área "Meus Carnês")
+                $carneId = (int) $carne['id'];
+                $carneService = new \App\Services\CarneService();
+                $carneModel = new \App\Models\Carne();
+
+                // Buscar parcelas do carnê
+                $parcelas = $carneModel->getParcelas($carneId);
+                if (empty($parcelas)) {
+                    throw new \Exception('Nenhuma parcela encontrada para este carnê.');
+                }
+
+                // Encontrar a primeira parcela pendente (não paga, não cancelada)
+                $primeiraPendente = null;
+                foreach ($parcelas as $p) {
+                    $st = strtolower(trim((string) ($p['status'] ?? '')));
+                    if (!in_array($st, ['paga', 'cancelada'], true)) {
+                        $primeiraPendente = $p;
+                        break;
+                    }
+                }
+
+                if (!$primeiraPendente) {
+                    throw new \Exception('Todas as parcelas já foram pagas ou canceladas.');
+                }
+
+                // Buscar dados do cliente
+                $stCli = $pdo->prepare("SELECT u.* FROM carnes c JOIN usuarios u ON c.cliente_id = u.id WHERE c.id = ? LIMIT 1");
+                $stCli->execute([$carneId]);
+                $clienteData = $stCli->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $dadosCliente = [
+                    'nome' => (string) ($clienteData['nome'] ?? ($clienteData['name'] ?? '')),
+                    'email' => (string) ($clienteData['email'] ?? ''),
+                    'documento' => (string) ($clienteData['documento'] ?? ($clienteData['cpf'] ?? '')),
+                    'data_nascimento' => (string) ($clienteData['data_nascimento'] ?? ''),
+                    'telefone' => (string) ($clienteData['telefone'] ?? ($clienteData['phone'] ?? '')),
+                ];
+
+                // Verificar se já tem links gerados para esta parcela
+                $temLinkProdutos = !empty($primeiraPendente['boleto_produtos_url']) || !empty($primeiraPendente['pix_produtos_payload']);
+                $temLinkTaxas = !empty($primeiraPendente['boleto_taxas_url']) || !empty($primeiraPendente['pix_taxas_payload']);
+
+                if (!$temLinkProdutos || !$temLinkTaxas) {
+                    // Gerar links para esta parcela
+                    $carneService->gerarBoletosParcela($primeiraPendente, $pedidoId, $dadosCliente);
+                    // Recarregar parcela com os links gerados
+                    $primeiraPendente = $carneModel->getParcela($primeiraPendente['id']);
+                }
+
+                $linkProd = (string) ($primeiraPendente['boleto_produtos_url'] ?? '');
+                $linkTaxas = (string) ($primeiraPendente['boleto_taxas_url'] ?? '');
+                $pixProdPayload = (string) ($primeiraPendente['pix_produtos_payload'] ?? '');
+                $pixTaxasPayload = (string) ($primeiraPendente['pix_taxas_payload'] ?? '');
+                $pixProdQr = (string) ($primeiraPendente['pix_produtos_qrcode'] ?? '');
+                $pixTaxasQr = (string) ($primeiraPendente['pix_taxas_qrcode'] ?? '');
+
+                $this->json([
+                    'success' => true,
+                    'carne' => true,
+                    'carne_id' => $carneId,
+                    'pedido_id' => $pedidoId,
+                    'quantidade_parcelas' => (int) $carne['quantidade_parcelas'],
+                    'parcela' => [
+                        'numero' => (int) ($primeiraPendente['numero_parcela'] ?? 1),
+                        'valor_produtos' => (float) ($primeiraPendente['valor_produtos'] ?? 0),
+                        'valor_taxas' => (float) ($primeiraPendente['valor_taxas'] ?? 0),
+                        'valor_total' => (float) ($primeiraPendente['valor_total'] ?? 0),
+                        'vencimento' => (string) ($primeiraPendente['vencimento'] ?? ''),
+                        'status' => (string) ($primeiraPendente['status'] ?? ''),
+                        'link_produtos' => $linkProd,
+                        'link_taxas' => $linkTaxas,
+                        'pix_produtos_payload' => $pixProdPayload,
+                        'pix_taxas_payload' => $pixTaxasPayload,
+                        'pix_produtos_qrcode' => $pixProdQr,
+                        'pix_taxas_qrcode' => $pixTaxasQr,
+                    ],
+                ]);
+                return;
+            }
+
+            // Fluxo normal (não é carnê)
             $svc = new PedidoManualService();
             $result = $svc->gerarLinkPagamentoPedidoManual($pedidoId, $billingType);
             $this->json($result);

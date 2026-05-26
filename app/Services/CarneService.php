@@ -64,7 +64,7 @@ class CarneService {
     /**
      * Cria carnê a partir do checkout
      */
-    public function criarCarne($pedidoId, $clienteId, $totalProdutos, $totalTaxas, $qtdParcelas, $dadosCliente = []) {
+    public function criarCarne($pedidoId, $clienteId, $totalProdutos, $totalTaxas, $qtdParcelas, $dadosCliente = [], $gerarPagamentosAutomaticamente = true) {
         $this->carneModel->registrarLog(null, (int) $pedidoId, null, 'carne_criado', "Iniciando criação de carnê para pedido #{$pedidoId}", json_encode(['cliente_id' => $clienteId, 'total_produtos' => $totalProdutos, 'total_taxas' => $totalTaxas, 'parcelas' => $qtdParcelas]));
 
         $dados = [
@@ -81,7 +81,8 @@ class CarneService {
 
         $carneId = $this->carneModel->criarComParcelas($dados, $qtdParcelas);
 
-        // Gerar boletos da primeira parcela automaticamente
+        // Gerar boletos da primeira parcela automaticamente (exceto em pedidos manuais)
+        if ($gerarPagamentosAutomaticamente) {
         try {
             $parcelas = $this->carneModel->getParcelas($carneId);
             if (!empty($parcelas[0])) {
@@ -92,6 +93,7 @@ class CarneService {
             error_log('[CARNE] Erro ao gerar boletos da 1ª parcela: ' . $e->getMessage());
             $this->carneModel->registrarLog($carneId, (int) $pedidoId, null, 'carne_erro', "Erro ao gerar boletos da 1ª parcela", $e->getMessage());
         }
+        } // fim gerarPagamentosAutomaticamente
 
         $this->carneModel->registrarLog($carneId, (int) $pedidoId, null, 'carne_criado', "Carnê #{$carneId} criado com sucesso para pedido #{$pedidoId}", json_encode(['carne_id' => $carneId, 'parcelas' => $qtdParcelas, 'total' => round($totalProdutos + $totalTaxas, 2)]));
         $this->dispararNotificacao($carneId, null, 'carne_criado');

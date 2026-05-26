@@ -1218,7 +1218,7 @@ class PedidoManualService {
 
         if ($formaPagamento !== null) {
             $fpNorm = trim((string) $formaPagamento);
-            $formasValidas = ['', 'pagdev', 'carteira', 'pix', 'boleto', 'cartao_credito', 'cartao_debito', 'transferencia'];
+            $formasValidas = ['', 'pagdev', 'carteira', 'pix', 'boleto', 'cartao_credito', 'cartao_debito', 'transferencia', 'carne_braziliana'];
             if (!in_array($fpNorm, $formasValidas, true)) {
                 throw new \Exception('Forma de pagamento inválida');
             }
