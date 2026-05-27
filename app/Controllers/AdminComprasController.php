@@ -936,10 +936,24 @@ class AdminComprasController extends Controller {
         $produtoId = (int) $request->getParam('produto_id', 0);
         $lojaId = (int) $request->getParam('loja_id', 0);
 
+        // Construir URL de redirect preservando filtros
+        $redirectLojasRaw = trim((string) ($request->getParam('redirect_lojas', '') ?? ''));
+        $redirectLojaIdRaw = $request->getParam('redirect_loja_id', null);
+        $redirectSemLojaRaw = $request->getParam('redirect_sem_loja', null);
+        $redirectParams = ['status' => 'pendente'];
+        if ($redirectLojasRaw !== '') {
+            $redirectParams['lojas'] = $redirectLojasRaw;
+        } elseif ((string) ($redirectSemLojaRaw ?? '0') === '1') {
+            $redirectParams['sem_loja'] = '1';
+        } elseif ((int) ($redirectLojaIdRaw ?? 0) > 0) {
+            $redirectParams['loja_id'] = (string) (int) $redirectLojaIdRaw;
+        }
+        $redirectUrl = '/admin/estoque/compras' . (!empty($redirectParams) ? ('?' . http_build_query($redirectParams)) : '');
+
         if ($produtoId <= 0) {
             $_SESSION['message'] = 'Parâmetros inválidos.';
             $_SESSION['message_type'] = 'danger';
-            header('Location: /admin/estoque/compras');
+            header('Location: ' . $redirectUrl);
             exit;
         }
 
@@ -977,12 +991,12 @@ class AdminComprasController extends Controller {
                 $_SESSION['message'] = 'Nenhum item pendente encontrado para remover.';
                 $_SESSION['message_type'] = 'warning';
             }
-            header('Location: /admin/estoque/compras');
+            header('Location: ' . $redirectUrl);
             exit;
         } catch (\Exception $e) {
             $_SESSION['message'] = 'Erro ao remover item.';
             $_SESSION['message_type'] = 'danger';
-            header('Location: /admin/estoque/compras');
+            header('Location: ' . $redirectUrl);
             exit;
         }
     }
@@ -2282,6 +2296,9 @@ class AdminComprasController extends Controller {
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="remover_produto_id" value="">
                                         <input type="hidden" name="loja_id" id="remover_loja_id" value="0">
+                                        <input type="hidden" name="redirect_lojas" id="remover_redirect_lojas" value="">
+                                        <input type="hidden" name="redirect_loja_id" id="remover_redirect_loja_id" value="0">
+                                        <input type="hidden" name="redirect_sem_loja" id="remover_redirect_sem_loja" value="0">
                                         <div class="alert alert-warning mb-0">
                                             Tem certeza que deseja remover da lista o item <strong id="remover_produto_nome"></strong>?
                                         </div>
@@ -2303,6 +2320,10 @@ class AdminComprasController extends Controller {
                             document.getElementById("remover_produto_id").value = button.getAttribute("data-produto-id") || "";
                             document.getElementById("remover_loja_id").value = button.getAttribute("data-loja-id") || "0";
                             document.getElementById("remover_produto_nome").textContent = button.getAttribute("data-produto-nome") || "";
+                            var urlParams = new URLSearchParams(window.location.search);
+                            document.getElementById("remover_redirect_lojas").value = urlParams.get("lojas") || "";
+                            document.getElementById("remover_redirect_loja_id").value = urlParams.get("loja_id") || "0";
+                            document.getElementById("remover_redirect_sem_loja").value = urlParams.get("sem_loja") || "0";
                         });
                     }
                 </script>';
@@ -2358,6 +2379,7 @@ class AdminComprasController extends Controller {
                                         <input type="hidden" name="loja_id" id="concluir_loja_id" value="0">
                                         <input type="hidden" name="redirect_loja_id" id="concluir_redirect_loja_id" value="0">
                                         <input type="hidden" name="redirect_sem_loja" id="concluir_redirect_sem_loja" value="0">
+                                        <input type="hidden" name="redirect_lojas" id="concluir_redirect_lojas" value="">
                                         <div class="alert alert-success mb-0">
                                             Concluir compra de: <strong id="concluir_produto_nome"></strong>
                                         </div>
@@ -2391,8 +2413,10 @@ class AdminComprasController extends Controller {
                             var urlParams = new URLSearchParams(window.location.search);
                             var currentLojaId = urlParams.get("loja_id") || "0";
                             var currentSemLoja = urlParams.get("sem_loja") || "0";
+                            var currentLojas = urlParams.get("lojas") || "";
                             document.getElementById("concluir_redirect_loja_id").value = currentLojaId;
                             document.getElementById("concluir_redirect_sem_loja").value = currentSemLoja;
+                            document.getElementById("concluir_redirect_lojas").value = currentLojas;
                             if (inp) {
                                 inp.max = String(Math.max(0, maxQ));
                                 inp.value = "0";
@@ -2892,18 +2916,24 @@ class AdminComprasController extends Controller {
         // Se não vier, cai no loja_id do produto como fallback
         $redirectLojaIdRaw = $request->getParam('redirect_loja_id', null);
         $redirectSemLojaRaw = $request->getParam('redirect_sem_loja', null);
-        $hasRedirectFilter = ($redirectLojaIdRaw !== null || $redirectSemLojaRaw !== null);
+        $redirectLojasRaw = trim((string) ($request->getParam('redirect_lojas', '') ?? ''));
+        $hasRedirectFilter = ($redirectLojaIdRaw !== null || $redirectSemLojaRaw !== null || $redirectLojasRaw !== '');
 
         $redirectParams = ['status' => 'pendente'];
         if ($hasRedirectFilter) {
-            $redirectSemLoja = (string) ($redirectSemLojaRaw ?? '0') === '1';
-            $redirectLojaId = (int) ($redirectLojaIdRaw ?? 0);
-            if ($redirectSemLoja) {
-                $redirectParams['sem_loja'] = '1';
-            } elseif ($redirectLojaId > 0) {
-                $redirectParams['loja_id'] = (string) $redirectLojaId;
+            if ($redirectLojasRaw !== '') {
+                // Multi-select de lojas
+                $redirectParams['lojas'] = $redirectLojasRaw;
+            } else {
+                $redirectSemLoja = (string) ($redirectSemLojaRaw ?? '0') === '1';
+                $redirectLojaId = (int) ($redirectLojaIdRaw ?? 0);
+                if ($redirectSemLoja) {
+                    $redirectParams['sem_loja'] = '1';
+                } elseif ($redirectLojaId > 0) {
+                    $redirectParams['loja_id'] = (string) $redirectLojaId;
+                }
             }
-            // Se redirect_loja_id = 0 e redirect_sem_loja = 0 → filtro "Todas as lojas", não adiciona nada
+            // Se redirect_loja_id = 0 e redirect_sem_loja = 0 e lojas vazio → filtro "Todas as lojas", não adiciona nada
         } else {
             // Fallback: comportamento anterior (usa loja do produto)
             if ($semLoja) {
