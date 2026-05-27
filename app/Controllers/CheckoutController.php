@@ -1034,13 +1034,26 @@ class CheckoutController extends Controller {
     }
 
     /**
-     * Calcula o valor elegível para pagamento via carteira (subtotal_produtos + taxa_servico).
-     * Impostos e imposto_local são EXCLUÍDOS — sempre cobrados via gateway.
+     * Calcula o valor elegível para pagamento via carteira.
+     * Respeita a configuração 'carteira_cobertura_modo':
+     *   - 'subtotal_taxa': subtotal_produtos + taxa_servico (impostos excluídos)
+     *   - 'subtotal_taxa_impostos': subtotal_produtos + taxa_servico + impostos + imposto_local
      */
     private function calcularWalletEligibleAmount(array $pedido): float
     {
         $subtotalProdutos = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
         $taxaServico = (float) ($pedido['taxa_servico'] ?? ($pedido['servicos'] ?? 0));
+        $impostos = (float) ($pedido['impostos'] ?? 0);
+        $impostoLocal = (float) ($pedido['imposto_local'] ?? 0);
+
+        // Obter modo de cobertura da configuração
+        $modo = (string) ($this->getConfigValue('carteira_cobertura_modo', 'subtotal_taxa'));
+
+        if ($modo === 'subtotal_taxa_impostos') {
+            return $subtotalProdutos + $taxaServico + $impostos + $impostoLocal;
+        }
+
+        // Padrão: subtotal + taxa_servico (impostos excluídos)
         return $subtotalProdutos + $taxaServico;
     }
 
@@ -2846,7 +2859,9 @@ class CheckoutController extends Controller {
             'cambioreal_rate_brl' => $rateBRL,
             'pix_desconto_taxa_servico_percent' => $this->getPixDescontoTaxaServicoPercent(),
             'free_offer_info' => $this->calcularFreeOfferInfo($items),
-            'wallet_eligible_amount' => ($subtotal + $taxaServico),
+            'wallet_eligible_amount' => ($this->getConfigValue('carteira_cobertura_modo', 'subtotal_taxa') === 'subtotal_taxa_impostos')
+                ? ($subtotal + $taxaServico + $impostos + ($impostoLocal ?? 0))
+                : ($subtotal + $taxaServico),
         ]);
     }
 

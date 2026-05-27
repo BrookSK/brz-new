@@ -198,6 +198,10 @@ $router->get('/admin/produtos/busca-ajax', 'AdminProdutosController', 'buscaAjax
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 
+// Configuração da Carteira (cobertura parcial)
+$router->get('/admin/carteira-config', 'AdminCarteiraConfigController', 'index');
+$router->post('/admin/carteira-config/salvar', 'AdminCarteiraConfigController', 'salvar');
+
 // FAQ / Termos
 $router->get('/admin/faq', 'AdminFaqController', 'index');
 $router->post('/admin/faq/salvar', 'AdminFaqController', 'salvar');
