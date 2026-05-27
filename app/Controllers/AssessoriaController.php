@@ -2889,7 +2889,10 @@ class AssessoriaController extends Controller {
                 if ($jsonHttpCode === 200 && !empty($jsonResp)) {
                     $shopifyData = json_decode($jsonResp, true);
                     if (is_array($shopifyData) && isset($shopifyData['product'])) {
-                        $produto = $this->normalizarShopifyProduct($shopifyData['product'], $url);
+                        // O endpoint público .json não inclui 'available' nas variantes.
+                        // Extrair disponibilidade do HTML original (que contém o JSON com 'available').
+                        $availabilityMap = $this->extrairDisponibilidadeShopifyHtml($html);
+                        $produto = $this->normalizarShopifyProduct($shopifyData['product'], $url, $availabilityMap);
                     }
                 }
             }
@@ -2956,9 +2959,89 @@ class AssessoriaController extends Controller {
     }
 
     /**
+     * Extrai mapa de disponibilidade (variant_id => bool) do HTML de uma página Shopify.
+     * O Shopify inclui no HTML um JSON com os dados completos do produto incluindo 'available'.
+     */
+    private function extrairDisponibilidadeShopifyHtml(string $html): array {
+        $map = [];
+
+        // Padrão 1: "variants":[{...,"id":123,"available":true,...}]
+        // Buscar qualquer bloco JSON que contenha variants com id e available
+        if (preg_match_all('/"variants"\s*:\s*\[(.*?)\]/s', $html, $matches)) {
+            foreach ($matches[1] as $variantsJson) {
+                // Tentar parsear como array JSON
+                $variants = json_decode('[' . $variantsJson . ']', true);
+                if (is_array($variants) && !empty($variants)) {
+                    foreach ($variants as $v) {
+                        if (is_array($v) && isset($v['id'])) {
+                            $vid = (string) $v['id'];
+                            if (array_key_exists('available', $v)) {
+                                $map[$vid] = (bool) $v['available'];
+                            }
+                        }
+                    }
+                    if (!empty($map)) break;
+                }
+            }
+        }
+
+        // Padrão 2: product JSON completo no script tag
+        if (empty($map) && preg_match('/var\s+product\s*=\s*(\{.*?"variants".*?\});/s', $html, $m)) {
+            $productData = json_decode($m[1], true);
+            if (is_array($productData) && !empty($productData['variants'])) {
+                foreach ($productData['variants'] as $v) {
+                    if (is_array($v) && isset($v['id']) && array_key_exists('available', $v)) {
+                        $map[(string) $v['id']] = (bool) $v['available'];
+                    }
+                }
+            }
+        }
+
+        // Padrão 3: JSON dentro de <script type="application/json"> com product data
+        if (empty($map) && preg_match_all('/<script[^>]*type=["\']application\/json["\'][^>]*>(.*?)<\/script>/si', $html, $scriptMatches)) {
+            foreach ($scriptMatches[1] as $jsonContent) {
+                $data = json_decode(trim($jsonContent), true);
+                if (!is_array($data)) continue;
+                // Pode estar em data.product.variants ou data.variants
+                $variants = $data['product']['variants'] ?? ($data['variants'] ?? null);
+                if (is_array($variants)) {
+                    foreach ($variants as $v) {
+                        if (is_array($v) && isset($v['id']) && array_key_exists('available', $v)) {
+                            $map[(string) $v['id']] = (bool) $v['available'];
+                        }
+                    }
+                    if (!empty($map)) break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Resolve a disponibilidade de uma variante usando o mapa extraído do HTML.
+     * Se o mapa estiver vazio (não conseguimos extrair), assume disponível (true).
+     */
+    private function resolverDisponibilidadeVariante(array $variant, array $availabilityMap): bool {
+        // Se o próprio JSON já tem 'available', usar direto
+        if (array_key_exists('available', $variant)) {
+            return (bool) $variant['available'];
+        }
+        // Se temos o mapa do HTML, consultar por ID
+        if (!empty($availabilityMap) && isset($variant['id'])) {
+            $vid = (string) $variant['id'];
+            if (array_key_exists($vid, $availabilityMap)) {
+                return $availabilityMap[$vid];
+            }
+        }
+        // Sem informação, assumir disponível
+        return true;
+    }
+
+    /**
      * Normaliza dados de produto Shopify para o formato esperado pelo ChatGPT analyzer.
      */
-    private function normalizarShopifyProduct(array $product, string $url): array {
+    private function normalizarShopifyProduct(array $product, string $url, array $availabilityMap = []): array {
         $nome = $product['title'] ?? '';
         $imagem = '';
         if (!empty($product['images'])) {
@@ -3022,7 +3105,7 @@ class AssessoriaController extends Controller {
                     'id' => $v['id'] ?? null,
                     'nome' => $v['title'] ?? null,
                     'preco' => $vPrice,
-                    'disponivel' => ($v['available'] ?? true),
+                    'disponivel' => $this->resolverDisponibilidadeVariante($v, $availabilityMap),
                     'sku' => $v['sku'] ?? null,
                     'atributos' => $atributos,
                 ];
