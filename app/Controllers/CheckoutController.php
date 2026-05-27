@@ -3578,6 +3578,23 @@ class CheckoutController extends Controller {
                     // Se carteira cobriu tudo e não há gateway charge, pedido está PAID
                     try {
                         if ($gatewayCharge <= 0.50 && strtoupper((string) ($walletResult['status'] ?? '')) === 'PAID') {
+                            // Forçar status PAID diretamente no banco
+                            try {
+                                $dbStatus = \Config\Database::getConnection();
+                                $colsStatus = [];
+                                try { $stC = $dbStatus->query('DESCRIBE pedidos'); $colsStatus = $stC ? ($stC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : []; } catch (\Exception $e) {}
+                                $setStatus = [];
+                                $pStatus = [];
+                                if (in_array('payment_status', $colsStatus, true)) { $setStatus[] = 'payment_status = ?'; $pStatus[] = 'PAID'; }
+                                if (in_array('status', $colsStatus, true)) { $setStatus[] = 'status = ?'; $pStatus[] = 'pago'; }
+                                if (in_array('pago_em', $colsStatus, true)) { $setStatus[] = 'pago_em = ?'; $pStatus[] = date('Y-m-d H:i:s'); }
+                                if (!empty($setStatus)) {
+                                    $pStatus[] = (int) $pedidoId;
+                                    $stUpd = $dbStatus->prepare('UPDATE pedidos SET ' . implode(', ', $setStatus) . ' WHERE id = ?');
+                                    $stUpd->execute($pStatus);
+                                }
+                            } catch (\Exception $e) {}
+
                             $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
                         }
                     } catch (\Exception $e) {
