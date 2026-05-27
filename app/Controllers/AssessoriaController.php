@@ -2183,6 +2183,17 @@ class AssessoriaController extends Controller {
             // Usar ChatGPT para analisar os dados brutos
             $produto = $this->analisarComChatGPT($decodedResponse, $url);
             
+            // Validar peso com IA
+            if (is_array($produto) && isset($produto['peso'])) {
+                $pesoValidado = $this->validarPesoComIA(
+                    (string) ($produto['nome'] ?? ''),
+                    (string) ($produto['descricao'] ?? ''),
+                    (float) ($produto['peso'] ?? 0)
+                );
+                $produto['peso'] = $pesoValidado['peso'];
+                $produto['peso_estimado_ia'] = $pesoValidado['estimado_ia'];
+            }
+
             return [
                 'success' => true,
                 'data' => $produto
@@ -2336,6 +2347,63 @@ class AssessoriaController extends Controller {
     }
 
     /**
+     * Valida o peso do produto usando ChatGPT.
+     * Se o peso informado parece incorreto, retorna o peso estimado pela IA.
+     * Retorna ['peso' => float, 'estimado_ia' => bool]
+     */
+    private function validarPesoComIA(string $nomeProduto, string $descricao, float $pesoObtido): array {
+        $chatGptApiKey = $this->getChatGPTApiKey();
+        if (!$chatGptApiKey) {
+            return ['peso' => $pesoObtido, 'estimado_ia' => false];
+        }
+
+        // Se peso é 0 ou negativo, pedir estimativa direto
+        $pesoZero = ($pesoObtido <= 0);
+
+        $descResumida = mb_substr(trim($descricao), 0, 200);
+
+        $prompt = $pesoZero
+            ? "Produto: \"{$nomeProduto}\"\nDescrição: \"{$descResumida}\"\n\nEste produto não tem peso informado. Estime o peso em kg (apenas o produto, sem embalagem de envio). Retorne APENAS JSON: {\"peso_kg\": number, \"ajustado\": true}"
+            : "Produto: \"{$nomeProduto}\"\nDescrição: \"{$descResumida}\"\nPeso informado: {$pesoObtido} kg\n\nVerifique se o peso informado é plausível para este tipo de produto. Se estiver correto (margem de ±30%), retorne o mesmo peso. Se estiver claramente errado (ex: peso de embalagem de envio em vez do produto, ou valor absurdo), retorne o peso correto estimado. Retorne APENAS JSON: {\"peso_kg\": number, \"ajustado\": boolean}";
+
+        try {
+            [$response, $httpCode, $curlError] = $this->callChatGPT($chatGptApiKey, $prompt, true);
+
+            if ($curlError || $httpCode !== 200) {
+                return ['peso' => $pesoObtido > 0 ? $pesoObtido : 0.5, 'estimado_ia' => $pesoZero];
+            }
+
+            $decoded = json_decode($response, true);
+            $content = '';
+            if (is_array($decoded) && isset($decoded['choices'][0]['message']['content'])) {
+                $content = trim((string) $decoded['choices'][0]['message']['content']);
+            }
+
+            // Limpar possíveis markdown code blocks
+            $content = preg_replace('/^```(?:json)?\s*/i', '', $content);
+            $content = preg_replace('/\s*```$/i', '', $content);
+
+            $result = json_decode($content, true);
+            if (is_array($result) && isset($result['peso_kg'])) {
+                $pesoIA = (float) $result['peso_kg'];
+                $ajustado = (bool) ($result['ajustado'] ?? false);
+
+                if ($pesoIA > 0 && $pesoIA < 100) {
+                    // Se a IA ajustou ou o peso original era 0
+                    if ($ajustado || $pesoZero) {
+                        return ['peso' => round($pesoIA, 2), 'estimado_ia' => true];
+                    }
+                    return ['peso' => $pesoObtido, 'estimado_ia' => false];
+                }
+            }
+        } catch (\Exception $e) {
+            // Silenciar erro — usar peso original
+        }
+
+        return ['peso' => $pesoObtido > 0 ? $pesoObtido : 0.5, 'estimado_ia' => $pesoZero];
+    }
+
+    /**
      * Tenta buscar dados do produto direto via endpoint .json do Shopify (sem ScrapingBee).
      * Retorna array de resultado ou null se não for Shopify / endpoint não disponível.
      */
@@ -2449,6 +2517,11 @@ class AssessoriaController extends Controller {
             header('X-Shopify-Image: ' . ($variantImageUrl ? 'found' : 'none'));
         }
 
+        // Validar peso com IA
+        $pesoValidado = $this->validarPesoComIA($fullTitle, $descricao, $weightKg);
+        $pesoFinal = $pesoValidado['peso'];
+        $pesoEstimadoIA = $pesoValidado['estimado_ia'];
+
         return [
             'success' => true,
             'data' => [
@@ -2458,7 +2531,8 @@ class AssessoriaController extends Controller {
                 'moeda' => 'USD',
                 'sku' => $sku,
                 'imagens' => $variantImageUrl ? [$variantImageUrl] : [],
-                'peso' => $weightKg,
+                'peso' => $pesoFinal,
+                'peso_estimado_ia' => $pesoEstimadoIA,
                 'url_original' => $url,
                 'data_scraping' => date('Y-m-d H:i:s'),
                 'fonte' => 'shopify_json',

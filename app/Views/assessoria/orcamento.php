@@ -165,6 +165,20 @@ ob_start();
                         </h5>
                     </div>
                     <div class="card-body">
+                        <?php
+                        $temPesoEstimadoIA = false;
+                        foreach ($orcamento['produtos'] as $p) {
+                            if (!empty($p['peso_estimado_ia'])) { $temPesoEstimadoIA = true; break; }
+                        }
+                        ?>
+                        <?php if ($temPesoEstimadoIA): ?>
+                        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size: 0.85rem;">
+                            <i class="fas fa-robot me-1"></i>
+                            <strong>Aviso sobre peso:</strong> Um ou mais produtos tiveram o peso estimado por inteligência artificial.
+                            O peso será verificado pela nossa equipe assim que você finalizar a compra.
+                            Se você souber o peso correto, use o campo "Peso errado?" para informar.
+                        </div>
+                        <?php endif; ?>
                         <?php foreach ($orcamento['produtos'] as $index => $produto): ?>
                         <div class="product-item border rounded p-3 mb-3">
                             <div class="row align-items-center">
@@ -203,6 +217,11 @@ ob_start();
                                         <span class="badge bg-light text-dark peso-badge" data-index="<?= $index ?>">
                                             <i class="fas fa-weight me-1"></i><span class="peso-text" data-base-peso="<?= htmlspecialchars((string) $produto['peso']) ?>"><?= number_format($produto['peso'], 2) ?></span> kg
                                         </span>
+                                        <?php if (!empty($produto['peso_estimado_ia'])): ?>
+                                        <span class="badge bg-warning text-dark" title="Peso estimado por IA — será verificado pela equipe após a compra">
+                                            <i class="fas fa-robot me-1"></i>Peso estimado
+                                        </span>
+                                        <?php endif; ?>
                                         <a href="#" class="text-decoration-none small text-warning peso-override-toggle" data-index="<?= $index ?>">
                                             <i class="fas fa-edit me-1"></i>Peso errado?
                                         </a>
