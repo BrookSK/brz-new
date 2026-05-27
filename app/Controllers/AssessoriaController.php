@@ -1946,6 +1946,8 @@ class AssessoriaController extends Controller {
                 'imagens' => !empty($decodedResponse['imagem']) ? [(string) $decodedResponse['imagem']] : ['/assets/img/produto-sem-imagem.svg'],
                 'variacoes' => $variacoes,
                 'url' => $url,
+                'url_original' => $url,
+                'sku' => '',
                 'moeda' => $decodedResponse['moeda'] ?? 'USD',
             ];
             return [

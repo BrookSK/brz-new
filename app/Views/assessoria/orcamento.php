@@ -197,22 +197,26 @@ ob_start();
                                         <div class="mt-2 variation-combo" data-index="<?= $index ?>"></div>
                                     <?php endif; ?>
                                     <div class="d-flex align-items-center gap-3 flex-wrap">
+                                        <?php if (!empty($produto['sku'])): ?>
                                         <span class="badge bg-light text-dark">
-                                            <i class="fas fa-tag me-1"></i><?= htmlspecialchars($produto['sku']) ?>
+                                            <i class="fas fa-tag me-1"></i><?= htmlspecialchars((string) $produto['sku']) ?>
                                         </span>
+                                        <?php endif; ?>
                                         <span class="badge bg-light text-dark peso-badge" data-index="<?= $index ?>">
                                             <i class="fas fa-weight me-1"></i><span class="peso-text" data-base-peso="<?= htmlspecialchars((string) $produto['peso']) ?>"><?= number_format($produto['peso'], 2) ?></span> kg
                                         </span>
                                         <a href="#" class="text-decoration-none small text-warning peso-override-toggle" data-index="<?= $index ?>">
                                             <i class="fas fa-edit me-1"></i>Peso errado?
                                         </a>
+                                        <?php if (!empty($produto['url_original'] ?? ($produto['url'] ?? ''))): ?>
                                         <small class="text-muted">
                                             <i class="fas fa-link me-1"></i>
-                                            <a href="<?= htmlspecialchars($produto['url_original']) ?>" 
+                                            <a href="<?= htmlspecialchars((string) ($produto['url_original'] ?? ($produto['url'] ?? ''))) ?>" 
                                                target="_blank" class="text-decoration-none">
                                                 Ver original
                                             </a>
                                         </small>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="peso-override-box mt-2" data-index="<?= $index ?>" style="display:none;">
                                         <div class="input-group input-group-sm" style="max-width: 220px;">
