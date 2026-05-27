@@ -2032,6 +2032,72 @@ class AssessoriaController extends Controller {
             }
 
             if (!empty($shopifyJsonData)) {
+                // Se a URL tem ?variant=ID, filtrar para a variante específica
+                $selectedVariantId = null;
+                if (preg_match('/[?&]variant=(\d+)/', $url, $variantMatch)) {
+                    $selectedVariantId = (int) $variantMatch[1];
+                }
+
+                if ($selectedVariantId && !empty($shopifyJsonData['variants']) && !empty($shopifyJsonData['images'])) {
+                    // Encontrar a variante selecionada
+                    $selectedVariant = null;
+                    foreach ($shopifyJsonData['variants'] as $v) {
+                        if ((int) ($v['id'] ?? 0) === $selectedVariantId) {
+                            $selectedVariant = $v;
+                            break;
+                        }
+                    }
+
+                    if ($selectedVariant) {
+                        // Encontrar a imagem da variante pelo image_id
+                        $variantImageUrl = null;
+                        $variantImageId = (int) ($selectedVariant['image_id'] ?? 0);
+                        if ($variantImageId > 0) {
+                            foreach ($shopifyJsonData['images'] as $img) {
+                                if ((int) ($img['id'] ?? 0) === $variantImageId) {
+                                    $variantImageUrl = str_replace('\\/', '/', (string) ($img['src'] ?? ''));
+                                    break;
+                                }
+                            }
+                        }
+                        // Fallback: primeira imagem que contém o variant_id
+                        if (!$variantImageUrl) {
+                            foreach ($shopifyJsonData['images'] as $img) {
+                                if (isset($img['variant_ids']) && is_array($img['variant_ids']) && in_array($selectedVariantId, $img['variant_ids'])) {
+                                    $variantImageUrl = str_replace('\\/', '/', (string) ($img['src'] ?? ''));
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Construir título com variação
+                        $variantTitle = (string) ($selectedVariant['title'] ?? '');
+                        $productTitle = (string) ($shopifyJsonData['title'] ?? '');
+                        $fullTitle = $productTitle . ($variantTitle ? ' - ' . $variantTitle : '');
+
+                        // Montar dados simplificados com a variante selecionada
+                        $shopifyJsonData = [
+                            'title' => $fullTitle,
+                            'name' => $fullTitle,
+                            'price' => (string) ($selectedVariant['price'] ?? ''),
+                            'sku' => (string) ($selectedVariant['sku'] ?? ''),
+                            'image' => $variantImageUrl ?: (str_replace('\\/', '/', (string) ($shopifyJsonData['images'][0]['src'] ?? ''))),
+                            'description' => strip_tags((string) ($shopifyJsonData['body_html'] ?? '')),
+                            'variant_attributes' => [
+                                'option1' => $selectedVariant['option1'] ?? null,
+                                'option2' => $selectedVariant['option2'] ?? null,
+                                'option3' => $selectedVariant['option3'] ?? null,
+                            ],
+                            'weight_grams' => (int) ($selectedVariant['grams'] ?? 0),
+                            'url' => $url,
+                        ];
+
+                        if (headers_sent() === false) {
+                            header('X-ScrapingBee-Shopify-Variant-Found: ' . $selectedVariantId);
+                        }
+                    }
+                }
+
                 try {
                     $produto = $this->analisarComChatGPT($shopifyJsonData, $url);
                     return [
