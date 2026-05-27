@@ -3427,17 +3427,32 @@ class CheckoutController extends Controller {
                     }
 
                     // Calcular quanto da carteira cobriu de cada componente
-                    // A carteira cobre primeiro o subtotal de produtos, depois a taxa de serviço
+                    // A carteira cobre primeiro o subtotal de produtos, depois a taxa de serviço, depois impostos (se modo inclui impostos)
+                    $modoCobertura = (string) ($this->getConfigValue('carteira_cobertura_modo', 'subtotal_taxa'));
+                    $carteiraCobreImpostos = ($modoCobertura === 'subtotal_taxa_impostos');
+
                     $restanteDebit = $debitAmount;
                     $cobriuSubtotal = min($restanteDebit, $subtotalProdutosBrl);
                     $restanteDebit -= $cobriuSubtotal;
                     $cobriuTaxaServico = min($restanteDebit, $taxaServicoBrl);
+                    $restanteDebit -= $cobriuTaxaServico;
+
+                    // Se modo inclui impostos, a carteira também cobre impostos
+                    $cobriuImpostos = 0.0;
+                    $cobriuImpostoLocal = 0.0;
+                    if ($carteiraCobreImpostos) {
+                        $cobriuImpostos = min($restanteDebit, $impostosBrl);
+                        $restanteDebit -= $cobriuImpostos;
+                        $cobriuImpostoLocal = min($restanteDebit, $impostoLocalBrl);
+                    }
 
                     // Valores não cobertos pela carteira
                     $uncoveredSubtotal = round(max(0.0, $subtotalProdutosBrl - $cobriuSubtotal), 2);
                     $uncoveredTaxaServico = round(max(0.0, $taxaServicoBrl - $cobriuTaxaServico), 2);
+                    $uncoveredImpostos = $carteiraCobreImpostos ? round(max(0.0, $impostosBrl - $cobriuImpostos), 2) : round($impostosBrl, 2);
+                    $uncoveredImpostoLocal = $carteiraCobreImpostos ? round(max(0.0, $impostoLocalBrl - $cobriuImpostoLocal), 2) : round($impostoLocalBrl, 2);
 
-                    $gatewayCharge = $uncoveredSubtotal + $uncoveredTaxaServico + $impostosBrl + $impostoLocalBrl;
+                    $gatewayCharge = $uncoveredSubtotal + $uncoveredTaxaServico + $uncoveredImpostos + $uncoveredImpostoLocal;
                     if ($gatewayCharge < 0.50) $gatewayCharge = 0.0;
 
                     // 5. Registrar split da carteira
@@ -3533,8 +3548,8 @@ class CheckoutController extends Controller {
                             $dados,
                             $uncoveredSubtotal,
                             $uncoveredTaxaServico,
-                            $impostosBrl,
-                            $impostoLocalBrl
+                            $uncoveredImpostos,
+                            $uncoveredImpostoLocal
                         );
 
                         if (empty($gwResult['success'])) {
