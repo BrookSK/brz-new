@@ -1645,6 +1645,8 @@ class AdminComprasController extends Controller {
                                         <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
                                         <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
                                     </div>
+                                    <hr class="my-1">
+                                    <button type="button" class="btn btn-primary btn-sm w-100 mt-1" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar filtro</button>
                                 </div>
                             </div>
                         </div>'
@@ -1662,6 +1664,7 @@ class AdminComprasController extends Controller {
                     var todasCheck = document.getElementById("lojaCheck_todas");
                     var lojaChecks = document.querySelectorAll(".loja-check:not(#lojaCheck_todas)");
                     var searchInput = document.getElementById("lojaSearchInput");
+                    var applyBtn = document.getElementById("lojaApplyBtn");
 
                     function aplicarFiltro() {
                         var selected = [];
@@ -1680,15 +1683,24 @@ class AdminComprasController extends Controller {
                         window.location.href = url;
                     }
 
-                    // "Todas" unchecks others and applies immediately
+                    function updateBtnLabel() {
+                        var count = Array.from(lojaChecks).filter(function(c) { return c.checked; }).length;
+                        if (todasCheck.checked || count === 0) {
+                            applyBtn.textContent = "Aplicar filtro";
+                        } else {
+                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>Aplicar (" + count + " loja" + (count > 1 ? "s" : "") + ")";
+                        }
+                    }
+
+                    // "Todas" unchecks others (but does NOT reload)
                     todasCheck.addEventListener("change", function() {
                         if (this.checked) {
                             lojaChecks.forEach(function(cb) { cb.checked = false; });
                         }
-                        aplicarFiltro();
+                        updateBtnLabel();
                     });
 
-                    // Any other check unchecks "Todas" and applies immediately
+                    // Any other check unchecks "Todas" (but does NOT reload)
                     lojaChecks.forEach(function(cb) {
                         cb.addEventListener("change", function() {
                             if (this.checked) {
@@ -1697,7 +1709,7 @@ class AdminComprasController extends Controller {
                             // If none selected, re-check "Todas"
                             var anyChecked = Array.from(lojaChecks).some(function(c) { return c.checked; });
                             if (!anyChecked) todasCheck.checked = true;
-                            aplicarFiltro();
+                            updateBtnLabel();
                         });
                     });
 
@@ -1711,6 +1723,13 @@ class AdminComprasController extends Controller {
                             }
                         });
                     });
+
+                    // Apply button triggers the filter
+                    applyBtn.addEventListener("click", function() {
+                        aplicarFiltro();
+                    });
+
+                    updateBtnLabel();
                 });
                 </script>';
 
