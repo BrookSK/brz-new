@@ -1934,7 +1934,7 @@ class AssessoriaController extends Controller {
                         'valor' => (float) ($v['preco'] ?? $decodedResponse['preco']),
                         'sku' => $v['sku'] ?? null,
                         'disponivel' => $v['disponivel'] ?? true,
-                        'atributos' => [],
+                        'atributos' => $v['atributos'] ?? [],
                     ];
                 }
             }
@@ -2975,6 +2975,18 @@ class AssessoriaController extends Controller {
             $selectedVariantId = $vm[1];
         }
 
+        // Extrair nomes dos options (ex: ["Color", "Size"])
+        $optionNames = [];
+        if (!empty($product['options']) && is_array($product['options'])) {
+            foreach ($product['options'] as $opt) {
+                if (is_array($opt) && isset($opt['name'])) {
+                    $optionNames[] = $opt['name'];
+                } elseif (is_string($opt)) {
+                    $optionNames[] = $opt;
+                }
+            }
+        }
+
         $preco = 0;
         $moeda = 'USD';
         $variantes = [];
@@ -2993,12 +3005,24 @@ class AssessoriaController extends Controller {
                         $imagem = $v['featured_image']['src'];
                     }
                 }
+
+                // Montar atributos a partir de option1, option2, option3
+                $atributos = [];
+                for ($i = 1; $i <= 3; $i++) {
+                    $optVal = $v['option' . $i] ?? null;
+                    if ($optVal !== null && $optVal !== '' && $optVal !== 'Default Title') {
+                        $optName = $optionNames[$i - 1] ?? ('Option ' . $i);
+                        $atributos[$optName] = $optVal;
+                    }
+                }
+
                 $variantes[] = [
                     'id' => $v['id'] ?? null,
                     'nome' => $v['title'] ?? null,
                     'preco' => $vPrice,
                     'disponivel' => ($v['available'] ?? true),
                     'sku' => $v['sku'] ?? null,
+                    'atributos' => $atributos,
                 ];
             }
         } else {
