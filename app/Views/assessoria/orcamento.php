@@ -535,6 +535,7 @@ $(document).ready(function() {
                 const candidate = { ...sel, [k]: v };
                 const hasAny = p.variacoes.some(variant => {
                     if (!variant || typeof variant !== 'object') return false;
+                    if (variant.disponivel === false) return false;
                     const attrs = variant.atributos || {};
                     if (!attrs || typeof attrs !== 'object') return false;
                     for (const kk of keys) {
@@ -545,8 +546,8 @@ $(document).ready(function() {
                     return true;
                 });
                 const disabled = !hasAny;
-                const classes = 'btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline-secondary');
-                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled' : '') + '>' + $('<div>').text(v).html() + '</button>';
+                const classes = 'btn btn-sm ' + (isActive ? 'btn-primary' : (disabled ? 'btn-outline-secondary text-decoration-line-through opacity-50' : 'btn-outline-secondary'));
+                html += '<button type="button" class="' + classes + ' variation-btn" data-index="' + index + '" data-key="' + encodeURIComponent(String(k)) + '" data-value="' + encodeURIComponent(String(v)) + '" ' + (disabled ? 'disabled title="Indisponível"' : '') + '>' + $('<div>').text(v).html() + '</button>';
             });
             html += '</div>';
             html += '</div>';
@@ -820,6 +821,7 @@ $(document).ready(function() {
                 const candidate = { ...selections[index] };
                 const hasAny = p.variacoes.some(variant => {
                     if (!variant || typeof variant !== 'object') return false;
+                    if (variant.disponivel === false) return false;
                     const attrs = variant.atributos || {};
                     if (!attrs || typeof attrs !== 'object') return false;
                     for (const kk of keys) {
