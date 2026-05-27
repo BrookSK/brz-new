@@ -2193,6 +2193,15 @@ JS;
             $busca = $request->getParam('busca', '');
             $status = $request->getParam('status', '');
 
+            // Construir query string para preservar estado de paginação nos links de detalhe
+            $listQueryParams = [];
+            if ((int) $pagina > 1) $listQueryParams[] = 'pagina=' . (int) $pagina;
+            if (!empty($busca)) $listQueryParams[] = 'busca=' . urlencode($busca);
+            if (!empty($status)) $listQueryParams[] = 'status=' . urlencode($status);
+            $fpParam = strtolower(trim((string) ($request->getParam('fp', '') ?? '')));
+            if ($fpParam !== '') $listQueryParams[] = 'fp=' . urlencode($fpParam);
+            $listQueryString = !empty($listQueryParams) ? '?' . implode('&', $listQueryParams) : '';
+
             $colsPedidos = [];
             try {
                 $stmtColsP = $pdo->query('DESCRIBE pedidos');
@@ -2901,7 +2910,7 @@ JS;
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
-                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
@@ -3022,7 +3031,7 @@ JS;
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
-                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
@@ -3142,7 +3151,7 @@ JS;
                                     </div>
                                     <div class="col-12 col-lg-3">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
-                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . '" class="btn btn-sm btn-outline-primary">
+                                            <a href="/admin/pedidos/detalhes/' . $pedido['id'] . $listQueryString . '" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $pedido['id'] . '">
@@ -3442,6 +3451,18 @@ HTML;
         $embed = ((string) $request->getParam('embed', '0') === '1');
         $syncOk = ((string) $request->getParam('sync_ok', '0') === '1');
         $syncErr = (string) $request->getParam('sync_err', '');
+
+        // Construir URL de retorno preservando paginação/filtros da listagem
+        $voltarParams = [];
+        $voltarPagina = (int) $request->getParam('pagina', 0);
+        $voltarBusca = trim((string) $request->getParam('busca', ''));
+        $voltarStatus = trim((string) $request->getParam('status', ''));
+        $voltarFp = trim((string) $request->getParam('fp', ''));
+        if ($voltarPagina > 1) $voltarParams[] = 'pagina=' . $voltarPagina;
+        if ($voltarBusca !== '') $voltarParams[] = 'busca=' . urlencode($voltarBusca);
+        if ($voltarStatus !== '') $voltarParams[] = 'status=' . urlencode($voltarStatus);
+        if ($voltarFp !== '') $voltarParams[] = 'fp=' . urlencode($voltarFp);
+        $voltarUrl = '/admin/pedidos' . (!empty($voltarParams) ? '?' . implode('&', $voltarParams) : '');
         
         try {
             // Usar o PedidoEcommerce que já está corrigido e adaptativo
@@ -3450,7 +3471,7 @@ HTML;
             
             if (!$pedido) {
                 echo '<div class="alert alert-danger">Pedido não encontrado</div>';
-                echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+                echo '<a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary">Voltar</a>';
                 exit;
             }
             
@@ -3466,7 +3487,7 @@ HTML;
             
         } catch (\Exception $e) {
             echo '<div class="alert alert-danger">Erro: ' . $e->getMessage() . '</div>';
-            echo '<a href="/admin/pedidos" class="btn btn-secondary">Voltar</a>';
+            echo '<a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary">Voltar</a>';
             exit;
         }
         
@@ -3554,7 +3575,7 @@ HTML;
                     <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
                         <i class="fas fa-trash me-1"></i><span class="d-none d-md-inline">Lixeira</span>
                     </button>
-                    <a href="/admin/pedidos" class="btn btn-secondary btn-sm">
+                    <a href="' . htmlspecialchars($voltarUrl) . '" class="btn btn-secondary btn-sm">
                         <i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">Voltar</span>
                     </a>
                 </div>
