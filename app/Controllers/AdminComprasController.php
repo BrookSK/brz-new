@@ -1620,10 +1620,11 @@ class AdminComprasController extends Controller {
                                 <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="lojaDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                                     <i class="fas fa-store me-1"></i>' . $dropdownLabel . '
                                 </button>
-                                <div class="dropdown-menu p-3" style="min-width:250px;max-height:320px;overflow-y:auto;" aria-labelledby="lojaDropdownBtn">
+                                <div class="dropdown-menu p-3" style="min-width:280px;max-height:320px;overflow-y:auto;" aria-labelledby="lojaDropdownBtn">
                                     <div class="mb-2">
                                         <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="Buscar loja...">
                                     </div>
+                                    <div style="overflow-y:auto;max-height:240px;">
                                     <div class="form-check mb-1">
                                         <input class="form-check-input loja-check" type="checkbox" value="todas" id="lojaCheck_todas" ' . (empty($lojasAtivas) ? 'checked' : '') . '>
                                         <label class="form-check-label" for="lojaCheck_todas">Todas</label>
@@ -1645,10 +1646,10 @@ class AdminComprasController extends Controller {
                                         <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
                                         <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
                                     </div>
-                                    <hr class="my-1">
-                                    <button type="button" class="btn btn-primary btn-sm w-100 mt-1" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar filtro</button>
+                                    </div>
                                 </div>
                             </div>
+                            <button type="button" class="btn btn-sm btn-primary d-none" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar</button>
                         </div>'
                     . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">Tipo:</small>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
@@ -1686,10 +1687,12 @@ class AdminComprasController extends Controller {
                     function updateBtnLabel() {
                         var count = Array.from(lojaChecks).filter(function(c) { return c.checked; }).length;
                         if (todasCheck.checked || count === 0) {
-                            applyBtn.textContent = "Aplicar filtro";
+                            applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>Aplicar";
                         } else {
                             applyBtn.innerHTML = "<i class=\"fas fa-filter me-1\"></i>Aplicar (" + count + " loja" + (count > 1 ? "s" : "") + ")";
                         }
+                        // Mostrar o botão sempre que houver mudança pendente
+                        applyBtn.classList.remove("d-none");
                     }
 
                     // "Todas" unchecks others (but does NOT reload)
@@ -1728,8 +1731,6 @@ class AdminComprasController extends Controller {
                     applyBtn.addEventListener("click", function() {
                         aplicarFiltro();
                     });
-
-                    updateBtnLabel();
                 });
                 </script>';
 
