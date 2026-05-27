@@ -2363,8 +2363,8 @@ class AssessoriaController extends Controller {
         $descResumida = mb_substr(trim($descricao), 0, 200);
 
         $prompt = $pesoZero
-            ? "Produto: \"{$nomeProduto}\"\nDescrição: \"{$descResumida}\"\n\nEste produto não tem peso informado. Estime o peso em kg (apenas o produto, sem embalagem de envio). Retorne APENAS JSON: {\"peso_kg\": number, \"ajustado\": true}"
-            : "Produto: \"{$nomeProduto}\"\nDescrição: \"{$descResumida}\"\nPeso informado: {$pesoObtido} kg\n\nVerifique se o peso informado é plausível para este tipo de produto. Se estiver correto (margem de ±30%), retorne o mesmo peso. Se estiver claramente errado (ex: peso de embalagem de envio em vez do produto, ou valor absurdo), retorne o peso correto estimado. Retorne APENAS JSON: {\"peso_kg\": number, \"ajustado\": boolean}";
+            ? "Produto: \"{$nomeProduto}\"\nDescrição: \"{$descResumida}\"\n\nEste produto não tem peso informado. Com base no nome e descrição, estime o peso real do produto em kg (apenas o produto em si, sem caixa de envio). Retorne APENAS JSON: {\"peso_kg\": number, \"ajustado\": true}"
+            : "Produto: \"{$nomeProduto}\"\nDescrição: \"{$descResumida}\"\nPeso informado pelo site: {$pesoObtido} kg\n\nCom base no seu conhecimento sobre este tipo de produto, qual é o peso real aproximado dele (em kg, apenas o produto, sem embalagem de envio)? Compare com o peso informado. Se o peso informado estiver razoável (diferença menor que 40%), mantenha-o. Se estiver claramente errado (ex: um aspirador de piso pesando 1kg, ou um tênis pesando 5kg), retorne o peso correto. Retorne APENAS JSON: {\"peso_kg\": number, \"ajustado\": boolean}";
 
         try {
             [$response, $httpCode, $curlError] = $this->callChatGPT($chatGptApiKey, $prompt, true);
