@@ -93,8 +93,8 @@ $successMsg = $success_msg ?? '';
                             </div>
 
                             <div class="mt-3">
-                                <label for="motivo" class="form-label">Motivo da alteração (opcional)</label>
-                                <input type="text" class="form-control" id="motivo" name="motivo" placeholder="Ex: Decisão comercial para facilitar checkout">
+                                <label for="motivo" class="form-label">Motivo da alteração <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="motivo" name="motivo" placeholder="Ex: Decisão comercial para facilitar checkout" required>
                             </div>
 
                             <div class="mt-3">

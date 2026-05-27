@@ -74,6 +74,13 @@ class AdminCarteiraConfigController extends Controller {
             return;
         }
 
+        // Validar motivo obrigatório
+        if ($motivo === '') {
+            $_SESSION['_flash_carteira_config_success'] = 'O motivo da alteração é obrigatório.';
+            $this->redirect('/admin/carteira-config');
+            return;
+        }
+
         $db = \Config\Database::getConnection();
 
         // Obter modo atual
