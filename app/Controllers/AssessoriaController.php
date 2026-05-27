@@ -1898,14 +1898,23 @@ class AssessoriaController extends Controller {
         $jsonError = json_last_error();
         
         if ($jsonError !== JSON_ERROR_NONE) {
-            if (headers_sent() === false) {
-                header('X-ScrapingBee-JSON-Error: ' . json_last_error_msg());
-                header('X-ScrapingBee-Response-Raw: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
+            // Fallback: se a resposta é HTML, tentar extrair dados estruturados (JSON-LD / Shopify)
+            $htmlData = $this->extrairDadosProdutoDeHtml($response, $url);
+            if ($htmlData !== null) {
+                if (headers_sent() === false) {
+                    header('X-ScrapingBee-Fallback: html-extraction');
+                }
+                $decodedResponse = $htmlData;
+            } else {
+                if (headers_sent() === false) {
+                    header('X-ScrapingBee-JSON-Error: ' . json_last_error_msg());
+                    header('X-ScrapingBee-Response-Raw: ' . $this->headerSafeValue(substr((string) $response, 0, 500), 500));
+                }
+                return [
+                    'success' => false,
+                    'error' => 'Resposta não é JSON válido: ' . json_last_error_msg()
+                ];
             }
-            return [
-                'success' => false,
-                'error' => 'Resposta não é JSON válido: ' . json_last_error_msg()
-            ];
         }
         
         // Log da estrutura do JSON
@@ -1914,6 +1923,37 @@ class AssessoriaController extends Controller {
             header('X-ScrapingBee-JSON-Type: ' . gettype($decodedResponse));
         }
         
+        // Se os dados vieram do fallback HTML e já temos nome + preço, montar produto direto (sem ChatGPT)
+        if (isset($decodedResponse['_source']) && !empty($decodedResponse['nome']) && (float) ($decodedResponse['preco'] ?? 0) > 0) {
+            $variacoes = [];
+            if (!empty($decodedResponse['variantes']) && is_array($decodedResponse['variantes'])) {
+                foreach ($decodedResponse['variantes'] as $v) {
+                    $variacoes[] = [
+                        'id' => $v['id'] ?? null,
+                        'nome' => $v['nome'] ?? null,
+                        'valor' => (float) ($v['preco'] ?? $decodedResponse['preco']),
+                        'sku' => $v['sku'] ?? null,
+                        'disponivel' => $v['disponivel'] ?? true,
+                        'atributos' => [],
+                    ];
+                }
+            }
+            $produto = [
+                'nome' => (string) $decodedResponse['nome'],
+                'valor' => (float) $decodedResponse['preco'],
+                'peso' => 1.0,
+                'descricao' => 'Produto importado automaticamente: ' . (string) $decodedResponse['nome'],
+                'imagens' => !empty($decodedResponse['imagem']) ? [(string) $decodedResponse['imagem']] : ['/assets/img/produto-sem-imagem.svg'],
+                'variacoes' => $variacoes,
+                'url' => $url,
+                'moeda' => $decodedResponse['moeda'] ?? 'USD',
+            ];
+            return [
+                'success' => true,
+                'data' => $produto
+            ];
+        }
+
         try {
             // Usar ChatGPT para analisar os dados brutos
             $produto = $this->analisarComChatGPT($decodedResponse, $url);
@@ -2778,6 +2818,206 @@ class AssessoriaController extends Controller {
         }
 
         return $newId;
+    }
+
+    /**
+     * Extrai dados de produto de uma resposta HTML (fallback quando ScrapingBee não retorna JSON).
+     * Suporta JSON-LD (schema.org/Product) e dados Shopify embutidos no HTML.
+     * Retorna array com dados do produto ou null se não conseguir extrair.
+     */
+    private function extrairDadosProdutoDeHtml(string $html, string $url): ?array {
+        if (strlen($html) < 100) {
+            return null;
+        }
+
+        $produto = null;
+
+        // 1) Tentar JSON-LD (schema.org Product)
+        if (preg_match_all('/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/si', $html, $matches)) {
+            foreach ($matches[1] as $jsonLd) {
+                $data = json_decode(trim($jsonLd), true);
+                if (!is_array($data)) continue;
+
+                // Pode ser um array de schemas
+                if (isset($data[0])) {
+                    foreach ($data as $item) {
+                        if (is_array($item) && ($item['@type'] ?? '') === 'Product') {
+                            $data = $item;
+                            break;
+                        }
+                    }
+                }
+
+                if (($data['@type'] ?? '') === 'Product') {
+                    $produto = $this->normalizarJsonLdProduct($data, $url);
+                    break;
+                }
+            }
+        }
+
+        // 2) Tentar dados Shopify (var meta = {...} ou product JSON embutido)
+        if ($produto === null && preg_match('/var\s+meta\s*=\s*(\{.*?\});/s', $html, $m)) {
+            $meta = json_decode($m[1], true);
+            if (is_array($meta) && isset($meta['product'])) {
+                $produto = $this->normalizarShopifyProduct($meta['product'], $url);
+            }
+        }
+
+        // 3) Shopify: buscar o JSON do produto via endpoint .json (muitos sites Shopify expõem isso)
+        if ($produto === null && (strpos($html, 'Shopify') !== false || strpos($html, 'shopify') !== false || strpos($url, 'variant=') !== false)) {
+            // Extrair path do produto da URL
+            $parsedUrl = parse_url($url);
+            $productPath = $parsedUrl['path'] ?? '';
+            if (preg_match('#/products/[^/?]+#', $productPath, $pathMatch)) {
+                $jsonUrl = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '') . $pathMatch[0] . '.json';
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => $jsonUrl,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 10,
+                    CURLOPT_CONNECTTIMEOUT => 5,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    CURLOPT_FOLLOWLOCATION => true,
+                ]);
+                $jsonResp = curl_exec($ch);
+                $jsonHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($jsonHttpCode === 200 && !empty($jsonResp)) {
+                    $shopifyData = json_decode($jsonResp, true);
+                    if (is_array($shopifyData) && isset($shopifyData['product'])) {
+                        $produto = $this->normalizarShopifyProduct($shopifyData['product'], $url);
+                    }
+                }
+            }
+        }
+
+        return $produto;
+    }
+
+    /**
+     * Normaliza dados de produto JSON-LD (schema.org) para o formato esperado pelo ChatGPT analyzer.
+     */
+    private function normalizarJsonLdProduct(array $data, string $url): array {
+        $nome = $data['name'] ?? '';
+        $imagem = '';
+        if (!empty($data['image'])) {
+            $img = $data['image'];
+            if (is_array($img)) {
+                $imagem = $img[0] ?? ($img['url'] ?? '');
+            } else {
+                $imagem = (string) $img;
+            }
+        }
+
+        $preco = 0;
+        $moeda = 'USD';
+        if (isset($data['offers'])) {
+            $offers = $data['offers'];
+            if (isset($offers['@type']) && $offers['@type'] === 'Offer') {
+                $preco = (float) ($offers['price'] ?? 0);
+                $moeda = $offers['priceCurrency'] ?? 'USD';
+            } elseif (isset($offers[0])) {
+                $preco = (float) ($offers[0]['price'] ?? 0);
+                $moeda = $offers[0]['priceCurrency'] ?? 'USD';
+            } elseif (isset($offers['lowPrice'])) {
+                $preco = (float) $offers['lowPrice'];
+                $moeda = $offers['priceCurrency'] ?? 'USD';
+            }
+        }
+
+        $variantes = [];
+        if (isset($data['offers']) && is_array($data['offers'])) {
+            $offersList = isset($data['offers'][0]) ? $data['offers'] : [$data['offers']];
+            foreach ($offersList as $offer) {
+                if (isset($offer['name']) || isset($offer['sku'])) {
+                    $variantes[] = [
+                        'id' => $offer['sku'] ?? null,
+                        'nome' => $offer['name'] ?? null,
+                        'preco' => (float) ($offer['price'] ?? $preco),
+                        'disponivel' => ($offer['availability'] ?? '') !== 'https://schema.org/OutOfStock',
+                    ];
+                }
+            }
+        }
+
+        return [
+            'nome' => $nome,
+            'preco' => $preco,
+            'moeda' => $moeda,
+            'imagem' => $imagem,
+            'url' => $url,
+            'variantes' => $variantes,
+            '_source' => 'json-ld',
+        ];
+    }
+
+    /**
+     * Normaliza dados de produto Shopify para o formato esperado pelo ChatGPT analyzer.
+     */
+    private function normalizarShopifyProduct(array $product, string $url): array {
+        $nome = $product['title'] ?? '';
+        $imagem = '';
+        if (!empty($product['images'])) {
+            if (is_array($product['images'][0] ?? null)) {
+                $imagem = $product['images'][0]['src'] ?? '';
+            } else {
+                $imagem = (string) ($product['images'][0] ?? '');
+            }
+        } elseif (!empty($product['image'])) {
+            $imagem = is_array($product['image']) ? ($product['image']['src'] ?? '') : (string) $product['image'];
+        }
+
+        // Extrair variant_id da URL se presente
+        $selectedVariantId = null;
+        if (preg_match('/variant=(\d+)/', $url, $vm)) {
+            $selectedVariantId = $vm[1];
+        }
+
+        $preco = 0;
+        $moeda = 'USD';
+        $variantes = [];
+
+        if (!empty($product['variants']) && is_array($product['variants'])) {
+            foreach ($product['variants'] as $v) {
+                $vPrice = (float) ($v['price'] ?? 0);
+                // Shopify às vezes retorna preço em centavos como string "29.99"
+                if ($vPrice > 0 && $preco === 0) {
+                    $preco = $vPrice;
+                }
+                // Se este é o variant selecionado na URL, usar seu preço
+                if ($selectedVariantId !== null && (string) ($v['id'] ?? '') === $selectedVariantId) {
+                    $preco = $vPrice;
+                    if (!empty($v['featured_image']['src'])) {
+                        $imagem = $v['featured_image']['src'];
+                    }
+                }
+                $variantes[] = [
+                    'id' => $v['id'] ?? null,
+                    'nome' => $v['title'] ?? null,
+                    'preco' => $vPrice,
+                    'disponivel' => ($v['available'] ?? true),
+                    'sku' => $v['sku'] ?? null,
+                ];
+            }
+        } else {
+            $preco = (float) ($product['price'] ?? ($product['price_min'] ?? 0));
+            // Shopify pode retornar preço em centavos (ex: 2999 = $29.99)
+            if ($preco > 1000) {
+                $preco = $preco / 100;
+            }
+        }
+
+        return [
+            'nome' => $nome,
+            'preco' => $preco,
+            'moeda' => $moeda,
+            'imagem' => $imagem,
+            'url' => $url,
+            'variantes' => $variantes,
+            '_source' => 'shopify',
+        ];
     }
     
     /**
