@@ -1812,6 +1812,14 @@ class AssessoriaController extends Controller {
      * Processa um link individual via ScrapingBee
      */
     private function processarLinkIndividual(string $url): array {
+        // Atalho Shopify: se a URL contém /products/, tentar endpoint .json direto (sem gastar ScrapingBee)
+        if (preg_match('#/products/([^/?#]+)#', $url, $slugMatch)) {
+            $shopifyResult = $this->tentarShopifyJsonDireto($url);
+            if ($shopifyResult !== null) {
+                return $shopifyResult;
+            }
+        }
+
         $scriptbeeApiKey = $this->getScriptBeeApiKey();
         
         if (!$scriptbeeApiKey) {
@@ -2325,6 +2333,138 @@ class AssessoriaController extends Controller {
         }
         
         return [];
+    }
+
+    /**
+     * Tenta buscar dados do produto direto via endpoint .json do Shopify (sem ScrapingBee).
+     * Retorna array de resultado ou null se não for Shopify / endpoint não disponível.
+     */
+    private function tentarShopifyJsonDireto(string $url): ?array {
+        $baseProductUrl = preg_replace('#(\?|#).*$#', '', $url);
+        $shopifyJsonUrl = rtrim($baseProductUrl, '/') . '.json';
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $shopifyJsonUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+        $resp = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || empty($resp)) {
+            return null;
+        }
+
+        $decoded = json_decode($resp, true);
+        if (!is_array($decoded) || !isset($decoded['product'])) {
+            return null;
+        }
+
+        $product = $decoded['product'];
+        $variants = $product['variants'] ?? [];
+        $images = $product['images'] ?? [];
+
+        if (headers_sent() === false) {
+            header('X-Shopify-JSON-Direct: true');
+        }
+
+        // Verificar se a URL tem ?variant=ID
+        $selectedVariantId = null;
+        if (preg_match('/[?&]variant=(\d+)/', $url, $variantMatch)) {
+            $selectedVariantId = (int) $variantMatch[1];
+        }
+
+        // Encontrar a variante selecionada (ou usar a primeira)
+        $selectedVariant = null;
+        if ($selectedVariantId && !empty($variants)) {
+            foreach ($variants as $v) {
+                if ((int) ($v['id'] ?? 0) === $selectedVariantId) {
+                    $selectedVariant = $v;
+                    break;
+                }
+            }
+        }
+        // Fallback: primeira variante
+        if (!$selectedVariant && !empty($variants)) {
+            $selectedVariant = $variants[0];
+        }
+
+        if (!$selectedVariant) {
+            return null;
+        }
+
+        // Encontrar a imagem da variante
+        $variantImageUrl = null;
+        $variantImageId = (int) ($selectedVariant['image_id'] ?? 0);
+
+        if ($variantImageId > 0 && !empty($images)) {
+            foreach ($images as $img) {
+                if ((int) ($img['id'] ?? 0) === $variantImageId) {
+                    $variantImageUrl = str_replace('\\/', '/', (string) ($img['src'] ?? ''));
+                    break;
+                }
+            }
+        }
+        // Fallback: imagem que contém o variant_id no array variant_ids
+        if (!$variantImageUrl && $selectedVariantId && !empty($images)) {
+            foreach ($images as $img) {
+                if (isset($img['variant_ids']) && is_array($img['variant_ids']) && in_array($selectedVariantId, $img['variant_ids'])) {
+                    $variantImageUrl = str_replace('\\/', '/', (string) ($img['src'] ?? ''));
+                    break;
+                }
+            }
+        }
+        // Fallback: primeira imagem do produto
+        if (!$variantImageUrl && !empty($images)) {
+            $variantImageUrl = str_replace('\\/', '/', (string) ($images[0]['src'] ?? ''));
+        }
+
+        // Construir título com variação
+        $productTitle = (string) ($product['title'] ?? 'Produto');
+        $variantTitle = (string) ($selectedVariant['title'] ?? '');
+        $fullTitle = $productTitle . ($variantTitle ? ' - ' . $variantTitle : '');
+
+        $price = (float) ($selectedVariant['price'] ?? 0);
+        $sku = (string) ($selectedVariant['sku'] ?? '');
+        $weightKg = round(((int) ($selectedVariant['grams'] ?? 0)) / 1000, 2);
+
+        $descricao = strip_tags((string) ($product['body_html'] ?? ''));
+        if (trim($descricao) === '') {
+            $descricao = 'Produto importado: ' . $fullTitle;
+        }
+        // Limitar descrição a 500 chars
+        if (mb_strlen($descricao) > 500) {
+            $descricao = mb_substr($descricao, 0, 497) . '...';
+        }
+
+        if (headers_sent() === false) {
+            header('X-Shopify-Variant-ID: ' . ($selectedVariantId ?: 'first'));
+            header('X-Shopify-Price: ' . $price);
+            header('X-Shopify-Image: ' . ($variantImageUrl ? 'found' : 'none'));
+        }
+
+        return [
+            'success' => true,
+            'data' => [
+                'nome' => $fullTitle,
+                'descricao' => $descricao,
+                'valor' => $price,
+                'moeda' => 'USD',
+                'sku' => $sku,
+                'imagens' => $variantImageUrl ? [$variantImageUrl] : [],
+                'peso' => $weightKg,
+                'url_original' => $url,
+                'data_scraping' => date('Y-m-d H:i:s'),
+                'fonte' => 'shopify_json',
+                'variacoes' => [],
+            ]
+        ];
     }
     
     /**
