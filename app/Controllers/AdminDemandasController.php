@@ -258,6 +258,11 @@ class AdminDemandasController extends Controller {
             }
         }
 
+        // Notificar devs/admins por email sobre nova mensagem do solicitante
+        if ($msgId) {
+            $this->notificarMensagemChat($id, $nomeUsuario, $mensagem, 'solicitante_para_admin');
+        }
+
         $this->redirect('/admin/demandas/minha/' . $id . '#chat');
     }
 
@@ -489,6 +494,11 @@ class AdminDemandasController extends Controller {
                         ->execute([$id, $msgId, $uid, $nomeOriginal, $caminho, $tipo, $tamanho]);
                 }
             }
+        }
+
+        // Notificar solicitante por email sobre nova mensagem do admin/dev
+        if ($msgId) {
+            $this->notificarMensagemChat($id, $nomeUsuario, $mensagem, 'admin_para_solicitante');
         }
 
         $_SESSION['message'] = 'Mensagem enviada!';
@@ -951,6 +961,76 @@ class AdminDemandasController extends Controller {
         $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
         return false;
+    }
+
+    /**
+     * Notificar por email quando uma nova mensagem é enviada no chat da demanda
+     */
+    private function notificarMensagemChat(int $demandaId, string $remetente, string $mensagem, string $direcao): void {
+        try {
+            // Buscar dados da demanda
+            $st = $this->db->prepare("SELECT * FROM demandas WHERE id = ? LIMIT 1");
+            $st->execute([$demandaId]);
+            $demanda = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$demanda) return;
+
+            $titulo = $demanda['bloco1_titulo'] ?? $demanda['titulo'] ?? 'Demanda #' . $demandaId;
+            $preview = mb_substr($mensagem, 0, 200);
+            if ($preview === '') $preview = '(arquivo anexado)';
+
+            if ($direcao === 'admin_para_solicitante') {
+                // Admin/dev enviou mensagem → notificar o solicitante
+                $email = $this->getEmailSolicitante($demanda);
+                if (!$email) return;
+
+                $assunto = '💬 Nova mensagem na sua demanda: ' . $titulo;
+                $corpo = "Olá " . ($demanda['solicitante'] ?? $demanda['bloco1_solicitante'] ?? '') . ",\n\n";
+                $corpo .= "Você recebeu uma nova mensagem na sua demanda \"{$titulo}\".\n\n";
+                $corpo .= "De: {$remetente}\n";
+                $corpo .= "Mensagem: {$preview}\n\n";
+                $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/minha/{$demandaId}#chat\n\n";
+                $corpo .= "Atenciosamente,\nEquipe TI Braziliana";
+
+                $this->enviarEmailSimples($email, $assunto, $corpo);
+
+            } elseif ($direcao === 'solicitante_para_admin') {
+                // Solicitante enviou mensagem → notificar devs/admins configurados
+                $emails = $this->getConfig('demandas_emails_notificacao');
+                if ($emails === '') return;
+
+                $listaEmails = array_filter(array_map('trim', explode(',', $emails)));
+                $assunto = '💬 Nova mensagem do cliente na demanda: ' . $titulo;
+                $corpo = "Nova mensagem recebida na demanda \"{$titulo}\".\n\n";
+                $corpo .= "De: {$remetente}\n";
+                $corpo .= "Mensagem: {$preview}\n\n";
+                $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/detalhe/{$demandaId}#chat\n\n";
+                $corpo .= "Atenciosamente,\nSistema Braziliana";
+
+                foreach ($listaEmails as $email) {
+                    if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        try { $this->enviarEmailSimples($email, $assunto, $corpo); } catch (\Exception $e) {}
+                    }
+                }
+
+                // Também criar notificação push para admins configurados
+                $usuariosNotif = $this->getConfig('demandas_usuarios_notificacao');
+                if ($usuariosNotif !== '') {
+                    $this->ensureNotificacoesTable();
+                    $ids = array_filter(array_map('intval', explode(',', $usuariosNotif)));
+                    $link = '/admin/demandas/detalhe/' . $demandaId . '#chat';
+                    foreach ($ids as $uid) {
+                        if ($uid > 0) {
+                            try {
+                                $this->db->prepare("INSERT INTO admin_notificacoes (usuario_id, tipo, titulo, mensagem, link) VALUES (?,?,?,?,?)")
+                                    ->execute([$uid, 'demanda_mensagem', '💬 ' . $remetente . ' respondeu', $preview, $link]);
+                            } catch (\Exception $e) {}
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[DEMANDAS] Erro ao notificar mensagem chat: ' . $e->getMessage());
+        }
     }
 
     /**
