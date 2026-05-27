@@ -1813,7 +1813,7 @@ class AssessoriaController extends Controller {
      */
     private function processarLinkIndividual(string $url): array {
         // Atalho Shopify: se a URL contém /products/, tentar endpoint .json direto (sem gastar ScrapingBee)
-        if (preg_match('#/products/([^/?#]+)#', $url, $slugMatch)) {
+        if (preg_match('~/products/([^/?&#]+)~', $url, $slugMatch)) {
             $shopifyResult = $this->tentarShopifyJsonDireto($url);
             if ($shopifyResult !== null) {
                 return $shopifyResult;
@@ -2011,8 +2011,8 @@ class AssessoriaController extends Controller {
             // Fallback: resposta é HTML — tentar extrair dados estruturados (LD+JSON, meta tags)
             // Primeiro: se parece ser Shopify, tentar endpoint .json direto (sem ScrapingBee)
             $shopifyJsonData = null;
-            if (preg_match('#/products/([^/?#]+)#', $url, $slugMatch)) {
-                $baseProductUrl = preg_replace('#(\?|#).*$#', '', $url);
+            if (preg_match('~/products/([^/?&#]+)~', $url, $slugMatch)) {
+                $baseProductUrl = preg_replace('~[?#].*$~', '', $url);
                 $shopifyJsonUrl = rtrim($baseProductUrl, '/') . '.json';
                 $chShopify = curl_init();
                 curl_setopt_array($chShopify, [
@@ -2340,7 +2340,7 @@ class AssessoriaController extends Controller {
      * Retorna array de resultado ou null se não for Shopify / endpoint não disponível.
      */
     private function tentarShopifyJsonDireto(string $url): ?array {
-        $baseProductUrl = preg_replace('#(\?|#).*$#', '', $url);
+        $baseProductUrl = preg_replace('~[?#].*$~', '', $url);
         $shopifyJsonUrl = rtrim($baseProductUrl, '/') . '.json';
 
         $ch = curl_init();
