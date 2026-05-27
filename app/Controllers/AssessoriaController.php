@@ -2095,6 +2095,32 @@ class AssessoriaController extends Controller {
                         if (headers_sent() === false) {
                             header('X-ScrapingBee-Shopify-Variant-Found: ' . $selectedVariantId);
                         }
+
+                        // Retornar direto sem ChatGPT — já temos todos os dados confiáveis
+                        $variantPrice = (float) ($selectedVariant['price'] ?? 0);
+                        $variantSku = (string) ($selectedVariant['sku'] ?? '');
+                        $variantWeightKg = round(((int) ($selectedVariant['grams'] ?? 0)) / 1000, 2);
+                        $descricao = strip_tags((string) ($shopifyJsonData['description'] ?? ''));
+                        if (trim($descricao) === '') {
+                            $descricao = 'Produto importado: ' . $fullTitle;
+                        }
+
+                        return [
+                            'success' => true,
+                            'data' => [
+                                'nome' => $fullTitle,
+                                'descricao' => $descricao,
+                                'valor' => $variantPrice,
+                                'moeda' => 'USD',
+                                'sku' => $variantSku,
+                                'imagens' => $variantImageUrl ? [$variantImageUrl] : [],
+                                'peso' => $variantWeightKg,
+                                'url_original' => $url,
+                                'data_scraping' => date('Y-m-d H:i:s'),
+                                'fonte' => 'shopify_json',
+                                'variacoes' => [],
+                            ]
+                        ];
                     }
                 }
 
