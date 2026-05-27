@@ -3438,7 +3438,7 @@ class CheckoutController extends Controller {
                     $uncoveredTaxaServico = round(max(0.0, $taxaServicoBrl - $cobriuTaxaServico), 2);
 
                     $gatewayCharge = $uncoveredSubtotal + $uncoveredTaxaServico + $impostosBrl + $impostoLocalBrl;
-                    if ($gatewayCharge < 0.01) $gatewayCharge = 0.0;
+                    if ($gatewayCharge < 0.50) $gatewayCharge = 0.0;
 
                     // 5. Registrar split da carteira
                     $this->paymentService->registrarPedidoPagamentoSplit([
@@ -3453,7 +3453,7 @@ class CheckoutController extends Controller {
                     ]);
 
                     // 6. Cobrar gateway secundário (se gatewayCharge > 0)
-                    if ($gatewayCharge > 0.01) {
+                    if ($gatewayCharge > 0.50) {
                         $metodoSecundario = strtolower(trim((string) ($dados['forma_pagamento_secundaria'] ?? '')));
 
                         // Validação server-side: método secundário obrigatório
@@ -3567,7 +3567,7 @@ class CheckoutController extends Controller {
                     $gateway = 'carteira';
 
                     // Se há gateway charge pendente, o pedido NÃO está totalmente pago
-                    if ($gatewayCharge > 0.01) {
+                    if ($gatewayCharge > 0.50) {
                         $payResult['status'] = 'PENDING';
                         unset($payResult['paid_at']);
                     }
@@ -3577,7 +3577,7 @@ class CheckoutController extends Controller {
 
                     // Se carteira cobriu tudo e não há gateway charge, pedido está PAID
                     try {
-                        if ($gatewayCharge <= 0.01 && strtoupper((string) ($walletResult['status'] ?? '')) === 'PAID') {
+                        if ($gatewayCharge <= 0.50 && strtoupper((string) ($walletResult['status'] ?? '')) === 'PAID') {
                             $this->paymentService->creditarCashbackClubePorPedidoPago((int) $pedidoId);
                         }
                     } catch (\Exception $e) {
