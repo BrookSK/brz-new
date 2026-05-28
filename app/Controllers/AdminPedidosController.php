@@ -3252,15 +3252,16 @@ HTML;
             if (btn) { btn.click(); }
         }
         (function(){
-            var debounceTimer = null;
             var form = document.getElementById("pedidosFilterForm");
             var busca = document.getElementById("pedidosBuscaInput");
             var status = document.getElementById("pedidosStatusSelect");
             function submitFilter() { if (form) form.submit(); }
             if (busca) {
-                busca.addEventListener("input", function() {
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(submitFilter, 400);
+                busca.addEventListener("keydown", function(e) {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        submitFilter();
+                    }
                 });
             }
             if (status) {
