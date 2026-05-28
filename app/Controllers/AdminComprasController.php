@@ -1359,7 +1359,7 @@ class AdminComprasController extends Controller {
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
-                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada')))" : '')
+                . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','itens_comprados','itens_parcialmente_comprados')))" : '')
                 . $whereTipoCompra
                 // Excluir itens de pedidos de carnê (tela separada) - por tabela carnes E por forma_pagamento
                 . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL) AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'))" : '')
@@ -3138,7 +3138,7 @@ class AdminComprasController extends Controller {
             . ($temLojaIdEmProdutos ? ' LEFT JOIN produtos p_inner ON p_inner.id = lc.produto_id' : '')
             . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
             . "   WHERE lc.status = 'pendente'"
-            . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAtPdf ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada')))" : '')
+            . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAtPdf ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','itens_comprados','itens_parcialmente_comprados')))" : '')
             // Excluir itens de carnê do PDF
             . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (lc.pedido_id NOT IN (SELECT pedido_id FROM carnes WHERE pedido_id IS NOT NULL) AND LOWER(COALESCE(ped.forma_pagamento,'')) != 'carne_braziliana'))" : '')
             . ($this->columnExists('lista_compras', 'tipo_compra') ? " AND (lc.tipo_compra IS NULL OR lc.tipo_compra = '' OR lc.tipo_compra != 'carne')" : '')
