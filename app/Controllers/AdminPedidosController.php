@@ -2786,7 +2786,10 @@ JS;
                 
                 <form method="GET" class="row g-2 mb-4" id="pedidosFilterForm">
                     <div class="col-md-5">
-                        <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+                        </div>
                     </div>
                     <div class="col-md-4">
                         <select class="form-select" name="status" id="pedidosStatusSelect">
