@@ -1751,7 +1751,11 @@ class PedidoEcommerce {
             // Enriquecer itens com status de compra da lista_compras
             try {
                 $temListaCompras = $this->tableExists('lista_compras');
-                $temPedidoIdLista = $temListaCompras && $this->columnExists('lista_compras', 'pedido_id');
+                $temPedidoIdLista = false;
+                if ($temListaCompras) {
+                    $colsLista = $this->getTableColumns('lista_compras');
+                    $temPedidoIdLista = in_array('pedido_id', $colsLista, true);
+                }
                 if ($temPedidoIdLista && !empty($itens)) {
                     $stmtCompra = $this->connection->prepare(
                         "SELECT produto_id, status FROM lista_compras WHERE pedido_id = :pedido_id"
