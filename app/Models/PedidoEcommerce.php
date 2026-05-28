@@ -1747,6 +1747,41 @@ class PedidoEcommerce {
             }
 
             $pedido['items'] = $itens;
+
+            // Enriquecer itens com status de compra da lista_compras
+            try {
+                $temListaCompras = $this->tableExists('lista_compras');
+                $temPedidoIdLista = $temListaCompras && $this->columnExists('lista_compras', 'pedido_id');
+                if ($temPedidoIdLista && !empty($itens)) {
+                    $stmtCompra = $this->connection->prepare(
+                        "SELECT produto_id, status FROM lista_compras WHERE pedido_id = :pedido_id"
+                    );
+                    $stmtCompra->execute([':pedido_id' => $pedidoId]);
+                    $compraRows = $stmtCompra->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    // Mapear: produto_id => status (prioridade: comprado > pendente > cancelado)
+                    $compraMap = [];
+                    foreach ($compraRows as $cr) {
+                        $pid = (int) ($cr['produto_id'] ?? 0);
+                        $st = (string) ($cr['status'] ?? '');
+                        if ($pid <= 0) continue;
+                        if (!isset($compraMap[$pid]) || $st === 'comprado') {
+                            $compraMap[$pid] = $st;
+                        }
+                    }
+
+                    // Atribuir compra_status a cada item
+                    foreach ($pedido['items'] as &$it) {
+                        $pid = (int) ($it['produto_id'] ?? 0);
+                        if ($pid > 0 && isset($compraMap[$pid])) {
+                            $it['compra_status'] = $compraMap[$pid];
+                        }
+                    }
+                    unset($it);
+                }
+            } catch (\Exception $e) {
+                // Silenciar — não impede exibição do pedido
+            }
         } catch (\Exception $e) {
             $pedido['items'] = [];
         }

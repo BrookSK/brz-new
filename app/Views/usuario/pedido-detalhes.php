@@ -24,6 +24,7 @@ function getStatusText($status) {
         'pago'                           => 'order_status.paid',
         'produto_consolidado'            => 'order_status.product_consolidated',
         'itens_comprados'                => 'order_status.items_purchased',
+        'itens_parcialmente_comprados'   => 'order_status.items_partially_purchased',
         'etiqueta_gerada'                => 'order_status.label_generated',
         'enviado'                        => 'order_status.label_generated',
         'em_transporte'                  => 'order_status.in_transit',
@@ -248,6 +249,18 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                             <?php if (!empty($item['variacao_descricao'])): ?>
                                                 <div class="small text-muted"><?= htmlspecialchars((string) $item['variacao_descricao'], ENT_QUOTES, 'UTF-8') ?></div>
                                             <?php endif; ?>
+                                            <?php
+                                            // Mostrar status de compra do item (se pedido está em compra parcial/total)
+                                            $statusPedido = strtolower(trim((string) ($pedido['status'] ?? '')));
+                                            if (in_array($statusPedido, ['itens_parcialmente_comprados', 'itens_comprados'])) {
+                                                $itemCompraStatus = $item['compra_status'] ?? null;
+                                                if ($itemCompraStatus === 'comprado') {
+                                                    echo '<span class="badge bg-success mt-1"><i class="fas fa-check me-1"></i>' . __('order_item.purchased', 'Comprado') . '</span>';
+                                                } elseif ($itemCompraStatus === 'pendente') {
+                                                    echo '<span class="badge bg-warning text-dark mt-1"><i class="fas fa-clock me-1"></i>' . __('order_item.pending_purchase', 'Aguardando compra') . '</span>';
+                                                }
+                                            }
+                                            ?>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="quantity-badge"><?= $item['quantidade'] ?? 1 ?></span>

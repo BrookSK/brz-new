@@ -2826,13 +2826,11 @@ class AdminComprasController extends Controller {
     }
 
     /**
-     * Verifica pedidos cujos itens na lista de compras foram todos marcados como 'comprado'
-     * e atualiza o status do pedido para 'itens_comprados'.
+     * Verifica pedidos cujos itens na lista de compras foram marcados como 'comprado'
+     * e atualiza o status do pedido:
+     * - Se TODOS os itens foram comprados → 'itens_comprados'
+     * - Se ALGUNS itens foram comprados (mas ainda há pendentes) → 'itens_parcialmente_comprados'
      * Prioriza pedidos mais antigos (ORDER BY pedido_id ASC / created_at ASC).
-     *
-     * Lógica: para cada pedido vinculado na lista_compras, se NÃO existir nenhum item
-     * com status 'pendente' para aquele pedido, então todos foram comprados → muda status.
-     * Só altera pedidos que estejam em status 'pago' (ainda não avançaram no fluxo).
      */
     private function atualizarStatusPedidosComprados(): void {
         try {
@@ -2841,8 +2839,6 @@ class AdminComprasController extends Controller {
                 return;
             }
 
-            // Buscar pedidos distintos que têm pelo menos um item 'comprado' na lista
-            // e que ainda estão com status 'pago' (elegíveis para avançar)
             $colsPedidos = [];
             try {
                 $stmtCols = $this->connection->query('DESCRIBE pedidos');
@@ -2855,16 +2851,15 @@ class AdminComprasController extends Controller {
                 return;
             }
 
-            // Pedidos com status 'pago' que possuem itens na lista de compras marcados como 'comprado'
-            // ordenados do mais antigo para o mais novo
             $orderCol = in_array('created_at', $colsPedidos, true) ? 'p.created_at' : 'p.id';
 
+            // Buscar pedidos com status 'pago' ou 'itens_parcialmente_comprados' que têm itens comprados
             $sql = "SELECT DISTINCT lc.pedido_id
                     FROM lista_compras lc
                     INNER JOIN pedidos p ON p.id = lc.pedido_id
                     WHERE lc.pedido_id IS NOT NULL
                       AND lc.pedido_id > 0
-                      AND p.status = 'pago'
+                      AND p.status IN ('pago', 'itens_parcialmente_comprados')
                       AND lc.status = 'comprado'
                     ORDER BY {$orderCol} ASC";
 
@@ -2876,26 +2871,40 @@ class AdminComprasController extends Controller {
                 return;
             }
 
-            // Para cada pedido candidato, verificar se ainda tem itens pendentes
-            $stmtCheck = $this->connection->prepare(
+            $stmtCheckPendentes = $this->connection->prepare(
                 "SELECT COUNT(*) FROM lista_compras
                  WHERE pedido_id = :pedido_id AND status = 'pendente'"
             );
 
-            $stmtUpdate = $this->connection->prepare(
-                "UPDATE pedidos SET status = 'itens_comprados' WHERE id = :pedido_id AND status = 'pago' LIMIT 1"
+            $stmtCheckComprados = $this->connection->prepare(
+                "SELECT COUNT(*) FROM lista_compras
+                 WHERE pedido_id = :pedido_id AND status = 'comprado'"
+            );
+
+            $stmtUpdateTotal = $this->connection->prepare(
+                "UPDATE pedidos SET status = 'itens_comprados' WHERE id = :pedido_id AND status IN ('pago', 'itens_parcialmente_comprados') LIMIT 1"
+            );
+
+            $stmtUpdateParcial = $this->connection->prepare(
+                "UPDATE pedidos SET status = 'itens_parcialmente_comprados' WHERE id = :pedido_id AND status = 'pago' LIMIT 1"
             );
 
             foreach ($pedidoIds as $pedidoId) {
                 $pedidoId = (int) $pedidoId;
                 if ($pedidoId <= 0) continue;
 
-                $stmtCheck->execute([':pedido_id' => $pedidoId]);
-                $pendentes = (int) $stmtCheck->fetchColumn();
+                $stmtCheckPendentes->execute([':pedido_id' => $pedidoId]);
+                $pendentes = (int) $stmtCheckPendentes->fetchColumn();
 
-                if ($pendentes === 0) {
-                    // Todos os itens deste pedido foram comprados → atualizar status
-                    $stmtUpdate->execute([':pedido_id' => $pedidoId]);
+                $stmtCheckComprados->execute([':pedido_id' => $pedidoId]);
+                $comprados = (int) $stmtCheckComprados->fetchColumn();
+
+                if ($pendentes === 0 && $comprados > 0) {
+                    // Todos os itens comprados → status final
+                    $stmtUpdateTotal->execute([':pedido_id' => $pedidoId]);
+                } elseif ($pendentes > 0 && $comprados > 0) {
+                    // Parcialmente comprado → status intermediário
+                    $stmtUpdateParcial->execute([':pedido_id' => $pedidoId]);
                 }
             }
         } catch (\Exception $e) {

@@ -2268,6 +2268,14 @@ JS;
             if ($fpFiltro === 'carne' && in_array('forma_pagamento', $colsPedidos, true)) {
                 $sql .= " AND (LOWER(p.forma_pagamento) = 'carne_braziliana' OR LOWER(p.status) IN ('carne_pagando','carne_aguardando'))";
             }
+            // Filtro Parcialmente Comprado
+            if ($fpFiltro === 'parcial') {
+                $sql .= " AND LOWER(p.status) = 'itens_parcialmente_comprados'";
+            }
+            // Filtro Totalmente Comprado
+            if ($fpFiltro === 'comprado') {
+                $sql .= " AND LOWER(p.status) = 'itens_comprados'";
+            }
             
             if (!empty($busca)) {
                 $buscaRaw = trim((string) $busca);
@@ -2792,20 +2800,25 @@ JS;
                 <!-- Abas de Pedidos por Moeda -->
                 <div class="mb-3">';
                     $isCarneFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'carne');
+                    $isParcialFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'parcial');
+                    $isCompradoFiltro = (strtolower(trim((string) ($request->getParam('fp', '') ?? ''))) === 'comprado');
+                    $isSpecialFilter = ($isCarneFiltro || $isParcialFiltro || $isCompradoFiltro);
                     echo '<!-- Mobile: Dropdown -->
                     <div class="d-md-none mb-2">
                         <select class="form-select" onchange="handlePedidosTabMobile(this.value)" id="pedidosTabMobile">
-                            <option value="todos" ' . ($isCarneFiltro ? '' : 'selected') . '>Todos os Pedidos</option>
+                            <option value="todos" ' . (!$isSpecialFilter ? 'selected' : '') . '>Todos os Pedidos</option>
                             <option value="dolar">Dólar</option>
                             <option value="real">Reais</option>
                             <option value="carne" ' . ($isCarneFiltro ? 'selected' : '') . '>Carnê</option>
+                            <option value="parcial" ' . ($isParcialFiltro ? 'selected' : '') . '>Parcialmente Comprado</option>
+                            <option value="comprado" ' . ($isCompradoFiltro ? 'selected' : '') . '>Comprado</option>
                         </select>
                     </div>
                     <!-- Desktop: Pills -->
                     <ul class="nav nav-pills d-none d-md-flex" id="pedidosTabs" role="tablist">';
                     echo '
                         <li class="nav-item" role="presentation">';
-                    if ($isCarneFiltro) {
+                    if ($isSpecialFilter) {
                         echo '<a class="nav-link" href="/admin/pedidos">Todos os Pedidos</a>';
                     } else {
                         echo '<button class="nav-link active" id="pedidos-todos-tab" data-bs-toggle="pill" data-bs-target="#pedidos-todos" type="button">Todos os Pedidos</button>';
@@ -2819,6 +2832,12 @@ JS;
                         </li>
                         <li class="nav-item" role="presentation">
                             <a class="nav-link ' . ($isCarneFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=carne">Carnê</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link ' . ($isParcialFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=parcial" style="' . ($isParcialFiltro ? '' : 'color:#fd7e14;') . '">Parcial</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link ' . ($isCompradoFiltro ? 'active' : '') . '" href="/admin/pedidos?fp=comprado">Comprado</a>
                         </li>
                     </ul>';
                     echo '
@@ -2877,7 +2896,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->isCarnePedido($pedido) ? 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;' : '') . '">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
                             <div class="card-body">
                                 <div class="row align-items-center gy-3">
                                     <div class="col-6 col-lg-2">
@@ -2998,7 +3017,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->isCarnePedido($pedido) ? 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;' : '') . '">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
                             <div class="card-body">
                                 <div class="row align-items-center gy-3">
                                     <div class="col-6 col-lg-2">
@@ -3118,7 +3137,7 @@ JS;
                     $origemTxt = $isManualBool ? 'Manual' : 'Orgânica';
 
                     echo '<div class="col-12 mb-3">
-                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->isCarnePedido($pedido) ? 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;' : '') . '">
+                        <div class="card order-card' . ($needsReview ? ' needs-review border border-warning' : '') . '" style="' . ($this->getCardStyle($pedido)) . '">
                             <div class="card-body">
                                 <div class="row align-items-center gy-3">
                                     <div class="col-6 col-lg-2">
@@ -3225,7 +3244,9 @@ HTML;
     <script>
         function handlePedidosTabMobile(val) {
             if (val === "carne") { window.location.href = "/admin/pedidos?fp=carne"; return; }
-            if (val === "todos" && window.location.search.indexOf("fp=carne") !== -1) { window.location.href = "/admin/pedidos"; return; }
+            if (val === "parcial") { window.location.href = "/admin/pedidos?fp=parcial"; return; }
+            if (val === "comprado") { window.location.href = "/admin/pedidos?fp=comprado"; return; }
+            if (val === "todos" && (window.location.search.indexOf("fp=") !== -1)) { window.location.href = "/admin/pedidos"; return; }
             var tabMap = {todos:"pedidos-todos-tab", dolar:"pedidos-dolar-tab", real:"pedidos-real-tab"};
             var btn = document.getElementById(tabMap[val]);
             if (btn) { btn.click(); }
@@ -3510,6 +3531,8 @@ HTML;
         echo '<style>
         .status-pendente { background-color: #ffc107; }
         .status-pago { background-color: #28a745; }
+        .status-itens_parcialmente_comprados { background-color: #fd7e14; }
+        .status-itens_comprados { background-color: #17a2b8; }
         .status-carne_pagando { background-color: #6f42c1; }
         .status-carne_aguardando { background-color: #6f42c1; }
         .status-processando { background-color: #0d6efd; }
@@ -4022,6 +4045,17 @@ HTML;
                                             $isValorInformadoCliente = !empty($item['valor_informado_cliente']);
                                             if ($isValorInformadoCliente) {
                                                 $nomeHtml .= ' <span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>Valor informado pelo cliente</span>';
+                                            }
+
+                                            // Badge de status de compra (lista de compras)
+                                            $itemCompraStatus = $item['compra_status'] ?? null;
+                                            if ($itemCompraStatus === 'comprado') {
+                                                $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-check me-1"></i>Comprado</span>';
+                                            } elseif ($itemCompraStatus === 'pendente') {
+                                                $statusPedidoAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
+                                                if (in_array($statusPedidoAtual, ['itens_parcialmente_comprados', 'pago'])) {
+                                                    $nomeHtml .= ' <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Aguardando compra</span>';
+                                                }
                                             }
 
                                             $extraHtml = '';
@@ -5829,6 +5863,20 @@ LINKSCRIPT;
         return ($fp === 'carne_braziliana' || in_array($st, ['carne_pagando', 'carne_aguardando'], true));
     }
 
+    private function getCardStyle(array $pedido): string {
+        $st = strtolower(trim((string) ($pedido['status'] ?? '')));
+        if ($this->isCarnePedido($pedido)) {
+            return 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;';
+        }
+        if ($st === 'itens_parcialmente_comprados') {
+            return 'background: rgba(253, 126, 20, 0.06); border-left: 4px solid #fd7e14;';
+        }
+        if ($st === 'itens_comprados') {
+            return 'background: rgba(16, 185, 129, 0.06); border-left: 4px solid #10b981;';
+        }
+        return '';
+    }
+
     private function getStatusColor($status, ?array $pedido = null) {
         // Carnê com pagamento parcial → azul
         if ($pedido !== null) {
@@ -5847,6 +5895,7 @@ LINKSCRIPT;
             'carne_aguardando'              => 'info',
             'produto_consolidado'            => 'dark',
             'itens_comprados'                => 'info',
+            'itens_parcialmente_comprados'   => 'warning',
             'etiqueta_gerada'                => 'primary',
             'em_transporte'                  => 'info',
             'aguardando_liberacao_aduaneira' => 'secondary',
@@ -5872,6 +5921,7 @@ LINKSCRIPT;
             'pendente'                       => 'Pendente',
             'processando'                    => 'Processando',
             'pago'                           => 'Pago',
+            'itens_parcialmente_comprados'   => 'Parcialmente Comprado',
             'itens_comprados'                => 'Produto Comprado',
             'carne_pagando'                  => 'Carnê em Pagamento',
             'carne_aguardando'               => 'Carnê Aguardando',
