@@ -156,6 +156,40 @@ function calcularSimilaridadeTexto (a, b) {
   return uniao === 0 ? 0 : intersecao / uniao
 }
 
+// ============================================================
+// JOB 6: Processar Carnê (a cada 5 minutos)
+// Verifica parcelas vencidas, cancela carnês expirados, aplica juros
+// ============================================================
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const axios = require('axios')
+    const baseUrl = process.env.BRAZILIANA_BASE_URL || 'https://brazilianashop.com.br'
+    let cronSecret = ''
+    try {
+      const rows = await db.query("SELECT valor FROM configuracoes_sistema WHERE chave = 'cron_secret' LIMIT 1")
+      if (rows && rows.length > 0 && rows[0].valor) {
+        cronSecret = rows[0].valor
+      }
+    } catch (e) {}
+
+    const url = `${baseUrl}/cron/carne/processar${cronSecret ? '?token=' + cronSecret : ''}`
+    const res = await axios.get(url, { timeout: 120000 })
+    const data = res.data
+
+    if (data && data.success && data.resultados) {
+      const r = data.resultados
+      const total = (r.cancelados || 0) + (r.quitados || 0) + (r.notificadas || 0) + (r.vencidas || 0)
+      if (total > 0) {
+        console.log(`[Cron] Carnê: ${r.cancelados || 0} cancelados, ${r.quitados || 0} quitados, ${r.notificadas || 0} notificadas, ${r.vencidas || 0} vencidas`)
+      }
+    } else if (data && !data.success) {
+      console.error('[Cron] Carnê erro:', data.error || 'unknown')
+    }
+  } catch (err) {
+    console.error('[Cron] Erro no processamento de carnê:', err.message)
+  }
+})
+
 // Manter processo vivo
 process.on('SIGINT', () => {
   console.log('[Cron] Encerrando...')
