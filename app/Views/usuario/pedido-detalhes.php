@@ -298,13 +298,11 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                             <?php
                                             $pu = (float) ($item['preco_unitario'] ?? 0);
                                             ?>
-                                            ?>
                                             <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($pu, 2, ',', '.') ?></span>
                                         </div>
                                         <div class="text-end">
                                             <?php
                                             $st = (float) ($item['subtotal'] ?? 0);
-                                            ?>
                                             ?>
                                             <small class="text-muted"><?= __('checkout.subtotal', 'Subtotal') ?>: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
                                         </div>
@@ -385,7 +383,6 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <span><?= __('checkout.subtotal', 'Subtotal') ?>:</span>
                                         <?php
                                         $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
-                                        ?>
                                         ?>
                                         <span><?= $simboloMoeda ?> <?= number_format($sub, 2, ',', '.') ?></span>
                                     </div>
