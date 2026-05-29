@@ -210,7 +210,21 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                             $moedaPedido = strtoupper((string) ($pedido['moeda'] ?? 'BRL'));
                             if ($moedaPedido === '') $moedaPedido = 'BRL';
                             $simboloMoeda = ($moedaPedido === 'BRL') ? 'R$' : 'US$';
+                            // Taxa de conversão para converter itens USD→BRL quando pedido é BRL
+                            $taxaConvView = (float) ($pedido['taxa_conversao'] ?? 0);
+                            if ($taxaConvView <= 1.01) $taxaConvView = 5.85;
+                            // Detectar se é carnê (itens podem estar em USD mesmo com pedido BRL)
+                            $isCarnePedido = (strtolower(trim((string) ($pedido['forma_pagamento'] ?? ''))) === 'carne_braziliana'
+                                || in_array(strtolower(trim((string) ($pedido['status'] ?? ''))), ['carne_pagando', 'carne_aguardando'], true));
+                            $itensConvertidos = !empty($pedido['__converted_items_to_brl']);
                             ?>
+                            <?php if ($isCarnePedido): ?>
+                                <div class="alert alert-info small mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong><?= __('order_detail.carne_full_price_title', 'Carnê Braziliana — Valor original') ?>:</strong>
+                                    <?= __('order_detail.carne_full_price_msg', 'Os produtos neste pedido foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.') ?>
+                                </div>
+                            <?php endif; ?>
                             <?php if (!empty($pedido['items'])): ?>
                                 <?php foreach ($pedido['items'] as $item): ?>
                                     <div class="product-item">
@@ -267,12 +281,19 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                             <span class="text-muted">x</span>
                                             <?php
                                             $pu = (float) ($item['preco_unitario'] ?? 0);
+                                            // Se pedido é BRL e itens não foram convertidos, converter USD→BRL
+                                            if ($moedaPedido === 'BRL' && !$itensConvertidos && $pu > 0 && $pu < 500 && $taxaConvView > 1.01) {
+                                                $pu = round($pu * $taxaConvView, 2);
+                                            }
                                             ?>
                                             <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($pu, 2, ',', '.') ?></span>
                                         </div>
                                         <div class="text-end">
                                             <?php
                                             $st = (float) ($item['subtotal'] ?? 0);
+                                            if ($moedaPedido === 'BRL' && !$itensConvertidos && $st > 0 && $st < 5000 && $taxaConvView > 1.01) {
+                                                $st = round($st * $taxaConvView, 2);
+                                            }
                                             ?>
                                             <small class="text-muted"><?= __('checkout.subtotal', 'Subtotal') ?>: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
                                         </div>
@@ -353,6 +374,9 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <span><?= __('checkout.subtotal', 'Subtotal') ?>:</span>
                                         <?php
                                         $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
+                                        if ($moedaPedido === 'BRL' && !$itensConvertidos && $sub > 0 && $sub < 5000 && $taxaConvView > 1.01) {
+                                            $sub = round($sub * $taxaConvView, 2);
+                                        }
                                         ?>
                                         <span><?= $simboloMoeda ?> <?= number_format($sub, 2, ',', '.') ?></span>
                                     </div>
