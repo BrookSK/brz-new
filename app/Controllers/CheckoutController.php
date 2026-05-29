@@ -3754,9 +3754,17 @@ class CheckoutController extends Controller {
 
                                     // Se o preço original é maior que o promocional, usar o original
                                     if ($subtotalOriginal > $subtotalPromo + 0.01) {
-                                        $subUsd = $subtotalOriginal;
+                                        // Verificar moeda do pedido para saber se precisa converter
+                                        $moedaPedidoCheck = strtoupper(trim((string) ($pedSep['moeda'] ?? ($pedSep['currency'] ?? 'USD'))));
+                                        if ($moedaPedidoCheck === '' || $moedaPedidoCheck === 'BRL') {
+                                            // Pedido está em BRL — converter preço USD para BRL
+                                            $subUsd = round($subtotalOriginal * $taxaConv, 2);
+                                        } else {
+                                            // Pedido está em USD — usar direto
+                                            $subUsd = $subtotalOriginal;
+                                        }
                                         $carneUsouPrecoOriginal = true;
-                                        error_log("[CARNE] Preço original usado: subtotalOriginal={$subtotalOriginal} vs subtotalPromo={$subtotalPromo}");
+                                        error_log("[CARNE] Preço original usado: subtotalOriginal={$subtotalOriginal} (USD) moedaPedido={$moedaPedidoCheck} subUsd(ajustado)={$subUsd}");
 
                                         // Atualizar o subtotal do pedido para refletir o preço cheio
                                         try {
