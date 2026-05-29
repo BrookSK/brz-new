@@ -85,20 +85,35 @@
             <?php if (!empty($itensPedido)): ?>
             <?php
             // Detectar se os preços dos itens estão em USD (precisam converter para BRL)
-            // O carnê é sempre em BRL, mas os itens podem estar salvos em USD
+            // Só converter se a soma dos itens é muito menor que o total_produtos do carnê (fator > 2x)
             $taxaConvCarne = (float) ($pedido['taxa_conversao'] ?? 0);
             if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
             $itensJaConvertidos = !empty($pedido['__converted_items_to_brl']);
             $moedaPedidoCarne = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
-            $precisaConverter = ($moedaPedidoCarne === 'BRL' && !$itensJaConvertidos && $taxaConvCarne > 1.01);
+            $precisaConverter = false;
+            $mostrarAvisoCarneDet = false;
+
+            if ($moedaPedidoCarne === 'BRL' && !$itensJaConvertidos && $taxaConvCarne > 1.01) {
+                $somaItensRawCarne = 0;
+                foreach ($itensPedido as $itChk) {
+                    $somaItensRawCarne += (float) ($itChk['subtotal'] ?? ((float)($itChk['preco_unitario'] ?? 0) * (int)($itChk['quantidade'] ?? 1)));
+                }
+                $totalProdutosCarne = (float) ($carne['total_produtos'] ?? 0);
+                if ($somaItensRawCarne > 0 && $totalProdutosCarne > 0 && ($totalProdutosCarne / $somaItensRawCarne) > 2) {
+                    $precisaConverter = true;
+                    $mostrarAvisoCarneDet = true;
+                }
+            }
             ?>
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0"><i class="fas fa-box-open me-2"></i>Produtos do Pedido</h6></div>
                 <div class="card-body p-0">
+                    <?php if ($mostrarAvisoCarneDet): ?>
                     <div class="alert alert-info small m-3 mb-0">
                         <i class="fas fa-info-circle me-1"></i>
                         <strong>Carnê Braziliana:</strong> Os produtos foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.
                     </div>
+                    <?php endif; ?>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">

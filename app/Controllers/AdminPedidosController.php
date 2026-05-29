@@ -3962,14 +3962,53 @@ HTML;
             if ($taxaConvPedido <= 0) $taxaConvPedido = 1;
             $exibirEmBrl = ($moedaPedido === 'BRL');
 
+            // Detectar se é carnê e se os itens precisam de conversão USD→BRL
+            $isCarnePedidoAdmin = (strtolower(trim((string) ($pedido['forma_pagamento'] ?? ''))) === 'carne_braziliana'
+                || in_array(strtolower(trim((string) ($pedido['status'] ?? ''))), ['carne_pagando', 'carne_aguardando'], true));
+            $itensConvertidosAdmin = !empty($pedido['__converted_items_to_brl']);
+            $precisaConverterAdmin = false;
+
+            // Só converter se é carnê BRL E os itens parecem estar em USD (subtotal itens << total pedido)
+            if ($exibirEmBrl && !$itensConvertidosAdmin && $isCarnePedidoAdmin && $taxaConvPedido > 1.01) {
+                $somaItensRaw = 0;
+                if (!empty($itens)) {
+                    foreach ($itens as $itCheck) {
+                        $somaItensRaw += (float) ($itCheck['subtotal'] ?? 0);
+                    }
+                }
+                $subtotalPedido = (float) ($pedido['subtotal'] ?? 0);
+                // Se a soma dos itens é muito menor que o subtotal do pedido (fator > 2x), itens estão em USD
+                if ($somaItensRaw > 0 && $subtotalPedido > 0 && ($subtotalPedido / $somaItensRaw) > 2) {
+                    $precisaConverterAdmin = true;
+                }
+            }
+
+            // Buscar taxa se precisa converter mas não veio no pedido
+            if ($precisaConverterAdmin && $taxaConvPedido <= 1.01) {
+                try {
+                    $pdoTx = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    $stTx = $pdoTx->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                    $stTx->execute();
+                    $txVal = (float) ($stTx->fetchColumn() ?: 0);
+                    if ($txVal > 1.01) $taxaConvPedido = $txVal;
+                } catch (\Exception $e) {}
+                $precisaConverterAdmin = ($taxaConvPedido > 1.01);
+            }
+
+            // Aviso de preço cheio: só mostrar se é carnê E os itens precisam de conversão (carnê novo com preço cheio)
+            $mostrarAvisoCarnePrecoCheio = ($isCarnePedidoAdmin && $precisaConverterAdmin);
+
             echo '<div class="row">
                     <div class="col-md-12">
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Itens do Pedido</h5>
                             </div>
-                            <div class="card-body">
-                                <div class="table-responsive">
+                            <div class="card-body">';
+            if ($mostrarAvisoCarnePrecoCheio) {
+                echo '<div class="alert alert-info small mb-3"><i class="fas fa-info-circle me-1"></i><strong>Carnê Braziliana:</strong> Os produtos foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.</div>';
+            }
+            echo '              <div class="table-responsive">
                                     <table class="table table-sm table-bordered">
                                         <thead>
                                             <tr>
@@ -4161,12 +4200,12 @@ HTML;
                                             echo '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . ($isFreeOfferItem
-                                                    ? '<span class="text-decoration-line-through text-muted">' . ($exibirEmBrl ? 'R$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, '.', ',')) . '</span>'
-                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ','))
+                                                    ? '<span class="text-decoration-line-through text-muted">' . ($exibirEmBrl ? 'R$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0) * ($precisaConverterAdmin ? $taxaConvPedido : 1), 2, ',', '.') : 'US$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, '.', ',')) . '</span>'
+                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['preco_unitario'] ?? 0) * ($precisaConverterAdmin ? $taxaConvPedido : 1), 2, ',', '.') : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . ($isFreeOfferItem
                                                     ? '<span class="badge bg-success">GRÁTIS</span>'
-                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
+                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0) * ($precisaConverterAdmin ? $taxaConvPedido : 1), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
                                                 <td>' . $acoesHtml . '</td>
@@ -4633,10 +4672,11 @@ HTML;
                                             ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
                                             <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>';
 
-            // Função helper: só troca o símbolo, sem converter valores
-            $fmtPedido = function(float $valor) use ($exibirEmBrl) {
+            // Função helper: formata valor e converte USD→BRL se necessário (carnê com itens em USD)
+            $fmtPedido = function(float $valor) use ($exibirEmBrl, $precisaConverterAdmin, $taxaConvPedido) {
                 if ($exibirEmBrl) {
-                    return 'R$ ' . number_format($valor, 2, ',', '.');
+                    $valorFinal = $precisaConverterAdmin ? round($valor * $taxaConvPedido, 2) : $valor;
+                    return 'R$ ' . number_format($valorFinal, 2, ',', '.');
                 }
                 return $this->formatarMoeda($valor, 'USD');
             };

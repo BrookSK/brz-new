@@ -217,8 +217,22 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                             $isCarnePedido = (strtolower(trim((string) ($pedido['forma_pagamento'] ?? ''))) === 'carne_braziliana'
                                 || in_array(strtolower(trim((string) ($pedido['status'] ?? ''))), ['carne_pagando', 'carne_aguardando'], true));
                             $itensConvertidos = !empty($pedido['__converted_items_to_brl']);
+
+                            // Só converter se é carnê BRL E os itens parecem estar em USD
+                            $precisaConverterView = false;
+                            if ($moedaPedido === 'BRL' && !$itensConvertidos && $isCarnePedido && $taxaConvView > 1.01 && !empty($pedido['items'])) {
+                                $somaItensCheck = 0;
+                                foreach ($pedido['items'] as $itChk) {
+                                    $somaItensCheck += (float) ($itChk['subtotal'] ?? 0);
+                                }
+                                $subtotalPedCheck = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
+                                if ($somaItensCheck > 0 && $subtotalPedCheck > 0 && ($subtotalPedCheck / $somaItensCheck) > 2) {
+                                    $precisaConverterView = true;
+                                }
+                            }
+                            $mostrarAvisoCarne = ($isCarnePedido && $precisaConverterView);
                             ?>
-                            <?php if ($isCarnePedido): ?>
+                            <?php if ($mostrarAvisoCarne): ?>
                                 <div class="alert alert-info small mb-3">
                                     <i class="fas fa-info-circle me-1"></i>
                                     <strong><?= __('order_detail.carne_full_price_title', 'Carnê Braziliana — Valor original') ?>:</strong>
@@ -282,7 +296,7 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                             <?php
                                             $pu = (float) ($item['preco_unitario'] ?? 0);
                                             // Se pedido é BRL e itens não foram convertidos, converter USD→BRL
-                                            if ($moedaPedido === 'BRL' && !$itensConvertidos && $pu > 0 && $pu < 500 && $taxaConvView > 1.01) {
+                                            if ($precisaConverterView && $pu > 0 && $pu < 500) {
                                                 $pu = round($pu * $taxaConvView, 2);
                                             }
                                             ?>
@@ -291,7 +305,7 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <div class="text-end">
                                             <?php
                                             $st = (float) ($item['subtotal'] ?? 0);
-                                            if ($moedaPedido === 'BRL' && !$itensConvertidos && $st > 0 && $st < 5000 && $taxaConvView > 1.01) {
+                                            if ($precisaConverterView && $st > 0 && $st < 5000) {
                                                 $st = round($st * $taxaConvView, 2);
                                             }
                                             ?>
@@ -374,7 +388,7 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <span><?= __('checkout.subtotal', 'Subtotal') ?>:</span>
                                         <?php
                                         $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
-                                        if ($moedaPedido === 'BRL' && !$itensConvertidos && $sub > 0 && $sub < 5000 && $taxaConvView > 1.01) {
+                                        if ($precisaConverterView && $sub > 0 && $sub < 5000) {
                                             $sub = round($sub * $taxaConvView, 2);
                                         }
                                         ?>
