@@ -3777,13 +3777,29 @@ class CheckoutController extends Controller {
                                         } catch (\Exception $e) {}
 
                                         // Atualizar subtotal do pedido para o valor cheio em BRL
-                                        // (necessário para que o model PedidoEcommerce converta os itens corretamente)
                                         try {
                                             $colSubtotal = in_array('subtotal', $colsPedSep, true) ? 'subtotal' : (in_array('subtotal_produtos', $colsPedSep, true) ? 'subtotal_produtos' : null);
                                             if ($colSubtotal) {
                                                 $dbCarneSep->prepare("UPDATE pedidos SET {$colSubtotal} = ? WHERE id = ?")->execute([$subUsd, (int) $pedidoId]);
                                             }
                                         } catch (\Exception $e) {}
+
+                                        // Atualizar preco_unitario dos itens para o preço cheio (USD)
+                                        try {
+                                            foreach ($itensDoCarneRaw as $itCarne) {
+                                                $pidCarne = (int) ($itCarne['produto_id'] ?? 0);
+                                                if ($pidCarne <= 0) continue;
+                                                $stPreco2 = $dbCarneSep->prepare("SELECT price FROM produtos WHERE id = ? LIMIT 1");
+                                                $stPreco2->execute([$pidCarne]);
+                                                $precoDb2 = (float) ($stPreco2->fetchColumn() ?: 0);
+                                                if ($precoDb2 > 0 && $precoDb2 > (float) ($itCarne['preco_unitario'] ?? 0) + 0.01) {
+                                                    $dbCarneSep->prepare("UPDATE {$itensTable} SET preco_unitario = ?, subtotal = ? * quantidade WHERE pedido_id = ? AND produto_id = ?")
+                                                        ->execute([$precoDb2, $precoDb2, (int) $pedidoId, $pidCarne]);
+                                                }
+                                            }
+                                        } catch (\Exception $e) {
+                                            error_log('[CARNE] Erro ao atualizar preços dos itens: ' . $e->getMessage());
+                                        }
 
                                         // Atualizar o subtotal do pedido para refletir o preço cheio
                                     }
