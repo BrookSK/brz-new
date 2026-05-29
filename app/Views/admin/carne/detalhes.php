@@ -83,9 +83,22 @@
 
             <!-- Produtos do Pedido -->
             <?php if (!empty($itensPedido)): ?>
+            <?php
+            // Detectar se os preços dos itens estão em USD (precisam converter para BRL)
+            // O carnê é sempre em BRL, mas os itens podem estar salvos em USD
+            $taxaConvCarne = (float) ($pedido['taxa_conversao'] ?? 0);
+            if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
+            $itensJaConvertidos = !empty($pedido['__converted_items_to_brl']);
+            $moedaPedidoCarne = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
+            $precisaConverter = ($moedaPedidoCarne === 'BRL' && !$itensJaConvertidos && $taxaConvCarne > 1.01);
+            ?>
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0"><i class="fas fa-box-open me-2"></i>Produtos do Pedido</h6></div>
                 <div class="card-body p-0">
+                    <div class="alert alert-info small m-3 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Carnê Braziliana:</strong> Os produtos foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
@@ -106,8 +119,16 @@
                                         </div>
                                     </td>
                                     <td class="text-center"><?= (int)($item['quantidade'] ?? 1) ?></td>
-                                    <td class="text-end"><?= isset($item['preco_unitario']) ? 'R$ ' . number_format((float)$item['preco_unitario'], 2, ',', '.') : '-' ?></td>
-                                    <td class="text-end"><?= isset($item['subtotal']) ? 'R$ ' . number_format((float)$item['subtotal'], 2, ',', '.') : '-' ?></td>
+                                    <?php
+                                    $puCarne = (float) ($item['preco_unitario'] ?? 0);
+                                    $stCarne = (float) ($item['subtotal'] ?? 0);
+                                    if ($precisaConverter && $puCarne > 0 && $puCarne < 500) {
+                                        $puCarne = round($puCarne * $taxaConvCarne, 2);
+                                        $stCarne = round($stCarne * $taxaConvCarne, 2);
+                                    }
+                                    ?>
+                                    <td class="text-end"><?= $puCarne > 0 ? 'R$ ' . number_format($puCarne, 2, ',', '.') : '-' ?></td>
+                                    <td class="text-end"><?= $stCarne > 0 ? 'R$ ' . number_format($stCarne, 2, ',', '.') : '-' ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>

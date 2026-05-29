@@ -249,6 +249,25 @@ class AdminCarneController extends Controller {
             } catch (\Exception $e) {}
         }
 
+        // Buscar dados do pedido para conversão de moeda na view
+        $pedido = [];
+        if ($pedidoId > 0) {
+            try {
+                $stPed = $this->db->prepare("SELECT * FROM pedidos WHERE id = ? LIMIT 1");
+                $stPed->execute([$pedidoId]);
+                $pedido = $stPed->fetch(\PDO::FETCH_ASSOC) ?: [];
+                // Buscar taxa de conversão se não estiver no pedido
+                if (empty($pedido['taxa_conversao'])) {
+                    try {
+                        $stTx = $this->db->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                        $stTx->execute();
+                        $tx = (float) ($stTx->fetchColumn() ?: 0);
+                        if ($tx > 1.01) $pedido['taxa_conversao'] = $tx;
+                    } catch (\Exception $e) {}
+                }
+            } catch (\Exception $e) {}
+        }
+
         require __DIR__ . '/../Views/admin/carne/detalhes.php';
     }
 
