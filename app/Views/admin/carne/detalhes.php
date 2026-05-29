@@ -98,37 +98,14 @@
             if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
 
             // Verificar se este carnê usou preço original (flag salva na criação)
-            // OU se algum produto do pedido tem promoção ativa (para carnês criados antes da flag)
             $carneUsouPrecoOriginal = false;
             $pedidoIdMeta = (int) ($carne['pedido_id'] ?? 0);
             if ($pedidoIdMeta > 0) {
                 try {
                     $db = \Config\Database::getConnection();
-                    // Verificar flag explícita
                     $stMeta = $db->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
                     $stMeta->execute([$pedidoIdMeta]);
                     $carneUsouPrecoOriginal = ((string) $stMeta->fetchColumn() === '1');
-
-                    // Se não tem flag, verificar se algum produto do pedido tem sale_price < price
-                    if (!$carneUsouPrecoOriginal && !empty($itensPedido)) {
-                        foreach ($itensPedido as $itCheck) {
-                            $pidCheck = (int) ($itCheck['produto_id'] ?? 0);
-                            if ($pidCheck <= 0) continue;
-                            try {
-                                $stPromo = $db->prepare("SELECT price, sale_price, sale_price_expires FROM produtos WHERE id = ? LIMIT 1");
-                                $stPromo->execute([$pidCheck]);
-                                $prodRow = $stPromo->fetch(\PDO::FETCH_ASSOC);
-                                if ($prodRow) {
-                                    $fullPrice = (float) ($prodRow['price'] ?? 0);
-                                    $salePrice = (float) ($prodRow['sale_price'] ?? 0);
-                                    if ($salePrice > 0 && $salePrice < $fullPrice) {
-                                        $carneUsouPrecoOriginal = true;
-                                        break;
-                                    }
-                                }
-                            } catch (\Exception $e) {}
-                        }
-                    }
                 } catch (\Exception $e) {}
             }
             ?>
