@@ -4672,6 +4672,7 @@ HTML;
             // Função helper: formata valor e converte USD→BRL se necessário (carnê com itens em USD)
             $fmtPedido = function(float $valor) use ($exibirEmBrl, $precisaConverterAdmin, $taxaConvPedido) {
                 if ($exibirEmBrl) {
+                    // Só converter se é carnê novo com flag de preço original
                     $valorFinal = $precisaConverterAdmin ? round($valor * $taxaConvPedido, 2) : $valor;
                     return 'R$ ' . number_format($valorFinal, 2, ',', '.');
                 }

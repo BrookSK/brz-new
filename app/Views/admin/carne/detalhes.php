@@ -84,13 +84,7 @@
             <!-- Produtos do Pedido -->
             <?php if (!empty($itensPedido)): ?>
             <?php
-            // Detectar se este carnê usou preço original (flag salva na criação)
-            $taxaConvCarne = (float) ($pedido['taxa_conversao'] ?? 0);
-            if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
-            $precisaConverter = false;
-            $mostrarAvisoCarneDet = false;
-
-            // Verificar flag no pedido_meta
+            // Verificar se este carnê usou preço original (flag salva na criação)
             $carneUsouPrecoOriginal = false;
             $pedidoIdMeta = (int) ($carne['pedido_id'] ?? 0);
             if ($pedidoIdMeta > 0) {
@@ -101,16 +95,26 @@
                     $carneUsouPrecoOriginal = ((string) $stMeta->fetchColumn() === '1');
                 } catch (\Exception $e) {}
             }
-
+            // Se usou preço original, os itens estão em USD e precisam converter para BRL
+            $taxaConvCarne = 0;
             if ($carneUsouPrecoOriginal) {
-                $precisaConverter = true;
-                $mostrarAvisoCarneDet = true;
+                $taxaConvCarne = (float) ($pedido['taxa_conversao'] ?? 0);
+                if ($taxaConvCarne <= 1.01) {
+                    try {
+                        $db2 = \Config\Database::getConnection();
+                        $stTx = $db2->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
+                        $stTx->execute();
+                        $txV = (float) ($stTx->fetchColumn() ?: 0);
+                        if ($txV > 1.01) $taxaConvCarne = $txV;
+                    } catch (\Exception $e) {}
+                }
+                if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
             }
             ?>
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header"><h6 class="mb-0"><i class="fas fa-box-open me-2"></i>Produtos do Pedido</h6></div>
                 <div class="card-body p-0">
-                    <?php if ($mostrarAvisoCarneDet): ?>
+                    <?php if ($carneUsouPrecoOriginal): ?>
                     <div class="alert alert-info small m-3 mb-0">
                         <i class="fas fa-info-circle me-1"></i>
                         <strong>Carnê Braziliana:</strong> Os produtos foram cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento.
@@ -139,7 +143,7 @@
                                     <?php
                                     $puCarne = (float) ($item['preco_unitario'] ?? 0);
                                     $stCarne = (float) ($item['subtotal'] ?? 0);
-                                    if ($precisaConverter && $puCarne > 0 && $puCarne < 500) {
+                                    if ($carneUsouPrecoOriginal && $taxaConvCarne > 1.01 && $puCarne > 0 && $puCarne < 500) {
                                         $puCarne = round($puCarne * $taxaConvCarne, 2);
                                         $stCarne = round($stCarne * $taxaConvCarne, 2);
                                     }
