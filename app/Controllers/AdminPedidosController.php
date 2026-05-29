@@ -4197,12 +4197,12 @@ HTML;
                                             echo '</td>
                                                 <td>' . $item['quantidade'] . '</td>
                                                 <td>' . ($isFreeOfferItem
-                                                    ? '<span class="text-decoration-line-through text-muted">' . ($exibirEmBrl ? 'R$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0) * ($precisaConverterAdmin ? $taxaConvPedido : 1), 2, ',', '.') : 'US$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, '.', ',')) . '</span>'
-                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['preco_unitario'] ?? 0) * ($precisaConverterAdmin ? $taxaConvPedido : 1), 2, ',', '.') : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ','))
+                                                    ? '<span class="text-decoration-line-through text-muted">' . ($exibirEmBrl ? 'R$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['free_offer_original_price'] ?? $item['preco_unitario'] ?? 0), 2, '.', ',')) . '</span>'
+                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['preco_unitario'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . ($isFreeOfferItem
                                                     ? '<span class="badge bg-success">GRÁTIS</span>'
-                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0) * ($precisaConverterAdmin ? $taxaConvPedido : 1), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
+                                                    : ($exibirEmBrl ? 'R$ ' . number_format((float)($item['subtotal'] ?? 0), 2, ',', '.') : 'US$ ' . number_format((float)($item['subtotal'] ?? 0), 2, '.', ','))
                                                 ) . '</td>
                                                 <td>' . date('d/m/Y H:i', strtotime($item['created_at'])) . '</td>
                                                 <td>' . $acoesHtml . '</td>
@@ -4669,12 +4669,10 @@ HTML;
                                             ' . (!empty($pedido['origem_pedido']) ? ('<tr><td><strong>Origem</strong></td><td>' . htmlspecialchars($pedido['origem_pedido']) . (!empty($pedido['admin_criador_nome']) || !empty($pedido['admin_criador_email']) ? ('<div class="small text-muted">Admin: ' . htmlspecialchars((string) ($pedido['admin_criador_nome'] ?? '')) . (!empty($pedido['admin_criador_email']) ? (' &lt;' . htmlspecialchars((string) $pedido['admin_criador_email']) . '&gt;') : '') . '</div>') : '') . '</td></tr>') : '') . '
                                             <tr><td><strong>Quantidade de itens</strong></td><td>' . (int) $quantidadeTotalItens . '</td></tr>';
 
-            // Função helper: formata valor e converte USD→BRL se necessário (carnê com itens em USD)
-            $fmtPedido = function(float $valor) use ($exibirEmBrl, $precisaConverterAdmin, $taxaConvPedido) {
+            // Função helper: formata valor — NÃO converte (valores do pedido já estão na moeda correta no banco)
+            $fmtPedido = function(float $valor) use ($exibirEmBrl) {
                 if ($exibirEmBrl) {
-                    // Só converter se é carnê novo com flag de preço original
-                    $valorFinal = $precisaConverterAdmin ? round($valor * $taxaConvPedido, 2) : $valor;
-                    return 'R$ ' . number_format($valorFinal, 2, ',', '.');
+                    return 'R$ ' . number_format($valor, 2, ',', '.');
                 }
                 return $this->formatarMoeda($valor, 'USD');
             };

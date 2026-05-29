@@ -297,19 +297,14 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                             <span class="text-muted">x</span>
                                             <?php
                                             $pu = (float) ($item['preco_unitario'] ?? 0);
-                                            // Se pedido é BRL e itens não foram convertidos, converter USD→BRL
-                                            if ($precisaConverterView && $pu > 0 && $pu < 500) {
-                                                $pu = round($pu * $taxaConvView, 2);
-                                            }
+                                            ?>
                                             ?>
                                             <span class="fw-bold"><?= $simboloMoeda ?> <?= number_format($pu, 2, ',', '.') ?></span>
                                         </div>
                                         <div class="text-end">
                                             <?php
                                             $st = (float) ($item['subtotal'] ?? 0);
-                                            if ($precisaConverterView && $st > 0 && $st < 5000) {
-                                                $st = round($st * $taxaConvView, 2);
-                                            }
+                                            ?>
                                             ?>
                                             <small class="text-muted"><?= __('checkout.subtotal', 'Subtotal') ?>: <?= $simboloMoeda ?> <?= number_format($st, 2, ',', '.') ?></small>
                                         </div>
@@ -390,9 +385,7 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                         <span><?= __('checkout.subtotal', 'Subtotal') ?>:</span>
                                         <?php
                                         $sub = (float) ($pedido['subtotal_produtos'] ?? 0);
-                                        if ($precisaConverterView && $sub > 0 && $sub < 5000) {
-                                            $sub = round($sub * $taxaConvView, 2);
-                                        }
+                                        ?>
                                         ?>
                                         <span><?= $simboloMoeda ?> <?= number_format($sub, 2, ',', '.') ?></span>
                                     </div>
