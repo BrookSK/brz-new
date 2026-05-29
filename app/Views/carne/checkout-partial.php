@@ -14,6 +14,10 @@
 
             <!-- Conteúdo normal do carnê -->
             <div id="carne-conteudo-normal" style="display:none;">
+                <div class="alert alert-info small mb-3" id="carne-aviso-preco-cheio" style="display:none;">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Importante:</strong> No Carnê Braziliana, os produtos são cobrados pelo valor original (sem promoção), pois promoções podem não estar vigentes durante todo o período de parcelamento. Os valores abaixo já refletem o preço cheio dos produtos.
+                </div>
                 <p class="small text-muted mb-3">
                     Parcele sua compra em até 12x via boleto bancário. Cada parcela gera dois boletos: um para produtos (Câmbio Real) e outro para taxas (Câmbio Real).
                     <strong>O envio ocorre somente após a quitação total.</strong>
@@ -73,7 +77,7 @@
     const valTotal   = document.getElementById('carne-valor-total');
 
     // Chamada pelo checkout ao selecionar/desselecionar carnê
-    window.toggleCarneBraziliana = function(show, totalProdutos, totalTaxas) {
+    window.toggleCarneBraziliana = function(show, totalProdutos, totalTaxas, temPromo) {
         if (!show) {
             section.style.display = 'none';
             avisoBox.style.display = 'none';
@@ -81,6 +85,11 @@
             return;
         }
         section.style.display = 'block';
+        // Mostrar aviso de preço cheio se há produtos com promoção
+        var avisoPreco = document.getElementById('carne-aviso-preco-cheio');
+        if (avisoPreco) {
+            avisoPreco.style.display = temPromo ? 'block' : 'none';
+        }
         carregarParcelas(totalProdutos, totalTaxas);
     };
 

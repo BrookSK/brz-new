@@ -2808,10 +2808,52 @@ class CheckoutController extends Controller {
             }
         } catch (\Exception $e) {}
 
+        // Calcular subtotal sem promoção (preço cheio) para o carnê
+        $subtotal_sem_promo = $subtotal;
+        $tem_promo_no_carrinho = false;
+        try {
+            if (!empty($items) && is_array($items)) {
+                $dbPromo = \Config\Database::getConnection();
+                $subtotalCheio = 0.0;
+                foreach ($items as $itPromo) {
+                    $pidPromo = (int) ($itPromo['produto_id'] ?? 0);
+                    $qtdPromo = (int) ($itPromo['quantidade'] ?? 1);
+                    $precoAtual = (float) ($itPromo['preco_unitario'] ?? $itPromo['price'] ?? $itPromo['preco'] ?? 0);
+
+                    // Buscar preço cheio (price) do produto
+                    $precoCheio = $precoAtual;
+                    if ($pidPromo > 0) {
+                        try {
+                            $stP = $dbPromo->prepare("SELECT price FROM produtos WHERE id = ? LIMIT 1");
+                            $stP->execute([$pidPromo]);
+                            $pDb = (float) ($stP->fetchColumn() ?: 0);
+                            if ($pDb > 0) {
+                                $precoCheio = $pDb;
+                            }
+                        } catch (\Exception $e) {}
+                    }
+
+                    if ($precoCheio > $precoAtual + 0.01) {
+                        $tem_promo_no_carrinho = true;
+                    }
+
+                    $isFree = !empty($itPromo['is_free_offer']);
+                    if (!$isFree) {
+                        $subtotalCheio += $precoCheio * $qtdPromo;
+                    }
+                }
+                if ($tem_promo_no_carrinho) {
+                    $subtotal_sem_promo = $subtotalCheio;
+                }
+            }
+        } catch (\Exception $e) {}
+
         $this->view('checkout/index', [
             'carrinho' => $carrinho,
             'items' => $items,
             'subtotal' => $subtotal,
+            'subtotal_sem_promo' => $subtotal_sem_promo,
+            'tem_promo_no_carrinho' => $tem_promo_no_carrinho,
             'peso_clube_total' => $pesoClubeTotal,
             'subtotal_clube' => $subtotalClube,
             'desconto_clube' => $descontoClube,
@@ -3670,6 +3712,81 @@ class CheckoutController extends Controller {
                             $svcUsd = (float) ($pedSep['servicos'] ?? 0);
                             $impUsd = (float) ($pedSep['impostos'] ?? 0);
                             $freUsd = (float) ($pedSep['frete'] ?? 0);
+
+                            // CARNÊ: Recalcular subtotal usando preço CHEIO (sem promoção)
+                            // Promoções não se aplicam ao carnê pois podem expirar durante o parcelamento
+                            $carneUsouPrecoOriginal = false;
+                            try {
+                                $itensTable = 'pedido_itens';
+                                $temPI = false;
+                                try { $stChk = $dbCarneSep->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'pedido_itens'"); $stChk->execute(); $temPI = (int) $stChk->fetchColumn() > 0; } catch (\Exception $e) {}
+                                if (!$temPI) {
+                                    try { $stChk2 = $dbCarneSep->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'pedido_items'"); $stChk2->execute(); if ((int) $stChk2->fetchColumn() > 0) $itensTable = 'pedido_items'; } catch (\Exception $e) {}
+                                }
+
+                                $stItens = $dbCarneSep->prepare("SELECT produto_id, quantidade, preco_unitario FROM {$itensTable} WHERE pedido_id = ?");
+                                $stItens->execute([(int) $pedidoId]);
+                                $itensDoCarneRaw = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                                if (!empty($itensDoCarneRaw)) {
+                                    $subtotalOriginal = 0.0;
+                                    $subtotalPromo = 0.0;
+                                    foreach ($itensDoCarneRaw as $itCarne) {
+                                        $pidCarne = (int) ($itCarne['produto_id'] ?? 0);
+                                        $qtdCarne = (int) ($itCarne['quantidade'] ?? 1);
+                                        $precoUsado = (float) ($itCarne['preco_unitario'] ?? 0);
+                                        $subtotalPromo += $precoUsado * $qtdCarne;
+
+                                        // Buscar preço cheio do produto (campo price)
+                                        $precoOriginal = $precoUsado;
+                                        if ($pidCarne > 0) {
+                                            try {
+                                                $stPreco = $dbCarneSep->prepare("SELECT price FROM produtos WHERE id = ? LIMIT 1");
+                                                $stPreco->execute([$pidCarne]);
+                                                $precoDb = (float) ($stPreco->fetchColumn() ?: 0);
+                                                if ($precoDb > 0) {
+                                                    $precoOriginal = $precoDb;
+                                                }
+                                            } catch (\Exception $e) {}
+                                        }
+                                        $subtotalOriginal += $precoOriginal * $qtdCarne;
+                                    }
+
+                                    // Se o preço original é maior que o promocional, usar o original
+                                    if ($subtotalOriginal > $subtotalPromo + 0.01) {
+                                        $subUsd = $subtotalOriginal;
+                                        $carneUsouPrecoOriginal = true;
+                                        error_log("[CARNE] Preço original usado: subtotalOriginal={$subtotalOriginal} vs subtotalPromo={$subtotalPromo}");
+
+                                        // Atualizar o subtotal do pedido para refletir o preço cheio
+                                        try {
+                                            $colSubtotal = in_array('subtotal', $colsPedSep, true) ? 'subtotal' : (in_array('subtotal_produtos', $colsPedSep, true) ? 'subtotal_produtos' : null);
+                                            if ($colSubtotal) {
+                                                $dbCarneSep->prepare("UPDATE pedidos SET {$colSubtotal} = ? WHERE id = ?")->execute([$subtotalOriginal, (int) $pedidoId]);
+                                            }
+                                        } catch (\Exception $e) {}
+
+                                        // Atualizar preço unitário dos itens para o preço cheio
+                                        try {
+                                            foreach ($itensDoCarneRaw as $itCarne) {
+                                                $pidCarne = (int) ($itCarne['produto_id'] ?? 0);
+                                                if ($pidCarne <= 0) continue;
+                                                $stPreco2 = $dbCarneSep->prepare("SELECT price FROM produtos WHERE id = ? LIMIT 1");
+                                                $stPreco2->execute([$pidCarne]);
+                                                $precoDb2 = (float) ($stPreco2->fetchColumn() ?: 0);
+                                                if ($precoDb2 > 0 && $precoDb2 > (float) ($itCarne['preco_unitario'] ?? 0) + 0.01) {
+                                                    $dbCarneSep->prepare("UPDATE {$itensTable} SET preco_unitario = ?, subtotal = ? * quantidade WHERE pedido_id = ? AND produto_id = ?")
+                                                        ->execute([$precoDb2, $precoDb2, (int) $pedidoId, $pidCarne]);
+                                                }
+                                            }
+                                        } catch (\Exception $e) {
+                                            error_log('[CARNE] Erro ao atualizar preços dos itens: ' . $e->getMessage());
+                                        }
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                error_log('[CARNE] Erro ao recalcular preço original: ' . $e->getMessage());
+                            }
 
                             // Fallback: se o pedido não tem valores, tentar do carrinho
                             if ($subUsd <= 0) {

@@ -2396,14 +2396,20 @@ function atualizarFormaPagamento() {
             // Valores em USD do checkout, converter para BRL
             const rate = Number(window.CAMBIOREAL_RATE_BRL || 5.5);
             let subtotalUsd = 0, taxasUsd = 0;
+            // Para carnê: usar subtotal SEM promoção (preço cheio)
+            let temPromo = false;
+            if (window.checkoutBaseValues && window.checkoutBaseValues.temPromo) {
+                temPromo = true;
+            }
+            const subtotalKey = temPromo ? 'subtotalSemPromo' : 'subtotal';
             if (window.checkoutOriginalValues) {
-                subtotalUsd = Number(window.checkoutOriginalValues.subtotal || 0);
+                subtotalUsd = Number(window.checkoutOriginalValues[subtotalKey] || window.checkoutOriginalValues.subtotal || 0);
                 const taxaServico = Number(window.checkoutOriginalValues.taxaServico || 0);
                 const impostos = Number(window.checkoutOriginalValues.impostos || 0);
                 const impostoLocal = Number(window.checkoutOriginalValues.impostoLocal || 0);
                 taxasUsd = taxaServico + impostos + impostoLocal;
             } else if (window.checkoutBaseValues) {
-                subtotalUsd = Number(window.checkoutBaseValues.subtotal || 0);
+                subtotalUsd = Number(window.checkoutBaseValues[subtotalKey] || window.checkoutBaseValues.subtotal || 0);
                 const taxaServico = Number(window.checkoutBaseValues.taxaServico || 0);
                 const impostos = Number(window.checkoutBaseValues.impostos || 0);
                 const impostoLocal = Number(window.checkoutBaseValues.impostoLocal || 0);
@@ -2412,9 +2418,9 @@ function atualizarFormaPagamento() {
             // Converter para BRL
             const tProds = Math.round(subtotalUsd * rate * 100) / 100;
             const tTaxas = Math.round(taxasUsd * rate * 100) / 100;
-            toggleCarneBraziliana(true, tProds, tTaxas);
+            toggleCarneBraziliana(true, tProds, tTaxas, temPromo);
         } else {
-            toggleCarneBraziliana(false, 0, 0);
+            toggleCarneBraziliana(false, 0, 0, false);
         }
     }
 
@@ -2688,6 +2694,8 @@ function updatePrices(currency) {
     if (!window.checkoutBaseValues) {
         window.checkoutBaseValues = {
             subtotal: <?= $subtotal ?>,
+            subtotalSemPromo: <?= ($subtotal_sem_promo ?? $subtotal) ?>,
+            temPromo: <?= (!empty($tem_promo_no_carrinho) ? 'true' : 'false') ?>,
             frete: <?= ($frete ?? 0) ?>,
             taxaServico: <?= ($taxa_servico ?? 0) ?>,
             taxaServicoOriginal: <?= ($taxa_servico_original ?? 0) ?>,
