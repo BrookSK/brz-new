@@ -3776,6 +3776,15 @@ class CheckoutController extends Controller {
                                                 ->execute([(int) $pedidoId]);
                                         } catch (\Exception $e) {}
 
+                                        // Atualizar subtotal do pedido para o valor cheio em BRL
+                                        // (necessário para que o model PedidoEcommerce converta os itens corretamente)
+                                        try {
+                                            $colSubtotal = in_array('subtotal', $colsPedSep, true) ? 'subtotal' : (in_array('subtotal_produtos', $colsPedSep, true) ? 'subtotal_produtos' : null);
+                                            if ($colSubtotal) {
+                                                $dbCarneSep->prepare("UPDATE pedidos SET {$colSubtotal} = ? WHERE id = ?")->execute([$subUsd, (int) $pedidoId]);
+                                            }
+                                        } catch (\Exception $e) {}
+
                                         // Atualizar o subtotal do pedido para refletir o preço cheio
                                     }
                                 }
