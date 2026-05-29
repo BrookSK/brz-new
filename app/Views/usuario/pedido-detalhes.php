@@ -218,19 +218,21 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                                 || in_array(strtolower(trim((string) ($pedido['status'] ?? ''))), ['carne_pagando', 'carne_aguardando'], true));
                             $itensConvertidos = !empty($pedido['__converted_items_to_brl']);
 
-                            // Só converter se é carnê BRL E os itens parecem estar em USD
+                            // Verificar flag no pedido_meta (só carnês novos que usaram preço cheio)
                             $precisaConverterView = false;
-                            if ($moedaPedido === 'BRL' && !$itensConvertidos && $isCarnePedido && $taxaConvView > 1.01 && !empty($pedido['items'])) {
-                                $somaItensCheck = 0;
-                                foreach ($pedido['items'] as $itChk) {
-                                    $somaItensCheck += (float) ($itChk['subtotal'] ?? 0);
-                                }
-                                $subtotalPedCheck = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
-                                if ($somaItensCheck > 0 && $subtotalPedCheck > 0 && ($subtotalPedCheck / $somaItensCheck) > 2) {
-                                    $precisaConverterView = true;
-                                }
+                            $mostrarAvisoCarne = false;
+                            if ($isCarnePedido && $moedaPedido === 'BRL' && !$itensConvertidos) {
+                                try {
+                                    $dbMeta = \Config\Database::getConnection();
+                                    $stMeta = $dbMeta->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
+                                    $stMeta->execute([(int) ($pedido['id'] ?? 0)]);
+                                    $flagOriginal = ((string) $stMeta->fetchColumn() === '1');
+                                    if ($flagOriginal) {
+                                        $precisaConverterView = true;
+                                        $mostrarAvisoCarne = true;
+                                    }
+                                } catch (\Exception $e) {}
                             }
-                            $mostrarAvisoCarne = ($isCarnePedido && $precisaConverterView);
                             ?>
                             <?php if ($mostrarAvisoCarne): ?>
                                 <div class="alert alert-info small mb-3">

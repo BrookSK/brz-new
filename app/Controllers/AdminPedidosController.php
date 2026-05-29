@@ -3967,20 +3967,20 @@ HTML;
                 || in_array(strtolower(trim((string) ($pedido['status'] ?? ''))), ['carne_pagando', 'carne_aguardando'], true));
             $itensConvertidosAdmin = !empty($pedido['__converted_items_to_brl']);
             $precisaConverterAdmin = false;
+            $mostrarAvisoCarnePrecoCheio = false;
 
-            // Só converter se é carnê BRL E os itens parecem estar em USD (subtotal itens << total pedido)
-            if ($exibirEmBrl && !$itensConvertidosAdmin && $isCarnePedidoAdmin && $taxaConvPedido > 1.01) {
-                $somaItensRaw = 0;
-                if (!empty($itens)) {
-                    foreach ($itens as $itCheck) {
-                        $somaItensRaw += (float) ($itCheck['subtotal'] ?? 0);
+            // Verificar flag no pedido_meta (só carnês novos que usaram preço cheio)
+            if ($isCarnePedidoAdmin && $exibirEmBrl && !$itensConvertidosAdmin) {
+                try {
+                    $pdoMeta = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+                    $stMeta = $pdoMeta->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
+                    $stMeta->execute([(int) $id]);
+                    $flagPrecoOriginal = ((string) $stMeta->fetchColumn() === '1');
+                    if ($flagPrecoOriginal) {
+                        $precisaConverterAdmin = true;
+                        $mostrarAvisoCarnePrecoCheio = true;
                     }
-                }
-                $subtotalPedido = (float) ($pedido['subtotal'] ?? 0);
-                // Se a soma dos itens é muito menor que o subtotal do pedido (fator > 2x), itens estão em USD
-                if ($somaItensRaw > 0 && $subtotalPedido > 0 && ($subtotalPedido / $somaItensRaw) > 2) {
-                    $precisaConverterAdmin = true;
-                }
+                } catch (\Exception $e) {}
             }
 
             // Buscar taxa se precisa converter mas não veio no pedido
@@ -3994,9 +3994,6 @@ HTML;
                 } catch (\Exception $e) {}
                 $precisaConverterAdmin = ($taxaConvPedido > 1.01);
             }
-
-            // Aviso de preço cheio: só mostrar se é carnê E os itens precisam de conversão (carnê novo com preço cheio)
-            $mostrarAvisoCarnePrecoCheio = ($isCarnePedidoAdmin && $precisaConverterAdmin);
 
             echo '<div class="row">
                     <div class="col-md-12">

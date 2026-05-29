@@ -3766,6 +3766,12 @@ class CheckoutController extends Controller {
                                         $carneUsouPrecoOriginal = true;
                                         error_log("[CARNE] Preço original usado: subtotalOriginal={$subtotalOriginal} (USD) moedaPedido={$moedaPedidoCheck} subUsd(ajustado)={$subUsd}");
 
+                                        // Salvar flag indicando que este carnê usou preço original (sem promoção)
+                                        try {
+                                            $dbCarneSep->prepare("INSERT INTO pedido_meta (pedido_id, meta_key, meta_value) VALUES (?, 'carne_usou_preco_original', '1') ON DUPLICATE KEY UPDATE meta_value = '1'")
+                                                ->execute([(int) $pedidoId]);
+                                        } catch (\Exception $e) {}
+
                                         // Atualizar o subtotal do pedido para refletir o preço cheio
                                         try {
                                             $colSubtotal = in_array('subtotal', $colsPedSep, true) ? 'subtotal' : (in_array('subtotal_produtos', $colsPedSep, true) ? 'subtotal_produtos' : null);

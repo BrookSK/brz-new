@@ -84,25 +84,27 @@
             <!-- Produtos do Pedido -->
             <?php if (!empty($itensPedido)): ?>
             <?php
-            // Detectar se os preços dos itens estão em USD (precisam converter para BRL)
-            // Só converter se a soma dos itens é muito menor que o total_produtos do carnê (fator > 2x)
+            // Detectar se este carnê usou preço original (flag salva na criação)
             $taxaConvCarne = (float) ($pedido['taxa_conversao'] ?? 0);
             if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
-            $itensJaConvertidos = !empty($pedido['__converted_items_to_brl']);
-            $moedaPedidoCarne = strtoupper(trim((string) ($pedido['moeda'] ?? 'BRL')));
             $precisaConverter = false;
             $mostrarAvisoCarneDet = false;
 
-            if ($moedaPedidoCarne === 'BRL' && !$itensJaConvertidos && $taxaConvCarne > 1.01) {
-                $somaItensRawCarne = 0;
-                foreach ($itensPedido as $itChk) {
-                    $somaItensRawCarne += (float) ($itChk['subtotal'] ?? ((float)($itChk['preco_unitario'] ?? 0) * (int)($itChk['quantidade'] ?? 1)));
-                }
-                $totalProdutosCarne = (float) ($carne['total_produtos'] ?? 0);
-                if ($somaItensRawCarne > 0 && $totalProdutosCarne > 0 && ($totalProdutosCarne / $somaItensRawCarne) > 2) {
-                    $precisaConverter = true;
-                    $mostrarAvisoCarneDet = true;
-                }
+            // Verificar flag no pedido_meta
+            $carneUsouPrecoOriginal = false;
+            $pedidoIdMeta = (int) ($carne['pedido_id'] ?? 0);
+            if ($pedidoIdMeta > 0) {
+                try {
+                    $db = \Config\Database::getConnection();
+                    $stMeta = $db->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
+                    $stMeta->execute([$pedidoIdMeta]);
+                    $carneUsouPrecoOriginal = ((string) $stMeta->fetchColumn() === '1');
+                } catch (\Exception $e) {}
+            }
+
+            if ($carneUsouPrecoOriginal) {
+                $precisaConverter = true;
+                $mostrarAvisoCarneDet = true;
             }
             ?>
             <div class="card border-0 shadow-sm mb-4">
