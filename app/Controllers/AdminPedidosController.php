@@ -3970,14 +3970,13 @@ HTML;
             $mostrarAvisoCarnePrecoCheio = false;
 
             // Verificar flag no pedido_meta (só carnês novos que usaram preço cheio)
-            if ($isCarnePedidoAdmin && $exibirEmBrl && !$itensConvertidosAdmin) {
+            if ($isCarnePedidoAdmin && $exibirEmBrl) {
                 try {
                     $pdoMeta = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
                     $stMeta = $pdoMeta->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
                     $stMeta->execute([(int) $id]);
                     $flagPrecoOriginal = ((string) $stMeta->fetchColumn() === '1');
                     if ($flagPrecoOriginal) {
-                        $precisaConverterAdmin = true;
                         $mostrarAvisoCarnePrecoCheio = true;
                     }
                 } catch (\Exception $e) {}

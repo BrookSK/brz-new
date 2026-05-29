@@ -221,14 +221,13 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                             // Verificar flag no pedido_meta (só carnês novos que usaram preço cheio)
                             $precisaConverterView = false;
                             $mostrarAvisoCarne = false;
-                            if ($isCarnePedido && $moedaPedido === 'BRL' && !$itensConvertidos) {
+                            if ($isCarnePedido && $moedaPedido === 'BRL') {
                                 try {
                                     $dbMeta = \Config\Database::getConnection();
                                     $stMeta = $dbMeta->prepare("SELECT meta_value FROM pedido_meta WHERE pedido_id = ? AND meta_key = 'carne_usou_preco_original' LIMIT 1");
                                     $stMeta->execute([(int) ($pedido['id'] ?? 0)]);
                                     $flagOriginal = ((string) $stMeta->fetchColumn() === '1');
                                     if ($flagOriginal) {
-                                        $precisaConverterView = true;
                                         $mostrarAvisoCarne = true;
                                     }
                                 } catch (\Exception $e) {}
