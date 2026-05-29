@@ -3728,6 +3728,8 @@ class CheckoutController extends Controller {
                                 $stItens->execute([(int) $pedidoId]);
                                 $itensDoCarneRaw = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+                                error_log("[CARNE] Recalcular preço: pedidoId={$pedidoId} itensTable={$itensTable} itensCount=" . count($itensDoCarneRaw));
+
                                 if (!empty($itensDoCarneRaw)) {
                                     $subtotalOriginal = 0.0;
                                     $subtotalPromo = 0.0;
@@ -3751,6 +3753,8 @@ class CheckoutController extends Controller {
                                         }
                                         $subtotalOriginal += $precoOriginal * $qtdCarne;
                                     }
+
+                                    error_log("[CARNE] Comparação preços: subtotalOriginal={$subtotalOriginal} subtotalPromo={$subtotalPromo} diff=" . ($subtotalOriginal - $subtotalPromo));
 
                                     // Se o preço original é maior que o promocional, usar o original
                                     if ($subtotalOriginal > $subtotalPromo + 0.01) {
