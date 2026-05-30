@@ -561,7 +561,7 @@ class Produto extends Model {
         
         // Mapear campos do formulário para o banco
         $dadosBanco = [
-            'name' => $data['name'] ?? '',
+            'name' => mb_substr((string) ($data['name'] ?? ''), 0, 255),
             'slug' => $slug,
             'sku' => $sku,
             'description' => $data['description'] ?? '',
@@ -661,7 +661,7 @@ class Produto extends Model {
         
         // Mapear campos do formulário para o banco
         $dadosBanco = [
-            'name' => $data['name'] ?? '',
+            'name' => mb_substr((string) ($data['name'] ?? ''), 0, 255),
             'sku' => $data['sku'] ?? '',
             'description' => $data['description'] ?? '',
             'short_description' => $data['short_description'] ?? '',

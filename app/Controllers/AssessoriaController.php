@@ -3152,6 +3152,10 @@ class AssessoriaController extends Controller {
         if ($nome === '') {
             throw new \Exception('Produto sem nome');
         }
+        // Truncar nome para caber na coluna VARCHAR(255) do banco
+        if (mb_strlen($nome) > 255) {
+            $nome = mb_substr($nome, 0, 252) . '...';
+        }
 
         $sku = trim((string) ($produto['sku'] ?? ''));
         if ($sku === '') {
