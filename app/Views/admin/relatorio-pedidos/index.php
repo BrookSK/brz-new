@@ -90,7 +90,7 @@ $statusColors = [
                 return $moeda === 'BRL' ? 'R$ ' . number_format((float)$v, 2, ',', '.') : 'US$ ' . number_format((float)$v, 2, '.', ',');
             };
         ?>
-        <div class="card border-0 shadow-sm mb-2">
+        <div class="card border-0 shadow-sm mb-2" style="<?= ($imp['count'] > 0) ? 'opacity: 0.5;' : '' ?>">
             <div class="card-header py-2 d-flex justify-content-between align-items-center" style="cursor:pointer;background:<?= $cor === 'purple' ? '#6f42c1' : '' ?>;" data-bs-toggle="collapse" data-bs-target="#pedido-<?= $pid ?>">
                 <div class="d-flex align-items-center gap-3 flex-wrap">
                     <span class="badge bg-<?= $cor ?>"><?= $label ?></span>
@@ -99,14 +99,14 @@ $statusColors = [
                     <span class="fw-semibold"><?= htmlspecialchars($p['cliente_nome'] ?? 'Sem nome') ?></span>
                     <span class="small text-muted"><?= htmlspecialchars($p['cliente_email'] ?? '') ?></span>
                     <span class="fw-bold text-primary"><?= $fmt($p['total'] ?? 0) ?></span>
-                    <?php if ($imp['count'] > 0): ?>
-                        <span class="badge bg-success small">Impresso <?= $imp['count'] ?>x por <?= htmlspecialchars($imp['by']) ?></span>
-                    <?php else: ?>
-                        <span class="badge bg-secondary small">Não impresso</span>
-                    <?php endif; ?>
                 </div>
-                <div class="d-flex gap-1" onclick="event.stopPropagation()">
-                    <a href="/admin/relatorio-pedidos/imprimir/<?= $pid ?>" target="_blank" class="btn btn-sm btn-outline-dark" onclick="registrarImpressao(<?= $pid ?>)"><i class="fas fa-print"></i></a>
+                <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
+                    <?php if ($imp['count'] > 0): ?>
+                        <span class="badge bg-success small me-1">Impresso <?= $imp['count'] ?>x por <?= htmlspecialchars($imp['by']) ?></span>
+                    <?php else: ?>
+                        <span class="badge bg-secondary small me-1">Não impresso</span>
+                    <?php endif; ?>
+                    <a href="/admin/relatorio-pedidos/imprimir/<?= $pid ?>" target="_blank" class="btn btn-sm btn-outline-dark" onclick="return confirmarImpressao(<?= $pid ?>, <?= (int)$imp['count'] ?>, '<?= htmlspecialchars(addslashes($imp['by']), ENT_QUOTES) ?>')"><i class="fas fa-print"></i></a>
                     <a href="/admin/pedidos/detalhes/<?= $pid ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
                 </div>
             </div>
@@ -186,6 +186,16 @@ function registrarImpressao(pedidoId) {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'pedido_id=' + pedidoId
     });
+}
+
+function confirmarImpressao(pedidoId, printCount, lastBy) {
+    if (printCount > 0) {
+        if (!confirm('⚠️ Este pedido já foi impresso ' + printCount + 'x por ' + lastBy + '.\n\nDeseja imprimir novamente?')) {
+            return false;
+        }
+    }
+    registrarImpressao(pedidoId);
+    return true;
 }
 
 function imprimirTodos() {
