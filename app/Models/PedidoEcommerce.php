@@ -2083,11 +2083,50 @@ class PedidoEcommerce {
         return $uniq;
     }
 
+    /**
+     * Status que exigem medidas (peso, altura, largura, comprimento) preenchidas.
+     */
+    private const STATUSES_EXIGEM_MEDIDAS = [
+        'produto_consolidado',
+        'consolidado',
+        'em_transporte',
+        'aguardando_liberacao_aduaneira',
+        'enviado_ao_destinatario',
+        'enviado',
+        'entregue',
+    ];
+
     public function atualizarStatus(int $pedidoId, string $novoStatus, ?string $observacao = null, $usuarioId = null): bool {
         $pedidoId = (int) $pedidoId;
         if ($pedidoId <= 0) return false;
 
         try {
+            // Validar medidas obrigatórias para status de "ciclo fechado"
+            $novoStatusKey = strtolower(trim($novoStatus));
+            if (in_array($novoStatusKey, self::STATUSES_EXIGEM_MEDIDAS, true)) {
+                $stM = $this->connection->prepare('SELECT peso_total, altura, largura, comprimento FROM pedidos WHERE id = ? LIMIT 1');
+                $stM->execute([$pedidoId]);
+                $medidas = $stM->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $peso = (float) ($medidas['peso_total'] ?? 0);
+                $altura = (float) ($medidas['altura'] ?? 0);
+                $largura = (float) ($medidas['largura'] ?? 0);
+                $comprimento = (float) ($medidas['comprimento'] ?? 0);
+
+                if ($peso <= 0 || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
+                    error_log("[PEDIDO #{$pedidoId}] Tentativa de alterar status para '{$novoStatus}' bloqueada: medidas não preenchidas (peso={$peso}, alt={$altura}, larg={$largura}, comp={$comprimento}).");
+                    return false;
+                }
+            }
+
+            // Capturar status anterior para o histórico
+            $statusAnterior = null;
+            try {
+                $stPrev = $this->connection->prepare('SELECT status FROM pedidos WHERE id = ? LIMIT 1');
+                $stPrev->execute([$pedidoId]);
+                $statusAnterior = $stPrev->fetchColumn() ?: null;
+            } catch (\Exception $e) {}
+
             // Garantir que status seja VARCHAR (não ENUM) para aceitar todos os valores
             try {
                 $stDesc = $this->connection->query("DESCRIBE pedidos");
@@ -2107,13 +2146,32 @@ class PedidoEcommerce {
                 try {
                     $usuarioCol = $this->resolvePedidoStatusHistoryUsuarioColumn();
                     $uid = $usuarioId !== null ? (int) $usuarioId : null;
-                    $stH = $this->connection->prepare('INSERT INTO pedido_status_history (pedido_id, status_anterior, status_novo, observacao, ' . $usuarioCol . ', created_at) VALUES (?, NULL, ?, ?, ?, NOW())');
-                    $stH->execute([$pedidoId, $novoStatus, $observacao, $uid]);
+
+                    // Detectar nome correto da coluna de status novo (novo_status ou status_novo)
+                    $stmtCols = $this->connection->query('DESCRIBE pedido_status_history');
+                    $colsH = $stmtCols ? ($stmtCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                    $colStatusNovo = in_array('novo_status', $colsH, true) ? 'novo_status' : 'status_novo';
+                    $hasStatusAnterior = in_array('status_anterior', $colsH, true);
+
+                    $fields = ['pedido_id', $colStatusNovo, 'observacao', $usuarioCol, 'created_at'];
+                    $vals = ['?', '?', '?', '?', 'NOW()'];
+                    $bind = [$pedidoId, $novoStatus, $observacao, $uid];
+
+                    if ($hasStatusAnterior) {
+                        $fields[] = 'status_anterior';
+                        $vals[] = '?';
+                        $bind[] = $statusAnterior;
+                    }
+
+                    $stH = $this->connection->prepare('INSERT INTO pedido_status_history (' . implode(', ', $fields) . ') VALUES (' . implode(', ', $vals) . ')');
+                    $stH->execute($bind);
                 } catch (\Exception $e) {
+                    error_log("[PEDIDO #{$pedidoId}] Falha ao gravar histórico de status: " . $e->getMessage());
                 }
             }
             return true;
         } catch (\Exception $e) {
+            error_log("[PEDIDO #{$pedidoId}] Erro ao atualizar status para '{$novoStatus}': " . $e->getMessage());
             return false;
         }
     }

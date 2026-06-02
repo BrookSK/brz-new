@@ -1383,10 +1383,13 @@ class AdminCorreiosMundialController extends Controller {
             return;
         }
 
-        // Reverter status do pedido para permitir nova geração
+        // Reverter status do pedido para permitir nova geração (somente se medidas estão preenchidas)
         try {
             $pedidoModel = new PedidoEcommerce();
-            $pedidoModel->atualizarStatus($id, 'produto_consolidado', 'Etiqueta PACKET deletada para regeração', $_SESSION['usuario_id'] ?? null);
+            $result = $pedidoModel->atualizarStatus($id, 'produto_consolidado', 'Etiqueta PACKET deletada para regeração', $_SESSION['usuario_id'] ?? null);
+            if (!$result) {
+                error_log("[CORREIOS_MUNDIAL] Não foi possível reverter pedido #{$id} para produto_consolidado: medidas não preenchidas.");
+            }
         } catch (\Exception $e) {
         }
 
