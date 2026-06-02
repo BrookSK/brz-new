@@ -685,12 +685,33 @@ HTML;
                 } // end if temComprovante
 
                 // concluir pedido e registrar finalizador (quando colunas existirem)
+                // Validar medidas antes de permitir status produto_consolidado
                 $colsPedidos2 = $colsPedidos;
                 $set2 = [];
                 $p2 = [':id' => $id];
+
+                $podeMudarParaConsolidado = true;
                 if (in_array('status', $colsPedidos2, true)) {
-                    $set2[] = 'status = :st';
-                    $p2[':st'] = 'produto_consolidado';
+                    // Verificar se medidas estão preenchidas antes de avançar para Caixa Fechada
+                    try {
+                        $stMed = $this->connection->prepare('SELECT peso_total, altura, largura, comprimento FROM pedidos WHERE id = ? LIMIT 1');
+                        $stMed->execute([$id]);
+                        $med = $stMed->fetch(\PDO::FETCH_ASSOC) ?: [];
+                        $peso = (float) ($med['peso_total'] ?? 0);
+                        $alt = (float) ($med['altura'] ?? 0);
+                        $larg = (float) ($med['largura'] ?? 0);
+                        $comp = (float) ($med['comprimento'] ?? 0);
+                        if ($peso <= 0 || $alt <= 0 || $larg <= 0 || $comp <= 0) {
+                            $podeMudarParaConsolidado = false;
+                        }
+                    } catch (\Exception $e) {
+                        $podeMudarParaConsolidado = false;
+                    }
+
+                    if ($podeMudarParaConsolidado) {
+                        $set2[] = 'status = :st';
+                        $p2[':st'] = 'produto_consolidado';
+                    }
                 }
                 if ($usuarioId > 0 && in_array('compra_finalizada_por', $colsPedidos2, true)) {
                     $set2[] = 'compra_finalizada_por = :cfp';
@@ -820,8 +841,13 @@ HTML;
 
                 $this->connection->commit();
 
-                $_SESSION['message'] = 'Pedido confirmado (online), comprovante anexado e comissão registrada.';
-                $_SESSION['message_type'] = 'success';
+                if (!$podeMudarParaConsolidado) {
+                    $_SESSION['message'] = 'Pedido confirmado (online), comprovante anexado e comissão registrada. ATENÇÃO: O status NÃO foi alterado para Caixa Fechada porque as medidas (peso, altura, largura, comprimento) não estão preenchidas. Preencha as medidas e altere o status manualmente.';
+                    $_SESSION['message_type'] = 'warning';
+                } else {
+                    $_SESSION['message'] = 'Pedido confirmado (online), comprovante anexado e comissão registrada.';
+                    $_SESSION['message_type'] = 'success';
+                }
                 header('Location: /admin/pedidos/conferencia');
                 exit;
             }
