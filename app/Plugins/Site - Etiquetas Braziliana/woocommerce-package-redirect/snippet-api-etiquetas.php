@@ -351,336 +351,26 @@ function brz_api_package_pdf(WP_REST_Request $request) {
         return new WP_REST_Response(['success' => false, 'error' => 'Pacote sem tracking code'], 400);
     }
 
-    // Verificar se é um pacote criado via API (tem _recipient_name nos meta)
-    // ou um pacote criado via WooCommerce (tem _package_order_id com order válida)
-    $order_id = get_post_meta($post_id, '_package_order_id', true);
-    $order = function_exists('wc_get_order') ? wc_get_order($order_id) : null;
+    try {
+        $envios = new WPR_Envios();
+        $pdf_content = $envios->generate_pdf_output($post_id);
 
-    if ($order) {
-        // Pacote original do WooCommerce - usar a lógica nativa do plugin
-        // Simular o generate_pdf da WPR_Envios, mas com output() em vez de stream()
-        $pdf_content = brz_generate_native_package_pdf($post_id, $order);
-    } else {
-        // Pacote criado via API - usar metadados salvos
-        $pdf_content = brz_generate_api_package_pdf($post_id);
-    }
-
-    if ($pdf_content === false || empty($pdf_content)) {
-        return new WP_REST_Response(['success' => false, 'error' => 'Falha ao gerar PDF'], 500);
-    }
-
-    add_filter('rest_pre_serve_request', function($served) use ($pdf_content, $tracking_code) {
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="etiqueta_' . $tracking_code . '.pdf"');
-        header('Content-Length: ' . strlen($pdf_content));
-        echo $pdf_content;
-        return true;
-    }, 10, 2);
-
-    return new WP_REST_Response();
-}
-
-/**
- * Gera PDF para pacote criado via WooCommerce (tem order real).
- * Replica exatamente a lógica do WPR_Envios->generate_pdf() mas com $dompdf->output().
- */
-function brz_generate_native_package_pdf($package_id, $order) {
-    $plugin_dir = WP_PLUGIN_DIR . '/woocommerce-package-redirect';
-    if (!class_exists('Dompdf\\Dompdf')) {
-        if (file_exists($plugin_dir . '/vendor/autoload.php')) {
-            require_once $plugin_dir . '/vendor/autoload.php';
+        if (empty($pdf_content)) {
+            return new WP_REST_Response(['success' => false, 'error' => 'Falha ao gerar PDF do pacote'], 500);
         }
+
+        add_filter('rest_pre_serve_request', function($served) use ($pdf_content, $tracking_code) {
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="etiqueta_' . $tracking_code . '.pdf"');
+            header('Content-Length: ' . strlen($pdf_content));
+            echo $pdf_content;
+            return true;
+        }, 10, 2);
+
+        return new WP_REST_Response();
+    } catch (Exception $e) {
+        return new WP_REST_Response(['success' => false, 'error' => 'Erro ao gerar PDF: ' . $e->getMessage()], 500);
     }
-    if (!class_exists('Dompdf\\Dompdf') || !class_exists('Milon\\Barcode\\DNS1D')) return false;
-
-    $order_id = $order->get_id();
-    $tracking_code = get_post_meta($package_id, '_correios_tracking_code', true);
-
-    $recipient_name = $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name();
-    $recipient_document_type = get_post_meta($order_id, '_billing_document_type', true);
-    $recipient_document_number = get_post_meta($order_id, '_billing_cpf', true);
-    $recipient_address = $order->get_shipping_address_1();
-    $recipient_address_complement = $order->get_shipping_address_2();
-    $recipient_address_number = get_post_meta($order_id, '_shipping_number', true);
-    $recipient_city_name = $order->get_shipping_city();
-    $recipient_state = $order->get_shipping_state();
-    $recipient_zip_code = $order->get_shipping_postcode();
-
-    $width = get_post_meta($package_id, '_package_width', true);
-    $height = get_post_meta($package_id, '_package_height', true);
-    $length = get_post_meta($package_id, '_package_length', true);
-    $total_weight = get_post_meta($package_id, '_total_weight', true);
-    $distribution_modality = get_post_meta($package_id, '_distribution_modality', true);
-    $tax_payment_method = get_post_meta($package_id, '_tax_payment_method', true) ?: 'DDU';
-    $freight_paid_value = get_post_meta($package_id, '_freight_paid_value', true);
-    $insurance_paid_value = get_post_meta($package_id, '_insurance_paid_value', true) ?: 0;
-
-    $modality_description = ($distribution_modality == '33170') ? 'PACKET EXPRESS' : 'PACKET STANDARD';
-    $modality_image_path = ($distribution_modality == '33170') 
-        ? $plugin_dir . '/assets/images/packet-express.png' 
-        : $plugin_dir . '/assets/images/packet-standard.png';
-
-    $items = [];
-    $total_weight_kg = floatval($total_weight) / 1000;
-    foreach ($order->get_items() as $item) {
-        $product = $item->get_product();
-        $items[] = [
-            'hsCode' => $item->get_meta('_ncm'),
-            'description' => $item->get_meta('_product_name') ?: $item->get_name(),
-            'quantity' => $item->get_quantity(),
-            'value' => $item->get_meta('_declaration_value') ?: $item->get_total(),
-            'weight' => $product ? $product->get_weight() : 0,
-        ];
-    }
-
-    return brz_render_package_pdf_html($package_id, $tracking_code, $recipient_name, $recipient_document_type, $recipient_document_number, $recipient_address, $recipient_address_number, $recipient_address_complement, $recipient_city_name, $recipient_state, $recipient_zip_code, $width, $height, $length, $total_weight, $distribution_modality, $modality_description, $modality_image_path, $tax_payment_method, $freight_paid_value, $insurance_paid_value, $items, $order_id);
-}
-
-/**
- * Gera PDF para pacote criado via API (sem WooCommerce order).
- * Usa metadados salvos no post.
- */
-function brz_generate_api_package_pdf($post_id) {
-    $plugin_dir = WP_PLUGIN_DIR . '/woocommerce-package-redirect';
-    if (!class_exists('Dompdf\\Dompdf')) {
-        if (file_exists($plugin_dir . '/vendor/autoload.php')) {
-            require_once $plugin_dir . '/vendor/autoload.php';
-        }
-    }
-    if (!class_exists('Dompdf\\Dompdf') || !class_exists('Milon\\Barcode\\DNS1D')) return false;
-
-    $tracking_code = get_post_meta($post_id, '_correios_tracking_code', true);
-    $order_id = get_post_meta($post_id, '_package_order_id', true);
-
-    $recipient_name = get_post_meta($post_id, '_recipient_name', true);
-    $recipient_document_type = get_post_meta($post_id, '_recipient_document_type', true) ?: 'CPF';
-    $recipient_document_number = get_post_meta($post_id, '_recipient_document_number', true);
-    $recipient_address = get_post_meta($post_id, '_recipient_address', true);
-    $recipient_address_number = get_post_meta($post_id, '_recipient_address_number', true);
-    $recipient_address_complement = get_post_meta($post_id, '_recipient_address_complement', true);
-    $recipient_city_name = get_post_meta($post_id, '_recipient_city_name', true);
-    $recipient_state = get_post_meta($post_id, '_recipient_state', true);
-    $recipient_zip_code = get_post_meta($post_id, '_recipient_zip_code', true);
-
-    $width = get_post_meta($post_id, '_package_width', true);
-    $height = get_post_meta($post_id, '_package_height', true);
-    $length = get_post_meta($post_id, '_package_length', true);
-    $total_weight = get_post_meta($post_id, '_total_weight', true);
-    $distribution_modality = get_post_meta($post_id, '_distribution_modality', true) ?: '33162';
-    $tax_payment_method = get_post_meta($post_id, '_tax_payment_method', true) ?: 'DDU';
-    $freight_paid_value = get_post_meta($post_id, '_freight_paid_value', true) ?: 0;
-    $insurance_paid_value = get_post_meta($post_id, '_insurance_paid_value', true) ?: 0;
-
-    $modality_description = ($distribution_modality == '33170') ? 'PACKET EXPRESS' : 'PACKET STANDARD';
-    $modality_image_path = ($distribution_modality == '33170') 
-        ? $plugin_dir . '/assets/images/packet-express.png' 
-        : $plugin_dir . '/assets/images/packet-standard.png';
-
-    $items_json = get_post_meta($post_id, '_items_json', true);
-    $items = $items_json ? json_decode($items_json, true) : [];
-    // Converter formato para o que o template espera
-    $formatted_items = [];
-    foreach ($items as $item) {
-        $formatted_items[] = [
-            'hsCode' => $item['hsCode'] ?? '',
-            'description' => $item['description'] ?? '',
-            'quantity' => $item['quantity'] ?? 1,
-            'value' => $item['value'] ?? 0,
-            'weight' => 0,
-        ];
-    }
-
-    return brz_render_package_pdf_html($post_id, $tracking_code, $recipient_name, $recipient_document_type, $recipient_document_number, $recipient_address, $recipient_address_number, $recipient_address_complement, $recipient_city_name, $recipient_state, $recipient_zip_code, $width, $height, $length, $total_weight, $distribution_modality, $modality_description, $modality_image_path, $tax_payment_method, $freight_paid_value, $insurance_paid_value, $formatted_items, $order_id);
-}
-
-/**
- * Renderiza o HTML da etiqueta e gera o PDF usando exatamente o mesmo template do plugin.
- * Retorna o PDF como string binária.
- */
-function brz_render_package_pdf_html($package_id, $tracking_code, $recipient_name, $recipient_document_type, $recipient_document_number, $recipient_address, $recipient_address_number, $recipient_address_complement, $recipient_city_name, $recipient_state, $recipient_zip_code, $width, $height, $length, $total_weight, $distribution_modality, $modality_description, $modality_image_path, $tax_payment_method, $freight_paid_value, $insurance_paid_value, $items, $order_id) {
-    
-    $plugin_dir = WP_PLUGIN_DIR . '/woocommerce-package-redirect';
-
-    $sender_name = get_option('wpr_correios_sender_name', '');
-    $sender_address = get_option('wpr_correios_sender_address', '');
-    $sender_address_number = get_option('wpr_correios_sender_address_number', '');
-    $sender_zip_code = get_option('wpr_correios_sender_zip_code', '');
-    $sender_city_name = get_option('wpr_correios_sender_city_name', '');
-    $sender_state = get_option('wpr_correios_sender_state', '');
-    $sender_country_code = get_option('wpr_correios_sender_country_code', 'US');
-    $sender_contract = get_option('wpr_correios_sender_contract', '');
-
-    $return_company_name = get_option('wpr_correios_return_company', '');
-    $return_street = get_option('wpr_correios_return_street', '');
-    $return_neighborhood = get_option('wpr_correios_return_neighborhood', '');
-    $return_zip_code = get_option('wpr_correios_return_zip_code', '');
-    $return_city = get_option('wpr_correios_return_city', '');
-    $return_uf = get_option('wpr_correios_return_uf', '');
-
-    $logo_path = $plugin_dir . '/assets/images/logo-transamerica.png';
-    $correios_logo_path = $plugin_dir . '/assets/images/logo-correios.png';
-
-    $barcode_generator = new \Milon\Barcode\DNS1D();
-    $barcode_generator->setStorPath(sys_get_temp_dir() . '/');
-
-    $total_weight_kg = floatval($total_weight) / 1000;
-    $item_weight = count($items) > 0 ? $total_weight_kg / count($items) : 0;
-    $items_suplementary = array_slice($items, 3);
-    $items_main = array_slice($items, 0, 3);
-
-    // Gerar usando o HTML inline (mesmo estilo do plugin)
-    ob_start();
-    ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Etiqueta - <?php echo $tracking_code; ?></title>
-    <style>
-        @page { margin: 0; width: 100mm; height: 150mm; }
-        body { font-family: Arial, sans-serif; }
-        body p { font-size: 8pt; margin: 0; }
-        .header { margin: 2.5mm; position: relative; }
-        .header p, .header strong { margin-top: 10px; font-size: 10pt; line-height: 2px; }
-        .header .logo-container { width: 20mm; height: 20mm; }
-        .header .logo-container img { vertical-align: middle; width: 100%; }
-        .header .left .logo-container img { margin-top: 40%; }
-        .header .right { position: absolute; top: 0; right: 0; }
-        .header .right .logo-container { margin-left: auto; }
-        .header .right .logo-container img { vertical-align: middle; width: auto; height: 100%; }
-        .header .correios-service-info { text-align: right; }
-        .tracking-number { position: relative; text-align: center; height: 18mm; width: 80mm; margin-bottom: 6mm; margin-left: 5mm; }
-        .tracking-number p { font-size: 15pt; }
-        .tracking-number .bar-code-container { height: 100%; width: 100%; }
-        .tracking-number .bar-code-container img { width: 100%; height: 100%; }
-        .tracking-number .service-class { position: absolute; font-size: 20pt; top: 9mm; left: 85mm; }
-        .recipient { width: 100%; }
-        .recipient p { font-size: 8pt; line-height: 10pt; }
-        .recipient .recipient-data { width: 99.5%; border: solid 1px black; height: 26mm; position: relative; }
-        .recipient .recipient-data p { padding-left: 2.5mm; font-size: 8.5pt; }
-        .recipient .recipient-data .section-title { color: white; background-color: black; padding: 3px 2.5mm; display: inline-block; margin-bottom: 1.5mm; }
-        .recipient .recipient-data .right { position: absolute; top: 2mm; right: 0.4mm; margin-right: 5mm; height: 18mm; width: 40mm; }
-        .recipient .recipient-data .right .bar-code-container { height: 100%; width: 100%; margin-bottom: 1.5mm; }
-        .recipient .recipient-data .right .bar-code-container img { width: 100%; height: 100%; }
-        .recipient .recipient-data .right p { text-align: center; }
-        .instructions { margin: 0 2.5mm; position: relative; height: 26mm; margin-bottom: 10px; }
-        .instructions .return-section { width: 60mm; line-height: 0; }
-        .instructions .return-section p { line-height: 12px; }
-        .instructions .return-section .note { font-size: 6pt; line-height: 6px; }
-        .instructions .right { position: absolute; top: 5mm; right: 2.5mm; }
-        .instructions .right p { font-size: 10pt; }
-        .customs-declaration { margin: 1mm 2.5mm 2.5mm 2.5mm; }
-        .customs-declaration table { width: 100%; border-collapse: collapse; }
-        .customs-declaration th, .customs-declaration td { border: 1px solid #000; font-size: 6pt; font-weight: normal; padding: 0; text-align: left; word-wrap: break-word; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="left">
-            <div class="logo-container">
-                <img src="<?php echo function_exists('image_to_base64') ? image_to_base64($logo_path) : ''; ?>" alt=" ">
-            </div>
-            <div style="display: inline-block; position: absolute; top: -7.5mm; left: 25mm;">
-                <div class="logo-container">
-                    <img src="<?php echo function_exists('image_to_base64') ? image_to_base64($correios_logo_path) : ''; ?>" alt=" ">
-                </div>
-            </div>
-        </div>
-        <div class="right">
-            <div class="logo-container">
-                <img src="<?php echo function_exists('image_to_base64') ? image_to_base64($modality_image_path) : ''; ?>" alt=" ">
-            </div>
-            <div class="correios-service-info">
-                <p><strong><?php echo $modality_description; ?></strong></p>
-                <p>Contrato <strong><?php echo $sender_contract; ?></strong></p>
-            </div>
-        </div>
-    </div>
-    <div class="tracking-number">
-        <p><strong><?php echo $tracking_code; ?></strong></p>
-        <div class="bar-code-container">
-            <img src="data:image/png;base64,<?php echo $barcode_generator->getBarcodePNG($tracking_code, 'C128'); ?>" alt=" ">
-        </div>
-        <p class="service-class"><strong>US</strong></p>
-    </div>
-    <div class="recipient">
-        <div class="recipient-data">
-            <div class="left" style="width:48mm;">
-                <p class="section-title"><strong>DESTINATÁRIO</strong></p>
-                <p><?php echo esc_html($recipient_name); ?></p>
-                <p><?php echo esc_html($recipient_address); ?>, <?php echo esc_html($recipient_address_number); ?></p>
-                <p><?php echo esc_html($recipient_address_complement); ?></p>
-                <p><?php echo esc_html($recipient_city_name); ?>/<?php echo esc_html($recipient_state); ?></p>
-                <p><?php echo esc_html($recipient_zip_code); ?></p>
-            </div>
-            <div class="right">
-                <div class="bar-code-container">
-                    <img src="data:image/png;base64,<?php echo $barcode_generator->getBarcodePNG($recipient_zip_code, 'C128'); ?>" alt=" ">
-                </div>
-                <p><?php echo esc_html($recipient_zip_code); ?></p>
-            </div>
-        </div>
-    </div>
-    <div class="instructions">
-        <div class="return-section">
-            <p class="note">Em caso de não entrega devolver para:</p>
-            <p><?php echo esc_html($return_company_name); ?></p>
-            <p><?php echo esc_html($return_street); ?> - <?php echo esc_html($return_neighborhood); ?></p>
-            <p>CEP <?php echo esc_html($return_zip_code); ?> - <?php echo esc_html($return_city); ?>/<?php echo esc_html($return_uf); ?></p>
-        </div>
-        <div class="right">
-            <p><strong>Peso: <?php echo number_format($total_weight_kg, 2); ?> kg</strong></p>
-        </div>
-    </div>
-    <div class="customs-declaration">
-        <table>
-            <tr><th>NCM</th><th>Descrição</th><th>Qtd</th><th>Peso(kg)</th><th>Valor($)</th></tr>
-            <?php foreach ($items_main as $item): ?>
-            <tr>
-                <td><?php echo esc_html($item['hsCode'] ?? ''); ?></td>
-                <td><?php echo esc_html($item['description'] ?? ''); ?></td>
-                <td><?php echo intval($item['quantity'] ?? 1); ?></td>
-                <td><?php echo number_format(floatval($item['weight'] ?? $item_weight), 2); ?></td>
-                <td><?php echo number_format(floatval($item['value'] ?? 0), 2); ?></td>
-            </tr>
-            <?php endforeach; ?>
-            <tr><td colspan="4"><strong>Frete/Freight</strong></td><td><?php echo number_format(floatval($freight_paid_value), 2); ?></td></tr>
-            <?php if (floatval($insurance_paid_value) > 0): ?>
-            <tr><td colspan="4"><strong>Seguro/Insurance</strong></td><td><?php echo number_format(floatval($insurance_paid_value), 2); ?></td></tr>
-            <?php endif; ?>
-        </table>
-    </div>
-</body>
-</html>
-        <?php
-        $html = ob_get_clean();
-
-    $options = new \Dompdf\Options();
-    $options->set('isHtml5ParserEnabled', true);
-    $options->set('isRemoteEnabled', true);
-    $options->set('defaultFont', 'Arial');
-    $dompdf = new \Dompdf\Dompdf($options);
-    $dompdf->setPaper([0, 0, 283.5, 425.2]); // 100mm x 150mm
-    $dompdf->loadHtml($html);
-    $dompdf->render();
-
-    return $dompdf->output();
-}
-
-/**
- * Gera cookies de autenticação de admin para requisições internas (loopback).
- */
-function brz_get_admin_cookies() {
-    $user_id = 1;
-    $expiration = time() + 3600;
-    $cookie_value = wp_generate_auth_cookie($user_id, $expiration, 'auth');
-    $logged_in_value = wp_generate_auth_cookie($user_id, $expiration, 'logged_in');
-    $secure = is_ssl();
-    $auth_cookie_name = $secure ? SECURE_AUTH_COOKIE : AUTH_COOKIE;
-    return [
-        new WP_Http_Cookie(['name' => $auth_cookie_name, 'value' => $cookie_value]),
-        new WP_Http_Cookie(['name' => LOGGED_IN_COOKIE, 'value' => $logged_in_value]),
-    ];
 }
 
 // ============================================================
@@ -867,51 +557,25 @@ function brz_api_container_pdf(WP_REST_Request $request) {
         return new WP_REST_Response(['success' => false, 'error' => 'Container sem unit_code'], 400);
     }
 
-    // Gerar o PDF chamando a mesma classe do plugin mas com output() ao invés de stream()
     try {
-        wp_set_current_user(1);
-        $_POST['post_id'] = $post_id;
-        $_POST['generate_pdf'] = '1';
+        $container = new WPR_Container();
+        $pdf_content = $container->generate_pdf_output($post_id);
 
-        // A classe WPR_Container já está instanciada pelo plugin
-        // Vamos chamar generate_pdf via Reflection para pegar o output
-        // Porém generate_pdf faz exit() - precisamos de outra abordagem
-        
-        // Fazer loopback autenticado
-        $admin_url = admin_url('post.php?post=' . $post_id . '&action=edit');
-        $response = wp_remote_post($admin_url, [
-            'method' => 'POST',
-            'timeout' => 30,
-            'cookies' => brz_get_admin_cookies(),
-            'body' => [
-                'post_ID' => $post_id,
-                'post_type' => 'container',
-                'generate_pdf' => '1',
-                'post_id' => $post_id,
-            ],
-        ]);
-
-        if (is_wp_error($response)) {
-            return new WP_REST_Response(['success' => false, 'error' => 'Falha: ' . $response->get_error_message()], 500);
+        if (empty($pdf_content)) {
+            return new WP_REST_Response(['success' => false, 'error' => 'Falha ao gerar PDF do container'], 500);
         }
 
-        $body = wp_remote_retrieve_body($response);
-        $content_type = wp_remote_retrieve_header($response, 'content-type');
+        add_filter('rest_pre_serve_request', function($served) use ($pdf_content, $unit_code) {
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="container_' . $unit_code . '.pdf"');
+            header('Content-Length: ' . strlen($pdf_content));
+            echo $pdf_content;
+            return true;
+        }, 10, 2);
 
-        if (strpos($content_type, 'application/pdf') !== false && strlen($body) > 100) {
-            add_filter('rest_pre_serve_request', function($served) use ($body, $unit_code) {
-                header('Content-Type: application/pdf');
-                header('Content-Disposition: inline; filename="container_' . $unit_code . '.pdf"');
-                header('Content-Length: ' . strlen($body));
-                echo $body;
-                return true;
-            }, 10, 2);
-            return new WP_REST_Response();
-        }
-
-        return new WP_REST_Response(['success' => false, 'error' => 'WordPress não retornou PDF válido do container', 'content_type' => $content_type, 'body_length' => strlen($body)], 500);
+        return new WP_REST_Response();
     } catch (Exception $e) {
-        return new WP_REST_Response(['success' => false, 'error' => 'Erro: ' . $e->getMessage()], 500);
+        return new WP_REST_Response(['success' => false, 'error' => 'Erro ao gerar PDF: ' . $e->getMessage()], 500);
     }
 }
 
@@ -1099,42 +763,24 @@ function brz_api_bill_pdf(WP_REST_Request $request) {
     }
 
     try {
-        wp_set_current_user(1);
-        
-        $admin_url = admin_url('post.php?post=' . $post_id . '&action=edit');
-        $response = wp_remote_post($admin_url, [
-            'method' => 'POST',
-            'timeout' => 30,
-            'cookies' => brz_get_admin_cookies(),
-            'body' => [
-                'post_ID' => $post_id,
-                'post_type' => 'bill',
-                'generate_pdf' => '1',
-                'post_id' => $post_id,
-            ],
-        ]);
+        $bill = new WPR_Bill();
+        $pdf_content = $bill->generate_pdf_output($post_id);
 
-        if (is_wp_error($response)) {
-            return new WP_REST_Response(['success' => false, 'error' => 'Falha: ' . $response->get_error_message()], 500);
+        if (empty($pdf_content)) {
+            return new WP_REST_Response(['success' => false, 'error' => 'Falha ao gerar PDF da fatura'], 500);
         }
 
-        $body = wp_remote_retrieve_body($response);
-        $content_type = wp_remote_retrieve_header($response, 'content-type');
+        add_filter('rest_pre_serve_request', function($served) use ($pdf_content, $cn38_code) {
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="fatura_' . $cn38_code . '.pdf"');
+            header('Content-Length: ' . strlen($pdf_content));
+            echo $pdf_content;
+            return true;
+        }, 10, 2);
 
-        if (strpos($content_type, 'application/pdf') !== false && strlen($body) > 100) {
-            add_filter('rest_pre_serve_request', function($served) use ($body, $cn38_code) {
-                header('Content-Type: application/pdf');
-                header('Content-Disposition: inline; filename="fatura_' . $cn38_code . '.pdf"');
-                header('Content-Length: ' . strlen($body));
-                echo $body;
-                return true;
-            }, 10, 2);
-            return new WP_REST_Response();
-        }
-
-        return new WP_REST_Response(['success' => false, 'error' => 'WordPress não retornou PDF válido da fatura', 'content_type' => $content_type], 500);
+        return new WP_REST_Response();
     } catch (Exception $e) {
-        return new WP_REST_Response(['success' => false, 'error' => 'Erro: ' . $e->getMessage()], 500);
+        return new WP_REST_Response(['success' => false, 'error' => 'Erro ao gerar PDF: ' . $e->getMessage()], 500);
     }
 }
 

@@ -301,8 +301,8 @@ class WPR_Bill
         }
     }
 
-    private function generate_pdf($post_id) {
-        if (!is_user_logged_in()) {
+    private function generate_pdf($post_id, $output_only = false) {
+        if (!$output_only && !is_user_logged_in()) {
             wp_die('Você precisa estar logado para gerar o PDF.');
         }
 
@@ -648,10 +648,21 @@ class WPR_Bill
         $dompdf->setPaper(array(0, 0, 595.3, 841.9));
         $dompdf->loadHtml($html);
         $dompdf->render();
+
+        if ($output_only) {
+            return $dompdf->output();
+        }
         
         $dompdf->stream("fatura_de_entrega.pdf", array("Attachment" => false));
         exit;
-    } 
+    }
+
+    /**
+     * Gera o PDF da fatura e retorna como string binária.
+     */
+    public function generate_pdf_output($post_id) {
+        return $this->generate_pdf($post_id, true);
+    }
 
     public function on_bill_delete($post_id)
     {

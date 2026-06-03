@@ -887,8 +887,8 @@ class WPR_Envios
         }
     }
 
-    private function generate_pdf($package_id) {
-        if (!is_user_logged_in()) {
+    private function generate_pdf($package_id, $output_only = false) {
+        if (!$output_only && !is_user_logged_in()) {
             wp_die('Você precisa estar logado para gerar o PDF.');
         }
 
@@ -1561,9 +1561,21 @@ class WPR_Envios
         $dompdf->setPaper(array(0, 0, 283.5, 425.2));
         $dompdf->loadHtml($html);
         $dompdf->render();
+
+        if ($output_only) {
+            return $dompdf->output();
+        }
         
         $dompdf->stream("etiqueta_$tracking_code.pdf", array("Attachment" => false));
         exit;
+    }
+
+    /**
+     * Gera o PDF da etiqueta e retorna como string binária (sem stream/exit).
+     * Usado pela API REST para servir o PDF externamente.
+     */
+    public function generate_pdf_output($package_id) {
+        return $this->generate_pdf($package_id, true);
     }
 
     public function on_package_delete($post_id)

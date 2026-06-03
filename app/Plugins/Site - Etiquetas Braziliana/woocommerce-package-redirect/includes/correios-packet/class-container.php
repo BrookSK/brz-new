@@ -434,8 +434,8 @@ class WPR_Container
         }
     }
 
-    private function generate_pdf($post_id) {
-        if (!is_user_logged_in()) {
+    private function generate_pdf($post_id, $output_only = false) {
+        if (!$output_only && !is_user_logged_in()) {
             wp_die('Você precisa estar logado para gerar o PDF.');
         }
 
@@ -659,9 +659,20 @@ class WPR_Container
         $dompdf->setPaper(array(0, 0, 623.6, 311.8));
         $dompdf->loadHtml($html);
         $dompdf->render();
+
+        if ($output_only) {
+            return $dompdf->output();
+        }
         
         $dompdf->stream("etiqueta_unitizador_$unit_code.pdf", array("Attachment" => false));
         exit;
+    }
+
+    /**
+     * Gera o PDF do container e retorna como string binária.
+     */
+    public function generate_pdf_output($post_id) {
+        return $this->generate_pdf($post_id, true);
     }
     
     public function on_container_delete($post_id)
