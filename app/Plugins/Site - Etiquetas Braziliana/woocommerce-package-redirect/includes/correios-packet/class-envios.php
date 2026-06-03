@@ -896,6 +896,62 @@ class WPR_Envios
         $order = wc_get_order($order_id);
 
         if (!$order) {
+            // Pacote criado via API externa - usar metadados salvos no post
+            if ($output_only) {
+                $tracking_code = get_post_meta($package_id, '_correios_tracking_code', true);
+                $recipient_name = get_post_meta($package_id, '_recipient_name', true);
+                $recipient_document_type = get_post_meta($package_id, '_recipient_document_type', true) ?: 'CPF';
+                $recipient_document_number = get_post_meta($package_id, '_recipient_document_number', true);
+                $recipient_address = get_post_meta($package_id, '_recipient_address', true);
+                $recipient_address_complement = get_post_meta($package_id, '_recipient_address_complement', true);
+                $recipient_address_number = get_post_meta($package_id, '_recipient_address_number', true);
+                $recipient_city_name = get_post_meta($package_id, '_recipient_city_name', true);
+                $recipient_state = get_post_meta($package_id, '_recipient_state', true);
+                $recipient_zip_code = get_post_meta($package_id, '_recipient_zip_code', true);
+                $recipient_email = get_post_meta($package_id, '_recipient_email', true);
+                $recipient_phone_number = get_post_meta($package_id, '_recipient_phone_number', true);
+
+                $width = get_post_meta($package_id, '_package_width', true);
+                $height = get_post_meta($package_id, '_package_height', true);
+                $length = get_post_meta($package_id, '_package_length', true);
+                $total_weight = get_post_meta($package_id, '_total_weight', true) / 1000;
+                $distribution_modality = get_post_meta($package_id, '_distribution_modality', true);
+                $tax_payment_method = get_post_meta($package_id, '_tax_payment_method', true) ?: 'DDU';
+                $currency = get_post_meta($package_id, '_currency', true) ?: 'USD';
+                $non_nationalization_instruction = get_post_meta($package_id, '_non_nationalization_instruction', true) ?: 'RETURNTOORIGIN';
+                $package_rfid_code = get_post_meta($package_id, '_package_rfid_code', true);
+                $freight_paid_value = get_post_meta($package_id, '_freight_paid_value', true) ?: 0;
+                $insurance_paid_value = get_post_meta($package_id, '_insurance_paid_value', true) ?: 0;
+
+                $modality_description = '';
+                $modality_image_path = '';
+                if ($distribution_modality == '33162') {
+                    $modality_description = 'PACKET STANDARD';
+                    $modality_image_path = plugin_dir_path(dirname(plugin_dir_path(__FILE__), 1)) . 'assets/images/packet-standard.png';
+                } elseif ($distribution_modality == '33170') {
+                    $modality_description = 'PACKET EXPRESS';
+                    $modality_image_path = plugin_dir_path(dirname(plugin_dir_path(__FILE__), 1)) . 'assets/images/packet-express.png';
+                }
+
+                $items_json = get_post_meta($package_id, '_items_json', true);
+                $items_raw = $items_json ? json_decode($items_json, true) : [];
+                $items = [];
+                foreach ($items_raw as $it) {
+                    $items[] = [
+                        'hsCode' => $it['hsCode'] ?? '',
+                        'description' => $it['description'] ?? '',
+                        'quantity' => $it['quantity'] ?? 1,
+                        'value' => $it['value'] ?? 0,
+                        'weight' => $it['weight'] ?? 0,
+                    ];
+                }
+                $item_weight = count($items) > 0 ? $total_weight / count($items) : 0;
+                $items_suplementary = array_slice($items, 3);
+                $items = array_slice($items, 0, 3);
+
+                // Jump to rendering (skip the $order-based data loading below)
+                goto render_pdf;
+            }
             wp_die('Pedido não encontrado. ID do pedido: ' . $order_id);
         }
 
@@ -955,6 +1011,8 @@ class WPR_Envios
         $item_weight = $total_weight / count($items);
         $items_suplementary = array_slice($items, 3);
         $items = array_slice($items, 0, 3);
+
+        render_pdf:
 
         $sender_name = get_option('wpr_correios_sender_name', '');
         $sender_address = get_option('wpr_correios_sender_address', '');
