@@ -93,6 +93,81 @@
 
         <!-- TAB: ETIQUETAS -->
         <div class="tab-pane fade" id="tab-etiquetas">
+            <!-- SEÇÃO 1: Pedidos prontos para gerar etiqueta -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Pedidos em Caixa Fechada (prontos para gerar etiqueta)</strong>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-warning" id="btnGerarMassa" onclick="gerarEtiquetasMassa()" style="display:none;">
+                            <i class="fas fa-bolt me-1"></i>Gerar Selecionados
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="pedidos-loading" class="text-center py-3" style="display:none;">
+                        <div class="spinner-border spinner-border-sm text-primary"></div> Gerando etiquetas...
+                    </div>
+                    <div id="pedidos-resultado" class="mb-3" style="display:none;"></div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="checkAllPedidos" onclick="toggleAllPedidos()"></th>
+                                    <th>Pedido</th>
+                                    <th>Cliente</th>
+                                    <th>Peso</th>
+                                    <th>Medidas (CxLxA)</th>
+                                    <th>Data</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pedidos-body">
+                                <?php
+                                // Buscar pedidos em Caixa Fechada sem etiqueta
+                                $pedidosCaixaFechada = [];
+                                try {
+                                    $conn = \Config\Database::getConnection();
+                                    $sql = "SELECT p.id, p.created_at, p.peso_total, p.altura, p.largura, p.comprimento, u.nome as cliente_nome
+                                            FROM pedidos p
+                                            LEFT JOIN usuarios u ON u.id = p.usuario_id
+                                            LEFT JOIN correios_packet_etiquetas cpe ON cpe.pedido_id = p.id
+                                            WHERE LOWER(COALESCE(p.status,'')) IN ('produto_consolidado','consolidado')
+                                              AND cpe.id IS NULL
+                                            ORDER BY p.created_at ASC
+                                            LIMIT 200";
+                                    $st = $conn->prepare($sql);
+                                    $st->execute();
+                                    $pedidosCaixaFechada = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                                } catch (\Exception $e) {
+                                    $pedidosCaixaFechada = [];
+                                }
+
+                                if (empty($pedidosCaixaFechada)): ?>
+                                    <tr><td colspan="6" class="text-muted">Nenhum pedido em Caixa Fechada aguardando etiqueta.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($pedidosCaixaFechada as $ped): ?>
+                                        <tr>
+                                            <td><input type="checkbox" class="chk-pedido" value="<?= (int) $ped['id'] ?>"></td>
+                                            <td><strong>#<?= str_pad((string) $ped['id'], 6, '0', STR_PAD_LEFT) ?></strong></td>
+                                            <td><?= htmlspecialchars((string) ($ped['cliente_nome'] ?? '-')) ?></td>
+                                            <td><?= !empty($ped['peso_total']) ? number_format((float) $ped['peso_total'], 2, ',', '.') . ' kg' : '<span class="text-danger">-</span>' ?></td>
+                                            <td>
+                                                <?php if (!empty($ped['comprimento']) && !empty($ped['largura']) && !empty($ped['altura'])): ?>
+                                                    <?= $ped['comprimento'] ?>x<?= $ped['largura'] ?>x<?= $ped['altura'] ?> cm
+                                                <?php else: ?>
+                                                    <span class="text-danger">Sem medidas</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?= !empty($ped['created_at']) ? date('d/m/Y', strtotime((string) $ped['created_at'])) : '-' ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 2: Pacotes já gerados no WordPress (sem container) -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <strong>Pacotes sem Container (disponíveis)</strong>
@@ -384,6 +459,101 @@ async function executarTeste() {
 }
 
 // ============================================================
+// PEDIDOS → GERAR ETIQUETAS
+// ============================================================
+function toggleAllPedidos() {
+    const checked = document.getElementById('checkAllPedidos').checked;
+    document.querySelectorAll('.chk-pedido').forEach(el => el.checked = checked);
+    atualizarBotaoMassa();
+}
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('chk-pedido')) {
+        atualizarBotaoMassa();
+    }
+    if (e.target.classList.contains('chk-pacote')) {
+        atualizarTrackingsSelecionados();
+    }
+    if (e.target.classList.contains('chk-container')) {
+        atualizarContainersSelecionados();
+    }
+    if (e.target.classList.contains('chk-fatura')) {
+        atualizarFaturasSelecionadas();
+    }
+});
+
+function atualizarBotaoMassa() {
+    const selecionados = document.querySelectorAll('.chk-pedido:checked').length;
+    const btn = document.getElementById('btnGerarMassa');
+    if (selecionados > 0) {
+        btn.style.display = 'inline-block';
+        btn.innerHTML = '<i class="fas fa-bolt me-1"></i>Gerar ' + selecionados + ' Etiqueta(s)';
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+async function gerarEtiquetasMassa() {
+    const ids = [];
+    document.querySelectorAll('.chk-pedido:checked').forEach(el => {
+        ids.push(parseInt(el.value));
+    });
+    
+    if (ids.length === 0) {
+        alert('Selecione pelo menos 1 pedido.');
+        return;
+    }
+    
+    if (!confirm('Gerar etiquetas para ' + ids.length + ' pedido(s) via WordPress?')) return;
+    
+    const btn = document.getElementById('btnGerarMassa');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Gerando...';
+    document.getElementById('pedidos-loading').style.display = 'block';
+    
+    try {
+        const resp = await fetch(BASE + '/gerar-etiquetas-massa', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ids: ids })
+        });
+        const data = await resp.json();
+        
+        const el = document.getElementById('pedidos-resultado');
+        el.style.display = 'block';
+        
+        if (data.success) {
+            let html = '<div class="alert alert-' + (data.failed > 0 ? 'warning' : 'success') + '">';
+            html += '<strong>Resultado:</strong> ' + data.generated + ' gerada(s), ' + data.failed + ' falha(s)</div>';
+            
+            if (data.results && data.results.length > 0) {
+                html += '<table class="table table-sm"><thead><tr><th>Pedido</th><th>Status</th><th>Tracking</th><th>Erro</th></tr></thead><tbody>';
+                data.results.forEach(r => {
+                    const badge = r.success ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">ERRO</span>';
+                    html += '<tr><td>#' + String(r.pedido_id).padStart(6, '0') + '</td><td>' + badge + '</td><td><code>' + (r.tracking_number || '-') + '</code></td><td class="small text-danger">' + (r.error || '') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            el.innerHTML = html;
+            
+            // Recarregar a página após 3 segundos para atualizar a lista
+            if (data.generated > 0) {
+                setTimeout(() => location.reload(), 3000);
+            }
+        } else {
+            el.innerHTML = '<div class="alert alert-danger">' + (data.error || 'Erro desconhecido') + '</div>';
+        }
+    } catch (e) {
+        document.getElementById('pedidos-resultado').style.display = 'block';
+        document.getElementById('pedidos-resultado').innerHTML = '<div class="alert alert-danger">Erro: ' + e.message + '</div>';
+    }
+    
+    btn.disabled = false;
+    atualizarBotaoMassa();
+    document.getElementById('pedidos-loading').style.display = 'none';
+}
+
+// ============================================================
 // PACOTES (ETIQUETAS)
 // ============================================================
 async function carregarPacotes() {
@@ -431,18 +601,7 @@ function atualizarTrackingsSelecionados() {
     document.getElementById('cnt-trackings').value = selectedTrackings.join('\n');
 }
 
-// Listener para checkboxes de pacotes
-document.addEventListener('change', function(e) {
-    if (e.target.classList.contains('chk-pacote')) {
-        atualizarTrackingsSelecionados();
-    }
-    if (e.target.classList.contains('chk-container')) {
-        atualizarContainersSelecionados();
-    }
-    if (e.target.classList.contains('chk-fatura')) {
-        atualizarFaturasSelecionadas();
-    }
-});
+// Listener para checkboxes de pacotes (handled by main listener above)
 
 // ============================================================
 // CONTAINERS
