@@ -528,20 +528,9 @@ function brz_render_package_pdf_html($package_id, $tracking_code, $recipient_nam
     $items_suplementary = array_slice($items, 3);
     $items_main = array_slice($items, 0, 3);
 
-    // Usar exatamente o template do plugin - incluir o arquivo de template
-    $template_file = $plugin_dir . '/includes/correios-packet/templates/package-label.php';
-    
-    // Se o template file existir, usar ele. Caso contrário, usar o HTML inline do generate_pdf
-    // Como o plugin usa HTML inline no generate_pdf, vamos replicar exatamente
+    // Gerar usando o HTML inline (mesmo estilo do plugin)
     ob_start();
-    // Incluir o exato mesmo HTML que o plugin gera - usando as mesmas variáveis
-    include $plugin_dir . '/includes/correios-packet/templates/package-label-api.php';
-    $html = ob_get_clean();
-
-    // Se o template não existe, gerar inline (fallback com o mesmo estilo do plugin)
-    if (empty($html)) {
-        ob_start();
-        ?>
+    ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -665,7 +654,6 @@ function brz_render_package_pdf_html($package_id, $tracking_code, $recipient_nam
 </html>
         <?php
         $html = ob_get_clean();
-    }
 
     $options = new \Dompdf\Options();
     $options->set('isHtml5ParserEnabled', true);
