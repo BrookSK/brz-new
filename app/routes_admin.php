@@ -132,6 +132,19 @@ $router->post('/admin/correios-mundial/exportar-csv', 'AdminCorreiosMundialContr
 // Download PDF da etiqueta (gerada localmente)
 $router->get('/admin/correios-mundial/etiqueta/{tracking}.pdf', 'AdminCorreiosMundialController', 'etiquetaPdf');
 
+// Etiquetas via WordPress (nova integração)
+$router->get('/admin/etiquetas-wp', 'AdminEtiquetasWpController', 'index');
+$router->get('/admin/etiquetas-wp/testar-conexao', 'AdminEtiquetasWpController', 'testarConexao');
+$router->post('/admin/etiquetas-wp/gerar-etiqueta', 'AdminEtiquetasWpController', 'gerarEtiqueta');
+$router->post('/admin/etiquetas-wp/gerar-etiquetas-massa', 'AdminEtiquetasWpController', 'gerarEtiquetasMassa');
+$router->post('/admin/etiquetas-wp/criar-container', 'AdminEtiquetasWpController', 'criarContainer');
+$router->post('/admin/etiquetas-wp/criar-fatura', 'AdminEtiquetasWpController', 'criarFatura');
+$router->post('/admin/etiquetas-wp/criar-embarque', 'AdminEtiquetasWpController', 'criarEmbarque');
+$router->get('/admin/etiquetas-wp/listar-pacotes', 'AdminEtiquetasWpController', 'listarPacotes');
+$router->get('/admin/etiquetas-wp/listar-containers', 'AdminEtiquetasWpController', 'listarContainers');
+$router->get('/admin/etiquetas-wp/listar-faturas', 'AdminEtiquetasWpController', 'listarFaturas');
+$router->get('/admin/etiquetas-wp/listar-embarques', 'AdminEtiquetasWpController', 'listarEmbarques');
+
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
 $router->post('/admin/pagamentos/comissoes-gerais/ajuste', 'AdminPagamentosController', 'criarAjusteComissaoGeral');
