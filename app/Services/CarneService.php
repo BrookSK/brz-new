@@ -565,7 +565,10 @@ class CarneService {
         // 5. Verificar carnês quitados
         $stmt = $this->db->query("
             SELECT c.id FROM carnes c
+            JOIN pedidos p ON c.pedido_id = p.id
             WHERE c.status NOT IN ('quitado','encerrado','liberado_envio','cancelado')
+            AND p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+            AND (p.deleted_at IS NULL)
             AND NOT EXISTS (
                 SELECT 1 FROM carne_parcelas cp WHERE cp.carne_id = c.id AND cp.status != 'paga'
             )
@@ -581,9 +584,13 @@ class CarneService {
         // 6. Notificar parcelas próximas do vencimento (3 dias)
         $tresDias = date('Y-m-d', strtotime('+3 days'));
         $stmt = $this->db->prepare("
-            SELECT cp.*, c.cliente_id FROM carne_parcelas cp
+            SELECT cp.*, c.cliente_id, c.id AS carne_id_ref FROM carne_parcelas cp
             JOIN carnes c ON cp.carne_id = c.id
+            JOIN pedidos p ON c.pedido_id = p.id
             WHERE cp.status = 'aguardando_pagamento' AND cp.vencimento = :data
+            AND c.status NOT IN ('cancelado', 'quitado', 'encerrado', 'liberado_envio')
+            AND p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+            AND (p.deleted_at IS NULL)
         ");
         $stmt->execute([':data' => $tresDias]);
         $proximasVencer = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -662,10 +669,13 @@ class CarneService {
                 SELECT cp.*, c.pedido_id, c.id AS carne_id_ref
                 FROM carne_parcelas cp
                 JOIN carnes c ON cp.carne_id = c.id
+                JOIN pedidos p ON c.pedido_id = p.id
                 WHERE cp.status IN ('aguardando_pagamento', 'vencida', 'em_atraso')
                 AND cp.numero_parcela > 1
                 AND cp.vencimento < :hoje
                 AND c.status NOT IN ('cancelado', 'quitado', 'encerrado', 'liberado_envio')
+                AND p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+                AND (p.deleted_at IS NULL)
             ");
             $stVencidas->execute([':hoje' => $hoje]);
             $parcelasVencidas = $stVencidas->fetchAll(\PDO::FETCH_ASSOC);
@@ -776,8 +786,11 @@ class CarneService {
         // 7a. Enviar aviso de cancelamento para carnês com X meses de atraso
         $stmt = $this->db->prepare("
             SELECT c.id FROM carnes c
+            JOIN pedidos p ON c.pedido_id = p.id
             WHERE c.status IN ('com_atraso','inadimplente')
             AND c.aviso_cancelamento_em IS NULL
+            AND p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')
+            AND (p.deleted_at IS NULL)
             AND EXISTS (
                 SELECT 1 FROM carne_parcelas cp 
                 WHERE cp.carne_id = c.id AND cp.status IN ('vencida','em_atraso')
@@ -827,6 +840,20 @@ class CarneService {
     public function dispararNotificacao($carneId, $parcelaId, $evento) {
         $carne = $this->carneModel->getCompleto($carneId);
         if (!$carne) return;
+
+        // Não enviar notificações para carnês cancelados (exceto notificação de cancelamento)
+        if ($carne['status'] === 'cancelado' && !in_array($evento, ['carne_cancelado'])) {
+            return;
+        }
+
+        // Não enviar notificações se o pedido está deletado/lixeira
+        $pedidoStatus = $carne['pedido_status'] ?? '';
+        if (in_array($pedidoStatus, ['cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash'])) {
+            // Permitir apenas notificação de cancelamento
+            if (!in_array($evento, ['carne_cancelado'])) {
+                return;
+            }
+        }
 
         $parcela = $parcelaId ? $this->carneModel->getParcela($parcelaId) : null;
 
@@ -950,6 +977,25 @@ class CarneService {
         $stmt = $this->db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'carne_email_ativo'");
         $stmt->execute();
         if (!$stmt->fetchColumn()) return;
+
+        // Limite diário: máximo 2 emails por carnê/evento por dia
+        // Isso evita spam quando o cron roda a cada 5 minutos
+        $hoje = date('Y-m-d');
+        try {
+            $stCheck = $this->db->prepare("
+                SELECT COUNT(*) FROM carne_notificacoes
+                WHERE carne_id = :cid AND evento = :ev AND canal = 'email'
+                AND DATE(created_at) = :hoje
+                AND status IN ('pendente', 'enviado')
+            ");
+            $stCheck->execute([':cid' => $carneId, ':ev' => $evento, ':hoje' => $hoje]);
+            $enviadosHoje = (int) $stCheck->fetchColumn();
+            if ($enviadosHoje >= 2) {
+                return; // Já enviou o máximo de emails para este carnê/evento hoje
+            }
+        } catch (\Exception $e) {
+            // Se a verificação falhar (ex: coluna created_at não existe), prosseguir com envio
+        }
 
         // Registrar na carne_notificacoes (manter compatibilidade)
         $stmt = $this->db->prepare("
