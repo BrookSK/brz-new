@@ -461,6 +461,91 @@ class AdminEtiquetasWpController extends Controller
     }
 
     // =========================================================
+    // DOWNLOAD DE PDFs
+    // =========================================================
+
+    /**
+     * Download do PDF da etiqueta de um pacote.
+     * GET /admin/etiquetas-wp/pdf/pacote/{id}
+     */
+    public function pdfPacote(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $wpPostId = (int) $request->getParam('id');
+        if ($wpPostId <= 0) {
+            http_response_code(400);
+            echo 'ID inválido.';
+            return;
+        }
+
+        $result = $this->wp->downloadPackagePdf($wpPostId);
+        $this->servePdf($result, 'etiqueta_' . $wpPostId . '.pdf');
+    }
+
+    /**
+     * Download do PDF do container.
+     * GET /admin/etiquetas-wp/pdf/container/{id}
+     */
+    public function pdfContainer(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $wpPostId = (int) $request->getParam('id');
+        if ($wpPostId <= 0) {
+            http_response_code(400);
+            echo 'ID inválido.';
+            return;
+        }
+
+        $result = $this->wp->downloadContainerPdf($wpPostId);
+        $this->servePdf($result, 'container_' . $wpPostId . '.pdf');
+    }
+
+    /**
+     * Download do PDF da fatura.
+     * GET /admin/etiquetas-wp/pdf/fatura/{id}
+     */
+    public function pdfFatura(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $wpPostId = (int) $request->getParam('id');
+        if ($wpPostId <= 0) {
+            http_response_code(400);
+            echo 'ID inválido.';
+            return;
+        }
+
+        $result = $this->wp->downloadBillPdf($wpPostId);
+        $this->servePdf($result, 'fatura_' . $wpPostId . '.pdf');
+    }
+
+    /**
+     * Serve o PDF para download ou mostra erro.
+     */
+    private function servePdf($result, string $filename): void
+    {
+        if (is_string($result)) {
+            // É o PDF binário
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($result));
+            echo $result;
+            exit;
+        }
+
+        // É um array de erro
+        http_response_code(is_array($result) ? ((int) ($result['http_code'] ?? 500)) : 500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($result);
+        exit;
+    }
+
+    // =========================================================
     // LISTAR DADOS DO WORDPRESS
     // =========================================================
 

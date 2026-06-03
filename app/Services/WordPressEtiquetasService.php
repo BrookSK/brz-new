@@ -223,6 +223,78 @@ class WordPressEtiquetasService
     }
 
     // =========================================================
+    // PDFs - DOWNLOAD DIRETO
+    // =========================================================
+
+    /**
+     * Baixar PDF da etiqueta de um pacote.
+     * Retorna o conteúdo binário do PDF ou array com erro.
+     */
+    public function downloadPackagePdf(int $wpPostId): array|string
+    {
+        return $this->downloadPdf('/wp-json/brz/v1/packages/pdf/' . $wpPostId);
+    }
+
+    /**
+     * Baixar PDF do container (etiqueta unitizador).
+     */
+    public function downloadContainerPdf(int $wpPostId): array|string
+    {
+        return $this->downloadPdf('/wp-json/brz/v1/containers/pdf/' . $wpPostId);
+    }
+
+    /**
+     * Baixar PDF da fatura (Delivery Bill).
+     */
+    public function downloadBillPdf(int $wpPostId): array|string
+    {
+        return $this->downloadPdf('/wp-json/brz/v1/bills/pdf/' . $wpPostId);
+    }
+
+    /**
+     * Faz GET em um endpoint de PDF e retorna o conteúdo binário.
+     * Retorna string (PDF raw) em caso de sucesso, ou array com erro.
+     */
+    private function downloadPdf(string $path): array|string
+    {
+        $url = $this->baseUrl . $path;
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-API-Key: ' . $this->apiKey,
+        ]);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'brz-system/1.0');
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+        curl_setopt($ch, CURLOPT_ENCODING, '');
+
+        $raw = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false || $raw === null) {
+            return ['success' => false, 'error' => 'Falha na conexão: ' . $err, 'http_code' => $httpCode];
+        }
+
+        // Se o content-type é PDF, retornar o binário direto
+        if (strpos($contentType, 'application/pdf') !== false) {
+            return $raw; // string binária do PDF
+        }
+
+        // Se não é PDF, provavelmente é um JSON de erro
+        $json = json_decode((string) $raw, true);
+        if (is_array($json)) {
+            return $json; // array com success/error
+        }
+
+        return ['success' => false, 'error' => 'Resposta inesperada do WordPress', 'http_code' => $httpCode];
+    }
+
+    // =========================================================
     // HTTP HELPERS
     // =========================================================
 

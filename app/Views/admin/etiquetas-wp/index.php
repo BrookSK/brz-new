@@ -111,10 +111,11 @@
                                     <th>Tracking Code</th>
                                     <th>Peso</th>
                                     <th>Data</th>
+                                    <th>PDF</th>
                                 </tr>
                             </thead>
                             <tbody id="pacotes-body">
-                                <tr><td colspan="5" class="text-muted">Clique em "Atualizar" para carregar os pacotes do WordPress.</td></tr>
+                                <tr><td colspan="6" class="text-muted">Clique em "Atualizar" para carregar os pacotes do WordPress.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -200,10 +201,11 @@
                                     <th>Unit Code</th>
                                     <th>Pacotes</th>
                                     <th>Data</th>
+                                    <th>PDF</th>
                                 </tr>
                             </thead>
                             <tbody id="containers-body">
-                                <tr><td colspan="5" class="text-muted">Clique em "Atualizar" para carregar.</td></tr>
+                                <tr><td colspan="6" class="text-muted">Clique em "Atualizar" para carregar.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -240,10 +242,11 @@
                                     <th>CN38 Code</th>
                                     <th>Remessas</th>
                                     <th>Data</th>
+                                    <th>PDF</th>
                                 </tr>
                             </thead>
                             <tbody id="faturas-body">
-                                <tr><td colspan="4" class="text-muted">Clique em "Atualizar" para carregar.</td></tr>
+                                <tr><td colspan="5" class="text-muted">Clique em "Atualizar" para carregar.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -401,6 +404,7 @@ async function carregarPacotes() {
                     <td><code>${pkg.tracking_code || '-'}</code></td>
                     <td>${pkg.total_weight ? (pkg.total_weight / 1000).toFixed(2) + 'kg' : '-'}</td>
                     <td>${pkg.created_at || '-'}</td>
+                    <td>${pkg.wp_post_id ? '<a href="' + BASE + '/pdf/pacote/' + pkg.wp_post_id + '" target="_blank" class="btn btn-sm btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : ''}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -513,6 +517,7 @@ async function carregarContainers() {
                     <td><code>${cnt.unit_code || '-'}</code></td>
                     <td>${tks} pacotes</td>
                     <td>${cnt.created_at || '-'}</td>
+                    <td>${cnt.wp_post_id ? '<a href="' + BASE + '/pdf/container/' + cnt.wp_post_id + '" target="_blank" class="btn btn-sm btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : ''}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -598,6 +603,7 @@ async function carregarFaturas() {
                     <td><code>${bill.cn38_code || '-'}</code></td>
                     <td>${dns}</td>
                     <td>${bill.created_at || '-'}</td>
+                    <td>${bill.wp_post_id ? '<a href="' + BASE + '/pdf/fatura/' + bill.wp_post_id + '" target="_blank" class="btn btn-sm btn-outline-danger"><i class="fas fa-file-pdf"></i></a>' : ''}</td>
                 `;
                 tbody.appendChild(row);
             });

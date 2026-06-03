@@ -144,6 +144,9 @@ $router->get('/admin/etiquetas-wp/listar-pacotes', 'AdminEtiquetasWpController',
 $router->get('/admin/etiquetas-wp/listar-containers', 'AdminEtiquetasWpController', 'listarContainers');
 $router->get('/admin/etiquetas-wp/listar-faturas', 'AdminEtiquetasWpController', 'listarFaturas');
 $router->get('/admin/etiquetas-wp/listar-embarques', 'AdminEtiquetasWpController', 'listarEmbarques');
+$router->get('/admin/etiquetas-wp/pdf/pacote/{id}', 'AdminEtiquetasWpController', 'pdfPacote');
+$router->get('/admin/etiquetas-wp/pdf/container/{id}', 'AdminEtiquetasWpController', 'pdfContainer');
+$router->get('/admin/etiquetas-wp/pdf/fatura/{id}', 'AdminEtiquetasWpController', 'pdfFatura');
 
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
