@@ -582,6 +582,12 @@ class AdminPedidosEditController extends Controller {
                                     </div>
                                 </div>
 
+                                <div class="mb-3">
+                                    <label class="form-label">Código de Rastreio</label>
+                                    <input type="text" class="form-control" id="tracking_code" value="' . htmlspecialchars((string) ($pedido['tracking_code'] ?? ''), ENT_QUOTES, 'UTF-8') . '" placeholder="Ex: AB123456789BR">
+                                    <div class="form-text">Código de rastreio exibido para o cliente. Deixe vazio se não houver.</div>
+                                </div>
+
                                 <div class="mb-0">
                                     <label class="form-label">Observação do vendedor</label>
                                     <textarea class="form-control" id="observacao_vendedor" rows="4" placeholder="Observação interna para compras/PDF...">' . htmlspecialchars((string) ($pedido['observacao_vendedor'] ?? ''), ENT_QUOTES, 'UTF-8') . '</textarea>
@@ -891,6 +897,7 @@ class AdminPedidosEditController extends Controller {
                     frete: document.getElementById("valor_frete")?.value,
                     desconto: document.getElementById("percentual_desconto")?.value,
                     observacao_vendedor: document.getElementById("observacao_vendedor")?.value,
+                    tracking_code: document.getElementById("tracking_code")?.value,
                     itens: itens
                 };
 
@@ -945,6 +952,7 @@ class AdminPedidosEditController extends Controller {
                     frete: document.getElementById("valor_frete")?.value,
                     desconto: document.getElementById("percentual_desconto")?.value,
                     observacao_vendedor: document.getElementById("observacao_vendedor")?.value,
+                    tracking_code: document.getElementById("tracking_code")?.value,
                     itens: itens
                 };
 
@@ -1517,6 +1525,23 @@ class AdminPedidosEditController extends Controller {
             if (is_array($colsPedidos) && in_array('observacao_vendedor', $colsPedidos, true)) {
                 $setParts[] = 'observacao_vendedor = :observacao_vendedor';
                 $paramsUpd[':observacao_vendedor'] = (string) ($dados['observacao_vendedor'] ?? '');
+            }
+
+            // Tracking code (código de rastreio)
+            if (array_key_exists('tracking_code', $dados)) {
+                $trackingCandidates = ['tracking_code', 'codigo_rastreio', 'rastreamento', 'tracking'];
+                $trackingCol = null;
+                foreach ($trackingCandidates as $candidate) {
+                    if (is_array($colsPedidos) && in_array($candidate, $colsPedidos, true)) {
+                        $trackingCol = $candidate;
+                        break;
+                    }
+                }
+                if ($trackingCol) {
+                    $trackingValue = trim((string) ($dados['tracking_code'] ?? ''));
+                    $setParts[] = $trackingCol . ' = :tracking_code';
+                    $paramsUpd[':tracking_code'] = $trackingValue !== '' ? $trackingValue : null;
+                }
             }
 
             if (is_array($colsPedidos) && in_array('peso_total', $colsPedidos, true)) {
