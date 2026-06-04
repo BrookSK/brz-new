@@ -3763,15 +3763,17 @@ HTML;
                     }
 
                     // Correios
-                    try {
-                        $st = $pdoTrack->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
-                        $st->execute([(int) $id]);
-                        $c = (string) ($st->fetchColumn() ?: '');
-                        if ($c !== '') {
-                            $tracking = $c;
-                            $trackingFonte = 'Correios';
+                    if ($tracking === '') {
+                        try {
+                            $st = $pdoTrack->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                            $st->execute([(int) $id]);
+                            $c = (string) ($st->fetchColumn() ?: '');
+                            if ($c !== '') {
+                                $tracking = $c;
+                                $trackingFonte = 'Correios';
+                            }
+                        } catch (\Exception $e) {
                         }
-                    } catch (\Exception $e) {
                     }
 
                     // W-Express (internacional)
