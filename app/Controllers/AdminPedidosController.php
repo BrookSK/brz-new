@@ -3704,6 +3704,28 @@ HTML;
                 $trackingUrl = '';
 
                 if ($pdoTrack instanceof \PDO) {
+                    // Prioridade 1: campo tracking_code manual da tabela pedidos
+                    try {
+                        $trackingCandidates = ['tracking_code', 'codigo_rastreio', 'rastreamento', 'tracking'];
+                        $trackingColName = null;
+                        foreach ($trackingCandidates as $tc) {
+                            if (is_array($colsPedido) && in_array($tc, $colsPedido, true)) {
+                                $trackingColName = $tc;
+                                break;
+                            }
+                        }
+                        if ($trackingColName) {
+                            $stManual = $pdoTrack->prepare("SELECT {$trackingColName} FROM pedidos WHERE id = ? LIMIT 1");
+                            $stManual->execute([(int) $id]);
+                            $manualTracking = trim((string) ($stManual->fetchColumn() ?: ''));
+                            if ($manualTracking !== '') {
+                                $tracking = $manualTracking;
+                                $trackingFonte = 'Manual (Pedido)';
+                            }
+                        }
+                    } catch (\Exception $e) {
+                    }
+
                     // ShipStation (UPS - exterior)
                     if ($tracking === '') {
                         try {

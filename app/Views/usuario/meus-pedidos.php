@@ -328,8 +328,23 @@
                                                         $statusPedidoRastreio = strtolower(trim((string) ($pedido['status'] ?? '')));
                                                         try {
                                                             $dbRast = \Config\Database::getConnection();
+                                                            // Prioridade 1: campo tracking_code manual da tabela pedidos
+                                                            try {
+                                                                $stmtDescP = $dbRast->query('DESCRIBE pedidos');
+                                                                $colsPedidoRast = $stmtDescP ? $stmtDescP->fetchAll(\PDO::FETCH_COLUMN) : [];
+                                                                $trackingColRast = null;
+                                                                foreach (['tracking_code', 'codigo_rastreio', 'rastreamento', 'tracking'] as $tcR) {
+                                                                    if (in_array($tcR, $colsPedidoRast, true)) { $trackingColRast = $tcR; break; }
+                                                                }
+                                                                if ($trackingColRast) {
+                                                                    $stR = $dbRast->prepare("SELECT {$trackingColRast} FROM pedidos WHERE id = ? LIMIT 1");
+                                                                    $stR->execute([$pedidoIdRastreio]);
+                                                                    $cr = trim((string)($stR->fetchColumn() ?: ''));
+                                                                    if ($cr !== '') $codigoRastreioReal = $cr;
+                                                                }
+                                                            } catch (\Exception $e) {}
                                                             // Correios
-                                                            try { $stR = $dbRast->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {}
+                                                            if ($codigoRastreioReal === '') { try { $stR = $dbRast->prepare("SELECT codigo_etiqueta FROM correios_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {} }
                                                             // ShipStation
                                                             if ($codigoRastreioReal === '') { try { $stR = $dbRast->prepare("SELECT tracking_number FROM shipstation_etiquetas WHERE pedido_id = ? ORDER BY id DESC LIMIT 1"); $stR->execute([$pedidoIdRastreio]); $cr = (string)($stR->fetchColumn() ?: ''); if ($cr !== '') $codigoRastreioReal = $cr; } catch (\Exception $e) {} }
                                                             // Stamps
