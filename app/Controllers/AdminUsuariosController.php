@@ -350,6 +350,7 @@ class AdminUsuariosController extends Controller {
     
     // Adicionar modais
     echo \App\Controllers\AdminUsuariosViews::renderModalAdicionarCredito();
+    echo \App\Controllers\AdminUsuariosViews::renderModalDebitarCredito();
     echo \App\Controllers\AdminUsuariosViews::renderModalConverterMoeda();
     echo \App\Controllers\AdminUsuariosViews::renderModalCreditosLote();
     

@@ -94,6 +94,9 @@ class AdminUsuariosViews {
                                 <button type="button" class="btn btn-sm btn-success" onclick="adicionarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
                                     <i class="fas fa-dollar-sign"></i>
                                 </button>
+                                <button type="button" class="btn btn-sm btn-danger" onclick="debitarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')" title="Debitar crédito">
+                                    <i class="fas fa-minus"></i>
+                                </button>
                                 <a href="/admin/usuarios/editar/' . $usuario['id'] . '" class="btn btn-sm btn-outline-warning">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -216,6 +219,9 @@ class AdminUsuariosViews {
                                 <button type="button" class="btn btn-success btn-sm w-100" onclick="adicionarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
                                     <i class="fas fa-dollar-sign me-1"></i>Adicionar Crédito
                                 </button>
+                                <button type="button" class="btn btn-danger btn-sm w-100 mt-2" onclick="debitarCredito(' . $usuario['id'] . ', \'' . htmlspecialchars($usuario['nome']) . '\')">
+                                    <i class="fas fa-minus-circle me-1"></i>Debitar Crédito
+                                </button>
                                 <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="converterMoeda(' . $usuario['id'] . ')">
                                     <i class="fas fa-exchange-alt me-1"></i>Converter USD → BRL
                                 </button>
@@ -322,6 +328,49 @@ class AdminUsuariosViews {
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                             <button type="button" class="btn btn-success" onclick="confirmarAdicionarCredito()">
                                 <i class="fas fa-dollar-sign me-1"></i>Adicionar Crédito
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>';
+    }
+
+    public static function renderModalDebitarCredito() {
+        return '
+            <div class="modal fade" id="modalDebitarCredito" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title"><i class="fas fa-minus-circle me-2"></i>Debitar Crédito</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="formDebitarCredito">
+                                <input type="hidden" id="debitoUsuarioId">
+                                <div class="mb-3">
+                                    <label class="form-label">Nome do Usuário</label>
+                                    <input type="text" class="form-control" id="debitoNomeUsuario" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Saldo atual (USD)</label>
+                                    <input type="text" class="form-control fw-bold text-success" id="debitoSaldoAtual" readonly>
+                                    <small class="text-muted">Este é o crédito disponível do usuário</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Valor a debitar (USD)</label>
+                                    <input type="number" class="form-control" id="debitoValor" step="0.01" min="0.01" required>
+                                    <small class="text-muted">O valor será subtraído do saldo em dólares americanos</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Descrição (opcional)</label>
+                                    <input type="text" class="form-control" id="debitoDescricao" placeholder="Débito realizado pelo admin">
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-danger" onclick="confirmarDebitarCredito()">
+                                <i class="fas fa-minus-circle me-1"></i>Debitar Crédito
                             </button>
                         </div>
                     </div>
@@ -443,6 +492,22 @@ class AdminUsuariosViews {
                 const modal = new bootstrap.Modal(document.getElementById("modalAdicionarCredito"));
                 modal.show();
             }
+
+            function debitarCredito(usuarioId, nomeUsuario) {
+                document.getElementById("debitoUsuarioId").value = usuarioId;
+                document.getElementById("debitoNomeUsuario").value = nomeUsuario;
+                document.getElementById("debitoValor").value = "";
+                document.getElementById("debitoDescricao").value = "Débito realizado pelo admin";
+
+                // Buscar saldo atual do usuário
+                const usuario = usuariosData.find(u => u.id == usuarioId);
+                const saldo = usuario ? (parseFloat(usuario.carteira_usd) || 0) : 0;
+                document.getElementById("debitoSaldoAtual").value = "$" + saldo.toFixed(2);
+                document.getElementById("debitoValor").max = saldo;
+
+                const modal = new bootstrap.Modal(document.getElementById("modalDebitarCredito"));
+                modal.show();
+            }
             
             function confirmarAdicionarCredito() {
                 const usuarioId = document.getElementById("creditoUsuarioId").value;
@@ -478,6 +543,55 @@ class AdminUsuariosViews {
                 .catch(error => {
                     console.error("Error:", error);
                     alert("Erro ao adicionar crédito");
+                });
+            }
+
+            function confirmarDebitarCredito() {
+                const usuarioId = document.getElementById("debitoUsuarioId").value;
+                const valor = parseFloat(document.getElementById("debitoValor").value);
+                const descricao = document.getElementById("debitoDescricao").value;
+
+                if (!valor || valor <= 0) {
+                    alert("Digite um valor válido maior que zero");
+                    return;
+                }
+
+                // Verificar se não excede o saldo
+                const saldoText = document.getElementById("debitoSaldoAtual").value.replace("$", "");
+                const saldo = parseFloat(saldoText) || 0;
+                if (valor > saldo) {
+                    alert("O valor de débito ($" + valor.toFixed(2) + ") não pode ser maior que o saldo disponível ($" + saldo.toFixed(2) + ")");
+                    return;
+                }
+
+                if (!confirm("Confirma o débito de $" + valor.toFixed(2) + " USD da carteira deste usuário?")) {
+                    return;
+                }
+
+                fetch("/admin/usuarios/debitar-credito", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        usuario_id: usuarioId,
+                        valor: valor,
+                        descricao: descricao
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Débito realizado com sucesso! -$" + valor + " USD");
+                        bootstrap.Modal.getInstance(document.getElementById("modalDebitarCredito")).hide();
+                        location.reload();
+                    } else {
+                        alert("Erro ao debitar crédito: " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("Erro ao debitar crédito");
                 });
             }
             

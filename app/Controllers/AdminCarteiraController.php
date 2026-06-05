@@ -109,6 +109,80 @@ class AdminCarteiraController extends Controller {
         }
         exit;
     }
+
+    public function debitarCredito(Request $request) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor']);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $usuarioId = (int) ($data['usuario_id'] ?? 0);
+        $valor = (float) ($data['valor'] ?? 0);
+        $descricao = trim((string) ($data['descricao'] ?? ''));
+        if ($descricao === '') {
+            $descricao = 'Débito realizado pelo admin';
+        }
+
+        if ($usuarioId <= 0 || $valor <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Dados inválidos']);
+            exit;
+        }
+
+        try {
+            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->beginTransaction();
+
+            // Verificar se usuário existe
+            $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
+            $stmt->execute([$usuarioId]);
+            if (!$stmt->fetch()) {
+                throw new \Exception('Usuário não encontrado');
+            }
+
+            // Garantir carteira existe
+            $this->garantirCarteiraUsuario($pdo, $usuarioId);
+
+            // Verificar saldo disponível
+            $stmt = $pdo->prepare("SELECT saldo_usd FROM carteiras WHERE usuario_id = ?");
+            $stmt->execute([$usuarioId]);
+            $saldoAtual = (float) ($stmt->fetchColumn() ?: 0);
+
+            if ($valor > $saldoAtual) {
+                throw new \Exception('Saldo insuficiente. Saldo atual: $' . number_format($saldoAtual, 2) . ' USD');
+            }
+
+            // Ensure modalidade column exists
+            try {
+                $stCols = $pdo->query('DESCRIBE transacoes_carteira');
+                $cols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!in_array('modalidade', $cols, true)) {
+                    $pdo->exec("ALTER TABLE transacoes_carteira ADD COLUMN modalidade varchar(10) DEFAULT 'normal'");
+                }
+            } catch (\Exception $e) {}
+
+            // Debitar valor (subtrair do saldo)
+            $stmt = $pdo->prepare("UPDATE carteiras SET saldo_usd = saldo_usd - ?, updated_at = NOW() WHERE usuario_id = ?");
+            $stmt->execute([$valor, $usuarioId]);
+
+            // Registrar transação como débito
+            $stmt = $pdo->prepare("
+                INSERT INTO transacoes_carteira 
+                (usuario_id, tipo, valor_usd, descricao, modalidade, created_at) 
+                VALUES (?, 'debito', ?, ?, 'normal', NOW())
+            ");
+            $stmt->execute([$usuarioId, $valor, $descricao]);
+
+            $pdo->commit();
+
+            $novoSaldo = $saldoAtual - $valor;
+            echo json_encode(['success' => true, 'message' => 'Débito realizado com sucesso', 'novo_saldo' => $novoSaldo]);
+
+        } catch (\Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
     
     public function converterParaBRL(Request $request) {
         $auth = new AuthService();

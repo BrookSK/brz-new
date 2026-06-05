@@ -613,6 +613,7 @@ $router->post('/admin/remessa-shipstation/gerar-etiqueta', 'AdminRemessaShipstat
 
 // Rotas de Carteira
 $router->post('/admin/usuarios/adicionar-credito', 'AdminCarteiraController', 'adicionarCredito');
+$router->post('/admin/usuarios/debitar-credito', 'AdminCarteiraController', 'debitarCredito');
 $router->post('/admin/carteira/converter-para-brl', 'AdminCarteiraController', 'converterParaBRL');
 $router->post('/admin/carteira/adicionar-creditos-em-lote', 'AdminCarteiraController', 'adicionarCreditosEmLote');
 $router->get('/admin/carteira/saldo/{usuario_id}', 'AdminCarteiraController', 'getSaldo');
