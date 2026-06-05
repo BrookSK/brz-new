@@ -3012,6 +3012,11 @@ class AssessoriaController extends Controller {
                         $produto['peso_manual'] = true;
                     }
 
+                    // Aplicar valor informado manualmente pelo cliente (override)
+                    if ($valorInformadoCliente !== null && $valorInformadoCliente > 0) {
+                        $produto['valor'] = $valorInformadoCliente;
+                    }
+
                     $produtoId = $this->criarOuReutilizarProdutoNoSistema($produto);
 
                     // Persistir no banco de dados quando o usuário está logado
