@@ -3024,34 +3024,50 @@ class AssessoriaController extends Controller {
 
                             $carrinhoModel->adicionarItem($cartId, (int) $produtoId, (int) $quantidade, null, null);
 
-                            // Atualizar o preço unitário no carrinho_items para refletir o valor correto
-                            // (o adicionarItem usa o preço do produto cadastrado, mas assessoria pode ter valor diferente)
-                            if ($preco > 0) {
-                                $db = \Config\Database::getConnection();
+                            // Atualizar o preço unitário e peso no carrinho_items para refletir os valores corretos
+                            // (o adicionarItem usa o preço/peso do produto cadastrado, mas assessoria pode ter valores diferentes)
+                            $db = \Config\Database::getConnection();
+                            $itemsCols = [];
+                            try {
+                                $stCols = $db->query('DESCRIBE carrinho_items');
+                                $itemsCols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                            } catch (\Exception $e) {
                                 $itemsCols = [];
-                                try {
-                                    $stCols = $db->query('DESCRIBE carrinho_items');
-                                    $itemsCols = $stCols ? ($stCols->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-                                } catch (\Exception $e) {
-                                    $itemsCols = [];
-                                }
+                            }
+
+                            if ($preco > 0) {
                                 $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
                                 $subtotalItem = $quantidade * $preco;
 
                                 $setExtra = '';
+                                $binds = [];
                                 if (is_array($itemsCols) && in_array('preco_unit_snapshot', $itemsCols, true)) {
                                     $setExtra .= ', preco_unit_snapshot = :snap';
+                                    $binds[':snap'] = $preco;
+                                }
+                                if (is_array($itemsCols) && in_array('valor_informado_cliente', $itemsCols, true)) {
+                                    $setExtra .= ', valor_informado_cliente = :vic';
+                                    $binds[':vic'] = ($valorInformadoCliente !== null && $valorInformadoCliente > 0) ? 1 : 0;
                                 }
 
                                 $stUpd = $db->prepare("UPDATE carrinho_items SET {$unitCol} = :preco, subtotal = :subtotal{$setExtra} WHERE carrinho_id = :cid AND produto_id = :pid ORDER BY id DESC LIMIT 1");
                                 $stUpd->bindValue(':preco', $preco);
                                 $stUpd->bindValue(':subtotal', $subtotalItem);
-                                if (strpos($setExtra, ':snap') !== false) {
-                                    $stUpd->bindValue(':snap', $preco);
+                                foreach ($binds as $bk => $bv) {
+                                    $stUpd->bindValue($bk, $bv);
                                 }
                                 $stUpd->bindValue(':cid', $cartId);
                                 $stUpd->bindValue(':pid', (int) $produtoId);
                                 $stUpd->execute();
+                            }
+
+                            // Atualizar peso unitário snapshot se peso manual foi informado
+                            if ($pesoManual !== null && $pesoManual > 0 && is_array($itemsCols) && in_array('peso_unit_snapshot', $itemsCols, true)) {
+                                $stUpdPeso = $db->prepare("UPDATE carrinho_items SET peso_unit_snapshot = :peso WHERE carrinho_id = :cid AND produto_id = :pid ORDER BY id DESC LIMIT 1");
+                                $stUpdPeso->bindValue(':peso', $pesoManual);
+                                $stUpdPeso->bindValue(':cid', $cartId);
+                                $stUpdPeso->bindValue(':pid', (int) $produtoId);
+                                $stUpdPeso->execute();
                             }
 
                             $produtosAdicionados++;
@@ -3162,18 +3178,38 @@ class AssessoriaController extends Controller {
             $sku = 'ASS-' . substr(md5($nome . '|' . ((string) ($produto['url_original'] ?? ''))), 0, 10);
         }
 
+        $preco = floatval($produto['valor'] ?? 0);
+        $peso = floatval($produto['peso'] ?? 1.0);
+
         try {
             $stmt = $db->prepare('SELECT id FROM produtos WHERE sku = ? ORDER BY id DESC LIMIT 1');
             $stmt->execute([$sku]);
             $existingId = $stmt->fetchColumn();
             if ($existingId) {
+                // Atualizar preço e peso do produto existente se os valores mudaram (assessoria pode ter override)
+                try {
+                    $updParts = [];
+                    $updParams = [];
+                    if ($preco > 0) {
+                        $updParts[] = 'price = ?';
+                        $updParams[] = $preco;
+                    }
+                    if ($peso > 0) {
+                        $updParts[] = 'weight = ?';
+                        $updParams[] = $peso;
+                    }
+                    if (!empty($updParts)) {
+                        $updParts[] = 'updated_at = NOW()';
+                        $updParams[] = (int) $existingId;
+                        $db->prepare('UPDATE produtos SET ' . implode(', ', $updParts) . ' WHERE id = ?')->execute($updParams);
+                    }
+                } catch (\Exception $e) {
+                }
                 return (int) $existingId;
             }
         } catch (\Exception $e) {
         }
 
-        $preco = floatval($produto['valor'] ?? 0);
-        $peso = floatval($produto['peso'] ?? 1.0);
         $descricao = (string) ($produto['descricao'] ?? '');
 
         $categoriaAssessoriaId = $this->getOrCreateCategoriaAssessoriaId();
