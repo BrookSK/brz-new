@@ -4207,6 +4207,14 @@ class PaymentService {
             $impostoOk = ($imposto === null ? true : ($imposto === 'approved'));
             $statusAgregado = ($produtoOk && $taxaOk && $impostoOk) ? 'approved' : 'pending';
 
+            // Se qualquer componente foi rejeitado, marcar como rejected (não apenas pending)
+            $produtoRejected = ($produto === 'rejected');
+            $taxaRejected = ($taxa === 'rejected');
+            $impostoRejected = ($imposto !== null && $imposto === 'rejected');
+            if ($produtoRejected || $taxaRejected || $impostoRejected) {
+                $statusAgregado = 'rejected';
+            }
+
             $db = \Config\Database::getConnection();
             $colsP = [];
             try {
@@ -4251,7 +4259,101 @@ class PaymentService {
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
                 $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
             }
+
+            if ($statusAgregado === 'rejected') {
+                $this->pedidoModel->dispararEvento('pagamento_cancelado', (int) $pedidoId);
+                $this->cancelarPedidoPorPagamentoRejeitado($db, (int) $pedidoId, $colsP);
+            }
         } catch (\Exception $e) {
+        }
+    }
+
+    /**
+     * Cancela um pedido quando o pagamento é rejeitado pelo gateway.
+     * Atualiza o status do pedido para 'cancelado' e cancela itens na lista de compras.
+     */
+    private function cancelarPedidoPorPagamentoRejeitado(\PDO $db, int $pedidoId, array $colsP = []): void {
+        try {
+            if ($pedidoId <= 0) return;
+
+            // Obter colunas da tabela pedidos se não fornecidas
+            if (empty($colsP)) {
+                try {
+                    $stColsP = $db->query('DESCRIBE pedidos');
+                    $colsP = $stColsP ? ($stColsP->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                } catch (\Exception $e) {
+                    $colsP = [];
+                }
+            }
+
+            // Verificar status atual — só cancelar se estiver em status inicial (pagamento/pendente)
+            $statusAtual = '';
+            try {
+                $stCur = $db->prepare('SELECT status FROM pedidos WHERE id = ? LIMIT 1');
+                $stCur->execute([$pedidoId]);
+                $statusAtual = strtolower(trim((string) ($stCur->fetchColumn() ?: '')));
+            } catch (\Exception $e) {
+            }
+
+            // Não cancelar pedidos já processados/avançados
+            $statusProtegidos = [
+                'pago', 'paid', 'aprovado', 'approved',
+                'produto_consolidado', 'consolidado',
+                'etiqueta_gerada', 'em_transporte', 'enviado',
+                'entregue', 'cancelado', 'cancelled',
+            ];
+            if (in_array($statusAtual, $statusProtegidos, true)) {
+                return;
+            }
+
+            // Atualizar status do pedido para cancelado
+            if (is_array($colsP) && in_array('status', $colsP, true)) {
+                try {
+                    $stUp = $db->prepare('UPDATE pedidos SET status = :status WHERE id = :id');
+                    $stUp->execute([':status' => 'cancelado', ':id' => $pedidoId]);
+                } catch (\Exception $e) {
+                    // Se 'cancelado' não é válido no enum, tentar 'cancelled'
+                    try {
+                        $stUp = $db->prepare('UPDATE pedidos SET status = :status WHERE id = :id');
+                        $stUp->execute([':status' => 'cancelled', ':id' => $pedidoId]);
+                    } catch (\Exception $e2) {
+                    }
+                }
+            }
+
+            // Cancelar itens na lista de compras deste pedido
+            try {
+                $stColsLC = $db->query('DESCRIBE lista_compras');
+                $colsLC = $stColsLC ? ($stColsLC->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+                if (is_array($colsLC) && in_array('pedido_id', $colsLC, true)) {
+                    if (in_array('status', $colsLC, true)) {
+                        // Cancelar apenas itens pendentes (não tocar em itens já comprados)
+                        $stLC = $db->prepare("UPDATE lista_compras SET status = 'cancelado' WHERE pedido_id = ? AND status = 'pendente'");
+                        $stLC->execute([$pedidoId]);
+                    } else {
+                        // Se não tem coluna status, deletar os itens
+                        $stLC = $db->prepare('DELETE FROM lista_compras WHERE pedido_id = ?');
+                        $stLC->execute([$pedidoId]);
+                    }
+                }
+            } catch (\Exception $e) {
+            }
+
+            // Liberar reservas de estoque
+            try {
+                $stColsER = $db->query('DESCRIBE estoque_reservas');
+                $colsER = $stColsER ? ($stColsER->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (is_array($colsER) && in_array('pedido_id', $colsER, true) && in_array('status', $colsER, true)) {
+                    $stER = $db->prepare("UPDATE estoque_reservas SET status = 'cancelada' WHERE pedido_id = ? AND (status = 'ativa' OR status = '' OR status IS NULL)");
+                    $stER->execute([$pedidoId]);
+                }
+            } catch (\Exception $e) {
+            }
+
+            error_log('[PAGAMENTO_REJEITADO] Pedido #' . $pedidoId . ' cancelado por pagamento rejeitado');
+        } catch (\Exception $e) {
+            error_log('[PAGAMENTO_REJEITADO] Erro ao cancelar pedido #' . $pedidoId . ': ' . $e->getMessage());
         }
     }
 
@@ -7227,6 +7329,8 @@ class PaymentService {
                     $this->pedidoModel->dispararEvento('pagamento_cancelado', $pedidoId);
                 } catch (\Exception $e) {
                 }
+                // Cancelar pedido e remover itens da lista de compras
+                $this->cancelarPedidoPorPagamentoRejeitado($db, (int) $pedidoId, $colsP);
             }
 
             try {
@@ -7586,6 +7690,8 @@ class PaymentService {
 
             if ($paymentStatusInterno === 'rejected') {
                 $this->pedidoModel->dispararEvento('pagamento_cancelado', $pedidoId);
+                // Cancelar pedido e remover itens da lista de compras
+                $this->cancelarPedidoPorPagamentoRejeitado($db, (int) $pedidoId, $colsP);
             }
         } catch (\Exception $e) {
             // Webhook não deve retornar 4xx por causa de erro interno/schema
