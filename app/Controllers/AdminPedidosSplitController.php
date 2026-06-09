@@ -368,6 +368,7 @@ document.addEventListener("DOMContentLoaded", function() {
         $colQtd = $this->pickCol($colsItens, ['quantidade', 'qty']);
         $colPrecoUnit = $this->pickCol($colsItens, ['preco_unitario', 'valor_unitario', 'price', 'preco']);
         $colSubtotal = $this->pickCol($colsItens, ['subtotal']);
+        $colProdutoId = $this->pickCol($colsItens, ['produto_id']);
 
         $subtotalOriginal = 0;
         foreach ($todosItens as $item) {
@@ -389,9 +390,56 @@ document.addEventListener("DOMContentLoaded", function() {
 
         $subtotalPermanecer = $subtotalOriginal - $subtotalSeparar;
 
-        // Proporção para distribuir frete, impostos, taxas etc
+        // Proporção para distribuir frete, impostos, descontos (NÃO taxa de serviço)
         $proporcaoNovo = ($subtotalOriginal > 0) ? ($subtotalSeparar / $subtotalOriginal) : 0;
         $proporcaoOriginal = 1 - $proporcaoNovo;
+
+        // ===== CALCULAR TAXA DE SERVIÇO BASEADA NO PESO (US$ 39/kg arredondado para cima) =====
+        // Buscar peso dos produtos para calcular a taxa de serviço corretamente
+        $pesoColProd = null;
+        if ($this->tableExists('produtos')) {
+            $colsProd = $this->getTableColumns('produtos');
+            $pesoColProd = $this->pickCol($colsProd, ['weight', 'peso', 'peso_kg', 'product_weight']);
+        }
+
+        // Buscar taxa por kg da configuração
+        $taxaPorKg = 39.0;
+        try {
+            $stCfg = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'taxa_servico_usd_por_kg' LIMIT 1");
+            $stCfg->execute();
+            $cfgVal = $stCfg->fetchColumn();
+            if ($cfgVal && (float) $cfgVal > 0) {
+                $taxaPorKg = (float) $cfgVal;
+            }
+        } catch (\Exception $e) {}
+
+        // Buscar taxa de conversão USD->BRL do pedido
+        $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? $pedido['currency'] ?? 'USD')));
+        $taxaConversao = (float) ($pedido['taxa_conversao'] ?? $pedido['exchange_rate'] ?? $pedido['conversion_rate'] ?? 0);
+        if ($taxaConversao <= 1.01 && $moedaPedido === 'BRL') {
+            // Buscar taxa da configuração do sistema
+            try {
+                $stTx = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
+                $stTx->execute();
+                $v = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
+                if ($v > 1.01) $taxaConversao = $v;
+            } catch (\Exception $e) {}
+            if ($taxaConversao <= 1.01) $taxaConversao = 5.85;
+        }
+
+        // Calcular peso total dos itens que vão para o novo pedido
+        $pesoNovo = $this->calcularPesoItens($itensSeparar, $colProdutoId, $colQtd, $pesoColProd);
+        $pesoPermanecer = $this->calcularPesoItens($itensPermanecer, $colProdutoId, $colQtd, $pesoColProd);
+
+        // Taxa de serviço = ceil(peso) * $39/kg (em USD)
+        // Se a moeda do pedido é BRL, multiplicar pela taxa de conversão
+        $taxaServicoNovo = ceil($pesoNovo) * $taxaPorKg;
+        $taxaServicoPermanecer = ceil($pesoPermanecer) * $taxaPorKg;
+
+        if ($moedaPedido === 'BRL' && $taxaConversao > 1.0) {
+            $taxaServicoNovo = round($taxaServicoNovo * $taxaConversao, 2);
+            $taxaServicoPermanecer = round($taxaServicoPermanecer * $taxaConversao, 2);
+        }
 
         // Iniciar transação
         $this->connection->beginTransaction();
@@ -411,14 +459,13 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             // Valores proporcionais (sobrescrever com valores ajustados)
+            // NOTA: taxa_servico/servicos NÃO é proporcional - é recalculada pelo peso
             $colsValorProporcional = [
                 'valor_total', 'total', 'amount',
                 'subtotal',
                 'valor_frete', 'frete', 'shipping', 'shipping_cost',
                 'valor_impostos', 'impostos', 'tax', 'taxes',
                 'valor_desconto', 'desconto', 'discount',
-                'valor_taxa_servico', 'taxa_servico', 'service_fee',
-                'servicos',
             ];
 
             foreach ($colsValorProporcional as $col) {
@@ -426,6 +473,43 @@ document.addEventListener("DOMContentLoaded", function() {
                     $valorOriginal = (float) $pedido[$col];
                     $dadosNovoPedido[$col] = round($valorOriginal * $proporcaoNovo, 2);
                 }
+            }
+
+            // Taxa de serviço: recalcular baseado no peso (ceil(peso) * $39/kg)
+            $colsTaxaServico = ['valor_taxa_servico', 'taxa_servico', 'service_fee', 'servicos'];
+            foreach ($colsTaxaServico as $col) {
+                if (in_array($col, $colsPedidos, true) && isset($pedido[$col]) && $pedido[$col] !== null) {
+                    $dadosNovoPedido[$col] = $taxaServicoNovo;
+                }
+            }
+
+            // Recalcular valor_total do novo pedido: subtotal + taxa_servico + impostos + frete - desconto
+            $novoSubtotal = $subtotalSeparar;
+            $colSubtotalPedido = $this->pickCol($colsPedidos, ['subtotal']);
+            if ($colSubtotalPedido) {
+                $dadosNovoPedido[$colSubtotalPedido] = round($novoSubtotal, 2);
+            }
+
+            // Recalcular total do novo pedido
+            $colTotalPedido = $this->pickCol($colsPedidos, ['valor_total', 'total', 'amount']);
+            if ($colTotalPedido) {
+                $novoFrete = 0;
+                $colFretePedido = $this->pickCol($colsPedidos, ['valor_frete', 'frete', 'shipping', 'shipping_cost']);
+                if ($colFretePedido && isset($dadosNovoPedido[$colFretePedido])) {
+                    $novoFrete = (float) $dadosNovoPedido[$colFretePedido];
+                }
+                $novoImpostos = 0;
+                $colImpostosPedido = $this->pickCol($colsPedidos, ['valor_impostos', 'impostos', 'tax', 'taxes']);
+                if ($colImpostosPedido && isset($dadosNovoPedido[$colImpostosPedido])) {
+                    $novoImpostos = (float) $dadosNovoPedido[$colImpostosPedido];
+                }
+                $novoDesconto = 0;
+                $colDescontoPedido = $this->pickCol($colsPedidos, ['valor_desconto', 'desconto', 'discount']);
+                if ($colDescontoPedido && isset($dadosNovoPedido[$colDescontoPedido])) {
+                    $novoDesconto = (float) $dadosNovoPedido[$colDescontoPedido];
+                }
+
+                $dadosNovoPedido[$colTotalPedido] = round($novoSubtotal + $taxaServicoNovo + $novoImpostos + $novoFrete - $novoDesconto, 2);
             }
 
             // Código do novo pedido: original + "-B"
@@ -482,6 +566,36 @@ document.addEventListener("DOMContentLoaded", function() {
                     $valorOriginal = (float) $pedido[$col];
                     $updateOriginal[$col] = round($valorOriginal * $proporcaoOriginal, 2);
                 }
+            }
+
+            // Taxa de serviço do pedido original: recalcular pelo peso remanescente
+            foreach ($colsTaxaServico as $col) {
+                if (in_array($col, $colsPedidos, true) && isset($pedido[$col]) && $pedido[$col] !== null) {
+                    $updateOriginal[$col] = $taxaServicoPermanecer;
+                }
+            }
+
+            // Recalcular subtotal do pedido original
+            if ($colSubtotalPedido) {
+                $updateOriginal[$colSubtotalPedido] = round($subtotalPermanecer, 2);
+            }
+
+            // Recalcular total do pedido original
+            if ($colTotalPedido) {
+                $origFrete = 0;
+                if ($colFretePedido && isset($updateOriginal[$colFretePedido])) {
+                    $origFrete = (float) $updateOriginal[$colFretePedido];
+                }
+                $origImpostos = 0;
+                if ($colImpostosPedido && isset($updateOriginal[$colImpostosPedido])) {
+                    $origImpostos = (float) $updateOriginal[$colImpostosPedido];
+                }
+                $origDesconto = 0;
+                if ($colDescontoPedido && isset($updateOriginal[$colDescontoPedido])) {
+                    $origDesconto = (float) $updateOriginal[$colDescontoPedido];
+                }
+
+                $updateOriginal[$colTotalPedido] = round($subtotalPermanecer + $taxaServicoPermanecer + $origImpostos + $origFrete - $origDesconto, 2);
             }
 
             // Adicionar observação no pedido original
@@ -573,6 +687,33 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
         return null;
+    }
+
+    /**
+     * Calcula o peso total de um conjunto de itens buscando o peso de cada produto
+     */
+    private function calcularPesoItens(array $itens, ?string $colProdutoId, ?string $colQtd, ?string $pesoColProd): float {
+        if (!$colProdutoId || !$pesoColProd) {
+            return 0.0;
+        }
+
+        $pesoTotal = 0.0;
+        foreach ($itens as $item) {
+            $produtoId = (int) ($item[$colProdutoId] ?? 0);
+            $qtd = (int) ($item[$colQtd] ?? 1);
+            if ($produtoId <= 0) continue;
+
+            try {
+                $stmt = $this->connection->prepare('SELECT ' . $pesoColProd . ' FROM produtos WHERE id = :id LIMIT 1');
+                $stmt->execute([':id' => $produtoId]);
+                $peso = (float) ($stmt->fetchColumn() ?: 0);
+                $pesoTotal += $peso * $qtd;
+            } catch (\Exception $e) {
+                // Se não conseguir buscar peso, continua
+            }
+        }
+
+        return $pesoTotal;
     }
 
     private function redirectWithMessage(string $url, string $message, string $type = 'success'): void {
