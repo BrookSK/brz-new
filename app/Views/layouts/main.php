@@ -1835,7 +1835,7 @@ if ($__copilotoMostrar):
 <?php endif; ?>
 
 <!-- WhatsApp Floating Button -->
-<a href="https://wa.me/5517991098286" target="_blank" rel="noopener noreferrer"
+<a href="https://wa.me/5517996203062" target="_blank" rel="noopener noreferrer"
    id="whatsapp-float"
    aria-label="Falar no WhatsApp"
    style="position:fixed;bottom:30px;right:30px;z-index:9998;width:58px;height:58px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(37,211,102,0.45);text-decoration:none;transition:transform 0.2s ease,box-shadow 0.2s ease;">

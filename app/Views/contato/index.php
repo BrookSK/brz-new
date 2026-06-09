@@ -25,7 +25,7 @@
                             <div class="text-muted contact-lines">
                                 <div class="d-flex align-items-center justify-content-between gap-2">
                                     <strong class="contact-label">Suporte:</strong>
-                                    <a class="contact-wa-link" href="https://wa.me/5517991098286" target="_blank" rel="noopener">+55 17 99109-8286</a>
+                                    <a class="contact-wa-link" href="https://wa.me/5517996203062" target="_blank" rel="noopener">+55 17 99620-3062</a>
                                 </div>
                                 <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
                                     <strong class="contact-label">Vendas:</strong>
