@@ -397,31 +397,20 @@ document.addEventListener("DOMContentLoaded", function() {
         $this->connection->beginTransaction();
         try {
             // ===== CRIAR NOVO PEDIDO =====
-            // Copiar dados do pedido original, ajustando valores proporcionalmente
+            // Copiar TODOS os campos do pedido original, exceto id e campos auto-gerados
             $dadosNovoPedido = [];
-            $colsParaCopiar = [
-                'cliente_id', 'usuario_id', 'user_id',
-                'nome_cliente', 'email_cliente', 'telefone_cliente', 'cpf_cliente',
-                'endereco_entrega', 'cidade_entrega', 'estado_entrega', 'cep_entrega', 'pais_entrega',
-                'endereco_cobranca', 'cidade_cobranca', 'estado_cobranca', 'cep_cobranca', 'pais_cobranca',
-                'moeda', 'currency', 'taxa_conversao', 'exchange_rate',
-                'pagamento_metodo', 'forma_pagamento', 'payment_gateway', 'pagamento_gateway',
-                'origem_pedido', 'origem', 'tipo',
-                'observacao', 'notas', 'notes',
-                'shipping_address_line1', 'shipping_address_line2', 'shipping_city', 'shipping_state',
-                'shipping_zip', 'shipping_country', 'shipping_name', 'shipping_phone',
-                'billing_address_line1', 'billing_address_line2', 'billing_city', 'billing_state',
-                'billing_zip', 'billing_country', 'billing_name', 'billing_phone',
-                'customer_name', 'customer_email', 'customer_phone', 'customer_document',
-            ];
+            $colsIgnorar = ['id', 'deleted_at', 'updated_at', 'tracking_code', 'codigo_rastreio',
+                'peso_total', 'altura', 'largura', 'comprimento',
+                'status_conferencia', 'conferido_por', 'conferido_em'];
 
-            foreach ($colsParaCopiar as $col) {
-                if (in_array($col, $colsPedidos, true) && isset($pedido[$col]) && $pedido[$col] !== null) {
+            foreach ($colsPedidos as $col) {
+                if (in_array($col, $colsIgnorar, true)) continue;
+                if (array_key_exists($col, $pedido) && $pedido[$col] !== null) {
                     $dadosNovoPedido[$col] = $pedido[$col];
                 }
             }
 
-            // Valores proporcionais
+            // Valores proporcionais (sobrescrever com valores ajustados)
             $colsValorProporcional = [
                 'valor_total', 'total', 'amount',
                 'subtotal',
@@ -437,17 +426,6 @@ document.addEventListener("DOMContentLoaded", function() {
                     $valorOriginal = (float) $pedido[$col];
                     $dadosNovoPedido[$col] = round($valorOriginal * $proporcaoNovo, 2);
                 }
-            }
-
-            // Status: manter o mesmo do pedido original
-            if (in_array('status', $colsPedidos, true)) {
-                $dadosNovoPedido['status'] = $pedido['status'] ?? 'pendente';
-            }
-            if (in_array('payment_status', $colsPedidos, true) && isset($pedido['payment_status'])) {
-                $dadosNovoPedido['payment_status'] = $pedido['payment_status'];
-            }
-            if (in_array('pagamento_status', $colsPedidos, true) && isset($pedido['pagamento_status'])) {
-                $dadosNovoPedido['pagamento_status'] = $pedido['pagamento_status'];
             }
 
             // Código do novo pedido: original + "-B"
