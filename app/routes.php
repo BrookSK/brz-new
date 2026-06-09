@@ -422,6 +422,10 @@ $router->post('/admin/pedidos/{id}/criar-ticket', 'AdminPedidosController', 'cri
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 $router->post('/admin/pedidos/atualizar-status-massa', 'AdminPedidosController', 'atualizarStatusMassa');
 
+// Split Order
+$router->get('/admin/pedidos/split', 'AdminPedidosSplitController', 'index');
+$router->post('/admin/pedidos/split', 'AdminPedidosSplitController', 'processar');
+
 // Usuários
 $router->get('/admin/usuarios', 'AdminUsuariosController', 'index');
 $router->get('/admin/usuarios/detalhes/{id}', 'AdminUsuariosController', 'detalhes');

@@ -3599,6 +3599,9 @@ HTML;
                     <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning btn-sm">
                         <i class="fas fa-edit me-1"></i><span class="d-none d-md-inline">Editar</span>
                     </a>
+                    <a href="/admin/pedidos/split?id=' . $id . '" class="btn btn-info btn-sm">
+                        <i class="fas fa-cut me-1"></i><span class="d-none d-md-inline">Split</span>
+                    </a>
                     <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalLixeiraPedido" data-pedido-id="' . (int) $id . '">
                         <i class="fas fa-trash me-1"></i><span class="d-none d-md-inline">Lixeira</span>
                     </button>
