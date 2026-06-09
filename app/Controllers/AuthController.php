@@ -938,7 +938,8 @@ class AuthController extends Controller {
                     }
                     return;
                 } else {
-                    if ($usuario === 'inactive') {
+                    if (!empty($_SESSION['login_blocked_inactive'])) {
+                        unset($_SESSION['login_blocked_inactive']);
                         $_SESSION['message'] = 'Sua conta está inativa. Entre em contato com o suporte.';
                         $_SESSION['message_type'] = 'danger';
                         if ($isAjax) {
@@ -1082,7 +1083,8 @@ class AuthController extends Controller {
                     $this->redirect($adminTarget);
                     return;
                 } else {
-                    if ($usuario === 'inactive') {
+                    if (!empty($_SESSION['login_blocked_inactive'])) {
+                        unset($_SESSION['login_blocked_inactive']);
                         $_SESSION['message'] = 'Sua conta está inativa. Entre em contato com o suporte.';
                     } else {
                         $_SESSION['message'] = 'E-mail ou senha incorretos';

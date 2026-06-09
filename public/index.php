@@ -154,8 +154,21 @@ try {
         $u = $userModel->findByRememberToken($remember);
         if (is_array($u) && !empty($u['id'])) {
             // Verificar se o usuário está ativo antes de restaurar sessão
-            $userStatus = strtolower(trim((string) ($u['status'] ?? $u['ativo'] ?? $u['active'] ?? '')));
-            if ($userStatus === 'inativo' || $userStatus === 'inactive' || $userStatus === '0' || $userStatus === 'bloqueado' || $userStatus === 'blocked') {
+            $isInactive = false;
+            if (array_key_exists('ativo', $u) && (int) $u['ativo'] === 0) {
+                $isInactive = true;
+            }
+            if (!$isInactive && array_key_exists('status', $u) && $u['status'] !== null) {
+                $st = strtolower(trim((string) $u['status']));
+                if (in_array($st, ['inativo', 'inactive', 'bloqueado', 'blocked', 'disabled', 'suspended'], true)) {
+                    $isInactive = true;
+                }
+            }
+            if (!$isInactive && array_key_exists('active', $u) && (int) $u['active'] === 0) {
+                $isInactive = true;
+            }
+
+            if ($isInactive) {
                 // Usuário inativo — limpar cookie e não restaurar sessão
                 if (PHP_VERSION_ID >= 70300) {
                     setcookie('remember_token', '', [

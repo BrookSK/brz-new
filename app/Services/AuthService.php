@@ -85,6 +85,24 @@ class AuthService {
         $usuario = $this->usuarioModel->authenticate($email, $senha);
         
         if ($usuario) {
+            // Verificar se o usuário está ativo
+            $isInactive = false;
+            if (array_key_exists('ativo', $usuario) && (int) $usuario['ativo'] === 0) {
+                $isInactive = true;
+            }
+            if (!$isInactive && array_key_exists('status', $usuario) && $usuario['status'] !== null) {
+                $st = strtolower(trim((string) $usuario['status']));
+                if (in_array($st, ['inativo', 'inactive', 'bloqueado', 'blocked', 'disabled', 'suspended'], true)) {
+                    $isInactive = true;
+                }
+            }
+            if (!$isInactive && array_key_exists('active', $usuario) && (int) $usuario['active'] === 0) {
+                $isInactive = true;
+            }
+            if ($isInactive) {
+                return false;
+            }
+
             $this->criarSessao($usuario);
             return $usuario;
         }
@@ -97,9 +115,38 @@ class AuthService {
         
         if ($usuario) {
             // Verificar se o usuário está ativo
-            $status = strtolower(trim((string) ($usuario['status'] ?? $usuario['ativo'] ?? $usuario['active'] ?? '')));
-            if ($status === 'inativo' || $status === 'inactive' || $status === '0' || $status === 'bloqueado' || $status === 'blocked') {
-                return 'inactive';
+            // A tabela pode ter coluna 'ativo' (int 0/1) OU 'status' (string 'ativo'/'inativo')
+            $isInactive = false;
+
+            // Checar coluna 'ativo' (inteiro)
+            if (array_key_exists('ativo', $usuario)) {
+                if ((int) $usuario['ativo'] === 0) {
+                    $isInactive = true;
+                }
+            }
+
+            // Checar coluna 'status' (string)
+            if (!$isInactive && array_key_exists('status', $usuario) && $usuario['status'] !== null) {
+                $statusStr = strtolower(trim((string) $usuario['status']));
+                if (in_array($statusStr, ['inativo', 'inactive', 'bloqueado', 'blocked', 'disabled', 'suspended'], true)) {
+                    $isInactive = true;
+                }
+            }
+
+            // Checar coluna 'active' (inteiro, fallback)
+            if (!$isInactive && array_key_exists('active', $usuario)) {
+                if ((int) $usuario['active'] === 0) {
+                    $isInactive = true;
+                }
+            }
+
+            if ($isInactive) {
+                // Sinalizar via sessão para mensagem específica
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+                $_SESSION['login_blocked_inactive'] = true;
+                return false;
             }
 
             $this->criarSessao($usuario);
