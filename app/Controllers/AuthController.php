@@ -938,15 +938,24 @@ class AuthController extends Controller {
                     }
                     return;
                 } else {
-                    if ($this->tryWpRecadastroFlow((string) $email, $isAjax)) {
+                    if ($usuario === 'inactive') {
+                        $_SESSION['message'] = 'Sua conta está inativa. Entre em contato com o suporte.';
+                        $_SESSION['message_type'] = 'danger';
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                            return;
+                        }
+                    } elseif ($this->tryWpRecadastroFlow((string) $email, $isAjax)) {
                         return;
-                    }
-                    $_SESSION['message'] = 'E-mail ou senha incorretos';
-                    $_SESSION['message_type'] = 'danger';
-                    if ($isAjax) {
-                        header('Content-Type: application/json; charset=utf-8');
-                        echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
-                        return;
+                    } else {
+                        $_SESSION['message'] = 'E-mail ou senha incorretos';
+                        $_SESSION['message_type'] = 'danger';
+                        if ($isAjax) {
+                            header('Content-Type: application/json; charset=utf-8');
+                            echo json_encode(['success' => false, 'error' => $_SESSION['message']]);
+                            return;
+                        }
                     }
                 }
             } catch (\Exception $e) {
@@ -1073,7 +1082,11 @@ class AuthController extends Controller {
                     $this->redirect($adminTarget);
                     return;
                 } else {
-                    $_SESSION['message'] = 'E-mail ou senha incorretos';
+                    if ($usuario === 'inactive') {
+                        $_SESSION['message'] = 'Sua conta está inativa. Entre em contato com o suporte.';
+                    } else {
+                        $_SESSION['message'] = 'E-mail ou senha incorretos';
+                    }
                     $_SESSION['message_type'] = 'danger';
 
                     if ($isAjax) {

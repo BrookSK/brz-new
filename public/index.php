@@ -153,8 +153,25 @@ try {
         $userModel = new \App\Models\Usuario();
         $u = $userModel->findByRememberToken($remember);
         if (is_array($u) && !empty($u['id'])) {
-            $auth = new \App\Services\AuthService();
-            $auth->criarSessao($u);
+            // Verificar se o usuário está ativo antes de restaurar sessão
+            $userStatus = strtolower(trim((string) ($u['status'] ?? $u['ativo'] ?? $u['active'] ?? '')));
+            if ($userStatus === 'inativo' || $userStatus === 'inactive' || $userStatus === '0' || $userStatus === 'bloqueado' || $userStatus === 'blocked') {
+                // Usuário inativo — limpar cookie e não restaurar sessão
+                if (PHP_VERSION_ID >= 70300) {
+                    setcookie('remember_token', '', [
+                        'expires' => time() - 3600,
+                        'path' => '/',
+                        'secure' => $secure,
+                        'httponly' => true,
+                        'samesite' => 'Lax',
+                    ]);
+                } else {
+                    setcookie('remember_token', '', time() - 3600, '/; samesite=Lax', '', $secure, true);
+                }
+            } else {
+                $auth = new \App\Services\AuthService();
+                $auth->criarSessao($u);
+            }
         } else {
             if (PHP_VERSION_ID >= 70300) {
                 setcookie('remember_token', '', [

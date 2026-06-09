@@ -96,6 +96,12 @@ class AuthService {
         $usuario = $this->usuarioModel->authenticate($email, $senha);
         
         if ($usuario) {
+            // Verificar se o usuário está ativo
+            $status = strtolower(trim((string) ($usuario['status'] ?? $usuario['ativo'] ?? $usuario['active'] ?? '')));
+            if ($status === 'inativo' || $status === 'inactive' || $status === '0' || $status === 'bloqueado' || $status === 'blocked') {
+                return 'inactive';
+            }
+
             $this->criarSessao($usuario);
             return $usuario;
         }
