@@ -217,6 +217,23 @@ function registrarImpressao(pedidoId) {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'pedido_id=' + pedidoId
+    }).then(function() {
+        // Atualizar UI sem recarregar
+        var card = document.querySelector('[data-bs-target="#pedido-' + pedidoId + '"]');
+        if (card) {
+            var cardContainer = card.closest('.card');
+            if (cardContainer) {
+                cardContainer.style.opacity = '0.5';
+            }
+            // Encontrar o badge de impressão e atualizar
+            var badges = card.querySelectorAll('.badge.bg-secondary, .badge.bg-success');
+            badges.forEach(function(badge) {
+                if (badge.textContent.indexOf('impresso') !== -1 || badge.textContent.indexOf('Impresso') !== -1) {
+                    badge.className = 'badge bg-success small me-1';
+                    badge.textContent = '✓ Impresso agora';
+                }
+            });
+        }
     });
 }
 
