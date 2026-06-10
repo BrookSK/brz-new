@@ -2981,9 +2981,11 @@ class AdminComprasController extends Controller {
 
                 // Aplicar compra parcial consumindo quantidades das pendências mais antigas
                 $stmtSel = $this->connection->prepare(
-                    "SELECT id, quantidade_faltante, quantidade_necessaria
+                    "SELECT lc.id, lc.quantidade_faltante, lc.quantidade_necessaria
                      FROM lista_compras lc
+                     LEFT JOIN pedidos p ON p.id = lc.pedido_id
                      WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja .
+                    " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))" .
                     " ORDER BY lc.id ASC"
                 );
                 $stmtSel->execute($params);
@@ -2992,9 +2994,11 @@ class AdminComprasController extends Controller {
                 // fallback: se filtro de loja não retornou nada, tentar sem loja
                 if (empty($rows) && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
                     $stmtSel2 = $this->connection->prepare(
-                        "SELECT id, quantidade_faltante, quantidade_necessaria\n"
-                        . " FROM lista_compras lc\n"
-                        . " WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id\n"
+                        "SELECT lc.id, lc.quantidade_faltante, lc.quantidade_necessaria"
+                        . " FROM lista_compras lc"
+                        . " LEFT JOIN pedidos p ON p.id = lc.pedido_id"
+                        . " WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id"
+                        . " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))"
                         . " ORDER BY lc.id ASC"
                     );
                     $stmtSel2->execute([':produto_id' => $produtoId]);
@@ -3046,7 +3050,11 @@ class AdminComprasController extends Controller {
             }
 
             // Total (comportamento padrão): marcar como comprado
-            $sql = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+            $sql = "UPDATE lista_compras lc
+                    LEFT JOIN pedidos p ON p.id = lc.pedido_id
+                    SET lc.status = 'comprado', lc.quantidade_faltante = 0
+                    WHERE lc.status = 'pendente'
+                      AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))";
             $params = [];
             if ($produtoId > 0) {
                 $sql .= ' AND lc.produto_id = :produto_id';
@@ -3069,7 +3077,11 @@ class AdminComprasController extends Controller {
             // fallback: se nenhum registro foi marcado como comprado e o filtro por loja pode estar divergente,
             // tentar novamente sem restringir por loja.
             if ($affected === 0 && $temLojaIdEmLista && !$semLoja && $lojaId > 0) {
-                $sql2 = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+                $sql2 = "UPDATE lista_compras lc
+                         LEFT JOIN pedidos p ON p.id = lc.pedido_id
+                         SET lc.status = 'comprado', lc.quantidade_faltante = 0
+                         WHERE lc.status = 'pendente'
+                           AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))";
                 $params2 = [];
                 if ($produtoId > 0) {
                     $sql2 .= ' AND lc.produto_id = :produto_id';

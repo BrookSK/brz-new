@@ -252,7 +252,13 @@ class AdminEstoqueController extends Controller {
         if ($deficit <= 0) {
             if ($pendAtual > 0 && $this->tableExists('lista_compras')) {
                 try {
-                    $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'comprado', quantidade_faltante = 0 WHERE produto_id = :p AND status = 'pendente'");
+                    $stmt = $this->connection->prepare(
+                        "UPDATE lista_compras lc
+                         LEFT JOIN pedidos p ON p.id = lc.pedido_id
+                         SET lc.status = 'comprado', lc.quantidade_faltante = 0
+                         WHERE lc.produto_id = :p AND lc.status = 'pendente'
+                           AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))"
+                    );
                     $stmt->execute([':p' => $produtoId]);
                 } catch (\Throwable $e) {
                 }
@@ -2059,7 +2065,11 @@ class AdminEstoqueController extends Controller {
 
             $temLojaIdEmLista = $this->columnExists('lista_compras', 'loja_id');
 
-            $sql = "UPDATE lista_compras lc SET lc.status = 'comprado', lc.quantidade_faltante = 0 WHERE lc.status = 'pendente'";
+            $sql = "UPDATE lista_compras lc
+                    LEFT JOIN pedidos p ON p.id = lc.pedido_id
+                    SET lc.status = 'comprado', lc.quantidade_faltante = 0
+                    WHERE lc.status = 'pendente'
+                      AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))";
             $params = [];
 
             if ($itemId > 0) {
