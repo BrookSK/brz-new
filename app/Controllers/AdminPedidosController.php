@@ -59,13 +59,13 @@ class AdminPedidosController extends Controller {
             $colDoc = $pickCol(['cliente_documento', 'cliente_cpf_cnpj', 'cpf_cnpj', 'documento', 'customer_document', 'cpf']);
 
             $colPais = $pickCol(['pais_entrega', 'country_entrega', 'pais', 'country', 'customer_country']);
-            $colCep = $pickCol(['cep', 'zipcode', 'zip_code', 'customer_zipcode']);
-            $colEndereco = $pickCol(['endereco', 'logradouro', 'address', 'customer_address']);
-            $colNumero = $pickCol(['numero', 'address_number', 'customer_address_number']);
-            $colComplemento = $pickCol(['complemento', 'address_complement', 'customer_address_complement']);
-            $colBairro = $pickCol(['bairro', 'province', 'district', 'customer_province']);
-            $colCidade = $pickCol(['cidade', 'city', 'customer_city']);
-            $colEstado = $pickCol(['estado', 'state', 'customer_state']);
+            $colCep = $pickCol(['cep_entrega', 'cep', 'zipcode', 'zip_code', 'customer_zipcode']);
+            $colEndereco = $pickCol(['endereco_entrega', 'endereco', 'logradouro', 'address', 'customer_address']);
+            $colNumero = $pickCol(['numero_entrega', 'numero', 'address_number', 'customer_address_number']);
+            $colComplemento = $pickCol(['complemento_entrega', 'complemento', 'address_complement', 'customer_address_complement']);
+            $colBairro = $pickCol(['bairro_entrega', 'bairro', 'province', 'district', 'customer_province']);
+            $colCidade = $pickCol(['cidade_entrega', 'cidade', 'city', 'customer_city']);
+            $colEstado = $pickCol(['estado_entrega', 'estado', 'state', 'customer_state']);
 
             $debugLog['cols_detectadas'] = [
                 'nome' => $colNome, 'email' => $colEmail, 'telefone' => $colTelefone, 'doc' => $colDoc,
@@ -101,14 +101,26 @@ class AdminPedidosController extends Controller {
             $addSet($colTelefone, trim((string) $request->getParam('telefone')));
             $addSet($colDoc, trim((string) $request->getParam('documento')));
 
-            $addSet($colPais, trim((string) $request->getParam('pais')));
-            $addSet($colCep, trim((string) $request->getParam('cep')));
-            $addSet($colEndereco, trim((string) $request->getParam('endereco')));
-            $addSet($colNumero, trim((string) $request->getParam('numero')));
-            $addSet($colComplemento, trim((string) $request->getParam('complemento')));
-            $addSet($colBairro, trim((string) $request->getParam('bairro')));
-            $addSet($colCidade, trim((string) $request->getParam('cidade')));
-            $addSet($colEstado, trim((string) $request->getParam('estado')));
+            // Endereço: salvar em AMBAS as colunas (_entrega e sem sufixo) quando existirem
+            $addSetDual = function(string $colEntrega, string $colSimples, $val) use (&$set, &$params, $cols): void {
+                if ($colEntrega !== '' && in_array($colEntrega, $cols, true)) {
+                    $set[] = $colEntrega . ' = ?';
+                    $params[] = $val;
+                }
+                if ($colSimples !== '' && $colSimples !== $colEntrega && in_array($colSimples, $cols, true)) {
+                    $set[] = $colSimples . ' = ?';
+                    $params[] = $val;
+                }
+            };
+
+            $addSetDual('pais_entrega', 'pais', trim((string) $request->getParam('pais')));
+            $addSetDual('cep_entrega', 'cep', trim((string) $request->getParam('cep')));
+            $addSetDual('endereco_entrega', 'endereco', trim((string) $request->getParam('endereco')));
+            $addSetDual('numero_entrega', 'numero', trim((string) $request->getParam('numero')));
+            $addSetDual('complemento_entrega', 'complemento', trim((string) $request->getParam('complemento')));
+            $addSetDual('bairro_entrega', 'bairro', trim((string) $request->getParam('bairro')));
+            $addSetDual('cidade_entrega', 'cidade', trim((string) $request->getParam('cidade')));
+            $addSetDual('estado_entrega', 'estado', trim((string) $request->getParam('estado')));
 
             // Destinatário (entrega para outra pessoa)
             $colDestNome = $pickCol(['destinatario_nome']);
@@ -4497,13 +4509,13 @@ CUSTOSCRIPT;
                     $clienteTelefone = (string) ($pedido['cliente_telefone'] ?? ($pedido['telefone'] ?? ''));
                     $clienteDoc = (string) ($pedido['cliente_cpf_cnpj'] ?? ($pedido['cliente_documento'] ?? ($pedido['documento'] ?? '')));
                     $pais = (string) ($pedido['pais_entrega'] ?? ($pedido['country_entrega'] ?? ($pedido['pais'] ?? '')));
-                    $cep = (string) ($pedido['cep'] ?? '');
-                    $endereco = (string) ($pedido['endereco'] ?? '');
-                    $numero = (string) ($pedido['numero'] ?? '');
-                    $complemento = (string) ($pedido['complemento'] ?? '');
-                    $bairro = (string) ($pedido['bairro'] ?? '');
-                    $cidade = (string) ($pedido['cidade'] ?? '');
-                    $estado = (string) ($pedido['estado'] ?? '');
+                    $cep = (string) ($pedido['cep_entrega'] ?? ($pedido['cep'] ?? ''));
+                    $endereco = (string) ($pedido['endereco_entrega'] ?? ($pedido['endereco'] ?? ''));
+                    $numero = (string) ($pedido['numero_entrega'] ?? ($pedido['numero'] ?? ''));
+                    $complemento = (string) ($pedido['complemento_entrega'] ?? ($pedido['complemento'] ?? ''));
+                    $bairro = (string) ($pedido['bairro_entrega'] ?? ($pedido['bairro'] ?? ''));
+                    $cidade = (string) ($pedido['cidade_entrega'] ?? ($pedido['cidade'] ?? ''));
+                    $estado = (string) ($pedido['estado_entrega'] ?? ($pedido['estado'] ?? ''));
 
                     echo '<div class="modal fade" id="modalEditarClientePedido" tabindex="-1" aria-hidden="true">'
                         . '<div class="modal-dialog modal-lg">'
@@ -5451,13 +5463,13 @@ LINKSCRIPT;
                                 <p><strong>Endereço:</strong><br>' .
                                     htmlspecialchars(
                                         trim(
-                                            ($pedido['endereco_entrega'] ?? '') .
-                                            (!empty($pedido['numero_entrega']) ? ', ' . $pedido['numero_entrega'] : '') .
-                                            (!empty($pedido['complemento_entrega']) ? ' - ' . $pedido['complemento_entrega'] : '') .
-                                            (!empty($pedido['bairro_entrega']) ? ' - ' . $pedido['bairro_entrega'] : '') .
-                                            (!empty($pedido['cidade_entrega']) ? ' - ' . $pedido['cidade_entrega'] : '') .
-                                            (!empty($pedido['estado_entrega']) ? '/' . $pedido['estado_entrega'] : '') .
-                                            (!empty($pedido['cep_entrega']) ? ' - CEP: ' . $pedido['cep_entrega'] : '')
+                                            ($pedido['endereco_entrega'] ?? $pedido['endereco'] ?? $pedido['logradouro'] ?? '') .
+                                            (!empty($pedido['numero_entrega'] ?? $pedido['numero'] ?? '') ? ', ' . ($pedido['numero_entrega'] ?? $pedido['numero'] ?? '') : '') .
+                                            (!empty($pedido['complemento_entrega'] ?? $pedido['complemento'] ?? '') ? ' - ' . ($pedido['complemento_entrega'] ?? $pedido['complemento'] ?? '') : '') .
+                                            (!empty($pedido['bairro_entrega'] ?? $pedido['bairro'] ?? '') ? ' - ' . ($pedido['bairro_entrega'] ?? $pedido['bairro'] ?? '') : '') .
+                                            (!empty($pedido['cidade_entrega'] ?? $pedido['cidade'] ?? '') ? ' - ' . ($pedido['cidade_entrega'] ?? $pedido['cidade'] ?? '') : '') .
+                                            (!empty($pedido['estado_entrega'] ?? $pedido['estado'] ?? '') ? '/' . ($pedido['estado_entrega'] ?? $pedido['estado'] ?? '') : '') .
+                                            (!empty($pedido['cep_entrega'] ?? $pedido['cep'] ?? '') ? ' - CEP: ' . ($pedido['cep_entrega'] ?? $pedido['cep'] ?? '') : '')
                                         )
                                     ) .
                                 '</p>';
