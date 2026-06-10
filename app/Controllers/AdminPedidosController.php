@@ -19,7 +19,12 @@ class AdminPedidosController extends Controller {
 
         $id = $id ?? $request->getParam('id');
         $pedidoId = (int) $id;
+
+        error_log('[atualizarCliente] CHAMADO - pedidoId=' . $pedidoId . ' method=' . $request->getMethod());
+        error_log('[atualizarCliente] POST raw: ' . json_encode($_POST));
+
         if ($pedidoId <= 0) {
+            error_log('[atualizarCliente] ERRO: pedidoId invalido');
             $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
             return;
         }
@@ -143,6 +148,10 @@ class AdminPedidosController extends Controller {
             $st->execute($params);
             $debugLog['update_pedidos_sql'] = $sql;
             $debugLog['update_pedidos_rows_affected'] = $st->rowCount();
+
+            error_log('[atualizarCliente] SQL: ' . $sql);
+            error_log('[atualizarCliente] Params: ' . json_encode($params));
+            error_log('[atualizarCliente] Rows affected: ' . $st->rowCount());
 
             // Atualizar também a tabela usuarios (telefone, nome, email, documento) se o pedido tem usuario_id
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
