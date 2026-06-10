@@ -34,6 +34,10 @@ class AdminPedidosController extends Controller {
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
+            error_log('[atualizarCliente] Colunas tabela pedidos (endereco-related): ' . json_encode(array_values(array_filter($cols, function($c) {
+                return stripos($c, 'endereco') !== false || stripos($c, 'cep') !== false || stripos($c, 'cidade') !== false || stripos($c, 'estado') !== false || stripos($c, 'bairro') !== false || stripos($c, 'numero') !== false || stripos($c, 'complemento') !== false || stripos($c, 'pais') !== false || stripos($c, 'email') !== false || stripos($c, 'telefone') !== false || stripos($c, 'nome') !== false;
+            }))));
+            error_log('[atualizarCliente] Total colunas: ' . count($cols));
             $debugLog['pedidos_cols_endereco'] = array_values(array_filter($cols, function($c) {
                 return stripos($c, 'endereco') !== false || stripos($c, 'cep') !== false || stripos($c, 'cidade') !== false || stripos($c, 'estado') !== false || stripos($c, 'bairro') !== false || stripos($c, 'numero') !== false || stripos($c, 'complemento') !== false || stripos($c, 'pais') !== false || stripos($c, 'address') !== false || stripos($c, 'zip') !== false;
             }));
@@ -127,6 +131,8 @@ class AdminPedidosController extends Controller {
             $addSetDual('cidade_entrega', 'cidade', trim((string) $request->getParam('cidade')));
             $addSetDual('estado_entrega', 'estado', trim((string) $request->getParam('estado')));
 
+            error_log('[atualizarCliente] SET antes do filter: ' . json_encode($set));
+            error_log('[atualizarCliente] PARAMS antes do filter: ' . json_encode($params));
             // Destinatário (entrega para outra pessoa)
             $colDestNome = $pickCol(['destinatario_nome']);
             $colDestDoc = $pickCol(['destinatario_documento']);
