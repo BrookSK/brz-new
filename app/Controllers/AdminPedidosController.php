@@ -3201,6 +3201,17 @@ HTML;
         // Restaurar scroll e mostrar flash de sucesso ao voltar
         (function(){
             try {
+                // Atribuir IDs nos cards para âncora de scroll
+                document.querySelectorAll(".card.order-card").forEach(function(card){
+                    var link = card.querySelector("a[href*='/admin/pedidos/detalhes/']");
+                    if (link) {
+                        var match = link.href.match(/\/detalhes\/(\d+)/);
+                        if (match) {
+                            card.closest(".col-12").id = "pedido-" + match[1];
+                        }
+                    }
+                });
+
                 var flash = sessionStorage.getItem("brz_pedidos_flash");
                 if (flash) {
                     sessionStorage.removeItem("brz_pedidos_flash");
@@ -3211,10 +3222,21 @@ HTML;
                     document.body.appendChild(div);
                     setTimeout(function(){ try { div.remove(); } catch(e){} }, 4000);
                 }
-                var scrollY = sessionStorage.getItem("brz_pedidos_scrollY");
-                if (scrollY) {
-                    sessionStorage.removeItem("brz_pedidos_scrollY");
-                    window.scrollTo(0, parseInt(scrollY, 10));
+
+                // Scroll para âncora (#pedido-XXX) se presente na URL
+                if (window.location.hash && window.location.hash.indexOf("#pedido-") === 0) {
+                    var target = document.getElementById(window.location.hash.substring(1));
+                    if (target) {
+                        setTimeout(function(){ target.scrollIntoView({behavior: "smooth", block: "center"}); }, 200);
+                        target.querySelector(".card").style.boxShadow = "0 0 0 3px rgba(26,26,26,0.4)";
+                        setTimeout(function(){ target.querySelector(".card").style.boxShadow = ""; }, 3000);
+                    }
+                } else {
+                    var scrollY = sessionStorage.getItem("brz_pedidos_scrollY");
+                    if (scrollY) {
+                        sessionStorage.removeItem("brz_pedidos_scrollY");
+                        window.scrollTo(0, parseInt(scrollY, 10));
+                    }
                 }
             } catch(e){}
         })();
@@ -3521,7 +3543,7 @@ HTML;
                     <a href="/admin/relatorio-pedidos/imprimir/' . $id . '" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf me-1"></i><span class="d-none d-md-inline">PDF</span>
                     </a>
-                    <a href="/admin/pedidos/editar/' . $id . '" class="btn btn-warning btn-sm">
+                    <a href="/admin/pedidos/editar/' . $id . '?returnUrl=' . urlencode($voltarUrl) . '" class="btn btn-warning btn-sm">
                         <i class="fas fa-edit me-1"></i><span class="d-none d-md-inline">Editar</span>
                     </a>
                     <a href="/admin/pedidos/split?id=' . $id . '" class="btn btn-info btn-sm">

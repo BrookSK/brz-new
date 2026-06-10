@@ -763,9 +763,17 @@ class AdminPedidosEditController extends Controller {
 
             // Guardar URL de origem (listagem de pedidos com paginação/filtros)
             try {
-                var ref = document.referrer || "";
-                if (ref && ref.indexOf("/admin/pedidos") !== -1 && ref.indexOf("/editar/") === -1 && ref.indexOf("/detalhes/") === -1) {
-                    sessionStorage.setItem("brz_pedidos_returnUrl", ref);
+                // Prioridade 1: returnUrl passado via query string
+                var urlParams = new URLSearchParams(window.location.search);
+                var returnUrlParam = urlParams.get("returnUrl");
+                if (returnUrlParam) {
+                    sessionStorage.setItem("brz_pedidos_returnUrl", returnUrlParam);
+                } else {
+                    // Prioridade 2: document.referrer se vier da listagem diretamente
+                    var ref = document.referrer || "";
+                    if (ref && ref.indexOf("/admin/pedidos") !== -1 && ref.indexOf("/editar/") === -1) {
+                        sessionStorage.setItem("brz_pedidos_returnUrl", ref);
+                    }
                 }
             } catch(e){}
 
@@ -913,6 +921,10 @@ class AdminPedidosEditController extends Controller {
                         var label = st.replace(/_/g, " ");
                         sessionStorage.setItem("brz_pedidos_flash", "Pedido #" + pedidoId + " salvo com sucesso" + (label ? " — Status: " + label : ""));
                         var returnUrl = sessionStorage.getItem("brz_pedidos_returnUrl") || "/admin/pedidos";
+                        // Adicionar âncora para rolar até o pedido na listagem
+                        if (returnUrl.indexOf("#") === -1) {
+                            returnUrl += "#pedido-" + pedidoId;
+                        }
                         window.location.href = returnUrl;
                         return;
                     }
