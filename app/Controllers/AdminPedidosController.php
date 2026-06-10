@@ -250,6 +250,10 @@ class AdminPedidosController extends Controller {
                     foreach ($mapEnd as $param => $candidates) {
                         $col = $pickEnd($candidates);
                         $val = trim((string) $request->getParam($param));
+                        // Converter nome de estado para sigla UF (coluna pode ser VARCHAR(2))
+                        if ($param === 'estado' && strlen($val) > 2) {
+                            $val = $this->estadoParaUf($val);
+                        }
                         if ($col !== '') {
                             $endFields[$col] = $val;
                         }
@@ -411,6 +415,20 @@ class AdminPedidosController extends Controller {
         } catch (\Exception $e) {
             return [];
         }
+    }
+
+    private function estadoParaUf(string $estado): string {
+        $mapa = [
+            'acre' => 'AC', 'alagoas' => 'AL', 'amapa' => 'AP', 'amazonas' => 'AM',
+            'bahia' => 'BA', 'ceara' => 'CE', 'distrito federal' => 'DF', 'espirito santo' => 'ES',
+            'goias' => 'GO', 'maranhao' => 'MA', 'mato grosso' => 'MT', 'mato grosso do sul' => 'MS',
+            'minas gerais' => 'MG', 'para' => 'PA', 'paraiba' => 'PB', 'parana' => 'PR',
+            'pernambuco' => 'PE', 'piaui' => 'PI', 'rio de janeiro' => 'RJ', 'rio grande do norte' => 'RN',
+            'rio grande do sul' => 'RS', 'rondonia' => 'RO', 'roraima' => 'RR', 'santa catarina' => 'SC',
+            'sao paulo' => 'SP', 'sergipe' => 'SE', 'tocantins' => 'TO',
+        ];
+        $normalized = strtolower(trim(iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $estado) ?: $estado));
+        return $mapa[$normalized] ?? $estado;
     }
 
     private function pickColumn(array $cols, array $candidates): ?string {
