@@ -218,6 +218,8 @@ class AdminPedidosController extends Controller {
             $debugLog['usuario_id_pedido'] = $usuarioIdPedido;
             $debugLog['tabela_enderecos_existe'] = $this->tableExistsPdo($pdo, 'enderecos');
 
+            error_log('[atualizarCliente] endereco_entrega_id_col=' . $endEntregaIdCol . ' val=' . (($endEntregaIdCol !== '') ? ($oldRow[$endEntregaIdCol] ?? 'NULL') : 'N/A') . ' usuario_id_pedido=' . $usuarioIdPedido . ' tabela_enderecos=' . ($this->tableExistsPdo($pdo, 'enderecos') ? 'SIM' : 'NAO'));
+
             if ($endEntregaIdCol !== '' && !empty($oldRow[$endEntregaIdCol])) {
                 $enderecoId = (int) $oldRow[$endEntregaIdCol];
                 $debugLog['endereco_path'] = 'via_endereco_entrega_id=' . $enderecoId;
@@ -489,8 +491,10 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
             }
 
+            error_log('[atualizarCliente] DEBUG FINAL: ' . json_encode($debugLog));
             $this->json(['success' => true, 'debug' => $debugLog]);
         } catch (\Exception $e) {
+            error_log('[atualizarCliente] EXCEPTION: ' . $e->getMessage());
             $this->json(['success' => false, 'error' => $e->getMessage(), 'debug' => $debugLog ?? []], 500);
         }
     }
