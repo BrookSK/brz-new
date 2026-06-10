@@ -3203,7 +3203,7 @@ HTML;
             try {
                 // Atribuir IDs nos cards para âncora de scroll
                 document.querySelectorAll(".card.order-card").forEach(function(card){
-                    var link = card.querySelector("a[href*='/admin/pedidos/detalhes/']");
+                    var link = card.querySelector("a[href*=\"/admin/pedidos/detalhes/\"]");
                     if (link) {
                         var match = link.href.match(/\/detalhes\/(\d+)/);
                         if (match) {
