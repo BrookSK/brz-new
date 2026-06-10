@@ -421,6 +421,7 @@ $router->post('/admin/pedidos/excluir/{id}', 'AdminPedidosController', 'excluir'
 $router->post('/admin/pedidos/{id}/criar-ticket', 'AdminPedidosController', 'criarTicket');
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 $router->post('/admin/pedidos/atualizar-status-massa', 'AdminPedidosController', 'atualizarStatusMassa');
+$router->post('/admin/pedidos/atualizar-cliente/{id}', 'AdminPedidosController', 'atualizarCliente');
 
 // Split Order
 $router->get('/admin/pedidos/split', 'AdminPedidosSplitController', 'index');
