@@ -52,6 +52,7 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
                 $oldRow = [];
             }
+            error_log('[atualizarCliente] oldRow encontrado: ' . (empty($oldRow) ? 'NAO' : 'SIM (id=' . ($oldRow['id'] ?? '?') . ')'));
 
             $pickCol = function(array $candidates) use ($cols): string {
                 foreach ($candidates as $c) {
