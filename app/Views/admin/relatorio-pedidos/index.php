@@ -54,20 +54,34 @@ $statusColors = [
                     <label class="form-label">Data Final</label>
                     <input type="date" name="date_end" class="form-control" value="<?= htmlspecialchars($dateEnd) ?>">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">Status</label>
-                    <select name="status[]" class="form-select" multiple size="5" id="statusSelect">
-                        <?php
-                        $selectedStatuses = is_array($statusFilter) ? $statusFilter : ($statusFilter !== '' ? [$statusFilter] : []);
-                        foreach ($statusList as $s):
-                            if (in_array($s, ['carne_pagando','carne_aguardando'], true)) continue;
-                        ?>
-                            <option value="<?= htmlspecialchars($s) ?>" <?= in_array($s, $selectedStatuses, true) ? 'selected' : '' ?>><?= htmlspecialchars($statusLabels[$s] ?? ucfirst($s)) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <small class="form-text text-muted">Ctrl+click para selecionar vários. Nenhum = Todos.</small>
+                    <div class="dropdown w-100">
+                        <button class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center" type="button" id="statusDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                            <span id="statusLabel"><?= empty($selectedStatuses) ? 'Todos' : count($selectedStatuses) . ' selecionado(s)' ?></span>
+                            <i class="fas fa-chevron-down ms-2"></i>
+                        </button>
+                        <div class="dropdown-menu w-100 p-2 shadow" style="max-height:280px;overflow-y:auto;" aria-labelledby="statusDropdown">
+                            <div class="mb-2 d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary flex-fill" onclick="toggleAllStatus(true)">Todos</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" onclick="toggleAllStatus(false)">Limpar</button>
+                            </div>
+                            <?php
+                            $selectedStatuses = is_array($statusFilter) ? $statusFilter : ($statusFilter !== '' ? [$statusFilter] : []);
+                            foreach ($statusList as $s):
+                                if (in_array($s, ['carne_pagando','carne_aguardando'], true)) continue;
+                                $checked = in_array($s, $selectedStatuses, true) ? 'checked' : '';
+                                $label = htmlspecialchars($statusLabels[$s] ?? ucfirst(str_replace('_', ' ', $s)));
+                            ?>
+                            <label class="dropdown-item d-flex align-items-center gap-2 rounded px-2 py-1" style="cursor:pointer;font-size:0.9rem;">
+                                <input type="checkbox" name="status[]" value="<?= htmlspecialchars($s) ?>" <?= $checked ?> class="form-check-input m-0 status-cb" onchange="updateStatusLabel()">
+                                <?= $label ?>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Filtrar</button>
                 </div>
             </form>
@@ -182,6 +196,22 @@ $statusColors = [
 </div>
 
 <script>
+function updateStatusLabel() {
+    var checked = document.querySelectorAll('.status-cb:checked');
+    var label = document.getElementById('statusLabel');
+    if (checked.length === 0) {
+        label.textContent = 'Todos';
+    } else if (checked.length === 1) {
+        label.textContent = checked[0].parentElement.textContent.trim();
+    } else {
+        label.textContent = checked.length + ' selecionado(s)';
+    }
+}
+function toggleAllStatus(selectAll) {
+    document.querySelectorAll('.status-cb').forEach(function(cb) { cb.checked = selectAll; });
+    updateStatusLabel();
+}
+
 function registrarImpressao(pedidoId) {
     fetch('/admin/relatorio-pedidos/registrar-impressao', {
         method: 'POST',
