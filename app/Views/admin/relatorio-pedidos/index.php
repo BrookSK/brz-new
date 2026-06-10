@@ -56,14 +56,16 @@ $statusColors = [
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
-                    <select name="status" class="form-select">
-                        <option value="">Todos</option>
-                        <?php foreach ($statusList as $s):
+                    <select name="status[]" class="form-select" multiple size="5" id="statusSelect">
+                        <?php
+                        $selectedStatuses = is_array($statusFilter) ? $statusFilter : ($statusFilter !== '' ? [$statusFilter] : []);
+                        foreach ($statusList as $s):
                             if (in_array($s, ['carne_pagando','carne_aguardando'], true)) continue;
                         ?>
-                            <option value="<?= htmlspecialchars($s) ?>" <?= $statusFilter === $s ? 'selected' : '' ?>><?= htmlspecialchars($statusLabels[$s] ?? ucfirst($s)) ?></option>
+                            <option value="<?= htmlspecialchars($s) ?>" <?= in_array($s, $selectedStatuses, true) ? 'selected' : '' ?>><?= htmlspecialchars($statusLabels[$s] ?? ucfirst($s)) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <small class="form-text text-muted">Ctrl+click para selecionar vários. Nenhum = Todos.</small>
                 </div>
                 <div class="col-md-3">
                     <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Filtrar</button>

@@ -18,7 +18,15 @@ class AdminRelatorioPedidosController extends Controller {
 
         $dateStart = $request->getParam('date_start', date('Y-m-d'));
         $dateEnd = $request->getParam('date_end', date('Y-m-d'));
-        $statusFilter = $request->getParam('status', '');
+        $statusFilterRaw = $request->getParam('status', '');
+
+        // Suportar múltiplos status (array do multi-select)
+        $statusFilter = [];
+        if (is_array($statusFilterRaw)) {
+            $statusFilter = array_filter(array_map('trim', $statusFilterRaw), function($s) { return $s !== ''; });
+        } elseif (is_string($statusFilterRaw) && $statusFilterRaw !== '') {
+            $statusFilter = [$statusFilterRaw];
+        }
 
         // Buscar pedidos
         $where = ["p.created_at >= :ds", "p.created_at < DATE_ADD(:de, INTERVAL 1 DAY)"];
@@ -28,13 +36,18 @@ class AdminRelatorioPedidosController extends Controller {
         $cols = [];
         try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
 
-        if ($statusFilter !== '') {
-            $where[] = "p.status = :st";
-            $params[':st'] = $statusFilter;
+        if (!empty($statusFilter)) {
+            $placeholders = [];
+            foreach ($statusFilter as $i => $s) {
+                $key = ':st' . $i;
+                $placeholders[] = $key;
+                $params[$key] = $s;
+            }
+            $where[] = "p.status IN (" . implode(',', $placeholders) . ")";
+        } else {
+            // Excluir pedidos de carnê e deletados/cancelados da listagem (apenas quando não há filtro explícito)
+            $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('carne_pagando','carne_aguardando')";
         }
-
-        // Excluir pedidos de carnê e deletados/cancelados da listagem
-        $where[] = "LOWER(COALESCE(p.status,'')) NOT IN ('carne_pagando','carne_aguardando','cancelado','cancelled','apagado','deleted','lixeira','trash')";
 
         // Excluir soft-deleted (deleted_at)
         if (in_array('deleted_at', $cols, true)) {
