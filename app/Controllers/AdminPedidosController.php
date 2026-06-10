@@ -3355,6 +3355,23 @@ HTML;
                 return;
             }
 
+            // Registrar impressão
+            try {
+                $db = \Config\Database::getConnection();
+                $cols = [];
+                try { $stC = $db->query('DESCRIBE pedidos'); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                if (!in_array('print_count', $cols, true)) {
+                    try { $db->exec("ALTER TABLE pedidos ADD COLUMN print_count INT NOT NULL DEFAULT 0"); } catch (\Exception $e) {}
+                }
+                if (!in_array('last_printed_by', $cols, true)) {
+                    try { $db->exec("ALTER TABLE pedidos ADD COLUMN last_printed_by VARCHAR(100) DEFAULT NULL"); } catch (\Exception $e) {}
+                }
+                if (session_status() === PHP_SESSION_NONE) session_start();
+                $userName = $_SESSION['usuario_nome'] ?? ($_SESSION['usuario_email'] ?? 'Admin');
+                $db->prepare("UPDATE pedidos SET print_count = COALESCE(print_count,0) + 1, last_printed_by = ? WHERE id = ?")
+                    ->execute([$userName, (int) $id]);
+            } catch (\Exception $e) {}
+
             $itens = $pedido['items'] ?? [];
 
             $paymentDetails = null;
@@ -5839,16 +5856,19 @@ LINKSCRIPT;
 
     private function getCardStyle(array $pedido): string {
         $st = strtolower(trim((string) ($pedido['status'] ?? '')));
+        $printed = (int) ($pedido['print_count'] ?? 0) > 0;
+        $borderExtra = $printed ? 'border: 2px solid #1a1a1a !important; ' : '';
+
         if ($this->isCarnePedido($pedido)) {
-            return 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;';
+            return $borderExtra . 'background: rgba(59, 130, 246, 0.06); border-left: 4px solid #3b82f6;';
         }
         if ($st === 'itens_parcialmente_comprados') {
-            return 'background: rgba(253, 126, 20, 0.06); border-left: 4px solid #fd7e14;';
+            return $borderExtra . 'background: rgba(253, 126, 20, 0.06); border-left: 4px solid #fd7e14;';
         }
         if ($st === 'itens_comprados') {
-            return 'background: rgba(16, 185, 129, 0.06); border-left: 4px solid #10b981;';
+            return $borderExtra . 'background: rgba(16, 185, 129, 0.06); border-left: 4px solid #10b981;';
         }
-        return '';
+        return $borderExtra;
     }
 
     private function getStatusColor($status, ?array $pedido = null) {
