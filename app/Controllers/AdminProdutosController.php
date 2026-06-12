@@ -2935,6 +2935,18 @@ document.getElementById("formProduto").addEventListener("submit", async function
 
 renderGrupos();
 
+// Auto-selecionar grupo se veio via ?grupo_id=X
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var gid = parseInt(params.get("grupo_id") || "0", 10);
+    if (gid > 0) {
+        var g = GRUPOS.find(function(gr) { return parseInt(gr.id, 10) === gid; });
+        if (g) {
+            selecionarGrupo(g);
+        }
+    }
+})();
+
 // ─── Produto para o Site (sem grupo) ───
 document.getElementById("btnProdutoSite").addEventListener("click", function() {
     modoProdutoSite = true;
@@ -3202,6 +3214,13 @@ setupMic("btnMicLote", "micStatusLote", "transcricaoLote", "Lote",
         }
 
         if (!empty($_SESSION['cadastro_rapido_autorizado'])) {
+            return true;
+        }
+
+        // Auto-autorizar se veio da tela de grupos (com grupo_id) e está logado como admin/vendedor
+        $grupoId = (int) ($request->getParam('grupo_id', 0) ?? 0);
+        if ($grupoId > 0) {
+            $_SESSION['cadastro_rapido_autorizado'] = true;
             return true;
         }
 

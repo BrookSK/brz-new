@@ -76,6 +76,9 @@ $grupos = is_array($grupos ?? null) ? $grupos : [];
                     <div class="small mb-1"><i class="fas fa-user me-1 text-muted"></i>Cadastrado por: <strong><?= $criadoPor ?></strong></div>
                     <div class="small mb-3"><i class="fas fa-clock me-1 text-muted"></i><?= $criadoEm ?></div>
                     <div class="d-flex gap-2 flex-wrap">
+                        <a href="/admin/produtos/cadastro-rapido?grupo_id=<?= (int)$g['id'] ?>" class="btn btn-sm btn-outline-success" title="Adicionar produto neste grupo">
+                            <i class="fas fa-plus"></i>
+                        </a>
                         <button class="btn btn-sm btn-outline-primary btn-produtos" data-id="<?= (int)$g['id'] ?>" data-nome="<?= htmlspecialchars($g['nome'], ENT_QUOTES, 'UTF-8') ?>" title="Ver produtos">
                             <i class="fas fa-box"></i> Produtos
                         </button>
