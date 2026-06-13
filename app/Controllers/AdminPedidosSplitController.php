@@ -192,7 +192,8 @@ class AdminPedidosSplitController extends Controller {
                             <th style="width:40px;"><input type="checkbox" id="select-all" class="form-check-input"></th>
                             <th>Produto</th>
                             <th>SKU</th>
-                            <th class="text-center">Qtd</th>
+                            <th class="text-center">Qtd Total</th>
+                            <th class="text-center">Qtd a Separar</th>
                             <th class="text-end">Preço Unit.</th>
                             <th class="text-end">Subtotal</th>
                             <th class="text-end">Peso Total</th>
@@ -211,10 +212,11 @@ class AdminPedidosSplitController extends Controller {
             $pesoTotal = $pesoUnit * $qtd;
 
             echo '<tr>
-                    <td><input type="checkbox" class="form-check-input item-checkbox" name="items[]" value="' . $itemId . '" data-weight="' . $pesoTotal . '" data-value="' . $subtotal . '"></td>
+                    <td><input type="checkbox" class="form-check-input item-checkbox" name="items[]" value="' . $itemId . '" data-weight-unit="' . $pesoUnit . '" data-price-unit="' . $precoUnit . '" data-qty="' . $qtd . '"></td>
                     <td>' . htmlspecialchars($nome) . '</td>
                     <td><small class="text-muted">' . htmlspecialchars($sku) . '</small></td>
                     <td class="text-center">' . $qtd . '</td>
+                    <td class="text-center"><input type="number" name="qty[' . $itemId . ']" class="form-control form-control-sm text-center item-qty-input" min="1" max="' . $qtd . '" value="' . $qtd . '" style="width:70px;display:inline-block;" disabled></td>
                     <td class="text-end">' . $simboloMoeda . ' ' . number_format($precoUnit, 2, ',', '.') . '</td>
                     <td class="text-end fw-bold">' . $simboloMoeda . ' ' . number_format($subtotal, 2, ',', '.') . '</td>
                     <td class="text-end">' . number_format($pesoTotal, 3, ',', '.') . ' kg</td>
@@ -246,16 +248,40 @@ document.addEventListener("DOMContentLoaded", function() {
         return num.toFixed(decimals).replace(".", ",").replace(/\\B(?=(\\d{3})+(?!\\d))/g, ".");
     }
 
+    // Habilitar/desabilitar campo de quantidade ao marcar checkbox
+    checkboxes.forEach(function(cb) {
+        var qtyInput = document.querySelector("input[name=\\"qty[" + cb.value + "]\\"]");
+        cb.addEventListener("change", function() {
+            if (qtyInput) {
+                qtyInput.disabled = !cb.checked;
+                if (cb.checked) {
+                    qtyInput.value = qtyInput.getAttribute("max");
+                }
+            }
+            updateTotals();
+        });
+        if (qtyInput) {
+            qtyInput.addEventListener("input", updateTotals);
+        }
+    });
+
     function updateTotals() {
         let totalWeight = 0;
         let totalValue = 0;
         let anyChecked = false;
 
-        checkboxes.forEach(cb => {
+        checkboxes.forEach(function(cb) {
             if (cb.checked) {
                 anyChecked = true;
-                totalWeight += parseFloat(cb.getAttribute("data-weight")) || 0;
-                totalValue += parseFloat(cb.getAttribute("data-value")) || 0;
+                var weightUnit = parseFloat(cb.getAttribute("data-weight-unit")) || 0;
+                var priceUnit = parseFloat(cb.getAttribute("data-price-unit")) || 0;
+                var maxQty = parseInt(cb.getAttribute("data-qty")) || 1;
+                var qtyInput = document.querySelector("input[name=\\"qty[" + cb.value + "]\\"]");
+                var qty = qtyInput ? parseInt(qtyInput.value) || maxQty : maxQty;
+                if (qty > maxQty) qty = maxQty;
+                if (qty < 1) qty = 1;
+                totalWeight += weightUnit * qty;
+                totalValue += priceUnit * qty;
             }
         });
 
@@ -263,29 +289,53 @@ document.addEventListener("DOMContentLoaded", function() {
         totalValueDisplay.textContent = simboloMoeda + " " + formatNumber(totalValue, 2);
         btnSplit.disabled = !anyChecked;
 
-        // Não permitir selecionar TODOS os itens
-        let allChecked = true;
-        checkboxes.forEach(cb => { if (!cb.checked) allChecked = false; });
-        if (allChecked && checkboxes.length > 0) {
+        // Verificação: não pode separar tudo com quantidade total
+        let allFullQty = true;
+        let checkedCount = 0;
+        let totalItems = checkboxes.length;
+        checkboxes.forEach(function(cb) {
+            if (cb.checked) {
+                checkedCount++;
+                var maxQty = parseInt(cb.getAttribute("data-qty")) || 1;
+                var qtyInput = document.querySelector("input[name=\\"qty[" + cb.value + "]\\"]");
+                var qty = qtyInput ? parseInt(qtyInput.value) || maxQty : maxQty;
+                if (qty < maxQty) allFullQty = false;
+            }
+        });
+        if (checkedCount >= totalItems && allFullQty) {
             btnSplit.disabled = true;
             totalValueDisplay.textContent += " (não pode separar todos)";
         }
     }
 
-    checkboxes.forEach(cb => cb.addEventListener("change", updateTotals));
-
     selectAll.addEventListener("change", function() {
-        checkboxes.forEach(cb => { cb.checked = selectAll.checked; });
+        checkboxes.forEach(function(cb) {
+            cb.checked = selectAll.checked;
+            var qtyInput = document.querySelector("input[name=\\"qty[" + cb.value + "]\\"]");
+            if (qtyInput) {
+                qtyInput.disabled = !selectAll.checked;
+                if (selectAll.checked) qtyInput.value = qtyInput.getAttribute("max");
+            }
+        });
         updateTotals();
     });
 
     // Confirmação antes de enviar
     document.getElementById("split-order-form").addEventListener("submit", function(e) {
-        let allChecked = true;
-        checkboxes.forEach(cb => { if (!cb.checked) allChecked = false; });
-        if (allChecked) {
+        let allFullQty = true;
+        let checkedCount = 0;
+        checkboxes.forEach(function(cb) {
+            if (cb.checked) {
+                checkedCount++;
+                var maxQty = parseInt(cb.getAttribute("data-qty")) || 1;
+                var qtyInput = document.querySelector("input[name=\\"qty[" + cb.value + "]\\"]");
+                var qty = qtyInput ? parseInt(qtyInput.value) || maxQty : maxQty;
+                if (qty < maxQty) allFullQty = false;
+            }
+        });
+        if (checkedCount >= checkboxes.length && allFullQty) {
             e.preventDefault();
-            alert("Você não pode separar TODOS os itens. Pelo menos um item deve permanecer no pedido original.");
+            alert("Você não pode separar TODOS os itens com quantidade total. Pelo menos um item (ou parte dele) deve permanecer no pedido original.");
             return;
         }
         if (!confirm("Tem certeza que deseja separar os itens selecionados em um novo pedido? Esta ação não pode ser desfeita.")) {
@@ -339,21 +389,67 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        // Validar: não pode selecionar TODOS os itens
+        // Validar: não pode selecionar TODOS os itens com quantidade total
         $selectedItemIds = array_map('intval', $selectedItems);
+        $qtyMap = $_POST['qty'] ?? []; // qty[item_id] => quantidade a separar
+
+        $colQtd = $this->pickCol($colsItens, ['quantidade', 'qty']);
+        $colPrecoUnit = $this->pickCol($colsItens, ['preco_unitario', 'valor_unitario', 'price', 'preco']);
+        $colSubtotal = $this->pickCol($colsItens, ['subtotal']);
+
         $allItemIds = array_map(function($it) { return (int) ($it['id'] ?? 0); }, $todosItens);
-        if (count(array_intersect($selectedItemIds, $allItemIds)) >= count($allItemIds)) {
-            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Você não pode separar todos os itens. Pelo menos um item deve permanecer no pedido original.', 'danger');
+
+        // Verificar se está tentando separar tudo
+        $allFull = true;
+        foreach ($todosItens as $item) {
+            $itemId = (int) ($item['id'] ?? 0);
+            if (!in_array($itemId, $selectedItemIds, true)) {
+                $allFull = false;
+                break;
+            }
+            $qtdItem = (int) ($item[$colQtd] ?? 1);
+            $qtdSeparar = (int) ($qtyMap[$itemId] ?? $qtdItem);
+            if ($qtdSeparar < $qtdItem) {
+                $allFull = false;
+                break;
+            }
+        }
+        if ($allFull) {
+            $this->redirectWithMessage('/admin/pedidos/split?id=' . $pedidoId, 'Você não pode separar todos os itens com quantidade total. Pelo menos um item (ou parte) deve permanecer no pedido original.', 'danger');
             return;
         }
 
-        // Separar itens selecionados vs itens que ficam
-        $itensSeparar = [];
-        $itensPermanecer = [];
+        // Separar itens: considerar quantidades parciais
+        $itensSeparar = []; // itens (ou parte deles) que vão pro novo pedido
+        $itensPermanecer = []; // itens que ficam no pedido original
+        $itensParaDividir = []; // itens que precisam ser divididos (quantidade parcial)
+
         foreach ($todosItens as $item) {
             $itemId = (int) ($item['id'] ?? 0);
             if (in_array($itemId, $selectedItemIds, true)) {
-                $itensSeparar[] = $item;
+                $qtdItem = (int) ($item[$colQtd] ?? 1);
+                $qtdSeparar = min((int) ($qtyMap[$itemId] ?? $qtdItem), $qtdItem);
+                if ($qtdSeparar <= 0) $qtdSeparar = $qtdItem;
+
+                if ($qtdSeparar >= $qtdItem) {
+                    // Mover item inteiro
+                    $itensSeparar[] = $item;
+                } else {
+                    // Dividir: parte vai, parte fica
+                    $itensParaDividir[] = [
+                        'item' => $item,
+                        'qty_separar' => $qtdSeparar,
+                        'qty_permanecer' => $qtdItem - $qtdSeparar,
+                    ];
+                    // Para cálculo de subtotal, considerar a parte que vai
+                    $itemCopy = $item;
+                    $itemCopy['_qty_override'] = $qtdSeparar;
+                    $itensSeparar[] = $itemCopy;
+                    // A parte que fica
+                    $itemFica = $item;
+                    $itemFica['_qty_override'] = $qtdItem - $qtdSeparar;
+                    $itensPermanecer[] = $itemFica;
+                }
             } else {
                 $itensPermanecer[] = $item;
             }
@@ -365,9 +461,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         // Calcular totais para distribuição proporcional
-        $colQtd = $this->pickCol($colsItens, ['quantidade', 'qty']);
-        $colPrecoUnit = $this->pickCol($colsItens, ['preco_unitario', 'valor_unitario', 'price', 'preco']);
-        $colSubtotal = $this->pickCol($colsItens, ['subtotal']);
         $colProdutoId = $this->pickCol($colsItens, ['produto_id']);
 
         $subtotalOriginal = 0;
@@ -381,11 +474,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         $subtotalSeparar = 0;
         foreach ($itensSeparar as $item) {
-            $sub = (float) ($item[$colSubtotal] ?? 0);
-            if ($sub == 0 && $colPrecoUnit && $colQtd) {
-                $sub = (float) ($item[$colPrecoUnit] ?? 0) * (int) ($item[$colQtd] ?? 1);
-            }
-            $subtotalSeparar += $sub;
+            $qtyEfetiva = (int) ($item['_qty_override'] ?? ($item[$colQtd] ?? 1));
+            $preco = (float) ($item[$colPrecoUnit] ?? 0);
+            $subtotalSeparar += $preco * $qtyEfetiva;
         }
 
         $subtotalPermanecer = $subtotalOriginal - $subtotalSeparar;
@@ -550,13 +641,62 @@ document.addEventListener("DOMContentLoaded", function() {
             $stmtInsert->execute();
             $novoPedidoId = (int) $this->connection->lastInsertId();
 
-            // ===== MOVER ITENS SELECIONADOS PARA O NOVO PEDIDO =====
+            // ===== MOVER/DIVIDIR ITENS PARA O NOVO PEDIDO =====
             foreach ($itensSeparar as $item) {
                 $itemId = (int) ($item['id'] ?? 0);
                 if ($itemId <= 0) continue;
 
-                $stmtMove = $this->connection->prepare('UPDATE ' . $itensTable . ' SET pedido_id = :novo_pedido_id WHERE id = :item_id');
-                $stmtMove->execute([':novo_pedido_id' => $novoPedidoId, ':item_id' => $itemId]);
+                // Verificar se é um item que precisa ser dividido (quantidade parcial)
+                if (isset($item['_qty_override'])) {
+                    // Item parcial: criar novo registro no novo pedido com a quantidade separada
+                    $qtySeparar = (int) $item['_qty_override'];
+                    $precoUnit = (float) ($item[$colPrecoUnit] ?? 0);
+
+                    // Copiar todas as colunas do item original
+                    $itemData = $item;
+                    unset($itemData['id'], $itemData['_qty_override']);
+                    $itemData['pedido_id'] = $novoPedidoId;
+                    if ($colQtd) $itemData[$colQtd] = $qtySeparar;
+                    if ($colSubtotal) $itemData[$colSubtotal] = round($precoUnit * $qtySeparar, 2);
+
+                    $cols = array_keys($itemData);
+                    $placeholders = ':' . implode(', :', $cols);
+                    $sqlIns = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $cols) . ') VALUES (' . $placeholders . ')';
+                    $stIns = $this->connection->prepare($sqlIns);
+                    foreach ($itemData as $key => $val) {
+                        $stIns->bindValue(':' . $key, $val);
+                    }
+                    $stIns->execute();
+                } else {
+                    // Item inteiro: mover para o novo pedido
+                    $stmtMove = $this->connection->prepare('UPDATE ' . $itensTable . ' SET pedido_id = :novo_pedido_id WHERE id = :item_id');
+                    $stmtMove->execute([':novo_pedido_id' => $novoPedidoId, ':item_id' => $itemId]);
+                }
+            }
+
+            // Atualizar quantidade dos itens que foram divididos (parte que fica no pedido original)
+            foreach ($itensParaDividir as $div) {
+                $itemId = (int) ($div['item']['id'] ?? 0);
+                $qtyPermanecer = (int) $div['qty_permanecer'];
+                $precoUnit = (float) ($div['item'][$colPrecoUnit] ?? 0);
+                if ($itemId <= 0) continue;
+
+                $updSet = [];
+                $updParams = [];
+                if ($colQtd) {
+                    $updSet[] = $colQtd . ' = :qty';
+                    $updParams[':qty'] = $qtyPermanecer;
+                }
+                if ($colSubtotal) {
+                    $updSet[] = $colSubtotal . ' = :sub';
+                    $updParams[':sub'] = round($precoUnit * $qtyPermanecer, 2);
+                }
+                if (!empty($updSet)) {
+                    $updParams[':id'] = $itemId;
+                    $sqlUpd = 'UPDATE ' . $itensTable . ' SET ' . implode(', ', $updSet) . ' WHERE id = :id';
+                    $stUpd = $this->connection->prepare($sqlUpd);
+                    $stUpd->execute($updParams);
+                }
             }
 
             // ===== ATUALIZAR VALORES DO PEDIDO ORIGINAL =====
