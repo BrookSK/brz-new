@@ -405,8 +405,31 @@ class AdminUsuariosController extends Controller {
                                 <input type="email" class="form-control" name="email" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">CPF</label>
-                                <input type="text" class="form-control" name="cpf">
+                                <label class="form-label">País</label>
+                                <select class="form-select" name="pais" id="novo_pais" onchange="atualizarCpfObrigatorio()">
+                                    <option value="BR" selected>Brasil</option>
+                                    <option value="US">Estados Unidos</option>
+                                    <option value="CA">Canadá</option>
+                                    <option value="PT">Portugal</option>
+                                    <option value="DE">Alemanha</option>
+                                    <option value="FR">França</option>
+                                    <option value="GB">Reino Unido</option>
+                                    <option value="AR">Argentina</option>
+                                    <option value="CL">Chile</option>
+                                    <option value="CO">Colômbia</option>
+                                    <option value="MX">México</option>
+                                    <option value="UY">Uruguai</option>
+                                    <option value="PY">Paraguai</option>
+                                    <option value="PE">Peru</option>
+                                    <option value="JP">Japão</option>
+                                    <option value="AU">Austrália</option>
+                                    <option value="OTHER">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6" id="wrap_cpf">
+                                <label class="form-label" id="lbl_cpf">CPF</label>
+                                <input type="text" class="form-control" name="cpf" id="input_cpf">
+                                <small class="text-muted" id="cpf_hint">Obrigatório para residentes no Brasil</small>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Telefone</label>
@@ -448,6 +471,24 @@ class AdminUsuariosController extends Controller {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function atualizarCpfObrigatorio() {
+        var pais = document.getElementById("novo_pais").value;
+        var inputCpf = document.getElementById("input_cpf");
+        var lblCpf = document.getElementById("lbl_cpf");
+        var hint = document.getElementById("cpf_hint");
+        if (pais === "BR") {
+            lblCpf.textContent = "CPF";
+            inputCpf.placeholder = "000.000.000-00";
+            hint.textContent = "Obrigatório para residentes no Brasil";
+        } else {
+            lblCpf.textContent = "Documento (opcional)";
+            inputCpf.placeholder = "SSN, Tax ID, etc.";
+            hint.textContent = "Opcional para residentes fora do Brasil";
+        }
+    }
+    atualizarCpfObrigatorio();
+    </script>
 </body>
 </html>';
         exit;
@@ -754,6 +795,12 @@ class AdminUsuariosController extends Controller {
                 'senha' => $request->getParam('senha'),
                 'perfil' => $request->getParam('perfil', 'cliente')
             ];
+
+            // Se o país não for Brasil, CPF/documento não é obrigatório
+            $pais = strtoupper(trim((string) $request->getParam('pais')));
+            if ($pais !== '' && $pais !== 'BR') {
+                $dados['_allow_missing_documento'] = true;
+            }
 
             if (!empty($id)) {
                 $helper->atualizarUsuario($id, $dados);
