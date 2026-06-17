@@ -672,6 +672,8 @@ $router->post('/admin/carnes/recriar', 'AdminCarneController', 'recriarCarne');
 $router->post('/admin/carnes/marcar-parcela-paga/{parcelaId}', 'AdminCarneController', 'marcarParcelaPaga');
 $router->post('/admin/carnes/enviar-cobranca/{parcelaId}', 'AdminCarneController', 'enviarCobranca');
 $router->get('/admin/carnes/buscar-pedido', 'AdminCarneController', 'buscarPedido');
+$router->post('/admin/carnes/arquivar/{id}', 'AdminCarneController', 'arquivar');
+$router->get('/admin/carnes/arquivados', 'AdminCarneController', 'arquivados');
 
 // Área do Representante
 $router->get('/admin/representante/produtos', 'AdminProdutosController', 'index');

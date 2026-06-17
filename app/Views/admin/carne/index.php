@@ -35,6 +35,7 @@ $countQuitados = count(array_filter($carnes, fn($c) => ($c['status'] ?? '') === 
             <p class="text-muted small mb-0 d-none d-md-block">Painel completo do ciclo de carnê</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+            <a href="/admin/carnes/arquivados" class="btn btn-outline-secondary btn-sm"><i class="fas fa-archive me-1"></i><span class="d-none d-md-inline">Arquivados</span></a>
             <a href="/admin/carnes/logs" class="btn btn-outline-info btn-sm"><i class="fas fa-history me-1"></i><span class="d-none d-md-inline">Logs</span></a>
             <a href="/admin/carnes/configuracoes" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog me-1"></i><span class="d-none d-md-inline">Configurações</span></a>
             <a href="/admin" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">Voltar</span></a>

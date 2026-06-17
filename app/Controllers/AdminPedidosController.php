@@ -669,6 +669,10 @@ class AdminPedidosController extends Controller {
             if ($temDeletedAt) {
                 $sql .= " AND p.deleted_at IS NULL";
             }
+            // Excluir pedidos arquivados (cancelados automaticamente por carnê expirado)
+            if (in_array('arquivado', $colsPedidos, true)) {
+                $sql .= " AND p.arquivado = 0";
+            }
 
             if (trim($busca) !== '') {
                 $buscaRaw = trim($busca);
@@ -990,8 +994,13 @@ class AdminPedidosController extends Controller {
             // Restaurar carnê associado ao pedido (se existir)
             try {
                 // Restaurar status do carnê (cancelado -> ativo)
-                $pdo->prepare("UPDATE carnes SET status = 'ativo', cancelado_em = NULL, motivo_cancelamento = NULL WHERE pedido_id = ? AND status = 'cancelado'")
+                $pdo->prepare("UPDATE carnes SET status = 'ativo', cancelado_em = NULL, motivo_cancelamento = NULL, arquivado = 0 WHERE pedido_id = ? AND status = 'cancelado'")
                     ->execute([(int) $id]);
+
+                // Desarquivar o pedido também
+                try {
+                    $pdo->prepare("UPDATE pedidos SET arquivado = 0 WHERE id = ?")->execute([(int) $id]);
+                } catch (\Exception $e) {}
 
                 // Restaurar parcelas canceladas que não foram pagas (cancelada -> pendente)
                 $pdo->prepare("UPDATE carne_parcelas cp
@@ -2171,6 +2180,11 @@ JS;
                 $sql .= " AND p.deleted_at IS NULL";
             }
 
+            // Excluir pedidos arquivados (cancelados automaticamente por carnê expirado)
+            if (in_array('arquivado', $colsPedidos, true)) {
+                $sql .= " AND p.arquivado = 0";
+            }
+
             // Filtro Carnê (server-side via URL)
             $fpFiltro = strtolower(trim((string) ($request->getParam('fp', '') ?? '')));
             if ($fpFiltro === 'carne' && in_array('forma_pagamento', $colsPedidos, true)) {
@@ -2496,6 +2510,9 @@ JS;
             $paramsTotal = [];
             if ($temDeletedAt) {
                 $sqlTotal .= " AND p.deleted_at IS NULL";
+            }
+            if (in_array('arquivado', $colsPedidos, true)) {
+                $sqlTotal .= " AND p.arquivado = 0";
             }
             if (!empty($busca)) {
                 $buscaRaw = trim((string) $busca);

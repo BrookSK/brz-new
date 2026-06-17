@@ -328,10 +328,27 @@ class Carne extends Model {
         $where = ['1=1'];
         $params = [];
 
-        // Sempre excluir carnês de pedidos cancelados/excluídos/deletados/na lixeira
+        // Sempre excluir carnês de pedidos excluídos/deletados/na lixeira
         $where[] = "p.id IS NOT NULL";
-        $where[] = "p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')";
         $where[] = "(p.deleted_at IS NULL)";
+
+        // Quando listando arquivados, não excluir cancelados (pois os arquivados SÃO cancelados)
+        if (empty($filtros['incluir_arquivados'])) {
+            $where[] = "p.status NOT IN ('cancelado','cancelada','cancelled','canceled','excluido','excluída','deleted','lixeira','trash')";
+        } else {
+            $where[] = "p.status NOT IN ('excluido','excluída','deleted','lixeira','trash')";
+        }
+
+        // Excluir arquivados por padrão (a menos que filtro explícito)
+        if (empty($filtros['incluir_arquivados'])) {
+            try {
+                $stCol = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'carnes' AND column_name = 'arquivado'");
+                $stCol->execute();
+                if ((int) $stCol->fetchColumn() > 0) {
+                    $where[] = "c.arquivado = 0";
+                }
+            } catch (\Exception $e) {}
+        }
 
         if (!empty($filtros['status'])) {
             $where[] = 'c.status = :status';

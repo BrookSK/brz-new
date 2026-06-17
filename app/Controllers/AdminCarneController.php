@@ -1337,4 +1337,50 @@ class AdminCarneController extends Controller {
 
         $this->redirect("/admin/carnes/detalhes/{$carneId}");
     }
+
+    /**
+     * Arquivar/desarquivar um carnê manualmente
+     */
+    public function arquivar(Request $request, $id) {
+        $auth = new \App\Services\AuthService();
+        $auth->requerPerfis(['admin']);
+        $id = (int) $id;
+        $arquivar = (int) ($request->getParam('arquivar', 1));
+
+        // Arquivar carnê
+        $this->db->prepare("UPDATE carnes SET arquivado = ? WHERE id = ?")->execute([$arquivar, $id]);
+
+        // Arquivar/desarquivar pedido associado
+        $stPed = $this->db->prepare("SELECT pedido_id FROM carnes WHERE id = ? LIMIT 1");
+        $stPed->execute([$id]);
+        $pedidoId = (int) $stPed->fetchColumn();
+        if ($pedidoId > 0) {
+            $this->db->prepare("UPDATE pedidos SET arquivado = ? WHERE id = ?")->execute([$arquivar, $pedidoId]);
+        }
+
+        $_SESSION['message'] = $arquivar ? 'Carnê arquivado com sucesso.' : 'Carnê desarquivado.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect($arquivar ? '/admin/carnes' : '/admin/carnes/arquivados');
+    }
+
+    /**
+     * Listagem de carnês arquivados
+     */
+    public function arquivados(Request $request) {
+        $auth = new \App\Services\AuthService();
+        $auth->requerPerfis(['admin', 'suporte']);
+
+        $carnes = $this->carneModel->listarAdmin(['incluir_arquivados' => true, 'status' => 'cancelado']);
+
+        // Filtrar apenas os arquivados
+        $carnes = array_filter($carnes, fn($c) => !empty($c['arquivado']));
+
+        $title = 'Carnês Arquivados';
+        $sidebarActive = 'carnes';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start();
+        require __DIR__ . '/../Views/admin/carne/arquivados.php';
+        $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
 }

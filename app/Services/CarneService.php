@@ -641,6 +641,15 @@ class CarneService {
                 $this->carneModel->registrarHistorico($cid, null, 'carne_cancelado',
                     'Carnê cancelado: primeira parcela não paga dentro do prazo de 30 minutos.');
                 $this->dispararNotificacao($cid, null, 'carne_cancelado');
+
+                // Auto-arquivar carnê e pedido cancelados
+                try {
+                    $this->db->prepare("UPDATE carnes SET arquivado = 1 WHERE id = ?")->execute([$cid]);
+                    if ($pidCarne > 0) {
+                        $this->db->prepare("UPDATE pedidos SET arquivado = 1 WHERE id = ?")->execute([$pidCarne]);
+                    }
+                } catch (\Exception $e) {}
+
                 $resultados['cancelados']++;
                 error_log("[CARNE CRON] Carnê #{$cid} cancelado: 1ª parcela expirou (pedido #{$pidCarne})");
             }
@@ -761,6 +770,15 @@ class CarneService {
                         $this->carneModel->registrarHistorico($cid, $pvId, 'carne_cancelado',
                             "Carnê cancelado: parcela #{$pv['numero_parcela']} com {$diasAtraso} dias de atraso (limite: {$diasTolerancia} dias).");
                         $this->dispararNotificacao($cid, null, 'carne_cancelado');
+
+                        // Auto-arquivar carnê e pedido cancelados
+                        try {
+                            $this->db->prepare("UPDATE carnes SET arquivado = 1 WHERE id = ?")->execute([$cid]);
+                            if ($pidCarne > 0) {
+                                $this->db->prepare("UPDATE pedidos SET arquivado = 1 WHERE id = ?")->execute([$pidCarne]);
+                            }
+                        } catch (\Exception $e) {}
+
                         $resultados['cancelados']++;
                         error_log("[CARNE CRON] Carnê #{$cid} cancelado: atraso de {$diasAtraso} dias na parcela #{$pv['numero_parcela']}");
                     }
@@ -828,6 +846,18 @@ class CarneService {
             $this->carneModel->registrarHistorico($cid, null, 'carne_cancelado',
                 "Carnê cancelado por inadimplência após aviso de {$diasAviso} dias.");
             $this->dispararNotificacao($cid, null, 'carne_cancelado');
+
+            // Auto-arquivar carnê e pedido cancelados
+            try {
+                $this->db->prepare("UPDATE carnes SET arquivado = 1 WHERE id = ?")->execute([$cid]);
+                $stPed = $this->db->prepare("SELECT pedido_id FROM carnes WHERE id = ? LIMIT 1");
+                $stPed->execute([$cid]);
+                $pidArq = (int) $stPed->fetchColumn();
+                if ($pidArq > 0) {
+                    $this->db->prepare("UPDATE pedidos SET arquivado = 1 WHERE id = ?")->execute([$pidArq]);
+                }
+            } catch (\Exception $e) {}
+
             $resultados['cancelados']++;
         }
 
