@@ -19,28 +19,14 @@ class AdminPedidosController extends Controller {
 
         $id = $id ?? $request->getParam('id');
         $pedidoId = (int) $id;
-
-        error_log('[atualizarCliente] CHAMADO - pedidoId=' . $pedidoId . ' method=' . $request->getMethod());
-        error_log('[atualizarCliente] POST raw: ' . json_encode($_POST));
-
         if ($pedidoId <= 0) {
-            error_log('[atualizarCliente] ERRO: pedidoId invalido');
             $this->json(['success' => false, 'error' => 'Pedido inválido'], 400);
             return;
         }
 
-        $debugLog = [];
-
         try {
             $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
             $cols = $this->getTableColumnsPdo($pdo, 'pedidos');
-            error_log('[atualizarCliente] Colunas tabela pedidos (endereco-related): ' . json_encode(array_values(array_filter($cols, function($c) {
-                return stripos($c, 'endereco') !== false || stripos($c, 'cep') !== false || stripos($c, 'cidade') !== false || stripos($c, 'estado') !== false || stripos($c, 'bairro') !== false || stripos($c, 'numero') !== false || stripos($c, 'complemento') !== false || stripos($c, 'pais') !== false || stripos($c, 'email') !== false || stripos($c, 'telefone') !== false || stripos($c, 'nome') !== false;
-            }))));
-            error_log('[atualizarCliente] Total colunas: ' . count($cols));
-            $debugLog['pedidos_cols_endereco'] = array_values(array_filter($cols, function($c) {
-                return stripos($c, 'endereco') !== false || stripos($c, 'cep') !== false || stripos($c, 'cidade') !== false || stripos($c, 'estado') !== false || stripos($c, 'bairro') !== false || stripos($c, 'numero') !== false || stripos($c, 'complemento') !== false || stripos($c, 'pais') !== false || stripos($c, 'address') !== false || stripos($c, 'zip') !== false;
-            }));
 
             $usuarioLogado = $auth->getUsuarioLogado();
             $audUsuarioId = (int) ($usuarioLogado['id'] ?? 0);
@@ -52,7 +38,6 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
                 $oldRow = [];
             }
-            error_log('[atualizarCliente] oldRow encontrado: ' . (empty($oldRow) ? 'NAO' : 'SIM (id=' . ($oldRow['id'] ?? '?') . ')'));
 
             $pickCol = function(array $candidates) use ($cols): string {
                 foreach ($candidates as $c) {
@@ -76,26 +61,6 @@ class AdminPedidosController extends Controller {
             $colBairro = $pickCol(['bairro_entrega', 'bairro', 'province', 'district', 'customer_province']);
             $colCidade = $pickCol(['cidade_entrega', 'cidade', 'city', 'customer_city']);
             $colEstado = $pickCol(['estado_entrega', 'estado', 'state', 'customer_state']);
-
-            $debugLog['cols_detectadas'] = [
-                'nome' => $colNome, 'email' => $colEmail, 'telefone' => $colTelefone, 'doc' => $colDoc,
-                'pais' => $colPais, 'cep' => $colCep, 'endereco' => $colEndereco, 'numero' => $colNumero,
-                'complemento' => $colComplemento, 'bairro' => $colBairro, 'cidade' => $colCidade, 'estado' => $colEstado
-            ];
-            $debugLog['request_params'] = [
-                'nome' => trim((string) $request->getParam('nome')),
-                'email' => trim((string) $request->getParam('email')),
-                'telefone' => trim((string) $request->getParam('telefone')),
-                'documento' => trim((string) $request->getParam('documento')),
-                'pais' => trim((string) $request->getParam('pais')),
-                'cep' => trim((string) $request->getParam('cep')),
-                'endereco' => trim((string) $request->getParam('endereco')),
-                'numero' => trim((string) $request->getParam('numero')),
-                'complemento' => trim((string) $request->getParam('complemento')),
-                'bairro' => trim((string) $request->getParam('bairro')),
-                'cidade' => trim((string) $request->getParam('cidade')),
-                'estado' => trim((string) $request->getParam('estado')),
-            ];
 
             $set = [];
             $params = [];
@@ -132,8 +97,6 @@ class AdminPedidosController extends Controller {
             $addSetDual('cidade_entrega', 'cidade', trim((string) $request->getParam('cidade')));
             $addSetDual('estado_entrega', 'estado', trim((string) $request->getParam('estado')));
 
-            error_log('[atualizarCliente] SET antes do filter: ' . json_encode($set));
-            error_log('[atualizarCliente] PARAMS antes do filter: ' . json_encode($params));
             // Destinatário (entrega para outra pessoa)
             $colDestNome = $pickCol(['destinatario_nome']);
             $colDestDoc = $pickCol(['destinatario_documento']);
@@ -153,75 +116,16 @@ class AdminPedidosController extends Controller {
             $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?';
             $st = $pdo->prepare($sql);
             $st->execute($params);
-            $debugLog['update_pedidos_sql'] = $sql;
-            $debugLog['update_pedidos_rows_affected'] = $st->rowCount();
 
-            error_log('[atualizarCliente] SQL: ' . $sql);
-            error_log('[atualizarCliente] Params: ' . json_encode($params));
-            error_log('[atualizarCliente] Rows affected: ' . $st->rowCount());
-
-            // Atualizar também a tabela usuarios (telefone, nome, email, documento) se o pedido tem usuario_id
+            // NÃO atualizar tabela usuarios — edição no pedido é exclusiva deste pedido
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
             $usuarioIdPedido = ($colUsuarioId !== '') ? (int) ($oldRow[$colUsuarioId] ?? 0) : 0;
-            if ($usuarioIdPedido > 0 && $this->tableExistsPdo($pdo, 'usuarios')) {
-                try {
-                    $colsUsu = $this->getTableColumnsPdo($pdo, 'usuarios');
-                    $pickUsu = function(array $candidates) use ($colsUsu): string {
-                        foreach ($candidates as $c) {
-                            if (is_array($colsUsu) && in_array($c, $colsUsu, true)) return $c;
-                        }
-                        return '';
-                    };
 
-                    $setUsu = [];
-                    $paramsUsu = [];
-                    $addSetUsu = function(string $col, $val) use (&$setUsu, &$paramsUsu): void {
-                        if ($col === '') return;
-                        $setUsu[] = $col . ' = ?';
-                        $paramsUsu[] = $val;
-                    };
-
-                    $telefoneVal = trim((string) $request->getParam('telefone'));
-                    $nomeVal = trim((string) $request->getParam('nome'));
-                    $emailVal = trim((string) $request->getParam('email'));
-                    $docVal = trim((string) $request->getParam('documento'));
-
-                    if ($telefoneVal !== '') {
-                        $addSetUsu($pickUsu(['telefone', 'phone', 'celular', 'mobile', 'whatsapp']), $telefoneVal);
-                    }
-                    if ($nomeVal !== '') {
-                        $addSetUsu($pickUsu(['nome', 'name', 'full_name']), $nomeVal);
-                    }
-                    if ($emailVal !== '') {
-                        $addSetUsu($pickUsu(['email']), $emailVal);
-                    }
-                    if ($docVal !== '') {
-                        $addSetUsu($pickUsu(['cpf_cnpj', 'cpfCnpj', 'documento', 'document', 'cpf']), $docVal);
-                    }
-
-                    $setUsu = array_values(array_filter($setUsu, static function($x){ return is_string($x) && trim($x) !== ''; }));
-                    if (!empty($setUsu)) {
-                        $paramsUsu[] = $usuarioIdPedido;
-                        $sqlUsu = 'UPDATE usuarios SET ' . implode(', ', $setUsu) . ' WHERE id = ?';
-                        $stUsu = $pdo->prepare($sqlUsu);
-                        $stUsu->execute($paramsUsu);
-                    }
-                } catch (\Throwable $e) {
-                    // Silenciar erro na tabela usuarios — o update principal no pedido já foi feito
-                }
-            }
-
-            // Se o pedido usa endereco_entrega_id (endereço em tabela separada), atualizar lá também
+            // ENDEREÇO: SEMPRE criar registro NOVO exclusivo para este pedido
+            // Isso garante que editar endereço de um pedido NÃO afeta outros pedidos da mesma cliente.
             $endEntregaIdCol = $pickCol(['endereco_entrega_id']);
             $enderecoIdAtualizado = 0;
-            $debugLog['endereco_entrega_id_col'] = $endEntregaIdCol;
-            $debugLog['endereco_entrega_id_val'] = ($endEntregaIdCol !== '') ? ($oldRow[$endEntregaIdCol] ?? 'NULL') : 'col_not_found';
-            $debugLog['usuario_id_pedido'] = $usuarioIdPedido;
-            $debugLog['tabela_enderecos_existe'] = $this->tableExistsPdo($pdo, 'enderecos');
 
-            error_log('[atualizarCliente] endereco_entrega_id_col=' . $endEntregaIdCol . ' val=' . (($endEntregaIdCol !== '') ? ($oldRow[$endEntregaIdCol] ?? 'NULL') : 'N/A') . ' usuario_id_pedido=' . $usuarioIdPedido . ' tabela_enderecos=' . ($this->tableExistsPdo($pdo, 'enderecos') ? 'SIM' : 'NAO'));
-
-            // ENDEREÇO: sempre gravar na tabela enderecos e associar ao pedido
             if ($endEntregaIdCol !== '' && $this->tableExistsPdo($pdo, 'enderecos')) {
                 try {
                     $colsEnd = $this->getTableColumnsPdo($pdo, 'enderecos');
@@ -232,15 +136,12 @@ class AdminPedidosController extends Controller {
                         return '';
                     };
 
-                    $enderecoId = (int) ($oldRow[$endEntregaIdCol] ?? 0);
-                    error_log('[atualizarCliente] enderecoId existente=' . $enderecoId);
-
-                    // Mapear campos
+                    // Mapear campos do formulário para colunas da tabela enderecos
                     $endFields = [];
                     $mapEnd = [
                         'pais' => ['pais', 'country', 'country_code'],
                         'cep' => ['cep', 'zip_code', 'zipcode'],
-                        'endereco' => ['endereco', 'logradouro', 'address', 'rua'],
+                        'endereco' => ['endereco', 'logradouro', 'address'],
                         'numero' => ['numero', 'number'],
                         'complemento' => ['complemento'],
                         'bairro' => ['bairro', 'neighborhood'],
@@ -249,86 +150,64 @@ class AdminPedidosController extends Controller {
                     ];
                     foreach ($mapEnd as $param => $candidates) {
                         $col = $pickEnd($candidates);
-                        $val = trim((string) $request->getParam($param));
-                        // Converter nome de estado para sigla UF (coluna pode ser VARCHAR(2))
-                        if ($param === 'estado' && strlen($val) > 2) {
-                            $val = $this->estadoParaUf($val);
-                        }
                         if ($col !== '') {
-                            $endFields[$col] = $val;
+                            $endFields[$col] = trim((string) $request->getParam($param));
                         }
                     }
 
-                    error_log('[atualizarCliente] endFields mapeados: ' . json_encode($endFields));
+                    // Verificar se há pelo menos algum valor de endereço informado
+                    $temAlgumEndereco = false;
+                    foreach ($endFields as $val) {
+                        if ($val !== '') { $temAlgumEndereco = true; break; }
+                    }
 
-                    if ($enderecoId > 0) {
-                        // Atualizar endereço existente
-                        $setEnd = [];
-                        $paramsEnd = [];
-                        foreach ($endFields as $col => $val) {
-                            $setEnd[] = $col . ' = ?';
-                            $paramsEnd[] = $val;
-                        }
-                        if (!empty($setEnd)) {
-                            $paramsEnd[] = $enderecoId;
-                            $sqlEnd = 'UPDATE enderecos SET ' . implode(', ', $setEnd) . ' WHERE id = ?';
-                            $stEnd = $pdo->prepare($sqlEnd);
-                            $stEnd->execute($paramsEnd);
-                            $enderecoIdAtualizado = $enderecoId;
-                            error_log('[atualizarCliente] UPDATE enderecos id=' . $enderecoId . ' rows=' . $stEnd->rowCount());
-                        }
-                    } else {
-                        // Criar novo endereço
+                    if ($temAlgumEndereco) {
+                        // Criar NOVO registro de endereço exclusivo para este pedido
                         $insertCols = [];
                         $insertVals = [];
                         $insertPlaceholders = [];
 
-                        // usuario_id
                         if (in_array('usuario_id', $colsEnd, true) && $usuarioIdPedido > 0) {
                             $insertCols[] = 'usuario_id';
                             $insertVals[] = $usuarioIdPedido;
                             $insertPlaceholders[] = '?';
                         }
-
-                        // nome (campo obrigatório em muitas tabelas de endereço)
                         if (in_array('nome', $colsEnd, true)) {
                             $insertCols[] = 'nome';
-                            $insertVals[] = trim((string) $request->getParam('nome')) ?: 'Endereço Principal';
+                            $insertVals[] = trim((string) $request->getParam('nome')) ?: 'Pedido #' . $pedidoId;
+                            $insertPlaceholders[] = '?';
+                        }
+                        if (in_array('telefone', $colsEnd, true)) {
+                            $insertCols[] = 'telefone';
+                            $insertVals[] = trim((string) $request->getParam('telefone'));
                             $insertPlaceholders[] = '?';
                         }
 
                         foreach ($endFields as $col => $val) {
-                            if ($val !== '' || $col === 'pais') {
-                                $insertCols[] = $col;
-                                $insertVals[] = $val !== '' ? $val : 'BR';
-                                $insertPlaceholders[] = '?';
-                            }
-                        }
-
-                        if (in_array('principal', $colsEnd, true)) {
-                            $insertCols[] = 'principal';
-                            $insertVals[] = 1;
+                            $insertCols[] = $col;
+                            $insertVals[] = ($val !== '') ? $val : ($col === 'pais' ? 'BR' : '');
                             $insertPlaceholders[] = '?';
                         }
 
-                        if (!empty($insertCols)) {
-                            $sqlIns = 'INSERT INTO enderecos (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertPlaceholders) . ')';
-                            $stIns = $pdo->prepare($sqlIns);
-                            $stIns->execute($insertVals);
-                            $newEndId = (int) $pdo->lastInsertId();
-                            error_log('[atualizarCliente] INSERT enderecos novo id=' . $newEndId);
+                        // NÃO marcar como principal — é exclusivo deste pedido
+                        if (in_array('principal', $colsEnd, true)) {
+                            $insertCols[] = 'principal';
+                            $insertVals[] = 0;
+                            $insertPlaceholders[] = '?';
+                        }
 
-                            if ($newEndId > 0) {
-                                // Associar ao pedido
-                                $pdo->prepare('UPDATE pedidos SET ' . $endEntregaIdCol . ' = ? WHERE id = ?')->execute([$newEndId, $pedidoId]);
-                                $enderecoIdAtualizado = $newEndId;
-                                error_log('[atualizarCliente] pedido ' . $pedidoId . ' agora aponta para endereco_entrega_id=' . $newEndId);
-                            }
+                        $sqlIns = 'INSERT INTO enderecos (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $insertPlaceholders) . ')';
+                        $pdo->prepare($sqlIns)->execute($insertVals);
+                        $newEndId = (int) $pdo->lastInsertId();
+
+                        // Atualizar o pedido para apontar para o novo endereço exclusivo
+                        if ($newEndId > 0) {
+                            $pdo->prepare('UPDATE pedidos SET ' . $endEntregaIdCol . ' = ? WHERE id = ?')->execute([$newEndId, $pedidoId]);
+                            $enderecoIdAtualizado = $newEndId;
                         }
                     }
                 } catch (\Throwable $e) {
-                    error_log('[atualizarCliente] ERRO enderecos: ' . $e->getMessage());
-                    $debugLog['endereco_erro'] = $e->getMessage();
+                    // Silenciar erro na tabela enderecos
                 }
             }
 
@@ -354,11 +233,9 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            error_log('[atualizarCliente] DEBUG FINAL: ' . json_encode($debugLog));
-            $this->json(['success' => true, 'debug' => $debugLog]);
+            $this->json(['success' => true]);
         } catch (\Exception $e) {
-            error_log('[atualizarCliente] EXCEPTION: ' . $e->getMessage());
-            $this->json(['success' => false, 'error' => $e->getMessage(), 'debug' => $debugLog ?? []], 500);
+            $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 
