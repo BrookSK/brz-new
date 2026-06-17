@@ -177,6 +177,8 @@ $router->get('/admin/demandas/api/notificacoes', 'AdminDemandasController', 'not
 $router->post('/admin/demandas/api/notificacao/{id}/lida', 'AdminDemandasController', 'marcarLida');
 $router->get('/admin/demandas/configuracoes', 'AdminDemandasController', 'configuracoes');
 $router->post('/admin/demandas/configuracoes', 'AdminDemandasController', 'salvarConfiguracoes');
+$router->post('/admin/demandas/arquivar/{id}', 'AdminDemandasController', 'arquivar');
+$router->get('/admin/demandas/arquivados', 'AdminDemandasController', 'arquivados');
 
 // Oferta Gratuita
 $router->get('/admin/oferta-gratuita', 'AdminOfertaGratuitaController', 'index');

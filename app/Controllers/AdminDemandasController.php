@@ -1119,13 +1119,61 @@ class AdminDemandasController extends Controller {
         }
     }
 
+    /**
+     * Arquivar/desarquivar demanda
+     */
+    public function arquivar(Request $request, $id) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin']);
+        $id = (int)$id;
+        $arquivar = (int)($_POST['arquivar'] ?? 1);
+
+        $this->ensureColumnArquivado();
+        $this->db->prepare("UPDATE demandas SET arquivado = ? WHERE id = ?")->execute([$arquivar, $id]);
+
+        $_SESSION['message'] = $arquivar ? 'Demanda arquivada.' : 'Demanda desarquivada.';
+        $_SESSION['message_type'] = 'success';
+        $this->redirect('/admin/demandas/painel');
+    }
+
+    /**
+     * Lista demandas arquivadas
+     */
+    public function arquivados(Request $request) {
+        $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
+        $this->ensureColumnArquivado();
+
+        $st = $this->db->query("SELECT * FROM demandas WHERE arquivado = 1 ORDER BY updated_at DESC");
+        $demandas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
+        $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
+
+        $title = 'Demandas Arquivadas'; $sidebarActive = 'demandas-painel';
+        include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
+        ob_start(); require __DIR__ . '/../Views/admin/demandas/arquivados.php'; $content = ob_get_clean();
+        include __DIR__ . '/../Views/layouts/admin.php';
+    }
+
     // === PRIVATE ===
     private function listar($status = null) {
-        $sql = "SELECT * FROM demandas" . ($status ? " WHERE status = ?" : "") . " ORDER BY created_at DESC";
-        $st = $this->db->prepare($sql); $st->execute($status ? [$status] : []); return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $this->ensureColumnArquivado();
+        if ($status) {
+            $sql = "SELECT * FROM demandas WHERE status = ? AND arquivado = 0 ORDER BY created_at DESC";
+            $st = $this->db->prepare($sql); $st->execute([$status]);
+        } else {
+            $sql = "SELECT * FROM demandas WHERE arquivado = 0 ORDER BY created_at DESC";
+            $st = $this->db->prepare($sql); $st->execute();
+        }
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
     private function getById($id) { $st = $this->db->prepare("SELECT * FROM demandas WHERE id = ?"); $st->execute([$id]); return $st->fetch(\PDO::FETCH_ASSOC) ?: null; }
     private function getHistorico($id) { $st = $this->db->prepare("SELECT * FROM demanda_historico WHERE demanda_id = ? ORDER BY created_at ASC"); $st->execute([$id]); return $st->fetchAll(\PDO::FETCH_ASSOC) ?: []; }
     private function registrarHistorico($id, $anterior, $novo, $obs = null) { $this->db->prepare("INSERT INTO demanda_historico (demanda_id, status_anterior, status_novo, usuario_id, observacao) VALUES (?,?,?,?,?)")->execute([$id, $anterior, $novo, $_SESSION['usuario_id'] ?? null, $obs]); }
     private function ensureTables() { try { $this->db->query("SELECT 1 FROM demandas LIMIT 1"); } catch (\Exception $e) { $f = __DIR__ . '/../../database/migrations/165_create_demandas_schema.sql'; if (file_exists($f)) { foreach (array_filter(array_map('trim', explode(';', file_get_contents($f)))) as $s) { if ($s && stripos($s,'--')!==0) try { $this->db->exec($s); } catch (\Exception $ex) {} } } } }
+
+    private function ensureColumnArquivado(): void {
+        try { $this->db->query("SELECT arquivado FROM demandas LIMIT 1"); } catch (\Exception $e) {
+            try { $this->db->exec("ALTER TABLE demandas ADD COLUMN arquivado TINYINT(1) NOT NULL DEFAULT 0 AFTER teste_expirado"); } catch (\Exception $ex) {}
+        }
+    }
 }

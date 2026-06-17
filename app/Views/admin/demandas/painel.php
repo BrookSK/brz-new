@@ -9,7 +9,10 @@ foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatu
 <div class="container-fluid py-3">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
         <h1 class="page-title">Painel de Demandas</h1>
-        <a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>
+        <div class="d-flex gap-2">
+            <a href="/admin/demandas/arquivados" class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="fas fa-archive me-1"></i>Arquivados</a>
+            <a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>
+        </div>
     </div>
     <?php if (!empty($_SESSION['message'])): ?><div class="alert alert-<?= $_SESSION['message_type'] ?? 'info' ?> alert-dismissible fade show"><?= htmlspecialchars($_SESSION['message']) ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div><?php unset($_SESSION['message'], $_SESSION['message_type']); endif; ?>
 
@@ -38,7 +41,13 @@ foreach ($demandas as $d) { $s = $d['status'] ?? 'pendente'; if (isset($porStatu
                     ?>
                     <a href="/admin/demandas/detalhe/<?= $card['id'] ?>" class="card mb-2 border-0 shadow-sm text-decoration-none <?= $testeExpired ? 'border-danger border-2' : '' ?>" style="<?= $testeExpired ? 'border:2px solid #ef4444!important;' : '' ?>">
                         <div class="card-body p-2">
-                            <div class="fw-semibold small text-dark text-truncate"><?= htmlspecialchars($card['titulo'] ?? $card['bloco1_titulo'] ?? '') ?></div>
+                            <div class="d-flex align-items-start justify-content-between gap-1">
+                                <div class="fw-semibold small text-dark text-truncate"><?= htmlspecialchars($card['titulo'] ?? $card['bloco1_titulo'] ?? '') ?></div>
+                                <form method="POST" action="/admin/demandas/arquivar/<?= $card['id'] ?>" class="flex-shrink-0" onclick="event.stopPropagation(); event.preventDefault(); if(confirm('Arquivar esta demanda?')) this.submit();">
+                                    <input type="hidden" name="arquivar" value="1">
+                                    <button type="submit" class="btn btn-link btn-sm p-0 text-muted" title="Arquivar" style="font-size:10px;line-height:1;"><i class="fas fa-archive"></i></button>
+                                </form>
+                            </div>
                             <div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($card['solicitante'] ?? '') ?> · <?= date('d/m', strtotime($card['created_at'])) ?></div>
                             <?php if ($prazo && $statusKey === 'em_execucao'): ?><div class="mt-1"><span class="badge bg-warning text-dark" style="font-size:9px;"><i class="fas fa-clock me-1"></i>Prazo: <?= date('d/m/Y', strtotime($prazo)) ?></span></div><?php endif; ?>
                             <?php if ($teste && $statusKey === 'em_teste'):

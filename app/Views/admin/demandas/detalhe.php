@@ -2,6 +2,10 @@
 <div class="container-fluid py-3">
     <a href="/admin/demandas/painel" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
     <?php if ($d['status'] === 'concluido'): ?><a href="/admin/demandas/pdf/<?= $d['id'] ?>" class="btn btn-sm btn-outline-dark mb-3 ms-2" target="_blank"><i class="fas fa-file-pdf me-1"></i>Gerar PDF</a><?php endif; ?>
+    <form method="POST" action="/admin/demandas/arquivar/<?= $d['id'] ?>" class="d-inline">
+        <input type="hidden" name="arquivar" value="<?= empty($d['arquivado']) ? 1 : 0 ?>">
+        <button type="submit" class="btn btn-sm btn-outline-secondary mb-3 ms-2"><i class="fas fa-archive me-1"></i><?= empty($d['arquivado']) ? 'Arquivar' : 'Desarquivar' ?></button>
+    </form>
     <div class="row">
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h5 class="fw-bold mb-0"><?= htmlspecialchars($d['bloco1_titulo']) ?></h5><span class="badge bg-primary fs-6"><?= $statusLabels[$d['status']] ?? $d['status'] ?></span></div><div class="card-body">
