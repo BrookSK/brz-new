@@ -223,6 +223,27 @@ class AdminPedidosEditController extends Controller {
         $temPedido = $this->columnExists('lista_compras', 'pedido_id');
         $temNomeProduto = $this->columnExists('lista_compras', 'nome_produto');
 
+        // Verificar se já existe item comprado para este produto/pedido — se sim, descontar a quantidade já comprada
+        if ($temPedido) {
+            try {
+                $sqlComprado = "SELECT COALESCE(SUM(quantidade_faltante), 0) as qty_comprada FROM lista_compras WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status != 'pendente'";
+                $paramsComprado = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId];
+                if ($temNomeProduto && $nomeProdutoCustom !== '') {
+                    $sqlComprado .= ' AND nome_produto = :nome_produto';
+                    $paramsComprado[':nome_produto'] = $nomeProdutoCustom;
+                }
+                $stmtComprado = $this->connection->prepare($sqlComprado);
+                $stmtComprado->execute($paramsComprado);
+                $jaComprado = (int) ($stmtComprado->fetchColumn() ?: 0);
+                if ($jaComprado > 0) {
+                    $qtdFaltante = $qtdFaltante - $jaComprado;
+                    if ($qtdFaltante <= 0) {
+                        return; // Toda a quantidade já foi comprada, não precisa criar pendência
+                    }
+                }
+            } catch (\Exception $e) {}
+        }
+
         // Se não tem coluna nome_produto, tentar criar
         if (!$temNomeProduto && $nomeProdutoCustom !== '') {
             try {
@@ -287,9 +308,10 @@ class AdminPedidosEditController extends Controller {
         }
 
         // Pendências geradas por pedido (se existir coluna)
+        // Só remove itens pendentes — preserva itens já comprados/finalizados
         if ($this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
             try {
-                $stmt = $this->connection->prepare("DELETE FROM lista_compras WHERE pedido_id = :pedido_id");
+                $stmt = $this->connection->prepare("DELETE FROM lista_compras WHERE pedido_id = :pedido_id AND status = 'pendente'");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             } catch (\Exception $e) {
             }
