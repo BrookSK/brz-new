@@ -7237,6 +7237,15 @@ HTML;
                 }
             }
 
+            // Ao marcar como caixa fechada (produto_consolidado), considerar que todos os itens foram comprados
+            if ((string) $novoStatus === 'produto_consolidado') {
+                try {
+                    $stmtMarkComprado = $pdo->prepare("UPDATE lista_compras SET status = 'comprado', quantidade_faltante = 0 WHERE pedido_id = ? AND status = 'pendente'");
+                    $stmtMarkComprado->execute([(int) $id]);
+                } catch (\Exception $e) {
+                }
+            }
+
             if ((string) $novoStatus === 'cancelado') {
                 // Cancelamento: liberar reservas e remover pendncias do pedido
                 try {

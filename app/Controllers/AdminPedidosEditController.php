@@ -337,7 +337,8 @@ class AdminPedidosEditController extends Controller {
 
         if ($this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id') && $this->columnExists('lista_compras', 'status')) {
             try {
-                $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'cancelado', quantidade_faltante = 0 WHERE pedido_id = :pedido_id");
+                // Ao fechar a caixa, marcar itens pendentes como comprados (já foram comprados na prática)
+                $stmt = $this->connection->prepare("UPDATE lista_compras SET status = 'comprado', quantidade_faltante = 0 WHERE pedido_id = :pedido_id AND status = 'pendente'");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             } catch (\Exception $e) {
             }
