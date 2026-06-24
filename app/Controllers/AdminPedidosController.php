@@ -7046,7 +7046,7 @@ HTML;
                 // limpar pendancias antigas deste pedido para regravar somente o que faltar
                 if ($temPedidoIdLista) {
                     try {
-                        $stmtDel = $pdo->prepare('DELETE FROM lista_compras WHERE pedido_id = ?');
+                        $stmtDel = $pdo->prepare("DELETE FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'");
                         $stmtDel->execute([(int) $id]);
                     } catch (\Exception $e) {
                     }
@@ -7160,7 +7160,20 @@ HTML;
                             continue;
                         }
 
-                        // inserir pendancia na lista_compras com o que faltar
+                        // Descontar quantidade ja comprada que permaneceu na lista_compras
+                        try {
+                            $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                            $stQC->execute([(int) $id, $produtoId]);
+                            $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
+                            if ($jaCompradoQtd > 0) {
+                                $faltante = $faltante - $jaCompradoQtd;
+                                if ($faltante <= 0) {
+                                    continue;
+                                }
+                            }
+                        } catch (\Exception $e) {}
+
+                        // inserir pendancia na lista_compras com o que faltar
                         try {
                             $cols = ['produto_id', 'pedido_id'];
                             $vals = [':produto_id', ':pedido_id'];

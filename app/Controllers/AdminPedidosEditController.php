@@ -1499,7 +1499,18 @@ class AdminPedidosEditController extends Controller {
                         $this->upsertReserva($pedidoId, $produtoId, $reservar, $statusReserva);
                     }
                     $faltante = $qtdPedido - $reservar;
-                    if (!$cicloFechado && $faltante > 0) {
+                    $statusPermitePendencia = in_array($newStatus, [
+                        'pago',
+                        'itens_parcialmente_comprados',
+                        'itens_comprados',
+                        'produto_consolidado',
+                        'em_transporte',
+                        'aguardando_liberacao_aduaneira',
+                        'enviado_ao_destinatario',
+                        'enviado',
+                        'entregue',
+                    ], true);
+                    if (!$cicloFechado && $faltante > 0 && $statusPermitePendencia) {
                         // Se o nome do produto foi customizado, verificar se difere do nome original
                         $nomeProdutoCustom = '';
                         $nomeProdutoItem = trim((string) ($item['nome_produto'] ?? ''));

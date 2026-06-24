@@ -2985,7 +2985,7 @@ class AdminComprasController extends Controller {
                      FROM lista_compras lc
                      LEFT JOIN pedidos p ON p.id = lc.pedido_id
                      WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id" . $whereLoja .
-                    " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))" .
+                    " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status IN ('pago','itens_parcialmente_comprados','itens_comprados','produto_consolidado','em_transporte','aguardando_liberacao_aduaneira','enviado_ao_destinatario','enviado','entregue') AND p.deleted_at IS NULL))" .
                     " ORDER BY lc.id ASC"
                 );
                 $stmtSel->execute($params);
@@ -2998,7 +2998,7 @@ class AdminComprasController extends Controller {
                         . " FROM lista_compras lc"
                         . " LEFT JOIN pedidos p ON p.id = lc.pedido_id"
                         . " WHERE lc.status = 'pendente' AND lc.produto_id = :produto_id"
-                        . " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))"
+                        . " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status IN ('pago','itens_parcialmente_comprados','itens_comprados','produto_consolidado','em_transporte','aguardando_liberacao_aduaneira','enviado_ao_destinatario','enviado','entregue') AND p.deleted_at IS NULL))"
                         . " ORDER BY lc.id ASC"
                     );
                     $stmtSel2->execute([':produto_id' => $produtoId]);
@@ -3054,7 +3054,7 @@ class AdminComprasController extends Controller {
                     LEFT JOIN pedidos p ON p.id = lc.pedido_id
                     SET lc.status = 'comprado', lc.quantidade_faltante = 0
                     WHERE lc.status = 'pendente'
-                      AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))";
+                      AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status IN ('pago','itens_parcialmente_comprados','itens_comprados','produto_consolidado','em_transporte','aguardando_liberacao_aduaneira','enviado_ao_destinatario','enviado','entregue') AND p.deleted_at IS NULL))";
             $params = [];
             if ($produtoId > 0) {
                 $sql .= ' AND lc.produto_id = :produto_id';
@@ -3081,7 +3081,7 @@ class AdminComprasController extends Controller {
                          LEFT JOIN pedidos p ON p.id = lc.pedido_id
                          SET lc.status = 'comprado', lc.quantidade_faltante = 0
                          WHERE lc.status = 'pendente'
-                           AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status NOT IN ('cancelado','cancelled','refunded','estornado') AND p.deleted_at IS NULL))";
+                           AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (p.status IN ('pago','itens_parcialmente_comprados','itens_comprados','produto_consolidado','em_transporte','aguardando_liberacao_aduaneira','enviado_ao_destinatario','enviado','entregue') AND p.deleted_at IS NULL))";
                 $params2 = [];
                 if ($produtoId > 0) {
                     $sql2 .= ' AND lc.produto_id = :produto_id';
