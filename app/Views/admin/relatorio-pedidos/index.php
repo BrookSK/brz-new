@@ -33,6 +33,8 @@ $statusColors = [
 ];
 ?>
 
+<?php $selectedStatuses = is_array($statusFilter) ? $statusFilter : ($statusFilter !== '' ? [$statusFilter] : []); ?>
+
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>

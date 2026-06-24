@@ -28,6 +28,13 @@ class AdminRelatorioPedidosController extends Controller {
             $statusFilter = [$statusFilterRaw];
         }
 
+        // Padrão: filtrar por 'pago' quando nenhum status é selecionado
+        $statusDefaultApplied = false;
+        if (empty($statusFilter) && $request->getParam('status', null) === null) {
+            $statusFilter = ['pago'];
+            $statusDefaultApplied = true;
+        }
+
         // Buscar pedidos
         $where = ["p.created_at >= :ds", "p.created_at < DATE_ADD(:de, INTERVAL 1 DAY)"];
         $params = [':ds' => $dateStart, ':de' => $dateEnd];
@@ -191,7 +198,7 @@ class AdminRelatorioPedidosController extends Controller {
         } catch (\Exception $e) {}
 
         // Passar para a view
-        $data = compact('pedidos', 'itensPorPedido', 'rastreioPorPedido', 'impressoesPorPedido', 'dateStart', 'dateEnd', 'statusFilter', 'statusList');
+        $data = compact('pedidos', 'itensPorPedido', 'rastreioPorPedido', 'impressoesPorPedido', 'dateStart', 'dateEnd', 'statusFilter', 'statusList', 'statusDefaultApplied');
         extract($data);
 
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
