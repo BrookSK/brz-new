@@ -3193,7 +3193,7 @@ class AssessoriaController extends Controller {
             if ($existingId) {
                 // Atualizar preço e peso do produto existente se os valores mudaram (assessoria pode ter override)
                 try {
-                    $updParts = [];
+                    $updParts = ['oculto = 1'];
                     $updParams = [];
                     if ($preco > 0) {
                         $updParts[] = 'price = ?';
@@ -3203,11 +3203,9 @@ class AssessoriaController extends Controller {
                         $updParts[] = 'weight = ?';
                         $updParams[] = $peso;
                     }
-                    if (!empty($updParts)) {
-                        $updParts[] = 'updated_at = NOW()';
-                        $updParams[] = (int) $existingId;
-                        $db->prepare('UPDATE produtos SET ' . implode(', ', $updParts) . ' WHERE id = ?')->execute($updParams);
-                    }
+                    $updParts[] = 'updated_at = NOW()';
+                    $updParams[] = (int) $existingId;
+                    $db->prepare('UPDATE produtos SET ' . implode(', ', $updParts) . ' WHERE id = ?')->execute($updParams);
                 } catch (\Exception $e) {
                 }
                 return (int) $existingId;
@@ -3291,6 +3289,22 @@ class AssessoriaController extends Controller {
                 } catch (\Exception $e) {
                 }
             }
+        }
+
+        // Marcar produto como oculto (não aparece no site, apenas para uso interno do pedido)
+        try {
+            $colsProdOculto = [];
+            try {
+                $stmtColsOc = $db->query('DESCRIBE produtos');
+                $colsProdOculto = $stmtColsOc ? $stmtColsOc->fetchAll(\PDO::FETCH_COLUMN) : [];
+            } catch (\Exception $e) {
+                $colsProdOculto = [];
+            }
+            if (is_array($colsProdOculto) && in_array('oculto', $colsProdOculto, true)) {
+                $stmtOculto = $db->prepare('UPDATE produtos SET oculto = 1 WHERE id = ?');
+                $stmtOculto->execute([(int) $newId]);
+            }
+        } catch (\Exception $e) {
         }
 
         return $newId;

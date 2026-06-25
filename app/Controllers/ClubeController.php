@@ -198,6 +198,9 @@ class ClubeController extends Controller {
                 if (in_array('attributes', $cols, true)) {
                     $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
                 }
+                if (in_array('oculto', $cols, true)) {
+                    $where[] = "(p.oculto IS NULL OR p.oculto = 0)";
+                }
 
                 $sql = "SELECT p.*, c.name as categoria\n                        FROM produtos p\n                        LEFT JOIN categorias c ON p.category_id = c.id\n                        WHERE " . implode(' AND ', $where) . "\n                        ORDER BY p.featured DESC, p.name ASC";
                 $stmt = $pdo->prepare($sql);

@@ -377,6 +377,18 @@ class ProdutoController extends Controller {
             return;
         }
 
+        // Bloquear acesso direto a produtos de assessoria/redirecionamento
+        $produtoSku = (string) ($produto['sku'] ?? '');
+        if (stripos($produtoSku, 'ASS-') === 0) {
+            $this->view('errors/404');
+            return;
+        }
+        $produtoAttrs = $produto['attributes'] ?? null;
+        if (is_string($produtoAttrs) && stripos($produtoAttrs, '"fonte":"assessoria"') !== false) {
+            $this->view('errors/404');
+            return;
+        }
+
         // Verificar se produto pertence a grupo exclusivo do Clube Braziliana
         $clubeOnly = false;
         try {
