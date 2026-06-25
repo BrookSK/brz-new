@@ -126,6 +126,22 @@ class AdminPedidosController extends Controller {
             $sql = 'UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?';
             $st = $pdo->prepare($sql);
             $st->execute($params);
+            $rowsAffected = $st->rowCount();
+
+            // DEBUG: logar detalhes da operação
+            $debugInfo = [
+                'pedido_id' => $pedidoId,
+                'colDoc_resolved' => $colDoc,
+                'documento_received' => trim((string) $request->getParam('documento')),
+                'sql' => $sql,
+                'params_count' => count($params),
+                'set_clauses' => $set,
+                'rows_affected' => $rowsAffected,
+                'all_cols_in_pedidos' => array_values(array_filter($cols, function($c) {
+                    return stripos($c, 'cpf') !== false || stripos($c, 'doc') !== false || stripos($c, 'cliente') !== false;
+                })),
+            ];
+            error_log('[ATUALIZAR_CLIENTE_DEBUG] ' . json_encode($debugInfo, JSON_UNESCAPED_UNICODE));
 
             // NÃO atualizar tabela usuarios — edição no pedido é exclusiva deste pedido
             $colUsuarioId = $pickCol(['usuario_id', 'user_id', 'cliente_id']);
@@ -243,7 +259,7 @@ class AdminPedidosController extends Controller {
             } catch (\Throwable $e) {
             }
 
-            $this->json(['success' => true]);
+            $this->json(['success' => true, 'debug' => $debugInfo]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
