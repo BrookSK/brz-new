@@ -51,7 +51,7 @@ class AdminPedidosController extends Controller {
             $colNome = $pickCol(['cliente_nome', 'customer_name', 'nome', 'name']);
             $colEmail = $pickCol(['cliente_email', 'customer_email', 'email']);
             $colTelefone = $pickCol(['cliente_telefone', 'customer_phone', 'telefone', 'phone', 'celular']);
-            $colDoc = $pickCol(['cliente_documento', 'cliente_cpf_cnpj', 'cpf_cnpj', 'documento', 'customer_document', 'cpf']);
+            $colDoc = $pickCol(['cliente_cpf_cnpj', 'cliente_documento', 'cpf_cnpj', 'documento', 'customer_document', 'cpf']);
 
             $colPais = $pickCol(['pais_entrega', 'country_entrega', 'pais', 'country', 'customer_country']);
             $colCep = $pickCol(['cep_entrega', 'cep', 'zipcode', 'zip_code', 'customer_zipcode']);
@@ -75,6 +75,16 @@ class AdminPedidosController extends Controller {
             $addSet($colEmail, trim((string) $request->getParam('email')));
             $addSet($colTelefone, trim((string) $request->getParam('telefone')));
             $addSet($colDoc, trim((string) $request->getParam('documento')));
+
+            // CPF/Documento: salvar em TODAS as colunas CPF existentes para evitar mismatch de leitura
+            $docValue = trim((string) $request->getParam('documento'));
+            $docCandidates = ['cliente_cpf_cnpj', 'cliente_documento', 'cpf_cnpj', 'documento', 'customer_document', 'cpf'];
+            foreach ($docCandidates as $docCol) {
+                if ($docCol !== $colDoc && is_array($cols) && in_array($docCol, $cols, true)) {
+                    $set[] = $docCol . ' = ?';
+                    $params[] = $docValue;
+                }
+            }
 
             // Endereço: salvar em AMBAS as colunas (_entrega e sem sufixo) quando existirem
             $addSetDual = function(string $colEntrega, string $colSimples, $val) use (&$set, &$params, $cols): void {
