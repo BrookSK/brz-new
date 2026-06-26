@@ -590,7 +590,7 @@ class AdminCorreiosMundialController extends Controller {
                 LEFT JOIN usuarios u ON u.id = p.usuario_id
                 " . $extraWhere . "
                 ORDER BY cpe.created_at DESC
-                LIMIT 100
+                LIMIT 1000
             ");
             $st->execute();
             return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
