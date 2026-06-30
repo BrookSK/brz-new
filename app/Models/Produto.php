@@ -600,6 +600,11 @@ class Produto extends Model {
             'published_at' => ($data['status'] ?? 'draft') === 'published' ? date('Y-m-d H:i:s') : null
         ];
         
+        // Adicionar campo oculto se existir na tabela
+        if (isset($data['oculto'])) {
+            $dadosBanco['oculto'] = intval($data['oculto']);
+        }
+        
         error_log('🔍 [PRODUTO-MODEL-CREATE] Dados mapeados para o banco: ' . print_r($dadosBanco, true));
         
         $stmt = $this->getConnection()->prepare("
@@ -657,6 +662,13 @@ class Produto extends Model {
         
         $lastId = $this->getConnection()->lastInsertId();
         error_log('🔍 [PRODUTO-MODEL-CREATE] Last Insert ID: ' . $lastId);
+        
+        // Setar oculto após a criação se solicitado
+        if ($lastId > 0 && isset($dadosBanco['oculto']) && $dadosBanco['oculto'] == 1) {
+            try {
+                $this->getConnection()->prepare("UPDATE {$this->table} SET oculto = 1 WHERE id = ?")->execute([$lastId]);
+            } catch (\Exception $e) {}
+        }
         
         return $lastId;
     }

@@ -3229,6 +3229,7 @@ class AssessoriaController extends Controller {
             'status' => 'published',
             'stock' => 999999,
             'category_id' => $categoriaAssessoriaId,
+            'oculto' => 1,
             'images' => $produto['imagens'] ?? [],
             'variations' => $produto['variacoes'] ?? [],
             'attributes' => [
