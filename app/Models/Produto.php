@@ -142,6 +142,7 @@ class Produto extends Model {
         if (in_array('attributes', $cols, true)) {
             $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
+        $where[] = "(c.name IS NULL OR LOWER(c.name) NOT IN ('assessoria','redirecionamento'))";
 
         $sql = "\n            SELECT p.*, c.name as categoria\n            FROM {$this->table} p\n            LEFT JOIN categorias c ON p.category_id = c.id\n            WHERE " . implode(' AND ', $where) . "\n            ORDER BY p.featured DESC, p.name ASC\n        ";
 
@@ -181,6 +182,9 @@ class Produto extends Model {
         if (in_array('attributes', $cols, true)) {
             $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
+
+        // Excluir produtos da categoria Assessoria/Redirecionamento
+        $where[] = "(c.name IS NULL OR LOWER(c.name) NOT IN ('assessoria','redirecionamento'))";
 
         // Excluir produtos que pertencem a grupos de compras (devem ser acessados via grupo)
         if (in_array('grupo_compras_id', $cols, true)) {
@@ -288,6 +292,7 @@ class Produto extends Model {
         if (in_array('attributes', $cols, true)) {
             $where[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
+        $where[] = "(c.name IS NULL OR LOWER(c.name) NOT IN ('assessoria','redirecionamento'))";
 
         $sql = "SELECT p.*, c.name as categoria\n                FROM {$this->table} p\n                LEFT JOIN categorias c ON p.category_id = c.id\n                WHERE " . implode(' AND ', $where) . "\n                ORDER BY p.updated_at DESC, p.id DESC";
         $stmt = $pdo->prepare($sql);
@@ -321,6 +326,7 @@ class Produto extends Model {
         if (in_array('attributes', $cols, true)) {
             $baseWhere[] = "(p.attributes IS NULL OR p.attributes NOT LIKE '%\"fonte\":\"assessoria\"%')";
         }
+        $baseWhere[] = "(c.name IS NULL OR LOWER(c.name) NOT IN ('assessoria','redirecionamento'))";
         if (in_array('grupo_compras_id', $cols, true)) {
             $baseWhere[] = "(p.grupo_compras_id IS NULL OR p.grupo_compras_id = 0)";
         }

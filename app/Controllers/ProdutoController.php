@@ -388,6 +388,24 @@ class ProdutoController extends Controller {
             $this->view('errors/404');
             return;
         }
+        // Bloquear por categoria Assessoria/Redirecionamento
+        $produtoCategoria = strtolower(trim((string) ($produto['categoria'] ?? '')));
+        if ($produtoCategoria === '') {
+            // find() não traz categoria via JOIN, buscar pelo category_id
+            try {
+                $catId = (int) ($produto['categoria_id'] ?? 0);
+                if ($catId > 0) {
+                    $pdo = $this->getDirectPdo();
+                    $stCat = $pdo->prepare('SELECT name FROM categorias WHERE id = ? LIMIT 1');
+                    $stCat->execute([$catId]);
+                    $produtoCategoria = strtolower(trim((string) ($stCat->fetchColumn() ?: '')));
+                }
+            } catch (\Throwable $e) {}
+        }
+        if (in_array($produtoCategoria, ['assessoria', 'redirecionamento'], true)) {
+            $this->view('errors/404');
+            return;
+        }
 
         // Verificar se produto pertence a grupo exclusivo do Clube Braziliana
         $clubeOnly = false;
