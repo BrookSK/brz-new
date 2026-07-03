@@ -7,7 +7,7 @@ class AdminUsuariosController extends Controller {
     
     public function index(Request $request) {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Verificar se a tabela usuarios existe
             $stmtCheck = $pdo->prepare("SHOW TABLES LIKE 'usuarios'");
@@ -373,7 +373,7 @@ class AdminUsuariosController extends Controller {
         $valor = $data['valor'] ?? 0;
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             // Verificar se usuário existe

@@ -125,7 +125,7 @@ class AdminProdutosController extends Controller {
         @ini_set('max_execution_time', '0');
         @set_time_limit(0);
 
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         $token = trim((string) ($request->getParam('token') ?? ''));
         $batchSize = (int) ($request->getParam('batch') ?? 300);
         if ($batchSize <= 0) $batchSize = 300;
@@ -1319,7 +1319,7 @@ class AdminProdutosController extends Controller {
         $id = (int) ($id ?? $request->getParam('id'));
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
 
             $cols = $this->getTableColumns($pdo, 'produtos');
@@ -1378,7 +1378,7 @@ class AdminProdutosController extends Controller {
 
     private function fetchLojasSafe(): array {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $stmt = $pdo->query("SHOW TABLES LIKE 'lojas'");
             $exists = $stmt->fetchColumn();
             if (!$exists) {
@@ -1913,7 +1913,7 @@ class AdminProdutosController extends Controller {
     }
 
     private function salvarCadastroRapidoLoteItem(Request $request, string $reutilizarFoto = ''): array {
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
         // DDL (CREATE TABLE) faz commit implícito no MySQL, então executar ANTES da transação
         try {
@@ -2125,7 +2125,7 @@ class AdminProdutosController extends Controller {
         // Buscar grupos existentes
         $grupos = [];
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->exec("CREATE TABLE IF NOT EXISTS grupos_compras (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 nome VARCHAR(255) NOT NULL,
@@ -2163,7 +2163,7 @@ class AdminProdutosController extends Controller {
         // Buscar lojas para o campo de seleção (produto para o site)
         $lojas = [];
         try {
-            $pdoL = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdoL = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $stL = $pdoL->query("SELECT id, nome FROM lojas WHERE ativo = 1 ORDER BY nome ASC");
             $lojas = $stL ? ($stL->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
         } catch (\Throwable $e) {}
@@ -3331,7 +3331,7 @@ HTML;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $varId = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireVariacaoOwnerIfRepresentante($pdo, (int) $varId);
             $pdo->beginTransaction();
 
@@ -3407,7 +3407,7 @@ HTML;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $fotoId = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
                 throw new \Exception('Tabela produto_variacao_fotos não encontrada');
             }
@@ -3445,7 +3445,7 @@ HTML;
         $varId = (int) ($id ?? $request->getParam('id'));
         $ordens = $request->getParam('ordens_variacao', []);
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireVariacaoOwnerIfRepresentante($pdo, (int) $varId);
             if (!$this->tableExists($pdo, 'produto_variacao_fotos')) {
                 throw new \Exception('Tabela produto_variacao_fotos não encontrada');
@@ -3472,7 +3472,7 @@ HTML;
     }
 
     private function salvarCadastroRapido(Request $request): array {
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
         // DDL (CREATE TABLE) faz commit implícito no MySQL, então executar ANTES da transação
         try {
@@ -3870,7 +3870,7 @@ HTML;
         $lojaFiltro = (string) $request->getParam('loja_filtro', '');
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
             $cols = [];
             try {
@@ -4149,7 +4149,7 @@ HTML;
         $categoriasSelect = [];
         $gruposSelect = [];
         try {
-            $pdoModal = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdoModal = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             // Categorias
             try {
                 $stCat = $pdoModal->query("SELECT id, nome FROM categorias WHERE 1=1 ORDER BY nome ASC");
@@ -4469,7 +4469,7 @@ HTML;
         }
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $in = implode(',', array_fill(0, count($ids), '?'));
             $sql = 'UPDATE produtos SET ' . implode(', ', $campos) . ' WHERE id IN (' . $in . ')';
@@ -4507,7 +4507,7 @@ HTML;
         $lojaFiltro = (string) $request->getParam('loja_filtro', '');
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
             $cols = [];
             try {
@@ -4899,7 +4899,7 @@ JS;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         // Buscar categorias
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY name ASC");
             $categorias = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
@@ -5214,7 +5214,7 @@ HTML;
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             $cols = $this->getTableColumns($pdo, 'produtos');
@@ -5421,7 +5421,7 @@ HTML;
         $id = (int) $request->getParam('id');
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
 
@@ -6405,7 +6405,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = $id ?? $request->getParam('id');
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             $cols = $this->getTableColumns($pdo, 'produtos');
 
@@ -6680,7 +6680,7 @@ HTMLSCRIPT;
         if (!is_array($opcoes)) $opcoes = [];
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_atributos')) {
@@ -6752,7 +6752,7 @@ HTMLSCRIPT;
         if (!is_array($ativos)) $ativos = [];
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_variacoes')) {
                 throw new \Exception('Tabelas de variações não encontradas');
@@ -6815,7 +6815,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             $pdo->beginTransaction();
 
@@ -6859,7 +6859,7 @@ HTMLSCRIPT;
         $replace = (int) $request->getParam('replace', 0) === 1;
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_variacoes') || !$this->tableExists($pdo, 'produto_variacao_itens')) {
                 throw new \Exception('Tabelas de variações não encontradas');
@@ -6955,7 +6955,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $produtoId = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
             if (!$this->tableExists($pdo, 'produto_variacoes')) {
                 throw new \Exception('Tabelas de variações não encontradas');
@@ -7175,7 +7175,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
 
@@ -7230,7 +7230,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
 
@@ -7304,7 +7304,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $fotoId = $fotoId ?? $request->getParam('id');
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             $stmt = $pdo->prepare("SELECT id, produto_id, nome_arquivo FROM produto_fotos WHERE id = ? LIMIT 1");
             $stmt->execute([$fotoId]);
@@ -7352,7 +7352,7 @@ HTMLSCRIPT;
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'representante']);
         $id = (int) ($id ?? $request->getParam('id'));
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $stmt = $pdo->prepare('SELECT foto_principal FROM produtos WHERE id = ?');
             $stmt->execute([$id]);
@@ -7394,7 +7394,7 @@ HTMLSCRIPT;
         $id = (int) ($id ?? $request->getParam('id'));
         $ordens = $request->getParam('ordens', []);
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
             $pdo->beginTransaction();
 
@@ -7432,7 +7432,7 @@ HTMLSCRIPT;
             || (isset($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'json') !== false);
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $id);
 
             if ($this->produtoTemVendas($pdo, (int) $id)) {
@@ -7633,7 +7633,7 @@ HTMLSCRIPT;
         }
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
 
             $cols = $this->getTableColumns($pdo, 'produtos');
@@ -7687,7 +7687,7 @@ HTMLSCRIPT;
         }
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $this->requireProdutoOwnerIfRepresentante($pdo, (int) $produtoId);
 
             $cols = $this->getTableColumns($pdo, 'produtos');

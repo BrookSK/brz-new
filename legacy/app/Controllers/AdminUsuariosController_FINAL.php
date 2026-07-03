@@ -7,7 +7,7 @@ class AdminUsuariosController extends Controller {
     
     public function index(Request $request) {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Verificar se a tabela usuarios existe
             $stmtCheck = $pdo->prepare("SHOW TABLES LIKE 'usuarios'");
@@ -315,7 +315,7 @@ class AdminUsuariosController extends Controller {
 
     public function editar(Request $request) {
         $id = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = ?");
         $stmt->execute([$id]);
         $usuario = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -357,7 +357,7 @@ class AdminUsuariosController extends Controller {
 
     public function salvar(Request $request) {
         $id = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         $sql = "UPDATE usuarios SET nome = ?, email = ?, cpf = ?, telefone = ?, ativo = ?, updated_at = NOW()";
         $params = [$request->getParam('nome'), $request->getParam('email'), $request->getParam('cpf'), $request->getParam('telefone'), $request->getParam('ativo', 1)];
@@ -379,7 +379,7 @@ class AdminUsuariosController extends Controller {
 
     public function excluir(Request $request) {
         $id = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         $stmt = $pdo->prepare("UPDATE usuarios SET ativo = 0 WHERE id = ?");
         $stmt->execute([$id]);
@@ -478,7 +478,7 @@ class AdminUsuariosController extends Controller {
         $valor = $data['valor'] ?? 0;
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             // Verificar se usuário existe

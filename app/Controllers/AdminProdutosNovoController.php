@@ -113,7 +113,7 @@ class AdminProdutosNovoController extends Controller {
     }
 
     private function getPdo(): \PDO {
-        return new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        return new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
     private function ensureDir(string $dir): void {

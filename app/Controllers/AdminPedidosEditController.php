@@ -9,7 +9,7 @@ class AdminPedidosEditController extends Controller {
     public function __construct() {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor']);
-        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->connection = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
     private function ensurePedidoMedidasColumns(): void {

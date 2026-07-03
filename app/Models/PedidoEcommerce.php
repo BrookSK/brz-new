@@ -7,7 +7,7 @@ class PedidoEcommerce {
     private \PDO $connection;
 
     public function __construct() {
-        $this->connection = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $this->connection = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
     }
 
     public function getResumoComissoesPedidosManuaisTodos(): array {

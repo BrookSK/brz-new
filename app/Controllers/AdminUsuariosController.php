@@ -1278,7 +1278,7 @@ class AdminUsuariosController extends Controller {
         $id = $id ?? $request->getParam('id');
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
 
             $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
             $stmt->execute([$id]);
@@ -1297,7 +1297,7 @@ class AdminUsuariosController extends Controller {
         $ativo = $request->getParam('ativo');
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             $stmt = $pdo->prepare("UPDATE usuarios SET ativo = ?, updated_at = NOW() WHERE id = ?");
             $stmt->execute([$ativo, $id]);

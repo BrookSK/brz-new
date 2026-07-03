@@ -7,7 +7,7 @@ echo "Teste de conexão com o banco...<br>";
 
 try {
     // Testar conexão básica
-    $pdo = new PDO('mysql:host=localhost;dbname=novobr_brazilianashop', 'root', '');
+    $pdo = new PDO('mysql:host=127.0.0.1;dbname=novobr_brazilianashop', 'root', '');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     echo "✅ Conexão OK<br>";
     

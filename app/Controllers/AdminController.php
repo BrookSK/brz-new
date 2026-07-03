@@ -11,7 +11,7 @@ class AdminController extends Controller {
         $auth->requerPerfis(['admin', 'vendedor', 'suporte', 'redirecionador']);
         // Conexão com o banco
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         } catch (\Exception $e) {
             // Se não conseguir conectar ao banco, mostra dashboard básico
             include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
@@ -429,7 +429,7 @@ class AdminController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pagina = $request->getParam('pagina', 1);
             $limite = 10;
             $offset = ($pagina - 1) * $limite;
@@ -627,7 +627,7 @@ class AdminController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         // Conexão com o banco
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         // Obter categorias
         $stmtCats = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
@@ -852,7 +852,7 @@ class AdminController extends Controller {
     public function salvarProduto(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         try {
             $pdo->beginTransaction();
@@ -958,7 +958,7 @@ class AdminController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         $stmt = $pdo->prepare("SELECT * FROM produtos WHERE id = ?");
         $stmt->execute([$produtoId]);
@@ -984,7 +984,7 @@ class AdminController extends Controller {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
         $produtoId = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         try {
             $stmt = $pdo->prepare("UPDATE produtos SET nome = ?, sku = ?, updated_at = NOW() WHERE id = ?");
@@ -1004,7 +1004,7 @@ class AdminController extends Controller {
         error_log('🔍 [ADMIN-EXCLUIR] Método excluirProduto chamado com ID: ' . $request->getParam('id'));
         
         $produtoId = $request->getParam('id');
-        $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+        $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
         
         try {
             error_log('🔍 [ADMIN-EXCLUIR] Iniciando transação');

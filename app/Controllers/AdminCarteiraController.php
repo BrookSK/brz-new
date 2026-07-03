@@ -13,7 +13,7 @@ class AdminCarteiraController extends Controller {
     
     private function verificarCriarTabelas() {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Criar tabela de carteiras se não existir
             $pdo->exec("
@@ -65,7 +65,7 @@ class AdminCarteiraController extends Controller {
         }
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             // Verificar se usuário existe
@@ -127,7 +127,7 @@ class AdminCarteiraController extends Controller {
         }
 
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
 
             // Verificar se usuário existe
@@ -193,7 +193,7 @@ class AdminCarteiraController extends Controller {
         $taxaConversao = $data['taxa_conversao'] ?? 5.85; // Taxa padrão
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             // Verificar carteira e saldo
@@ -246,7 +246,7 @@ class AdminCarteiraController extends Controller {
         $usuarioId = $request->getParam('usuario_id');
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             $this->garantirCarteiraUsuario($pdo, $usuarioId);
             
@@ -275,7 +275,7 @@ class AdminCarteiraController extends Controller {
         $offset = ($pagina - 1) * $limite;
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             $stmt = $pdo->prepare("
                 SELECT * FROM transacoes_carteira 
@@ -308,7 +308,7 @@ class AdminCarteiraController extends Controller {
     
     public function getStatsGerais() {
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             
             // Estatísticas gerais
             $stmt = $pdo->prepare("
@@ -359,7 +359,7 @@ class AdminCarteiraController extends Controller {
         $descricao = $data['descricao'] ?? 'Crédito em lote adicionado pelo admin';
         
         try {
-            $pdo = new \PDO('mysql:host=localhost;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
             $pdo->beginTransaction();
             
             $sucessos = 0;
