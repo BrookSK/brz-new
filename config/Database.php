@@ -2,7 +2,7 @@
 namespace Config;
 
 class Database {
-    private static $host = 'localhost';
+    private static $host = '127.0.0.1';
     private static $db_name = 'novobr';
     private static $username = 'novobr';
     private static $password = '33537095Ab12$';
