@@ -126,21 +126,19 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Nome do Operador de Origem*</label>
-                            <input type="text" class="form-control form-control-sm" id="cnt-origin-operator" value="USPS" maxlength="10">
+                            <input type="text" class="form-control form-control-sm" id="cnt-origin-operator" value="BRAZ" maxlength="10">
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Nome do Operador de Destino*</label>
-                            <select class="form-select form-select-sm" id="cnt-dest-operator">
-                                <option value="">Selecione o operador</option>
-                                <option value="CWBA">CWBA - Curitiba</option>
+                            <select class="form-select form-select-sm" id="cnt-dest-operator" required>
+                                <option value="CWBA" selected>CWBA - Curitiba</option>
                                 <option value="SAOD">SAOD - Guarulhos</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Código da Categoria Postal*</label>
-                            <select class="form-select form-select-sm" id="cnt-postal-category">
-                                <option value="">Selecione a categoria postal</option>
-                                <option value="A">A – Airmail ou Priority Mail</option>
+                            <select class="form-select form-select-sm" id="cnt-postal-category" required>
+                                <option value="A" selected>A – Airmail ou Priority Mail</option>
                                 <option value="B">B – S.A.L Mail ou Non-Priority Mail</option>
                                 <option value="C">C – Surface Mail ou Non-Priority Mail</option>
                                 <option value="D">D – Priority Mail enviado por transporte terrestre</option>
@@ -148,18 +146,16 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Código da Subclasse do Serviço*</label>
-                            <select class="form-select form-select-sm" id="cnt-subclass">
-                                <option value="">Selecione a subclasse de serviço</option>
-                                <option value="NX">NX – Serviço padrão</option>
+                            <select class="form-select form-select-sm" id="cnt-subclass" required>
+                                <option value="NX" selected>NX – Serviço padrão</option>
                                 <option value="IX">IX – Serviço expresso</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Tipo de Unidade*</label>
-                            <select class="form-select form-select-sm" id="cnt-unit-type">
-                                <option value="">Selecione o tipo de unidade</option>
+                            <select class="form-select form-select-sm" id="cnt-unit-type" required>
+                                <option value="2" selected>2 - Caixa com base pallet até 500kg</option>
                                 <option value="1">1 - Saco até 30kg</option>
-                                <option value="2">2 - Caixa com base pallet até 500kg</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
@@ -168,9 +164,8 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Grupos de Triagem</label>
-                            <select class="form-select form-select-sm" id="cnt-triage">
-                                <option value="">Selecione o grupo</option>
-                                <option value="1">1 - São Paulo/SP</option>
+                            <select class="form-select form-select-sm" id="cnt-triage" required>
+                                <option value="1" selected>1 - São Paulo/SP</option>
                                 <option value="2">2 - Valinhos/SP</option>
                                 <option value="3">3 - Rio de Janeiro/RJ</option>
                                 <option value="4">4 - Curitiba/PR</option>
