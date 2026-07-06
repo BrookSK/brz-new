@@ -126,7 +126,7 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Nome do Operador de Origem*</label>
-                            <input type="text" class="form-control form-control-sm" id="cnt-origin-operator" value="BRAZ" maxlength="10">
+                            <input type="text" class="form-control form-control-sm" id="cnt-origin-operator" value="BRAZ" maxlength="10" readonly>
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Nome do Operador de Destino*</label>
