@@ -121,60 +121,76 @@
                             <input type="number" class="form-control form-control-sm" id="cnt-dispatch" required min="1">
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">País Origem</label>
-                            <input type="text" class="form-control form-control-sm" id="cnt-origin-country" value="US" maxlength="2">
+                            <label class="form-label small">País de Origem*</label>
+                            <input type="text" class="form-control form-control-sm" id="cnt-origin-country" value="US" maxlength="2" readonly>
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">Operador Origem</label>
-                            <input type="text" class="form-control form-control-sm" id="cnt-origin-operator" value="USPS">
+                            <label class="form-label small">Nome do Operador de Origem*</label>
+                            <input type="text" class="form-control form-control-sm" id="cnt-origin-operator" value="USPS" maxlength="10">
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">Operador Destino*</label>
+                            <label class="form-label small">Nome do Operador de Destino*</label>
                             <select class="form-select form-select-sm" id="cnt-dest-operator">
+                                <option value="">Selecione o operador</option>
                                 <option value="CWBA">CWBA - Curitiba</option>
                                 <option value="SAOD">SAOD - Guarulhos</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">Categoria Postal</label>
+                            <label class="form-label small">Código da Categoria Postal*</label>
                             <select class="form-select form-select-sm" id="cnt-postal-category">
-                                <option value="A">A – Airmail</option>
-                                <option value="B">B – S.A.L</option>
-                                <option value="C">C – Surface</option>
-                                <option value="D">D – Priority</option>
+                                <option value="">Selecione a categoria postal</option>
+                                <option value="A">A – Airmail ou Priority Mail</option>
+                                <option value="B">B – S.A.L Mail ou Non-Priority Mail</option>
+                                <option value="C">C – Surface Mail ou Non-Priority Mail</option>
+                                <option value="D">D – Priority Mail enviado por transporte terrestre</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">Subclasse</label>
+                            <label class="form-label small">Código da Subclasse do Serviço*</label>
                             <select class="form-select form-select-sm" id="cnt-subclass">
-                                <option value="NX">NX - Standard</option>
-                                <option value="IX">IX - Express</option>
+                                <option value="">Selecione a subclasse de serviço</option>
+                                <option value="NX">NX – Serviço padrão</option>
+                                <option value="IX">IX – Serviço expresso</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">Tipo Unidade</label>
+                            <label class="form-label small">Tipo de Unidade*</label>
                             <select class="form-select form-select-sm" id="cnt-unit-type">
-                                <option value="2">Caixa (500kg)</option>
-                                <option value="1">Saco (30kg)</option>
+                                <option value="">Selecione o tipo de unidade</option>
+                                <option value="1">1 - Saco até 30kg</option>
+                                <option value="2">2 - Caixa com base pallet até 500kg</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small">Grupo Triagem</label>
-                            <select class="form-select form-select-sm" id="cnt-triage">
-                                <option value="1">1 - São Paulo</option>
-                                <option value="2">2 - Valinhos</option>
-                                <option value="3">3 - Rio de Janeiro</option>
-                                <option value="4">4 - Curitiba</option>
-                                <option value="5">5 - Curitiba</option>
-                            </select>
-                        </div>
-                        <div class="col-6 col-md-2">
-                            <label class="form-label small">AWB</label>
+                            <label class="form-label small">N° AWB</label>
                             <input type="text" class="form-control form-control-sm" id="cnt-awb" placeholder="(opcional)">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small">Grupos de Triagem</label>
+                            <select class="form-select form-select-sm" id="cnt-triage">
+                                <option value="">Selecione o grupo</option>
+                                <option value="1">1 - São Paulo/SP</option>
+                                <option value="2">2 - Valinhos/SP</option>
+                                <option value="3">3 - Rio de Janeiro/RJ</option>
+                                <option value="4">4 - Curitiba/PR</option>
+                                <option value="5">5 - Curitiba/PR</option>
+                            </select>
                         </div>
                     </div>
                     <!-- Seleção de pacotes -->
                     <label class="form-label small fw-bold">Pacotes para este container:</label>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-8">
+                            <textarea class="form-control form-control-sm" id="cnt-paste-trackings" rows="2" placeholder="Cole tracking codes aqui (um por linha, separados por vírgula ou espaço)"></textarea>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="validarESelecionar()">
+                                <i class="fas fa-check-double me-1"></i>Validar e Selecionar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="cnt-validacao" class="mb-2" style="display:none;"></div>
                     <div id="cnt-pacotes-lista" class="border rounded p-2 mb-2" style="max-height:250px; overflow-y:auto;">
                         <span class="text-muted small"><i class="fas fa-spinner fa-spin me-1"></i>Carregando pacotes...</span>
                     </div>
@@ -416,6 +432,45 @@ async function carregarPacotesParaContainer() {
 function updateCntCount() {
     const n = document.querySelectorAll('.chk-cnt-pacote:checked').length;
     document.getElementById('cnt-selected-count').textContent = n > 0 ? n + ' pacote(s) selecionado(s)' : '';
+}
+
+function validarESelecionar() {
+    const raw = document.getElementById('cnt-paste-trackings').value.trim();
+    if (!raw) { alert('Cole pelo menos 1 tracking code.'); return; }
+    
+    const colados = raw.split(/[\n,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => s.length > 5);
+    if (!colados.length) { alert('Nenhum tracking code válido encontrado.'); return; }
+    
+    const checkboxes = document.querySelectorAll('.chk-cnt-pacote');
+    const disponiveis = {};
+    checkboxes.forEach(el => { disponiveis[el.value.toUpperCase()] = el; });
+    
+    let encontrados = [];
+    let naoEncontrados = [];
+    
+    colados.forEach(code => {
+        if (disponiveis[code]) {
+            disponiveis[code].checked = true;
+            encontrados.push(code);
+        } else {
+            naoEncontrados.push(code);
+        }
+    });
+    
+    updateCntCount();
+    
+    const el = document.getElementById('cnt-validacao');
+    el.style.display = 'block';
+    let html = '';
+    if (encontrados.length > 0) {
+        html += '<div class="text-success small"><i class="fas fa-check-circle me-1"></i><strong>' + encontrados.length + ' selecionado(s)</strong></div>';
+    }
+    if (naoEncontrados.length > 0) {
+        html += '<div class="text-danger small mt-1"><i class="fas fa-times-circle me-1"></i><strong>' + naoEncontrados.length + ' NÃO encontrado(s):</strong>';
+        naoEncontrados.forEach(c => { html += '<br><code>' + c + '</code> — não disponível (já em container ou não existe)'; });
+        html += '</div>';
+    }
+    el.innerHTML = html;
 }
 
 async function criarContainer(event) {
