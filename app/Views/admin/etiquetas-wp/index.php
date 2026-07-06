@@ -168,8 +168,8 @@
                                 <option value="1">1 - São Paulo/SP</option>
                                 <option value="2">2 - Valinhos/SP</option>
                                 <option value="3">3 - Rio de Janeiro/RJ</option>
-                                <option value="4" selected>4 - Curitiba/PR</option>
-                                <option value="5">5 - Curitiba/PR</option>
+                                <option value="4">4 - Curitiba/PR</option>
+                                <option value="5" selected>5 - Curitiba/PR</option>
                             </select>
                         </div>
                     </div>
