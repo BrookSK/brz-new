@@ -246,8 +246,14 @@
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label">Tracking Codes Selecionados</label>
-                                <textarea class="form-control" id="cnt-trackings" rows="3" placeholder="Selecione pacotes na aba Etiquetas ou cole os tracking codes aqui (um por linha)"></textarea>
-                                <small class="text-muted">Selecione pacotes na aba Etiquetas e eles aparecerão aqui, ou cole manualmente.</small>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="carregarPacotesParaContainer()">
+                                        <i class="fas fa-sync me-1"></i>Carregar pacotes disponíveis
+                                    </button>
+                                </div>
+                                <div id="cnt-pacotes-lista" class="mb-2" style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:4px; padding:8px; display:none;"></div>
+                                <textarea class="form-control" id="cnt-trackings" rows="3" placeholder="Selecione acima ou cole os tracking codes aqui (um por linha)"></textarea>
+                                <small class="text-muted">Marque os pacotes acima ou cole manualmente os tracking codes.</small>
                             </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-success" id="btn-criar-container">
@@ -606,6 +612,44 @@ function atualizarTrackingsSelecionados() {
 // ============================================================
 // CONTAINERS
 // ============================================================
+async function carregarPacotesParaContainer() {
+    const lista = document.getElementById('cnt-pacotes-lista');
+    lista.style.display = 'block';
+    lista.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Carregando...</span>';
+    
+    try {
+        const resp = await fetch(BASE + '/listar-pacotes?without_container=1');
+        const data = await resp.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+            let html = '';
+            data.data.forEach(pkg => {
+                html += `<div class="form-check">
+                    <input class="form-check-input chk-cnt-pacote" type="checkbox" value="${pkg.tracking_code}" id="cnt-pkg-${pkg.wp_post_id}" onchange="atualizarTrackingsContainer()">
+                    <label class="form-check-label" for="cnt-pkg-${pkg.wp_post_id}">
+                        <code>${pkg.tracking_code}</code> — Pedido: ${pkg.order_id || '-'}
+                    </label>
+                </div>`;
+            });
+            html = '<div class="mb-1"><small class="text-muted">' + data.data.length + ' pacote(s) disponível(is)</small></div>' + html;
+            html += '<div class="mt-2"><button type="button" class="btn btn-xs btn-outline-secondary" onclick="document.querySelectorAll(\'.chk-cnt-pacote\').forEach(e=>e.checked=true);atualizarTrackingsContainer();">Selecionar todos</button></div>';
+            lista.innerHTML = html;
+        } else {
+            lista.innerHTML = '<span class="text-muted">Nenhum pacote sem container disponível.</span>';
+        }
+    } catch (e) {
+        lista.innerHTML = '<span class="text-danger">Erro: ' + e.message + '</span>';
+    }
+}
+
+function atualizarTrackingsContainer() {
+    const codes = [];
+    document.querySelectorAll('.chk-cnt-pacote:checked').forEach(el => {
+        codes.push(el.value);
+    });
+    document.getElementById('cnt-trackings').value = codes.join('\n');
+}
+
 async function criarContainer(event) {
     event.preventDefault();
     
