@@ -131,8 +131,8 @@
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Nome do Operador de Destino*</label>
                             <select class="form-select form-select-sm" id="cnt-dest-operator" required>
-                                <option value="CWBA" selected>CWBA - Curitiba</option>
-                                <option value="SAOD">SAOD - Guarulhos</option>
+                                <option value="SAOD" selected>SAOD - Guarulhos</option>
+                                <option value="CWBA">CWBA - Curitiba</option>
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
@@ -165,10 +165,10 @@
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Grupos de Triagem</label>
                             <select class="form-select form-select-sm" id="cnt-triage" required>
-                                <option value="1" selected>1 - São Paulo/SP</option>
+                                <option value="1">1 - São Paulo/SP</option>
                                 <option value="2">2 - Valinhos/SP</option>
                                 <option value="3">3 - Rio de Janeiro/RJ</option>
-                                <option value="4">4 - Curitiba/PR</option>
+                                <option value="4" selected>4 - Curitiba/PR</option>
                                 <option value="5">5 - Curitiba/PR</option>
                             </select>
                         </div>
