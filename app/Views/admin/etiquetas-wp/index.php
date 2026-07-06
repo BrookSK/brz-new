@@ -205,15 +205,32 @@
                 <div class="card-body">
                     <form id="form-container" onsubmit="criarContainer(event)">
                         <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">Nº Remessa (Dispatch Number)*</label>
+                            <div class="col-md-2">
+                                <label class="form-label">Nº Remessa*</label>
                                 <input type="number" class="form-control" id="cnt-dispatch" required min="1">
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <label class="form-label">País de Origem*</label>
+                                <input type="text" class="form-control" id="cnt-origin-country" value="US" maxlength="2" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Operador Origem*</label>
+                                <input type="text" class="form-control" id="cnt-origin-operator" value="USPS" maxlength="10" required>
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">Operador Destino*</label>
                                 <select class="form-select" id="cnt-dest-operator">
                                     <option value="CWBA">CWBA - Curitiba</option>
                                     <option value="SAOD">SAOD - Guarulhos</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Categoria Postal*</label>
+                                <select class="form-select" id="cnt-postal-category">
+                                    <option value="A" selected>A – Airmail</option>
+                                    <option value="B">B – S.A.L Mail</option>
+                                    <option value="C">C – Surface Mail</option>
+                                    <option value="D">D – Priority terrestre</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
@@ -740,14 +757,14 @@ async function criarContainer(event) {
     const data = {
         dispatchNumber: parseInt(document.getElementById('cnt-dispatch').value),
         trackingCodes: trackingCodes,
+        originCountry: document.getElementById('cnt-origin-country').value.toUpperCase(),
+        originOperatorName: document.getElementById('cnt-origin-operator').value,
         destinationOperatorName: document.getElementById('cnt-dest-operator').value,
+        postalCategoryCode: document.getElementById('cnt-postal-category').value,
         serviceSubclassCode: document.getElementById('cnt-subclass').value,
         unitType: document.getElementById('cnt-unit-type').value,
         triageGroup: document.getElementById('cnt-triage').value,
         awb: document.getElementById('cnt-awb').value,
-        originCountry: 'US',
-        originOperatorName: 'USPS',
-        postalCategoryCode: 'A',
     };
     
     document.getElementById('btn-criar-container').disabled = true;
