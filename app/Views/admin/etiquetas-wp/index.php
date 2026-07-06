@@ -253,6 +253,12 @@
                                 </div>
                                 <div id="cnt-pacotes-lista" class="mb-2" style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:4px; padding:8px; display:none;"></div>
                                 <textarea class="form-control" id="cnt-trackings" rows="3" placeholder="Selecione acima ou cole os tracking codes aqui (um por linha)"></textarea>
+                                <div class="mt-2 d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="validarTrackingsColados()">
+                                        <i class="fas fa-check-double me-1"></i>Validar colados
+                                    </button>
+                                </div>
+                                <div id="cnt-validacao-resultado" class="mt-2" style="display:none;"></div>
                                 <small class="text-muted">Marque os pacotes acima ou cole manualmente os tracking codes.</small>
                             </div>
                             <div class="col-12">
@@ -648,6 +654,76 @@ function atualizarTrackingsContainer() {
         codes.push(el.value);
     });
     document.getElementById('cnt-trackings').value = codes.join('\n');
+}
+
+async function validarTrackingsColados() {
+    const textarea = document.getElementById('cnt-trackings');
+    const colados = textarea.value.trim().split(/[\n,;]+/).map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+    
+    if (colados.length === 0) {
+        alert('Cole pelo menos 1 tracking code no campo.');
+        return;
+    }
+    
+    const resultado = document.getElementById('cnt-validacao-resultado');
+    resultado.style.display = 'block';
+    resultado.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Validando...';
+    
+    try {
+        const resp = await fetch(BASE + '/listar-pacotes?without_container=1&per_page=200');
+        const data = await resp.json();
+        
+        const disponiveis = {};
+        if (data.success && data.data) {
+            data.data.forEach(pkg => {
+                disponiveis[pkg.tracking_code.toUpperCase()] = pkg;
+            });
+        }
+        
+        let encontrados = [];
+        let naoEncontrados = [];
+        
+        colados.forEach(code => {
+            if (disponiveis[code]) {
+                encontrados.push(code);
+            } else {
+                naoEncontrados.push(code);
+            }
+        });
+        
+        let html = '';
+        if (encontrados.length > 0) {
+            html += '<div class="text-success mb-1"><i class="fas fa-check-circle me-1"></i><strong>' + encontrados.length + ' encontrado(s):</strong></div>';
+            html += '<ul class="list-unstyled ms-3 mb-2">';
+            encontrados.forEach(c => {
+                const pkg = disponiveis[c];
+                html += '<li><code>' + c + '</code> — Pedido: ' + (pkg.order_id || '-') + '</li>';
+            });
+            html += '</ul>';
+        }
+        if (naoEncontrados.length > 0) {
+            html += '<div class="text-danger mb-1"><i class="fas fa-times-circle me-1"></i><strong>' + naoEncontrados.length + ' NÃO encontrado(s):</strong></div>';
+            html += '<ul class="list-unstyled ms-3 mb-2">';
+            naoEncontrados.forEach(c => {
+                html += '<li><code>' + c + '</code> — <span class="text-danger">Não disponível (já em container ou não existe)</span></li>';
+            });
+            html += '</ul>';
+        }
+        
+        // Atualizar textarea só com os encontrados
+        if (encontrados.length > 0 && naoEncontrados.length > 0) {
+            html += '<button type="button" class="btn btn-sm btn-outline-success" onclick="document.getElementById(\'cnt-trackings\').value=\'' + encontrados.join('\\n') + '\';document.getElementById(\'cnt-validacao-resultado\').style.display=\'none\';"><i class="fas fa-filter me-1"></i>Manter apenas os válidos (' + encontrados.length + ')</button>';
+        }
+        
+        // Marcar checkboxes correspondentes na lista se estiver aberta
+        document.querySelectorAll('.chk-cnt-pacote').forEach(el => {
+            el.checked = encontrados.includes(el.value.toUpperCase());
+        });
+        
+        resultado.innerHTML = html;
+    } catch (e) {
+        resultado.innerHTML = '<span class="text-danger">Erro ao validar: ' + e.message + '</span>';
+    }
 }
 
 async function criarContainer(event) {
