@@ -224,10 +224,12 @@
         <div class="card ewp-card mb-3">
             <div class="card-header py-2"><strong class="small">Criar Fatura (CN38)</strong></div>
             <div class="card-body">
-                <p class="small text-muted mb-2">Selecione containers abaixo e clique em criar fatura.</p>
-                <div id="faturas-containers-sel" class="mb-2"></div>
+                <p class="small text-muted mb-2">Selecione os containers abaixo para faturar:</p>
+                <div id="fatura-containers-lista" class="border rounded p-2 mb-2" style="max-height:200px; overflow-y:auto;">
+                    <span class="text-muted small"><i class="fas fa-spinner fa-spin me-1"></i>Carregando containers...</span>
+                </div>
                 <div id="fatura-resultado" class="mb-2" style="display:none;"></div>
-                <button class="btn btn-warning btn-sm" onclick="criarFatura()" id="btn-criar-fatura" disabled>
+                <button class="btn btn-warning btn-sm" onclick="criarFatura()" id="btn-criar-fatura">
                     <i class="fas fa-file-invoice me-1"></i>Criar Fatura
                 </button>
             </div>
@@ -284,9 +286,11 @@
                             <input type="text" class="form-control form-control-sm" id="emb-arrival-airport" placeholder="GRU" required maxlength="3">
                         </div>
                     </div>
-                    <div id="emb-faturas-sel" class="small text-muted mb-2">Selecione faturas acima</div>
+                    <div id="emb-faturas-lista" class="border rounded p-2 mb-2" style="max-height:150px; overflow-y:auto;">
+                        <span class="text-muted small"><i class="fas fa-spinner fa-spin me-1"></i>Carregando faturas...</span>
+                    </div>
                     <div id="embarque-resultado" class="mb-2" style="display:none;"></div>
-                    <button type="submit" class="btn btn-danger btn-sm" id="btn-criar-embarque" disabled>
+                    <button type="submit" class="btn btn-danger btn-sm" id="btn-criar-embarque">
                         <i class="fas fa-plane me-1"></i>Confirmar Embarque
                     </button>
                 </form>
@@ -312,8 +316,7 @@
 
 <script>
 const BASE = '/admin/etiquetas-wp';
-let selectedContainerIds = [];
-let selectedBillIds = [];
+let currentTab = 'etiquetas';
 
 // ============================================================
 // TABS
@@ -325,8 +328,8 @@ function switchTab(tab) {
     event.target.classList.add('active');
     // Auto-load data on tab switch
     if (tab === 'containers') { carregarPacotesParaContainer(); carregarContainers(); }
-    if (tab === 'faturas') { carregarContainers(); carregarFaturas(); }
-    if (tab === 'embarques') { carregarFaturas(); carregarEmbarques(); }
+    if (tab === 'faturas') { carregarContainersParaFatura(); carregarFaturas(); }
+    if (tab === 'embarques') { carregarFaturasParaEmbarque(); carregarEmbarques(); }
 }
 
 // ============================================================
@@ -362,8 +365,6 @@ function toggleAllPedidos() {
 document.addEventListener('change', e => {
     if (e.target.classList.contains('chk-pedido')) updateMassBtn();
     if (e.target.classList.contains('chk-cnt-pacote')) updateCntCount();
-    if (e.target.classList.contains('chk-container')) updateContainerSel();
-    if (e.target.classList.contains('chk-fatura')) updateFaturaSel();
 });
 function updateMassBtn() {
     const n = document.querySelectorAll('.chk-pedido:checked').length;
@@ -512,28 +513,38 @@ async function carregarContainers() {
         } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum container sem fatura</td></tr>'; }
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
 }
-function toggleAllContainers() { const c = document.getElementById('checkAllContainers').checked; document.querySelectorAll('.chk-container').forEach(e=>e.checked=c); updateContainerSel(); }
-function updateContainerSel() {
-    selectedContainerIds = [...document.querySelectorAll('.chk-container:checked')].map(e=>parseInt(e.value));
-    const el = document.getElementById('faturas-containers-sel');
-    const btn = document.getElementById('btn-criar-fatura');
-    if (selectedContainerIds.length > 0) { el.innerHTML = '<span class="badge bg-success">'+selectedContainerIds.length+' container(s)</span>'; btn.disabled = false; }
-    else { el.innerHTML = ''; btn.disabled = true; }
-}
+function toggleAllContainers() { const c = document.getElementById('checkAllContainers').checked; document.querySelectorAll('.chk-container').forEach(e=>e.checked=c); }
 
 // ============================================================
 // FATURAS
 // ============================================================
+async function carregarContainersParaFatura() {
+    const el = document.getElementById('fatura-containers-lista');
+    try {
+        const r = await fetch(BASE + '/listar-containers?without_bill=1');
+        const d = await r.json();
+        if (d.success && d.data && d.data.length > 0) {
+            let h = '<div class="d-flex justify-content-between mb-1"><small class="text-muted">'+d.data.length+' container(s) disponível(is)</small><a href="#" onclick="document.querySelectorAll(\'.chk-fatura-cnt\').forEach(e=>e.checked=true);return false;" class="small">Todos</a></div>';
+            d.data.forEach(c => {
+                const tks = Array.isArray(c.tracking_codes) ? c.tracking_codes.length : 0;
+                h += '<div class="form-check"><input class="form-check-input chk-fatura-cnt" type="checkbox" value="'+c.wp_post_id+'"><label class="form-check-label small">Remessa <strong>'+c.dispatch_number+'</strong> — <code>'+( c.unit_code||'')+'</code> — '+tks+' pacotes</label></div>';
+            });
+            el.innerHTML = h;
+        } else { el.innerHTML = '<span class="small text-muted">Nenhum container sem fatura disponível.</span>'; }
+    } catch(e) { el.innerHTML = '<span class="text-danger small">'+e.message+'</span>'; }
+}
+
 async function criarFatura() {
-    if (!selectedContainerIds.length) { alert('Selecione containers primeiro.'); return; }
-    if (!confirm('Criar fatura com '+selectedContainerIds.length+' container(s)? Operação irreversível.')) return;
+    const ids = [...document.querySelectorAll('.chk-fatura-cnt:checked')].map(e => parseInt(e.value));
+    if (!ids.length) { alert('Selecione pelo menos 1 container.'); return; }
+    if (!confirm('Criar fatura com '+ids.length+' container(s)? Operação irreversível.')) return;
     const btn = document.getElementById('btn-criar-fatura');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processando...';
     try {
-        const r = await fetch(BASE + '/criar-fatura', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({containerIds:selectedContainerIds})});
+        const r = await fetch(BASE + '/criar-fatura', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({containerIds:ids})});
         const d = await r.json();
         const el = document.getElementById('fatura-resultado'); el.style.display = 'block';
-        if (d.success) { el.innerHTML = '<div class="alert alert-success py-2 small">Fatura criada: <code>'+d.cn38_code+'</code></div>'; carregarContainers(); carregarFaturas(); }
+        if (d.success) { el.innerHTML = '<div class="alert alert-success py-2 small">Fatura criada: <code>'+d.cn38_code+'</code></div>'; carregarContainersParaFatura(); carregarFaturas(); }
         else { el.innerHTML = '<div class="alert alert-danger py-2 small">'+d.error+'</div>'; }
     } catch(e) { alert('Erro: '+e.message); }
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-invoice me-1"></i>Criar Fatura';
@@ -552,23 +563,30 @@ async function carregarFaturas() {
         } else { tbody.innerHTML = '<tr><td colspan="5" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhuma fatura disponível</td></tr>'; }
     } catch(e) { tbody.innerHTML = '<tr><td colspan="5" class="text-danger">'+e.message+'</td></tr>'; }
 }
-function toggleAllFaturas() { const c = document.getElementById('checkAllFaturas').checked; document.querySelectorAll('.chk-fatura').forEach(e=>e.checked=c); updateFaturaSel(); }
-function updateFaturaSel() {
-    selectedBillIds = [...document.querySelectorAll('.chk-fatura:checked')].map(e=>parseInt(e.value));
-    const btn = document.getElementById('btn-criar-embarque');
-    const el = document.getElementById('emb-faturas-sel');
-    if (selectedBillIds.length > 0) { el.innerHTML = '<span class="badge bg-warning text-dark">'+selectedBillIds.length+' fatura(s)</span>'; btn.disabled = false; }
-    else { el.innerHTML = '<span class="text-muted small">Selecione faturas acima</span>'; btn.disabled = true; }
-}
+function toggleAllFaturas() { const c = document.getElementById('checkAllFaturas').checked; document.querySelectorAll('.chk-fatura').forEach(e=>e.checked=c); }
 
 // ============================================================
 // EMBARQUES
 // ============================================================
+async function carregarFaturasParaEmbarque() {
+    const el = document.getElementById('emb-faturas-lista');
+    try {
+        const r = await fetch(BASE + '/listar-faturas?without_departure=1');
+        const d = await r.json();
+        if (d.success && d.data && d.data.length > 0) {
+            let h = '<div class="d-flex justify-content-between mb-1"><small class="text-muted">'+d.data.length+' fatura(s)</small><a href="#" onclick="document.querySelectorAll(\'.chk-emb-fatura\').forEach(e=>e.checked=true);return false;" class="small">Todas</a></div>';
+            d.data.forEach(b => { h += '<div class="form-check"><input class="form-check-input chk-emb-fatura" type="checkbox" value="'+b.wp_post_id+'"><label class="form-check-label small">CN38: <code>'+(b.cn38_code||'-')+'</code></label></div>'; });
+            el.innerHTML = h;
+        } else { el.innerHTML = '<span class="small text-muted">Nenhuma fatura sem embarque.</span>'; }
+    } catch(e) { el.innerHTML = '<span class="text-danger small">'+e.message+'</span>'; }
+}
+
 async function criarEmbarque(event) {
     event.preventDefault();
-    if (!selectedBillIds.length) { alert('Selecione faturas primeiro.'); return; }
+    const billIds = [...document.querySelectorAll('.chk-emb-fatura:checked')].map(e=>parseInt(e.value));
+    if (!billIds.length) { alert('Selecione pelo menos 1 fatura.'); return; }
     const data = {
-        billIds: selectedBillIds,
+        billIds: billIds,
         flightNumber: parseInt(document.getElementById('emb-flight').value),
         airlineCode: document.getElementById('emb-airline').value.toUpperCase(),
         departureDate: new Date(document.getElementById('emb-departure-date').value).toISOString(),
