@@ -910,10 +910,13 @@ function brz_api_create_departure(WP_REST_Request $request) {
         update_post_meta($dep_post_id, '_debug_request_body', $departure_data);
         $response = $correios->confirm_departure($departure_data);
         
-        if ($response) {
-            update_post_meta($dep_post_id, '_debug_response_body', $response);
-            update_post_meta($dep_post_id, '_departure_status', 'confirmed');
+        update_post_meta($dep_post_id, '_debug_response_body', $response);
 
+        // confirm_departure retorna null/false em caso de sucesso (HTTP 200 sem body)
+        // ou retorna objeto com msgs em caso de erro
+        if ($response === null || $response === false || $response === '') {
+            // Sucesso - API retornou 200 sem body (comportamento documentado)
+            update_post_meta($dep_post_id, '_departure_status', 'confirmed');
             return new WP_REST_Response([
                 'success' => true,
                 'wp_post_id' => $dep_post_id,
@@ -923,13 +926,30 @@ function brz_api_create_departure(WP_REST_Request $request) {
             ], 200);
         }
 
+        if (is_object($response) && isset($response->msgs)) {
+            $error_msg = implode('; ', (array) $response->msgs);
+            update_post_meta($dep_post_id, '_departure_status', 'error');
+            update_post_meta($dep_post_id, '_debug_error_message', $error_msg);
+            return new WP_REST_Response([
+                'success' => false,
+                'error' => 'Erro ao confirmar embarque: ' . $error_msg,
+                'wp_post_id' => $dep_post_id,
+            ], 400);
+        }
+
+        // Se chegou aqui com resposta, consideramos sucesso (API pode retornar objeto vazio)
+        update_post_meta($dep_post_id, '_departure_status', 'confirmed');
         return new WP_REST_Response([
-            'success' => false,
-            'error' => 'API não retornou resposta válida',
+            'success' => true,
             'wp_post_id' => $dep_post_id,
-        ], 500);
+            'status' => 'confirmed',
+            'cn38_codes' => $cn38_code_list,
+            'flight' => $flight_list,
+            'raw_response' => $response,
+        ], 200);
 
     } catch (Exception $e) {
+        update_post_meta($dep_post_id, '_departure_status', 'error');
         update_post_meta($dep_post_id, '_debug_error_message', $e->getMessage());
         return new WP_REST_Response([
             'success' => false,
@@ -966,6 +986,7 @@ function brz_api_list_departures(WP_REST_Request $request) {
             $departures[] = [
                 'wp_post_id' => $id,
                 'status' => get_post_meta($id, '_departure_status', true),
+                'error_message' => get_post_meta($id, '_debug_error_message', true) ?: null,
                 'cn38_codes' => get_post_meta($id, '_cn38_code_list', true) ?: [],
                 'flight' => $flight,
                 'created_at' => get_the_date('Y-m-d H:i:s'),

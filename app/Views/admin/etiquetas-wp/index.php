@@ -767,7 +767,8 @@ async function carregarEmbarques() {
                 const fl = dep.flight || {};
                 const codes = Array.isArray(dep.cn38_codes) ? dep.cn38_codes.join(', ') : '-';
                 const st = dep.status === 'confirmed' ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">Erro</span>';
-                tbody.innerHTML += '<tr><td>'+(fl.flightNumber||'-')+'</td><td>'+(fl.airlineCode||'-')+'</td><td>'+(fl.departureDate?new Date(fl.departureDate).toLocaleDateString('pt-BR'):'-')+'</td><td class="d-none d-md-table-cell">'+(fl.arrivalDate?new Date(fl.arrivalDate).toLocaleDateString('pt-BR'):'-')+'</td><td><code class="small">'+codes+'</code></td><td>'+st+'</td></tr>';
+                const errMsg = (dep.status !== 'confirmed' && dep.error_message) ? '<br><small class="text-danger">' + dep.error_message + '</small>' : '';
+                tbody.innerHTML += '<tr><td>'+(fl.flightNumber||'-')+'</td><td>'+(fl.airlineCode||'-')+'</td><td>'+(fl.departureDate?new Date(fl.departureDate).toLocaleDateString('pt-BR'):'-')+'</td><td class="d-none d-md-table-cell">'+(fl.arrivalDate?new Date(fl.arrivalDate).toLocaleDateString('pt-BR'):'-')+'</td><td><code class="small">'+codes+'</code></td><td>'+st+errMsg+'</td></tr>';
             });
         } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum embarque</td></tr>'; }
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
