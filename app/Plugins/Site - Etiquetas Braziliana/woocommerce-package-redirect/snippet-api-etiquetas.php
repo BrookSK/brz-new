@@ -125,9 +125,13 @@ function brz_api_balance(WP_REST_Request $request) {
     try {
         $correios = new WPR_Correios_Service();
         $balance = $correios->get_tracking_numbers_balance();
-        return new WP_REST_Response(['success' => true, 'data' => $balance], 200);
+        $test_mode = get_option('wpr_correios_test_mode', '0') === '1';
+        $ambiente = $test_mode ? 'HOMOLOGACAO' : 'PRODUCAO';
+        return new WP_REST_Response(['success' => true, 'data' => $balance, 'ambiente' => $ambiente], 200);
     } catch (Exception $e) {
-        return new WP_REST_Response(['success' => false, 'error' => $e->getMessage()], 500);
+        $test_mode = get_option('wpr_correios_test_mode', '0') === '1';
+        $ambiente = $test_mode ? 'HOMOLOGACAO' : 'PRODUCAO';
+        return new WP_REST_Response(['success' => false, 'error' => $e->getMessage(), 'ambiente' => $ambiente], 500);
     }
 }
 
@@ -207,13 +211,20 @@ function brz_api_create_package(WP_REST_Request $request) {
 
     try {
         $correios = new WPR_Correios_Service();
+        $test_mode = get_option('wpr_correios_test_mode', '0') === '1';
+        $ambiente = $test_mode ? 'HOMOLOGACAO' : 'PRODUCAO';
+        $api_url = $test_mode ? 'https://apihom.correios.com.br' : 'https://api.correios.com.br';
+        error_log('[BRZ-ETIQUETAS] Criando pacote | Ambiente: ' . $ambiente . ' | URL: ' . $api_url . '/packet/v1/packages | CustomerControlCode: ' . ($body['customerControlCode'] ?? ''));
+        
         $response = $correios->create_package($api_payload);
 
         if (empty($response) || empty($response[0]->trackingNumber)) {
-            return new WP_REST_Response(['success' => false, 'error' => 'API não retornou tracking number', 'raw' => $response], 500);
+            error_log('[BRZ-ETIQUETAS] ERRO | Ambiente: ' . $ambiente . ' | API não retornou tracking number | Response: ' . json_encode($response));
+            return new WP_REST_Response(['success' => false, 'error' => 'API não retornou tracking number', 'raw' => $response, 'ambiente' => $ambiente], 500);
         }
 
         $tracking = $response[0]->trackingNumber;
+        error_log('[BRZ-ETIQUETAS] SUCESSO | Ambiente: ' . $ambiente . ' | Tracking: ' . $tracking . ' | CustomerControlCode: ' . ($body['customerControlCode'] ?? ''));
 
         // Criar o post do tipo package no WordPress
         $post_id = wp_insert_post([
@@ -263,6 +274,7 @@ function brz_api_create_package(WP_REST_Request $request) {
             'success' => true,
             'tracking_number' => $tracking,
             'wp_post_id' => $post_id,
+            'ambiente' => $ambiente,
         ], 200);
 
     } catch (Exception $e) {

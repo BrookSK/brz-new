@@ -23,6 +23,8 @@
         <div class="d-flex gap-2 align-items-center">
             <span id="ewp-conn-status" class="ewp-status"></span>
             <small id="ewp-conn-text" class="text-muted">Conectando...</small>
+            <span id="ewp-ambiente" class="ewp-badge" style="display:none;"></span>
+            <small id="ewp-saldo" class="text-muted" style="display:none;"></small>
             <button class="btn btn-xs btn-outline-secondary" onclick="testarConexaoDetalhado()" title="Testar conexão detalhada">
                 <i class="fas fa-stethoscope"></i>
             </button>
@@ -360,8 +362,29 @@ async function checkConnection() {
         const d = await r.json();
         const el = document.getElementById('ewp-conn-status');
         const txt = document.getElementById('ewp-conn-text');
-        if (d.success) { el.className = 'ewp-status ok'; txt.textContent = 'Conectado'; }
-        else { el.className = 'ewp-status err'; txt.textContent = 'Erro'; }
+        const amb = document.getElementById('ewp-ambiente');
+        if (d.success) {
+            el.className = 'ewp-status ok';
+            txt.textContent = 'Conectado';
+            // Mostrar ambiente
+            if (d.ambiente) {
+                amb.style.display = 'inline-block';
+                amb.textContent = d.ambiente === 'HOMOLOGACAO' ? '⚠️ HOMOLOGAÇÃO' : '🟢 PRODUÇÃO';
+                amb.className = 'ewp-badge ' + (d.ambiente === 'HOMOLOGACAO' ? 'bg-warning text-dark' : 'bg-success text-white');
+            }
+            // Mostrar saldo
+            if (d.results && d.results.balance && d.results.balance.data) {
+                const balData = d.results.balance.data;
+                const saldoEl = document.getElementById('ewp-saldo');
+                if (balData.data) {
+                    const avail = balData.data.availableQuantity ?? balData.data.currentBalance ?? '?';
+                    saldoEl.innerHTML = '| Saldo: <strong>' + avail + '</strong>';
+                } else if (balData.currentBalance !== undefined) {
+                    saldoEl.innerHTML = '| Saldo: <strong>' + balData.currentBalance + '</strong>';
+                }
+                saldoEl.style.display = 'inline';
+            }
+        } else { el.className = 'ewp-status err'; txt.textContent = 'Erro'; }
     } catch(e) {
         document.getElementById('ewp-conn-status').className = 'ewp-status err';
         document.getElementById('ewp-conn-text').textContent = 'Offline';
