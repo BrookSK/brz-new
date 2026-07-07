@@ -153,20 +153,10 @@ class AdminEtiquetasWpController extends Controller
             'time_ms' => $t1Time,
         ];
 
-        // Detectar ambiente (homologação ou produção) a partir das configurações do WP
-        $ambiente = 'PRODUÇÃO';
-        try {
-            $conn = \Config\Database::getConnection();
-            $st = $conn->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'wp_etiquetas_url' LIMIT 1");
-            $st->execute();
-            $wpUrl = (string) ($st->fetchColumn() ?: '');
-        } catch (\Exception $e) { $wpUrl = ''; }
-        // O ambiente é determinado pelo WordPress (modo teste checkbox)
-        // Vamos verificar se o retorno do saldo menciona homologação
-        if (!empty($balance['data']) && is_array($balance['data'])) {
-            if (isset($balance['data']['ambiente'])) {
-                $ambiente = (string) $balance['data']['ambiente'];
-            }
+        // Detectar ambiente a partir do retorno do WordPress
+        $ambiente = 'DESCONHECIDO';
+        if (!empty($balance['ambiente'])) {
+            $ambiente = (string) $balance['ambiente'];
         }
 
         // Teste 2: Listar pacotes
