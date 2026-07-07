@@ -23,6 +23,20 @@
         <div class="d-flex gap-2 align-items-center">
             <span id="ewp-conn-status" class="ewp-status"></span>
             <small id="ewp-conn-text" class="text-muted">Conectando...</small>
+            <button class="btn btn-xs btn-outline-secondary" onclick="testarConexaoDetalhado()" title="Testar conexão detalhada">
+                <i class="fas fa-stethoscope"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Painel de diagnóstico (oculto por padrão) -->
+    <div id="ewp-diagnostico" class="card ewp-card mb-3" style="display:none;">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+            <strong class="small">Diagnóstico de Conexão</strong>
+            <button class="btn btn-xs btn-outline-secondary" onclick="document.getElementById('ewp-diagnostico').style.display='none'">✕</button>
+        </div>
+        <div class="card-body p-2" id="ewp-diagnostico-body">
+            <i class="fas fa-spinner fa-spin me-1"></i>Testando...
         </div>
     </div>
 
@@ -351,6 +365,36 @@ async function checkConnection() {
     } catch(e) {
         document.getElementById('ewp-conn-status').className = 'ewp-status err';
         document.getElementById('ewp-conn-text').textContent = 'Offline';
+    }
+}
+
+async function testarConexaoDetalhado() {
+    const painel = document.getElementById('ewp-diagnostico');
+    const body = document.getElementById('ewp-diagnostico-body');
+    painel.style.display = 'block';
+    body.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testando conexão...';
+    
+    try {
+        const r = await fetch(BASE + '/testar-conexao');
+        const d = await r.json();
+        
+        let html = '<div class="alert py-2 small ' + (d.success ? 'alert-success' : 'alert-danger') + '">';
+        html += d.success ? '<i class="fas fa-check-circle me-1"></i>Todos os testes passaram!' : '<i class="fas fa-times-circle me-1"></i>Alguns testes falharam';
+        html += '</div>';
+        html += '<table class="table table-sm small mb-0"><thead><tr><th>Endpoint</th><th>Status</th><th>Tempo</th><th>Detalhes</th></tr></thead><tbody>';
+        
+        const labels = {balance:'Saldo', list_packages:'Pacotes', list_containers:'Containers', list_bills:'Faturas', list_departures:'Embarques'};
+        for (const [key, result] of Object.entries(d.results || {})) {
+            const badge = result.success ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">FALHA</span>';
+            let detail = '';
+            if (result.total !== undefined) detail = 'Total: ' + result.total;
+            if (!result.success && result.data && result.data.error) detail = result.data.error;
+            html += '<tr><td>'+(labels[key]||key)+'</td><td>'+badge+'</td><td>'+(result.time_ms||'-')+'ms</td><td>'+detail+'</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    } catch(e) {
+        body.innerHTML = '<div class="alert alert-danger py-2 small">Erro de conexão: '+e.message+'</div>';
     }
 }
 
