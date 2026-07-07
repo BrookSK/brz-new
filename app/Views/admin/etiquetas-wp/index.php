@@ -283,7 +283,50 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Cia Aérea*</label>
-                            <input type="text" class="form-control form-control-sm" id="emb-airline" value="M3" required maxlength="3">
+                            <select class="form-select form-select-sm" id="emb-airline" required>
+                                <option value="M3" selected>LATAM CARGO BRASIL (M3)</option>
+                                <option value="2I">21 Air (2I)</option>
+                                <option value="AA">American Airlines (AA)</option>
+                                <option value="AC">Air Canada (AC)</option>
+                                <option value="AD">Azul Brazilian Airlines (AD)</option>
+                                <option value="AF">Air France (AF)</option>
+                                <option value="AM">Aeromexico (AM)</option>
+                                <option value="AR">Aerolineas Argentinas (AR)</option>
+                                <option value="AV">Avianca (AV)</option>
+                                <option value="BA">British Airways (BA)</option>
+                                <option value="BR">EVA Air (BR)</option>
+                                <option value="CA">Air China (CA)</option>
+                                <option value="CM">Copa Airlines (CM)</option>
+                                <option value="CV">Cargolux (CV)</option>
+                                <option value="CX">Cathay Pacific (CX)</option>
+                                <option value="DL">Delta Air Lines (DL)</option>
+                                <option value="EK">Emirates (EK)</option>
+                                <option value="ET">Ethiopian Airlines (ET)</option>
+                                <option value="EY">Etihad Airways (EY)</option>
+                                <option value="FX">FedEx Express (FX)</option>
+                                <option value="G3">Gol (G3)</option>
+                                <option value="JL">Japan Airlines (JL)</option>
+                                <option value="KE">Korean Airlines (KE)</option>
+                                <option value="KL">KLM Cargo (KL)</option>
+                                <option value="LA">LATAM Airlines Group (LA)</option>
+                                <option value="LH">Lufthansa (LH)</option>
+                                <option value="LX">SWISS (LX)</option>
+                                <option value="M6">Amerijet (M6)</option>
+                                <option value="MU">China Eastern (MU)</option>
+                                <option value="NH">All Nippon Airways (NH)</option>
+                                <option value="QR">Qatar Airways (QR)</option>
+                                <option value="QT">Tampa Cargo (QT)</option>
+                                <option value="RU">AirBridgeCargo (RU)</option>
+                                <option value="SQ">Singapore Airlines (SQ)</option>
+                                <option value="SV">Saudi Arabian Airlines (SV)</option>
+                                <option value="TK">Turkish Cargo (TK)</option>
+                                <option value="TP">TAP (TP)</option>
+                                <option value="UA">United Airlines (UA)</option>
+                                <option value="UC">Latam Cargo (UC)</option>
+                                <option value="5X">UPS Airlines (5X)</option>
+                                <option value="5Y">Atlas Air (5Y)</option>
+                                <option value="6R">AeroUnion (6R)</option>
+                            </select>
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Partida*</label>
@@ -674,7 +717,7 @@ async function criarEmbarque(event) {
     const data = {
         billIds: billIds,
         flightNumber: parseInt(document.getElementById('emb-flight').value),
-        airlineCode: document.getElementById('emb-airline').value.toUpperCase(),
+        airlineCode: document.getElementById('emb-airline').value,
         departureDate: new Date(document.getElementById('emb-departure-date').value).toISOString(),
         departureAirportCode: document.getElementById('emb-departure-airport').value.toUpperCase(),
         arrivalDate: new Date(document.getElementById('emb-arrival-date').value).toISOString(),
