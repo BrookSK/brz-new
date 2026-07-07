@@ -223,7 +223,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width:30px"><input type="checkbox" id="checkAllContainers" onclick="toggleAllContainers()"></th>
-                                <th>Remessa</th><th>Unit Code</th><th>Pacotes</th><th class="d-none d-md-table-cell">Data</th><th>PDF</th>
+                                <th>Remessa</th><th>Unit Code</th><th>Pacotes</th><th class="d-none d-md-table-cell">Data</th><th>PDF</th><th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="containers-body">
@@ -258,7 +258,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width:30px"><input type="checkbox" id="checkAllFaturas" onclick="toggleAllFaturas()"></th>
-                                <th>CN38</th><th class="d-none d-md-table-cell">Remessas</th><th class="d-none d-md-table-cell">Data</th><th>PDF</th>
+                                <th>CN38</th><th class="d-none d-md-table-cell">Remessas</th><th class="d-none d-md-table-cell">Data</th><th>PDF</th><th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="faturas-body">
@@ -635,14 +635,35 @@ async function carregarContainers() {
         const d = await r.json();
         tbody.innerHTML = '';
         if (d.success && d.data && d.data.length > 0) {
-            d.data.forEach(c => {
+            d.data.forEach((c, idx) => {
                 const tks = Array.isArray(c.tracking_codes) ? c.tracking_codes.length : 0;
-                tbody.innerHTML += '<tr><td><input type="checkbox" class="chk-container" value="'+c.wp_post_id+'"></td><td>'+c.dispatch_number+'</td><td><code class="small">'+( c.unit_code||'-')+'</code></td><td>'+tks+'</td><td class="d-none d-md-table-cell">'+(c.created_at||'-')+'</td><td>'+(c.wp_post_id?'<a href="'+BASE+'/pdf/container/'+c.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td></tr>';
+                const isFirst = idx === 0;
+                tbody.innerHTML += '<tr class="'+(isFirst?'table-info':'')+'"><td><input type="checkbox" class="chk-container" value="'+c.wp_post_id+'"></td><td>'+c.dispatch_number+'</td><td><code class="small">'+( c.unit_code||'-')+'</code></td><td>'+tks+'</td><td class="d-none d-md-table-cell">'+(c.created_at||'-')+'</td><td>'+(c.wp_post_id?'<a href="'+BASE+'/pdf/container/'+c.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarContainer('+c.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
             });
         } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum container sem fatura</td></tr>'; }
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
 }
 function toggleAllContainers() { const c = document.getElementById('checkAllContainers').checked; document.querySelectorAll('.chk-container').forEach(e=>e.checked=c); }
+
+async function deletarContainer(wpPostId) {
+    if (!confirm('Deletar este container? Os pacotes serão desvinculados e o unitizador cancelado nos Correios.')) return;
+    try {
+        const r = await fetch(BASE + '/deletar-container', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wp_post_id:wpPostId})});
+        const d = await r.json();
+        if (d.success) { alert('Container deletado!'); carregarContainers(); carregarPacotesParaContainer(); }
+        else { alert('Erro: ' + d.error); }
+    } catch(e) { alert('Erro: '+e.message); }
+}
+
+async function deletarFatura(wpPostId) {
+    if (!confirm('Deletar esta fatura? Os containers serão desvinculados.')) return;
+    try {
+        const r = await fetch(BASE + '/deletar-fatura', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wp_post_id:wpPostId})});
+        const d = await r.json();
+        if (d.success) { alert('Fatura deletada!'); carregarFaturas(); carregarContainersParaFatura(); }
+        else { alert('Erro: ' + d.error); }
+    } catch(e) { alert('Erro: '+e.message); }
+}
 
 // ============================================================
 // FATURAS
@@ -685,12 +706,13 @@ async function carregarFaturas() {
         const d = await r.json();
         tbody.innerHTML = '';
         if (d.success && d.data && d.data.length > 0) {
-            d.data.forEach(b => {
+            d.data.forEach((b, idx) => {
                 const dns = Array.isArray(b.dispatch_numbers) ? b.dispatch_numbers.join(', ') : '-';
-                tbody.innerHTML += '<tr><td><input type="checkbox" class="chk-fatura" value="'+b.wp_post_id+'"></td><td><code class="small">'+(b.cn38_code||'-')+'</code></td><td class="d-none d-md-table-cell">'+dns+'</td><td class="d-none d-md-table-cell">'+(b.created_at||'-')+'</td><td>'+(b.wp_post_id?'<a href="'+BASE+'/pdf/fatura/'+b.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td></tr>';
+                const isFirst = idx === 0;
+                tbody.innerHTML += '<tr class="'+(isFirst?'table-info':'')+'"><td><input type="checkbox" class="chk-fatura" value="'+b.wp_post_id+'"></td><td><code class="small">'+(b.cn38_code||'-')+'</code>'+(isFirst?' <span class="badge bg-info text-dark">Última</span>':'')+'</td><td class="d-none d-md-table-cell">'+dns+'</td><td class="d-none d-md-table-cell">'+(b.created_at||'-')+'</td><td>'+(b.wp_post_id?'<a href="'+BASE+'/pdf/fatura/'+b.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarFatura('+b.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
             });
-        } else { tbody.innerHTML = '<tr><td colspan="5" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhuma fatura disponível</td></tr>'; }
-    } catch(e) { tbody.innerHTML = '<tr><td colspan="5" class="text-danger">'+e.message+'</td></tr>'; }
+        } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhuma fatura disponível</td></tr>'; }
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
 }
 function toggleAllFaturas() { const c = document.getElementById('checkAllFaturas').checked; document.querySelectorAll('.chk-fatura').forEach(e=>e.checked=c); }
 

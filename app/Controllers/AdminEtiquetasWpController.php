@@ -468,6 +468,42 @@ class AdminEtiquetasWpController extends Controller
     }
 
     // =========================================================
+    // DELETAR/DESVINCULAR
+    // =========================================================
+
+    public function deletarContainer(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $wpPostId = (int) ($body['wp_post_id'] ?? 0);
+        if ($wpPostId <= 0) {
+            $this->json(['success' => false, 'error' => 'wp_post_id inválido'], 400);
+            return;
+        }
+
+        $resp = $this->wp->deleteContainer($wpPostId);
+        $this->json($resp, !empty($resp['success']) ? 200 : 400);
+    }
+
+    public function deletarFatura(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $wpPostId = (int) ($body['wp_post_id'] ?? 0);
+        if ($wpPostId <= 0) {
+            $this->json(['success' => false, 'error' => 'wp_post_id inválido'], 400);
+            return;
+        }
+
+        $resp = $this->wp->deleteBill($wpPostId);
+        $this->json($resp, !empty($resp['success']) ? 200 : 400);
+    }
+
+    // =========================================================
     // DOWNLOAD DE PDFs
     // =========================================================
 

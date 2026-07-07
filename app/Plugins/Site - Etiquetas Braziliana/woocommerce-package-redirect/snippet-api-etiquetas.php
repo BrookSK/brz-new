@@ -102,6 +102,19 @@ add_action('rest_api_init', function () {
         'callback' => 'brz_api_balance',
         'permission_callback' => 'brz_api_check_auth',
     ]);
+
+    // === DELETAR/DESVINCULAR ===
+    register_rest_route($namespace, '/containers/delete/(?P<id>\d+)', [
+        'methods'  => 'DELETE',
+        'callback' => 'brz_api_delete_container',
+        'permission_callback' => 'brz_api_check_auth',
+    ]);
+
+    register_rest_route($namespace, '/bills/delete/(?P<id>\d+)', [
+        'methods'  => 'DELETE',
+        'callback' => 'brz_api_delete_bill',
+        'permission_callback' => 'brz_api_check_auth',
+    ]);
 });
 
 // ============================================================
@@ -966,5 +979,99 @@ function brz_api_list_departures(WP_REST_Request $request) {
         'data' => $departures,
         'total' => $query->found_posts,
         'pages' => $query->max_num_pages,
+    ], 200);
+}
+
+
+// ============================================================
+// CONTAINERS - DELETAR/DESVINCULAR
+// ============================================================
+function brz_api_delete_container(WP_REST_Request $request) {
+    $post_id = intval($request->get_param('id'));
+    $post = get_post($post_id);
+    
+    if (!$post || $post->post_type !== 'container') {
+        return new WP_REST_Response(['success' => false, 'error' => 'Container não encontrado'], 404);
+    }
+
+    // Verificar se tem fatura vinculada
+    $bill_id = get_post_meta($post_id, '_bill_id', true);
+    if (!empty($bill_id)) {
+        return new WP_REST_Response(['success' => false, 'error' => 'Container está vinculado a uma fatura. Desvincule/delete a fatura primeiro.'], 400);
+    }
+
+    // Cancelar unitizador na API dos Correios
+    $unit_code = get_post_meta($post_id, '_unit_code', true);
+    if ($unit_code) {
+        try {
+            $correios = new WPR_Correios_Service();
+            $correios->cancel_unit($unit_code);
+        } catch (Exception $e) {
+            // Logar mas não bloquear a exclusão
+            error_log('[BRZ-ETIQUETAS] Erro ao cancelar unitizador: ' . $e->getMessage());
+        }
+    }
+
+    // Desvincular pacotes deste container
+    $tracking_codes = get_post_meta($post_id, '_tracking_codes', true) ?: [];
+    foreach ($tracking_codes as $tc) {
+        $pkg_query = new WP_Query([
+            'post_type' => 'package',
+            'meta_key' => '_correios_tracking_code',
+            'meta_value' => $tc,
+            'posts_per_page' => 1,
+            'fields' => 'ids',
+        ]);
+        if ($pkg_query->have_posts()) {
+            delete_post_meta($pkg_query->posts[0], '_container_id');
+        }
+    }
+
+    // Deletar o post do container
+    wp_delete_post($post_id, true);
+
+    return new WP_REST_Response([
+        'success' => true,
+        'message' => 'Container deletado e pacotes desvinculados.',
+        'unit_code_cancelled' => $unit_code ?: null,
+    ], 200);
+}
+
+// ============================================================
+// FATURAS - DELETAR/DESVINCULAR
+// ============================================================
+function brz_api_delete_bill(WP_REST_Request $request) {
+    $post_id = intval($request->get_param('id'));
+    $post = get_post($post_id);
+    
+    if (!$post || $post->post_type !== 'bill') {
+        return new WP_REST_Response(['success' => false, 'error' => 'Fatura não encontrada'], 404);
+    }
+
+    // Desvincular containers desta fatura
+    $containers = get_posts([
+        'post_type' => 'container',
+        'meta_key' => '_bill_id',
+        'meta_value' => $post_id,
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+    ]);
+    foreach ($containers as $cid) {
+        delete_post_meta($cid, '_bill_id');
+    }
+
+    // Desvincular embarque se tiver
+    $departure_id = get_post_meta($post_id, '_departure_id', true);
+    if ($departure_id) {
+        delete_post_meta($post_id, '_departure_id');
+    }
+
+    // Deletar o post da fatura
+    wp_delete_post($post_id, true);
+
+    return new WP_REST_Response([
+        'success' => true,
+        'message' => 'Fatura deletada e containers desvinculados.',
+        'containers_unlinked' => count($containers),
     ], 200);
 }

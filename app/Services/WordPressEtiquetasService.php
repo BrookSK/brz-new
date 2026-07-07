@@ -223,6 +223,58 @@ class WordPressEtiquetasService
     }
 
     // =========================================================
+    // DELETAR/DESVINCULAR
+    // =========================================================
+
+    /**
+     * Deletar container e desvincular pacotes.
+     */
+    public function deleteContainer(int $wpPostId): array
+    {
+        return $this->delete('/wp-json/brz/v1/containers/delete/' . $wpPostId);
+    }
+
+    /**
+     * Deletar fatura e desvincular containers.
+     */
+    public function deleteBill(int $wpPostId): array
+    {
+        return $this->delete('/wp-json/brz/v1/bills/delete/' . $wpPostId);
+    }
+
+    private function delete(string $path): array
+    {
+        $url = $this->baseUrl . $path;
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: application/json',
+            'X-API-Key: ' . $this->apiKey,
+        ]);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'brz-system/1.0');
+
+        $raw = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false || $raw === null) {
+            return ['success' => false, 'error' => 'Falha na conexão: ' . $err, 'http_code' => $httpCode];
+        }
+
+        $json = json_decode((string) $raw, true);
+        if (!is_array($json)) {
+            return ['success' => false, 'error' => 'Resposta inválida', 'http_code' => $httpCode];
+        }
+
+        return $json;
+    }
+
+    // =========================================================
     // PDFs - DOWNLOAD DIRETO
     // =========================================================
 
