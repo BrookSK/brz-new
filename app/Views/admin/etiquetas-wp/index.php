@@ -283,7 +283,7 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Cia Aérea*</label>
-                            <input type="text" class="form-control form-control-sm" id="emb-airline" placeholder="LA, AA" required maxlength="3">
+                            <input type="text" class="form-control form-control-sm" id="emb-airline" value="M3" required maxlength="3">
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Partida*</label>
@@ -291,7 +291,7 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Aeroporto Partida*</label>
-                            <input type="text" class="form-control form-control-sm" id="emb-departure-airport" placeholder="MIA" required maxlength="3">
+                            <input type="text" class="form-control form-control-sm" id="emb-departure-airport" value="MIA" required maxlength="3">
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Chegada*</label>
@@ -299,7 +299,7 @@
                         </div>
                         <div class="col-6 col-md-2">
                             <label class="form-label small">Aeroporto Chegada*</label>
-                            <input type="text" class="form-control form-control-sm" id="emb-arrival-airport" placeholder="GRU" required maxlength="3">
+                            <input type="text" class="form-control form-control-sm" id="emb-arrival-airport" value="GRU" required maxlength="3">
                         </div>
                     </div>
                     <div id="emb-faturas-lista" class="border rounded p-2 mb-2" style="max-height:150px; overflow-y:auto;">
