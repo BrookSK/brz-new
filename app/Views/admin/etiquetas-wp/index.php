@@ -233,6 +233,23 @@
                 </div>
             </div>
         </div>
+
+        <!-- Todos os containers (histórico) -->
+        <div class="card ewp-card mt-3">
+            <div class="card-header py-2"><strong class="small">Histórico de Containers</strong></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr><th>Remessa</th><th>Unit Code</th><th>Pacotes</th><th>Fatura</th><th class="d-none d-md-table-cell">Data</th><th>PDF</th><th>Ações</th></tr>
+                        </thead>
+                        <tbody id="containers-todos-body">
+                            <tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- TAB: FATURAS -->
@@ -268,6 +285,24 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Histórico de Faturas -->
+    <div class="card ewp-card mt-3" id="panel-faturas-historico">
+        <div class="card-header py-2"><strong class="small">Histórico de Faturas</strong></div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr><th>CN38</th><th>Remessas</th><th>Embarque</th><th class="d-none d-md-table-cell">Data</th><th>PDF</th><th>Ações</th></tr>
+                    </thead>
+                    <tbody id="faturas-todas-body">
+                        <tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     </div>
 
     <!-- TAB: EMBARQUES -->
@@ -386,8 +421,8 @@ function switchTab(tab) {
     document.getElementById('panel-' + tab).style.display = 'block';
     event.target.classList.add('active');
     // Auto-load data on tab switch
-    if (tab === 'containers') { carregarPacotesParaContainer(); carregarContainers(); }
-    if (tab === 'faturas') { carregarContainersParaFatura(); carregarFaturas(); }
+    if (tab === 'containers') { carregarPacotesParaContainer(); carregarContainers(); carregarTodosContainers(); }
+    if (tab === 'faturas') { carregarContainersParaFatura(); carregarFaturas(); carregarTodasFaturas(); }
     if (tab === 'embarques') { carregarFaturasParaEmbarque(); carregarEmbarques(); }
 }
 
@@ -641,7 +676,7 @@ async function carregarContainers() {
                 tbody.innerHTML += '<tr class="'+(isFirst?'table-info':'')+'"><td><input type="checkbox" class="chk-container" value="'+c.wp_post_id+'"></td><td>'+c.dispatch_number+'</td><td><code class="small">'+( c.unit_code||'-')+'</code></td><td>'+tks+'</td><td class="d-none d-md-table-cell">'+(c.created_at||'-')+'</td><td>'+(c.wp_post_id?'<a href="'+BASE+'/pdf/container/'+c.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarContainer('+c.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
             });
         } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum container sem fatura</td></tr>'; }
-    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum container sem fatura</td></tr>'; }
 }
 function toggleAllContainers() { const c = document.getElementById('checkAllContainers').checked; document.querySelectorAll('.chk-container').forEach(e=>e.checked=c); }
 
@@ -781,6 +816,44 @@ async function carregarEmbarques() {
                 tbody.innerHTML += '<tr><td>'+(fl.flightNumber||'-')+'</td><td>'+(fl.airlineCode||'-')+'</td><td>'+(fl.departureDate?new Date(fl.departureDate).toLocaleDateString('pt-BR'):'-')+'</td><td class="d-none d-md-table-cell">'+(fl.arrivalDate?new Date(fl.arrivalDate).toLocaleDateString('pt-BR'):'-')+'</td><td><code class="small">'+codes+'</code></td><td>'+st+errMsg+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarEmbarque('+dep.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
             });
         } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum embarque</td></tr>'; }
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
+}
+
+// ============================================================
+// HISTÓRICOS COMPLETOS
+// ============================================================
+async function carregarTodosContainers() {
+    const tbody = document.getElementById('containers-todos-body');
+    if (!tbody) return;
+    try {
+        const r = await fetch(BASE + '/listar-containers?per_page=50');
+        const d = await r.json();
+        tbody.innerHTML = '';
+        if (d.success && d.data && d.data.length > 0) {
+            d.data.forEach(c => {
+                const tks = Array.isArray(c.tracking_codes) ? c.tracking_codes.length : 0;
+                const faturaInfo = c.bill_id ? '<span class="badge bg-success">Sim</span>' : '<span class="badge bg-secondary">Não</span>';
+                tbody.innerHTML += '<tr><td>'+c.dispatch_number+'</td><td><code class="small">'+(c.unit_code||'-')+'</code></td><td>'+tks+'</td><td>'+faturaInfo+'</td><td class="d-none d-md-table-cell">'+(c.created_at||'-')+'</td><td>'+(c.wp_post_id?'<a href="'+BASE+'/pdf/container/'+c.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarContainer('+c.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
+            });
+        } else { tbody.innerHTML = '<tr><td colspan="7" class="ewp-empty">Nenhum container</td></tr>'; }
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="text-danger">'+e.message+'</td></tr>'; }
+}
+
+async function carregarTodasFaturas() {
+    const tbody = document.getElementById('faturas-todas-body');
+    if (!tbody) return;
+    try {
+        const r = await fetch(BASE + '/listar-faturas?per_page=50');
+        const d = await r.json();
+        tbody.innerHTML = '';
+        if (d.success && d.data && d.data.length > 0) {
+            d.data.forEach((b, idx) => {
+                const dns = Array.isArray(b.dispatch_numbers) ? b.dispatch_numbers.join(', ') : '-';
+                const embarqueInfo = b.departure_id ? '<span class="badge bg-success">Sim</span>' : '<span class="badge bg-secondary">Não</span>';
+                const isFirst = idx === 0;
+                tbody.innerHTML += '<tr class="'+(isFirst?'table-info':'')+'"><td><code class="small">'+(b.cn38_code||'-')+'</code>'+(isFirst?' <span class="badge bg-info text-dark">Última</span>':'')+'</td><td>'+dns+'</td><td>'+embarqueInfo+'</td><td class="d-none d-md-table-cell">'+(b.created_at||'-')+'</td><td>'+(b.wp_post_id?'<a href="'+BASE+'/pdf/fatura/'+b.wp_post_id+'" target="_blank" class="btn btn-xs btn-outline-danger"><i class="fas fa-file-pdf"></i></a>':'')+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarFatura('+b.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
+            });
+        } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty">Nenhuma fatura</td></tr>'; }
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }
 }
 </script>

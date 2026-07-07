@@ -640,6 +640,7 @@ class AdminEtiquetasWpController extends Controller
 
         $params = [];
         if ($request->getParam('without_departure')) $params['without_departure'] = '1';
+        if ($request->getParam('per_page')) $params['per_page'] = (int) $request->getParam('per_page');
 
         $resp = $this->wp->listBills($params);
         $this->json($resp);
