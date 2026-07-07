@@ -127,11 +127,35 @@ function brz_api_balance(WP_REST_Request $request) {
         $balance = $correios->get_tracking_numbers_balance();
         $test_mode = get_option('wpr_correios_test_mode', '0') === '1';
         $ambiente = $test_mode ? 'HOMOLOGACAO' : 'PRODUCAO';
-        return new WP_REST_Response(['success' => true, 'data' => $balance, 'ambiente' => $ambiente], 200);
+        $api_url = $test_mode ? 'https://apihom.correios.com.br' : 'https://api.correios.com.br';
+        $username = get_option('wpr_correios_username', '');
+        $cartao = get_option('wpr_correios_numero', '');
+        return new WP_REST_Response([
+            'success' => true,
+            'data' => $balance,
+            'ambiente' => $ambiente,
+            'api_url' => $api_url,
+            'credenciais' => [
+                'username' => $username,
+                'cartao_postagem' => $cartao,
+            ],
+        ], 200);
     } catch (Exception $e) {
         $test_mode = get_option('wpr_correios_test_mode', '0') === '1';
         $ambiente = $test_mode ? 'HOMOLOGACAO' : 'PRODUCAO';
-        return new WP_REST_Response(['success' => false, 'error' => $e->getMessage(), 'ambiente' => $ambiente], 500);
+        $api_url = $test_mode ? 'https://apihom.correios.com.br' : 'https://api.correios.com.br';
+        $username = get_option('wpr_correios_username', '');
+        $cartao = get_option('wpr_correios_numero', '');
+        return new WP_REST_Response([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'ambiente' => $ambiente,
+            'api_url' => $api_url,
+            'credenciais' => [
+                'username' => $username,
+                'cartao_postagem' => $cartao,
+            ],
+        ], 500);
     }
 }
 
