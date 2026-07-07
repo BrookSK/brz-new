@@ -242,6 +242,14 @@ class WordPressEtiquetasService
         return $this->delete('/wp-json/brz/v1/bills/delete/' . $wpPostId);
     }
 
+    /**
+     * Deletar embarque e desvincular faturas.
+     */
+    public function deleteDeparture(int $wpPostId): array
+    {
+        return $this->delete('/wp-json/brz/v1/departures/delete/' . $wpPostId);
+    }
+
     private function delete(string $path): array
     {
         $url = $this->baseUrl . $path;

@@ -361,7 +361,7 @@
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0 align-middle">
                         <thead class="table-light">
-                            <tr><th>Voo</th><th>Cia</th><th>Partida</th><th class="d-none d-md-table-cell">Chegada</th><th>CN38</th><th>Status</th></tr>
+                            <tr><th>Voo</th><th>Cia</th><th>Partida</th><th class="d-none d-md-table-cell">Chegada</th><th>CN38</th><th>Status</th><th>Ações</th></tr>
                         </thead>
                         <tbody id="embarques-body">
                             <tr><td colspan="6" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Carregando...</td></tr>
@@ -665,6 +665,16 @@ async function deletarFatura(wpPostId) {
     } catch(e) { alert('Erro: '+e.message); }
 }
 
+async function deletarEmbarque(wpPostId) {
+    if (!confirm('Deletar este embarque? As faturas serão desvinculadas e poderão ser usadas novamente.')) return;
+    try {
+        const r = await fetch(BASE + '/deletar-embarque', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wp_post_id:wpPostId})});
+        const d = await r.json();
+        if (d.success) { alert('Embarque deletado!'); carregarEmbarques(); carregarFaturasParaEmbarque(); }
+        else { alert('Erro: ' + d.error); }
+    } catch(e) { alert('Erro: '+e.message); }
+}
+
 // ============================================================
 // FATURAS
 // ============================================================
@@ -768,7 +778,7 @@ async function carregarEmbarques() {
                 const codes = Array.isArray(dep.cn38_codes) ? dep.cn38_codes.join(', ') : '-';
                 const st = dep.status === 'confirmed' ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">Erro</span>';
                 const errMsg = (dep.status !== 'confirmed' && dep.error_message) ? '<br><small class="text-danger">' + dep.error_message + '</small>' : '';
-                tbody.innerHTML += '<tr><td>'+(fl.flightNumber||'-')+'</td><td>'+(fl.airlineCode||'-')+'</td><td>'+(fl.departureDate?new Date(fl.departureDate).toLocaleDateString('pt-BR'):'-')+'</td><td class="d-none d-md-table-cell">'+(fl.arrivalDate?new Date(fl.arrivalDate).toLocaleDateString('pt-BR'):'-')+'</td><td><code class="small">'+codes+'</code></td><td>'+st+errMsg+'</td></tr>';
+                tbody.innerHTML += '<tr><td>'+(fl.flightNumber||'-')+'</td><td>'+(fl.airlineCode||'-')+'</td><td>'+(fl.departureDate?new Date(fl.departureDate).toLocaleDateString('pt-BR'):'-')+'</td><td class="d-none d-md-table-cell">'+(fl.arrivalDate?new Date(fl.arrivalDate).toLocaleDateString('pt-BR'):'-')+'</td><td><code class="small">'+codes+'</code></td><td>'+st+errMsg+'</td><td><button class="btn btn-xs btn-outline-secondary" onclick="deletarEmbarque('+dep.wp_post_id+')" title="Deletar"><i class="fas fa-trash"></i></button></td></tr>';
             });
         } else { tbody.innerHTML = '<tr><td colspan="6" class="ewp-empty"><i class="fas fa-inbox"></i>Nenhum embarque</td></tr>'; }
     } catch(e) { tbody.innerHTML = '<tr><td colspan="6" class="text-danger">'+e.message+'</td></tr>'; }

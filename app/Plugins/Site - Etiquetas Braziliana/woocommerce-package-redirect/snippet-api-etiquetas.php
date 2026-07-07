@@ -115,6 +115,12 @@ add_action('rest_api_init', function () {
         'callback' => 'brz_api_delete_bill',
         'permission_callback' => 'brz_api_check_auth',
     ]);
+
+    register_rest_route($namespace, '/departures/delete/(?P<id>\d+)', [
+        'methods'  => 'DELETE',
+        'callback' => 'brz_api_delete_departure',
+        'permission_callback' => 'brz_api_check_auth',
+    ]);
 });
 
 // ============================================================
@@ -1094,5 +1100,40 @@ function brz_api_delete_bill(WP_REST_Request $request) {
         'success' => true,
         'message' => 'Fatura deletada e containers desvinculados.',
         'containers_unlinked' => count($containers),
+    ], 200);
+}
+
+
+// ============================================================
+// EMBARQUES - DELETAR
+// ============================================================
+function brz_api_delete_departure(WP_REST_Request $request) {
+    $post_id = intval($request->get_param('id'));
+    $post = get_post($post_id);
+    
+    if (!$post || $post->post_type !== 'departure') {
+        return new WP_REST_Response(['success' => false, 'error' => 'Embarque não encontrado'], 404);
+    }
+
+    // Desvincular faturas deste embarque
+    $cn38_codes = get_post_meta($post_id, '_cn38_code_list', true) ?: [];
+    $bills = get_posts([
+        'post_type' => 'bill',
+        'meta_key' => '_departure_id',
+        'meta_value' => $post_id,
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+    ]);
+    foreach ($bills as $bid) {
+        delete_post_meta($bid, '_departure_id');
+    }
+
+    // Deletar o post do embarque
+    wp_delete_post($post_id, true);
+
+    return new WP_REST_Response([
+        'success' => true,
+        'message' => 'Embarque deletado e faturas desvinculadas.',
+        'bills_unlinked' => count($bills),
     ], 200);
 }

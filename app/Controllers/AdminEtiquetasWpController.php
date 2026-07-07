@@ -503,6 +503,22 @@ class AdminEtiquetasWpController extends Controller
         $this->json($resp, !empty($resp['success']) ? 200 : 400);
     }
 
+    public function deletarEmbarque(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin']);
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $wpPostId = (int) ($body['wp_post_id'] ?? 0);
+        if ($wpPostId <= 0) {
+            $this->json(['success' => false, 'error' => 'wp_post_id inválido'], 400);
+            return;
+        }
+
+        $resp = $this->wp->deleteDeparture($wpPostId);
+        $this->json($resp, !empty($resp['success']) ? 200 : 400);
+    }
+
     // =========================================================
     // DOWNLOAD DE PDFs
     // =========================================================
