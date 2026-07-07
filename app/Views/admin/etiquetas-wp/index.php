@@ -468,6 +468,25 @@ async function carregarPacotesParaContainer() {
             el.innerHTML = h;
         } else { el.innerHTML = '<span class="small text-muted">Nenhum pacote disponível</span>'; }
     } catch(e) { el.innerHTML = '<span class="text-danger small">'+e.message+'</span>'; }
+    
+    // Auto-preencher nº remessa com próximo disponível
+    autoPreencherRemessa();
+}
+
+async function autoPreencherRemessa() {
+    try {
+        const r = await fetch(BASE + '/listar-containers?per_page=200');
+        const d = await r.json();
+        let max = 0;
+        if (d.success && d.data) {
+            d.data.forEach(c => {
+                const dn = parseInt(c.dispatch_number) || 0;
+                if (dn > max) max = dn;
+            });
+        }
+        const input = document.getElementById('cnt-dispatch');
+        if (!input.value) input.value = max + 1;
+    } catch(e) {}
 }
 function updateCntCount() {
     const n = document.querySelectorAll('.chk-cnt-pacote:checked').length;
