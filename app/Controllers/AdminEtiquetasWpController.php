@@ -736,6 +736,16 @@ class AdminEtiquetasWpController extends Controller
                 $this->connection->exec($sql);
             }
 
+            // Garantir coluna wp_post_id existe
+            try {
+                $cols = [];
+                $st = $this->connection->query('DESCRIBE correios_packet_etiquetas');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+                if (!in_array('wp_post_id', $cols, true)) {
+                    $this->connection->exec('ALTER TABLE correios_packet_etiquetas ADD COLUMN wp_post_id INT NULL DEFAULT NULL');
+                }
+            } catch (\Exception $e) {}
+
             $stIns = $this->connection->prepare('INSERT INTO correios_packet_etiquetas (pedido_id, customer_control_code, tracking_number, status, wp_post_id, last_response_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE tracking_number = VALUES(tracking_number), status = VALUES(status), wp_post_id = VALUES(wp_post_id), last_response_json = VALUES(last_response_json), updated_at = NOW()');
             $stIns->execute([
                 $pedidoId,
