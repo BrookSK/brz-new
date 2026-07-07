@@ -233,7 +233,7 @@ function renderAdminSidebar($activePage = '') {
         // 'remessa-wp' => ['icon' => 'fab fa-wordpress', 'label' => 'Remessa WP', 'url' => '/admin/remessa-wp', 'roles' => ['admin','vendedor','conferente']],
         'remessa-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Conferência de Remessa', 'url' => '/admin/remessa-conferencia', 'roles' => ['admin','vendedor','suporte','conferente']],
         'remessa-correios' => ['icon' => 'fas fa-shipping-fast', 'label' => 'Correio Brasil', 'url' => '/admin/remessa-correios', 'roles' => ['admin','vendedor']],
-        'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correio Internacional', 'url' => '/admin/correios-mundial', 'roles' => ['admin','vendedor','suporte','redirecionador']],
+        'correios-mundial' => ['icon' => 'fas fa-globe', 'label' => 'Correio Internacional', 'url' => '/admin/etiquetas-wp', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         'etiquetas-wp' => ['icon' => 'fas fa-tags', 'label' => 'Etiquetas', 'url' => '/admin/etiquetas-wp', 'roles' => ['admin','vendedor','suporte']],
         'pacotes-wordpress' => ['icon' => 'fab fa-wordpress', 'label' => 'Pacotes WordPress', 'url' => '/admin/pacotes-wordpress', 'roles' => ['admin','vendedor','suporte']],
         'remessa-shipstation' => ['icon' => 'fas fa-plane', 'label' => 'UPS', 'url' => '/admin/remessa-shipstation', 'roles' => ['admin','vendedor']],
