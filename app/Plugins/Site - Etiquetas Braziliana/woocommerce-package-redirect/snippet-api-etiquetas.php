@@ -1014,46 +1014,65 @@ function brz_api_list_departures(WP_REST_Request $request) {
 // CONTAINERS - DELETAR/DESVINCULAR
 // ============================================================
 function brz_api_delete_container(WP_REST_Request $request) {
-    $post_id = intval($request->get_param('id'));
-    $post = get_post($post_id);
+    $prev_handler = set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+    });
     
-    if (!$post || $post->post_type !== 'container') {
-        return new WP_REST_Response(['success' => false, 'error' => 'Container não encontrado'], 404);
-    }
+    try {
+        global $wpdb;
+        $post_id = intval($request->get_param('id'));
+        $post = get_post($post_id);
+        
+        if (!$post || $post->post_type !== 'container') {
+            restore_error_handler();
+            return new WP_REST_Response(['success' => false, 'error' => 'Container não encontrado'], 404);
+        }
 
-    // Verificar se tem fatura vinculada
-    $bill_id = get_post_meta($post_id, '_bill_id', true);
-    if (!empty($bill_id)) {
-        return new WP_REST_Response(['success' => false, 'error' => 'Container está vinculado a uma fatura. Desvincule/delete a fatura primeiro.'], 400);
-    }
+        $bill_id = get_post_meta($post_id, '_bill_id', true);
+        if (!empty($bill_id)) {
+            restore_error_handler();
+            return new WP_REST_Response(['success' => false, 'error' => 'Container vinculado a fatura. Delete a fatura primeiro.'], 400);
+        }
 
-    $unit_code = get_post_meta($post_id, '_unit_code', true);
+        $unit_code = get_post_meta($post_id, '_unit_code', true);
+        $tracking_codes = get_post_meta($post_id, '_tracking_codes', true);
 
-    // Desvincular pacotes deste container
-    $tracking_codes = get_post_meta($post_id, '_tracking_codes', true);
-    if (is_array($tracking_codes)) {
-        foreach ($tracking_codes as $tc) {
-            $pkg_query = new WP_Query([
-                'post_type' => 'package',
-                'meta_key' => '_correios_tracking_code',
-                'meta_value' => $tc,
-                'posts_per_page' => 1,
-                'fields' => 'ids',
-            ]);
-            if ($pkg_query->have_posts()) {
-                delete_post_meta($pkg_query->posts[0], '_container_id');
+        // Desvincular pacotes deste container
+        if (is_array($tracking_codes)) {
+            foreach ($tracking_codes as $tc) {
+                $pkg_id = $wpdb->get_var($wpdb->prepare(
+                    "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_correios_tracking_code' AND meta_value = %s LIMIT 1",
+                    $tc
+                ));
+                if ($pkg_id) {
+                    $wpdb->delete($wpdb->postmeta, ['post_id' => $pkg_id, 'meta_key' => '_container_id']);
+                }
             }
         }
+
+        // Remover TODOS os metadados via SQL direto (evita o bug do clone de Exception)
+        $wpdb->delete($wpdb->postmeta, ['post_id' => $post_id]);
+        
+        // Deletar o post direto via SQL tambem
+        $wpdb->delete($wpdb->posts, ['ID' => $post_id]);
+        
+        // Limpar cache
+        clean_post_cache($post_id);
+
+        restore_error_handler();
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => 'Container deletado e pacotes desvinculados.',
+            'unit_code' => $unit_code ?: null,
+        ], 200);
+        
+    } catch (\Throwable $e) {
+        restore_error_handler();
+        return new WP_REST_Response([
+            'success' => false,
+            'error' => 'Erro interno: ' . $e->getMessage() . ' em ' . basename($e->getFile()) . ':' . $e->getLine(),
+        ], 500);
     }
-
-    // Deletar o post do container
-    wp_delete_post($post_id, true);
-
-    return new WP_REST_Response([
-        'success' => true,
-        'message' => 'Container deletado e pacotes desvinculados.',
-        'unit_code' => $unit_code ?: null,
-    ], 200);
 }
 
 // ============================================================
