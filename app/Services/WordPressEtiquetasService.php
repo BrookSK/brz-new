@@ -272,21 +272,23 @@ class WordPressEtiquetasService
         $err = curl_error($ch);
         curl_close($ch);
 
+        // Debug log
+        error_log('[BRZ-WP-DELETE] URL=' . $url . ' | HTTP=' . $httpCode . ' | raw=' . substr((string)$raw, 0, 1000));
+
         if ($raw === false || $raw === null) {
             return ['success' => false, 'error' => 'Falha na conexão: ' . $err, 'http_code' => $httpCode];
         }
 
         $json = json_decode((string) $raw, true);
         if (!is_array($json)) {
-            return ['success' => false, 'error' => 'Resposta inválida do WordPress (não-JSON)', 'http_code' => $httpCode, 'raw' => substr((string) $raw, 0, 500)];
+            return ['success' => false, 'error' => 'Resposta não-JSON do WordPress (HTTP ' . $httpCode . ')', 'http_code' => $httpCode, 'raw' => substr((string) $raw, 0, 500)];
         }
 
         // Normalizar resposta de erro do WordPress REST API (formato: {code, message, data})
         if (!isset($json['success'])) {
             if (isset($json['code']) && isset($json['message'])) {
-                return ['success' => false, 'error' => $json['message'], 'wp_code' => $json['code'], 'http_code' => $httpCode];
+                return ['success' => false, 'error' => $json['message'] . ' (wp_code: ' . $json['code'] . ')', 'http_code' => $httpCode];
             }
-            // Se não tem 'success' nem formato WP padrão, considerar falha
             if ($httpCode >= 400) {
                 return ['success' => false, 'error' => $json['message'] ?? $json['error'] ?? 'Erro HTTP ' . $httpCode, 'http_code' => $httpCode];
             }
