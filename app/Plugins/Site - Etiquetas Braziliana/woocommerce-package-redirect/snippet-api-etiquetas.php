@@ -105,19 +105,19 @@ add_action('rest_api_init', function () {
 
     // === DELETAR/DESVINCULAR ===
     register_rest_route($namespace, '/containers/delete/(?P<id>\d+)', [
-        'methods'  => 'DELETE',
+        'methods'  => ['DELETE', 'POST'],
         'callback' => 'brz_api_delete_container',
         'permission_callback' => 'brz_api_check_auth',
     ]);
 
     register_rest_route($namespace, '/bills/delete/(?P<id>\d+)', [
-        'methods'  => 'DELETE',
+        'methods'  => ['DELETE', 'POST'],
         'callback' => 'brz_api_delete_bill',
         'permission_callback' => 'brz_api_check_auth',
     ]);
 
     register_rest_route($namespace, '/departures/delete/(?P<id>\d+)', [
-        'methods'  => 'DELETE',
+        'methods'  => ['DELETE', 'POST'],
         'callback' => 'brz_api_delete_departure',
         'permission_callback' => 'brz_api_check_auth',
     ]);

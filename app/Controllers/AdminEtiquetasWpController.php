@@ -484,6 +484,12 @@ class AdminEtiquetasWpController extends Controller
         }
 
         $resp = $this->wp->deleteContainer($wpPostId);
+        
+        // Garantir que sempre tem a chave 'error' se não teve sucesso
+        if (empty($resp['success']) && empty($resp['error'])) {
+            $resp['error'] = $resp['message'] ?? 'Erro desconhecido ao deletar container';
+        }
+        
         $this->json($resp, !empty($resp['success']) ? 200 : 400);
     }
 

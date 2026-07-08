@@ -77,8 +77,25 @@ class WPR_Correios_Service {
         $url = $this->url . '/packet/v1/units/';
         $response = $this->delete($url . $unit_code);
 
-        if ($response) {
+        // API dos Correios retorna "1" em caso de sucesso no cancelamento
+        // e um objeto com msgs em caso de erro
+        if ($response === false) {
+            throw new Exception('Erro de conexão ao cancelar o unitizador');
+        }
+        
+        // Se resposta é um inteiro (1 = sucesso), retornar silenciosamente
+        if (is_numeric($response)) {
+            return; // Cancelamento bem-sucedido
+        }
+        
+        // Se é um objeto com msgs, é erro
+        if (is_object($response) && isset($response->msgs)) {
             throw new Exception('Erro ao cancelar o unitizador: ' . implode("; ", $response->msgs));
+        }
+        
+        // Qualquer outro caso com mensagem de erro
+        if (is_object($response) && isset($response->message)) {
+            throw new Exception('Erro ao cancelar o unitizador: ' . $response->message);
         }
     }
 

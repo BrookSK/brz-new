@@ -258,9 +258,11 @@ class WordPressEtiquetasService
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, '');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Accept: application/json',
+            'Content-Type: application/json',
             'X-API-Key: ' . $this->apiKey,
         ]);
         curl_setopt($ch, CURLOPT_USERAGENT, 'brz-system/1.0');
@@ -276,7 +278,23 @@ class WordPressEtiquetasService
 
         $json = json_decode((string) $raw, true);
         if (!is_array($json)) {
-            return ['success' => false, 'error' => 'Resposta inválida', 'http_code' => $httpCode];
+            return ['success' => false, 'error' => 'Resposta inválida do WordPress (não-JSON)', 'http_code' => $httpCode, 'raw' => substr((string) $raw, 0, 500)];
+        }
+
+        // Normalizar resposta de erro do WordPress REST API (formato: {code, message, data})
+        if (!isset($json['success'])) {
+            if (isset($json['code']) && isset($json['message'])) {
+                return ['success' => false, 'error' => $json['message'], 'wp_code' => $json['code'], 'http_code' => $httpCode];
+            }
+            // Se não tem 'success' nem formato WP padrão, considerar falha
+            if ($httpCode >= 400) {
+                return ['success' => false, 'error' => $json['message'] ?? $json['error'] ?? 'Erro HTTP ' . $httpCode, 'http_code' => $httpCode];
+            }
+        }
+
+        // Garantir que sempre tenha a chave 'error' quando success=false
+        if (isset($json['success']) && !$json['success'] && !isset($json['error'])) {
+            $json['error'] = $json['message'] ?? 'Erro desconhecido';
         }
 
         return $json;
