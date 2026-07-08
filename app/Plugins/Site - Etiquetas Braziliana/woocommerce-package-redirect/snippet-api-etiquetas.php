@@ -1027,30 +1027,33 @@ function brz_api_delete_container(WP_REST_Request $request) {
         return new WP_REST_Response(['success' => false, 'error' => 'Container está vinculado a uma fatura. Desvincule/delete a fatura primeiro.'], 400);
     }
 
-    // Cancelar unitizador na API dos Correios
+    // Tentar cancelar unitizador na API dos Correios (não bloqueia exclusão se falhar)
     $unit_code = get_post_meta($post_id, '_unit_code', true);
+    $cancel_error = null;
     if ($unit_code) {
         try {
             $correios = new WPR_Correios_Service();
             $correios->cancel_unit($unit_code);
-        } catch (Exception $e) {
-            // Logar mas não bloquear a exclusão
-            error_log('[BRZ-ETIQUETAS] Erro ao cancelar unitizador: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            $cancel_error = $e->getMessage();
+            error_log('[BRZ-ETIQUETAS] Erro ao cancelar unitizador (não bloqueante): ' . $cancel_error);
         }
     }
 
     // Desvincular pacotes deste container
     $tracking_codes = get_post_meta($post_id, '_tracking_codes', true) ?: [];
-    foreach ($tracking_codes as $tc) {
-        $pkg_query = new WP_Query([
-            'post_type' => 'package',
-            'meta_key' => '_correios_tracking_code',
-            'meta_value' => $tc,
-            'posts_per_page' => 1,
-            'fields' => 'ids',
-        ]);
-        if ($pkg_query->have_posts()) {
-            delete_post_meta($pkg_query->posts[0], '_container_id');
+    if (is_array($tracking_codes)) {
+        foreach ($tracking_codes as $tc) {
+            $pkg_query = new WP_Query([
+                'post_type' => 'package',
+                'meta_key' => '_correios_tracking_code',
+                'meta_value' => $tc,
+                'posts_per_page' => 1,
+                'fields' => 'ids',
+            ]);
+            if ($pkg_query->have_posts()) {
+                delete_post_meta($pkg_query->posts[0], '_container_id');
+            }
         }
     }
 
@@ -1061,6 +1064,7 @@ function brz_api_delete_container(WP_REST_Request $request) {
         'success' => true,
         'message' => 'Container deletado e pacotes desvinculados.',
         'unit_code_cancelled' => $unit_code ?: null,
+        'cancel_warning' => $cancel_error,
     ], 200);
 }
 

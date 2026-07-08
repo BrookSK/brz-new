@@ -31,9 +31,15 @@ class WPR_Correios_Service {
 
         if ($response && isset($response->token)) {
             return $response->token;
-        } else {
-            throw new Exception('Erro ao obter o token: ' . implode("; ", $response->msgs));
         }
+        
+        $error_msg = 'Erro ao obter o token dos Correios';
+        if ($response && isset($response->msgs) && is_array($response->msgs)) {
+            $error_msg .= ': ' . implode("; ", $response->msgs);
+        } elseif ($response && isset($response->message)) {
+            $error_msg .= ': ' . $response->message;
+        }
+        throw new Exception($error_msg);
     }
 
     public function get_tracking_numbers_balance() {
@@ -57,9 +63,15 @@ class WPR_Correios_Service {
         
         if ($response && isset($response->packageResponseList)) {
             return $response->packageResponseList;
-        } else {
-            throw new Exception('Erro ao criar o pacote: ' . implode("; ", $response->msgs));
         }
+        
+        $error_msg = 'Erro ao criar o pacote';
+        if ($response && isset($response->msgs) && is_array($response->msgs)) {
+            $error_msg .= ': ' . implode("; ", $response->msgs);
+        } elseif ($response && isset($response->message)) {
+            $error_msg .= ': ' . $response->message;
+        }
+        throw new Exception($error_msg);
     }
 
     public function create_unit($unit_data) {
@@ -68,9 +80,15 @@ class WPR_Correios_Service {
 
         if ($response && isset($response->unitResponseList)) {
             return $response->unitResponseList;
-        } else {
-            throw new Exception('Erro ao criar o unitizador: ' . implode("; ", $response->msgs));
         }
+        
+        $error_msg = 'Erro ao criar o unitizador';
+        if ($response && isset($response->msgs) && is_array($response->msgs)) {
+            $error_msg .= ': ' . implode("; ", $response->msgs);
+        } elseif ($response && isset($response->message)) {
+            $error_msg .= ': ' . $response->message;
+        }
+        throw new Exception($error_msg);
     }
 
     public function cancel_unit($unit_code) {
@@ -103,12 +121,18 @@ class WPR_Correios_Service {
         $url = $this->url . '/packet/v1/cn38request';
         $response = $this->post($url, json_encode($bill_data));
 
-        if ($response) {
+        if ($response && isset($response->requestId)) {
             $status_response = $this->check_bill_status($response->requestId);
             return $status_response;
-        } else {
-            throw new Exception('Erro ao criar a fatura: ' . implode("; ", $response->msgs));
         }
+        
+        $error_msg = 'Erro ao criar a fatura';
+        if ($response && isset($response->msgs) && is_array($response->msgs)) {
+            $error_msg .= ': ' . implode("; ", $response->msgs);
+        } elseif ($response && isset($response->message)) {
+            $error_msg .= ': ' . $response->message;
+        }
+        throw new Exception($error_msg);
     }
 
     function check_bill_status($request_id) {
@@ -117,9 +141,9 @@ class WPR_Correios_Service {
 
         if ($response) {
             return $response;
-        } else {
-            throw new Exception('Erro ao criar a fatura: ' . implode("; ", $response->errorMessage));
         }
+        
+        throw new Exception('Erro ao consultar status da fatura');
     }
 
     public function get_airline_list() {
