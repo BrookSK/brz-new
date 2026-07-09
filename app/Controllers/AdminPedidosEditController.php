@@ -1538,6 +1538,13 @@ class AdminPedidosEditController extends Controller {
             }
 
             // Processar pendências acumuladas por produto (após o loop de itens)
+            // Primeiro, limpar qualquer pendente que já exista (evitar duplicatas com outros fluxos)
+            if ($this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
+                try {
+                    $stmtClean = $this->connection->prepare("DELETE FROM lista_compras WHERE pedido_id = :pedido_id AND status = 'pendente'");
+                    $stmtClean->execute([':pedido_id' => $pedidoId]);
+                } catch (\Exception $e) {}
+            }
             foreach ($pendenciasAcumuladas as $pend) {
                 $this->upsertPendenciaCompra($pedidoId, (int) $pend['produto_id'], (int) $pend['faltante'], (string) $pend['nome']);
             }
