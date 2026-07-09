@@ -5861,6 +5861,7 @@ class CheckoutController extends Controller {
                                 $sqlIns = 'INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')';
                                 $stIns = $db->prepare($sqlIns);
                                 $stIns->execute($pIns);
+                                error_log('[LISTA_COMPRAS_INSERT] pedido=' . $pedidoId . ' produto=' . ($produtoId ?? '?') . ' caller=CheckoutController');
                                 $criouPendenciaLista = true;
                             }
                         } catch (\Exception $e) {

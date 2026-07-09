@@ -7223,6 +7223,7 @@ HTML;
                             $sql = 'INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')';
                             $st = $pdo->prepare($sql);
                             $st->execute($params);
+                            error_log('[LISTA_COMPRAS_INSERT] pedido=' . $id . ' produto=' . $produtoId . ' faltante=' . $faltante . ' caller=atualizarStatus trace=' . json_encode(array_slice(array_map(function($f){ return ($f['file'] ?? '') . ':' . ($f['line'] ?? ''); }, debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5)), 0, 3)));
                         } catch (\Exception $e) {
                         }
                     }
