@@ -1,0 +1,11 @@
+{
+    "config": {
+        "platform": {
+            "php": "7.4.0"
+        }
+    },
+    "require": {
+        "dompdf/dompdf": "^1.0",
+        "milon/barcode": "^1.0"
+    }
+}
