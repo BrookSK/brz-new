@@ -1598,6 +1598,41 @@ class AdminPedidosEditController extends Controller {
             $stmt = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $setParts) . ' WHERE id = :pedido_id');
             $stmt->execute($paramsUpd);
 
+            // Criar pendências na lista_compras quando status muda pra "pago" pela primeira vez
+            $statusOldNormLC = strtolower(trim((string) $oldStatus));
+            $statusNewNormLC = strtolower(trim((string) $newStatus));
+            $statusPagos = ['pago', 'paid', 'approved', 'aprovado'];
+            $oldEraPago = in_array($statusOldNormLC, $statusPagos, true) || in_array($statusOldNormLC, ['itens_parcialmente_comprados', 'itens_comprados'], true);
+            $newEhPago = in_array($statusNewNormLC, $statusPagos, true);
+            if ($newEhPago && !$oldEraPago && $this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
+                // Verificar se já existem pendências para este pedido (evitar duplicação)
+                $jaTemPendencias = false;
+                try {
+                    $stCheck = $this->connection->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ?");
+                    $stCheck->execute([$pedidoId]);
+                    $jaTemPendencias = ((int) $stCheck->fetchColumn() > 0);
+                } catch (\Exception $e) {}
+
+                if (!$jaTemPendencias) {
+                    $itensTableLC = $this->tableExists('pedido_itens') ? 'pedido_itens' : ($this->tableExists('pedido_items') ? 'pedido_items' : '');
+                    if ($itensTableLC !== '') {
+                        try {
+                            $stItens = $this->connection->prepare("SELECT produto_id, quantidade FROM {$itensTableLC} WHERE pedido_id = ?");
+                            $stItens->execute([$pedidoId]);
+                            $itensLC = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                            foreach ($itensLC as $itemLC) {
+                                $pidLC = (int) ($itemLC['produto_id'] ?? 0);
+                                $qtdLC = (int) ($itemLC['quantidade'] ?? 0);
+                                if ($pidLC <= 0 || $qtdLC <= 0) continue;
+                                $this->connection->prepare(
+                                    "INSERT INTO lista_compras (produto_id, pedido_id, quantidade_necessaria, quantidade_faltante, prioridade, status, data_solicitacao) VALUES (?, ?, ?, ?, 'media', 'pendente', CURDATE())"
+                                )->execute([$pidLC, $pedidoId, $qtdLC, $qtdLC]);
+                            }
+                        } catch (\Exception $e) {}
+                    }
+                }
+            }
+
             if ($cicloFechado) {
                 $this->finalizarCicloPedido($pedidoId);
             }
