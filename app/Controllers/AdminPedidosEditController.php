@@ -225,9 +225,10 @@ class AdminPedidosEditController extends Controller {
 
         // Verificar se já existe item comprado para este produto/pedido — se sim, descontar a quantidade já comprada
         // Busca por produto_id + pedido_id SEM filtrar por nome, pois o nome pode ter sido editado
+        // Usa COUNT(*) pois itens comprados têm quantidade_faltante = 0 após marcação
         if ($temPedido) {
             try {
-                $sqlComprado = "SELECT COALESCE(SUM(quantidade_faltante), 0) as qty_comprada FROM lista_compras WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status != 'pendente'";
+                $sqlComprado = "SELECT COUNT(*) FROM lista_compras WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status = 'comprado'";
                 $paramsComprado = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId];
                 $stmtComprado = $this->connection->prepare($sqlComprado);
                 $stmtComprado->execute($paramsComprado);
@@ -1423,6 +1424,7 @@ class AdminPedidosEditController extends Controller {
             $subtotal = 0;
 
             if (!$isPago) {
+            $pendenciasAcumuladas = [];
             foreach ($itensTables as $t) {
                 $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
@@ -1525,9 +1527,19 @@ class AdminPedidosEditController extends Controller {
                                 }
                             } catch (\Exception $e) {}
                         }
-                        $this->upsertPendenciaCompra($pedidoId, $produtoId, $faltante, $nomeProdutoCustom);
+                        // Acumular faltantes por produto para processar em lote após o loop
+                        $key = $produtoId . '||' . $nomeProdutoCustom;
+                        if (!isset($pendenciasAcumuladas[$key])) {
+                            $pendenciasAcumuladas[$key] = ['produto_id' => $produtoId, 'nome' => $nomeProdutoCustom, 'faltante' => 0];
+                        }
+                        $pendenciasAcumuladas[$key]['faltante'] += $faltante;
                     }
                 }
+            }
+
+            // Processar pendências acumuladas por produto (após o loop de itens)
+            foreach ($pendenciasAcumuladas as $pend) {
+                $this->upsertPendenciaCompra($pedidoId, (int) $pend['produto_id'], (int) $pend['faltante'], (string) $pend['nome']);
             }
 
             } // end if (!$isPago) — processamento de itens
