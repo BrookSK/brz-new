@@ -224,14 +224,11 @@ class AdminPedidosEditController extends Controller {
         $temNomeProduto = $this->columnExists('lista_compras', 'nome_produto');
 
         // Verificar se já existe item comprado para este produto/pedido — se sim, descontar a quantidade já comprada
+        // Busca por produto_id + pedido_id SEM filtrar por nome, pois o nome pode ter sido editado
         if ($temPedido) {
             try {
                 $sqlComprado = "SELECT COALESCE(SUM(quantidade_faltante), 0) as qty_comprada FROM lista_compras WHERE produto_id = :produto_id AND pedido_id = :pedido_id AND status != 'pendente'";
                 $paramsComprado = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId];
-                if ($temNomeProduto && $nomeProdutoCustom !== '') {
-                    $sqlComprado .= ' AND nome_produto = :nome_produto';
-                    $paramsComprado[':nome_produto'] = $nomeProdutoCustom;
-                }
                 $stmtComprado = $this->connection->prepare($sqlComprado);
                 $stmtComprado->execute($paramsComprado);
                 $jaComprado = (int) ($stmtComprado->fetchColumn() ?: 0);
