@@ -1758,37 +1758,57 @@ class PedidoEcommerce {
                 }
                 if ($temPedidoIdLista && !empty($itens)) {
                     $stmtCompra = $this->connection->prepare(
-                        "SELECT produto_id, status FROM lista_compras WHERE pedido_id = :pedido_id ORDER BY id ASC"
+                        "SELECT produto_id, status, quantidade_faltante FROM lista_compras WHERE pedido_id = :pedido_id ORDER BY id ASC"
                     );
                     $stmtCompra->execute([':pedido_id' => $pedidoId]);
                     $compraRows = $stmtCompra->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-                    // Contar quantos de cada produto_id estão comprados e quantos pendentes
-                    $compraCountMap = []; // produto_id => ['comprado' => N, 'pendente' => N]
+                    // Calcular por produto: quantos registros comprados + total de quantidade pendente
+                    $compraInfoMap = []; // produto_id => ['comprado_count' => N, 'pendente_total' => N]
                     foreach ($compraRows as $cr) {
                         $pid = (int) ($cr['produto_id'] ?? 0);
                         $st = (string) ($cr['status'] ?? '');
                         if ($pid <= 0) continue;
-                        if (!isset($compraCountMap[$pid])) {
-                            $compraCountMap[$pid] = ['comprado' => 0, 'pendente' => 0];
+                        if (!isset($compraInfoMap[$pid])) {
+                            $compraInfoMap[$pid] = ['comprado_count' => 0, 'pendente_total' => 0];
                         }
                         if ($st === 'comprado') {
-                            $compraCountMap[$pid]['comprado']++;
+                            $compraInfoMap[$pid]['comprado_count']++;
                         } elseif ($st === 'pendente') {
-                            $compraCountMap[$pid]['pendente']++;
+                            $qf = (int) ($cr['quantidade_faltante'] ?? 0);
+                            $compraInfoMap[$pid]['pendente_total'] += max($qf, 1);
                         }
                     }
 
-                    // Atribuir compra_status a cada item distribuindo proporcionalmente
-                    $compraUsed = []; // produto_id => quantos já atribuímos como 'comprado'
+                    // Contar total de itens por produto no pedido
+                    $totalItensPorProduto = [];
+                    foreach ($pedido['items'] as $it) {
+                        $pid = (int) ($it['produto_id'] ?? 0);
+                        if ($pid <= 0) continue;
+                        $totalItensPorProduto[$pid] = ($totalItensPorProduto[$pid] ?? 0) + 1;
+                    }
+
+                    // Determinar quantos itens foram "satisfeitos" (comprados) por produto
+                    // = total de itens no pedido - quantidade pendente na lista_compras
+                    $satisfeitosPorProduto = [];
+                    foreach ($compraInfoMap as $pid => $info) {
+                        $totalItens = $totalItensPorProduto[$pid] ?? 0;
+                        $satisfeitos = $totalItens - $info['pendente_total'];
+                        // Somar também registros explicitamente marcados como comprado
+                        $satisfeitos = max($satisfeitos, $info['comprado_count']);
+                        $satisfeitosPorProduto[$pid] = max(0, min($satisfeitos, $totalItens));
+                    }
+
+                    // Atribuir compra_status a cada item
+                    $compraUsed = [];
                     foreach ($pedido['items'] as &$it) {
                         $pid = (int) ($it['produto_id'] ?? 0);
-                        if ($pid <= 0 || !isset($compraCountMap[$pid])) continue;
+                        if ($pid <= 0 || !isset($compraInfoMap[$pid])) continue;
                         if (!isset($compraUsed[$pid])) $compraUsed[$pid] = 0;
-                        if ($compraUsed[$pid] < $compraCountMap[$pid]['comprado']) {
+                        if ($compraUsed[$pid] < ($satisfeitosPorProduto[$pid] ?? 0)) {
                             $it['compra_status'] = 'comprado';
                             $compraUsed[$pid]++;
-                        } elseif ($compraCountMap[$pid]['pendente'] > 0) {
+                        } else {
                             $it['compra_status'] = 'pendente';
                         }
                     }
