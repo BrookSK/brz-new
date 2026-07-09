@@ -1251,6 +1251,7 @@ class AdminPedidosEditController extends Controller {
 
     public function salvar($request) {
         try {
+            error_log('[EDIT_SAVE_V2] AdminPedidosEditController::salvar() chamado - versao sem lista_compras');
             $dados = json_decode(file_get_contents('php://input'), true);
 
             $pedidoId = (int) ($dados['pedido_id'] ?? 0);
