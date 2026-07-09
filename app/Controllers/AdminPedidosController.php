@@ -7505,6 +7505,25 @@ HTML;
                 }
                 $st = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = :id');
                 $st->execute($params);
+
+                // Limpar lista_compras e reservas do pedido excluído
+                try {
+                    $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT->execute(['lista_compras']);
+                    if ((int) $stmtT->fetchColumn() > 0) {
+                        $stDel = $pdo->prepare("DELETE FROM lista_compras WHERE pedido_id = ?");
+                        $stDel->execute([(int) $id]);
+                    }
+                } catch (\Exception $e) {}
+                try {
+                    $stmtT2 = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stmtT2->execute(['estoque_reservas']);
+                    if ((int) $stmtT2->fetchColumn() > 0) {
+                        $stDel2 = $pdo->prepare("DELETE FROM estoque_reservas WHERE pedido_id = ?");
+                        $stDel2->execute([(int) $id]);
+                    }
+                } catch (\Exception $e) {}
+
                 $pdo->commit();
 
                 // Void invoice no QuickBooks ao mover para lixeira
