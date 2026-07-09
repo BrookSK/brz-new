@@ -7444,6 +7444,7 @@ HTML;
 
         try {
             $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             $pdo->beginTransaction();
 
             $colsPedidos = [];
@@ -7513,8 +7514,11 @@ HTML;
                     if ((int) $stmtT->fetchColumn() > 0) {
                         $stDel = $pdo->prepare("DELETE FROM lista_compras WHERE pedido_id = ?");
                         $stDel->execute([(int) $id]);
+                        error_log('[EXCLUIR_PEDIDO] Limpou lista_compras do pedido #' . $id . ' (' . $stDel->rowCount() . ' registros)');
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                    error_log('[EXCLUIR_PEDIDO] Erro ao limpar lista_compras: ' . $e->getMessage());
+                }
                 try {
                     $stmtT2 = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
                     $stmtT2->execute(['estoque_reservas']);
