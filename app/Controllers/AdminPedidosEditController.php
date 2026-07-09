@@ -1412,8 +1412,15 @@ class AdminPedidosEditController extends Controller {
                 }
             }
 
-            // Recalcular reservas/pendências baseado no novo estado do pedido
-            $this->limparReservasEPendenciasDoPedido($pedidoId);
+            // Recalcular reservas baseado no novo estado do pedido (NÃO toca na lista_compras)
+            // A lista_compras é gerenciada pelo fluxo de compras (concluirCompras/atualizarStatus)
+            if ($this->tableExists('estoque_reservas') && $this->columnExists('estoque_reservas', 'pedido_id')) {
+                try {
+                    $stmt = $this->connection->prepare("DELETE FROM estoque_reservas WHERE pedido_id = :pedido_id");
+                    $stmt->execute([':pedido_id' => $pedidoId]);
+                } catch (\Exception $e) {
+                }
+            }
 
             // Primeiro, remover todos os itens existentes do pedido (sincronizar tabelas quando ambas existirem)
             $itensTables = [];
@@ -1424,7 +1431,6 @@ class AdminPedidosEditController extends Controller {
             $subtotal = 0;
 
             if (!$isPago) {
-            $pendenciasAcumuladas = [];
             foreach ($itensTables as $t) {
                 $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
                 $stmt->execute([':pedido_id' => $pedidoId]);
@@ -1480,7 +1486,7 @@ class AdminPedidosEditController extends Controller {
                     $stmt->execute($params);
                 }
 
-                // Estoque: reservar o que houver disponível e gerar pendência só para o que faltar
+                // Estoque: reservar o que houver disponível
                 $produtoId = (int) ($item['produto_id'] ?? 0);
                 $qtdPedido = (int) ($item['quantidade'] ?? 0);
                 if ($produtoId > 0 && $qtdPedido > 0) {
@@ -1498,55 +1504,7 @@ class AdminPedidosEditController extends Controller {
                     if ($reservar > 0) {
                         $this->upsertReserva($pedidoId, $produtoId, $reservar, $statusReserva);
                     }
-                    $faltante = $qtdPedido - $reservar;
-                    $statusPermitePendencia = in_array($newStatus, [
-                        'pago',
-                        'itens_parcialmente_comprados',
-                        'itens_comprados',
-                        'produto_consolidado',
-                        'em_transporte',
-                        'aguardando_liberacao_aduaneira',
-                        'enviado_ao_destinatario',
-                        'enviado',
-                        'entregue',
-                    ], true);
-                    if (!$cicloFechado && $faltante > 0 && $statusPermitePendencia) {
-                        // Se o nome do produto foi customizado, verificar se difere do nome original
-                        $nomeProdutoCustom = '';
-                        $nomeProdutoItem = trim((string) ($item['nome_produto'] ?? ''));
-                        if ($nomeProdutoItem !== '' && $produtoId > 0) {
-                            try {
-                                $nomeCol = $this->columnExists('produtos', 'name') ? 'name' : ($this->columnExists('produtos', 'nome') ? 'nome' : null);
-                                if ($nomeCol) {
-                                    $stNome = $this->connection->prepare("SELECT {$nomeCol} FROM produtos WHERE id = ? LIMIT 1");
-                                    $stNome->execute([$produtoId]);
-                                    $nomeOriginal = trim((string) ($stNome->fetchColumn() ?: ''));
-                                    if ($nomeOriginal !== '' && $nomeProdutoItem !== $nomeOriginal) {
-                                        $nomeProdutoCustom = $nomeProdutoItem;
-                                    }
-                                }
-                            } catch (\Exception $e) {}
-                        }
-                        // Acumular faltantes por produto para processar em lote após o loop
-                        $key = $produtoId . '||' . $nomeProdutoCustom;
-                        if (!isset($pendenciasAcumuladas[$key])) {
-                            $pendenciasAcumuladas[$key] = ['produto_id' => $produtoId, 'nome' => $nomeProdutoCustom, 'faltante' => 0];
-                        }
-                        $pendenciasAcumuladas[$key]['faltante'] += $faltante;
-                    }
                 }
-            }
-
-            // Processar pendências acumuladas por produto (após o loop de itens)
-            // Primeiro, limpar qualquer pendente que já exista (evitar duplicatas com outros fluxos)
-            if ($this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
-                try {
-                    $stmtClean = $this->connection->prepare("DELETE FROM lista_compras WHERE pedido_id = :pedido_id AND status = 'pendente'");
-                    $stmtClean->execute([':pedido_id' => $pedidoId]);
-                } catch (\Exception $e) {}
-            }
-            foreach ($pendenciasAcumuladas as $pend) {
-                $this->upsertPendenciaCompra($pedidoId, (int) $pend['produto_id'], (int) $pend['faltante'], (string) $pend['nome']);
             }
 
             } // end if (!$isPago) — processamento de itens
