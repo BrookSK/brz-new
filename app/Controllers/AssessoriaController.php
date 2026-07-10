@@ -431,6 +431,23 @@ class AssessoriaController extends Controller {
      * Exibe a página principal de Assessoria
      */
     public function index(Request $request) {
+        // Verificar se assessoria está ativa nas configurações
+        $assessoriaEnabled = true;
+        try {
+            $pdo = \Config\Database::getConnection();
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'assessoria_enabled' LIMIT 1");
+            $st->execute();
+            $val = $st->fetchColumn();
+            if ($val !== false) {
+                $assessoriaEnabled = in_array(strtolower(trim((string) $val)), ['1', 'true', 'sim', 'yes', 'on'], true);
+            }
+        } catch (\Exception $e) {}
+
+        if (!$assessoriaEnabled) {
+            $this->view('assessoria/index_disabled', []);
+            return;
+        }
+
         $auth = new AuthService();
         $isLogged = $auth->estaLogado();
         $usuario = $isLogged ? $auth->getUsuarioLogado() : null;
