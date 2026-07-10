@@ -627,6 +627,30 @@ class AdminEtiquetasWpController extends Controller
         if ($request->getParam('per_page')) $params['per_page'] = (int) $request->getParam('per_page');
 
         $resp = $this->wp->listPackages($params);
+
+        // Enriquecer com pedido_id local para exibição formatada
+        if (!empty($resp['success']) && !empty($resp['data']) && is_array($resp['data'])) {
+            try {
+                $trackings = array_filter(array_map(function($p) { return $p['tracking_code'] ?? ''; }, $resp['data']));
+                if (!empty($trackings)) {
+                    $in = implode(',', array_fill(0, count($trackings), '?'));
+                    $st = $this->connection->prepare("SELECT tracking_number, pedido_id FROM correios_packet_etiquetas WHERE tracking_number IN ({$in})");
+                    $st->execute(array_values($trackings));
+                    $map = [];
+                    foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                        $map[$row['tracking_number']] = (int) $row['pedido_id'];
+                    }
+                    foreach ($resp['data'] as &$pkg) {
+                        $tc = $pkg['tracking_code'] ?? '';
+                        if (isset($map[$tc])) {
+                            $pkg['pedido_id_local'] = $map[$tc];
+                        }
+                    }
+                    unset($pkg);
+                }
+            } catch (\Exception $e) {}
+        }
+
         $this->json($resp);
     }
 
