@@ -1483,6 +1483,7 @@ class AdminRedirecionamentoController extends Controller {
             $result = $this->gerarEtiquetaCorreios($db, $envio, $produtos, $envioId);
         }
 
+        $result['_provedor_usado'] = $provedor;
         $this->json($result);
     }
 
