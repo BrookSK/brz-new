@@ -109,6 +109,7 @@ $_isAdmin = in_array($_perfilAtual, ['admin', 'suporte'], true);
                     <select class="form-select" id="cfgProvedorEtiqueta">
                         <option value="wexpress" <?= ($provedorEtiqueta ?? 'wexpress') === 'wexpress' ? 'selected' : '' ?>>W Express</option>
                         <option value="correios" <?= ($provedorEtiqueta ?? 'wexpress') === 'correios' ? 'selected' : '' ?>>Correios (Pré-Postagem)</option>
+                        <option value="correios_wordpress" <?= ($provedorEtiqueta ?? 'wexpress') === 'correios_wordpress' ? 'selected' : '' ?>>Correios (WordPress/PACKET)</option>
                     </select>
                     <div class="form-text">API usada quando o redirecionador gera a etiqueta.</div>
                 </div>

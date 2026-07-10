@@ -441,6 +441,7 @@ class AdminRedirecionamentoController extends Controller {
             'etiqueta_response_json' => "LONGTEXT DEFAULT NULL",
             'etiqueta_gerada_em' => "DATETIME DEFAULT NULL",
             'etiqueta_gerada_por' => "INT DEFAULT NULL",
+            'wp_post_id_etiqueta' => "INT DEFAULT NULL COMMENT 'ID do post (package) no WordPress Etiquetas'",
         ]);
 
         // Seed da tabela de pesos se vazia
@@ -1469,11 +1470,13 @@ class AdminRedirecionamentoController extends Controller {
             $stCfg = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'redirecionamento_provedor_etiqueta' LIMIT 1");
             $stCfg->execute();
             $cfgVal = strtolower(trim((string) ($stCfg->fetchColumn() ?: 'wexpress')));
-            if (in_array($cfgVal, ['wexpress', 'correios'], true)) $provedor = $cfgVal;
+            if (in_array($cfgVal, ['wexpress', 'correios', 'correios_wordpress'], true)) $provedor = $cfgVal;
         } catch (\Exception $e) {}
 
         if ($provedor === 'wexpress') {
             $result = $this->gerarEtiquetaWExpress($db, $envio, $produtos, $envioId);
+        } elseif ($provedor === 'correios_wordpress') {
+            $result = $this->gerarEtiquetaCorreiosWordPress($db, $envio, $produtos, $envioId);
         } else {
             $result = $this->gerarEtiquetaCorreios($db, $envio, $produtos, $envioId);
         }
@@ -1886,22 +1889,245 @@ class AdminRedirecionamentoController extends Controller {
     }
 
     /**
+     * Gerar etiqueta via WordPress/Correios PACKET.
+     * Usa o WordPressEtiquetasService para chamar POST /packages/create
+     * no WordPress etiquetas.brazilianashop.com.br.
+     */
+    private function gerarEtiquetaCorreiosWordPress(\PDO $db, array $envio, array $produtos, int $envioId): array {
+        // Montar dados do destinatário
+        $nome = trim((string) ($envio['destinatario_nome'] ?? ''));
+        $cpf = preg_replace('/\D+/', '', (string) ($envio['destinatario_cpf'] ?? ($envio['cliente_cpf'] ?? '')));
+        $email = trim((string) ($envio['destinatario_email'] ?? ($envio['cliente_email'] ?? '')));
+        $telefone = preg_replace('/\D+/', '', (string) ($envio['destinatario_telefone'] ?? ($envio['cliente_telefone'] ?? '')));
+
+        $cep = preg_replace('/\D+/', '', (string) ($envio['dest_cep'] ?? ''));
+        $logradouro = trim((string) ($envio['dest_logradouro'] ?? ''));
+        $numero = trim((string) ($envio['dest_numero'] ?? ''));
+        $complemento = trim((string) ($envio['dest_complemento'] ?? ''));
+        $cidade = trim((string) ($envio['dest_cidade'] ?? ''));
+        $estado = trim((string) ($envio['dest_estado'] ?? ''));
+
+        // Validações básicas
+        if ($nome === '') {
+            return ['ok' => false, 'msg' => 'Destinatário sem nome.'];
+        }
+        if (strlen($cep) !== 8) {
+            return ['ok' => false, 'msg' => 'CEP inválido (deve ter 8 dígitos).'];
+        }
+        if ($cpf === '' || !in_array(strlen($cpf), [11, 14], true)) {
+            return ['ok' => false, 'msg' => 'CPF/CNPJ do destinatário inválido.'];
+        }
+
+        $docType = strlen($cpf) === 14 ? 'CNPJ' : 'CPF';
+
+        // Telefone: garantir 10 ou 11 dígitos
+        if (strlen($telefone) >= 12 && strpos($telefone, '55') === 0) {
+            $telefone = substr($telefone, 2);
+        }
+
+        // Peso em gramas
+        $pesoKg = (float) ($envio['peso_kg'] ?? 0);
+        if ($pesoKg <= 0) $pesoKg = 1.0;
+        $totalWeight = (int) round($pesoKg * 1000);
+
+        // Dimensões em cm
+        $comprimento = (float) ($envio['comprimento_cm'] ?? 16);
+        $largura = (float) ($envio['largura_cm'] ?? 11);
+        $altura = (float) ($envio['altura_cm'] ?? 2);
+        if ($comprimento < 16) $comprimento = 16;
+        if ($largura < 11) $largura = 11;
+        if ($altura < 2) $altura = 2;
+
+        // Montar itens
+        $items = [];
+        $declaredValue = 0.0;
+        foreach ($produtos as $idx => $p) {
+            $qtd = (int) ($p['quantidade'] ?? 1);
+            if ($qtd <= 0) $qtd = 1;
+            $desc = trim((string) ($p['descricao'] ?? 'Item ' . ($idx + 1)));
+            $ncm = preg_replace('/\D+/', '', (string) ($p['ncm'] ?? ''));
+            if ($ncm === '' || strlen($ncm) < 6) {
+                return ['ok' => false, 'msg' => 'Produto "' . $desc . '" não tem NCM válido (mínimo 6 dígitos).'];
+            }
+            $hsCode = strlen($ncm) >= 8 ? substr($ncm, 0, 8) : substr($ncm, 0, 6);
+            $valor = (float) ($p['preco_usd'] ?? 0);
+            if ($valor < 0.01) $valor = 0.01;
+
+            $items[] = [
+                'hsCode' => $hsCode,
+                'description' => substr($desc, 0, 500),
+                'quantity' => $qtd,
+                'value' => (float) number_format($valor, 2, '.', ''),
+            ];
+            $declaredValue += ($valor * $qtd);
+        }
+
+        if (empty($items)) {
+            return ['ok' => false, 'msg' => 'Nenhum produto no envio. Adicione produtos antes de gerar a etiqueta.'];
+        }
+
+        // Frete declarado
+        $freightPaidValue = (float) ($envio['valor_frete_usd'] ?? 0.01);
+        if ($freightPaidValue < 0.01) $freightPaidValue = 0.01;
+
+        // Código de controle
+        $customerControlCode = 'REDIR-' . str_pad((string) $envioId, 6, '0', STR_PAD_LEFT);
+
+        // Montar payload para WordPress PACKET API
+        $payload = [
+            'customerControlCode' => $customerControlCode,
+            'totalWeight' => $totalWeight,
+            'packagingLength' => (float) number_format($comprimento, 2, '.', ''),
+            'packagingWidth' => (float) number_format($largura, 2, '.', ''),
+            'packagingHeight' => (float) number_format($altura, 2, '.', ''),
+            'recipientName' => $nome,
+            'recipientDocumentType' => $docType,
+            'recipientDocumentNumber' => $cpf,
+            'recipientAddress' => $logradouro,
+            'recipientAddressNumber' => $numero,
+            'recipientAddressComplement' => $complemento,
+            'recipientCityName' => $cidade,
+            'recipientState' => $estado,
+            'recipientZipCode' => $cep,
+            'recipientEmail' => $email,
+            'recipientPhoneNumber' => $telefone,
+            'freightPaidValue' => (float) number_format($freightPaidValue, 2, '.', ''),
+            'distributionModality' => 33162, // Standard
+            'taxPaymentMethod' => 'DDU',
+            'currency' => 'USD',
+            'nonNationalizationInstruction' => 'RETURNTOORIGIN',
+            'items' => $items,
+        ];
+
+        // Chamar WordPress Etiquetas via Service
+        try {
+            $wpService = new \App\Services\WordPressEtiquetasService();
+            $resp = $wpService->createPackage($payload);
+        } catch (\Exception $e) {
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios_wordpress', etiqueta_request_json=?, etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($payload), json_encode(['error' => $e->getMessage()]), $envioId]);
+            return ['ok' => false, 'msg' => 'Erro WordPress Etiquetas: ' . $e->getMessage()];
+        }
+
+        // Salvar request para debug
+        $db->prepare("UPDATE redirecionamento_envios SET etiqueta_provedor='correios_wordpress', etiqueta_request_json=? WHERE id=?")
+            ->execute([json_encode($payload), $envioId]);
+
+        // Verificar resposta
+        if (empty($resp['success'])) {
+            $errorMsg = (string) ($resp['error'] ?? 'Erro desconhecido do WordPress');
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($resp), $envioId]);
+            return ['ok' => false, 'msg' => 'Erro WordPress: ' . $errorMsg];
+        }
+
+        $tracking = (string) ($resp['tracking_number'] ?? '');
+        $wpPostId = (int) ($resp['wp_post_id'] ?? 0);
+
+        if ($tracking === '') {
+            $db->prepare("UPDATE redirecionamento_envios SET etiqueta_response_json=? WHERE id=?")
+                ->execute([json_encode($resp), $envioId]);
+            return ['ok' => false, 'msg' => 'WordPress não retornou código de rastreio.'];
+        }
+
+        // Montar URL do PDF da etiqueta
+        $labelUrl = '';
+        if ($wpPostId > 0) {
+            try {
+                $wpBaseUrl = '';
+                $stUrl = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'wp_etiquetas_url' LIMIT 1");
+                $stUrl->execute();
+                $wpBaseUrl = rtrim((string) ($stUrl->fetchColumn() ?: 'https://etiquetas.brazilianashop.com.br'), '/');
+                $labelUrl = $wpBaseUrl . '/wp-json/brz/v1/packages/pdf/' . $wpPostId;
+            } catch (\Exception $e) {
+                $labelUrl = 'https://etiquetas.brazilianashop.com.br/wp-json/brz/v1/packages/pdf/' . $wpPostId;
+            }
+        }
+
+        // Atualizar o envio com os dados da etiqueta
+        $db->prepare("UPDATE redirecionamento_envios SET
+            etiqueta_provedor = 'correios_wordpress',
+            tracking_code = ?,
+            etiqueta_url = ?,
+            wp_post_id_etiqueta = ?,
+            etiqueta_request_json = ?,
+            etiqueta_response_json = ?,
+            etiqueta_gerada_em = NOW(),
+            etiqueta_gerada_por = ?,
+            status = 'etiqueta_gerada'
+            WHERE id = ?")
+            ->execute([
+                $tracking,
+                $labelUrl ?: null,
+                $wpPostId > 0 ? $wpPostId : null,
+                json_encode($payload),
+                json_encode($resp),
+                (int) ($_SESSION['usuario_id'] ?? 0),
+                $envioId,
+            ]);
+
+        // Registrar na tabela wp_packet_etiquetas para aparecer no painel admin
+        try {
+            $db->prepare("INSERT INTO wp_packet_etiquetas (origem, wp_post_id, pedido_id, cliente_nome, tracking_number, created_at)
+                VALUES ('red', ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE tracking_number = VALUES(tracking_number), updated_at = NOW()")
+                ->execute([$wpPostId, $envioId, $nome, $tracking]);
+        } catch (\Exception $e) {
+            // Tabela pode não existir — não bloquear o fluxo
+            error_log('[REDIR-WP] Erro ao registrar em wp_packet_etiquetas: ' . $e->getMessage());
+        }
+
+        return [
+            'ok' => true,
+            'tracking' => $tracking,
+            'label_url' => $labelUrl,
+            'wp_post_id' => $wpPostId,
+            'msg' => 'Etiqueta PACKET gerada com sucesso! Rastreio: ' . $tracking,
+        ];
+    }
+
+    /**
      * Baixar/visualizar etiqueta de um envio
      */
     public function baixarEtiqueta(Request $request) {
         $this->auth(); $this->migrar();
         $envioId = (int) $request->getParam('envio_id', 0);
         $db = $this->pdo();
-        $st = $db->prepare("SELECT etiqueta_provedor, wexpress_shipping_id, wexpress_label_url, etiqueta_url, tracking_code FROM redirecionamento_envios WHERE id = ? LIMIT 1");
+        $st = $db->prepare("SELECT etiqueta_provedor, wexpress_shipping_id, wexpress_label_url, etiqueta_url, tracking_code, wp_post_id_etiqueta FROM redirecionamento_envios WHERE id = ? LIMIT 1");
         $st->execute([$envioId]);
         $envio = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$envio) { $this->json(['ok' => false, 'msg' => 'Envio não encontrado']); return; }
+
+        $provedor = trim((string) ($envio['etiqueta_provedor'] ?? ''));
+
+        // Para Correios WordPress/PACKET: fazer proxy do PDF via service (precisa da API key)
+        if ($provedor === 'correios_wordpress' && !empty($envio['wp_post_id_etiqueta'])) {
+            $wpPostId = (int) $envio['wp_post_id_etiqueta'];
+            try {
+                $wpService = new \App\Services\WordPressEtiquetasService();
+                $pdfContent = $wpService->downloadPackagePdf($wpPostId);
+                if (is_string($pdfContent) && strlen($pdfContent) > 100) {
+                    header('Content-Type: application/pdf');
+                    header('Content-Disposition: inline; filename="etiqueta-' . ($envio['tracking_code'] ?? $envioId) . '.pdf"');
+                    header('Content-Length: ' . strlen($pdfContent));
+                    echo $pdfContent;
+                    exit;
+                }
+                // Se retornou array, é erro
+                $errorMsg = is_array($pdfContent) ? ($pdfContent['error'] ?? 'Erro ao baixar PDF') : 'Resposta inválida';
+                $this->json(['ok' => false, 'msg' => $errorMsg]);
+                return;
+            } catch (\Exception $e) {
+                $this->json(['ok' => false, 'msg' => 'Erro ao baixar etiqueta: ' . $e->getMessage()]);
+                return;
+            }
+        }
 
         $url = trim((string) ($envio['wexpress_label_url'] ?? ($envio['etiqueta_url'] ?? '')));
         if ($url === '') {
             $this->json(['ok' => false, 'msg' => 'Etiqueta não disponível. Gere a etiqueta primeiro.']); return;
         }
 
-        $this->json(['ok' => true, 'url' => $url, 'provedor' => $envio['etiqueta_provedor'] ?? '']);
+        $this->json(['ok' => true, 'url' => $url, 'provedor' => $provedor]);
     }
 }

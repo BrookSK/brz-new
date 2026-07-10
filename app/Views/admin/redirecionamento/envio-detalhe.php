@@ -161,9 +161,15 @@ $statusLabels = ['rascunho'=>['Rascunho','secondary'],'aguardando_pagamento'=>['
 
                     <?php if (!empty($envio['etiqueta_url']) || !empty($envio['wexpress_label_url'])): ?>
                     <div class="mb-3">
+                        <?php if (($envio['etiqueta_provedor'] ?? '') === 'correios_wordpress' && !empty($envio['wp_post_id_etiqueta'])): ?>
+                        <a href="/admin/redirecionamento/envios/baixar-etiqueta?envio_id=<?= (int)$envio['id'] ?>" target="_blank" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-print me-2"></i>Imprimir / Baixar Etiqueta (PACKET)
+                        </a>
+                        <?php else: ?>
                         <a href="<?= htmlspecialchars($envio['wexpress_label_url'] ?? $envio['etiqueta_url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="btn btn-outline-primary w-100">
                             <i class="fas fa-print me-2"></i>Imprimir / Baixar Etiqueta
                         </a>
+                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
 
