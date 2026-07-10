@@ -1206,8 +1206,22 @@ class AdminRedirecionamentoController extends Controller {
         $chavesPermitidas = ['redirecionamento_provedor_etiqueta', 'redirecionamento_emails_coleta'];
         if (!in_array($chave, $chavesPermitidas, true)) { $this->json(['ok'=>false,'msg'=>'Chave não permitida']); return; }
         $db = $this->pdo();
-        $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)")
-            ->execute([$chave, $valor]);
+
+        // Primeiro tentar UPDATE direto (mais confiável que ON DUPLICATE KEY)
+        $stUpdate = $db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = ?");
+        $stUpdate->execute([$valor, $chave]);
+        $affected = $stUpdate->rowCount();
+
+        if ($affected === 0) {
+            // Se não atualizou (pode não existir), tentar INSERT IGNORE + UPDATE
+            try {
+                $db->prepare("INSERT IGNORE INTO configuracoes_sistema (chave, valor) VALUES (?, ?)")
+                    ->execute([$chave, $valor]);
+            } catch (\Exception $e) {}
+            // Garantir que o valor está correto mesmo se INSERT falhou
+            $db->prepare("UPDATE configuracoes_sistema SET valor = ? WHERE chave = ?")->execute([$valor, $chave]);
+        }
+
         // Debug: confirmar que salvou
         $stCheck = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
         $stCheck->execute([$chave]);
