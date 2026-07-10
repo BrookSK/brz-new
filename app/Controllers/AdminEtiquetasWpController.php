@@ -631,23 +631,53 @@ class AdminEtiquetasWpController extends Controller
         // Enriquecer com pedido_id local para exibição formatada
         if (!empty($resp['success']) && !empty($resp['data']) && is_array($resp['data'])) {
             try {
+                // Primeiro: buscar por tracking_number na tabela de etiquetas
                 $trackings = array_filter(array_map(function($p) { return $p['tracking_code'] ?? ''; }, $resp['data']));
+                $mapByTracking = [];
                 if (!empty($trackings)) {
                     $in = implode(',', array_fill(0, count($trackings), '?'));
                     $st = $this->connection->prepare("SELECT tracking_number, pedido_id FROM correios_packet_etiquetas WHERE tracking_number IN ({$in})");
                     $st->execute(array_values($trackings));
-                    $map = [];
                     foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                        $map[$row['tracking_number']] = (int) $row['pedido_id'];
+                        $mapByTracking[$row['tracking_number']] = (int) $row['pedido_id'];
                     }
-                    foreach ($resp['data'] as &$pkg) {
-                        $tc = $pkg['tracking_code'] ?? '';
-                        if (isset($map[$tc])) {
-                            $pkg['pedido_id_local'] = $map[$tc];
+                }
+
+                // Segundo: para os que não encontrou, buscar pelo order_id como numero_pedido na tabela pedidos
+                $orderIds = [];
+                foreach ($resp['data'] as $pkg) {
+                    $tc = $pkg['tracking_code'] ?? '';
+                    if (!isset($mapByTracking[$tc]) && !empty($pkg['order_id'])) {
+                        $orderIds[] = $pkg['order_id'];
+                    }
+                }
+                $mapByOrderId = [];
+                if (!empty($orderIds)) {
+                    $colsP = [];
+                    try { $stC = $this->connection->query('DESCRIBE pedidos'); $colsP = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                    $hasNumeroPedido = in_array('numero_pedido', $colsP, true);
+                    $hasCodigoPedido = in_array('codigo_pedido', $colsP, true);
+                    if ($hasNumeroPedido || $hasCodigoPedido) {
+                        $col = $hasNumeroPedido ? 'numero_pedido' : 'codigo_pedido';
+                        $in2 = implode(',', array_fill(0, count($orderIds), '?'));
+                        $st2 = $this->connection->prepare("SELECT id, {$col} FROM pedidos WHERE {$col} IN ({$in2})");
+                        $st2->execute(array_values($orderIds));
+                        foreach ($st2->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                            $mapByOrderId[$row[$col]] = (int) $row['id'];
                         }
                     }
-                    unset($pkg);
                 }
+
+                foreach ($resp['data'] as &$pkg) {
+                    $tc = $pkg['tracking_code'] ?? '';
+                    $oid = $pkg['order_id'] ?? '';
+                    if (isset($mapByTracking[$tc])) {
+                        $pkg['pedido_id_local'] = $mapByTracking[$tc];
+                    } elseif (isset($mapByOrderId[$oid])) {
+                        $pkg['pedido_id_local'] = $mapByOrderId[$oid];
+                    }
+                }
+                unset($pkg);
             } catch (\Exception $e) {}
         }
 
