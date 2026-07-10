@@ -435,8 +435,8 @@ class AssessoriaController extends Controller {
         $assessoriaEnabled = true;
         try {
             $pdo = \Config\Database::getConnection();
-            // Tentar com prefixo sistema_ (formato salvo pelo admin) e sem prefixo
-            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('assessoria_enabled', 'sistema_assessoria_enabled') ORDER BY chave ASC LIMIT 1");
+            // Priorizar sistema_assessoria_enabled (salvo pelo admin) sobre assessoria_enabled
+            $st = $pdo->prepare("SELECT valor FROM configuracoes_sistema WHERE chave IN ('assessoria_enabled', 'sistema_assessoria_enabled') ORDER BY chave DESC LIMIT 1");
             $st->execute();
             $val = $st->fetchColumn();
             if ($val !== false) {
