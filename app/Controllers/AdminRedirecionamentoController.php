@@ -1473,6 +1473,8 @@ class AdminRedirecionamentoController extends Controller {
             if (in_array($cfgVal, ['wexpress', 'correios', 'correios_wordpress'], true)) $provedor = $cfgVal;
         } catch (\Exception $e) {}
 
+        error_log('[REDIR] gerarEtiqueta envio_id=' . $envioId . ' provedor_config=' . $provedor);
+
         if ($provedor === 'wexpress') {
             $result = $this->gerarEtiquetaWExpress($db, $envio, $produtos, $envioId);
         } elseif ($provedor === 'correios_wordpress') {
