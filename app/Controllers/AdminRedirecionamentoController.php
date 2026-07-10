@@ -1208,6 +1208,11 @@ class AdminRedirecionamentoController extends Controller {
         $db = $this->pdo();
         $db->prepare("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)")
             ->execute([$chave, $valor]);
+        // Debug: confirmar que salvou
+        $stCheck = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
+        $stCheck->execute([$chave]);
+        $valorSalvo = $stCheck->fetchColumn();
+        error_log('[REDIR] configuracaoSalvar chave=' . $chave . ' valor_enviado=' . $valor . ' valor_no_banco=' . $valorSalvo);
         $this->json(['ok'=>true]);
     }
 
