@@ -65,6 +65,8 @@ class AdminUsuariosController extends Controller {
                 'admin' => ['Admin', 'role-admin'],
                 'vendedor' => ['Vendedor', 'role-vendedor'],
                 'suporte' => ['Suporte', 'role-suporte'],
+                'redirecionador' => ['Redirecionador', 'role-redirecionador'],
+                'conferente' => ['Conferente', 'role-conferente'],
             ];
             return $map[$perfil] ?? ['Cliente', 'role-cliente'];
         };
