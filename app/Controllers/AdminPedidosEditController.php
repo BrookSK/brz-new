@@ -522,6 +522,17 @@ class AdminPedidosEditController extends Controller {
 
                 ' . (!$canEditItens ? '<div class="alert alert-warning">Este pedido está com status <strong>Pago</strong>. Você pode <strong>alterar o status</strong> abaixo, mas não pode editar/adicionar itens até voltar para <strong>Pendente</strong>.</div>' : '') . '
 
+                <div class="card mb-4 border-info">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex flex-wrap gap-4 align-items-center">
+                            <span class="text-muted small"><i class="fas fa-hashtag me-1"></i><strong>Pedido:</strong> ' . htmlspecialchars($codigoPedido) . ' <span class="text-secondary">(ID: ' . (int)$id . ')</span></span>
+                            <span class="text-muted small"><i class="fas fa-user me-1"></i><strong>Cliente:</strong> ' . htmlspecialchars((string)($pedido['cliente_nome'] ?? '—')) . '</span>
+                            ' . (!empty($pedido['cliente_cpf_cnpj']) ? '<span class="text-muted small"><i class="fas fa-id-card me-1"></i><strong>CPF/CNPJ:</strong> ' . htmlspecialchars((string)$pedido['cliente_cpf_cnpj']) . '</span>' : '') . '
+                            ' . (!empty($pedido['cliente_suite']) ? '<span class="text-muted small"><i class="fas fa-box me-1"></i><strong>Suíte:</strong> ' . htmlspecialchars((string)$pedido['cliente_suite']) . '</span>' : '') . '
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row">
                     <div class="col-12">
                         <div class="card mb-4">
