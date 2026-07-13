@@ -585,8 +585,9 @@ class AdminPedidosEditController extends Controller {
                                     <div class="fw-bold">Medidas e peso (obrigatório para gerar etiqueta)</div>
                                     <div class="row g-2 mt-1">
                                         <div class="col-6">
-                                            <label class="form-label">Peso real (kg)</label>
-                                            <input type="number" class="form-control" id="pedido_peso_total" step="0.001" min="0" value="' . htmlspecialchars((string) ($pedido['peso_total'] ?? ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <label class="form-label">Peso real (gramas)</label>
+                                            <input type="number" class="form-control" id="pedido_peso_total" step="1" min="0" value="' . htmlspecialchars((string) (($pedido['peso_total'] ?? 0) > 0 ? round(((float)$pedido['peso_total']) * 1000) : ''), ENT_QUOTES, 'UTF-8') . '">
+                                            <div class="form-text" id="peso_kg_display" style="color:#0d6efd;font-weight:500;"></div>
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label">Comprimento (cm)</label>
@@ -916,10 +917,13 @@ class AdminPedidosEditController extends Controller {
                     itens.push(item);
                 });
 
+                var pesoGramas = parseFloat(document.getElementById("pedido_peso_total")?.value || "0");
+                var pesoKg = pesoGramas > 0 ? (pesoGramas / 1000).toFixed(3) : "0";
+
                 const dados = {
                     pedido_id: pedidoId,
                     status: document.getElementById("pedido_status")?.value,
-                    peso_total: document.getElementById("pedido_peso_total")?.value,
+                    peso_total: pesoKg,
                     altura: document.getElementById("pedido_altura")?.value,
                     largura: document.getElementById("pedido_largura")?.value,
                     comprimento: document.getElementById("pedido_comprimento")?.value,
@@ -975,10 +979,13 @@ class AdminPedidosEditController extends Controller {
                     itens.push(item);
                 });
 
+                var pesoGramas2 = parseFloat(document.getElementById("pedido_peso_total")?.value || "0");
+                var pesoKg2 = pesoGramas2 > 0 ? (pesoGramas2 / 1000).toFixed(3) : "0";
+
                 const dados = {
                     pedido_id: pedidoId,
                     status: st,
-                    peso_total: document.getElementById("pedido_peso_total")?.value,
+                    peso_total: pesoKg2,
                     altura: document.getElementById("pedido_altura")?.value,
                     largura: document.getElementById("pedido_largura")?.value,
                     comprimento: document.getElementById("pedido_comprimento")?.value,
@@ -1102,6 +1109,26 @@ class AdminPedidosEditController extends Controller {
                     if (row) row.dataset.nomeProduto = novoNome;
                 }
             };
+
+            // --- Peso em gramas: exibir equivalente em kg em tempo real ---
+            (function(){
+                var pesoInput = document.getElementById("pedido_peso_total");
+                var pesoDisplay = document.getElementById("peso_kg_display");
+                function atualizarPesoKg(){
+                    if (!pesoInput || !pesoDisplay) return;
+                    var g = parseFloat(pesoInput.value) || 0;
+                    if (g > 0) {
+                        var kg = (g / 1000).toFixed(3).replace(".", ",");
+                        pesoDisplay.textContent = "= " + kg + " kg";
+                    } else {
+                        pesoDisplay.textContent = "";
+                    }
+                }
+                if (pesoInput) {
+                    pesoInput.addEventListener("input", atualizarPesoKg);
+                    atualizarPesoKg(); // exibir ao carregar
+                }
+            })();
         })();
     </script>
 </body>
@@ -1344,7 +1371,7 @@ class AdminPedidosEditController extends Controller {
                 if ($pesoTotal <= 0 || $altura <= 0 || $largura <= 0 || $comprimento <= 0) {
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Para marcar como Caixa Fechada (ou status seguintes), preencha Peso real (kg), Altura, Largura e Comprimento.'
+                        'message' => 'Para marcar como Caixa Fechada (ou status seguintes), preencha Peso real (gramas), Altura, Largura e Comprimento.'
                     ]);
                     return;
                 }
