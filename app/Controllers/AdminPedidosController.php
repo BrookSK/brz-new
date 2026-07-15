@@ -6986,7 +6986,7 @@ HTML;
                 }
             }
 
-            if ((string) $novoStatus === 'produto_consolidado') {
+            if ($isPaid) {
                 try {
                     $stmtT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
                     $stmtT->execute(['estoque_reservas']);
