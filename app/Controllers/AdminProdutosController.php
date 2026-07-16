@@ -3985,6 +3985,7 @@ HTML;
                     $params[':categoria_filtro'] = (int) $categoriaFiltro;
                 }
             }
+            if (!isset($outletFiltro)) $outletFiltro = (string) ($request->getParam('outlet_filtro', '') ?? '');
             if ($outletFiltro === '1' && !empty($colNames['outlet'])) {
                 $where .= " AND p.outlet = 1 ";
             }
@@ -4101,7 +4102,7 @@ HTML;
             . '<div class="col-md-1">'
             . '<select class="form-select" name="outlet_filtro">'
             . '<option value="">Outlet</option>'
-            . '<option value="1"' . ($outletFiltro === '1' ? ' selected' : '') . '>Sim</option>'
+            . '<option value="1"' . ((isset($outletFiltro) && $outletFiltro === '1') ? ' selected' : '') . '>Sim</option>'
             . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
@@ -4390,6 +4391,7 @@ HTML;
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
+            if (!isset($outletFiltro)) $outletFiltro = '';
             $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
@@ -4401,10 +4403,10 @@ HTML;
                 if (trim($dir) !== '') {
                     $url .= "&dir=" . urlencode($dir);
                 }
-                if (trim($lojaFiltro) !== '') {
+                if (trim($lojaFiltro ?? '') !== '') {
                     $url .= "&loja_filtro=" . urlencode($lojaFiltro);
                 }
-                if (trim($outletFiltro) !== '') {
+                if (trim($outletFiltro ?? '') !== '') {
                     $url .= "&outlet_filtro=" . urlencode($outletFiltro);
                 }
                 return $url;
