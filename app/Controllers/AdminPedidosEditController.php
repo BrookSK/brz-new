@@ -592,6 +592,17 @@ class AdminPedidosEditController extends Controller {
                                     </button>
                                 </div>
 
+                                <!-- Botão Liberar Invoice -->
+                                <div class="mb-3">
+                                    <div class="fw-bold mb-1"><i class="fas fa-file-invoice me-1"></i>Invoice (Conferência)</div>
+                                    <form method="POST" action="/admin/pedidos/' . (int) $id . '/liberar-invoice" onsubmit="return confirm(\'Liberar invoice para conferência do cliente?\')">
+                                        <button type="submit" class="btn btn-outline-info w-100">
+                                            <i class="fas fa-paper-plane me-1"></i>Liberar Invoice
+                                        </button>
+                                    </form>
+                                    <div class="form-text">Libera os dados para o cliente conferir antes do envio.</div>
+                                </div>
+
                                 <div class="mb-3">
                                     <div class="fw-bold">Medidas e peso (obrigatório para gerar etiqueta)</div>
                                     <div class="row g-2 mt-1">

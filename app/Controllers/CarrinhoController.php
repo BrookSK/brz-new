@@ -261,6 +261,15 @@ class CarrinhoController extends Controller {
         $cartId = 0;
         $carrinho = [];
         if ($uid > 0) {
+            // Auto-adicionar pacotes pendentes e faturas adicionais ao carrinho
+            try {
+                $pacoteService = new \App\Services\PacoteCarrinhoService();
+                $pacoteService->autoAdicionarPacotesPendentes($uid);
+                $pacoteService->autoAdicionarFaturasPendentes($uid);
+            } catch (\Throwable $e) {
+                // Silencioso - não impedir carregamento do carrinho
+            }
+
             try {
                 $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
                 $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;

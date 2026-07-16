@@ -95,6 +95,11 @@ $router->post('/carteira/recarga/stripe/finalizar', 'UsuarioController', 'cartei
 $router->get('/meus-pedidos', 'UsuarioController', 'meusPedidos');
 $router->get('/pedido/detalhes/{id}', 'UsuarioController', 'pedidoDetalhes');
 $router->get('/pedido/detalhes/{id}/pdf', 'UsuarioController', 'pedidoPdf');
+
+// Invoice - Conferência pelo cliente
+$router->get('/minha-conta/invoice', 'InvoiceController', 'conferir');
+$router->post('/minha-conta/invoice/finalizar', 'InvoiceController', 'finalizar');
+$router->post('/minha-conta/invoice/contestar', 'InvoiceController', 'contestar');
 $router->post('/pedido/reemitir-pagamento/{id}', 'UsuarioController', 'reemitirPagamento');
 
 // Tickets (Cliente)
@@ -128,6 +133,7 @@ $router->post('/assessoria/aceitar-disclaimer', 'AssessoriaController', 'aceitar
 $router->get('/cron/assessoria/limpar-temporarios', 'AssessoriaController', 'cronLimparTemporarios');
 $router->get('/cron/clube/rendimento', 'ClubeController', 'cronRendimento');
 $router->get('/cron/backup', 'CronBackupController', 'run');
+$router->get('/cron/pacotes/armazenamento', 'CronPacotesController', 'verificarArmazenamento');
 
 // Área Administrativa - Novos Controllers
 $router->get('/admin', function($request) {
@@ -184,6 +190,8 @@ $router->get('/admin', function($request) {
         ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => '/admin/dashboard', 'roles' => ['admin','vendedor','suporte','redirecionador']],
         ['icon' => 'fas fa-box', 'label' => 'Produtos', 'url' => '/admin/produtos', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-shopping-cart', 'label' => 'Pedidos', 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        ['icon' => 'fas fa-box-open', 'label' => 'Pacotes Recebidos', 'url' => '/admin/pacotes-recebidos', 'roles' => ['admin','vendedor','conferente']],
+        ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Faturas Adicionais', 'url' => '/admin/faturas-adicionais', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-warehouse', 'label' => 'Estoque', 'url' => '/admin/estoque', 'roles' => ['admin','vendedor','suporte']],
         ['icon' => 'fas fa-shopping-basket', 'label' => 'Compras', 'url' => '/admin/estoque/compras', 'roles' => ['admin','vendedor']],
         ['icon' => 'fas fa-file-pdf', 'label' => 'Relatórios', 'url' => '/admin/estoque/relatorios', 'roles' => ['admin','vendedor']],
@@ -423,6 +431,26 @@ $router->post('/admin/pedidos/{id}/criar-ticket', 'AdminPedidosController', 'cri
 $router->get('/admin/pedidos/atualizar-status/{id}/{status}', 'AdminPedidosController', 'atualizarStatus');
 $router->post('/admin/pedidos/atualizar-status-massa', 'AdminPedidosController', 'atualizarStatusMassa');
 $router->post('/admin/pedidos/atualizar-cliente/{id}', 'AdminPedidosController', 'atualizarCliente');
+
+// Pacotes Recebidos (Admin)
+$router->get('/admin/pacotes-recebidos', 'AdminPacotesRecebidosController', 'index');
+$router->get('/admin/pacotes-recebidos/novo', 'AdminPacotesRecebidosController', 'novo');
+$router->get('/admin/pacotes-recebidos/configuracoes', 'AdminPacotesRecebidosController', 'configuracoes');
+$router->post('/admin/pacotes-recebidos/configuracoes/salvar', 'AdminPacotesRecebidosController', 'salvarConfiguracoes');
+$router->post('/admin/pacotes-recebidos/salvar', 'AdminPacotesRecebidosController', 'salvar');
+$router->get('/admin/pacotes-recebidos/{id}', 'AdminPacotesRecebidosController', 'editar');
+$router->post('/admin/pacotes-recebidos/{id}/excluir', 'AdminPacotesRecebidosController', 'excluir');
+
+// Faturas Adicionais (Admin)
+$router->get('/admin/faturas-adicionais', 'AdminFaturasAdicionaisController', 'index');
+$router->post('/admin/faturas-adicionais/criar', 'AdminFaturasAdicionaisController', 'criar');
+$router->post('/admin/faturas-adicionais/{id}/cancelar', 'AdminFaturasAdicionaisController', 'cancelar');
+
+// Invoice - Liberação (Admin)
+$router->post('/admin/pedidos/{id}/liberar-invoice', 'AdminInvoiceController', 'liberar');
+
+// API - Buscar usuario por suite
+$router->get('/api/buscar-usuario-suite', 'AdminPacotesRecebidosController', 'buscarSuite');
 
 // Split Order
 $router->get('/admin/pedidos/split', 'AdminPedidosSplitController', 'index');
