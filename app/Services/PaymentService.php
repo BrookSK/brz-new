@@ -4300,7 +4300,10 @@ class PaymentService {
                 'pago', 'paid', 'aprovado', 'approved',
                 'produto_consolidado', 'consolidado',
                 'etiqueta_gerada', 'em_transporte', 'enviado',
+                'enviado_ao_destinatario', 'aguardando_liberacao_aduaneira',
                 'entregue', 'cancelado', 'cancelled',
+                'carne_pagando', 'carne_aguardando',
+                'itens_comprados', 'itens_parcialmente_comprados',
             ];
             if (in_array($statusAtual, $statusProtegidos, true)) {
                 return;
