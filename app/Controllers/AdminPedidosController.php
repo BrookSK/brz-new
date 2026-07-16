@@ -7424,6 +7424,128 @@ HTML;
                 }
             } catch (\Exception $e) {}
 
+            // Se marcou como pago, inserir itens na lista_compras para cada pedido
+            $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
+            $isPaidMassa = in_array(strtolower($novoStatus), $paidValues, true);
+            if ($isPaidMassa) {
+                // Verificar tabelas necessárias
+                $temListaMassa = false;
+                $temReservasMassa = false;
+                try {
+                    $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stT->execute(['lista_compras']);
+                    $temListaMassa = ((int) $stT->fetchColumn() > 0);
+                    $stT->execute(['estoque_reservas']);
+                    $temReservasMassa = ((int) $stT->fetchColumn() > 0);
+                } catch (\Exception $e) {}
+
+                if ($temListaMassa) {
+                    $colsListaMassa = [];
+                    try {
+                        $st = $pdo->query('DESCRIBE lista_compras');
+                        $colsListaMassa = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    } catch (\Exception $e) { $colsListaMassa = []; }
+
+                    $temPedidoIdLista = is_array($colsListaMassa) && in_array('pedido_id', $colsListaMassa, true);
+                    $temProdutoIdLista = is_array($colsListaMassa) && in_array('produto_id', $colsListaMassa, true);
+
+                    if ($temPedidoIdLista && $temProdutoIdLista) {
+                        // Determinar tabela de itens
+                        $itensTableMassa = null;
+                        try {
+                            $stT2 = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                            $stT2->execute(['pedido_itens']);
+                            $temPI1 = ((int) $stT2->fetchColumn() > 0);
+                            $stT2->execute(['pedido_items']);
+                            $temPI2 = ((int) $stT2->fetchColumn() > 0);
+                            if ($temPI1) $itensTableMassa = 'pedido_itens';
+                            elseif ($temPI2) $itensTableMassa = 'pedido_items';
+                        } catch (\Exception $e) {}
+
+                        if ($itensTableMassa) {
+                            // Verificar colunas de reserva
+                            $temPedidoIdRes = false;
+                            $temProdutoIdRes = false;
+                            $temQtdRes = false;
+                            $temStatusRes = false;
+                            if ($temReservasMassa) {
+                                try {
+                                    $st = $pdo->query('DESCRIBE estoque_reservas');
+                                    $colsRes = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : [];
+                                    $temPedidoIdRes = in_array('pedido_id', $colsRes, true);
+                                    $temProdutoIdRes = in_array('produto_id', $colsRes, true);
+                                    $temQtdRes = in_array('quantidade_reservada', $colsRes, true);
+                                    $temStatusRes = in_array('status', $colsRes, true);
+                                } catch (\Exception $e) {}
+                            }
+
+                            foreach ($ids as $pid) {
+                                try {
+                                    // Limpar pendências antigas
+                                    $pdo->prepare("DELETE FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'")->execute([$pid]);
+
+                                    // Buscar itens do pedido
+                                    $stIt = $pdo->prepare('SELECT produto_id, quantidade FROM ' . $itensTableMassa . ' WHERE pedido_id = ?');
+                                    $stIt->execute([$pid]);
+                                    $itensP = $stIt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                                    foreach ($itensP as $it) {
+                                        $produtoId = (int) ($it['produto_id'] ?? 0);
+                                        $qtdPedido = (int) ($it['quantidade'] ?? 0);
+                                        if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                                        $qtdReservada = 0;
+                                        if ($temPedidoIdRes && $temProdutoIdRes && $temQtdRes) {
+                                            try {
+                                                $sqlR = 'SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ?';
+                                                if ($temStatusRes) $sqlR .= " AND status = 'ativa'";
+                                                $stR = $pdo->prepare($sqlR);
+                                                $stR->execute([$pid, $produtoId]);
+                                                $qtdReservada = (int) ($stR->fetchColumn() ?: 0);
+                                            } catch (\Exception $e) {}
+                                        }
+
+                                        $faltante = $qtdPedido - $qtdReservada;
+                                        if ($faltante <= 0) continue;
+
+                                        // Descontar já comprados
+                                        try {
+                                            $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                            $stQC->execute([$pid, $produtoId]);
+                                            $jaComprado = (int) ($stQC->fetchColumn() ?: 0);
+                                            $faltante -= $jaComprado;
+                                            if ($faltante <= 0) continue;
+                                        } catch (\Exception $e) {}
+
+                                        // Inserir pendência
+                                        $colsIns = ['produto_id', 'pedido_id'];
+                                        $valsIns = [':produto_id', ':pedido_id'];
+                                        $paramsIns = [':produto_id' => $produtoId, ':pedido_id' => $pid];
+
+                                        if (in_array('quantidade_faltante', $colsListaMassa, true)) {
+                                            $colsIns[] = 'quantidade_faltante';
+                                            $valsIns[] = ':q';
+                                            $paramsIns[':q'] = $faltante;
+                                        } elseif (in_array('quantidade_necessaria', $colsListaMassa, true)) {
+                                            $colsIns[] = 'quantidade_necessaria';
+                                            $valsIns[] = ':q';
+                                            $paramsIns[':q'] = $faltante;
+                                        }
+
+                                        if (in_array('status', $colsListaMassa, true)) {
+                                            $colsIns[] = 'status';
+                                            $valsIns[] = "'pendente'";
+                                        }
+
+                                        $pdo->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
+                                    }
+                                } catch (\Exception $e) {}
+                            }
+                        }
+                    }
+                }
+            }
+
             echo json_encode(['success' => true, 'affected' => $affected, 'total' => count($ids)]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);

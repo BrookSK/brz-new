@@ -380,5 +380,63 @@ class LiveShoppingService {
             "UPDATE pedidos SET status = 'paid', updated_at = NOW() WHERE id = :id"
         );
         $stmt->execute([':id' => $orderId]);
+
+        // Inserir itens na lista_compras
+        try {
+            $temLista = false;
+            try {
+                $stTbl = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stTbl->execute(['lista_compras']);
+                $temLista = ((int) $stTbl->fetchColumn() > 0);
+            } catch (\Exception $e) {}
+
+            if ($temLista) {
+                $colsLista = [];
+                try { $st = $this->pdo->query('DESCRIBE lista_compras'); $colsLista = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $temPedidoIdLista = in_array('pedido_id', $colsLista, true);
+                $temProdutoIdLista = in_array('produto_id', $colsLista, true);
+
+                if ($temPedidoIdLista && $temProdutoIdLista) {
+                    $itensTable = null;
+                    try {
+                        $stTbl->execute(['pedido_itens']);
+                        if ((int) $stTbl->fetchColumn() > 0) $itensTable = 'pedido_itens';
+                        else { $stTbl->execute(['pedido_items']); if ((int) $stTbl->fetchColumn() > 0) $itensTable = 'pedido_items'; }
+                    } catch (\Exception $e) {}
+
+                    if ($itensTable) {
+                        // Limpar pendências antigas
+                        try { $this->pdo->prepare("DELETE FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'")->execute([$orderId]); } catch (\Exception $e) {}
+
+                        $stIt = $this->pdo->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+                        $stIt->execute([$orderId]);
+                        $itens = $stIt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        foreach ($itens as $it) {
+                            $produtoId = (int) ($it['produto_id'] ?? 0);
+                            $qtdPedido = (int) ($it['quantidade'] ?? 0);
+                            if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                            $colsIns = ['produto_id', 'pedido_id'];
+                            $valsIns = [':produto_id', ':pedido_id'];
+                            $paramsIns = [':produto_id' => $produtoId, ':pedido_id' => $orderId];
+
+                            if (in_array('quantidade_faltante', $colsLista, true)) {
+                                $colsIns[] = 'quantidade_faltante'; $valsIns[] = ':q'; $paramsIns[':q'] = $qtdPedido;
+                            } elseif (in_array('quantidade_necessaria', $colsLista, true)) {
+                                $colsIns[] = 'quantidade_necessaria'; $valsIns[] = ':q'; $paramsIns[':q'] = $qtdPedido;
+                            }
+                            if (in_array('status', $colsLista, true)) {
+                                $colsIns[] = 'status'; $valsIns[] = "'pendente'";
+                            }
+
+                            $this->pdo->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[LIVE_SHOPPING] Erro ao inserir na lista_compras pedido #' . $orderId . ': ' . $e->getMessage());
+        }
     }
 }
