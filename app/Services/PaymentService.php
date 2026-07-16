@@ -4258,6 +4258,9 @@ class PaymentService {
                 // Garante cashback/efeitos apenas quando ambos pagos
                 $this->creditarCashbackClubePorPedidoAprovado($db, (int) $pedidoId);
                 $this->pedidoModel->dispararEvento('pagamento_aprovado', (int) $pedidoId);
+
+                // Inserir itens na lista_compras quando pagamento é aprovado
+                $this->inserirItensListaCompras($db, (int) $pedidoId);
             }
 
             if ($statusAgregado === 'rejected') {
@@ -4265,6 +4268,122 @@ class PaymentService {
                 $this->cancelarPedidoPorPagamentoRejeitado($db, (int) $pedidoId, $colsP);
             }
         } catch (\Exception $e) {
+        }
+    }
+
+    /**
+     * Insere itens do pedido na lista_compras quando pagamento é aprovado (via webhook).
+     * Calcula o faltante (qtd pedida - qtd reservada) e insere apenas o que precisa ser comprado.
+     */
+    private function inserirItensListaCompras(\PDO $db, int $pedidoId): void {
+        try {
+            if ($pedidoId <= 0) return;
+
+            // Verificar se lista_compras existe
+            $temLista = false;
+            try {
+                $stT = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT->execute(['lista_compras']);
+                $temLista = ((int) $stT->fetchColumn() > 0);
+            } catch (\Exception $e) {}
+
+            if (!$temLista) return;
+
+            $colsLista = [];
+            try { $st = $db->query('DESCRIBE lista_compras'); $colsLista = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+            $temPedidoIdLista = in_array('pedido_id', $colsLista, true);
+            $temProdutoIdLista = in_array('produto_id', $colsLista, true);
+
+            if (!$temPedidoIdLista || !$temProdutoIdLista) return;
+
+            // Determinar tabela de itens do pedido
+            $itensTable = null;
+            try {
+                $stT2 = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT2->execute(['pedido_itens']);
+                if ((int) $stT2->fetchColumn() > 0) $itensTable = 'pedido_itens';
+                else {
+                    $stT2->execute(['pedido_items']);
+                    if ((int) $stT2->fetchColumn() > 0) $itensTable = 'pedido_items';
+                }
+            } catch (\Exception $e) {}
+
+            if (!$itensTable) return;
+
+            // Limpar pendências antigas deste pedido
+            try {
+                $db->prepare("DELETE FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'")->execute([$pedidoId]);
+            } catch (\Exception $e) {}
+
+            // Verificar reservas
+            $temReservas = false;
+            $temPedIdRes = false; $temProdIdRes = false; $temQtdRes = false; $temStatusRes = false;
+            try {
+                $stT3 = $db->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                $stT3->execute(['estoque_reservas']);
+                $temReservas = ((int) $stT3->fetchColumn() > 0);
+                if ($temReservas) {
+                    $stDR = $db->query('DESCRIBE estoque_reservas');
+                    $colsRes = $stDR ? $stDR->fetchAll(\PDO::FETCH_COLUMN) : [];
+                    $temPedIdRes = in_array('pedido_id', $colsRes, true);
+                    $temProdIdRes = in_array('produto_id', $colsRes, true);
+                    $temQtdRes = in_array('quantidade_reservada', $colsRes, true);
+                    $temStatusRes = in_array('status', $colsRes, true);
+                }
+            } catch (\Exception $e) {}
+
+            // Buscar itens do pedido
+            $stIt = $db->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+            $stIt->execute([$pedidoId]);
+            $itens = $stIt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            foreach ($itens as $it) {
+                $produtoId = (int) ($it['produto_id'] ?? 0);
+                $qtdPedido = (int) ($it['quantidade'] ?? 0);
+                if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                $qtdReservada = 0;
+                if ($temPedIdRes && $temProdIdRes && $temQtdRes) {
+                    try {
+                        $sqlR = 'SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ?';
+                        if ($temStatusRes) $sqlR .= " AND status = 'ativa'";
+                        $stR = $db->prepare($sqlR);
+                        $stR->execute([$pedidoId, $produtoId]);
+                        $qtdReservada = (int) ($stR->fetchColumn() ?: 0);
+                    } catch (\Exception $e) {}
+                }
+
+                $faltante = $qtdPedido - $qtdReservada;
+                if ($faltante <= 0) continue;
+
+                // Descontar já comprados
+                try {
+                    $stQC = $db->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                    $stQC->execute([$pedidoId, $produtoId]);
+                    $faltante -= (int) ($stQC->fetchColumn() ?: 0);
+                    if ($faltante <= 0) continue;
+                } catch (\Exception $e) {}
+
+                // Inserir pendência
+                $colsIns = ['produto_id', 'pedido_id'];
+                $valsIns = [':produto_id', ':pedido_id'];
+                $paramsIns = [':produto_id' => $produtoId, ':pedido_id' => $pedidoId];
+
+                if (in_array('quantidade_faltante', $colsLista, true)) {
+                    $colsIns[] = 'quantidade_faltante'; $valsIns[] = ':q'; $paramsIns[':q'] = $faltante;
+                } elseif (in_array('quantidade_necessaria', $colsLista, true)) {
+                    $colsIns[] = 'quantidade_necessaria'; $valsIns[] = ':q'; $paramsIns[':q'] = $faltante;
+                }
+                if (in_array('status', $colsLista, true)) {
+                    $colsIns[] = 'status'; $valsIns[] = "'pendente'";
+                }
+
+                $db->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
+            }
+
+            error_log('[LISTA_COMPRAS_INSERT] pedido=' . $pedidoId . ' caller=PaymentService::recalcularStatusPagamentoPedidoSplit (webhook)');
+        } catch (\Exception $e) {
+            error_log('[LISTA_COMPRAS] Erro ao inserir para pedido #' . $pedidoId . ': ' . $e->getMessage());
         }
     }
 
