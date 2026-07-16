@@ -1979,6 +1979,10 @@ class AdminProdutosController extends Controller {
         $ocultoLote = $request->getParam('oculto') ? 1 : 0;
         if (in_array('oculto', $cols, true)) $data['oculto'] = $ocultoLote;
 
+        // Braziliana Outlet
+        $outletLote = $request->getParam('outlet') ? 1 : 0;
+        if (in_array('outlet', $cols, true)) $data['outlet'] = $outletLote;
+
         // Custo = valor do produto
         if ($request->getParam('custo_igual_preco') && in_array('cost_price', $cols, true)) {
             $data['cost_price'] = $price;
@@ -2398,6 +2402,11 @@ class AdminProdutosController extends Controller {
                     <div class="small text-muted">Se marcado, o produto só aparece para admin/vendedor no pedido manual.</div>
                 </div>
                 <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="outletSwitch" name="outlet" value="1">
+                    <label class="form-check-label fw-semibold" for="outletSwitch">Braziliana Outlet</label>
+                    <div class="small text-muted">Se marcado, o produto aparece na página Braziliana Outlet.</div>
+                </div>
+                <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitch" name="custo_igual_preco" value="1" checked>
                     <label class="form-check-label fw-semibold" for="custoIgualPrecoSwitch">Custo = Valor do produto</label>
                     <div class="small text-muted">Se ativado, o custo será preenchido com o valor de venda.</div>
@@ -2460,6 +2469,11 @@ class AdminProdutosController extends Controller {
                     <input class="form-check-input" type="checkbox" role="switch" id="ocultoSwitchLote" name="oculto" value="1">
                     <label class="form-check-label fw-semibold" for="ocultoSwitchLote">Ocultar em todo o site</label>
                     <div class="small text-muted">Se marcado, os produtos só aparecem para admin/vendedor no pedido manual.</div>
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="outletSwitchLote" name="outlet" value="1">
+                    <label class="form-check-label fw-semibold" for="outletSwitchLote">Braziliana Outlet</label>
+                    <div class="small text-muted">Se marcado, os produtos aparecem na página Braziliana Outlet.</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="custoIgualPrecoSwitchLote" name="custo_igual_preco" value="1" checked>
@@ -2802,6 +2816,7 @@ document.getElementById("formLote").addEventListener("submit", async function(e)
         fd.append("stock", document.getElementById("loteStockInput").value);
         fd.append("featured", document.getElementById("loteFeaturedSwitch").checked ? "1" : "0");
         fd.append("oculto", document.getElementById("ocultoSwitchLote") && document.getElementById("ocultoSwitchLote").checked ? "1" : "0");
+        fd.append("outlet", document.getElementById("outletSwitchLote") && document.getElementById("outletSwitchLote").checked ? "1" : "0");
         fd.append("custo_igual_preco", document.getElementById("custoIgualPrecoSwitchLote") && document.getElementById("custoIgualPrecoSwitchLote").checked ? "1" : "0");
         fd.append("name", descricoes[i]);
         const salePriceLote = document.getElementById("loteSalePriceInput").value.trim();
@@ -3538,6 +3553,10 @@ HTML;
         $oculto = $request->getParam('oculto') ? 1 : 0;
         if (in_array('oculto', $cols, true)) $data['oculto'] = $oculto;
 
+        // Braziliana Outlet
+        $outlet = $request->getParam('outlet') ? 1 : 0;
+        if (in_array('outlet', $cols, true)) $data['outlet'] = $outlet;
+
         // Custo = valor do produto
         if ($request->getParam('custo_igual_preco') && in_array('cost_price', $cols, true)) {
             $data['cost_price'] = $price;
@@ -3803,6 +3822,12 @@ HTML;
                     <div class="small subtle">Se marcado, o produto só aparece para admin/vendedor no pedido manual.</div>
                 </div>
 
+                <div class="form-check form-switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="outletSwitch" name="outlet" value="1">
+                    <label class="form-check-label fw-semibold" for="outletSwitch">Braziliana Outlet</label>
+                    <div class="small subtle">Se marcado, o produto aparece na página Braziliana Outlet.</div>
+                </div>
+
                 <div class="d-grid mt-4">
                     <button type="submit" class="btn btn-primary btn-lg">
                         <i class="fas fa-bolt me-2"></i>Salvar
@@ -3960,6 +3985,9 @@ HTML;
                     $params[':categoria_filtro'] = (int) $categoriaFiltro;
                 }
             }
+            if ($outletFiltro === '1' && !empty($colNames['outlet'])) {
+                $where .= " AND p.outlet = 1 ";
+            }
 
             // Quando há busca ativa, retornar todos os resultados sem paginação
             $buscaAtiva = (trim($busca) !== '');
@@ -4058,7 +4086,7 @@ HTML;
             . '</div>';
 
         echo '<form method="GET" class="row g-3 mb-4">'
-            . '<div class="col-md-5">'
+            . '<div class="col-md-4">'
             . '<input type="text" class="form-control" name="busca" placeholder="Buscar produto..." value="' . htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') . '">' 
             . '</div>'
             . '<div class="col-md-2">'
@@ -4069,6 +4097,12 @@ HTML;
             echo '<option value="' . (int) $_lid . '"' . $selLoja . '>' . htmlspecialchars($_lnome, ENT_QUOTES, 'UTF-8') . '</option>';
         }
         echo '</select>'
+            . '</div>'
+            . '<div class="col-md-1">'
+            . '<select class="form-select" name="outlet_filtro">'
+            . '<option value="">Outlet</option>'
+            . '<option value="1"' . ($outletFiltro === '1' ? ' selected' : '') . '>Sim</option>'
+            . '</select>'
             . '</div>'
             . '<div class="col-md-2">'
             . '<select class="form-select" name="sort">'
@@ -4229,6 +4263,14 @@ HTML;
               <label class="form-label fw-semibold">Grupo de Compras</label>
               <select class="form-select" name="massa_grupo_id">' . $optGrupos . '</select>
             </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Braziliana Outlet</label>
+              <select class="form-select" name="massa_outlet">
+                <option value="">— Não alterar —</option>
+                <option value="1">Sim</option>
+                <option value="0">Não</option>
+              </select>
+            </div>
           </div>
         </form>
       </div>
@@ -4348,7 +4390,7 @@ HTML;
 
         if ($totalPaginas > 1) {
             $base = $isRepresentante ? '/admin/representante/produtos' : '/admin/produtos';
-            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro): string {
+            $mkUrl = function(int $p) use ($base, $busca, $sort, $dir, $lojaFiltro, $outletFiltro): string {
                 $url = $base . "?pagina={$p}";
                 if (trim($busca) !== '') {
                     $url .= "&busca=" . urlencode($busca);
@@ -4361,6 +4403,9 @@ HTML;
                 }
                 if (trim($lojaFiltro) !== '') {
                     $url .= "&loja_filtro=" . urlencode($lojaFiltro);
+                }
+                if (trim($outletFiltro) !== '') {
+                    $url .= "&outlet_filtro=" . urlencode($outletFiltro);
                 }
                 return $url;
             };
@@ -4461,6 +4506,12 @@ HTML;
         if ($grupoId !== '') {
             $campos[] = 'grupo_compras_id = ?';
             $params[] = (int) $grupoId > 0 ? (int) $grupoId : null;
+        }
+
+        $outlet = $_POST['massa_outlet'] ?? '';
+        if ($outlet !== '') {
+            $campos[] = 'outlet = ?';
+            $params[] = (int) $outlet;
         }
 
         if (empty($campos)) {
@@ -5093,6 +5144,14 @@ HTML;
                                         <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Braziliana Outlet</label>
+                                        <select class="form-select" name="outlet">
+                                            <option value="0" selected>Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, o produto aparece na página Braziliana Outlet.</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Imposto Local (%)</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" name="imposto_local_percent" value="0" placeholder="Ex: 8">
@@ -5316,6 +5375,7 @@ HTML;
             if (in_array('clube_ativo', $cols, true)) $data['clube_ativo'] = $request->getParam('clube_ativo') ?: 0;
             if (in_array('elegivel_oferta_gratis', $cols, true)) $data['elegivel_oferta_gratis'] = $request->getParam('elegivel_oferta_gratis') ?: 0;
             if (in_array('oculto', $cols, true)) $data['oculto'] = (int) ($request->getParam('oculto') ?: 0);
+            if (in_array('outlet', $cols, true)) $data['outlet'] = (int) ($request->getParam('outlet') ?: 0);
             if (in_array('imposto_local_percent', $cols, true)) {
                 $impostoLocalVal = (float) str_replace(',', '.', (string) ($request->getParam('imposto_local_percent') ?: '0'));
                 if ($impostoLocalVal < 0) $impostoLocalVal = 0;
@@ -5987,6 +6047,14 @@ HTML;
                                         <small class="text-muted">Se ativo, o produto não aparece para clientes em nenhum lugar do site. Só fica visível para admin/vendedor no pedido manual.</small>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Braziliana Outlet</label>
+                                        <select class="form-select" name="outlet">
+                                            <option value="0" ' . (empty($produto['outlet']) ? 'selected' : '') . '>Não</option>
+                                            <option value="1" ' . (!empty($produto['outlet']) ? 'selected' : '') . '>Sim</option>
+                                        </select>
+                                        <small class="text-muted">Se ativo, o produto aparece na página Braziliana Outlet.</small>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Imposto Local (%)</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" name="imposto_local_percent" value="' . htmlspecialchars((string) ($produto['imposto_local_percent'] ?? '0')) . '" placeholder="Ex: 8">
@@ -6524,6 +6592,11 @@ HTMLSCRIPT;
             if (in_array('oculto', $cols, true)) {
                 $stmtOculto = $pdo->prepare('UPDATE produtos SET oculto = ? WHERE id = ?');
                 $stmtOculto->execute([(int) ($request->getParam('oculto') ?: 0), (int) $id]);
+            }
+
+            if (in_array('outlet', $cols, true)) {
+                $stmtOutlet = $pdo->prepare('UPDATE produtos SET outlet = ? WHERE id = ?');
+                $stmtOutlet->execute([(int) ($request->getParam('outlet') ?: 0), (int) $id]);
             }
 
             if (in_array('imposto_local_percent', $cols, true)) {

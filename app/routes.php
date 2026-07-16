@@ -55,6 +55,7 @@ $router->get('/politicas', 'PoliticasController', 'index');
 // Páginas institucionais
 $router->get('/politica-privacidade', 'PoliticaPrivacidadeController', 'index');
 $router->get('/termos-uso', 'TermosUsoController', 'index');
+$router->get('/outlet', 'OutletController', 'index');
 
 // Site lock (pré-publicação)
 $router->get('/site-lock', 'SiteLockController', 'index');

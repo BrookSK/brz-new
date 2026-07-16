@@ -1003,6 +1003,9 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                         <a class="nav-link" href="/produtos"><i class="fas fa-box"></i> <?= __('nav.products', 'Produtos') ?></a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/outlet"><i class="fas fa-tags"></i> Outlet</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/grupos-compras"><i class="fas fa-store"></i> Grupos de Compras</a>
                     </li>
                     <!-- Como Funciona: oculto -->
@@ -1293,6 +1296,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
                     <ul class="list-unstyled">
                         <li class="mb-2"><a href="/" class="footer-link"><?= __('nav.home', 'Início') ?></a></li>
                         <li class="mb-2"><a href="/produtos" class="footer-link"><?= __('nav.products', 'Produtos') ?></a></li>
+                        <li class="mb-2"><a href="/outlet" class="footer-link">Outlet</a></li>
                         <li class="mb-2"><a href="/faq" class="footer-link">FAQ</a></li>
                         <!-- OCULTO TEMPORARIAMENTE
                         <li class="mb-2"><a href="/status-pedido" class="footer-link">Status do Pedido</a></li>
