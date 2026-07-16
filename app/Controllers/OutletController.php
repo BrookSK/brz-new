@@ -48,17 +48,25 @@ class OutletController extends Controller {
             if ($featuredCol) $select[] = $featuredCol . ' AS featured';
             if ($fotoCol) $select[] = $fotoCol . ' AS foto_principal';
 
-            $sql = 'SELECT ' . implode(', ', $select) . ' FROM produtos WHERE outlet = 1 AND active = 1';
+            $sql = 'SELECT ' . implode(', ', $select) . ' FROM produtos WHERE outlet = 1';
+            if (in_array('active', $cols, true)) {
+                $sql .= ' AND active = 1';
+            } elseif (in_array('ativo', $cols, true)) {
+                $sql .= ' AND ativo = 1';
+            }
             if (in_array('oculto', $cols, true)) {
                 $sql .= ' AND (oculto = 0 OR oculto IS NULL)';
             }
-            $sql .= " AND LOWER(COALESCE(status,'')) != 'archived'";
+            if (in_array('status', $cols, true)) {
+                $sql .= " AND LOWER(COALESCE(status,'')) NOT IN ('archived','inactive','inativo')";
+            }
             $sql .= ' ORDER BY id DESC';
 
             try {
                 $st = $pdo->query($sql);
                 $produtos = $st ? ($st->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
             } catch (\Exception $e) {
+                error_log('[OUTLET] Erro na query: ' . $e->getMessage() . ' SQL: ' . $sql);
                 $produtos = [];
             }
         }
