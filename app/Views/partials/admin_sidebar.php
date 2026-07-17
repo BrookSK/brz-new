@@ -222,6 +222,8 @@ function renderAdminSidebar($activePage = '') {
         'lojas' => ['icon' => 'fas fa-store', 'label' => __('admin.menu.stores', 'Lojas'), 'url' => '/admin/lojas', 'roles' => ['admin','vendedor','suporte']],
         'categorias' => ['icon' => 'fas fa-tags', 'label' => __('admin.menu.categories', 'Categorias'), 'url' => '/admin/categorias', 'roles' => ['admin','vendedor','suporte']],
         'pedidos' => ['icon' => 'fas fa-shopping-cart', 'label' => __('admin.menu.orders', 'Pedidos'), 'url' => '/admin/pedidos', 'roles' => ['admin','vendedor','suporte']],
+        'pacotes-recebidos' => ['icon' => 'fas fa-box-open', 'label' => 'Pacotes Recebidos', 'url' => '/admin/pacotes-recebidos', 'roles' => ['admin','vendedor','conferente']],
+        'faturas-adicionais' => ['icon' => 'fas fa-file-invoice-dollar', 'label' => 'Faturas Adicionais', 'url' => '/admin/faturas-adicionais', 'roles' => ['admin','vendedor']],
         'pedidos-conferencia' => ['icon' => 'fas fa-clipboard-check', 'label' => 'Em Conferência', 'url' => '/admin/pedidos/conferencia', 'roles' => ['admin','vendedor']],
         'split-order' => ['icon' => 'fas fa-cut', 'label' => 'Split Order', 'url' => '/admin/pedidos/split', 'roles' => ['admin','vendedor']],
         'wp-estatisticas' => ['icon' => 'fas fa-chart-pie', 'label' => __('admin.menu.wp_orders_stats', 'Estatísticas (WP)'), 'url' => '/admin/pedidos-wp/estatisticas', 'roles' => ['admin']],
