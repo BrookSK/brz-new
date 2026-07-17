@@ -19,13 +19,16 @@ class PacoteCarrinhoService {
     public function autoAdicionarPacotesPendentes(int $usuarioId): void {
         if ($usuarioId <= 0) return;
 
+        // Garantir que as colunas necessárias existem
+        $this->ensureColumns();
+
         // Cache: só verificar a cada 2 minutos
         if (session_status() === PHP_SESSION_NONE) {
             @session_start();
         }
         $cacheKey = 'pacotes_auto_check_' . $usuarioId;
-        $lastCheck = $_SESSION[$cacheKey] ?? 0;
-        if ((time() - $lastCheck) < 120) {
+        $lastCheck = (int) ($_SESSION[$cacheKey] ?? 0);
+        if ($lastCheck > 0 && (time() - $lastCheck) < 120) {
             return; // Verificou há menos de 2 min
         }
         $_SESSION[$cacheKey] = time();
@@ -101,6 +104,52 @@ class PacoteCarrinhoService {
 
     // ==================== Métodos privados ====================
 
+    /**
+     * Garantir que as colunas necessárias existem na tabela carrinho_items
+     */
+    private function ensureColumns(): void {
+        try {
+            $cols = [];
+            $st = $this->connection->query('DESCRIBE carrinho_items');
+            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+
+            $needed = [
+                'tipo_item' => "ALTER TABLE carrinho_items ADD COLUMN tipo_item VARCHAR(30) NOT NULL DEFAULT 'produto'",
+                'pacote_id' => "ALTER TABLE carrinho_items ADD COLUMN pacote_id INT NULL",
+                'fatura_adicional_id' => "ALTER TABLE carrinho_items ADD COLUMN fatura_adicional_id INT NULL",
+                'nome_item' => "ALTER TABLE carrinho_items ADD COLUMN nome_item VARCHAR(255) NULL",
+                'peso_kg' => "ALTER TABLE carrinho_items ADD COLUMN peso_kg DECIMAL(6,3) NULL",
+                'foto_url' => "ALTER TABLE carrinho_items ADD COLUMN foto_url TEXT NULL",
+                'declaration_value' => "ALTER TABLE carrinho_items ADD COLUMN declaration_value DECIMAL(10,2) NULL",
+            ];
+
+            foreach ($needed as $col => $sql) {
+                if (!in_array($col, $cols, true)) {
+                    try {
+                        $this->connection->exec($sql);
+                    } catch (\Throwable $e) {
+                        // Coluna pode já existir em cenário de race condition
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Se não conseguir verificar, segue em frente (pode falhar depois)
+        }
+    }
+
+    /**
+     * Garantir que a tabela pacotes_recebidos existe
+     */
+    private function tableExists(string $table): bool {
+        try {
+            $stmt = $this->connection->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+            $stmt->execute([$table]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private function getUserSuite(int $usuarioId): ?int {
         try {
             $stmt = $this->connection->prepare('SELECT suite FROM usuarios WHERE id = ? LIMIT 1');
@@ -114,6 +163,7 @@ class PacoteCarrinhoService {
 
     private function getPacotesPendentes(int $suite): array {
         try {
+            if (!$this->tableExists('pacotes_recebidos')) return [];
             $stmt = $this->connection->prepare(
                 "SELECT * FROM pacotes_recebidos WHERE numero_suite = ? AND status = 'pendente' ORDER BY data_recebimento ASC"
             );

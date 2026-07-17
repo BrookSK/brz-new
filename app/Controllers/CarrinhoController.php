@@ -216,6 +216,42 @@ class CarrinhoController extends Controller {
             $out = [];
             foreach (($items ?: []) as $it) {
                 $pid = (int) ($it['produto_id'] ?? 0);
+                $tipoItem = (string) ($it['tipo_item'] ?? 'produto');
+
+                // Itens de pacote/fatura têm produto_id = 0, tratar separadamente
+                if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional') {
+                    $pacoteId = (int) ($it['pacote_id'] ?? 0);
+                    $faturaId = (int) ($it['fatura_adicional_id'] ?? 0);
+                    $key = $tipoItem . '_' . ($pacoteId > 0 ? $pacoteId : $faturaId) . '_' . ($it['id'] ?? 0);
+                    $qtd = (int) ($it['quantidade'] ?? 1);
+                    if ($qtd < 1) $qtd = 1;
+                    $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
+                    $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
+
+                    $out[$key] = [
+                        'produto_id' => 0,
+                        'produto_variacao_id' => null,
+                        'variacao_descricao' => null,
+                        'nome' => $it['nome_item'] ?? ($it['nome'] ?? 'Pacote'),
+                        'price' => $vu,
+                        'preco_unitario' => $vu,
+                        'stored_price' => $vu,
+                        'stored_subtotal' => $sub,
+                        'stored_peso_unit' => isset($it['peso_kg']) ? (float) $it['peso_kg'] : null,
+                        'quantidade' => $qtd,
+                        'subtotal' => $sub,
+                        'is_free_offer' => 0,
+                        'free_offer_original_price' => null,
+                        'tipo_item' => $tipoItem,
+                        'pacote_id' => $pacoteId > 0 ? $pacoteId : null,
+                        'fatura_adicional_id' => $faturaId > 0 ? $faturaId : null,
+                        'declaration_value' => isset($it['declaration_value']) ? (float) $it['declaration_value'] : null,
+                        'foto_url' => $it['foto_url'] ?? null,
+                        'carrinho_item_id' => (int) ($it['id'] ?? 0),
+                    ];
+                    continue;
+                }
+
                 if ($pid <= 0) continue;
                 $pvId = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? ($it['variacao_id'] ?? 0)));
                 $key = ((string) $pid) . ':' . ((string) $pvId);
