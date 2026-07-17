@@ -2294,6 +2294,9 @@ class PedidoEcommerce {
                                     if (in_array('status', $colsListaEc, true)) {
                                         $colsIns[] = 'status'; $valsIns[] = "'pendente'";
                                     }
+                                    if (in_array('data_solicitacao', $colsListaEc, true)) {
+                                        $colsIns[] = 'data_solicitacao'; $valsIns[] = 'CURDATE()';
+                                    }
 
                                     $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
                                 }

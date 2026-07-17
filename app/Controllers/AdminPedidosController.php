@@ -7220,6 +7220,11 @@ HTML;
                                 $vals[] = "'pendente'";
                             }
 
+                            if (in_array('data_solicitacao', $colsLista, true)) {
+                                $cols[] = 'data_solicitacao';
+                                $vals[] = 'CURDATE()';
+                            }
+
                             $sql = 'INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')';
                             $st = $pdo->prepare($sql);
                             $st->execute($params);
@@ -7535,6 +7540,11 @@ HTML;
                                         if (in_array('status', $colsListaMassa, true)) {
                                             $colsIns[] = 'status';
                                             $valsIns[] = "'pendente'";
+                                        }
+
+                                        if (in_array('data_solicitacao', $colsListaMassa, true)) {
+                                            $colsIns[] = 'data_solicitacao';
+                                            $valsIns[] = 'CURDATE()';
                                         }
 
                                         $pdo->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);

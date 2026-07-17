@@ -5858,6 +5858,10 @@ class CheckoutController extends Controller {
                                     $valsIns[] = ':tipo_compra';
                                     $pIns[':tipo_compra'] = 'online';
                                 }
+                                if (in_array('data_solicitacao', $colsLista, true)) {
+                                    $colsIns[] = 'data_solicitacao';
+                                    $valsIns[] = 'CURDATE()';
+                                }
                                 $sqlIns = 'INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')';
                                 $stIns = $db->prepare($sqlIns);
                                 $stIns->execute($pIns);
