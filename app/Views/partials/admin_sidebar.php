@@ -442,7 +442,7 @@ function renderAdminSidebar($activePage = '') {
             // Definir grupos de menu
             $menuGroups = [
                 '_solo_dashboard' => ['items' => ['dashboard']],
-                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pedidos-conferencia', 'split-order', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
+                'Pedidos' => ['icon' => 'fas fa-shopping-cart', 'items' => ['pedidos', 'pacotes-recebidos', 'faturas-adicionais', 'pedidos-conferencia', 'split-order', 'tickets', 'pedidos-comissoes', 'carnes', 'relatorio-pedidos']],
                 'Catálogo' => ['icon' => 'fas fa-box', 'items' => ['produtos', 'grupos-compras', 'lojas', 'categorias', 'descricao-produtos', 'promocoes-agendadas', 'promocoes-auditoria', 'oferta-gratuita']],
                 'Estoque & Compras' => ['icon' => 'fas fa-warehouse', 'items' => ['estoque', 'compras', 'carnes-compras', 'relatorios']],
                 'Envios & Etiquetas' => ['icon' => 'fas fa-shipping-fast', 'items' => ['remessa-internacional', 'remessa-wp', 'remessa-conferencia', 'remessa-correios', 'correios-mundial', 'etiquetas-wp', 'pacotes-wordpress', 'remessa-shipstation']],
