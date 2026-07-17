@@ -341,7 +341,7 @@ class AdminPacotesRecebidosController extends Controller {
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
     <div style="background: #1a3a5c; padding: 20px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana Express</h1>
+        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana</h1>
     </div>
     <div style="padding: 30px 20px;">
         <h2 style="color: #1a3a5c;">Seu produto foi cadastrado!</h2>
@@ -379,13 +379,13 @@ class AdminPacotesRecebidosController extends Controller {
         </div>
 
         <p style="text-align: center; margin-top: 30px;">
-            <a href="/carrinho" style="background: #1a3a5c; color: #fff; text-decoration: none; padding: 12px 30px; border-radius: 5px; display: inline-block;">
+            <a href="https://brazilianashop.com.br/carrinho" style="background: #1a3a5c; color: #fff; text-decoration: none; padding: 12px 30px; border-radius: 5px; display: inline-block;">
                 Ver meu Carrinho
             </a>
         </p>
     </div>
     <div style="background: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666;">
-        Braziliana Express - Seu parceiro em compras internacionais
+        Braziliana - Seu parceiro em compras internacionais
     </div>
 </body>
 </html>

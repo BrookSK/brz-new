@@ -126,7 +126,7 @@ class CronPacotesController extends Controller {
 <html><head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
     <div style="background: #1a3a5c; padding: 20px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana Express</h1>
+        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana</h1>
     </div>
     <div style="padding: 30px 20px;">
         <h2 style="color: #dc3545;">⚠️ Lembrete de Armazenamento</h2>
@@ -175,7 +175,7 @@ HTML;
 <html><head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
     <div style="background: #1a3a5c; padding: 20px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana Express</h1>
+        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana</h1>
     </div>
     <div style="padding: 30px 20px;">
         <h2 style="color: #dc3545;">Produto Descartado</h2>
