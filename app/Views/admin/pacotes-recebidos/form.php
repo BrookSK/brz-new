@@ -67,16 +67,14 @@
                     </div>
 
                     <!-- NCM -->
-                    <div class="col-md-3">
+                    <div class="col-md-5">
                         <label class="form-label fw-bold">NCM (Código Fiscal) *</label>
-                        <select name="ncm" class="form-select" required <?= !$editavel ? 'disabled' : '' ?>>
-                            <option value="">Selecione...</option>
-                            <?php foreach ($ncmOptions as $code => $label): ?>
-                                <option value="<?= $code ?>" <?= (($pacote['ncm'] ?? '') == $code) ? 'selected' : '' ?>>
-                                    <?= $code ?> - <?= $label ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <input type="text" id="ncm_search" class="form-control" placeholder="Digite para filtrar (ex: celular, bolsa, 8517...)"
+                               autocomplete="off" <?= !$editavel ? 'readonly' : '' ?>
+                               value="<?= isset($pacote['ncm']) && $pacote['ncm'] ? $pacote['ncm'] . ' - ' . ($ncmOptions[$pacote['ncm']] ?? '') : '' ?>">
+                        <input type="hidden" name="ncm" id="ncm_value" value="<?= htmlspecialchars($pacote['ncm'] ?? '') ?>" required>
+                        <div id="ncm_dropdown" class="list-group position-absolute shadow-sm" style="z-index:1050;max-height:250px;overflow-y:auto;display:none;width:calc(100% - 24px);"></div>
+                        <small class="form-text text-muted">Comece a digitar o nome ou código NCM.</small>
                     </div>
 
                     <!-- Data Recebimento -->
@@ -88,7 +86,7 @@
                     </div>
 
                     <!-- Peso -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold">Peso (kg) *</label>
                         <input type="number" name="peso_kg" class="form-control" step="0.001" min="0.001"
                                value="<?= htmlspecialchars($pacote['peso_kg'] ?? '') ?>" 
@@ -96,7 +94,7 @@
                     </div>
 
                     <!-- Quantidade -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold">Quantidade *</label>
                         <input type="number" name="quantidade" class="form-control" min="1"
                                value="<?= htmlspecialchars($pacote['quantidade'] ?? '1') ?>" 
@@ -161,7 +159,72 @@
 </div>
 
 <script>
-// Busca de usuario por suite (AJAX)
+// === NCM - Campo com busca/filtro ===
+(function() {
+    const ncmOptions = <?= json_encode($ncmOptions, JSON_UNESCAPED_UNICODE) ?>;
+    const searchInput = document.getElementById('ncm_search');
+    const hiddenInput = document.getElementById('ncm_value');
+    const dropdown = document.getElementById('ncm_dropdown');
+
+    if (!searchInput || !dropdown) return;
+
+    function renderOptions(filter) {
+        dropdown.innerHTML = '';
+        const term = (filter || '').toLowerCase();
+        let count = 0;
+
+        for (const [code, label] of Object.entries(ncmOptions)) {
+            const text = code + ' - ' + label;
+            if (term && !text.toLowerCase().includes(term)) continue;
+            if (count >= 30) break; // limitar resultados visíveis
+
+            const item = document.createElement('a');
+            item.href = '#';
+            item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+            item.textContent = text;
+            item.dataset.code = code;
+            item.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                searchInput.value = text;
+                hiddenInput.value = code;
+                dropdown.style.display = 'none';
+            });
+            dropdown.appendChild(item);
+            count++;
+        }
+
+        if (count === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'list-group-item text-muted small py-1';
+            empty.textContent = 'Nenhum NCM encontrado.';
+            dropdown.appendChild(empty);
+        }
+
+        dropdown.style.display = 'block';
+    }
+
+    searchInput.addEventListener('focus', function() {
+        renderOptions(this.value);
+    });
+
+    searchInput.addEventListener('input', function() {
+        hiddenInput.value = ''; // limpar seleção até selecionar novamente
+        renderOptions(this.value);
+    });
+
+    searchInput.addEventListener('blur', function() {
+        setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+    });
+
+    // Se limpar o campo, limpar o hidden
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+        }
+    });
+})();
+
+// === Busca de usuario por suite (AJAX) ===
 document.getElementById('btnBuscarSuite')?.addEventListener('click', function() {
     const suite = document.getElementById('numero_suite').value;
     const infoEl = document.getElementById('suiteInfo');
