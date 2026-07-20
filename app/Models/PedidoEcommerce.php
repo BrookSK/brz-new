@@ -2120,6 +2120,7 @@ class PedidoEcommerce {
     private const STATUSES_EXIGEM_MEDIDAS = [
         'produto_consolidado',
         'consolidado',
+        'etiqueta_gerada',
         'em_transporte',
         'aguardando_liberacao_aduaneira',
         'enviado_ao_destinatario',

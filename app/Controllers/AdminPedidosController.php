@@ -6547,6 +6547,8 @@ HTML;
             $novoStatusKey = strtolower(trim((string) $novoStatus));
             $cicloFechado = in_array($novoStatusKey, [
                 'produto_consolidado',
+                'consolidado',
+                'etiqueta_gerada',
                 'em_transporte',
                 'aguardando_liberacao_aduaneira',
                 'enviado_ao_destinatario',
@@ -7381,6 +7383,22 @@ HTML;
             if (is_array($cols) && !in_array('status', $cols, true)) {
                 foreach (['status_pedido', 'pedido_status'] as $cand) {
                     if (in_array($cand, $cols, true)) { $statusCol = $cand; break; }
+                }
+            }
+
+            // Validar medidas para status que exigem (caixa fechada, etiqueta, transporte, etc.)
+            $statusExigeMedidas = ['produto_consolidado', 'consolidado', 'etiqueta_gerada', 'em_transporte', 'aguardando_liberacao_aduaneira', 'enviado_ao_destinatario', 'enviado', 'entregue'];
+            if (in_array(strtolower(trim($novoStatus)), $statusExigeMedidas, true)) {
+                $placeholdersMedidas = implode(',', array_fill(0, count($ids), '?'));
+                $stMedidas = $pdo->prepare("SELECT id FROM pedidos WHERE id IN ({$placeholdersMedidas}) AND (peso_total IS NULL OR peso_total <= 0 OR altura IS NULL OR altura <= 0 OR largura IS NULL OR largura <= 0 OR comprimento IS NULL OR comprimento <= 0)");
+                $stMedidas->execute(array_values($ids));
+                $semMedidas = $stMedidas->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                if (!empty($semMedidas)) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Os seguintes pedidos não possuem peso/medidas preenchidos: #' . implode(', #', $semMedidas) . '. Preencha antes de alterar para este status.',
+                    ]);
+                    exit;
                 }
             }
 
