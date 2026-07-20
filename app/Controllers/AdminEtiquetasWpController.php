@@ -678,6 +678,27 @@ class AdminEtiquetasWpController extends Controller
                     }
                 }
                 unset($pkg);
+
+                // Enriquecer com nome do cliente a partir do banco local quando não veio da API
+                $pedidoIds = array_filter(array_map(function($p) { return $p['pedido_id_local'] ?? null; }, $resp['data']));
+                if (!empty($pedidoIds)) {
+                    $in3 = implode(',', array_fill(0, count($pedidoIds), '?'));
+                    try {
+                        $st3 = $this->connection->prepare("SELECT p.id, p.cliente_nome FROM pedidos p WHERE p.id IN ({$in3})");
+                        $st3->execute(array_values($pedidoIds));
+                        $mapNomes = [];
+                        foreach ($st3->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                            $mapNomes[(int) $row['id']] = $row['cliente_nome'] ?? '';
+                        }
+                        foreach ($resp['data'] as &$pkg) {
+                            $pid = $pkg['pedido_id_local'] ?? null;
+                            if ($pid && isset($mapNomes[$pid]) && empty($pkg['recipient_name'])) {
+                                $pkg['recipient_name'] = $mapNomes[$pid];
+                            }
+                        }
+                        unset($pkg);
+                    } catch (\Exception $e) {}
+                }
             } catch (\Exception $e) {}
         }
 
@@ -810,6 +831,7 @@ class AdminEtiquetasWpController extends Controller
 
         $payload = array_merge($destinatario, [
             'customerControlCode' => substr($customerControlCode, 0, 100),
+            'pedidoIdLocal' => $pid,
             'totalWeight' => $totalWeight,
             'packagingLength' => (float) number_format($packagingLength, 2, '.', ''),
             'packagingWidth' => (float) number_format($packagingWidth, 2, '.', ''),

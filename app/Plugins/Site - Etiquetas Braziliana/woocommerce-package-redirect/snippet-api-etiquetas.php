@@ -288,6 +288,9 @@ function brz_api_create_package(WP_REST_Request $request) {
         // Salvar metadados
         update_post_meta($post_id, '_package_order_id', $body['customerControlCode']);
         update_post_meta($post_id, '_correios_tracking_code', $tracking);
+        if (!empty($body['pedidoIdLocal'])) {
+            update_post_meta($post_id, '_pedido_id_local', intval($body['pedidoIdLocal']));
+        }
         update_post_meta($post_id, '_total_weight', intval($body['totalWeight']));
         update_post_meta($post_id, '_package_width', floatval($body['packagingWidth']));
         update_post_meta($post_id, '_package_height', floatval($body['packagingHeight']));
@@ -376,6 +379,8 @@ function brz_api_list_packages(WP_REST_Request $request) {
                 'tracking_code' => get_post_meta($id, '_correios_tracking_code', true),
                 'container_id' => get_post_meta($id, '_container_id', true),
                 'total_weight' => get_post_meta($id, '_total_weight', true),
+                'recipient_name' => get_post_meta($id, '_recipient_name', true),
+                'pedido_id_local' => get_post_meta($id, '_pedido_id_local', true),
                 'created_at' => get_the_date('Y-m-d H:i:s'),
             ];
         }

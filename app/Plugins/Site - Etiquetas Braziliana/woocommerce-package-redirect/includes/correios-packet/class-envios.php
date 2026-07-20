@@ -892,8 +892,11 @@ class WPR_Envios
             wp_die('Você precisa estar logado para gerar o PDF.');
         }
 
-        $order_id = get_post_meta($package_id, '_package_order_id', true);
-        $order = wc_get_order($order_id);
+        $order_id_raw = get_post_meta($package_id, '_package_order_id', true);
+        $pedido_id_local = get_post_meta($package_id, '_pedido_id_local', true);
+        // Usar o ID local do pedido como referência visual na etiqueta (ex: 1008)
+        $order_id = !empty($pedido_id_local) ? $pedido_id_local : $order_id_raw;
+        $order = wc_get_order($order_id_raw);
 
         if (!$order) {
             // Pacote criado via API externa - usar metadados salvos no post
@@ -935,6 +938,15 @@ class WPR_Envios
 
                 $items_json = get_post_meta($package_id, '_items_json', true);
                 $items_raw = $items_json ? json_decode($items_json, true) : [];
+
+                // Fallback: se _items_json está vazio, tentar reconstruir a partir do _debug_request_body
+                if (empty($items_raw)) {
+                    $debug_request = get_post_meta($package_id, '_debug_request_body', true);
+                    if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
+                        $items_raw = $debug_request['packageList'][0]['items'];
+                    }
+                }
+
                 $items = [];
                 foreach ($items_raw as $it) {
                     $items[] = [
