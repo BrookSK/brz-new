@@ -420,38 +420,34 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
     if (!empty($body['pedidoIdLocal'])) {
         $pid = intval($body['pedidoIdLocal']);
         update_post_meta($post_id, '_pedido_id_local', $pid);
-        update_post_meta($post_id, '_package_order_id', $pid);
+        // Formato não-numérico para que wc_get_order() retorne false (garante path output_only com _items_json)
+        update_post_meta($post_id, '_package_order_id', 'PED-' . $pid);
         $fixed[] = 'pedido_id_local=' . $pid;
     }
 
-    // Fix items_json: se estiver vazio, usar items do body OU reconstruir do _debug_request_body
-    $items_json = get_post_meta($post_id, '_items_json', true);
-    $items_decoded = $items_json ? json_decode($items_json, true) : [];
-    error_log('[BRZ-FIX-META] post_id=' . $post_id . ' | existing_items_json_empty=' . (empty($items_decoded) ? 'YES' : 'NO') . ' | items_json_raw_length=' . strlen($items_json ?: ''));
-    if (empty($items_decoded)) {
-        // Primeiro: tentar dos items enviados pelo painel
-        if (!empty($body['items']) && is_array($body['items'])) {
-            $encoded = wp_json_encode($body['items']);
-            update_post_meta($post_id, '_items_json', $encoded);
-            $fixed[] = 'items_json (from request body, ' . count($body['items']) . ' items)';
-            error_log('[BRZ-FIX-META] SAVED _items_json from body | length=' . strlen($encoded));
-        } else {
-            // Segundo: tentar do _debug_request_body
+    // Fix items_json: SEMPRE sobrescrever se body tiver items (corrige dados corrompidos)
+    if (!empty($body['items']) && is_array($body['items'])) {
+        $encoded = wp_json_encode($body['items']);
+        update_post_meta($post_id, '_items_json', $encoded);
+        $fixed[] = 'items_json FORCED from request body (' . count($body['items']) . ' items, ' . strlen($encoded) . ' bytes)';
+        error_log('[BRZ-FIX-META] FORCED SAVE _items_json from body | length=' . strlen($encoded) . ' | content=' . $encoded);
+    } else {
+        // Se não veio items do body, verificar se precisa reconstruir
+        $items_json = get_post_meta($post_id, '_items_json', true);
+        $items_decoded = $items_json ? json_decode($items_json, true) : [];
+        if (empty($items_decoded)) {
             $debug_request = get_post_meta($post_id, '_debug_request_body', true);
-            error_log('[BRZ-FIX-META] debug_request is_array=' . (is_array($debug_request) ? 'YES' : 'NO') . ' | type=' . gettype($debug_request));
             if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
                 $items_from_debug = $debug_request['packageList'][0]['items'];
                 $encoded = wp_json_encode($items_from_debug);
                 update_post_meta($post_id, '_items_json', $encoded);
-                $fixed[] = 'items_json (from debug_request_body, ' . count($items_from_debug) . ' items)';
-                error_log('[BRZ-FIX-META] SAVED _items_json from debug | length=' . strlen($encoded));
+                $fixed[] = 'items_json from debug_request_body (' . count($items_from_debug) . ' items)';
             } else {
-                $fixed[] = 'items_json FAILED - no source found';
-                error_log('[BRZ-FIX-META] FAILED to find items source');
+                $fixed[] = 'items_json FAILED - no source';
             }
+        } else {
+            $fixed[] = 'items_json already valid (' . count($items_decoded) . ' items)';
         }
-    } else {
-        $fixed[] = 'items_json already exists (' . count($items_decoded) . ' items)';
     }
 
     // Fix recipient_name: se recebido do painel
@@ -503,16 +499,17 @@ function brz_api_package_pdf(WP_REST_Request $request) {
     // Fix automático: se _pedido_id_local não existe, tentar extrair do request body
     $pedido_id_local = get_post_meta($post_id, '_pedido_id_local', true);
     if (empty($pedido_id_local)) {
-        $debug_request = get_post_meta($post_id, '_debug_request_body', true);
-        if (is_array($debug_request) && !empty($debug_request['packageList'][0]['pedidoIdLocal'])) {
-            $pedido_id_local = intval($debug_request['packageList'][0]['pedidoIdLocal']);
+        $debug_request_check = get_post_meta($post_id, '_debug_request_body', true);
+        if (is_array($debug_request_check) && !empty($debug_request_check['packageList'][0]['pedidoIdLocal'])) {
+            $pedido_id_local = intval($debug_request_check['packageList'][0]['pedidoIdLocal']);
             update_post_meta($post_id, '_pedido_id_local', $pedido_id_local);
         }
     }
 
-    // Atualizar _package_order_id para exibir o ID local na etiqueta (Order #)
+    // Sempre usar PED-{id} para garantir que wc_get_order() retorne false
+    // e o class-envios use o path output_only (que lê _items_json)
     if (!empty($pedido_id_local)) {
-        update_post_meta($post_id, '_package_order_id', $pedido_id_local);
+        update_post_meta($post_id, '_package_order_id', 'PED-' . $pedido_id_local);
     }
 
     try {

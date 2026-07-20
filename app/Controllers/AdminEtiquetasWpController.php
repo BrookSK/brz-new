@@ -577,21 +577,28 @@ class AdminEtiquetasWpController extends Controller
                         $cols = [];
                         try { $stC = $this->connection->query("DESCRIBE {$itensTable}"); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
                         $nomeCol = in_array('nome_produto', $cols) ? 'nome_produto' : (in_array('nome', $cols) ? 'nome' : 'nome_produto');
-                        $ncmCol = in_array('ncm', $cols) ? 'ncm' : null;
                         $precoCol = in_array('preco_unitario', $cols) ? 'preco_unitario' : (in_array('valor_unitario', $cols) ? 'valor_unitario' : 'preco_unitario');
                         $qtdCol = in_array('quantidade', $cols) ? 'quantidade' : 'quantidade';
+                        $hasProdutoId = in_array('produto_id', $cols);
 
-                        $selectCols = "{$nomeCol}, {$precoCol}, {$qtdCol}";
-                        if ($ncmCol) $selectCols .= ", {$ncmCol}";
+                        // NCM vem da tabela produtos via JOIN
+                        if ($hasProdutoId) {
+                            $sql = "SELECT i.{$nomeCol}, i.{$precoCol}, i.{$qtdCol}, p.ncm 
+                                    FROM {$itensTable} i 
+                                    LEFT JOIN produtos p ON p.id = i.produto_id 
+                                    WHERE i.pedido_id = ?";
+                        } else {
+                            $sql = "SELECT {$nomeCol}, {$precoCol}, {$qtdCol} FROM {$itensTable} WHERE pedido_id = ?";
+                        }
 
-                        $stItems = $this->connection->prepare("SELECT {$selectCols} FROM {$itensTable} WHERE pedido_id = ?");
+                        $stItems = $this->connection->prepare($sql);
                         $stItems->execute([$pedidoId]);
                         $itemsRows = $stItems->fetchAll(\PDO::FETCH_ASSOC);
-                        error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | items_found=' . count($itemsRows));
+                        error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | items_found=' . count($itemsRows) . ' | sample=' . json_encode($itemsRows[0] ?? []));
                         if (!empty($itemsRows)) {
                             $items = [];
                             foreach ($itemsRows as $it) {
-                                $ncmDigits = preg_replace('/\D/', '', $it[$ncmCol] ?? '');
+                                $ncmDigits = preg_replace('/\D/', '', $it['ncm'] ?? '');
                                 $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : (strlen($ncmDigits) >= 6 ? substr($ncmDigits, 0, 6) : $ncmDigits);
                                 $items[] = [
                                     'hsCode' => $hs,
