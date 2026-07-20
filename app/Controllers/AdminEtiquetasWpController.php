@@ -596,15 +596,30 @@ class AdminEtiquetasWpController extends Controller
                         $itemsRows = $stItems->fetchAll(\PDO::FETCH_ASSOC);
                         error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | items_found=' . count($itemsRows) . ' | sample=' . json_encode($itemsRows[0] ?? []));
                         if (!empty($itemsRows)) {
+                            // Verificar moeda do pedido para conversão BRL→USD
+                            $brlToUsdRate = 1.0;
+                            try {
+                                $stMoeda = $this->connection->prepare("SELECT moeda FROM pedidos WHERE id = ? LIMIT 1");
+                                $stMoeda->execute([$pedidoId]);
+                                $moedaPedido = strtoupper(trim((string) ($stMoeda->fetchColumn() ?: 'USD')));
+                                if ($moedaPedido === 'BRL') {
+                                    $usdRate = $this->getUsdToBrlRate();
+                                    $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+                                }
+                            } catch (\Exception $e) {}
+
                             $items = [];
                             foreach ($itemsRows as $it) {
                                 $ncmDigits = preg_replace('/\D/', '', $it['ncm'] ?? '');
                                 $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : (strlen($ncmDigits) >= 6 ? substr($ncmDigits, 0, 6) : $ncmDigits);
+                                $val = (float) ($it[$precoCol] ?? 0);
+                                if ($moedaPedido === 'BRL' && $val > 0) $val = $val * $brlToUsdRate;
+                                if ($val < 0.01) $val = 0.01;
                                 $items[] = [
                                     'hsCode' => $hs,
                                     'description' => $it[$nomeCol] ?? 'Item',
                                     'quantity' => (int) ($it[$qtdCol] ?? 1),
-                                    'value' => (float) ($it[$precoCol] ?? 0),
+                                    'value' => (float) number_format($val, 2, '.', ''),
                                 ];
                             }
                             $fixData['items'] = $items;
