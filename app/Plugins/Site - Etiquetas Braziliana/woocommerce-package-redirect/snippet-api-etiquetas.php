@@ -39,6 +39,12 @@ add_action('rest_api_init', function () {
         'permission_callback' => 'brz_api_check_auth',
     ]);
 
+    register_rest_route($namespace, '/packages/fix-meta/(?P<id>\d+)', [
+        'methods'  => 'POST',
+        'callback' => 'brz_api_fix_package_meta',
+        'permission_callback' => 'brz_api_check_auth',
+    ]);
+
     register_rest_route($namespace, '/packages', [
         'methods'  => 'GET',
         'callback' => 'brz_api_list_packages',
@@ -396,6 +402,55 @@ function brz_api_list_packages(WP_REST_Request $request) {
 }
 
 // ============================================================
+// PACOTES - FIX META (corrigir items e pedido_id_local)
+// ============================================================
+function brz_api_fix_package_meta(WP_REST_Request $request) {
+    $post_id = intval($request->get_param('id'));
+    $post = get_post($post_id);
+
+    if (!$post || $post->post_type !== 'package') {
+        return new WP_REST_Response(['success' => false, 'error' => 'Pacote não encontrado'], 404);
+    }
+
+    $body = $request->get_json_params();
+    $fixed = [];
+
+    // Fix pedido_id_local: recebe do painel e atualiza
+    if (!empty($body['pedidoIdLocal'])) {
+        $pid = intval($body['pedidoIdLocal']);
+        update_post_meta($post_id, '_pedido_id_local', $pid);
+        update_post_meta($post_id, '_package_order_id', $pid);
+        $fixed[] = 'pedido_id_local=' . $pid;
+    }
+
+    // Fix items_json: se estiver vazio, reconstruir do _debug_request_body
+    $items_json = get_post_meta($post_id, '_items_json', true);
+    if (empty($items_json)) {
+        $debug_request = get_post_meta($post_id, '_debug_request_body', true);
+        if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
+            $items_from_debug = $debug_request['packageList'][0]['items'];
+            update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
+            $fixed[] = 'items_json (from debug_request_body, ' . count($items_from_debug) . ' items)';
+        }
+    }
+
+    // Fix recipient_name: se recebido do painel
+    if (!empty($body['recipientName'])) {
+        $current = get_post_meta($post_id, '_recipient_name', true);
+        if (empty($current)) {
+            update_post_meta($post_id, '_recipient_name', sanitize_text_field($body['recipientName']));
+            $fixed[] = 'recipient_name';
+        }
+    }
+
+    return new WP_REST_Response([
+        'success' => true,
+        'fixed' => $fixed,
+        'wp_post_id' => $post_id,
+    ], 200);
+}
+
+// ============================================================
 // PACOTES - PDF
 // ============================================================
 function brz_api_package_pdf(WP_REST_Request $request) {
@@ -409,6 +464,31 @@ function brz_api_package_pdf(WP_REST_Request $request) {
     $tracking_code = get_post_meta($post_id, '_correios_tracking_code', true);
     if (empty($tracking_code)) {
         return new WP_REST_Response(['success' => false, 'error' => 'Pacote sem tracking code'], 400);
+    }
+
+    // Fix automático: se _items_json está vazio, reconstruir a partir do _debug_request_body
+    $items_json = get_post_meta($post_id, '_items_json', true);
+    if (empty($items_json)) {
+        $debug_request = get_post_meta($post_id, '_debug_request_body', true);
+        if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
+            $items_from_debug = $debug_request['packageList'][0]['items'];
+            update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
+        }
+    }
+
+    // Fix automático: se _pedido_id_local não existe, tentar extrair do request body
+    $pedido_id_local = get_post_meta($post_id, '_pedido_id_local', true);
+    if (empty($pedido_id_local)) {
+        $debug_request = get_post_meta($post_id, '_debug_request_body', true);
+        if (is_array($debug_request) && !empty($debug_request['packageList'][0]['pedidoIdLocal'])) {
+            $pedido_id_local = intval($debug_request['packageList'][0]['pedidoIdLocal']);
+            update_post_meta($post_id, '_pedido_id_local', $pedido_id_local);
+        }
+    }
+
+    // Atualizar _package_order_id para exibir o ID local na etiqueta (Order #)
+    if (!empty($pedido_id_local)) {
+        update_post_meta($post_id, '_package_order_id', $pedido_id_local);
     }
 
     try {

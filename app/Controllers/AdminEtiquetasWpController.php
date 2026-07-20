@@ -548,6 +548,23 @@ class AdminEtiquetasWpController extends Controller
             return;
         }
 
+        // Antes de gerar o PDF, enviar dados de fix para o WP (pedido_id_local)
+        try {
+            // Buscar pedido_id_local a partir do tracking no banco local
+            $st = $this->connection->prepare(
+                "SELECT pedido_id FROM correios_packet_etiquetas WHERE wp_post_id = ? LIMIT 1"
+            );
+            $st->execute([$wpPostId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if ($row && !empty($row['pedido_id'])) {
+                $this->wp->fixPackageMeta($wpPostId, [
+                    'pedidoIdLocal' => (int) $row['pedido_id'],
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Não bloquear o PDF por falha no fix
+        }
+
         $result = $this->wp->downloadPackagePdf($wpPostId);
         $this->servePdf($result, 'etiqueta_' . $wpPostId . '.pdf');
     }
