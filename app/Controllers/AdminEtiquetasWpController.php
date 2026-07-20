@@ -556,6 +556,7 @@ class AdminEtiquetasWpController extends Controller
             );
             $st->execute([$wpPostId]);
             $row = $st->fetch(\PDO::FETCH_ASSOC);
+            error_log('[BRZ-PDF-FIX] wp_post_id=' . $wpPostId . ' | etiqueta_row=' . json_encode($row));
             if ($row && !empty($row['pedido_id'])) {
                 $pedidoId = (int) $row['pedido_id'];
                 $fixData = ['pedidoIdLocal' => $pedidoId];
@@ -571,6 +572,7 @@ class AdminEtiquetasWpController extends Controller
                             if ($stCheck->fetchColumn()) { $itensTable = $t; break; }
                         } catch (\Exception $e) {}
                     }
+                    error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | itensTable=' . ($itensTable ?? 'NULL'));
                     if ($itensTable) {
                         $cols = [];
                         try { $stC = $this->connection->query("DESCRIBE {$itensTable}"); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
@@ -585,6 +587,7 @@ class AdminEtiquetasWpController extends Controller
                         $stItems = $this->connection->prepare("SELECT {$selectCols} FROM {$itensTable} WHERE pedido_id = ?");
                         $stItems->execute([$pedidoId]);
                         $itemsRows = $stItems->fetchAll(\PDO::FETCH_ASSOC);
+                        error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | items_found=' . count($itemsRows));
                         if (!empty($itemsRows)) {
                             $items = [];
                             foreach ($itemsRows as $it) {
@@ -600,12 +603,16 @@ class AdminEtiquetasWpController extends Controller
                             $fixData['items'] = $items;
                         }
                     }
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                    error_log('[BRZ-PDF-FIX] ERRO itens: ' . $e->getMessage());
+                }
 
-                $this->wp->fixPackageMeta($wpPostId, $fixData);
+                error_log('[BRZ-PDF-FIX] Chamando fixPackageMeta | fixData=' . json_encode($fixData));
+                $fixResp = $this->wp->fixPackageMeta($wpPostId, $fixData);
+                error_log('[BRZ-PDF-FIX] fixPackageMeta resp=' . json_encode($fixResp));
             }
         } catch (\Exception $e) {
-            // Não bloquear o PDF por falha no fix
+            error_log('[BRZ-PDF-FIX] ERRO geral: ' . $e->getMessage());
         }
 
         $result = $this->wp->downloadPackagePdf($wpPostId);

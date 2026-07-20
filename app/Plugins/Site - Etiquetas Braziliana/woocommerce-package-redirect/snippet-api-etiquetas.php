@@ -414,6 +414,7 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
 
     $body = $request->get_json_params();
     $fixed = [];
+    error_log('[BRZ-FIX-META] post_id=' . $post_id . ' | body_keys=' . implode(',', array_keys($body ?? [])) . ' | items_count=' . (isset($body['items']) ? count($body['items']) : 'N/A'));
 
     // Fix pedido_id_local: recebe do painel e atualiza
     if (!empty($body['pedidoIdLocal'])) {
@@ -426,22 +427,31 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
     // Fix items_json: se estiver vazio, usar items do body OU reconstruir do _debug_request_body
     $items_json = get_post_meta($post_id, '_items_json', true);
     $items_decoded = $items_json ? json_decode($items_json, true) : [];
+    error_log('[BRZ-FIX-META] post_id=' . $post_id . ' | existing_items_json_empty=' . (empty($items_decoded) ? 'YES' : 'NO') . ' | items_json_raw_length=' . strlen($items_json ?: ''));
     if (empty($items_decoded)) {
         // Primeiro: tentar dos items enviados pelo painel
         if (!empty($body['items']) && is_array($body['items'])) {
-            update_post_meta($post_id, '_items_json', wp_json_encode($body['items']));
+            $encoded = wp_json_encode($body['items']);
+            update_post_meta($post_id, '_items_json', $encoded);
             $fixed[] = 'items_json (from request body, ' . count($body['items']) . ' items)';
+            error_log('[BRZ-FIX-META] SAVED _items_json from body | length=' . strlen($encoded));
         } else {
             // Segundo: tentar do _debug_request_body
             $debug_request = get_post_meta($post_id, '_debug_request_body', true);
+            error_log('[BRZ-FIX-META] debug_request is_array=' . (is_array($debug_request) ? 'YES' : 'NO') . ' | type=' . gettype($debug_request));
             if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
                 $items_from_debug = $debug_request['packageList'][0]['items'];
-                update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
+                $encoded = wp_json_encode($items_from_debug);
+                update_post_meta($post_id, '_items_json', $encoded);
                 $fixed[] = 'items_json (from debug_request_body, ' . count($items_from_debug) . ' items)';
+                error_log('[BRZ-FIX-META] SAVED _items_json from debug | length=' . strlen($encoded));
             } else {
                 $fixed[] = 'items_json FAILED - no source found';
+                error_log('[BRZ-FIX-META] FAILED to find items source');
             }
         }
+    } else {
+        $fixed[] = 'items_json already exists (' . count($items_decoded) . ' items)';
     }
 
     // Fix recipient_name: se recebido do painel
@@ -479,11 +489,14 @@ function brz_api_package_pdf(WP_REST_Request $request) {
     // Fix automático: se _items_json está vazio, reconstruir a partir do _debug_request_body
     $items_json = get_post_meta($post_id, '_items_json', true);
     $items_decoded = $items_json ? json_decode($items_json, true) : [];
+    error_log('[BRZ-PDF] post_id=' . $post_id . ' | items_json_empty=' . (empty($items_decoded) ? 'YES' : 'NO') . ' | items_json_length=' . strlen($items_json ?: ''));
     if (empty($items_decoded)) {
         $debug_request = get_post_meta($post_id, '_debug_request_body', true);
+        error_log('[BRZ-PDF] debug_request type=' . gettype($debug_request) . ' | has_packageList=' . (is_array($debug_request) && isset($debug_request['packageList']) ? 'YES' : 'NO'));
         if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
             $items_from_debug = $debug_request['packageList'][0]['items'];
             update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
+            error_log('[BRZ-PDF] Fixed _items_json from debug | count=' . count($items_from_debug));
         }
     }
 
