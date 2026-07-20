@@ -548,18 +548,61 @@ class AdminEtiquetasWpController extends Controller
             return;
         }
 
-        // Antes de gerar o PDF, enviar dados de fix para o WP (pedido_id_local)
+        // Antes de gerar o PDF, enviar dados de fix para o WP (pedido_id_local + items)
         try {
-            // Buscar pedido_id_local a partir do tracking no banco local
+            // Buscar pedido_id_local a partir do wp_post_id no banco local
             $st = $this->connection->prepare(
                 "SELECT pedido_id FROM correios_packet_etiquetas WHERE wp_post_id = ? LIMIT 1"
             );
             $st->execute([$wpPostId]);
             $row = $st->fetch(\PDO::FETCH_ASSOC);
             if ($row && !empty($row['pedido_id'])) {
-                $this->wp->fixPackageMeta($wpPostId, [
-                    'pedidoIdLocal' => (int) $row['pedido_id'],
-                ]);
+                $pedidoId = (int) $row['pedido_id'];
+                $fixData = ['pedidoIdLocal' => $pedidoId];
+
+                // Buscar itens do pedido para enviar ao WP
+                try {
+                    // Detectar tabela de itens (pedido_itens ou pedido_items)
+                    $itensTable = null;
+                    foreach (['pedido_itens', 'pedido_items'] as $t) {
+                        try {
+                            $stCheck = $this->connection->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1");
+                            $stCheck->execute([$t]);
+                            if ($stCheck->fetchColumn()) { $itensTable = $t; break; }
+                        } catch (\Exception $e) {}
+                    }
+                    if ($itensTable) {
+                        $cols = [];
+                        try { $stC = $this->connection->query("DESCRIBE {$itensTable}"); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        $nomeCol = in_array('nome_produto', $cols) ? 'nome_produto' : (in_array('nome', $cols) ? 'nome' : 'nome_produto');
+                        $ncmCol = in_array('ncm', $cols) ? 'ncm' : null;
+                        $precoCol = in_array('preco_unitario', $cols) ? 'preco_unitario' : (in_array('valor_unitario', $cols) ? 'valor_unitario' : 'preco_unitario');
+                        $qtdCol = in_array('quantidade', $cols) ? 'quantidade' : 'quantidade';
+
+                        $selectCols = "{$nomeCol}, {$precoCol}, {$qtdCol}";
+                        if ($ncmCol) $selectCols .= ", {$ncmCol}";
+
+                        $stItems = $this->connection->prepare("SELECT {$selectCols} FROM {$itensTable} WHERE pedido_id = ?");
+                        $stItems->execute([$pedidoId]);
+                        $itemsRows = $stItems->fetchAll(\PDO::FETCH_ASSOC);
+                        if (!empty($itemsRows)) {
+                            $items = [];
+                            foreach ($itemsRows as $it) {
+                                $ncmDigits = preg_replace('/\D/', '', $it[$ncmCol] ?? '');
+                                $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : (strlen($ncmDigits) >= 6 ? substr($ncmDigits, 0, 6) : $ncmDigits);
+                                $items[] = [
+                                    'hsCode' => $hs,
+                                    'description' => $it[$nomeCol] ?? 'Item',
+                                    'quantity' => (int) ($it[$qtdCol] ?? 1),
+                                    'value' => (float) ($it[$precoCol] ?? 0),
+                                ];
+                            }
+                            $fixData['items'] = $items;
+                        }
+                    }
+                } catch (\Exception $e) {}
+
+                $this->wp->fixPackageMeta($wpPostId, $fixData);
             }
         } catch (\Exception $e) {
             // Não bloquear o PDF por falha no fix

@@ -423,14 +423,24 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
         $fixed[] = 'pedido_id_local=' . $pid;
     }
 
-    // Fix items_json: se estiver vazio, reconstruir do _debug_request_body
+    // Fix items_json: se estiver vazio, usar items do body OU reconstruir do _debug_request_body
     $items_json = get_post_meta($post_id, '_items_json', true);
-    if (empty($items_json)) {
-        $debug_request = get_post_meta($post_id, '_debug_request_body', true);
-        if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
-            $items_from_debug = $debug_request['packageList'][0]['items'];
-            update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
-            $fixed[] = 'items_json (from debug_request_body, ' . count($items_from_debug) . ' items)';
+    $items_decoded = $items_json ? json_decode($items_json, true) : [];
+    if (empty($items_decoded)) {
+        // Primeiro: tentar dos items enviados pelo painel
+        if (!empty($body['items']) && is_array($body['items'])) {
+            update_post_meta($post_id, '_items_json', wp_json_encode($body['items']));
+            $fixed[] = 'items_json (from request body, ' . count($body['items']) . ' items)';
+        } else {
+            // Segundo: tentar do _debug_request_body
+            $debug_request = get_post_meta($post_id, '_debug_request_body', true);
+            if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
+                $items_from_debug = $debug_request['packageList'][0]['items'];
+                update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
+                $fixed[] = 'items_json (from debug_request_body, ' . count($items_from_debug) . ' items)';
+            } else {
+                $fixed[] = 'items_json FAILED - no source found';
+            }
         }
     }
 
@@ -468,7 +478,8 @@ function brz_api_package_pdf(WP_REST_Request $request) {
 
     // Fix automático: se _items_json está vazio, reconstruir a partir do _debug_request_body
     $items_json = get_post_meta($post_id, '_items_json', true);
-    if (empty($items_json)) {
+    $items_decoded = $items_json ? json_decode($items_json, true) : [];
+    if (empty($items_decoded)) {
         $debug_request = get_post_meta($post_id, '_debug_request_body', true);
         if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
             $items_from_debug = $debug_request['packageList'][0]['items'];
