@@ -320,7 +320,7 @@ function brz_api_create_package(WP_REST_Request $request) {
         update_post_meta($post_id, '_recipient_zip_code', $recipient_data['recipientZipCode']);
         update_post_meta($post_id, '_recipient_email', $recipient_data['recipientEmail']);
         update_post_meta($post_id, '_recipient_phone_number', $recipient_data['recipientPhoneNumber']);
-        update_post_meta($post_id, '_items_json', wp_json_encode($items));
+        update_post_meta($post_id, '_items_json', wp_slash(wp_json_encode($items)));
 
         return new WP_REST_Response([
             'success' => true,
@@ -428,7 +428,8 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
     // Fix items_json: SEMPRE sobrescrever se body tiver items (corrige dados corrompidos)
     if (!empty($body['items']) && is_array($body['items'])) {
         $encoded = wp_json_encode($body['items']);
-        update_post_meta($post_id, '_items_json', $encoded);
+        // wp_slash para preservar backslashes no JSON (WP faz wp_unslash internamente no update_post_meta)
+        update_post_meta($post_id, '_items_json', wp_slash($encoded));
         $fixed[] = 'items_json FORCED from request body (' . count($body['items']) . ' items, ' . strlen($encoded) . ' bytes)';
         error_log('[BRZ-FIX-META] FORCED SAVE _items_json from body | length=' . strlen($encoded) . ' | content=' . $encoded);
     } else {
@@ -440,7 +441,7 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
             if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
                 $items_from_debug = $debug_request['packageList'][0]['items'];
                 $encoded = wp_json_encode($items_from_debug);
-                update_post_meta($post_id, '_items_json', $encoded);
+                update_post_meta($post_id, '_items_json', wp_slash($encoded));
                 $fixed[] = 'items_json from debug_request_body (' . count($items_from_debug) . ' items)';
             } else {
                 $fixed[] = 'items_json FAILED - no source';
@@ -491,7 +492,7 @@ function brz_api_package_pdf(WP_REST_Request $request) {
         error_log('[BRZ-PDF] debug_request type=' . gettype($debug_request) . ' | has_packageList=' . (is_array($debug_request) && isset($debug_request['packageList']) ? 'YES' : 'NO'));
         if (is_array($debug_request) && !empty($debug_request['packageList'][0]['items'])) {
             $items_from_debug = $debug_request['packageList'][0]['items'];
-            update_post_meta($post_id, '_items_json', wp_json_encode($items_from_debug));
+            update_post_meta($post_id, '_items_json', wp_slash(wp_json_encode($items_from_debug)));
             error_log('[BRZ-PDF] Fixed _items_json from debug | count=' . count($items_from_debug));
         }
     }
