@@ -135,6 +135,7 @@ $router->get('/admin/correios-mundial/etiqueta/{tracking}.pdf', 'AdminCorreiosMu
 // Etiquetas via WordPress (nova integração)
 $router->get('/admin/etiquetas-wp', 'AdminEtiquetasWpController', 'index');
 $router->get('/admin/etiquetas-wp/testar-conexao', 'AdminEtiquetasWpController', 'testarConexao');
+$router->get('/admin/etiquetas-wp/saldo', 'AdminEtiquetasWpController', 'saldo');
 $router->post('/admin/etiquetas-wp/gerar-etiqueta', 'AdminEtiquetasWpController', 'gerarEtiqueta');
 $router->post('/admin/etiquetas-wp/gerar-etiquetas-massa', 'AdminEtiquetasWpController', 'gerarEtiquetasMassa');
 $router->post('/admin/etiquetas-wp/criar-container', 'AdminEtiquetasWpController', 'criarContainer');

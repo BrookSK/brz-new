@@ -214,6 +214,36 @@ class AdminEtiquetasWpController extends Controller
     }
 
     // =========================================================
+    // SALDO FINANCEIRO (CORREIOS)
+    // =========================================================
+
+    /**
+     * Consultar saldo financeiro direto da API dos Correios (mesmo do painel antigo).
+     * GET /admin/etiquetas-wp/saldo
+     */
+    public function saldo(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $svc = new \App\Services\CorreiosPacketService();
+        $r = $svc->getBalance();
+
+        if (empty($r['success'])) {
+            $this->json([
+                'success' => false,
+                'error' => (string) ($r['error'] ?? 'Falha ao consultar saldo.'),
+            ], 400);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'currentBalance' => $r['currentBalance'] ?? null,
+        ]);
+    }
+
+    // =========================================================
     // GERAR ETIQUETAS VIA WORDPRESS
     // =========================================================
 
