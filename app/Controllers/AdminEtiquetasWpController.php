@@ -529,6 +529,51 @@ class AdminEtiquetasWpController extends Controller
     }
 
     // =========================================================
+    // REGERAR ETIQUETA
+    // =========================================================
+
+    /**
+     * Regerar etiqueta: deleta a existente e gera nova com dados atuais do pedido.
+     * POST /admin/etiquetas-wp/regerar-etiqueta
+     * Body JSON: { pedido_id: int }
+     */
+    public function regerarEtiqueta(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $pedidoId = (int) ($body['pedido_id'] ?? 0);
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => 'pedido_id inválido'], 400);
+            return;
+        }
+
+        // Deletar etiqueta local existente
+        try {
+            if ($this->tableExists('correios_packet_etiquetas')) {
+                $stDel = $this->connection->prepare('DELETE FROM correios_packet_etiquetas WHERE pedido_id = ?');
+                $stDel->execute([$pedidoId]);
+            }
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao deletar etiqueta anterior: ' . $e->getMessage()], 500);
+            return;
+        }
+
+        // Reverter status do pedido para permitir nova geração
+        try {
+            $pedidoModel = new PedidoEcommerce();
+            $pedidoModel->atualizarStatus($pedidoId, 'produto_consolidado', 'Etiqueta deletada para regeração (via WP)', $_SESSION['usuario_id'] ?? null);
+        } catch (\Exception $e) {
+            // Não bloquear se falhar a reversão de status
+            error_log('[BRZ-REGERAR-WP] Erro ao reverter status pedido #' . $pedidoId . ': ' . $e->getMessage());
+        }
+
+        // Agora gerar nova etiqueta usando o mesmo fluxo
+        $this->gerarEtiqueta($request);
+    }
+
+    // =========================================================
     // DOWNLOAD DE PDFs
     // =========================================================
 

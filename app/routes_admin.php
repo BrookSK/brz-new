@@ -150,6 +150,7 @@ $router->get('/admin/etiquetas-wp/pdf/fatura/{id}', 'AdminEtiquetasWpController'
 $router->post('/admin/etiquetas-wp/deletar-container', 'AdminEtiquetasWpController', 'deletarContainer');
 $router->post('/admin/etiquetas-wp/deletar-fatura', 'AdminEtiquetasWpController', 'deletarFatura');
 $router->post('/admin/etiquetas-wp/deletar-embarque', 'AdminEtiquetasWpController', 'deletarEmbarque');
+$router->post('/admin/etiquetas-wp/regerar-etiqueta', 'AdminEtiquetasWpController', 'regerarEtiqueta');
 
 // Comissões gerais
 $router->get('/admin/pagamentos/comissoes-gerais', 'AdminPagamentosController', 'comissoesGerais');
