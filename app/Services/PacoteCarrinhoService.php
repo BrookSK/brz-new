@@ -22,29 +22,37 @@ class PacoteCarrinhoService {
         // Garantir que as colunas necessárias existem
         $this->ensureColumns();
 
-        // Cache: só verificar a cada 2 minutos
+        // Cache: só verificar a cada 2 minutos (desativado temporariamente para debug)
         if (session_status() === PHP_SESSION_NONE) {
             @session_start();
         }
-        $cacheKey = 'pacotes_auto_check_' . $usuarioId;
-        $lastCheck = (int) ($_SESSION[$cacheKey] ?? 0);
-        if ($lastCheck > 0 && (time() - $lastCheck) < 120) {
-            return; // Verificou há menos de 2 min
-        }
-        $_SESSION[$cacheKey] = time();
+        // $cacheKey = 'pacotes_auto_check_' . $usuarioId;
+        // $lastCheck = (int) ($_SESSION[$cacheKey] ?? 0);
+        // if ($lastCheck > 0 && (time() - $lastCheck) < 120) {
+        //     return; // Verificou há menos de 2 min
+        // }
+        // $_SESSION[$cacheKey] = time();
 
         // Buscar suite do usuario
         $suite = $this->getUserSuite($usuarioId);
-        if (!$suite) return;
+        if (!$suite) {
+            error_log('[PacoteCarrinhoService] Sem suite para uid=' . $usuarioId);
+            return;
+        }
 
         // Buscar pacotes pendentes
         $pacotes = $this->getPacotesPendentes($suite);
+        error_log('[PacoteCarrinhoService] suite=' . $suite . ' pacotes_pendentes=' . count($pacotes));
         if (empty($pacotes)) return;
 
         // Buscar/criar carrinho
         $cartId = $this->getOrCreateCart($usuarioId);
-        if ($cartId <= 0) return;
+        if ($cartId <= 0) {
+            error_log('[PacoteCarrinhoService] Nao conseguiu pegar cartId para uid=' . $usuarioId);
+            return;
+        }
 
+        error_log('[PacoteCarrinhoService] cartId=' . $cartId . ' inserindo pacotes...');
         foreach ($pacotes as $pacote) {
             // Verificar se já está no carrinho
             if ($this->pacoteJaNoCarrinho($cartId, (int) $pacote['id'])) {
@@ -152,11 +160,27 @@ class PacoteCarrinhoService {
 
     private function getUserSuite(int $usuarioId): ?int {
         try {
+            // Verificar se a coluna suite existe
+            $cols = [];
+            try {
+                $st = $this->connection->query('DESCRIBE usuarios');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+            if (!in_array('suite', $cols, true)) {
+                error_log('[PacoteCarrinhoService] Coluna suite nao existe na tabela usuarios');
+                return null;
+            }
+
             $stmt = $this->connection->prepare('SELECT suite FROM usuarios WHERE id = ? LIMIT 1');
             $stmt->execute([$usuarioId]);
             $suite = $stmt->fetchColumn();
-            return ($suite && (int) $suite > 0) ? (int) $suite : null;
+            $suiteInt = ($suite !== false && $suite !== null && $suite !== '') ? (int) $suite : 0;
+            error_log('[PacoteCarrinhoService] getUserSuite uid=' . $usuarioId . ' suite=' . var_export($suite, true) . ' int=' . $suiteInt);
+            return $suiteInt > 0 ? $suiteInt : null;
         } catch (\Throwable $e) {
+            error_log('[PacoteCarrinhoService] Erro getUserSuite: ' . $e->getMessage());
             return null;
         }
     }
