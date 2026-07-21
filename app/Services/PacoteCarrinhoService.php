@@ -234,7 +234,7 @@ class PacoteCarrinhoService {
 
     private function adicionarPacoteAoCarrinho(int $cartId, array $pacote): void {
         try {
-            // Detectar nome da coluna de preço
+            // Detectar nome da coluna de preço e variação
             $cols = [];
             try {
                 $st = $this->connection->query('DESCRIBE carrinho_items');
@@ -243,17 +243,26 @@ class PacoteCarrinhoService {
                 $cols = [];
             }
             $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
+            $varCol = in_array('produto_variacao_id', $cols, true) ? 'produto_variacao_id' : null;
 
-            // Verificar se há unique key em (carrinho_id, produto_id, produto_variacao_id)
-            // Usar produto_id negativo baseado no pacote_id para evitar conflito
-            $fakeProdutoId = -1 * (int) $pacote['id'];
+            // Usar produto_id negativo para evitar conflito com UNIQUE KEY
+            $fakeProdutoId = -1 * abs((int) $pacote['id']);
+            // Usar variacao_id = pacote_id para evitar conflito com NULL duplicado
+            $fakeVariacaoId = abs((int) $pacote['id']);
 
-            $stmt = $this->connection->prepare(
-                "INSERT INTO carrinho_items 
-                (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url)
-                VALUES (?, ?, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?)"
-            );
-            $stmt->execute([
+            // Limpar registro antigo com produto_id=0 se existir (legado de tentativa anterior)
+            try {
+                $this->connection->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ? AND produto_id = 0")->execute([$cartId]);
+            } catch (\Throwable $e) {}
+
+            // Limpar registro com id=0 se existir (corrige auto_increment)
+            try {
+                $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
+            } catch (\Throwable $e) {}
+
+            $colsList = "carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url";
+            $valsList = "?, ?, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?";
+            $params = [
                 $cartId,
                 $fakeProdutoId,
                 (int) ($pacote['quantidade'] ?? 1),
@@ -261,7 +270,16 @@ class PacoteCarrinhoService {
                 $pacote['nome'] ?? 'Pacote',
                 (float) ($pacote['peso_kg'] ?? 0),
                 $pacote['foto_url'] ?? null,
-            ]);
+            ];
+
+            if ($varCol) {
+                $colsList .= ", {$varCol}";
+                $valsList .= ", ?";
+                $params[] = $fakeVariacaoId;
+            }
+
+            $stmt = $this->connection->prepare("INSERT INTO carrinho_items ({$colsList}) VALUES ({$valsList})");
+            $stmt->execute($params);
             error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId);
         } catch (\Throwable $e) {
             error_log('[PacoteCarrinhoService] Erro ao adicionar pacote #' . ($pacote['id'] ?? '?') . ': ' . $e->getMessage());
