@@ -549,6 +549,21 @@ class AdminEtiquetasWpController extends Controller
             return;
         }
 
+        // Marcar etiqueta antiga como cancelada no WordPress (via fix-meta)
+        try {
+            if ($this->tableExists('correios_packet_etiquetas')) {
+                $stWp = $this->connection->prepare('SELECT wp_post_id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                $stWp->execute([$pedidoId]);
+                $wpPostId = (int) ($stWp->fetchColumn() ?: 0);
+                if ($wpPostId > 0) {
+                    $this->wp->fixPackageMeta($wpPostId, ['packageStatus' => 'cancelado']);
+                }
+            }
+        } catch (\Exception $e) {
+            // Não bloquear se falhar a marcação no WP
+            error_log('[BRZ-REGERAR-WP] Erro ao marcar etiqueta como cancelada no WP (pedido #' . $pedidoId . '): ' . $e->getMessage());
+        }
+
         // Deletar etiqueta local existente
         try {
             if ($this->tableExists('correios_packet_etiquetas')) {

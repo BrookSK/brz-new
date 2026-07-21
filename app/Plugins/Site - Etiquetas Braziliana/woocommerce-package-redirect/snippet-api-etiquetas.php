@@ -387,6 +387,7 @@ function brz_api_list_packages(WP_REST_Request $request) {
                 'total_weight' => get_post_meta($id, '_total_weight', true),
                 'recipient_name' => get_post_meta($id, '_recipient_name', true),
                 'pedido_id_local' => get_post_meta($id, '_pedido_id_local', true),
+                'package_status' => get_post_meta($id, '_package_status', true) ?: 'ativo',
                 'created_at' => get_the_date('Y-m-d H:i:s'),
             ];
         }
@@ -457,6 +458,16 @@ function brz_api_fix_package_meta(WP_REST_Request $request) {
         if (empty($current)) {
             update_post_meta($post_id, '_recipient_name', sanitize_text_field($body['recipientName']));
             $fixed[] = 'recipient_name';
+        }
+    }
+
+    // Fix package_status: permite marcar pacote como cancelado
+    if (!empty($body['packageStatus'])) {
+        $allowed = ['ativo', 'cancelado'];
+        $status = sanitize_text_field($body['packageStatus']);
+        if (in_array($status, $allowed, true)) {
+            update_post_meta($post_id, '_package_status', $status);
+            $fixed[] = 'package_status=' . $status;
         }
     }
 
