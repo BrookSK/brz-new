@@ -122,6 +122,16 @@ class AdminFaturasAdicionaisController extends Controller {
         try {
             $db = $this->connection;
 
+            // Detectar nome da coluna de preço
+            $cols = [];
+            try {
+                $st = $db->query('DESCRIBE carrinho_items');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+            $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
+
             // Buscar ou criar carrinho do usuario
             $stCart = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 1');
             $stCart->execute([$usuarioId]);
@@ -142,7 +152,7 @@ class AdminFaturasAdicionaisController extends Controller {
 
             // Inserir item
             $stIns = $db->prepare(
-                "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, valor_unitario, subtotal, tipo_item, fatura_adicional_id, nome_item)
+                "INSERT INTO carrinho_items (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, fatura_adicional_id, nome_item)
                  VALUES (?, 0, 1, ?, ?, 'fatura_adicional', ?, ?)"
             );
             $stIns->execute([$cartId, $valor, $valor, $faturaId, 'Fatura Adicional: ' . $motivo]);

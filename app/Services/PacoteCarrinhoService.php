@@ -232,9 +232,19 @@ class PacoteCarrinhoService {
 
     private function adicionarPacoteAoCarrinho(int $cartId, array $pacote): void {
         try {
+            // Detectar nome da coluna de preço
+            $cols = [];
+            try {
+                $st = $this->connection->query('DESCRIBE carrinho_items');
+                $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+            $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
+
             $stmt = $this->connection->prepare(
                 "INSERT INTO carrinho_items 
-                (carrinho_id, produto_id, quantidade, valor_unitario, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url)
+                (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url)
                 VALUES (?, 0, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?)"
             );
             $stmt->execute([
@@ -245,6 +255,7 @@ class PacoteCarrinhoService {
                 (float) ($pacote['peso_kg'] ?? 0),
                 $pacote['foto_url'] ?? null,
             ]);
+            error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId);
         } catch (\Throwable $e) {
             error_log('[PacoteCarrinhoService] Erro ao adicionar pacote #' . ($pacote['id'] ?? '?') . ': ' . $e->getMessage());
         }
