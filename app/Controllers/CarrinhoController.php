@@ -218,8 +218,8 @@ class CarrinhoController extends Controller {
                 $pid = (int) ($it['produto_id'] ?? 0);
                 $tipoItem = (string) ($it['tipo_item'] ?? 'produto');
 
-                // Itens de pacote/fatura têm produto_id = 0, tratar separadamente
-                if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional') {
+                // Itens de pacote/fatura têm produto_id <= 0, tratar separadamente
+                if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional' || $pid <= 0) {
                     $pacoteId = (int) ($it['pacote_id'] ?? 0);
                     $faturaId = (int) ($it['fatura_adicional_id'] ?? 0);
                     $key = $tipoItem . '_' . ($pacoteId > 0 ? $pacoteId : $faturaId) . '_' . ($it['id'] ?? 0);

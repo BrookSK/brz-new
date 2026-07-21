@@ -220,10 +220,12 @@ class PacoteCarrinhoService {
 
     private function pacoteJaNoCarrinho(int $cartId, int $pacoteId): bool {
         try {
+            // Verificar por pacote_id OU por produto_id negativo
             $stmt = $this->connection->prepare(
-                "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND pacote_id = ? AND tipo_item = 'pacote_redirecionamento' LIMIT 1"
+                "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND (pacote_id = ? OR produto_id = ?) LIMIT 1"
             );
-            $stmt->execute([$cartId, $pacoteId]);
+            $fakeProdutoId = -1 * $pacoteId;
+            $stmt->execute([$cartId, $pacoteId, $fakeProdutoId]);
             return (bool) $stmt->fetchColumn();
         } catch (\Throwable $e) {
             return false;
@@ -242,13 +244,18 @@ class PacoteCarrinhoService {
             }
             $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
 
+            // Verificar se há unique key em (carrinho_id, produto_id, produto_variacao_id)
+            // Usar produto_id negativo baseado no pacote_id para evitar conflito
+            $fakeProdutoId = -1 * (int) $pacote['id'];
+
             $stmt = $this->connection->prepare(
                 "INSERT INTO carrinho_items 
                 (carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url)
-                VALUES (?, 0, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?)"
+                VALUES (?, ?, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?)"
             );
             $stmt->execute([
                 $cartId,
+                $fakeProdutoId,
                 (int) ($pacote['quantidade'] ?? 1),
                 (int) $pacote['id'],
                 $pacote['nome'] ?? 'Pacote',
