@@ -218,8 +218,8 @@ class CarrinhoController extends Controller {
                 $pid = (int) ($it['produto_id'] ?? 0);
                 $tipoItem = (string) ($it['tipo_item'] ?? 'produto');
 
-                // Itens de pacote/fatura têm produto_id <= 0, tratar separadamente
-                if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional' || $pid <= 0) {
+                // Itens de pacote/fatura têm produto_id >= 999990 ou <= 0, tratar separadamente
+                if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional' || $pid <= 0 || $pid >= 999990) {
                     $pacoteId = (int) ($it['pacote_id'] ?? 0);
                     $faturaId = (int) ($it['fatura_adicional_id'] ?? 0);
                     $key = $tipoItem . '_' . ($pacoteId > 0 ? $pacoteId : $faturaId) . '_' . ($it['id'] ?? 0);
@@ -344,7 +344,8 @@ class CarrinhoController extends Controller {
             
             // Itens de pacote/fatura: não buscar na tabela produtos
             $tipoItem = $item['tipo_item'] ?? 'produto';
-            if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional') {
+            $itemProdutoId = (int) ($item['produto_id'] ?? 0);
+            if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional' || $itemProdutoId >= 999990 || $itemProdutoId <= 0) {
                 $itemKey = $k;
                 $isAtivo = $this->getItemAtivoFromSession('pacote_' . ($item['pacote_id'] ?? ($item['fatura_adicional_id'] ?? $k)));
                 $pesoUnit = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? 0));

@@ -383,7 +383,7 @@ class Carrinho extends Model {
             SELECT ci.*, {$pesoExpr} AS peso {$clubeSelect}
             FROM carrinho_items ci 
             LEFT JOIN produtos p ON ci.produto_id = p.id 
-            WHERE ci.carrinho_id = :carrinho_id AND ci.produto_id > 0
+            WHERE ci.carrinho_id = :carrinho_id AND ci.produto_id > 0 AND ci.produto_id < 999990
         ");
         $stmt->bindParam(':carrinho_id', $carrinhoId);
         $stmt->execute();
@@ -413,7 +413,7 @@ class Carrinho extends Model {
                 $stPacotes = $this->connection->prepare(
                     "SELECT COALESCE(SUM(peso_kg * quantidade), 0) AS peso_pacotes 
                      FROM carrinho_items 
-                     WHERE carrinho_id = :cid AND produto_id <= 0"
+                     WHERE carrinho_id = :cid AND (produto_id <= 0 OR produto_id >= 999990)"
                 );
                 $stPacotes->execute([':cid' => $carrinhoId]);
                 $pesoPacotes = (float) ($stPacotes->fetchColumn() ?: 0);

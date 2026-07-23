@@ -222,21 +222,29 @@ class PacoteCarrinhoService {
 
     private function pacoteJaNoCarrinho(int $cartId, int $pacoteId): bool {
         try {
-            $fakeProdutoId = -1 * abs($pacoteId);
-            // Verificar por produto_id negativo (mais confiável) ou pacote_id
+            $virtualProdutoId = 999990 + abs($pacoteId);
+            // Verificar por produto_id virtual (999990+pacoteId)
             $stmt = $this->connection->prepare(
                 "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1"
             );
-            $stmt->execute([$cartId, $fakeProdutoId]);
+            $stmt->execute([$cartId, $virtualProdutoId]);
             if ($stmt->fetchColumn()) return true;
 
-            // Fallback: verificar pela coluna pacote_id se existir
+            // Fallback: verificar por produto_id negativo (legado)
+            $fakeProdutoId = -1 * abs($pacoteId);
+            $stmt2 = $this->connection->prepare(
+                "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1"
+            );
+            $stmt2->execute([$cartId, $fakeProdutoId]);
+            if ($stmt2->fetchColumn()) return true;
+
+            // Fallback: verificar pela coluna pacote_id
             try {
-                $stmt2 = $this->connection->prepare(
+                $stmt3 = $this->connection->prepare(
                     "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND pacote_id = ? LIMIT 1"
                 );
-                $stmt2->execute([$cartId, $pacoteId]);
-                if ($stmt2->fetchColumn()) return true;
+                $stmt3->execute([$cartId, $pacoteId]);
+                if ($stmt3->fetchColumn()) return true;
             } catch (\Throwable $e) {}
 
             return false;
@@ -258,26 +266,15 @@ class PacoteCarrinhoService {
             $unitCol = in_array('preco_unitario', $cols, true) ? 'preco_unitario' : 'valor_unitario';
             $varCol = in_array('produto_variacao_id', $cols, true) ? 'produto_variacao_id' : null;
 
-            // Usar produto_id negativo para evitar conflito com UNIQUE KEY
-            $fakeProdutoId = -1 * abs((int) $pacote['id']);
-            // Usar variacao_id = pacote_id para evitar conflito com NULL duplicado
+            // Usar produto_id = 999990 + pacote_id (ID virtual alto que não conflita com produtos reais)
+            $virtualProdutoId = 999990 + abs((int) $pacote['id']);
             $fakeVariacaoId = abs((int) $pacote['id']);
-
-            // Limpar registro antigo com produto_id=0 se existir (legado de tentativa anterior)
-            try {
-                $this->connection->prepare("DELETE FROM carrinho_items WHERE carrinho_id = ? AND produto_id = 0")->execute([$cartId]);
-            } catch (\Throwable $e) {}
-
-            // Limpar registro com id=0 se existir (corrige auto_increment)
-            try {
-                $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
-            } catch (\Throwable $e) {}
 
             $colsList = "carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url";
             $valsList = "?, ?, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?";
             $params = [
                 $cartId,
-                $fakeProdutoId,
+                $virtualProdutoId,
                 (int) ($pacote['quantidade'] ?? 1),
                 (int) $pacote['id'],
                 $pacote['nome'] ?? 'Pacote',
@@ -291,14 +288,9 @@ class PacoteCarrinhoService {
                 $params[] = $fakeVariacaoId;
             }
 
-            // Forçar auto_increment correto (evitar id=0)
-            try {
-                $this->connection->exec("SET sql_mode = REPLACE(@@sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')");
-            } catch (\Throwable $e) {}
-
             $stmt = $this->connection->prepare("INSERT INTO carrinho_items ({$colsList}) VALUES ({$valsList})");
             $stmt->execute($params);
-            error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId);
+            error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId . ' (produto_id=' . $virtualProdutoId . ')');
         } catch (\Throwable $e) {
             error_log('[PacoteCarrinhoService] Erro ao adicionar pacote #' . ($pacote['id'] ?? '?') . ': ' . $e->getMessage());
         }
