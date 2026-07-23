@@ -288,6 +288,11 @@ class PacoteCarrinhoService {
                 $params[] = $fakeVariacaoId;
             }
 
+            // Remover NO_AUTO_VALUE_ON_ZERO para garantir que id auto_increment funcione
+            try {
+                $this->connection->exec("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')");
+            } catch (\Throwable $e) {}
+
             $stmt = $this->connection->prepare("INSERT INTO carrinho_items ({$colsList}) VALUES ({$valsList})");
             $stmt->execute($params);
             error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId . ' (produto_id=' . $virtualProdutoId . ')');
