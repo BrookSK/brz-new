@@ -341,6 +341,52 @@ class CarrinhoController extends Controller {
         foreach ($carrinho as $k => $item) {
             $this->debugLog('[CARRINHO] Processando item: ' . json_encode($item));
             
+            // Itens de pacote/fatura: não buscar na tabela produtos
+            $tipoItem = $item['tipo_item'] ?? 'produto';
+            if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional') {
+                $itemKey = $k;
+                $isAtivo = $this->getItemAtivoFromSession('pacote_' . ($item['pacote_id'] ?? ($item['fatura_adicional_id'] ?? $k)));
+                $pesoUnit = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? 0));
+                $pesoItem = $pesoUnit * (int) ($item['quantidade'] ?? 1);
+                $itemPrice = (float) ($item['price'] ?? ($item['preco_unitario'] ?? 0));
+                $itemSubtotal = $itemPrice * (int) ($item['quantidade'] ?? 1);
+
+                $fotoUrl = $item['foto_url'] ?? null;
+                if (empty($fotoUrl)) {
+                    $fotoUrl = \App\Core\Url::absolute('/uploads/produtos/placeholder.jpg');
+                }
+
+                $produtosDetalhados[] = [
+                    'produto_id' => $item['produto_id'] ?? 0,
+                    'sku' => '',
+                    'name' => $item['nome'] ?? 'Pacote',
+                    'description' => '',
+                    'price' => $itemPrice,
+                    'preco_unitario' => $itemPrice,
+                    'stored_price' => $itemPrice,
+                    'weight' => $pesoUnit,
+                    'quantidade' => (int) ($item['quantidade'] ?? 1),
+                    'subtotal' => $itemSubtotal,
+                    'foto_principal' => $fotoUrl,
+                    'stock' => 999,
+                    'ativo' => $isAtivo ? 1 : 0,
+                    'tipo_item' => $tipoItem,
+                    'pacote_id' => $item['pacote_id'] ?? null,
+                    'fatura_adicional_id' => $item['fatura_adicional_id'] ?? null,
+                    'declaration_value' => $item['declaration_value'] ?? null,
+                    'carrinho_item_id' => $item['carrinho_item_id'] ?? null,
+                    'nome' => $item['nome'] ?? 'Pacote',
+                ];
+
+                $totalItensAll += (int) ($item['quantidade'] ?? 0);
+                if ($isAtivo) {
+                    $subtotal += $itemSubtotal;
+                    $pesoTotal += $pesoItem;
+                    $totalItensAtivos += (int) ($item['quantidade'] ?? 0);
+                }
+                continue;
+            }
+
             $produto = $this->produtoModel->find($item['produto_id']);
             
             if ($produto) {
@@ -512,6 +558,7 @@ class CarrinhoController extends Controller {
                     'foto_principal' => $fotoUrl,
                     'stock' => $itemStock,
                     'ativo' => $ativo ? 1 : 0,
+                    'tipo_item' => 'produto',
                 ];
 
                 $totalItensAll += (int) ($item['quantidade'] ?? 0);

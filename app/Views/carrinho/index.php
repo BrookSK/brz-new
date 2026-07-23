@@ -120,8 +120,14 @@
                                         <?php if (!empty($item['is_free_offer'])): ?>
                                             <span class="badge bg-success ms-1"><i class="fas fa-gift me-1"></i>Produto Gratuito</span>
                                         <?php endif; ?>
-                                        <?php if (!empty($item['is_brinde']) || ((float)($item['preco_unitario'] ?? ($item['price'] ?? 1)) === 0.0 && (float)($item['stored_price'] ?? 1) === 0.0)): ?>
+                                        <?php if (!empty($item['is_brinde']) || (($item['tipo_item'] ?? 'produto') === 'produto' && (float)($item['preco_unitario'] ?? ($item['price'] ?? 1)) === 0.0 && (float)($item['stored_price'] ?? 1) === 0.0)): ?>
                                             <span class="badge bg-success ms-1"><i class="fas fa-gift me-1"></i>Brinde</span>
+                                        <?php endif; ?>
+                                        <?php if (($item['tipo_item'] ?? 'produto') === 'pacote_redirecionamento'): ?>
+                                            <span class="badge bg-info ms-1"><i class="fas fa-box-open me-1"></i>Redirecionamento</span>
+                                        <?php endif; ?>
+                                        <?php if (($item['tipo_item'] ?? 'produto') === 'fatura_adicional'): ?>
+                                            <span class="badge bg-warning text-dark ms-1"><i class="fas fa-file-invoice-dollar me-1"></i>Fatura Adicional</span>
                                         <?php endif; ?>
                                         <?php if (!empty($isClubeAtivo)): ?>
                                             <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
@@ -161,7 +167,7 @@
                                     <?php endif; ?>
                                     <div class="input-group input-group-sm" style="max-width: 240px;">
                                         <?php
-                                        $isBrindeItem = (!empty($item['is_brinde']) || ((float)($item['preco_unitario'] ?? ($item['price'] ?? 1)) === 0.0 && (float)($item['stored_price'] ?? 1) === 0.0));
+                                        $isBrindeItem = (!empty($item['is_brinde']) || (($item['tipo_item'] ?? 'produto') === 'produto' && (float)($item['preco_unitario'] ?? ($item['price'] ?? 1)) === 0.0 && (float)($item['stored_price'] ?? 1) === 0.0));
                                         ?>
                                         <?php if (empty($item['is_free_offer']) && !$isBrindeItem): ?>
                                         <button class="btn btn-outline-secondary" <?= $isAtivo ? '' : 'disabled' ?> onclick='atualizarQuantidade(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>, <?= max(1, $item['quantidade'] - 1) ?>)'>
