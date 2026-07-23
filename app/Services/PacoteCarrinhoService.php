@@ -273,8 +273,8 @@ class PacoteCarrinhoService {
                 $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
             } catch (\Throwable $e) {}
 
-            $colsList = "id, carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url";
-            $valsList = "NULL, ?, ?, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?";
+            $colsList = "carrinho_id, produto_id, quantidade, {$unitCol}, subtotal, tipo_item, pacote_id, nome_item, peso_kg, foto_url";
+            $valsList = "?, ?, ?, 0, 0, 'pacote_redirecionamento', ?, ?, ?, ?";
             $params = [
                 $cartId,
                 $fakeProdutoId,
