@@ -382,8 +382,8 @@ class Carrinho extends Model {
         $stmt = $this->connection->prepare("
             SELECT ci.*, {$pesoExpr} AS peso {$clubeSelect}
             FROM carrinho_items ci 
-            JOIN produtos p ON ci.produto_id = p.id 
-            WHERE ci.carrinho_id = :carrinho_id
+            LEFT JOIN produtos p ON ci.produto_id = p.id 
+            WHERE ci.carrinho_id = :carrinho_id AND ci.produto_id > 0
         ");
         $stmt->bindParam(':carrinho_id', $carrinhoId);
         $stmt->execute();
@@ -404,6 +404,23 @@ class Carrinho extends Model {
                 $subtotalClube += (float) ($item['subtotal'] ?? 0);
                 $pesoClubeTotal += ((float) ($item['peso'] ?? 0)) * ((int) ($item['quantidade'] ?? 0));
             }
+        }
+
+        // Incluir peso dos itens de pacote/fatura (produto_id <= 0)
+        try {
+            $itemsCols = $this->getTableColumns('carrinho_items');
+            if (in_array('peso_kg', $itemsCols, true) && in_array('tipo_item', $itemsCols, true)) {
+                $stPacotes = $this->connection->prepare(
+                    "SELECT COALESCE(SUM(peso_kg * quantidade), 0) AS peso_pacotes 
+                     FROM carrinho_items 
+                     WHERE carrinho_id = :cid AND produto_id <= 0"
+                );
+                $stPacotes->execute([':cid' => $carrinhoId]);
+                $pesoPacotes = (float) ($stPacotes->fetchColumn() ?: 0);
+                $pesoTotal += $pesoPacotes;
+            }
+        } catch (\Throwable $e) {
+            // Silencioso
         }
         
         // Obter dados do carrinho
