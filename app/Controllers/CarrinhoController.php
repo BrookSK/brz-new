@@ -909,6 +909,45 @@ class CarrinhoController extends Controller {
         ]);
     }
 
+    /**
+     * Salvar valor declarado (declaration_value) de um item de pacote no carrinho
+     * POST /carrinho/declaration-value
+     */
+    public function salvarDeclarationValue(Request $request): void {
+        session_start();
+        
+        // Aceitar JSON body
+        $rawBody = file_get_contents('php://input');
+        $data = json_decode($rawBody, true);
+        if (!is_array($data)) {
+            $data = $request->getParams();
+        }
+
+        $itemId = (int) ($data['item_id'] ?? 0);
+        $valor = (float) ($data['declaration_value'] ?? 0);
+
+        if ($itemId <= 0 || $valor <= 0) {
+            $this->json(['success' => false, 'error' => 'Valor inválido'], 400);
+            return;
+        }
+
+        $uid = $this->getLoggedUserId();
+        if ($uid <= 0) {
+            $this->json(['success' => false, 'error' => 'Não autenticado'], 401);
+            return;
+        }
+
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('UPDATE carrinho_items SET declaration_value = ? WHERE id = ?');
+            $stmt->execute([$valor, $itemId]);
+
+            $this->json(['success' => true, 'item_id' => $itemId, 'declaration_value' => $valor]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao salvar'], 500);
+        }
+    }
+
     public function toggleAtivo(Request $request) {
         session_start();
 

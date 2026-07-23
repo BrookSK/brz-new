@@ -143,6 +143,27 @@
                                             <span class="badge" style="background:#0b1f3a; margin-left: 6px;"><i class="fas fa-crown me-1"></i><?= __('cart.club_active', 'Clube Ativo') ?></span>
                                         <?php endif; ?>
                                     </h6>
+
+                                    <?php // Campo Declaração de Valor para itens de pacote ?>
+                                    <?php if (($item['tipo_item'] ?? 'produto') === 'pacote_redirecionamento'): ?>
+                                        <div class="mt-2 mb-2 p-2 border rounded" style="background: #f0f8ff; max-width: 300px;">
+                                            <label class="form-label small fw-bold mb-1 text-primary">
+                                                <i class="fas fa-dollar-sign me-1"></i>Valor Declarado (USD) *
+                                            </label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">US$</span>
+                                                <input type="number" step="0.01" min="0.01" 
+                                                       class="form-control declaration-value-input"
+                                                       data-item-id="<?= (int)($item['carrinho_item_id'] ?? 0) ?>"
+                                                       data-pacote-id="<?= (int)($item['pacote_id'] ?? 0) ?>"
+                                                       value="<?= ($item['declaration_value'] ?? '') ? number_format((float)$item['declaration_value'], 2, '.', '') : '' ?>"
+                                                       placeholder="Ex: 25.00"
+                                                       onchange="salvarDeclarationValue(this)">
+                                            </div>
+                                            <small class="text-muted">Obrigatório para prosseguir ao checkout.</small>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <?php if (!empty($item['item_changed'])): ?>
                                         <div class="alert alert-warning py-2 px-2 mb-2">
                                             <div class="small">
@@ -826,6 +847,37 @@ function recusarOfertaGratuita() {
         .catch(function() {
             try { bootstrap.Modal.getInstance(document.getElementById('modalOfertaGratuita')).hide(); } catch(e) {}
         });
+}
+
+// Salvar valor declarado de pacote de redirecionamento
+function salvarDeclarationValue(input) {
+    const itemId = input.dataset.itemId;
+    const valor = parseFloat(input.value);
+    
+    if (!valor || valor <= 0) {
+        input.classList.add('is-invalid');
+        return;
+    }
+    input.classList.remove('is-invalid');
+    input.classList.add('is-valid');
+
+    fetch('/carrinho/declaration-value', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId, declaration_value: valor })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            input.classList.add('is-valid');
+            setTimeout(() => input.classList.remove('is-valid'), 2000);
+        } else {
+            input.classList.add('is-invalid');
+        }
+    })
+    .catch(() => {
+        input.classList.add('is-invalid');
+    });
 }
 </script>
 
