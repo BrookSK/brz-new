@@ -23,7 +23,7 @@ class Database {
                     self::$password,
                     [
                         \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                        \PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '-03:00'",
+                        \PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '-03:00', sql_mode = REPLACE(@@sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')",
                     ]
                 );
                 return self::$conn;
