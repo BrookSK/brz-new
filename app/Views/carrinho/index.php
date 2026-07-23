@@ -32,6 +32,15 @@
                                     $fotoUrl = null;
                                     $capaArquivo = null;
                                     $isClubeAtivo = false;
+
+                                    // Itens de pacote/fatura: usar foto_url direto do item
+                                    $tipoItemView = $item['tipo_item'] ?? 'produto';
+                                    if ($tipoItemView === 'pacote_redirecionamento' || $tipoItemView === 'fatura_adicional') {
+                                        $fotoUrl = $item['foto_url'] ?? null;
+                                        if (empty($fotoUrl)) {
+                                            $fotoUrl = \App\Core\Url::absolute('/uploads/produtos/placeholder.jpg');
+                                        }
+                                    } else {
                                     try {
                                         $produtoModel = new \App\Models\Produto();
                                         $produtoCarrinho = $produtoModel->find($item['produto_id']);
@@ -109,6 +118,7 @@
                                     if (empty($fotoUrl)) {
                                         $fotoUrl = Url::absolute('/uploads/produtos/placeholder.jpg');
                                     }
+                                    } // fim do else (produto normal)
                                     ?>
                                     <img src="<?= $fotoUrl ?>?v=<?= time() ?>" 
                                          alt="<?= htmlspecialchars($item['nome']) ?>"
@@ -432,6 +442,7 @@
                 <?php
                 $temBrindeNoCarrinho = false;
                 foreach ($carrinho as $cItem) {
+                    if (($cItem['tipo_item'] ?? 'produto') !== 'produto') continue;
                     if ((float)($cItem['preco_unitario'] ?? ($cItem['price'] ?? 1)) === 0.0 && (float)($cItem['stored_price'] ?? 1) === 0.0) {
                         $temBrindeNoCarrinho = true;
                         break;

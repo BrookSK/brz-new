@@ -229,7 +229,7 @@ class CarrinhoController extends Controller {
                     $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
 
                     $out[$key] = [
-                        'produto_id' => 0,
+                        'produto_id' => $pid,
                         'produto_variacao_id' => null,
                         'variacao_descricao' => null,
                         'nome' => $it['nome_item'] ?? ($it['nome'] ?? 'Pacote'),
@@ -248,6 +248,7 @@ class CarrinhoController extends Controller {
                         'declaration_value' => isset($it['declaration_value']) ? (float) $it['declaration_value'] : null,
                         'foto_url' => $it['foto_url'] ?? null,
                         'carrinho_item_id' => (int) ($it['id'] ?? 0),
+                        'ativo' => 1,
                     ];
                     continue;
                 }
