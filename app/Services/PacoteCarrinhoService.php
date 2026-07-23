@@ -55,7 +55,9 @@ class PacoteCarrinhoService {
         error_log('[PacoteCarrinhoService] cartId=' . $cartId . ' inserindo pacotes...');
         foreach ($pacotes as $pacote) {
             // Verificar se já está no carrinho
-            if ($this->pacoteJaNoCarrinho($cartId, (int) $pacote['id'])) {
+            $jaExiste = $this->pacoteJaNoCarrinho($cartId, (int) $pacote['id']);
+            error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' jaNoCarrinho=' . ($jaExiste ? 'SIM' : 'NAO'));
+            if ($jaExiste) {
                 continue;
             }
 
@@ -220,13 +222,24 @@ class PacoteCarrinhoService {
 
     private function pacoteJaNoCarrinho(int $cartId, int $pacoteId): bool {
         try {
-            // Verificar por pacote_id OU por produto_id negativo
+            $fakeProdutoId = -1 * abs($pacoteId);
+            // Verificar por produto_id negativo (mais confiável) ou pacote_id
             $stmt = $this->connection->prepare(
-                "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND (pacote_id = ? OR produto_id = ?) LIMIT 1"
+                "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1"
             );
-            $fakeProdutoId = -1 * $pacoteId;
-            $stmt->execute([$cartId, $pacoteId, $fakeProdutoId]);
-            return (bool) $stmt->fetchColumn();
+            $stmt->execute([$cartId, $fakeProdutoId]);
+            if ($stmt->fetchColumn()) return true;
+
+            // Fallback: verificar pela coluna pacote_id se existir
+            try {
+                $stmt2 = $this->connection->prepare(
+                    "SELECT id FROM carrinho_items WHERE carrinho_id = ? AND pacote_id = ? LIMIT 1"
+                );
+                $stmt2->execute([$cartId, $pacoteId]);
+                if ($stmt2->fetchColumn()) return true;
+            } catch (\Throwable $e) {}
+
+            return false;
         } catch (\Throwable $e) {
             return false;
         }
