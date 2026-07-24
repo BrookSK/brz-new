@@ -228,6 +228,7 @@ class Carrinho extends Model {
     }
 
     public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
+        error_log('[Carrinho::adicionarItem] INICIO carrinhoId=' . $carrinhoId . ' produtoId=' . $produtoId . ' qtd=' . $quantidade);
         $itemsCols = $this->getTableColumns('carrinho_items');
         $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
         $varCol = (is_array($itemsCols) && in_array('produto_variacao_id', $itemsCols, true))
@@ -252,6 +253,7 @@ class Carrinho extends Model {
         $produto = $produtoModel->find($produtoId);
         
         if (!$produto || $produto['estoque'] < $quantidade) {
+            error_log('[Carrinho::adicionarItem] FALHOU - produto nao encontrado ou estoque insuficiente. produto=' . json_encode($produto ? ['id' => $produto['id'], 'estoque' => $produto['estoque']] : null));
             return false;
         }
 
@@ -368,6 +370,7 @@ class Carrinho extends Model {
         }
         
         $this->atualizarTotais($carrinhoId);
+        error_log('[Carrinho::adicionarItem] SUCESSO produtoId=' . $produtoId);
         return true;
     }
 

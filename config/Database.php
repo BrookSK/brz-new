@@ -23,9 +23,15 @@ class Database {
                     self::$password,
                     [
                         \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                        \PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '-03:00', sql_mode = REPLACE(@@sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')",
+                        \PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '-03:00'",
                     ]
                 );
+                // Remover NO_AUTO_VALUE_ON_ZERO do sql_mode para evitar id=0 em auto_increment
+                try {
+                    self::$conn->exec("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')");
+                } catch (\PDOException $e) {
+                    // Silencioso - prosseguir mesmo se falhar
+                }
                 return self::$conn;
             } catch (\PDOException $exception) {
                 $lastException = $exception;
