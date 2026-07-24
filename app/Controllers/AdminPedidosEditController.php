@@ -1670,14 +1670,16 @@ class AdminPedidosEditController extends Controller {
                             // Pular itens marcados como já comprados
                             if ($temJaComprado && ((int) ($itemLC['ja_comprado'] ?? 0)) === 1) continue;
 
-                            // Descontar quantidade já comprada na lista
+                            // Verificar se já existe registro de compra na lista_compras para este produto/pedido
+                            $itemJaCompradoNaLista = false;
                             try {
-                                $stQC = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                $stQC = $this->connection->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                                 $stQC->execute([$pedidoId, $pidLC]);
-                                $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
-                                $qtdLC -= $jaCompradoQtd;
-                                if ($qtdLC <= 0) continue;
+                                $countComprado = (int) ($stQC->fetchColumn() ?: 0);
+                                if ($countComprado > 0) $itemJaCompradoNaLista = true;
                             } catch (\Exception $e) {}
+
+                            if ($itemJaCompradoNaLista) continue;
 
                             // Verificar reservas
                             $qtdReservada = 0;

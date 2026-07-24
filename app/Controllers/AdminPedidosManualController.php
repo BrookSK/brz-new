@@ -3183,13 +3183,12 @@ JS;
                                         } catch (\Exception $e) {}
                                     }
 
-                                    // Descontar já comprados na lista
+                                    // Pular se já comprado na lista
                                     try {
-                                        $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                        $stQC = $pdo->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                                         $stQC->execute([(int) $pedidoId, $produtoId]);
                                         $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
-                                        $qtdPedido -= $jaCompradoQtd;
-                                        if ($qtdPedido <= 0) continue;
+                                        if ($jaCompradoQtd > 0) continue;
                                     } catch (\Exception $e) {}
 
                                     $colsIns = ['produto_id', 'pedido_id'];

@@ -7188,16 +7188,13 @@ HTML;
                             continue;
                         }
 
-                        // Descontar quantidade ja comprada que permaneceu na lista_compras
+                        // Pular se já existe registro de compra na lista_compras para este produto/pedido
                         try {
-                            $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                            $stQC = $pdo->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                             $stQC->execute([(int) $id, $produtoId]);
                             $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
                             if ($jaCompradoQtd > 0) {
-                                $faltante = $faltante - $jaCompradoQtd;
-                                if ($faltante <= 0) {
-                                    continue;
-                                }
+                                continue;
                             }
                         } catch (\Exception $e) {}
 
@@ -7531,13 +7528,12 @@ HTML;
                                         $faltante = $qtdPedido - $qtdReservada;
                                         if ($faltante <= 0) continue;
 
-                                        // Descontar já comprados
+                                        // Pular se já comprado
                                         try {
-                                            $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                            $stQC = $pdo->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                                             $stQC->execute([$pid, $produtoId]);
                                             $jaComprado = (int) ($stQC->fetchColumn() ?: 0);
-                                            $faltante -= $jaComprado;
-                                            if ($faltante <= 0) continue;
+                                            if ($jaComprado > 0) continue;
                                         } catch (\Exception $e) {}
 
                                         // Inserir pendência
