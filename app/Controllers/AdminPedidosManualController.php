@@ -3134,6 +3134,86 @@ JS;
             $_SESSION['pedido_manual_form_token_used'][$token] = (int) $pedidoId;
             unset($_SESSION['pedido_manual_form_token']);
 
+            // Se o pedido resultante está com status pago, inserir itens na lista_compras
+            try {
+                $pdo = \Config\Database::getConnection();
+                $stStatus = $pdo->prepare('SELECT status FROM pedidos WHERE id = ? LIMIT 1');
+                $stStatus->execute([(int) $pedidoId]);
+                $statusPedido = strtolower(trim((string) ($stStatus->fetchColumn() ?: '')));
+                $paidValues = ['pago','paid','approved','aprovado','concluido','concluído','confirmed','received','succeeded','success'];
+                if (in_array($statusPedido, $paidValues, true)) {
+                    // Verificar se lista_compras existe
+                    $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
+                    $stT->execute(['lista_compras']);
+                    $temLista = ((int) $stT->fetchColumn() > 0);
+                    if ($temLista) {
+                        $colsLista = [];
+                        try { $st = $pdo->query('DESCRIBE lista_compras'); $colsLista = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        if (in_array('pedido_id', $colsLista, true) && in_array('produto_id', $colsLista, true)) {
+                            // Limpar pendências antigas
+                            try { $pdo->prepare("DELETE FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'")->execute([(int) $pedidoId]); } catch (\Exception $e) {}
+
+                            // Determinar tabela de itens
+                            $itensTable = null;
+                            $stT->execute(['pedido_itens']);
+                            if ((int) $stT->fetchColumn() > 0) $itensTable = 'pedido_itens';
+                            else { $stT->execute(['pedido_items']); if ((int) $stT->fetchColumn() > 0) $itensTable = 'pedido_items'; }
+
+                            if ($itensTable) {
+                                $stIt = $pdo->prepare('SELECT produto_id, quantidade FROM ' . $itensTable . ' WHERE pedido_id = ?');
+                                $stIt->execute([(int) $pedidoId]);
+                                $itensLC = $stIt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                                // Verificar coluna ja_comprado
+                                $colsItensT = [];
+                                try { $stD = $pdo->query('DESCRIBE ' . $itensTable); $colsItensT = $stD ? $stD->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                                $temJaComprado = in_array('ja_comprado', $colsItensT, true);
+
+                                foreach ($itensLC as $itemLC) {
+                                    $produtoId = (int) ($itemLC['produto_id'] ?? 0);
+                                    $qtdPedido = (int) ($itemLC['quantidade'] ?? 0);
+                                    if ($produtoId <= 0 || $qtdPedido <= 0) continue;
+
+                                    // Pular itens marcados como já comprados
+                                    if ($temJaComprado) {
+                                        try {
+                                            $stJc = $pdo->prepare('SELECT ja_comprado FROM ' . $itensTable . ' WHERE pedido_id = ? AND produto_id = ? LIMIT 1');
+                                            $stJc->execute([(int) $pedidoId, $produtoId]);
+                                            if ((int) ($stJc->fetchColumn() ?: 0) === 1) continue;
+                                        } catch (\Exception $e) {}
+                                    }
+
+                                    // Descontar já comprados na lista
+                                    try {
+                                        $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                        $stQC->execute([(int) $pedidoId, $produtoId]);
+                                        $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
+                                        $qtdPedido -= $jaCompradoQtd;
+                                        if ($qtdPedido <= 0) continue;
+                                    } catch (\Exception $e) {}
+
+                                    $colsIns = ['produto_id', 'pedido_id'];
+                                    $valsIns = [':produto_id', ':pedido_id'];
+                                    $paramsIns = [':produto_id' => $produtoId, ':pedido_id' => (int) $pedidoId];
+
+                                    if (in_array('quantidade_faltante', $colsLista, true)) {
+                                        $colsIns[] = 'quantidade_faltante'; $valsIns[] = ':q'; $paramsIns[':q'] = $qtdPedido;
+                                    } elseif (in_array('quantidade_necessaria', $colsLista, true)) {
+                                        $colsIns[] = 'quantidade_necessaria'; $valsIns[] = ':q'; $paramsIns[':q'] = $qtdPedido;
+                                    }
+                                    if (in_array('status', $colsLista, true)) { $colsIns[] = 'status'; $valsIns[] = "'pendente'"; }
+                                    if (in_array('data_solicitacao', $colsLista, true)) { $colsIns[] = 'data_solicitacao'; $valsIns[] = 'CURDATE()'; }
+
+                                    $pdo->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log('[PEDIDO_MANUAL] Erro ao inserir na lista_compras pedido #' . $pedidoId . ': ' . $e->getMessage());
+            }
+
             header('Location: /admin/pedidos/novo-manual?pedido_id=' . (int) $pedidoId);
             exit;
         } catch (\Exception $e) {

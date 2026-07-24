@@ -1636,37 +1636,78 @@ class AdminPedidosEditController extends Controller {
             $stmt = $this->connection->prepare('UPDATE pedidos SET ' . implode(', ', $setParts) . ' WHERE id = :pedido_id');
             $stmt->execute($paramsUpd);
 
-            // Criar pendências na lista_compras quando status muda pra "pago" pela primeira vez
-            $statusOldNormLC = strtolower(trim((string) $oldStatus));
+            // Criar/atualizar pendências na lista_compras quando o pedido está pago
             $statusNewNormLC = strtolower(trim((string) $newStatus));
             $statusPagos = ['pago', 'paid', 'approved', 'aprovado'];
-            $oldEraPago = in_array($statusOldNormLC, $statusPagos, true) || in_array($statusOldNormLC, ['itens_parcialmente_comprados', 'itens_comprados'], true);
             $newEhPago = in_array($statusNewNormLC, $statusPagos, true);
-            if ($newEhPago && !$oldEraPago && $this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
-                // Verificar se já existem pendências para este pedido (evitar duplicação)
-                $jaTemPendencias = false;
+            if ($newEhPago && $this->tableExists('lista_compras') && $this->columnExists('lista_compras', 'pedido_id')) {
+                // Limpar pendências antigas e regravar baseado nos itens atuais (evita duplicação)
                 try {
-                    $stCheck = $this->connection->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ?");
-                    $stCheck->execute([$pedidoId]);
-                    $jaTemPendencias = ((int) $stCheck->fetchColumn() > 0);
+                    $this->connection->prepare("DELETE FROM lista_compras WHERE pedido_id = ? AND status = 'pendente'")->execute([$pedidoId]);
                 } catch (\Exception $e) {}
 
-                if (!$jaTemPendencias) {
-                    $itensTableLC = $this->tableExists('pedido_itens') ? 'pedido_itens' : ($this->tableExists('pedido_items') ? 'pedido_items' : '');
-                    if ($itensTableLC !== '') {
-                        try {
-                            $stItens = $this->connection->prepare("SELECT produto_id, quantidade FROM {$itensTableLC} WHERE pedido_id = ?");
-                            $stItens->execute([$pedidoId]);
-                            $itensLC = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-                            foreach ($itensLC as $itemLC) {
-                                $pidLC = (int) ($itemLC['produto_id'] ?? 0);
-                                $qtdLC = (int) ($itemLC['quantidade'] ?? 0);
-                                if ($pidLC <= 0 || $qtdLC <= 0) continue;
-                                $this->connection->prepare(
-                                    "INSERT INTO lista_compras (produto_id, pedido_id, quantidade_necessaria, quantidade_faltante, prioridade, status, data_solicitacao) VALUES (?, ?, ?, ?, 'media', 'pendente', CURDATE())"
-                                )->execute([$pidLC, $pedidoId, $qtdLC, $qtdLC]);
+                $itensTableLC = $this->tableExists('pedido_itens') ? 'pedido_itens' : ($this->tableExists('pedido_items') ? 'pedido_items' : '');
+                if ($itensTableLC !== '') {
+                    try {
+                        // Verificar colunas disponíveis na lista_compras
+                        $colsListaLC = [];
+                        try { $stD = $this->connection->query('DESCRIBE lista_compras'); $colsListaLC = $stD ? $stD->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+
+                        // Verificar se tem coluna ja_comprado na tabela de itens
+                        $colsItensLC = [];
+                        try { $stD2 = $this->connection->query('DESCRIBE ' . $itensTableLC); $colsItensLC = $stD2 ? $stD2->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        $temJaComprado = in_array('ja_comprado', $colsItensLC, true);
+
+                        $stItens = $this->connection->prepare("SELECT produto_id, quantidade" . ($temJaComprado ? ", ja_comprado" : "") . " FROM {$itensTableLC} WHERE pedido_id = ?");
+                        $stItens->execute([$pedidoId]);
+                        $itensLC = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                        foreach ($itensLC as $itemLC) {
+                            $pidLC = (int) ($itemLC['produto_id'] ?? 0);
+                            $qtdLC = (int) ($itemLC['quantidade'] ?? 0);
+                            if ($pidLC <= 0 || $qtdLC <= 0) continue;
+
+                            // Pular itens marcados como já comprados
+                            if ($temJaComprado && ((int) ($itemLC['ja_comprado'] ?? 0)) === 1) continue;
+
+                            // Descontar quantidade já comprada na lista
+                            try {
+                                $stQC = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                $stQC->execute([$pedidoId, $pidLC]);
+                                $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
+                                $qtdLC -= $jaCompradoQtd;
+                                if ($qtdLC <= 0) continue;
+                            } catch (\Exception $e) {}
+
+                            // Verificar reservas
+                            $qtdReservada = 0;
+                            if ($this->tableExists('estoque_reservas') && $this->columnExists('estoque_reservas', 'pedido_id')) {
+                                try {
+                                    $sqlR = "SELECT COALESCE(SUM(quantidade_reservada),0) FROM estoque_reservas WHERE pedido_id = ? AND produto_id = ?";
+                                    if ($this->columnExists('estoque_reservas', 'status')) $sqlR .= " AND status = 'ativa'";
+                                    $stR = $this->connection->prepare($sqlR);
+                                    $stR->execute([$pedidoId, $pidLC]);
+                                    $qtdReservada = (int) ($stR->fetchColumn() ?: 0);
+                                } catch (\Exception $e) {}
                             }
-                        } catch (\Exception $e) {}
+
+                            $faltante = $qtdLC - $qtdReservada;
+                            if ($faltante <= 0) continue;
+
+                            $colsIns = ['produto_id', 'pedido_id'];
+                            $valsIns = ['?', '?'];
+                            $paramsIns = [$pidLC, $pedidoId];
+
+                            if (in_array('quantidade_necessaria', $colsListaLC, true)) { $colsIns[] = 'quantidade_necessaria'; $valsIns[] = '?'; $paramsIns[] = $faltante; }
+                            if (in_array('quantidade_faltante', $colsListaLC, true)) { $colsIns[] = 'quantidade_faltante'; $valsIns[] = '?'; $paramsIns[] = $faltante; }
+                            if (in_array('prioridade', $colsListaLC, true)) { $colsIns[] = 'prioridade'; $valsIns[] = "'media'"; }
+                            if (in_array('status', $colsListaLC, true)) { $colsIns[] = 'status'; $valsIns[] = "'pendente'"; }
+                            if (in_array('data_solicitacao', $colsListaLC, true)) { $colsIns[] = 'data_solicitacao'; $valsIns[] = 'CURDATE()'; }
+
+                            $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
+                        }
+                    } catch (\Exception $e) {
+                        error_log('[PEDIDO_EDIT] Erro ao inserir na lista_compras pedido #' . $pedidoId . ': ' . $e->getMessage());
                     }
                 }
             }
