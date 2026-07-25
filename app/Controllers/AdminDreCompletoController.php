@@ -54,13 +54,12 @@ class AdminDreCompletoController extends Controller {
 
         // Guard: se colunas essenciais não existem, retornar vazio
         if (!$colTotal || !$colCreatedAt || !$colStatus) {
-            echo json_encode(['success' => true, 'taxaUsdBrl' => 5.85, 'periodo' => ['inicio' => $dateStart, 'fim' => $dateEnd], 'resumo' => ['total_entradas' => 0, 'total_entradas_brl' => 0, 'total_entradas_usd' => 0, 'total_despesas' => 0, 'total_despesas_brl' => 0, 'total_despesas_usd' => 0, 'resultado' => 0, 'margem' => 0, 'maior_categoria' => '', 'qtd_pedidos' => 0], 'meses' => [], 'gateways' => [], 'despesas_categoria' => [], 'despesas_favorecido' => [], 'entradas_detalhadas' => [], 'entradas_paginacao' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1], 'status_filter_dre' => '', 'operacional' => [], 'conciliacao' => ['total_creditos' => 0, 'total_debitos' => 0, 'saldo_final' => 0, 'qtd_lancamentos' => 0]], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => true, 'taxaUsdBrl' => \App\Core\ExchangeRate::getUsdToBrl(), 'periodo' => ['inicio' => $dateStart, 'fim' => $dateEnd], 'resumo' => ['total_entradas' => 0, 'total_entradas_brl' => 0, 'total_entradas_usd' => 0, 'total_despesas' => 0, 'total_despesas_brl' => 0, 'total_despesas_usd' => 0, 'total_descontos' => 0, 'total_descontos_brl' => 0, 'total_descontos_usd' => 0, 'total_peso_kg' => 0, 'resultado' => 0, 'margem' => 0, 'maior_categoria' => '', 'qtd_pedidos' => 0], 'meses' => [], 'gateways' => [], 'despesas_categoria' => [], 'despesas_favorecido' => [], 'entradas_detalhadas' => [], 'entradas_paginacao' => ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1], 'status_filter_dre' => '', 'operacional' => [], 'conciliacao' => ['total_creditos' => 0, 'total_debitos' => 0, 'saldo_final' => 0, 'qtd_lancamentos' => 0]], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
         // Taxa USD→BRL
-        $taxaUsdBrl = 5.85;
-        try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
         // === ENTRADAS DE PEDIDOS (pagos) ===
         $paidStatuses = "('pago','paid','approved','carne_pagando','etiqueta_gerada','produto_consolidado','em_transporte','enviado_ao_destinatario','entregue')";
@@ -310,7 +309,7 @@ class AdminDreCompletoController extends Controller {
         $pick = function($c) use ($cols) { foreach ($c as $x) { if (in_array($x, $cols, true)) return $x; } return ''; };
         $colTotal=$pick(['total','valor_total']); $colSubtotal=$pick(['subtotal','subtotal_produtos']); $colServicos=$pick(['servicos','taxa_servico']); $colImpostos=$pick(['impostos','valor_impostos']); $colFrete=$pick(['frete','valor_frete']); $colMoeda=$pick(['moeda','currency']); $colStatus=$pick(['status']); $colPayGateway=$pick(['payment_gateway','gateway']); $colPayStatus=$pick(['payment_status']); $colFormaPgto=$pick(['forma_pagamento','payment_method']); $colCreatedAt=$pick(['created_at','data_criacao']); $colCliente=$pick(['cliente_nome','nome']); $colNumero=$pick(['numero_pedido','codigo_pedido']);
         $delF = in_array('deleted_at', $cols, true) ? "AND p.deleted_at IS NULL" : "";
-        $taxaUsdBrl = 5.85; try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
         $fV = function($v) { return number_format((float)($v??0), 2, ',', ''); };
         $toB = function($v, $m) use ($taxaUsdBrl) { return strtoupper(trim($m??'BRL'))==='USD' ? (float)$v*$taxaUsdBrl : (float)$v; };
         $sep = ';';
@@ -490,7 +489,7 @@ class AdminDreCompletoController extends Controller {
             'fluxo_caixa' => [],
             'agendamentos_futuros' => [],
             'resumo' => [],
-            'taxa_conversao' => 5.85,
+            'taxa_conversao' => \App\Core\ExchangeRate::getUsdToBrl(),
             'totais_por_gateway' => [], // Totais da tabela pedidos por gateway (debug)
             '_timestamp' => time(),
         ];
@@ -810,8 +809,7 @@ class AdminDreCompletoController extends Controller {
             $ate = $dateEnd ?: date('Y-m-d');
 
             // Taxa de conversão
-            $taxaUsdBrl = 5.85;
-            try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+            $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
             // 1. Total da tabela PEDIDOS por gateway (mesma fonte do DRE "Total Entradas")
             // Isso garante consistência com o "Total Entradas (Sistema)"

@@ -75,7 +75,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label"><?= __('admin.settings.general.exchange_rate', 'Taxa de Câmbio (1 USD)') ?></label>
-                                <input type="number" name="taxa_cambio" class="form-control" step="0.01" value="<?= $configuracoes['taxa_cambio'] ?? '5.85' ?>">
+                <input type="number" name="taxa_cambio" class="form-control" step="0.01" value="<?= $configuracoes['taxa_cambio'] ?? \App\Core\ExchangeRate::getUsdToBrl() ?>">
                             </div>
                             <div class="col-12">
                                 <label class="form-label"><?= __('admin.settings.general.site_description', 'Descrição do Site') ?></label>

@@ -69,8 +69,7 @@ class AdminDespesasController extends Controller {
         $data = compact('tab', 'filtros', 'categorias', 'stats', 'despesas', 'recorrencias', 'parcelamentos', 'comissoes');
 
         // Taxa para conversão visual
-        $taxaUsdBrl = 5.85;
-        try { $svc = new \App\Services\PedidoManualService(); $r = $svc->getTaxaConversaoUSDBRL(); if ($r > 1) $taxaUsdBrl = $r; } catch (\Exception $e) {}
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
         $data['taxaUsdBrl'] = $taxaUsdBrl;
 
         $title = 'Despesas';
@@ -683,12 +682,7 @@ class AdminDespesasController extends Controller {
         $dataFim = sprintf('%04d-%02d-09', $proxAno, $proxMes);
 
         // Taxa USD→BRL
-        $usdToBrl = 5.85;
-        try {
-            $svc = new \App\Services\PedidoManualService();
-            $r = $svc->getTaxaConversaoUSDBRL();
-            if ($r > 1) $usdToBrl = $r;
-        } catch (\Exception $e) {}
+        $usdToBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
         // Detectar colunas
         $cols = [];

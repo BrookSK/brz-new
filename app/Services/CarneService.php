@@ -164,14 +164,7 @@ class CarneService {
         if ($parcela['valor_produtos'] > 0) {
             try {
                 // Buscar taxa de câmbio real do sistema
-                $taxaConv = 5.85;
-                try {
-                    $db = \Config\Database::getConnection();
-                    $stTx = $db->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = 'usd_brl_rate' LIMIT 1");
-                    $stTx->execute();
-                    $v = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
-                    if ($v > 1.01) $taxaConv = $v;
-                } catch (\Exception $e) {}
+                $taxaConv = \App\Core\ExchangeRate::getUsdToBrl();
 
                 $valorBrl = (float) $parcela['valor_produtos'];
                 $valorUsd = round($valorBrl / $taxaConv, 2);

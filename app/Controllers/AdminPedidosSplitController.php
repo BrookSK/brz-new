@@ -515,7 +515,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 $v = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
                 if ($v > 1.01) $taxaConversao = $v;
             } catch (\Exception $e) {}
-            if ($taxaConversao <= 1.01) $taxaConversao = 5.85;
+            if ($taxaConversao <= 1.01) $taxaConversao = \App\Core\ExchangeRate::getUsdToBrl();
         }
 
         // Calcular peso total dos itens que vão para o novo pedido

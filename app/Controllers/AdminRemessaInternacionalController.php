@@ -1755,7 +1755,7 @@ function fecharJanela() {
             $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
             if ($moedaPedido === 'BRL' && $totalUsd > 0) {
                 $usdRate = $this->getUsdToBrlRate();
-                $brlRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+                $brlRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / \App\Core\ExchangeRate::getUsdToBrl());
                 $totalUsd = $totalUsd * $brlRate;
             }
         }
@@ -2333,29 +2333,7 @@ function regerarEtiqueta() {
     }
 
     private function getUsdToBrlRate(): float {
-        try {
-            // Primeiro: tentar da tabela configuracoes_moeda
-            $st = $this->connection->query('DESCRIBE configuracoes_moeda');
-            $cols = $st ? ($st->fetchAll(\PDO::FETCH_COLUMN) ?: []) : [];
-            if (is_array($cols) && !empty($cols) && in_array('taxa_conversao', $cols, true)) {
-                $stTx = $this->connection->prepare("SELECT taxa_conversao FROM configuracoes_moeda WHERE moeda_origem = 'USD' AND moeda_destino = 'BRL' ORDER BY id DESC LIMIT 1");
-                $stTx->execute();
-                $tx = (float) ($stTx->fetchColumn() ?: 0);
-                if ($tx > 1.01) return $tx;
-            }
-        } catch (\Exception $e) {}
-
-        // Fallback: buscar de configuracoes_sistema (sistema_usd_brl_rate ou usd_brl_rate)
-        try {
-            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
-                $stCfg = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
-                $stCfg->execute([$k]);
-                $v = (float) str_replace(',', '.', (string) ($stCfg->fetchColumn() ?: '0'));
-                if ($v > 1.01) return $v;
-            }
-        } catch (\Exception $e) {}
-
-        return 5.85;
+        return \App\Core\ExchangeRate::getUsdToBrl();
     }
 
     public function fecharJanela($request, $id) {

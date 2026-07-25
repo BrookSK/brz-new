@@ -400,8 +400,8 @@ class AdminUsuariosViews {
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Taxa de Conversão</label>
-                                    <input type="number" class="form-control" id="taxaConversao" step="0.0001" value="5.85" required>
-                                    <small class="text-muted">1 USD = R$ 5.85 (taxa atual)</small>
+                                    <input type="number" class="form-control" id="taxaConversao" step="0.0001" value="' . \App\Core\ExchangeRate::getUsdToBrl() . '" required>
+                                    <small class="text-muted">1 USD = R$ ' . number_format(\App\Core\ExchangeRate::getUsdToBrl(), 2, ',', '.') . ' (taxa atual)</small>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Valor em BRL</label>
@@ -610,14 +610,14 @@ class AdminUsuariosViews {
             
             document.getElementById("valorConverter")?.addEventListener("input", function() {
                 const valor = parseFloat(this.value) || 0;
-                const taxa = parseFloat(document.getElementById("taxaConversao").value) || 5.85;
+                const taxa = parseFloat(document.getElementById("taxaConversao").value) || ' . \App\Core\ExchangeRate::getUsdToBrl() . ';
                 const valorBRL = valor * taxa;
                 document.getElementById("valorBRL").value = "R$ " + valorBRL.toFixed(2);
             });
             
             document.getElementById("taxaConversao")?.addEventListener("input", function() {
                 const valor = parseFloat(document.getElementById("valorConverter").value) || 0;
-                const taxa = parseFloat(this.value) || 5.85;
+                const taxa = parseFloat(this.value) || (window.USD_BRL_RATE || 5.85);
                 const valorBRL = valor * taxa;
                 document.getElementById("valorBRL").value = "R$ " + valorBRL.toFixed(2);
             });

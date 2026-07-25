@@ -1414,14 +1414,7 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
         // Incluir o código diretamente para evitar problemas de caminho
         console.log('Carregando sistema de conversão inline...');
 
-        const __USD_BRL_RATE__ = <?php
-        try {
-            $svc = new \App\Services\PedidoManualService();
-            echo json_encode((float) $svc->getTaxaConversaoUSDBRL());
-        } catch (\Exception $e) {
-            echo '5.85';
-        }
-        ?>;
+        const __USD_BRL_RATE__ = <?= \App\Core\ExchangeRate::getUsdToBrl() ?>;
         
         // Variáveis globais
         window.CurrencyConverter = {

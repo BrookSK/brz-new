@@ -217,7 +217,7 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                             $simboloMoeda = ($moedaPedido === 'BRL') ? 'R$' : 'US$';
                             // Taxa de conversão para converter itens USD→BRL quando pedido é BRL
                             $taxaConvView = (float) ($pedido['taxa_conversao'] ?? 0);
-                            if ($taxaConvView <= 1.01) $taxaConvView = 5.85;
+                            if ($taxaConvView <= 1.01) $taxaConvView = \App\Core\ExchangeRate::getUsdToBrl();
                             // Detectar se é carnê (itens podem estar em USD mesmo com pedido BRL)
                             $isCarnePedido = (strtolower(trim((string) ($pedido['forma_pagamento'] ?? ''))) === 'carne_braziliana'
                                 || in_array(strtolower(trim((string) ($pedido['status'] ?? ''))), ['carne_pagando', 'carne_aguardando'], true));

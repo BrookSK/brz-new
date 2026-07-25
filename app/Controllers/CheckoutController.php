@@ -1163,8 +1163,7 @@ class CheckoutController extends Controller {
                 if ($dispUsd < 0) $dispUsd = 0.0;
 
                 // Obter taxa de conversão
-                $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
-                if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
+                $exchangeRate = \App\Core\ExchangeRate::getUsdToBrl();
 
                 // Saldo disponível em BRL = saldo_brl disponível + (saldo_usd disponível * taxa)
                 $saldoDisponivelBrl = $saldoDisponivel + ($dispUsd * $exchangeRate);
@@ -1264,8 +1263,7 @@ class CheckoutController extends Controller {
 
             if ($moeda === 'BRL') {
                 // O débito BRL foi feito em saldo_usd (convertido). Reverter em USD.
-                $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
-                if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
+                $exchangeRate = \App\Core\ExchangeRate::getUsdToBrl();
                 $valorUsd = round($valorDebitado / $exchangeRate, 2);
 
                 $stmtUpd = $db->prepare('UPDATE carteiras SET saldo_usd = saldo_usd + :valor, updated_at = NOW() WHERE usuario_id = :uid');
@@ -1353,8 +1351,7 @@ class CheckoutController extends Controller {
                 $descProduto = 'Pedido #' . $pedidoId . ' (produtos - complemento carteira)';
 
                 // Calcular valor em USD para o Câmbio Real (precisa do amount_usd)
-                $exchangeRate = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
-                if ($exchangeRate <= 1.01) $exchangeRate = 5.85;
+                $exchangeRate = \App\Core\ExchangeRate::getUsdToBrl();
                 $amountUsd = round($valorCR1 / $exchangeRate, 2);
                 if ($amountUsd <= 0) $amountUsd = 0.01;
 
@@ -3494,8 +3491,7 @@ class CheckoutController extends Controller {
                     // Taxa de conversão USD->BRL (usada apenas se valores do pedido estão em USD)
                     $exchangeRateW = 1.0;
                     if ($moedaPedidoWallet === 'BRL') {
-                        $exchangeRateW = (float) ($this->getConfigValue('usd_brl_rate', '5.85'));
-                        if ($exchangeRateW <= 1.01) $exchangeRateW = 5.85;
+                        $exchangeRateW = \App\Core\ExchangeRate::getUsdToBrl();
                         
                         // Verificar se os valores do pedido já estão em BRL
                         // Se o pedido tem moeda=BRL, os valores no banco JÁ estão em BRL — não converter
@@ -3774,7 +3770,7 @@ class CheckoutController extends Controller {
                                     if ($txVal > 1.01) $taxaConv = $txVal;
                                 } catch (\Exception $e) {}
                             }
-                            if ($taxaConv <= 1.01) $taxaConv = 5.85;
+                            if ($taxaConv <= 1.01) $taxaConv = \App\Core\ExchangeRate::getUsdToBrl();
 
                             // Fonte primária: valores do PEDIDO já salvo (mais confiável)
                             $subUsd = 0; $svcUsd = 0; $impUsd = 0; $freUsd = 0;
@@ -4860,7 +4856,7 @@ class CheckoutController extends Controller {
                                 }
                             } catch (\Exception $e) {}
                         }
-                        if ($taxaConvPix <= 1.01) $taxaConvPix = 5.85;
+                        if ($taxaConvPix <= 1.01) $taxaConvPix = \App\Core\ExchangeRate::getUsdToBrl();
 
                         $codigoPedidoPix = (string) ($pedidoRowPay['numero_pedido'] ?? $pedidoId);
                         $customerPix = [
@@ -5493,7 +5489,7 @@ class CheckoutController extends Controller {
                     if ($tx > 1.01) $txConv = $tx;
                 } catch (\Exception $e) {}
             }
-            if ($txConv <= 1.01) $txConv = 5.85;
+            if ($txConv <= 1.01) $txConv = \App\Core\ExchangeRate::getUsdToBrl();
 
             $pixBrlValor = round($totalUsd * $txConv, 2);
             $pixBrlTaxa = $txConv;

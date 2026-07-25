@@ -190,7 +190,7 @@ class AdminCarteiraController extends Controller {
         $data = json_decode(file_get_contents('php://input'), true);
         $usuarioId = $data['usuario_id'] ?? 0;
         $valorUSD = $data['valor_usd'] ?? 0;
-        $taxaConversao = $data['taxa_conversao'] ?? 5.85; // Taxa padrão
+        $taxaConversao = $data['taxa_conversao'] ?? \App\Core\ExchangeRate::getUsdToBrl();
         
         try {
             $pdo = new \PDO('mysql:host=127.0.0.1;dbname=novobr', 'novobr', '33537095Ab12$');

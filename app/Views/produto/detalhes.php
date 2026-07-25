@@ -892,7 +892,7 @@ function inicializarDetalhesProduto() {
         // Renderizar o valor conforme a moeda selecionada
         const cc = (window.CurrencyConverter && typeof window.CurrencyConverter === 'object') ? window.CurrencyConverter : null;
         const cur = (cc && cc.currentCurrency) ? String(cc.currentCurrency) : (localStorage.getItem('selected_currency') || 'USD');
-        const rates = (cc && cc.exchangeRates) ? cc.exchangeRates : (window.exchangeRates || { BRL: 5.85, USD: 1.00 });
+        const rates = (cc && cc.exchangeRates) ? cc.exchangeRates : (window.exchangeRates || { BRL: window.USD_BRL_RATE || 5.85, USD: 1.00 });
         const rate = Number(rates[cur] || 1);
         const symbol = (cur === 'BRL') ? 'R$' : '$';
         const converted = p * rate;

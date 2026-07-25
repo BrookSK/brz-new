@@ -1064,7 +1064,7 @@ function carregarFluxoCaixa(btn, force) {
 
 function renderFluxoCaixa(d, container) {
     var h = '';
-    var taxaConv = (d.taxa_conversao) ? d.taxa_conversao : ((window._dreData && window._dreData.taxaUsdBrl) ? window._dreData.taxaUsdBrl : 5.85);
+    var taxaConv = (d.taxa_conversao) ? d.taxa_conversao : ((window._dreData && window._dreData.taxaUsdBrl) ? window._dreData.taxaUsdBrl : (window.USD_BRL_RATE || 5.85));
     var fmtBRL = function(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
     var fmtUSD = function(v){ return '$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); };
     var fmtV = function(v,moeda){ moeda=moeda||'USD'; return moeda==='BRL' ? fmtBRL(v) : fmtUSD(v); };

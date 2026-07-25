@@ -125,7 +125,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     $comPeriodo = $comData['periodo'] ?? date('Y-m');
     $comInicio = $comData['dataInicio'] ?? '';
     $comFim = $comData['dataFim'] ?? '';
-    $comUsd = (float)($comData['usdToBrl'] ?? 5.85);
+    $comUsd = (float)($comData['usdToBrl'] ?? \App\Core\ExchangeRate::getUsdToBrl());
     ?>
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
@@ -580,7 +580,7 @@ function exportarDespesas() {
 }
 
 // Visualização moeda/idioma (apenas visual, não altera dados)
-const DESP_TAXA = <?= (float)($taxaUsdBrl ?? 5.85) ?>;
+const DESP_TAXA = <?= (float)($taxaUsdBrl ?? \App\Core\ExchangeRate::getUsdToBrl()) ?>;
 
 function abrirEditarDespesa(btn) {
     document.getElementById('formEditarDespesa').action = '/admin/despesas/editar/' + btn.dataset.id;

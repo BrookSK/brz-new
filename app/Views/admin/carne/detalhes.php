@@ -95,7 +95,7 @@
                     if ($txV > 1.01) $taxaConvCarne = $txV;
                 } catch (\Exception $e) {}
             }
-            if ($taxaConvCarne <= 1.01) $taxaConvCarne = 5.85;
+            if ($taxaConvCarne <= 1.01) $taxaConvCarne = \App\Core\ExchangeRate::getUsdToBrl();
 
             // Verificar se este carnê usou preço original (flag salva na criação)
             $carneUsouPrecoOriginal = false;

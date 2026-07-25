@@ -478,7 +478,7 @@ class AdminPedidosEditController extends Controller {
                     $v = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
                     if ($v > 1.01) $taxaConvPedido = $v;
                 } catch (\Exception $e) {}
-                if ($taxaConvPedido <= 1.01) $taxaConvPedido = 5.85;
+                if ($taxaConvPedido <= 1.01) $taxaConvPedido = \App\Core\ExchangeRate::getUsdToBrl();
             }
 
             $gatewayPedido = strtolower((string) ($pedido['payment_gateway'] ?? $pedido['pagamento_gateway'] ?? ''));

@@ -1429,7 +1429,7 @@ function updatePixBrlInfo() {
     }
 
     var rate = window.exchangeRates ? (window.exchangeRates['BRL'] || 0) : 0;
-    if (rate <= 1.01) rate = 5.85;
+    if (rate <= 1.01) rate = window.USD_BRL_RATE || 5.85;
 
     var brl = totalUsd * rate;
     var feeRate = 0.035;
@@ -2493,7 +2493,7 @@ function toggleButton() {
 
 <script>
 // Usar taxas de conversão globais se existirem, senão definir locais
-window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => 5.85, 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
+window.exchangeRates = <?php echo json_encode(($exchange_rates ?? ['BRL' => \App\Core\ExchangeRate::getUsdToBrl(), 'USD' => 1.00]), JSON_UNESCAPED_UNICODE); ?>;
 
 function updateCambioRealFeesPreview() {
     const moedaHidden = document.getElementById('moeda_hidden');
@@ -2910,7 +2910,7 @@ function updatePaymentMethodsForCurrency(currency) {
     var turboLibData = (window.CARTEIRA_TURBO_LIBERACAO_DATA || '').toString();
     var totalUsd = (window.checkoutOriginalValues && window.checkoutOriginalValues.total) ? Number(window.checkoutOriginalValues.total) : 0;
     var saldoSuficiente = (saldoDisp > 0.001);
-    var rate = Number(window.CAMBIOREAL_RATE_BRL || 5.85);
+    var rate = Number(window.CAMBIOREAL_RATE_BRL || window.USD_BRL_RATE || 5.85);
     var saldoLabel;
     if (isBRL) {
         var saldoBrlConvertido = saldoDisp * rate;
@@ -2996,7 +2996,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function atualizarWalletBreakdown() {
     var saldoDisp = Number(window.CARTEIRA_SALDO_DISPONIVEL || 0);
     var walletEligible = Number(window.WALLET_ELIGIBLE_AMOUNT || 0);
-    var rate = Number(window.CAMBIOREAL_RATE_BRL || 5.85);
+    var rate = Number(window.CAMBIOREAL_RATE_BRL || window.USD_BRL_RATE || 5.85);
     var moedaHidden = document.getElementById('moeda_hidden');
     var cur = (moedaHidden && moedaHidden.value ? moedaHidden.value : 'BRL').toString().trim().toUpperCase();
     var isBRL = (cur === 'BRL');

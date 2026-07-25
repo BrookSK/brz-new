@@ -608,7 +608,7 @@ class AdminCarneController extends Controller {
             $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
             if ($txVal > 1.01) $taxaConv = $txVal;
         } catch (\Exception $e) {}
-        if ($taxaConv <= 1.01) $taxaConv = 5.85;
+        if ($taxaConv <= 1.01) $taxaConv = \App\Core\ExchangeRate::getUsdToBrl();
 
         $subUsd = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
         $svcUsd = (float) ($pedido['taxa_servico'] ?? ($pedido['servicos'] ?? 0));
@@ -1147,7 +1147,7 @@ class AdminCarneController extends Controller {
             $txVal = (float) str_replace(',', '.', (string) ($stTx->fetchColumn() ?: '0'));
             if ($txVal > 1.01) $taxaConv = $txVal;
         } catch (\Exception $e) {}
-        if ($taxaConv <= 1.01) $taxaConv = 5.85;
+        if ($taxaConv <= 1.01) $taxaConv = \App\Core\ExchangeRate::getUsdToBrl();
 
         $subUsd = (float) ($pedido['subtotal_produtos'] ?? ($pedido['subtotal'] ?? 0));
         $svcUsd = (float) ($pedido['taxa_servico'] ?? ($pedido['servicos'] ?? 0));

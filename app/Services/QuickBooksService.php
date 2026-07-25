@@ -171,16 +171,7 @@ class QuickBooksService
         $pedidoEmBrl = ($moedaPedido === 'BRL' || $moedaPedido === '');
 
         // Taxa de câmbio BRL→USD (QuickBooks sandbox/produção opera em USD)
-        // Buscar do sistema; fallback 5.85 conforme configuração da empresa
-        $taxaCambio = 5.85;
-        try {
-            $stmt = $this->pdo->prepare(
-                "SELECT valor FROM configuracoes_sistema WHERE chave = 'sistema_usd_brl_rate' LIMIT 1"
-            );
-            $stmt->execute();
-            $taxa = (float) ($stmt->fetchColumn() ?: 0);
-            if ($taxa > 0) $taxaCambio = $taxa;
-        } catch (\Throwable $e) {}
+        $taxaCambio = \App\Core\ExchangeRate::getUsdToBrl();
 
         // Converter valor BRL para USD se necessário
         $converter = fn(float $v): float => $pedidoEmBrl ? round($v / $taxaCambio, 2) : round($v, 2);

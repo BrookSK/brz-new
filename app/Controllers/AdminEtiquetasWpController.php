@@ -49,10 +49,7 @@ class AdminEtiquetasWpController extends Controller
     private function getUsdToBrlRate(): float
     {
         try {
-            $st = $this->connection->prepare("SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1");
-            $st->execute(['sistema_usd_brl_rate']);
-            $v = (float) str_replace(',', '.', (string) ($st->fetchColumn() ?: '0'));
-            if ($v > 1.01) return $v;
+            return \App\Core\ExchangeRate::getUsdToBrl();
         } catch (\Exception $e) {}
         return 5.85;
     }
@@ -694,7 +691,7 @@ class AdminEtiquetasWpController extends Controller
                                 $moedaPedido = strtoupper(trim((string) ($stMoeda->fetchColumn() ?: 'USD')));
                                 if ($moedaPedido === 'BRL') {
                                     $usdRate = $this->getUsdToBrlRate();
-                                    $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+                                    $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / \App\Core\ExchangeRate::getUsdToBrl());
                                 }
                             } catch (\Exception $e) {}
 
@@ -1021,7 +1018,7 @@ class AdminEtiquetasWpController extends Controller
         $brlToUsdRate = 1.0;
         if ($moedaPedido === 'BRL') {
             $usdRate = $this->getUsdToBrlRate();
-            $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+            $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / \App\Core\ExchangeRate::getUsdToBrl());
         }
 
         $items = [];

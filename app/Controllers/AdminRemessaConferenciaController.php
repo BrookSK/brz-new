@@ -1338,23 +1338,7 @@ function confirmarRecebimento() {
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
 
-        $taxaUsdBrl = 5.85;
-        try {
-            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
-                try {
-                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-                    $st->execute([$k]);
-                    $val = $st->fetchColumn();
-                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
-                    if ($v > 0.0001) {
-                        $taxaUsdBrl = $v;
-                        break;
-                    }
-                } catch (\Throwable $e) {
-                }
-            }
-        } catch (\Throwable $e) {
-        }
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
         $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
         $gwLabel = match($gateway) { 'appmax' => 'AppMax', 'cambioreal' => 'Câmbio Real', 'cambioreal_taxas' => 'Câmbio Real Taxas', 'stripe' => 'Stripe', default => strtoupper($gateway) };
@@ -1458,23 +1442,7 @@ th{background:#f5f5f5;width:160px}
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
 
-        $taxaUsdBrl = 5.85;
-        try {
-            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
-                try {
-                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-                    $st->execute([$k]);
-                    $val = $st->fetchColumn();
-                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
-                    if ($v > 0.0001) {
-                        $taxaUsdBrl = $v;
-                        break;
-                    }
-                } catch (\Throwable $e) {
-                }
-            }
-        } catch (\Throwable $e) {
-        }
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
         $itens = $pedido['itens'] ?? [];
         $pagamentos = $pedido['pagamentos'] ?? [];
@@ -1735,18 +1703,7 @@ th{background:#f5f5f5}
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
 
-        $taxaUsdBrl = 5.85;
-        try {
-            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
-                try {
-                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-                    $st->execute([$k]);
-                    $val = $st->fetchColumn();
-                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
-                    if ($v > 0.0001) { $taxaUsdBrl = $v; break; }
-                } catch (\Throwable $e) {}
-            }
-        } catch (\Throwable $e) {}
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
         $pagamentos = array_filter($pedido['pagamentos'] ?? [], fn($pg) => strtolower((string)($pg['gateway'] ?? '')) === $gateway);
         if (empty($pagamentos)) return null;
@@ -1853,18 +1810,7 @@ th{background:#f5f5f5;width:160px}
         if ($moeda === '') $moeda = 'USD';
         $fmtMoeda = fn($v, $m) => $v !== null ? ($m === 'BRL' ? 'R$ ' : 'US$ ') . number_format((float)$v, 2, ',', '.') : '-';
 
-        $taxaUsdBrl = 5.85;
-        try {
-            foreach (['sistema_usd_brl_rate', 'usd_brl_rate'] as $k) {
-                try {
-                    $st = $this->connection->prepare('SELECT valor FROM configuracoes_sistema WHERE chave = ? LIMIT 1');
-                    $st->execute([$k]);
-                    $val = $st->fetchColumn();
-                    $v = (float) str_replace(',', '.', trim((string) ($val ?? '')));
-                    if ($v > 0.0001) { $taxaUsdBrl = $v; break; }
-                } catch (\Throwable $e) {}
-            }
-        } catch (\Throwable $e) {}
+        $taxaUsdBrl = \App\Core\ExchangeRate::getUsdToBrl();
 
         $itens = $pedido['itens'] ?? [];
         $pagamentos = $pedido['pagamentos'] ?? [];

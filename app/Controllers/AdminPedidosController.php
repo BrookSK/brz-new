@@ -4801,7 +4801,7 @@ HTML;
                                                     $taxaServicoPedido = (float) ($pedido['servicos'] ?? ($pedido['taxa_servico'] ?? 0));
                                                     $eligiblePedido = $subtotalPedido + $taxaServicoPedido;
                                                     if ($walletMoeda === 'BRL') {
-                                                        $rateCheck = (float) ($pedido['taxa_conversao'] ?? 5.85);
+                                                        $rateCheck = (float) ($pedido['taxa_conversao'] ?? \App\Core\ExchangeRate::getUsdToBrl());
                                                         if ($rateCheck > 1.01) $eligiblePedido = $eligiblePedido * $rateCheck;
                                                     }
                                                     if ($walletVal >= ($eligiblePedido - 0.01)) {
