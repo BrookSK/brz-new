@@ -295,13 +295,22 @@ class PacoteCarrinhoService {
 
             // Corrigir auto_increment se há registro com id=0
             try {
-                $stMax = $this->connection->query("SELECT MAX(id) FROM carrinho_items WHERE id > 0");
-                $maxId = (int) ($stMax ? $stMax->fetchColumn() : 0);
-                if ($maxId > 0) {
-                    $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
-                    $this->connection->exec("ALTER TABLE carrinho_items AUTO_INCREMENT = " . ($maxId + 1));
-                }
+                $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
             } catch (\Throwable $e) {}
+
+            // Calcular próximo ID manualmente (workaround para NO_AUTO_VALUE_ON_ZERO)
+            $nextId = 1;
+            try {
+                $stMax = $this->connection->query("SELECT COALESCE(MAX(id), 0) + 1 FROM carrinho_items");
+                $nextId = (int) $stMax->fetchColumn();
+                if ($nextId <= 0) $nextId = 1;
+            } catch (\Throwable $e) {
+                $nextId = 99999;
+            }
+
+            $colsList = "id, " . $colsList;
+            $valsList = "?, " . $valsList;
+            array_unshift($params, $nextId);
 
             $stmt = $this->connection->prepare("INSERT INTO carrinho_items ({$colsList}) VALUES ({$valsList})");
             $stmt->execute($params);
