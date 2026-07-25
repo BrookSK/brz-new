@@ -1119,6 +1119,8 @@ function renderAdminScripts() {
 
     // Bootstrap JS (necessário para modais em páginas inline que não usam admin.php layout)
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+    // Garantir que modais data-bs-toggle funcionem após carregamento
+    echo '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof bootstrap==="undefined")return;document.querySelectorAll("[data-bs-toggle=\\"modal\\"]").forEach(function(btn){btn.addEventListener("click",function(e){var target=btn.getAttribute("data-bs-target");if(target){var el=document.querySelector(target);if(el)bootstrap.Modal.getOrCreateInstance(el).show();}});});});</script>';
 
     // Notificações push de demandas + Sino de Notificações
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99998;max-width:400px;"></div>';
