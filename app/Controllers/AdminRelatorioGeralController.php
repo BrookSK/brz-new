@@ -20,6 +20,19 @@ class AdminRelatorioGeralController extends Controller {
         'cancelled'         => 'cancelado',
     ];
 
+    /**
+     * Progressão de status (hierarquia de fluxo do pedido).
+     * Cada status "engloba" os anteriores — ou seja, um pedido em "produto_consolidado"
+     * já passou por pago, comprado, etc. Quando o filtro seleciona um status avançado,
+     * os pedidos que já passaram por esse status (status posteriores) também são incluídos.
+     *
+     * Regra de negócio: "Caixa Fechada" engloba Pago, Parcialmente Comprado e Produto Comprado
+     * porque para fechar a caixa, o pedido obrigatoriamente já foi pago e teve seus itens comprados.
+     */
+    private static function getStatusEnglobados(string $status): array {
+        return \App\Controllers\AdminPedidosController::getStatusEnglobados($status);
+    }
+
     public function __construct() {
         $this->db = \Config\Database::getConnection();
     }
@@ -80,7 +93,7 @@ class AdminRelatorioGeralController extends Controller {
             $where[] = "p.deleted_at IS NULL";
         }
 
-        // Filtro por status: considerar sinônimos (suporta múltiplos)
+        // Filtro por status: considerar sinônimos e status englobados (suporta múltiplos)
         if (!empty($statusFilter)) {
             $sinonimosDoFiltro = [];
             foreach ($statusFilter as $sf) {
@@ -97,6 +110,18 @@ class AdminRelatorioGeralController extends Controller {
                     $sinonimosDoFiltro[] = $canonico;
                     foreach (self::$statusSinonimos as $sin => $can) {
                         if ($can === $canonico) {
+                            $sinonimosDoFiltro[] = $sin;
+                        }
+                    }
+                }
+                // Incluir status englobados pela hierarquia de progressão
+                // Ex: "produto_consolidado" (Caixa Fechada) engloba "pago", "itens_comprados", etc.
+                $englobados = self::getStatusEnglobados($sf);
+                foreach ($englobados as $eng) {
+                    $sinonimosDoFiltro[] = $eng;
+                    // Também incluir sinônimos dos status englobados
+                    foreach (self::$statusSinonimos as $sin => $canonico) {
+                        if ($canonico === $eng) {
                             $sinonimosDoFiltro[] = $sin;
                         }
                     }

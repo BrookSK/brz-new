@@ -44,8 +44,20 @@ class AdminRelatorioPedidosController extends Controller {
         try { $st = $this->db->query('DESCRIBE pedidos'); $cols = $st ? $st->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
 
         if (!empty($statusFilter)) {
+            // Expandir status englobados pela hierarquia de progressão
+            // Ex: 'produto_consolidado' (Caixa Fechada) engloba 'pago', 'itens_comprados', etc.
+            $expandido = [];
+            foreach ($statusFilter as $sf) {
+                $expandido[] = $sf;
+                $englobados = \App\Controllers\AdminPedidosController::getStatusEnglobados($sf);
+                foreach ($englobados as $eng) {
+                    $expandido[] = $eng;
+                }
+            }
+            $expandido = array_unique($expandido);
+
             $placeholders = [];
-            foreach ($statusFilter as $i => $s) {
+            foreach (array_values($expandido) as $i => $s) {
                 $key = ':st' . $i;
                 $placeholders[] = $key;
                 $params[$key] = $s;

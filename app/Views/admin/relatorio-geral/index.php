@@ -104,13 +104,16 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                     <!-- Status como chips/checkboxes inline -->
                     <div class="flex-grow-1">
                         <label class="form-label small text-muted mb-1"><i class="fas fa-tag me-1"></i>STATUS DO PEDIDO</label>
-                        <div class="d-flex flex-wrap gap-1">
+                        <div class="d-flex flex-wrap gap-1" id="statusChipsContainer">
                             <?php foreach ($statusList as $key => $label): ?>
-                            <label class="btn btn-sm <?= in_array($key, $statusFilter) ? 'btn-primary' : 'btn-outline-secondary' ?> rounded-pill px-2 py-1" style="font-size:11px;cursor:pointer;">
-                                <input type="checkbox" name="status[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $statusFilter) ? 'checked' : '' ?> class="d-none" onchange="this.closest('label').classList.toggle('btn-primary');this.closest('label').classList.toggle('btn-outline-secondary');">
+                            <label class="btn btn-sm <?= in_array($key, $statusFilter) ? 'btn-primary' : 'btn-outline-secondary' ?> rounded-pill px-2 py-1 status-chip" style="font-size:11px;cursor:pointer;" data-status="<?= htmlspecialchars($key) ?>">
+                                <input type="checkbox" name="status[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $statusFilter) ? 'checked' : '' ?> class="d-none status-chip-cb" onchange="handleStatusChange(this)">
                                 <?= htmlspecialchars($label) ?>
                             </label>
                             <?php endforeach; ?>
+                        </div>
+                        <div class="form-text mt-1" id="statusEnglobadoInfo" style="font-size:10px;display:none;">
+                            <i class="fas fa-info-circle me-1"></i><span id="statusEnglobadoText"></span>
                         </div>
                     </div>
 
@@ -464,6 +467,85 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
         </div>
     </div>
 </div>
+<script>
+// Hierarquia de status: mapa de quais status são englobados por cada status avançado
+const STATUS_PROGRESSAO = ['pendente','processando','pago','carne_pagando','carne_aguardando','itens_parcialmente_comprados','itens_comprados','invoice_liberado','invoice_confirmado','fatura_pendente','fatura_paga','produto_consolidado','etiqueta_gerada','em_transporte','aguardando_liberacao_aduaneira','enviado_ao_destinatario','entregue'];
+const STATUS_LABELS = <?= json_encode($statusList, JSON_UNESCAPED_UNICODE) ?>;
+
+function getEnglobados(status) {
+    const pos = STATUS_PROGRESSAO.indexOf(status);
+    if (pos <= 0) return [];
+    const inicioPago = STATUS_PROGRESSAO.indexOf('pago');
+    if (pos <= inicioPago) return [];
+    return STATUS_PROGRESSAO.slice(inicioPago, pos);
+}
+
+function handleStatusChange(cb) {
+    const label = cb.closest('label');
+    label.classList.toggle('btn-primary');
+    label.classList.toggle('btn-outline-secondary');
+    updateEnglobadoVisual();
+}
+
+function updateEnglobadoVisual() {
+    const chips = document.querySelectorAll('.status-chip');
+    const infoEl = document.getElementById('statusEnglobadoInfo');
+    const textEl = document.getElementById('statusEnglobadoText');
+
+    // Resetar estilos de "englobado"
+    chips.forEach(c => {
+        c.classList.remove('border-info');
+        c.style.borderWidth = '';
+        c.style.opacity = '';
+    });
+
+    // Verificar quais status estão selecionados
+    const selecionados = [];
+    chips.forEach(c => {
+        const cb = c.querySelector('input');
+        if (cb && cb.checked) selecionados.push(c.dataset.status);
+    });
+
+    // Coletar todos os englobados
+    let todosEnglobados = [];
+    selecionados.forEach(s => {
+        const eng = getEnglobados(s);
+        todosEnglobados = todosEnglobados.concat(eng);
+    });
+    todosEnglobados = [...new Set(todosEnglobados)];
+
+    // Destacar visualmente os chips englobados (que não foram explicitamente marcados)
+    if (todosEnglobados.length > 0) {
+        chips.forEach(c => {
+            const st = c.dataset.status;
+            const cb = c.querySelector('input');
+            if (todosEnglobados.includes(st) && cb && !cb.checked) {
+                c.classList.add('border-info');
+                c.style.borderWidth = '2px';
+                c.style.opacity = '0.7';
+            }
+        });
+
+        // Mostrar info com os nomes dos englobados
+        const englobadosNomes = todosEnglobados
+            .filter(e => !selecionados.includes(e))
+            .map(e => STATUS_LABELS[e] || e)
+            .slice(0, 5);
+        if (englobadosNomes.length > 0) {
+            textEl.textContent = 'Inclui automaticamente: ' + englobadosNomes.join(', ');
+            infoEl.style.display = 'block';
+        } else {
+            infoEl.style.display = 'none';
+        }
+    } else {
+        infoEl.style.display = 'none';
+    }
+}
+
+// Inicializar visual ao carregar
+document.addEventListener('DOMContentLoaded', updateEnglobadoVisual);
+</script>
+
 <script>
 (function(){
 const DATA=<?= json_encode($regionalData, JSON_UNESCAPED_UNICODE|JSON_NUMERIC_CHECK) ?>;

@@ -5927,6 +5927,60 @@ LINKSCRIPT;
         ];
     }
 
+    /**
+     * Retorna a progressão linear de status do pedido (hierarquia do fluxo).
+     * Status posteriores "englobam" os anteriores. Por exemplo, 'produto_consolidado'
+     * (Caixa Fechada) implica que o pedido já foi pago e os itens foram comprados.
+     * 
+     * Nota: 'cancelado' não faz parte da progressão linear pois é um estado terminal.
+     */
+    public static function getStatusProgressao(): array {
+        return [
+            'pendente',
+            'processando',
+            'pago',
+            'carne_pagando',
+            'carne_aguardando',
+            'itens_parcialmente_comprados',
+            'itens_comprados',
+            'invoice_liberado',
+            'invoice_confirmado',
+            'fatura_pendente',
+            'fatura_paga',
+            'produto_consolidado',        // Caixa Fechada
+            'etiqueta_gerada',
+            'em_transporte',
+            'aguardando_liberacao_aduaneira',
+            'enviado_ao_destinatario',
+            'entregue',
+        ];
+    }
+
+    /**
+     * Retorna todos os status que são englobados (implícitos) por um status avançado.
+     * Exemplo: 'produto_consolidado' engloba 'pago', 'itens_parcialmente_comprados', 'itens_comprados', etc.
+     * A lógica: se o pedido chegou a "Caixa Fechada", ele obrigatoriamente já foi pago e comprado.
+     */
+    public static function getStatusEnglobados(string $status): array {
+        $progressao = self::getStatusProgressao();
+        $pos = array_search($status, $progressao, true);
+        if ($pos === false || $pos === 0) {
+            return [];
+        }
+        // Englobamento começa a partir de "pago" (status pré-pagamento não são englobados)
+        $inicioPagamento = array_search('pago', $progressao, true);
+        if ($inicioPagamento === false) {
+            return [];
+        }
+        $englobados = [];
+        if ($pos > $inicioPagamento) {
+            for ($i = (int) $inicioPagamento; $i < $pos; $i++) {
+                $englobados[] = $progressao[$i];
+            }
+        }
+        return $englobados;
+    }
+
     /** Gera as <option> de status com o valor atual selecionado. */
     private function buildStatusOptions(string $current, bool $withEmpty = false): string {
         $html = $withEmpty ? '<option value="">Selecione...</option>' : '';
