@@ -1343,7 +1343,7 @@ class CheckoutController extends Controller {
 
             // Valor para Câmbio Real (conta 1): subtotal de produtos não coberto
             $valorCR1 = round(max(0.0, $uncoveredSubtotal), 2);
-            // Valor para Câmbio Real Taxas (conta 2): taxa_servico não coberta + impostos
+            // Valor para Câmbio Real Taxas (conta 2): taxa_servico não coberta + impostos + taxa_seguro + taxa_armazenamento
             $valorCR2 = round(max(0.0, $uncoveredTaxaServico + $impostos + $impostoLocal), 2);
 
             $results = ['success' => true, 'charges' => []];
@@ -6977,6 +6977,44 @@ class CheckoutController extends Controller {
             // Aplicar desconto promocional na taxa de serviço (compra orgânica)
             $descontoTaxaInfo = $this->carrinhoModel->calcularDescontoTaxaServico($taxaServicoBrutaUsd);
             $taxaServicoUsd = $descontoTaxaInfo['final'];
+
+            // === Taxa de Seguro + Taxa de Armazenamento (somadas à taxa de serviço para ir para CR2) ===
+            $taxaSeguroUsd = 0.0;
+            $taxaArmazenamentoUsd = 0.0;
+            try {
+                $dbTaxas = \Config\Database::getConnection();
+                $taxaSeguroPercent = (float) $this->getConfigValue('pacote_taxa_seguro_percentual', '3.00');
+                $diasMultaInicio = (int) $this->getConfigValue('pacote_dias_multa_inicio', '15');
+                $valorDiaUsd = (float) $this->getConfigValue('pacote_multa_valor_dia_usd', '2.00');
+
+                foreach ($carrinho as $cItem) {
+                    $tipoC = $cItem['tipo_item'] ?? 'produto';
+                    if ($tipoC !== 'pacote_redirecionamento') continue;
+                    $declVal = (float) ($cItem['declaration_value'] ?? 0);
+                    $qtdC = (int) ($cItem['quantidade'] ?? 1);
+
+                    // Taxa de seguro
+                    if ($taxaSeguroPercent > 0 && $declVal > 0) {
+                        $taxaSeguroUsd += $declVal * $qtdC * ($taxaSeguroPercent / 100.0);
+                    }
+
+                    // Taxa de armazenamento
+                    $pacoteIdC = (int) ($cItem['pacote_id'] ?? 0);
+                    if ($pacoteIdC > 0 && $diasMultaInicio > 0 && $valorDiaUsd > 0) {
+                        try {
+                            $stD = $dbTaxas->prepare('SELECT dias_armazenamento FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                            $stD->execute([$pacoteIdC]);
+                            $diasArm = (int) ($stD->fetchColumn() ?: 0);
+                            if ($diasArm > $diasMultaInicio) {
+                                $taxaArmazenamentoUsd += ($diasArm - $diasMultaInicio) * $valorDiaUsd;
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // Somar ao taxaServicoUsd (vai para CR2 no split)
+            $taxaServicoUsd += $taxaSeguroUsd + $taxaArmazenamentoUsd;
 
             $impostosUsd = (float) $this->carrinhoModel->calcularImpostos($subtotal, $freteUsd);
 

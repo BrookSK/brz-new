@@ -35,29 +35,18 @@ class PacoteCarrinhoService {
 
         // Buscar suite do usuario
         $suite = $this->getUserSuite($usuarioId);
-        if (!$suite) {
-            error_log('[PacoteCarrinhoService] Sem suite para uid=' . $usuarioId);
-            return;
-        }
+        if (!$suite) return;
 
         // Buscar pacotes pendentes
         $pacotes = $this->getPacotesPendentes($suite);
-        error_log('[PacoteCarrinhoService] suite=' . $suite . ' pacotes_pendentes=' . count($pacotes));
         if (empty($pacotes)) return;
 
         // Buscar/criar carrinho
         $cartId = $this->getOrCreateCart($usuarioId);
-        if ($cartId <= 0) {
-            error_log('[PacoteCarrinhoService] Nao conseguiu pegar cartId para uid=' . $usuarioId);
-            return;
-        }
-
-        error_log('[PacoteCarrinhoService] cartId=' . $cartId . ' inserindo pacotes...');
+        if ($cartId <= 0) return;
         foreach ($pacotes as $pacote) {
             // Verificar se já está no carrinho
-            $jaExiste = $this->pacoteJaNoCarrinho($cartId, (int) $pacote['id']);
-            error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' jaNoCarrinho=' . ($jaExiste ? 'SIM' : 'NAO'));
-            if ($jaExiste) {
+            if ($this->pacoteJaNoCarrinho($cartId, (int) $pacote['id'])) {
                 continue;
             }
 
@@ -171,7 +160,6 @@ class PacoteCarrinhoService {
                 $cols = [];
             }
             if (!in_array('suite', $cols, true)) {
-                error_log('[PacoteCarrinhoService] Coluna suite nao existe na tabela usuarios');
                 return null;
             }
 
@@ -179,10 +167,8 @@ class PacoteCarrinhoService {
             $stmt->execute([$usuarioId]);
             $suite = $stmt->fetchColumn();
             $suiteInt = ($suite !== false && $suite !== null && $suite !== '') ? (int) $suite : 0;
-            error_log('[PacoteCarrinhoService] getUserSuite uid=' . $usuarioId . ' suite=' . var_export($suite, true) . ' int=' . $suiteInt);
             return $suiteInt > 0 ? $suiteInt : null;
         } catch (\Throwable $e) {
-            error_log('[PacoteCarrinhoService] Erro getUserSuite: ' . $e->getMessage());
             return null;
         }
     }
@@ -314,7 +300,6 @@ class PacoteCarrinhoService {
 
             $stmt = $this->connection->prepare("INSERT INTO carrinho_items ({$colsList}) VALUES ({$valsList})");
             $stmt->execute($params);
-            error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId . ' (produto_id=' . $virtualProdutoId . ')');
         } catch (\Throwable $e) {
             error_log('[PacoteCarrinhoService] Erro ao adicionar pacote #' . ($pacote['id'] ?? '?') . ': ' . $e->getMessage());
         }

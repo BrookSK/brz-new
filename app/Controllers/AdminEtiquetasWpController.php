@@ -773,7 +773,46 @@ class AdminEtiquetasWpController extends Controller
         if (($packagingLength + $packagingWidth + $packagingHeight) > 200) return ['_error' => 'Soma dimensões > 200cm'];
 
         // Itens
+        // Se o pedido tem invoice confirmado, usar dados do invoice (nome_produto, ncm, declaration_value)
         $itemsIn = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
+        try {
+            $dbInv = \Config\Database::getConnection();
+            $stInv = $dbInv->prepare(
+                "SELECT pi.status FROM pedido_invoices pi WHERE pi.pedido_id = ? AND pi.status = 'confirmado' ORDER BY pi.id DESC LIMIT 1"
+            );
+            $stInv->execute([(int) ($pedido['id'] ?? 0)]);
+            $invoiceConfirmado = $stInv->fetch(\PDO::FETCH_ASSOC);
+
+            if ($invoiceConfirmado) {
+                // Buscar itens do invoice confirmado
+                $stItems = $dbInv->prepare(
+                    "SELECT pii.* FROM pedido_invoice_items pii 
+                     INNER JOIN pedido_invoices pi ON pi.id = pii.invoice_id 
+                     WHERE pi.pedido_id = ? AND pi.status = 'confirmado' 
+                     ORDER BY pii.id ASC"
+                );
+                $stItems->execute([(int) ($pedido['id'] ?? 0)]);
+                $invoiceItems = $stItems->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                if (!empty($invoiceItems)) {
+                    $itemsIn = [];
+                    foreach ($invoiceItems as $invItem) {
+                        $itemsIn[] = [
+                            'nome_produto' => $invItem['nome_produto'] ?? 'Produto',
+                            'nome' => $invItem['nome_produto'] ?? 'Produto',
+                            'ncm' => $invItem['ncm'] ?? '',
+                            'preco_unitario' => (float) ($invItem['declaration_value'] ?? 0),
+                            'quantidade' => (int) ($invItem['quantidade'] ?? 1),
+                            'peso_kg' => (float) ($invItem['peso_kg'] ?? 0),
+                            'tem_bateria' => $invItem['tem_bateria'] ?? 'N',
+                            'tem_perfume' => $invItem['tem_perfume'] ?? 'N',
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Se falhar, usa itens normais do pedido
+        }
         if (empty($itemsIn)) return ['_error' => 'Sem itens'];
         if (count($itemsIn) > 20) return ['_error' => 'Mais de 20 itens'];
 

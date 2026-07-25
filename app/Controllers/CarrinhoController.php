@@ -356,7 +356,6 @@ class CarrinhoController extends Controller {
                 $varIdPacoteLoop = (int) ($item['produto_variacao_id'] ?? 0);
                 $itemKeyStablePacote = ((string) $itemProdutoId) . ':' . ((string) $varIdPacoteLoop);
                 $isAtivo = $this->getItemAtivoFromSession($itemKeyStablePacote);
-                error_log('[CARRINHO_PACOTE] key=' . $itemKeyStablePacote . ' isAtivo=' . ($isAtivo ? '1' : '0') . ' session=' . json_encode($_SESSION['carrinho_itens_ativos'] ?? []));
                 $pesoUnit = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? 0));
                 $pesoItem = $pesoUnit * (int) ($item['quantidade'] ?? 1);
                 $itemPrice = (float) ($item['price'] ?? ($item['preco_unitario'] ?? 0));
@@ -712,8 +711,55 @@ class CarrinhoController extends Controller {
         if ($entregaForaBR) {
             $impostos = 0.0;
         }
+
+        // === Taxa de Seguro (% sobre declaration_value dos pacotes ativos) ===
+        $taxaSeguro = 0.0;
+        try {
+            $taxaSeguroPercent = (float) $this->getConfigValue('pacote_taxa_seguro_percentual', '3.00');
+            if ($taxaSeguroPercent > 0) {
+                foreach ($carrinho as $ck => $cItem) {
+                    $tipoCheck = $cItem['tipo_item'] ?? 'produto';
+                    if ($tipoCheck !== 'pacote_redirecionamento') continue;
+                    $pidCheck = (int) ($cItem['produto_id'] ?? 0);
+                    $varCheck = (int) ($cItem['produto_variacao_id'] ?? 0);
+                    $keyCheck = ((string) $pidCheck) . ':' . ((string) $varCheck);
+                    if (!$this->getItemAtivoFromSession($keyCheck)) continue;
+                    $declVal = (float) ($cItem['declaration_value'] ?? 0);
+                    if ($declVal > 0) {
+                        $taxaSeguro += $declVal * (int) ($cItem['quantidade'] ?? 1) * ($taxaSeguroPercent / 100.0);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // === Taxa de Armazenamento (dias > multa_inicio × valor/dia) ===
+        $taxaArmazenamento = 0.0;
+        try {
+            $diasMultaInicio = (int) $this->getConfigValue('pacote_dias_multa_inicio', '15');
+            $valorDiaUsd = (float) $this->getConfigValue('pacote_multa_valor_dia_usd', '2.00');
+            if ($diasMultaInicio > 0 && $valorDiaUsd > 0) {
+                $dbArm = \Config\Database::getConnection();
+                foreach ($carrinho as $ck => $cItem) {
+                    $tipoCheck = $cItem['tipo_item'] ?? 'produto';
+                    if ($tipoCheck !== 'pacote_redirecionamento') continue;
+                    $pidCheck = (int) ($cItem['produto_id'] ?? 0);
+                    $varCheck = (int) ($cItem['produto_variacao_id'] ?? 0);
+                    $keyCheck = ((string) $pidCheck) . ':' . ((string) $varCheck);
+                    if (!$this->getItemAtivoFromSession($keyCheck)) continue;
+                    $pacoteIdCheck = (int) ($cItem['pacote_id'] ?? 0);
+                    if ($pacoteIdCheck > 0) {
+                        $stDias = $dbArm->prepare('SELECT dias_armazenamento FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stDias->execute([$pacoteIdCheck]);
+                        $dias = (int) ($stDias->fetchColumn() ?: 0);
+                        if ($dias > $diasMultaInicio) {
+                            $taxaArmazenamento += ($dias - $diasMultaInicio) * $valorDiaUsd;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
         
-        $total = $subtotal + $taxaServico + $impostos + $frete;
+        $total = $subtotal + $taxaServico + $impostos + $frete + $taxaSeguro + $taxaArmazenamento;
 
         // Calcular imposto local do grupo de compras OU do produto individual
         $impostoLocal = 0.0;
@@ -911,6 +957,8 @@ class CarrinhoController extends Controller {
             'impostos' => $impostos,
             'imposto_local' => $impostoLocal,
             'imposto_local_percent' => $impostoLocalPercent,
+            'taxa_seguro' => $taxaSeguro,
+            'taxa_armazenamento' => $taxaArmazenamento,
             'frete' => $frete,
             'peso_total' => $pesoTotal,
             'total' => $total,

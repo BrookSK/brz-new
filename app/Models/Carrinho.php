@@ -228,8 +228,6 @@ class Carrinho extends Model {
     }
 
     public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
-        error_log('[Carrinho::adicionarItem] INICIO carrinhoId=' . $carrinhoId . ' produtoId=' . $produtoId . ' qtd=' . $quantidade);
-        
         // Fix NO_AUTO_VALUE_ON_ZERO: limpar registro com id=0 e setar sql_mode
         try {
             $this->connection->exec("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')");
@@ -260,7 +258,6 @@ class Carrinho extends Model {
         $produto = $produtoModel->find($produtoId);
         
         if (!$produto || $produto['estoque'] < $quantidade) {
-            error_log('[Carrinho::adicionarItem] FALHOU - produto nao encontrado ou estoque insuficiente. produto=' . json_encode($produto ? ['id' => $produto['id'], 'estoque' => $produto['estoque']] : null));
             return false;
         }
 
@@ -388,7 +385,6 @@ class Carrinho extends Model {
         }
         
         $this->atualizarTotais($carrinhoId);
-        error_log('[Carrinho::adicionarItem] SUCESSO produtoId=' . $produtoId);
         return true;
     }
 

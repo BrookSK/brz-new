@@ -449,6 +449,20 @@
                         <span class="cart-currency imposto-local-value" data-original-value="<?= $imposto_local ?>"><?= number_format($imposto_local, 2, ',', '.') ?></span>
                     </div>
                     <?php endif; ?>
+
+                    <?php if (($taxa_seguro ?? 0) > 0): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="fas fa-shield-alt me-1 text-info"></i>Taxa de Seguro</span>
+                        <span class="cart-currency">$ <?= number_format($taxa_seguro, 2, ',', '.') ?></span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (($taxa_armazenamento ?? 0) > 0): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><i class="fas fa-warehouse me-1 text-warning"></i>Taxa de Armazenamento</span>
+                        <span class="cart-currency text-warning">$ <?= number_format($taxa_armazenamento, 2, ',', '.') ?></span>
+                    </div>
+                    <?php endif; ?>
                     
                     <div class="d-flex justify-content-between mb-2">
                         <span><?= __('cart.shipping_kg', 'Frete ({kg} kg)', ['kg' => number_format(ceil($peso_total), 0, ',', '.')]) ?></span>
