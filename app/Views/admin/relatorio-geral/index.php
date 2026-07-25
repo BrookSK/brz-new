@@ -105,8 +105,15 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                     <div class="flex-grow-1">
                         <label class="form-label small text-muted mb-1"><i class="fas fa-tag me-1"></i>STATUS DO PEDIDO</label>
                         <div class="d-flex flex-wrap gap-1" id="statusChipsContainer">
-                            <?php foreach ($statusList as $key => $label): ?>
-                            <label class="btn btn-sm <?= in_array($key, $statusFilter) ? 'btn-primary' : 'btn-outline-secondary' ?> rounded-pill px-2 py-1 status-chip" style="font-size:11px;cursor:pointer;" data-status="<?= htmlspecialchars($key) ?>">
+                            <?php
+                            $statusTooltips = [
+                                'itens_parcialmente_comprados' => 'Pedido pago com parte dos itens já comprados do fornecedor. Itens restantes ainda pendentes de compra.',
+                                'itens_comprados' => 'Todos os itens do pedido foram comprados do fornecedor.',
+                                'produto_consolidado' => 'Caixa fechada — engloba Pago, Parcialmente Comprado e Produto Comprado.',
+                                'pago' => 'Pagamento confirmado. Itens aguardando compra do fornecedor.',
+                            ];
+                            foreach ($statusList as $key => $label): ?>
+                            <label class="btn btn-sm <?= in_array($key, $statusFilter) ? 'btn-primary' : 'btn-outline-secondary' ?> rounded-pill px-2 py-1 status-chip" style="font-size:11px;cursor:pointer;" data-status="<?= htmlspecialchars($key) ?>"<?= isset($statusTooltips[$key]) ? ' title="' . htmlspecialchars($statusTooltips[$key]) . '" data-bs-toggle="tooltip" data-bs-placement="top"' : '' ?>>
                                 <input type="checkbox" name="status[]" value="<?= htmlspecialchars($key) ?>" <?= in_array($key, $statusFilter) ? 'checked' : '' ?> class="d-none status-chip-cb" onchange="handleStatusChange(this)">
                                 <?= htmlspecialchars($label) ?>
                             </label>
@@ -322,9 +329,16 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                             <?php else: ?>
                                 <?php foreach ($statusConsolidado as $row):
                                     $cor = $statusColors[$row['status']] ?? 'secondary';
+                                    $statusDescricoes = [
+                                        'itens_parcialmente_comprados' => 'Parte dos itens já comprados, restantes pendentes',
+                                        'itens_comprados' => 'Todos os itens comprados do fornecedor',
+                                        'produto_consolidado' => 'Caixa fechada (já pago e comprado)',
+                                        'pago' => 'Pagamento confirmado, aguardando compra',
+                                    ];
+                                    $descr = $statusDescricoes[$row['status']] ?? '';
                                 ?>
                                 <tr>
-                                    <td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:var(--bs-<?= $cor ?>);"></span><a href="/admin/relatorio-geral?date_start=<?= $dateStart ?>&date_end=<?= $dateEnd ?>&status[]=<?= urlencode($row['status']??'') ?>&moeda=<?= urlencode($moedaFilter) ?>" class="text-decoration-none text-dark"><?= htmlspecialchars($statusLabels[$row['status']] ?? ucfirst(str_replace('_',' ',$row['status']??'N/A'))) ?></a></td>
+                                    <td><span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:var(--bs-<?= $cor ?>);"></span><a href="/admin/relatorio-geral?date_start=<?= $dateStart ?>&date_end=<?= $dateEnd ?>&status[]=<?= urlencode($row['status']??'') ?>&moeda=<?= urlencode($moedaFilter) ?>" class="text-decoration-none text-dark"<?= $descr !== '' ? ' title="' . htmlspecialchars($descr) . '" data-bs-toggle="tooltip"' : '' ?>><?= htmlspecialchars($statusLabels[$row['status']] ?? ucfirst(str_replace('_',' ',$row['status']??'N/A'))) ?></a></td>
                                     <td class="text-end"><?= (int)($row['qtd']??0) ?></td>
                                     <td class="text-end"><?= fmtNum($row['subtotal']??0) ?></td>
                                     <td class="text-end"><?= fmtNum($row['servicos']??0) ?></td>
@@ -543,7 +557,12 @@ function updateEnglobadoVisual() {
 }
 
 // Inicializar visual ao carregar
-document.addEventListener('DOMContentLoaded', updateEnglobadoVisual);
+document.addEventListener('DOMContentLoaded', function() {
+    updateEnglobadoVisual();
+    // Inicializar tooltips Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function(el) { new bootstrap.Tooltip(el); });
+});
 </script>
 
 <script>
