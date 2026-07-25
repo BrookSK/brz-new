@@ -1106,7 +1106,10 @@ function renderAdminSidebarStyles() {
 
 // Scripts JavaScript comuns
 function renderAdminScripts() {
-    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+    static $rendered = false;
+    if ($rendered) return;
+    $rendered = true;
+
     // Notificações push de demandas + Sino de Notificações
     echo '<div id="admin-notif-container" style="position:fixed;top:80px;right:20px;z-index:99998;max-width:400px;"></div>';
 
