@@ -1351,7 +1351,7 @@ class AdminComprasController extends Controller {
                     : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0) as loja_id' : '0 as loja_id'))
                 . '     , lc.status as status'
                 . ($this->columnExists('lista_compras', 'nome_produto') ? ', COALESCE(lc.nome_produto, \'\') as nome_produto_custom' : ", '' as nome_produto_custom")
-                . ($temTipoCompraEmLista ? ", COALESCE(lc.tipo_compra, '') as tipo_compra" : ", '' as tipo_compra")
+                . ($temTipoCompraEmLista ? ", MAX(COALESCE(lc.tipo_compra, '')) as tipo_compra" : ", '' as tipo_compra")
                 . '     , SUM(CASE WHEN COALESCE(lc.quantidade_faltante,0) > 0 THEN lc.quantidade_faltante ELSE COALESCE(lc.quantidade_necessaria,0) END) as quantidade_faltante'
                 . '     , SUM(COALESCE(lc.quantidade_necessaria,0)) as quantidade_necessaria'
                 . '     , MIN(COALESCE(lc.data_solicitacao, CURDATE())) as data_solicitacao'
@@ -1380,7 +1380,6 @@ class AdminComprasController extends Controller {
                 . $whereLojaInner
                 . '   GROUP BY lc.produto_id, '
                 . ($this->columnExists('lista_compras', 'nome_produto') ? 'COALESCE(lc.nome_produto, \'\'), ' : '')
-                . ($temTipoCompraEmLista ? "COALESCE(lc.tipo_compra, ''), " : '')
                 . ($temLojaIdEmLista && $temLojaIdEmProdutos
                     ? 'COALESCE(NULLIF(lc.loja_id,0), p_inner.loja_id, 0), lc.status'
                     : ($temLojaIdEmLista ? 'COALESCE(lc.loja_id,0), lc.status' : '0, lc.status'))

@@ -1117,6 +1117,9 @@ function renderAdminScripts() {
     if ($rendered) return;
     $rendered = true;
 
+    // Bootstrap JS (necessário para modais em páginas inline que não usam admin.php layout)
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+
     // Notificações push de demandas + Sino de Notificações
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99998;max-width:400px;"></div>';
 
