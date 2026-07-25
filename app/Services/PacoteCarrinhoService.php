@@ -293,6 +293,16 @@ class PacoteCarrinhoService {
                 $this->connection->exec("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')");
             } catch (\Throwable $e) {}
 
+            // Corrigir auto_increment se há registro com id=0
+            try {
+                $stMax = $this->connection->query("SELECT MAX(id) FROM carrinho_items WHERE id > 0");
+                $maxId = (int) ($stMax ? $stMax->fetchColumn() : 0);
+                if ($maxId > 0) {
+                    $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
+                    $this->connection->exec("ALTER TABLE carrinho_items AUTO_INCREMENT = " . ($maxId + 1));
+                }
+            } catch (\Throwable $e) {}
+
             $stmt = $this->connection->prepare("INSERT INTO carrinho_items ({$colsList}) VALUES ({$valsList})");
             $stmt->execute($params);
             error_log('[PacoteCarrinhoService] Pacote #' . $pacote['id'] . ' adicionado ao carrinho ' . $cartId . ' (produto_id=' . $virtualProdutoId . ')');
