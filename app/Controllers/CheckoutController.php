@@ -5617,6 +5617,49 @@ class CheckoutController extends Controller {
                 $this->debugLog('[CHECKOUT_ITENS] Produto ID vazio, pulando item');
                 continue;
             }
+
+            // Itens de pacote/fatura: inserir diretamente sem validar na tabela produtos
+            $tipoItemSalvar = $item['tipo_item'] ?? 'produto';
+            if ($tipoItemSalvar === 'pacote_redirecionamento' || $tipoItemSalvar === 'fatura_adicional' || (int) $produtoId >= 999990) {
+                $this->debugLog('[CHECKOUT_ITENS] Item de pacote/fatura, inserindo direto');
+                $nomePacote = (string) ($item['nome'] ?? ($item['name'] ?? 'Pacote Redirecionamento'));
+                $qtdPacote = (int) ($item['quantidade'] ?? 1);
+                $precoPacote = (float) ($item['preco_unitario'] ?? ($item['price'] ?? 0));
+                $pesoPacote = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? ($item['weight'] ?? 0)));
+                $declarationVal = (float) ($item['declaration_value'] ?? 0);
+                $pacoteIdItem = (int) ($item['pacote_id'] ?? 0);
+
+                $colsInsP = ['pedido_id', 'produto_id', 'quantidade'];
+                $valsInsP = [(int) $pedidoId, (int) $produtoId, $qtdPacote];
+                $phP = ['?', '?', '?'];
+
+                if (in_array('nome', $colsItens, true)) { $colsInsP[] = 'nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
+                elseif (in_array('produto_nome', $colsItens, true)) { $colsInsP[] = 'produto_nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
+                if (in_array('preco_unitario', $colsItens, true)) { $colsInsP[] = 'preco_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
+                elseif (in_array('valor_unitario', $colsItens, true)) { $colsInsP[] = 'valor_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
+                if (in_array('subtotal', $colsItens, true)) { $colsInsP[] = 'subtotal'; $valsInsP[] = $precoPacote * $qtdPacote; $phP[] = '?'; }
+                if (in_array('peso_kg', $colsItens, true)) { $colsInsP[] = 'peso_kg'; $valsInsP[] = $pesoPacote; $phP[] = '?'; }
+                elseif (in_array('peso', $colsItens, true)) { $colsInsP[] = 'peso'; $valsInsP[] = $pesoPacote; $phP[] = '?'; }
+                if (in_array('declaration_value', $colsItens, true)) { $colsInsP[] = 'declaration_value'; $valsInsP[] = $declarationVal; $phP[] = '?'; }
+                if (in_array('tipo_item', $colsItens, true)) { $colsInsP[] = 'tipo_item'; $valsInsP[] = $tipoItemSalvar; $phP[] = '?'; }
+                if (in_array('pacote_id', $colsItens, true)) { $colsInsP[] = 'pacote_id'; $valsInsP[] = $pacoteIdItem > 0 ? $pacoteIdItem : null; $phP[] = '?'; }
+                if (in_array('foto_url', $colsItens, true)) { $colsInsP[] = 'foto_url'; $valsInsP[] = $item['foto_url'] ?? null; $phP[] = '?'; }
+                if (in_array('comprovante_url', $colsItens, true)) { $colsInsP[] = 'comprovante_url'; $valsInsP[] = $item['comprovante_url'] ?? null; $phP[] = '?'; }
+
+                $sqlInsP = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $colsInsP) . ') VALUES (' . implode(', ', $phP) . ')';
+                $stInsP = $db->prepare($sqlInsP);
+                $stInsP->execute($valsInsP);
+
+                // Atualizar status do pacote
+                if ($pacoteIdItem > 0) {
+                    try {
+                        $db->prepare('UPDATE pacotes_recebidos SET status = ?, pedido_id = ? WHERE id = ?')
+                           ->execute(['pedido_criado', (int) $pedidoId, $pacoteIdItem]);
+                    } catch (\Throwable $e) {}
+                }
+
+                continue;
+            }
             
             $stmt = $db->prepare("SELECT id FROM produtos WHERE id = ?");
             $stmt->execute([$produtoId]);

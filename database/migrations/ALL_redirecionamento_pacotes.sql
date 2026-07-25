@@ -109,3 +109,11 @@ ON DUPLICATE KEY UPDATE chave = chave;
 
 -- 207: Coluna para comprovante de compra
 ALTER TABLE carrinho_items ADD COLUMN comprovante_url TEXT NULL;
+
+-- 208: Colunas extras na tabela de itens do pedido para pacotes
+ALTER TABLE pedido_itens ADD COLUMN declaration_value DECIMAL(10,2) NULL;
+ALTER TABLE pedido_itens ADD COLUMN tipo_item VARCHAR(30) DEFAULT 'produto';
+ALTER TABLE pedido_itens ADD COLUMN pacote_id INT NULL;
+ALTER TABLE pedido_itens ADD COLUMN foto_url TEXT NULL;
+ALTER TABLE pedido_itens ADD COLUMN comprovante_url TEXT NULL;
+ALTER TABLE pedido_itens ADD COLUMN ncm VARCHAR(20) NULL;
