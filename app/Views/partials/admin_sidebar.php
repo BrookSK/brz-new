@@ -1107,11 +1107,33 @@ function renderAdminSidebarStyles() {
 // Scripts JavaScript comuns
 function renderAdminScripts() {
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
-    // Notificações push de demandas
-    echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99999;max-width:400px;"></div>';
+    // Notificações push de demandas + Sino de Notificações
+    echo '<div id="admin-notif-container" style="position:fixed;top:80px;right:20px;z-index:99998;max-width:400px;"></div>';
+
+    // Bell Widget
+    echo '<div id="admin-bell-widget" style="position:fixed;top:16px;right:20px;z-index:99999;">
+        <button id="bellBtn" onclick="toggleBellDropdown()" style="position:relative;background:#1e293b;border:none;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:transform .2s;">
+            <i class="fas fa-bell" style="color:#fff;font-size:18px;"></i>
+            <span id="bellBadge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;line-height:18px;text-align:center;padding:0 4px;">0</span>
+        </button>
+        <div id="bellDropdown" style="display:none;position:absolute;top:52px;right:0;width:360px;max-height:440px;background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.2);overflow:hidden;">
+            <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-weight:700;font-size:15px;color:#1e293b;"><i class="fas fa-bell me-2"></i>Notificações</span>
+                <button onclick="marcarTodasLidas()" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;">Marcar todas como lidas</button>
+            </div>
+            <div id="bellList" style="max-height:340px;overflow-y:auto;padding:8px;">
+                <div class="text-center text-muted py-4" style="font-size:13px;"><i class="fas fa-check-circle d-block mb-2" style="font-size:24px;opacity:.4;"></i>Nenhuma notificação</div>
+            </div>
+            <div style="padding:10px 16px;border-top:1px solid #e2e8f0;text-align:center;">
+                <a href="/admin/demandas/minhas" style="color:#3b82f6;font-size:12px;font-weight:600;text-decoration:none;">Ver todas as demandas</a>
+            </div>
+        </div>
+    </div>';
+
     echo '<style>
 @keyframes notifSlideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes notifPulse{0%,100%{box-shadow:0 4px 20px rgba(0,0,0,0.15)}50%{box-shadow:0 4px 30px rgba(59,130,246,0.4)}}
+@keyframes bellShake{0%,100%{transform:rotate(0)}25%{transform:rotate(15deg)}50%{transform:rotate(-10deg)}75%{transform:rotate(5deg)}}
 .admin-notif{animation:notifSlideIn .4s ease,notifPulse 2s ease-in-out 3;border-left:5px solid #3b82f6;border-radius:12px;background:#fff;padding:16px 20px;margin-bottom:12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);position:relative;font-size:14px;}
 .admin-notif .notif-title{font-weight:700;font-size:16px;margin-bottom:4px;color:#1e293b;}
 .admin-notif .notif-msg{color:#64748b;font-size:13px;margin-bottom:8px;}
@@ -1119,16 +1141,78 @@ function renderAdminScripts() {
 .admin-notif .notif-link:hover{text-decoration:underline;}
 .admin-notif .notif-close{position:absolute;top:8px;right:12px;background:none;border:none;font-size:18px;color:#94a3b8;cursor:pointer;line-height:1;}
 .admin-notif .notif-close:hover{color:#ef4444;}
+.bell-item{padding:10px 12px;border-radius:8px;margin-bottom:4px;cursor:pointer;transition:background .2s;display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;}
+.bell-item:hover{background:#f1f5f9;}
+.bell-item.unread{background:#eff6ff;}
+.bell-item .bell-icon{width:32px;height:32px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.bell-item .bell-icon i{color:#fff;font-size:12px;}
+.bell-item .bell-content{flex:1;min-width:0;}
+.bell-item .bell-title{font-weight:600;font-size:13px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bell-item .bell-msg{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bell-item .bell-time{font-size:10px;color:#94a3b8;margin-top:2px;}
+#bellBtn.bell-shake i{animation:bellShake .5s ease;}
 </style>';
     echo '<script>
 (function(){
+    var bellOpen=false;
+    var lastNotifCount=0;
+    var allNotifs=[];
+
     function playNotifSound(){try{var a=new AudioContext();var o=a.createOscillator();var g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;o.type="sine";g.gain.value=0.3;o.start();g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+0.3);o.stop(a.currentTime+0.3);}catch(e){}}
+
+    function timeAgo(dateStr){
+        var now=new Date();var d=new Date(dateStr.replace(" ","T"));var diff=Math.floor((now-d)/1000);
+        if(diff<60)return"agora";if(diff<3600)return Math.floor(diff/60)+"min";if(diff<86400)return Math.floor(diff/3600)+"h";return Math.floor(diff/86400)+"d";
+    }
+
+    function updateBell(notifs){
+        allNotifs=notifs;
+        var badge=document.getElementById("bellBadge");
+        var list=document.getElementById("bellList");
+        var count=notifs.length;
+
+        if(count>0){
+            badge.textContent=count>99?"99+":count;
+            badge.style.display="inline-block";
+        } else {
+            badge.style.display="none";
+        }
+
+        // Shake bell on new notifications
+        if(count>lastNotifCount&&lastNotifCount>=0){
+            var btn=document.getElementById("bellBtn");
+            btn.classList.add("bell-shake");
+            setTimeout(function(){btn.classList.remove("bell-shake");},600);
+        }
+        lastNotifCount=count;
+
+        // Render dropdown list
+        if(count===0){
+            list.innerHTML="<div class=\"text-center text-muted py-4\" style=\"font-size:13px;\"><i class=\"fas fa-check-circle d-block mb-2\" style=\"font-size:24px;opacity:.4;\"></i>Nenhuma notificação pendente</div>";
+            return;
+        }
+        var html="";
+        notifs.slice(0,15).forEach(function(n){
+            html+="<a href=\""+(n.link||"#")+"\" class=\"bell-item unread\" onclick=\"markAndGo(event,"+n.id+")\">";
+            html+="<div class=\"bell-icon\"><i class=\"fas fa-comment-dots\"></i></div>";
+            html+="<div class=\"bell-content\">";
+            html+="<div class=\"bell-title\">"+n.titulo+"</div>";
+            html+="<div class=\"bell-msg\">"+(n.mensagem||"")+"</div>";
+            html+="<div class=\"bell-time\">"+timeAgo(n.created_at)+"</div>";
+            html+="</div></a>";
+        });
+        list.innerHTML=html;
+    }
+
     function checkNotifs(){
         fetch("/admin/demandas/api/notificacoes").then(function(r){return r.json()}).then(function(d){
-            if(!d.notificacoes||!d.notificacoes.length)return;
+            var notifs=d.notificacoes||[];
+            updateBell(notifs);
+
+            // Toast for brand-new ones
             var container=document.getElementById("admin-notif-container");
             var newCount=0;
-            d.notificacoes.forEach(function(n){
+            notifs.forEach(function(n){
                 if(document.getElementById("notif-"+n.id))return;
                 newCount++;
                 var el=document.createElement("div");
@@ -1136,21 +1220,54 @@ function renderAdminScripts() {
                 el.className="admin-notif";
                 el.innerHTML="<button class=\"notif-close\" onclick=\"dismissNotif("+n.id+",this)\">&times;</button>"
                     +"<div class=\"notif-title\">"+n.titulo+"</div>"
-                    +"<div class=\"notif-msg\">"+n.mensagem+"</div>"
+                    +"<div class=\"notif-msg\">"+(n.mensagem||"")+"</div>"
                     +(n.link?"<a href=\""+n.link+"\" class=\"notif-link\">Ver demanda &rarr;</a>":"");
                 container.appendChild(el);
+                // Auto-dismiss toast after 10s
+                setTimeout(function(){if(el.parentNode){el.style.transition="all .3s";el.style.opacity="0";el.style.transform="translateX(100%)";setTimeout(function(){el.remove()},300);}},10000);
             });
             if(newCount>0)playNotifSound();
         }).catch(function(){});
     }
+
+    window.toggleBellDropdown=function(){
+        var dd=document.getElementById("bellDropdown");
+        bellOpen=!bellOpen;
+        dd.style.display=bellOpen?"block":"none";
+    };
+
+    window.markAndGo=function(e,id){
+        fetch("/admin/demandas/api/notificacao/"+id+"/lida",{method:"POST"});
+    };
+
+    window.marcarTodasLidas=function(){
+        if(!allNotifs.length)return;
+        allNotifs.forEach(function(n){
+            fetch("/admin/demandas/api/notificacao/"+n.id+"/lida",{method:"POST"});
+        });
+        updateBell([]);
+        document.getElementById("bellDropdown").style.display="none";
+        bellOpen=false;
+    };
+
     window.dismissNotif=function(id,btn){
         fetch("/admin/demandas/api/notificacao/"+id+"/lida",{method:"POST"});
         var el=btn.closest(".admin-notif");
         el.style.transition="all .3s ease";el.style.transform="translateX(100%)";el.style.opacity="0";
         setTimeout(function(){el.remove()},300);
     };
-    setInterval(checkNotifs,30000);
-    setTimeout(checkNotifs,2000);
+
+    // Close dropdown on outside click
+    document.addEventListener("click",function(e){
+        var widget=document.getElementById("admin-bell-widget");
+        if(bellOpen&&widget&&!widget.contains(e.target)){
+            document.getElementById("bellDropdown").style.display="none";
+            bellOpen=false;
+        }
+    });
+
+    setInterval(checkNotifs,15000);
+    setTimeout(checkNotifs,1500);
 })();
 </script>';
 }

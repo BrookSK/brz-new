@@ -979,40 +979,60 @@ class AdminDemandasController extends Controller {
             if ($preview === '') $preview = '(arquivo anexado)';
 
             if ($direcao === 'admin_para_solicitante') {
-                // Admin/dev enviou mensagem → notificar o solicitante
+                // Admin/dev enviou mensagem → notificar o solicitante (email + push)
                 $email = $this->getEmailSolicitante($demanda);
-                if (!$email) return;
+                $criadorId = (int)($demanda['criado_por'] ?? 0);
 
-                $assunto = '💬 Nova mensagem na sua demanda: ' . $titulo;
-                $corpo = "Olá " . ($demanda['solicitante'] ?? $demanda['bloco1_solicitante'] ?? '') . ",\n\n";
-                $corpo .= "Você recebeu uma nova mensagem na sua demanda \"{$titulo}\".\n\n";
-                $corpo .= "De: {$remetente}\n";
-                $corpo .= "Mensagem: {$preview}\n\n";
-                $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/minha/{$demandaId}#chat\n\n";
-                $corpo .= "Atenciosamente,\nEquipe TI Braziliana";
+                // Email para o solicitante (apenas se a demanda não está concluída/arquivada)
+                $statusDemanda = strtolower(trim((string)($demanda['status'] ?? '')));
+                $arquivado = (int)($demanda['arquivado'] ?? 0);
+                if ($email && $statusDemanda !== 'concluido' && !$arquivado) {
+                    $assunto = '💬 Nova mensagem na sua demanda: ' . $titulo;
+                    $corpo = "Olá " . ($demanda['solicitante'] ?? $demanda['bloco1_solicitante'] ?? '') . ",\n\n";
+                    $corpo .= "Você recebeu uma nova mensagem na sua demanda \"{$titulo}\".\n\n";
+                    $corpo .= "De: {$remetente}\n";
+                    $corpo .= "Mensagem: {$preview}\n\n";
+                    $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/minha/{$demandaId}#chat\n\n";
+                    $corpo .= "Atenciosamente,\nEquipe TI Braziliana";
+                    try { $this->enviarEmailSimples($email, $assunto, $corpo); } catch (\Exception $e) {}
+                }
 
-                $this->enviarEmailSimples($email, $assunto, $corpo);
+                // Notificação push (sino) para o criador da demanda
+                if ($criadorId > 0) {
+                    $this->ensureNotificacoesTable();
+                    $link = '/admin/demandas/minha/' . $demandaId . '#chat';
+                    try {
+                        $this->db->prepare("INSERT INTO admin_notificacoes (usuario_id, tipo, titulo, mensagem, link) VALUES (?,?,?,?,?)")
+                            ->execute([$criadorId, 'demanda_mensagem', '💬 ' . $remetente . ' respondeu', $preview, $link]);
+                    } catch (\Exception $e) {}
+                }
 
             } elseif ($direcao === 'solicitante_para_admin') {
                 // Solicitante enviou mensagem → notificar devs/admins configurados
-                $emails = $this->getConfig('demandas_emails_notificacao');
-                if ($emails === '') return;
+                $statusDemanda = strtolower(trim((string)($demanda['status'] ?? '')));
+                $arquivado = (int)($demanda['arquivado'] ?? 0);
 
-                $listaEmails = array_filter(array_map('trim', explode(',', $emails)));
-                $assunto = '💬 Nova mensagem do cliente na demanda: ' . $titulo;
-                $corpo = "Nova mensagem recebida na demanda \"{$titulo}\".\n\n";
-                $corpo .= "De: {$remetente}\n";
-                $corpo .= "Mensagem: {$preview}\n\n";
-                $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/detalhe/{$demandaId}#chat\n\n";
-                $corpo .= "Atenciosamente,\nSistema Braziliana";
+                // Email: apenas se demanda não está concluída/arquivada
+                if ($statusDemanda !== 'concluido' && !$arquivado) {
+                    $emails = $this->getConfig('demandas_emails_notificacao');
+                    if ($emails !== '') {
+                        $listaEmails = array_filter(array_map('trim', explode(',', $emails)));
+                        $assunto = '💬 Nova mensagem do cliente na demanda: ' . $titulo;
+                        $corpo = "Nova mensagem recebida na demanda \"{$titulo}\".\n\n";
+                        $corpo .= "De: {$remetente}\n";
+                        $corpo .= "Mensagem: {$preview}\n\n";
+                        $corpo .= "Acesse para responder: https://brazilianashop.com.br/admin/demandas/detalhe/{$demandaId}#chat\n\n";
+                        $corpo .= "Atenciosamente,\nSistema Braziliana";
 
-                foreach ($listaEmails as $email) {
-                    if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                        try { $this->enviarEmailSimples($email, $assunto, $corpo); } catch (\Exception $e) {}
+                        foreach ($listaEmails as $email) {
+                            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                                try { $this->enviarEmailSimples($email, $assunto, $corpo); } catch (\Exception $e) {}
+                            }
+                        }
                     }
                 }
 
-                // Também criar notificação push para admins configurados
+                // Notificação push para admins configurados (sempre, independente do status)
                 $usuariosNotif = $this->getConfig('demandas_usuarios_notificacao');
                 if ($usuariosNotif !== '') {
                     $this->ensureNotificacoesTable();
