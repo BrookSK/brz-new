@@ -229,6 +229,13 @@ class Carrinho extends Model {
 
     public function adicionarItem($carrinhoId, $produtoId, $quantidade = 1, $produtoVariacaoId = null, $variacaoDescricao = null) {
         error_log('[Carrinho::adicionarItem] INICIO carrinhoId=' . $carrinhoId . ' produtoId=' . $produtoId . ' qtd=' . $quantidade);
+        
+        // Fix NO_AUTO_VALUE_ON_ZERO: limpar registro com id=0 e setar sql_mode
+        try {
+            $this->connection->exec("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_AUTO_VALUE_ON_ZERO', '')");
+            $this->connection->exec("DELETE FROM carrinho_items WHERE id = 0");
+        } catch (\Throwable $e) {}
+        
         $itemsCols = $this->getTableColumns('carrinho_items');
         $unitCol = (is_array($itemsCols) && in_array('preco_unitario', $itemsCols, true)) ? 'preco_unitario' : 'valor_unitario';
         $varCol = (is_array($itemsCols) && in_array('produto_variacao_id', $itemsCols, true))
