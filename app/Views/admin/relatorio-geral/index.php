@@ -433,9 +433,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                                     <tr><td class="ps-3 text-muted">Taxa de serviço</td><td class="text-end"><?= fmtNum($totalServicos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Impostos cobrados</td><td class="text-end"><?= fmtNum($totalImpostos) ?></td></tr>
                                     <tr><td class="ps-3 text-muted">Frete</td><td class="text-end"><?= fmtNum($totalFrete) ?></td></tr>
-                                    <?php if ($descontoTotalBrl > 0): ?>
-                                    <tr><td class="ps-3 text-danger"><i class="fas fa-percent me-1" style="font-size:10px;"></i>Descontos concedidos</td><td class="text-end text-danger">-<?= fmtNum($descontoTotalBrl) ?></td></tr>
-                                    <?php endif; ?>
+                                    <tr><td class="ps-3 <?= $descontoTotalBrl > 0 ? 'text-danger' : 'text-muted' ?>"><i class="fas fa-percent me-1" style="font-size:10px;"></i>Descontos concedidos</td><td class="text-end <?= $descontoTotalBrl > 0 ? 'text-danger' : '' ?>"><?= $descontoTotalBrl > 0 ? '-' : '' ?><?= fmtNum($descontoTotalBrl) ?></td></tr>
                                     <tr class="border-top border-bottom"><td class="fw-bold text-danger" data-i18n="despesas_totais"><i class="fas fa-arrow-down me-1"></i>DESPESAS TOTAIS</td><td class="text-end fw-bold text-danger fs-5 fin-value" data-value-brl="<?= $totalDespesas ?>"><?= fmtNum($totalDespesas) ?></td></tr>
                                     <?php if ($despUsd > 0): ?>
                                     <tr><td class="ps-3 text-muted">USD ($ <?= fmtNum($despUsd) ?> × <?= fmtNum($taxaUsdBrl) ?>)</td><td class="text-end">R$ <?= fmtNum($despUsd * $taxaUsdBrl) ?></td></tr>
