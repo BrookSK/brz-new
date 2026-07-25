@@ -3227,6 +3227,11 @@ class CheckoutController extends Controller {
                 if (empty($pid)) {
                     continue;
                 }
+                // Pular itens de pacote/fatura (produto_id virtual >= 999990)
+                $tipoItem = $item['tipo_item'] ?? 'produto';
+                if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional' || (int) $pid >= 999990) {
+                    continue;
+                }
                 try {
                     $exists = false;
                     foreach ($produtoPkCandidates as $pkCol) {
