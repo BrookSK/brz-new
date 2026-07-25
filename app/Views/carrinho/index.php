@@ -261,9 +261,13 @@
                                 </div>
                                 <div class="col-4 col-md-1 text-end mt-2 mt-md-0">
                                     <div class="d-flex gap-1 justify-content-end">
+                                        <?php if (($item['tipo_item'] ?? 'produto') !== 'pacote_redirecionamento'): ?>
                                         <button class="btn btn-sm btn-outline-danger" onclick='removerItem(<?= htmlspecialchars(json_encode((string) $itemKeyStable), ENT_QUOTES, "UTF-8") ?>, <?= htmlspecialchars(json_encode((string) $item['produto_id']), ENT_QUOTES, "UTF-8") ?>)'>
                                             <i class="fas fa-trash"></i>
                                         </button>
+                                        <?php else: ?>
+                                        <span class="badge bg-secondary" title="Desative pelo checkbox para não incluir no envio"><i class="fas fa-lock"></i></span>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
