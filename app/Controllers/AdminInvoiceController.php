@@ -78,6 +78,9 @@ class AdminInvoiceController extends Controller {
         } catch (\Throwable $e) {
         }
 
+        // Enviar e-mail ao cliente informando que o invoice foi liberado
+        $this->enviarEmailInvoiceLiberado($pedido, $pedidoId);
+
         $this->setFlash('Invoice liberado com sucesso. O cliente pode agora conferir os dados.', 'success');
         $this->redirect('/admin/pedidos/' . $pedidoId);
     }
@@ -168,5 +171,79 @@ class AdminInvoiceController extends Controller {
         }
         $_SESSION['message'] = $message;
         $_SESSION['message_type'] = $type;
+    }
+
+    /**
+     * Enviar e-mail ao cliente informando que o invoice foi liberado para conferência
+     */
+    private function enviarEmailInvoiceLiberado(array $pedido, int $pedidoId): void {
+        try {
+            $usuarioId = (int) ($pedido['usuario_id'] ?? 0);
+            if ($usuarioId <= 0) return;
+
+            $stUser = $this->connection->prepare('SELECT nome, email FROM usuarios WHERE id = ? LIMIT 1');
+            $stUser->execute([$usuarioId]);
+            $usuario = $stUser->fetch(\PDO::FETCH_ASSOC);
+            if (!$usuario || empty($usuario['email'])) return;
+
+            $nome = htmlspecialchars($usuario['nome'] ?? 'Cliente');
+            $linkInvoice = 'https://brazilianashop.com.br/minha-conta/invoice?pedido_id=' . $pedidoId;
+
+            $html = <<<HTML
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+    <div style="background: #1a3a5c; padding: 20px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; font-size: 22px;">Braziliana</h1>
+    </div>
+    <div style="padding: 30px 20px;">
+        <h2 style="color: #1a3a5c;">Confira os dados do seu envio</h2>
+        <p>Olá, <strong>{$nome}</strong>!</p>
+        <p>O invoice do seu pedido <strong>#{$pedidoId}</strong> foi liberado para conferência.</p>
+        <p>Antes de enviarmos seu pacote, precisamos que você confira e confirme os dados que irão na etiqueta de envio (declaração aduaneira).</p>
+        
+        <div style="background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 5px; padding: 15px; margin: 20px 0;">
+            <strong>O que você precisa fazer:</strong><br>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Conferir o nome de cada produto (será usado na etiqueta)</li>
+                <li>Verificar os valores declarados</li>
+                <li>Informar se contém bateria ou perfume/líquido</li>
+                <li>Confirmar o endereço de entrega</li>
+            </ul>
+        </div>
+
+        <p style="text-align: center; margin-top: 30px;">
+            <a href="{$linkInvoice}" style="background: #1a3a5c; color: #fff; text-decoration: none; padding: 14px 35px; border-radius: 5px; display: inline-block; font-size: 16px;">
+                Conferir Invoice Agora
+            </a>
+        </p>
+
+        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 25px 0;">
+            <strong>Importante:</strong> Seu pacote só será enviado após a confirmação dos dados. Se houver algo incorreto, você pode contestar e nossa equipe ajustará.
+        </div>
+    </div>
+    <div style="background: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+        Braziliana - Seu parceiro em compras internacionais
+    </div>
+</body></html>
+HTML;
+
+            $emailService = new \App\Services\EmailService();
+            $emailService->send(
+                $usuario['email'],
+                'Confira os dados do seu envio - Pedido #' . $pedidoId,
+                $html,
+                'invoice_liberado_' . $pedidoId,
+                [
+                    'evento' => 'invoice_liberado',
+                    'to_email' => $usuario['email'],
+                    'subject' => 'Confira os dados do seu envio - Pedido #' . $pedidoId,
+                    'pedido_id' => $pedidoId,
+                    'usuario_id' => $usuarioId,
+                ]
+            );
+        } catch (\Throwable $e) {
+            error_log('[AdminInvoice] Erro ao enviar e-mail invoice liberado: ' . $e->getMessage());
+        }
     }
 }
