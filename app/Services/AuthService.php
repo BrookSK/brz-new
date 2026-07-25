@@ -296,6 +296,15 @@ class AuthService {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
 
+        // Carregar preferências do admin na sessão
+        $uid = (int) ($usuario['id'] ?? 0);
+        $perfil = $_SESSION['usuario_perfil'] ?? '';
+        if ($uid > 0 && in_array($perfil, ['admin', 'suporte', 'vendedor'], true)) {
+            try {
+                \App\Controllers\AdminPreferencesController::loadIntoSession($uid);
+            } catch (\Exception $e) {}
+        }
+
         $this->mergeSessionCartToUser((int) ($usuario['id'] ?? 0));
     }
 

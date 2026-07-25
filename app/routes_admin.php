@@ -12,6 +12,10 @@ $router->post('/admin/marketing-calendar/excluir', 'AdminMarketingCalendarContro
 $router->post('/admin/marketing-calendar/toggle', 'AdminMarketingCalendarController', 'toggle');
 $router->post('/admin/marketing-calendar/gerar-ia', 'AdminMarketingCalendarController', 'gerarIA');
 
+// User Preferences
+$router->post('/admin/preferences/salvar', 'AdminPreferencesController', 'salvar');
+$router->get('/admin/preferences/get', 'AdminPreferencesController', 'get');
+
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
 $router->get('/admin/produtos/arquivados', 'AdminProdutosController', 'arquivados');

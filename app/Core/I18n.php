@@ -11,12 +11,25 @@ class I18n {
         }
 
         $locale = '';
+
+        // 1. Preferência do admin (persistida no banco)
         try {
-            $locale = (string) ($_SESSION['locale'] ?? '');
-        } catch (\Throwable $e) {
-            $locale = '';
+            $adminPref = (string) ($_SESSION['admin_pref_idioma'] ?? '');
+            if ($adminPref !== '') {
+                $locale = $adminPref;
+            }
+        } catch (\Throwable $e) {}
+
+        // 2. Session locale (fallback)
+        if ($locale === '') {
+            try {
+                $locale = (string) ($_SESSION['locale'] ?? '');
+            } catch (\Throwable $e) {
+                $locale = '';
+            }
         }
 
+        // 3. Cookie (fallback)
         if ($locale === '') {
             try {
                 $cookieLocale = (string) ($_COOKIE['locale'] ?? '');

@@ -257,7 +257,74 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>window.USD_BRL_RATE = <?= class_exists('\\App\\Core\\ExchangeRate') ? \App\Core\ExchangeRate::getUsdToBrl() : 5.85 ?>;</script>
+    <script>window.ADMIN_PREF_MOEDA = '<?= $_SESSION['admin_pref_moeda'] ?? 'USD' ?>';window.ADMIN_PREF_IDIOMA = '<?= $_SESSION['admin_pref_idioma'] ?? 'pt-BR' ?>';</script>
     <?php if (function_exists('renderAdminScripts')) { renderAdminScripts(); } ?>
+
+    <?php
+    // Wizard de primeiro acesso — exibe se o usuário nunca configurou preferências
+    $__prefConfigurado = (int) ($_SESSION['admin_pref_configurado'] ?? 0);
+    $__isAdmin = in_array(($_SESSION['usuario_perfil'] ?? ''), ['admin', 'suporte', 'vendedor'], true);
+    if ($__isAdmin && !$__prefConfigurado):
+    ?>
+    <!-- Modal Wizard Primeiro Acesso -->
+    <div class="modal fade" id="wizardPrefsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:16px;overflow:hidden;">
+                <div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:32px 24px;text-align:center;">
+                    <div style="font-size:48px;margin-bottom:12px;">👋</div>
+                    <h4 style="color:#fff;font-weight:700;margin-bottom:4px;">Bem-vindo ao Painel!</h4>
+                    <p style="color:rgba(255,255,255,.7);font-size:14px;margin:0;">Configure suas preferências para uma melhor experiência.</p>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold"><i class="fas fa-globe me-2 text-primary"></i>Idioma de exibição</label>
+                        <select id="wizard_idioma" class="form-select form-select-lg">
+                            <option value="pt-BR">Português (Brasil)</option>
+                            <option value="en">English</option>
+                        </select>
+                        <div class="form-text">Define o idioma dos textos e labels do painel.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><i class="fas fa-coins me-2 text-success"></i>Moeda padrão de exibição</label>
+                        <select id="wizard_moeda" class="form-select form-select-lg">
+                            <option value="USD">USD — Dólar Americano ($)</option>
+                            <option value="BRL">BRL — Real Brasileiro (R$)</option>
+                        </select>
+                        <div class="form-text">Define como os valores financeiros serão exibidos por padrão.</div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center border-0 pb-4">
+                    <button type="button" class="btn btn-dark btn-lg px-5" onclick="salvarWizardPrefs()">
+                        <i class="fas fa-check me-2"></i>Confirmar e Entrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        new bootstrap.Modal(document.getElementById('wizardPrefsModal')).show();
+    });
+    function salvarWizardPrefs() {
+        var idioma = document.getElementById('wizard_idioma').value;
+        var moeda = document.getElementById('wizard_moeda').value;
+        var body = new FormData();
+        body.append('idioma', idioma);
+        body.append('moeda', moeda);
+        fetch('/admin/preferences/salvar', { method: 'POST', body: body })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('wizardPrefsModal')).hide();
+                    location.reload();
+                } else {
+                    alert(d.error || 'Erro ao salvar');
+                }
+            })
+            .catch(function(e) { alert('Erro: ' + e.message); });
+    }
+    </script>
+    <?php endif; ?>
     <?php if (strpos($_SERVER['REQUEST_URI'] ?? '', '/admin/produtos') !== false): ?>
     <script>
     document.addEventListener('DOMContentLoaded',function(){

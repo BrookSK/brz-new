@@ -522,6 +522,13 @@ function renderAdminSidebar($activePage = '') {
             echo '</ul>
             <hr class="sidebar-divider">
             <div class="nav-item">
+                <a class="nav-link" href="javascript:void(0)" onclick="abrirPrefsModal()" style="font-size:12px;">
+                    <i class="fas fa-fw fa-cog"></i>
+                    <span>' . htmlspecialchars(($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'en' ? 'Preferences' : 'Preferências', ENT_QUOTES, 'UTF-8') . '</span>
+                    <span class="badge ms-1" style="font-size:9px;background:#3b82f6;color:#fff;">' . strtoupper($_SESSION['admin_pref_moeda'] ?? 'USD') . ' · ' . (($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'en' ? 'EN' : 'PT') . '</span>
+                </a>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link" href="/">
                     <i class="fas fa-fw fa-home"></i>
                     <span>' . htmlspecialchars(__('admin.back_to_site', 'Voltar ao Site'), ENT_QUOTES, 'UTF-8') . '</span>
@@ -1112,6 +1119,13 @@ function renderAdminScripts() {
 
     // Notificações push de demandas + Sino de Notificações
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99998;max-width:400px;"></div>';
+
+    // Modal de Preferências (acessível de qualquer tela via sidebar)
+    echo '<div class="modal fade" id="prefsChangeModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"><i class="fas fa-cog me-2"></i>Preferências</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label fw-semibold small">Idioma</label><select id="pref_idioma" class="form-select"><option value="pt-BR"' . (($_SESSION['admin_pref_idioma'] ?? 'pt-BR') === 'pt-BR' ? ' selected' : '') . '>Português (PT-BR)</option><option value="en"' . (($_SESSION['admin_pref_idioma'] ?? '') === 'en' ? ' selected' : '') . '>English</option></select></div><div class="mb-0"><label class="form-label fw-semibold small">Moeda de exibição</label><select id="pref_moeda" class="form-select"><option value="USD"' . (($_SESSION['admin_pref_moeda'] ?? 'USD') === 'USD' ? ' selected' : '') . '>USD (Dólar)</option><option value="BRL"' . (($_SESSION['admin_pref_moeda'] ?? '') === 'BRL' ? ' selected' : '') . '>BRL (Real)</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary btn-sm" onclick="salvarPrefsChange()"><i class="fas fa-check me-1"></i>Salvar</button></div></div></div></div>';
+    echo '<script>
+window.abrirPrefsModal=function(){new bootstrap.Modal(document.getElementById("prefsChangeModal")).show();};
+function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.getElementById("pref_idioma").value);b.append("moeda",document.getElementById("pref_moeda").value);fetch("/admin/preferences/salvar",{method:"POST",body:b}).then(function(r){return r.json()}).then(function(d){if(d.ok){bootstrap.Modal.getInstance(document.getElementById("prefsChangeModal")).hide();location.reload();}else{alert(d.error||"Erro");}}).catch(function(e){alert("Erro: "+e.message);});}
+</script>';
 
     // Bell Widget
     echo '<div id="admin-bell-widget" style="position:fixed;bottom:80px;right:20px;z-index:99999;">
