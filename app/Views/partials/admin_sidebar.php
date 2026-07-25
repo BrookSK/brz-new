@@ -1111,15 +1111,15 @@ function renderAdminScripts() {
     $rendered = true;
 
     // Notificações push de demandas + Sino de Notificações
-    echo '<div id="admin-notif-container" style="position:fixed;top:80px;right:20px;z-index:99998;max-width:400px;"></div>';
+    echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99998;max-width:400px;"></div>';
 
     // Bell Widget
-    echo '<div id="admin-bell-widget" style="position:fixed;top:16px;right:20px;z-index:99999;">
+    echo '<div id="admin-bell-widget" style="position:fixed;bottom:80px;right:20px;z-index:99999;">
         <button id="bellBtn" onclick="toggleBellDropdown()" style="position:relative;background:#1e293b;border:none;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:transform .2s;">
             <i class="fas fa-bell" style="color:#fff;font-size:18px;"></i>
             <span id="bellBadge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;line-height:18px;text-align:center;padding:0 4px;">0</span>
         </button>
-        <div id="bellDropdown" style="display:none;position:absolute;top:52px;right:0;width:360px;max-height:440px;background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.2);overflow:hidden;">
+        <div id="bellDropdown" style="display:none;position:absolute;bottom:52px;right:0;width:360px;max-height:440px;background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.2);overflow:hidden;">
             <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
                 <span style="font-weight:700;font-size:15px;color:#1e293b;"><i class="fas fa-bell me-2"></i>Notificações</span>
                 <button onclick="marcarTodasLidas()" style="background:none;border:none;color:#3b82f6;font-size:12px;font-weight:600;cursor:pointer;">Marcar todas como lidas</button>
