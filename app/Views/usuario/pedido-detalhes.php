@@ -108,6 +108,11 @@ $badgePedidoLabel = formatStatusLabel((string) ($pedido['status'] ?? ''));
                 <i class="fas fa-file-pdf"></i>
                 <?= __('user_order_details.export_pdf', 'Exportar PDF') ?>
             </a>
+            <?php if (($pedido['status'] ?? '') === 'invoice_liberado'): ?>
+            <a href="/minha-conta/invoice?pedido_id=<?= (int) ($pedido['id'] ?? 0) ?>" class="btn btn-sm btn-info text-white">
+                <i class="fas fa-file-invoice me-1"></i>Conferir Invoice
+            </a>
+            <?php endif; ?>
             <span class="badge" style="background: <?= $badgePedido['bg'] ?>; border: 1px solid <?= $badgePedido['border'] ?>; color: <?= $badgePedido['color'] ?>;">
                 <?= htmlspecialchars($badgePedidoLabel !== '' ? $badgePedidoLabel : getStatusText($pedido['status'] ?? '')) ?>
             </span>

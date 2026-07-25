@@ -1550,6 +1550,14 @@ class PedidoEcommerce {
             if ($pick(['conferido_em']) !== null) $selectParts[] = 'pi.conferido_em';
             if ($pick(['conferido_por']) !== null) $selectParts[] = 'pi.conferido_por';
 
+            // Colunas de pacote/redirecionamento
+            if ($pick(['tipo_item']) !== null) $selectParts[] = 'pi.tipo_item';
+            if ($pick(['pacote_id']) !== null) $selectParts[] = 'pi.pacote_id';
+            if ($pick(['foto_url']) !== null) $selectParts[] = 'pi.foto_url';
+            if ($pick(['nome_item']) !== null) $selectParts[] = 'pi.nome_item';
+            if ($pick(['declaration_value']) !== null) $selectParts[] = 'pi.declaration_value';
+            if ($pick(['comprovante_url']) !== null) $selectParts[] = 'pi.comprovante_url';
+
             // Fallback: buscar nome do produto na tabela produtos quando nome_produto do item estiver vazio
             if ($colProdutoId) {
                 try {
@@ -1667,6 +1675,37 @@ class PedidoEcommerce {
                     }
                 }
                 $item['imagem'] = ($img !== '') ? $img : 'placeholder.jpg';
+
+                // Para itens de pacote/redirecionamento, usar foto_url da tabela de itens
+                $tipoItemPedido = $item['tipo_item'] ?? 'produto';
+                if (($tipoItemPedido === 'pacote_redirecionamento' || (int) ($item['produto_id'] ?? 0) >= 999990) && $item['imagem'] === 'placeholder.jpg') {
+                    $fotoUrlItem = trim((string) ($item['foto_url'] ?? ''));
+                    if ($fotoUrlItem !== '') {
+                        $item['imagem'] = $fotoUrlItem;
+                    }
+                }
+
+                // Para itens de pacote, usar nome_item se nome_produto estiver vazio ou genérico
+                if (($tipoItemPedido === 'pacote_redirecionamento' || (int) ($item['produto_id'] ?? 0) >= 999990)) {
+                    $nomeAtual = trim((string) ($item['nome_produto'] ?? ''));
+                    if ($nomeAtual === '' || strpos($nomeAtual, 'Produto #') === 0) {
+                        $nomeFallback = trim((string) ($item['nome_item'] ?? ($item['nome'] ?? '')));
+                        if ($nomeFallback !== '') {
+                            $item['nome_produto'] = $nomeFallback;
+                        } else {
+                            // Buscar do pacote diretamente
+                            $pacIdItem = (int) ($item['pacote_id'] ?? 0);
+                            if ($pacIdItem > 0) {
+                                try {
+                                    $stPN = $this->connection->prepare('SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                    $stPN->execute([$pacIdItem]);
+                                    $nomeP = (string) ($stPN->fetchColumn() ?: '');
+                                    if ($nomeP !== '') $item['nome_produto'] = $nomeP;
+                                } catch (\Throwable $e) {}
+                            }
+                        }
+                    }
+                }
                 if ((float) ($item['preco_unitario'] ?? 0) <= 0 && isset($item['valor_unitario_alt'])) {
                     $vuAlt = (float) ($item['valor_unitario_alt'] ?? 0);
                     if ($vuAlt > 0) {
