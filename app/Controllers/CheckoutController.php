@@ -2378,6 +2378,40 @@ class CheckoutController extends Controller {
             $this->redirect('/produtos');
             return;
         }
+
+        // Validar itens de redirecionamento: exigir declaration_value e comprovante
+        $pacoteSemDados = false;
+        try {
+            $db = \Config\Database::getConnection();
+            $uid = (int) ($usuario['id'] ?? 0);
+            if ($uid > 0) {
+                $stCart = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 1');
+                $stCart->execute([$uid]);
+                $cartId = (int) $stCart->fetchColumn();
+                if ($cartId > 0) {
+                    $stPacotes = $db->prepare(
+                        "SELECT id, nome_item, declaration_value, comprovante_url FROM carrinho_items 
+                         WHERE carrinho_id = ? AND tipo_item = 'pacote_redirecionamento'"
+                    );
+                    $stPacotes->execute([$cartId]);
+                    $pacotesNoCarrinho = $stPacotes->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                    foreach ($pacotesNoCarrinho as $pac) {
+                        if (empty($pac['declaration_value']) || (float) $pac['declaration_value'] <= 0 || empty($pac['comprovante_url'])) {
+                            $pacoteSemDados = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        if ($pacoteSemDados) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $_SESSION['message'] = 'Preencha o valor declarado e envie o comprovante de compra para todos os itens de redirecionamento antes de prosseguir.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/carrinho');
+            return;
+        }
         
         // Obter usuário logado (já carregado acima)
         $usuarioCompletoDb = null;
