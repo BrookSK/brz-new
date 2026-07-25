@@ -324,6 +324,13 @@ class CheckoutController extends Controller {
 
         foreach ($carrinho as $cartKey => $item) {
             $produtoId = (int) ($item['produto_id'] ?? ($item['id'] ?? 0));
+
+            // Pular itens de pacote/fatura (não são produtos reais)
+            $tipoItemVal = $item['tipo_item'] ?? 'produto';
+            if ($tipoItemVal === 'pacote_redirecionamento' || $tipoItemVal === 'fatura_adicional' || $produtoId >= 999990) {
+                continue;
+            }
+
             if ($produtoId <= 0 && (is_int($cartKey) || (is_string($cartKey) && ctype_digit($cartKey)))) {
                 $produtoId = (int) $cartKey;
             }
