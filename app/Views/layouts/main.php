@@ -1416,6 +1416,17 @@ $__mostrarConversao = $__conversaoMoedaAtiva || $__isCheckoutPage;
 
         const __USD_BRL_RATE__ = <?= \App\Core\ExchangeRate::getUsdToBrl() ?>;
         
+        <?php
+        // Se admin está logado, injetar preferências para sincronizar com o site
+        $__adminLogado = in_array(($_SESSION['usuario_perfil'] ?? ''), ['admin','suporte','vendedor'], true);
+        if ($__adminLogado && !empty($_SESSION['admin_pref_moeda'])):
+        ?>
+        window.ADMIN_PREF_MOEDA = '<?= $_SESSION['admin_pref_moeda'] ?>';
+        window.USD_BRL_RATE = __USD_BRL_RATE__;
+        // Sincronizar preferência do admin com localStorage do site
+        try { localStorage.setItem('selected_currency', '<?= $_SESSION['admin_pref_moeda'] === 'BRL' ? 'BRL' : 'USD' ?>'); } catch(e){}
+        <?php endif; ?>
+
         // Variáveis globais
         window.CurrencyConverter = {
             currentCurrency: 'USD',

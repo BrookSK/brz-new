@@ -258,6 +258,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>window.USD_BRL_RATE = <?= class_exists('\\App\\Core\\ExchangeRate') ? \App\Core\ExchangeRate::getUsdToBrl() : 5.85 ?>;</script>
     <script>window.ADMIN_PREF_MOEDA = '<?= $_SESSION['admin_pref_moeda'] ?? 'USD' ?>';window.ADMIN_PREF_IDIOMA = '<?= $_SESSION['admin_pref_idioma'] ?? 'pt-BR' ?>';</script>
+    <script src="/assets/js/admin-currency-prefs.js"></script>
     <?php if (function_exists('renderAdminScripts')) { renderAdminScripts(); } ?>
 
     <?php
