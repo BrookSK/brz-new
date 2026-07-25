@@ -427,18 +427,23 @@ class Carrinho extends Model {
             }
         }
 
-        // Incluir peso dos itens de pacote/fatura (produto_id <= 0)
+        // Incluir peso dos itens de pacote/fatura (produto_id <= 0 ou >= 999990)
+        // O declaration_value dos pacotes entra como subtotal para cálculo de impostos
         try {
             $itemsCols = $this->getTableColumns('carrinho_items');
             if (in_array('peso_kg', $itemsCols, true) && in_array('tipo_item', $itemsCols, true)) {
                 $stPacotes = $this->connection->prepare(
-                    "SELECT COALESCE(SUM(peso_kg * quantidade), 0) AS peso_pacotes 
+                    "SELECT COALESCE(SUM(peso_kg * quantidade), 0) AS peso_pacotes,
+                            COALESCE(SUM(COALESCE(declaration_value, 0) * quantidade), 0) AS subtotal_declarado
                      FROM carrinho_items 
                      WHERE carrinho_id = :cid AND (produto_id <= 0 OR produto_id >= 999990)"
                 );
                 $stPacotes->execute([':cid' => $carrinhoId]);
-                $pesoPacotes = (float) ($stPacotes->fetchColumn() ?: 0);
+                $rowPacotes = $stPacotes->fetch(\PDO::FETCH_ASSOC);
+                $pesoPacotes = (float) ($rowPacotes['peso_pacotes'] ?? 0);
+                $subtotalDeclarado = (float) ($rowPacotes['subtotal_declarado'] ?? 0);
                 $pesoTotal += $pesoPacotes;
+                $subtotalProdutos += $subtotalDeclarado;
             }
         } catch (\Throwable $e) {
             // Silencioso

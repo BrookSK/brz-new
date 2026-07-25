@@ -242,6 +242,8 @@ class CarrinhoController extends Controller {
                         'stored_price' => $vu,
                         'stored_subtotal' => $sub,
                         'stored_peso_unit' => isset($it['peso_kg']) ? (float) $it['peso_kg'] : null,
+                        'peso_unit' => isset($it['peso_kg']) ? (float) $it['peso_kg'] : 0,
+                        'peso_item' => (isset($it['peso_kg']) ? (float) $it['peso_kg'] : 0) * $qtd,
                         'quantidade' => $qtd,
                         'subtotal' => $sub,
                         'is_free_offer' => 0,
