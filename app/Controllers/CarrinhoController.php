@@ -1317,23 +1317,15 @@ class CarrinhoController extends Controller {
                 $cart = $this->carrinhoModel->getOrCreateCarrinho($uid, null, 'BRL');
                 $cartId = is_array($cart) ? (int) ($cart['id'] ?? 0) : (int) $cart;
 
-                // Suporte a remoção de itens de pacote/fatura (produto_id negativo ou por carrinho_item_id)
+                // Suporte a remoção de itens de pacote/fatura (produto_id >= 999990 ou negativo)
                 $affected = 0;
-                if ($produtoIdDb < 0 || strpos((string) $produtoId, 'pacote_') === 0 || strpos((string) $produtoId, 'fatura_') === 0) {
-                    // Tentar remover por produto_id negativo
+                if ($produtoIdDb >= 999990 || $produtoIdDb < 0 || strpos((string) $produtoId, 'pacote_') === 0 || strpos((string) $produtoId, 'fatura_') === 0) {
+                    // Remover por produto_id
                     try {
                         $stDel = $this->carrinhoModel->getConnection()->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ?');
                         $stDel->execute([$cartId, $produtoIdDb]);
                         $affected = $stDel->rowCount();
                     } catch (\Throwable $e) {}
-                    // Se não achou, tentar por id do item diretamente
-                    if ($affected < 1 && $produtoIdDb !== 0) {
-                        try {
-                            $stDel2 = $this->carrinhoModel->getConnection()->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ? AND id = ?');
-                            $stDel2->execute([$cartId, abs($produtoIdDb)]);
-                            $affected = $stDel2->rowCount();
-                        } catch (\Throwable $e) {}
-                    }
                 } else {
                     $affected = (int) $this->carrinhoModel->removerItem($cartId, (int) $produtoIdDb, $pvId);
                 }
