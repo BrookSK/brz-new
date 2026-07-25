@@ -5634,12 +5634,26 @@ class CheckoutController extends Controller {
             $tipoItemSalvar = $item['tipo_item'] ?? 'produto';
             if ($tipoItemSalvar === 'pacote_redirecionamento' || $tipoItemSalvar === 'fatura_adicional' || (int) $produtoId >= 999990) {
                 $this->debugLog('[CHECKOUT_ITENS] Item de pacote/fatura, inserindo direto');
-                $nomePacote = (string) ($item['nome'] ?? ($item['name'] ?? 'Pacote Redirecionamento'));
+                $nomePacote = (string) ($item['nome'] ?? ($item['name'] ?? ($item['nome_item'] ?? '')));
                 $qtdPacote = (int) ($item['quantidade'] ?? 1);
                 $precoPacote = (float) ($item['preco_unitario'] ?? ($item['price'] ?? 0));
                 $pesoPacote = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? ($item['weight'] ?? 0)));
                 $declarationVal = (float) ($item['declaration_value'] ?? 0);
                 $pacoteIdItem = (int) ($item['pacote_id'] ?? 0);
+
+                // Se nome vazio, buscar do pacote no banco
+                if ($nomePacote === '' && $pacoteIdItem > 0) {
+                    try {
+                        $stNome = $db->prepare('SELECT nome FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stNome->execute([$pacoteIdItem]);
+                        $nomePacote = (string) ($stNome->fetchColumn() ?: 'Pacote Redirecionamento');
+                    } catch (\Throwable $e) {
+                        $nomePacote = 'Pacote Redirecionamento';
+                    }
+                }
+                if ($nomePacote === '') {
+                    $nomePacote = 'Pacote Redirecionamento';
+                }
 
                 $colsInsP = ['pedido_id', 'produto_id', 'quantidade'];
                 $valsInsP = [(int) $pedidoId, (int) $produtoId, $qtdPacote];
