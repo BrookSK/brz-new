@@ -101,6 +101,10 @@
                     <p class="text-muted text-center py-4">Nenhum item encontrado.</p>
                 <?php else: ?>
                     <?php foreach ($itens as $idx => $item): ?>
+                        <?php 
+                        // Só mostrar itens de redirecionamento (com pacote_id)
+                        if (empty($item['pacote_id'])) continue;
+                        ?>
                         <div class="p-3 <?= $idx > 0 ? 'border-top' : '' ?>">
                             <div class="row g-3 align-items-start">
                                 <!-- Foto -->
@@ -166,11 +170,17 @@
                                             </select>
                                         </div>
 
-                                        <!-- NCM (readonly info) -->
+                                        <!-- NCM (editável) -->
                                         <div class="col-md-6">
-                                            <label class="form-label small text-muted">NCM</label>
-                                            <input type="text" class="form-control form-control-sm" 
-                                                   value="<?= htmlspecialchars($item['ncm'] ?? '-') ?> - <?= htmlspecialchars($ncmOptions[$item['ncm']] ?? '') ?>" readonly>
+                                            <label class="form-label small">NCM</label>
+                                            <select name="itens[<?= $item['id'] ?>][ncm]" class="form-select form-select-sm">
+                                                <option value="">Selecione...</option>
+                                                <?php foreach ($ncmOptions as $ncmCode => $ncmLabel): ?>
+                                                    <option value="<?= $ncmCode ?>" <?= (($item['ncm'] ?? '') == $ncmCode) ? 'selected' : '' ?>>
+                                                        <?= $ncmCode ?> - <?= $ncmLabel ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>

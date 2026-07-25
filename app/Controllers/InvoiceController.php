@@ -138,6 +138,9 @@ class InvoiceController extends Controller {
                 if (isset($dados['tem_perfume'])) {
                     $updateData['tem_perfume'] = ($dados['tem_perfume'] === 'S') ? 'S' : 'N';
                 }
+                if (isset($dados['ncm']) && trim($dados['ncm']) !== '') {
+                    $updateData['ncm'] = trim($dados['ncm']);
+                }
 
                 if (!empty($updateData)) {
                     $this->invoiceItemModel->update($itemId, $updateData);
