@@ -262,9 +262,22 @@
 
     <?php
     // Wizard de primeiro acesso — exibe se o usuário nunca configurou preferências
-    $__prefConfigurado = (int) ($_SESSION['admin_pref_configurado'] ?? 0);
+    // Verifica: se a variável de sessão não existe OU se configurado = 0
+    $__prefConfigurado = isset($_SESSION['admin_pref_configurado']) ? (int) $_SESSION['admin_pref_configurado'] : -1;
     $__isAdmin = in_array(($_SESSION['usuario_perfil'] ?? ''), ['admin', 'suporte', 'vendedor'], true);
-    if ($__isAdmin && !$__prefConfigurado):
+    $__isLogado = !empty($_SESSION['usuario_id']);
+    
+    // Se a sessão não tem a variável, tentar carregar do banco agora
+    if ($__isAdmin && $__isLogado && $__prefConfigurado === -1) {
+        try {
+            \App\Controllers\AdminPreferencesController::loadIntoSession((int)$_SESSION['usuario_id']);
+            $__prefConfigurado = (int) ($_SESSION['admin_pref_configurado'] ?? 0);
+        } catch (\Throwable $e) {
+            $__prefConfigurado = 0;
+        }
+    }
+    
+    if ($__isAdmin && $__isLogado && $__prefConfigurado === 0):
     ?>
     <!-- Modal Wizard Primeiro Acesso -->
     <div class="modal fade" id="wizardPrefsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
