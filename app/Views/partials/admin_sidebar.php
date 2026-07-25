@@ -1123,6 +1123,10 @@ function renderAdminScripts() {
     echo '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof bootstrap==="undefined")return;document.querySelectorAll("[data-bs-toggle=\\"modal\\"]").forEach(function(btn){btn.addEventListener("click",function(e){var target=btn.getAttribute("data-bs-target");if(target){var el=document.querySelector(target);if(el)bootstrap.Modal.getOrCreateInstance(el).show();}});});});</script>';
 
     // Notificações push de demandas + Sino de Notificações
+    echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>';
+    echo '<script>document.addEventListener("DOMContentLoaded",function(){if(typeof bootstrap==="undefined")return;document.querySelectorAll("[data-bs-toggle=\"modal\"]").forEach(function(btn){btn.addEventListener("click",function(){var t=btn.getAttribute("data-bs-target");if(t){var el=document.querySelector(t);if(el)bootstrap.Modal.getOrCreateInstance(el).show();}});});});</script>';
+    echo '<script>window.USD_BRL_RATE=window.USD_BRL_RATE||' . \App\Core\ExchangeRate::getUsdToBrl() . ';window.ADMIN_PREF_MOEDA=window.ADMIN_PREF_MOEDA||"' . ($_SESSION['admin_pref_moeda'] ?? 'USD') . '";window.ADMIN_PREF_IDIOMA=window.ADMIN_PREF_IDIOMA||"' . ($_SESSION['admin_pref_idioma'] ?? 'pt-BR') . '";</script>';
+    echo '<script src="/assets/js/admin-currency-prefs.js"></script>';
     echo '<div id="admin-notif-container" style="position:fixed;top:20px;right:20px;z-index:99998;max-width:400px;"></div>';
 
     // Modal de Preferências (acessível de qualquer tela via sidebar)
