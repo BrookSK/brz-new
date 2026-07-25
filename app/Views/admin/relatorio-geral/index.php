@@ -904,6 +904,8 @@ function renderDreCompleto(d) {
     h += dreRow('RECEITA OPERACIONAL BRUTA',fmtR(r.total_entradas),'fw-bold text-success','fs-5');
     h += dreRow('  Entradas em BRL',fmtR(r.total_entradas_brl),'ps-3 text-muted');
     h += dreRow('  Entradas em USD (×'+taxa.toFixed(2)+')',fmtR(r.total_entradas_usd*taxa),'ps-3 text-muted');
+    h += dreRow('  Descontos concedidos',((r.total_descontos||0)>0?'-':'')+fmtR(r.total_descontos||0),(r.total_descontos||0)>0?'ps-3 text-danger':'ps-3 text-muted');
+    if ((r.total_peso_kg||0) > 0) h += dreRow('  Peso total',parseFloat(r.total_peso_kg||0).toFixed(2)+' kg','ps-3 text-muted');
     h += dreRow('(-) DESPESAS TOTAIS',fmtR(r.total_despesas),'fw-bold text-danger border-top','fs-5');
     h += dreRow('  Despesas em BRL',fmtR(r.total_despesas_brl),'ps-3 text-muted');
     if (r.total_despesas_usd > 0) h += dreRow('  Despesas em USD (×'+taxa.toFixed(2)+')',fmtR(r.total_despesas_usd*taxa),'ps-3 text-muted');

@@ -166,6 +166,33 @@ class AdminDreCompletoController extends Controller {
         $totalDespesas = $totalDespBrl + ($totalDespUsd * $taxaUsdBrl);
         $resultado = $totalEntradas - $totalDespesas;
 
+        // === TOTAL DESCONTOS ===
+        $totalDescontosUsd = 0; $totalDescontosBrl = 0;
+        $colDesconto = $pick(['desconto_global_aplicado','desconto','valor_desconto','discount']);
+        if ($colDesconto !== '') {
+            try {
+                $moedaSelectD = $colMoeda ? "UPPER(COALESCE(p.{$colMoeda},'USD')) as moeda" : "'USD' as moeda";
+                $stDesc = $this->db->prepare("SELECT {$moedaSelectD}, COALESCE(SUM(p.{$colDesconto}),0) as total FROM pedidos p WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY) AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses} {$deletedFilter} GROUP BY moeda");
+                $stDesc->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                foreach ($stDesc->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+                    if ($r['moeda'] === 'USD') $totalDescontosUsd += (float)$r['total'];
+                    else $totalDescontosBrl += (float)$r['total'];
+                }
+            } catch (\Exception $e) {}
+        }
+        $totalDescontos = $totalDescontosBrl + ($totalDescontosUsd * $taxaUsdBrl);
+
+        // === TOTAL PESO (KG) ===
+        $totalPesoKg = 0;
+        $colPeso = $pick(['peso_total','peso','weight']);
+        if ($colPeso !== '') {
+            try {
+                $stPeso = $this->db->prepare("SELECT COALESCE(SUM(p.{$colPeso}),0) as total FROM pedidos p WHERE p.{$colCreatedAt} >= :ds AND p.{$colCreatedAt} < DATE_ADD(:de, INTERVAL 1 DAY) AND LOWER(COALESCE(p.{$colStatus},'')) IN {$paidStatuses} {$deletedFilter}");
+                $stPeso->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                $totalPesoKg = (float)$stPeso->fetchColumn();
+            } catch (\Exception $e) {}
+        }
+
         // === CONCILIAÇÃO ===
         $conciliacao = [
             'total_creditos' => $totalEntradas,
@@ -246,6 +273,10 @@ class AdminDreCompletoController extends Controller {
                 'total_despesas' => $totalDespesas,
                 'total_despesas_brl' => $totalDespBrl,
                 'total_despesas_usd' => $totalDespUsd,
+                'total_descontos' => $totalDescontos,
+                'total_descontos_brl' => $totalDescontosBrl,
+                'total_descontos_usd' => $totalDescontosUsd,
+                'total_peso_kg' => $totalPesoKg,
                 'resultado' => $resultado,
                 'margem' => $totalEntradas > 0 ? round($resultado / $totalEntradas * 100, 1) : 0,
                 'maior_categoria' => $maiorCategoria,
