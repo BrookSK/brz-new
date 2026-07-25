@@ -1549,6 +1549,88 @@ class AdminCorreiosMundialController extends Controller {
         ]);
     }
 
+    public function containerDetalhes(Request $request, int $id) {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $this->ensurePacketContainersTable();
+        $this->ensurePacketEtiquetasTable();
+        $this->ensureEtiquetasHasContainerIdColumn();
+
+        // Buscar container
+        if (!$this->tableExists('correios_packet_containers')) {
+            echo json_encode(['error' => 'Tabela não encontrada']);
+            exit;
+        }
+
+        try {
+            $st = $this->connection->prepare('SELECT * FROM correios_packet_containers WHERE id = ? LIMIT 1');
+            $st->execute([$id]);
+            $container = $st->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            echo json_encode(['error' => 'Erro ao buscar container']);
+            exit;
+        }
+
+        if (!$container) {
+            echo json_encode(['error' => 'Container não encontrado']);
+            exit;
+        }
+
+        // Decodificar tracking numbers do container
+        $trackingNumbers = [];
+        $raw = (string) ($container['tracking_numbers_json'] ?? '');
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) $trackingNumbers = $decoded;
+        }
+
+        // Buscar etiquetas vinculadas a este container
+        $etiquetas = [];
+        if ($this->tableExists('correios_packet_etiquetas') && !empty($trackingNumbers)) {
+            try {
+                $placeholders = implode(',', array_fill(0, count($trackingNumbers), '?'));
+                $sql = "SELECT cpe.id, cpe.pedido_id, cpe.tracking_number, cpe.customer_control_code, cpe.status, cpe.created_at,
+                               p.peso_total, u.nome as cliente_nome
+                        FROM correios_packet_etiquetas cpe
+                        LEFT JOIN pedidos p ON p.id = cpe.pedido_id
+                        LEFT JOIN usuarios u ON u.id = p.usuario_id
+                        WHERE cpe.tracking_number IN ($placeholders)
+                        ORDER BY cpe.created_at DESC";
+                $st = $this->connection->prepare($sql);
+                $st->execute($trackingNumbers);
+                $etiquetas = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            } catch (\Exception $e) {
+                $etiquetas = [];
+            }
+        }
+
+        // Informações adicionais do container
+        $info = [
+            'id' => (int) $container['id'],
+            'dispatch_number' => (string) ($container['dispatch_number'] ?? ''),
+            'unit_code' => (string) ($container['unit_code'] ?? ''),
+            'origin_country' => (string) ($container['origin_country'] ?? ''),
+            'origin_operator_name' => (string) ($container['origin_operator_name'] ?? ''),
+            'destination_operator_name' => (string) ($container['destination_operator_name'] ?? ''),
+            'postal_category_code' => (string) ($container['postal_category_code'] ?? ''),
+            'service_subclass_code' => (string) ($container['service_subclass_code'] ?? ''),
+            'unit_type' => (string) ($container['unit_type'] ?? ''),
+            'awb' => (string) ($container['awb'] ?? ''),
+            'triage_group' => (string) ($container['triage_group'] ?? ''),
+            'status' => (string) ($container['status'] ?? ''),
+            'created_at' => (string) ($container['created_at'] ?? ''),
+            'packages_count' => count($trackingNumbers),
+            'tracking_numbers' => $trackingNumbers,
+            'etiquetas' => $etiquetas,
+        ];
+
+        echo json_encode($info, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     public function faturas(Request $request) {
         $auth = new AuthService();
         $auth->requerPerfis(['admin', 'vendedor', 'suporte']);

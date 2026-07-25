@@ -128,6 +128,7 @@ $router->post('/admin/correios-mundial/containers/criar', 'AdminCorreiosMundialC
 $router->post('/admin/correios-mundial/container/{id}/cancelar', 'AdminCorreiosMundialController', 'containerCancelar');
 $router->post('/admin/correios-mundial/container/{id}/deletar', 'AdminCorreiosMundialController', 'containerDeletar');
 $router->get('/admin/correios-mundial/container/{id}.pdf', 'AdminCorreiosMundialController', 'containerPdf');
+$router->get('/admin/correios-mundial/container/{id}/detalhes', 'AdminCorreiosMundialController', 'containerDetalhes');
 
 // Faturas (CN38)
 $router->get('/admin/correios-mundial/faturas', 'AdminCorreiosMundialController', 'faturas');
