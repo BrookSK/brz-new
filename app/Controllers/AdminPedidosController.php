@@ -6635,6 +6635,28 @@ HTML;
             $stmt = $pdo->prepare('UPDATE pedidos SET ' . implode(', ', $set) . ' WHERE id = ?');
             $stmt->execute($params);
 
+            // Enviar e-mail quando status muda para invoice_liberado
+            if ($novoStatusKey === 'invoice_liberado') {
+                try {
+                    $stUser = $pdo->prepare('SELECT u.nome, u.email FROM usuarios u INNER JOIN pedidos p ON p.usuario_id = u.id WHERE p.id = ? LIMIT 1');
+                    $stUser->execute([(int) $id]);
+                    $userInv = $stUser->fetch(\PDO::FETCH_ASSOC);
+                    if ($userInv && !empty($userInv['email'])) {
+                        $nomeInv = htmlspecialchars($userInv['nome'] ?? 'Cliente');
+                        $linkInv = 'https://brazilianashop.com.br/minha-conta/invoice?pedido_id=' . (int) $id;
+                        $htmlInv = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;"><div style="background:#1a3a5c;padding:20px;text-align:center;"><h1 style="color:#fff;margin:0;font-size:22px;">Braziliana</h1></div><div style="padding:30px 20px;"><h2 style="color:#1a3a5c;">Confira os dados do seu envio</h2><p>Olá, <strong>' . $nomeInv . '</strong>!</p><p>O invoice do seu pedido <strong>#' . (int) $id . '</strong> foi liberado para conferência.</p><p>Antes de enviarmos seu pacote, precisamos que você confira e confirme os dados que irão na etiqueta.</p><p style="text-align:center;margin-top:30px;"><a href="' . $linkInv . '" style="background:#1a3a5c;color:#fff;text-decoration:none;padding:14px 35px;border-radius:5px;display:inline-block;font-size:16px;">Conferir Invoice Agora</a></p><div style="background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:15px;margin:25px 0;"><strong>Importante:</strong> Seu pacote só será enviado após a confirmação dos dados.</div></div><div style="background:#f5f5f5;padding:15px;text-align:center;font-size:12px;color:#666;">Braziliana - Seu parceiro em compras internacionais</div></body></html>';
+                        $emailService = new \App\Services\EmailService();
+                        $emailService->send(
+                            $userInv['email'],
+                            'Confira os dados do seu envio - Pedido #' . (int) $id,
+                            $htmlInv,
+                            'invoice_liberado_' . (int) $id,
+                            ['evento' => 'invoice_liberado', 'pedido_id' => (int) $id, 'usuario_id' => null]
+                        );
+                    }
+                } catch (\Throwable $e) {}
+            }
+
             if ($isPaid) {
                 try {
                     $stT = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
@@ -7406,6 +7428,24 @@ HTML;
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $affected = $stmt->rowCount();
+
+            // Enviar e-mail de invoice_liberado para cada pedido afetado
+            if (strtolower(trim($novoStatus)) === 'invoice_liberado') {
+                try {
+                    foreach ($ids as $pidInv) {
+                        $stUser = $pdo->prepare('SELECT u.nome, u.email FROM usuarios u INNER JOIN pedidos p ON p.usuario_id = u.id WHERE p.id = ? LIMIT 1');
+                        $stUser->execute([$pidInv]);
+                        $userInv = $stUser->fetch(\PDO::FETCH_ASSOC);
+                        if ($userInv && !empty($userInv['email'])) {
+                            $nomeInv = htmlspecialchars($userInv['nome'] ?? 'Cliente');
+                            $linkInv = 'https://brazilianashop.com.br/minha-conta/invoice?pedido_id=' . $pidInv;
+                            $htmlInv = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;"><div style="background:#1a3a5c;padding:20px;text-align:center;"><h1 style="color:#fff;margin:0;font-size:22px;">Braziliana</h1></div><div style="padding:30px 20px;"><h2 style="color:#1a3a5c;">Confira os dados do seu envio</h2><p>Olá, <strong>' . $nomeInv . '</strong>!</p><p>O invoice do seu pedido <strong>#' . $pidInv . '</strong> foi liberado para conferência.</p><p>Antes de enviarmos seu pacote, precisamos que você confira e confirme os dados que irão na etiqueta.</p><p style="text-align:center;margin-top:30px;"><a href="' . $linkInv . '" style="background:#1a3a5c;color:#fff;text-decoration:none;padding:14px 35px;border-radius:5px;display:inline-block;font-size:16px;">Conferir Invoice Agora</a></p><div style="background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:15px;margin:25px 0;"><strong>Importante:</strong> Seu pacote só será enviado após a confirmação dos dados.</div></div><div style="background:#f5f5f5;padding:15px;text-align:center;font-size:12px;color:#666;">Braziliana - Seu parceiro em compras internacionais</div></body></html>';
+                            $emailService = new \App\Services\EmailService();
+                            $emailService->send($userInv['email'], 'Confira os dados do seu envio - Pedido #' . $pidInv, $htmlInv, 'invoice_liberado_' . $pidInv, ['evento' => 'invoice_liberado', 'pedido_id' => $pidInv]);
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
 
             // Registrar no histórico
             try {
