@@ -83,6 +83,9 @@ class AdminRelatorioGeralController extends Controller {
         $colTaxaConversao = $this->pick($cols, ['taxa_conversao']);
         $colFormaPagamento = $this->pick($cols, ['forma_pagamento','payment_method']);
         $colOrigemPedido = $this->pick($cols, ['origem_pedido']);
+        $colPesoTotal = $this->pick($cols, ['peso_total','peso','weight']);
+        $colDesconto = $this->pick($cols, ['desconto_global_aplicado','desconto','valor_desconto','discount']);
+        $colAdminCriador = $this->pick($cols, ['admin_criador_id','vendedor_id']);
 
         // WHERE — excluir status irrelevantes para relatório financeiro
         $where = ["p.created_at >= :ds", "p.created_at < DATE_ADD(:de, INTERVAL 1 DAY)"];
@@ -153,6 +156,8 @@ class AdminRelatorioGeralController extends Controller {
         if ($colFrete !== '') $selectSums[] = "COALESCE(SUM(p.{$colFrete}), 0) AS total_frete";
         if ($colImpostoLocal !== '') $selectSums[] = "COALESCE(SUM(p.{$colImpostoLocal}), 0) AS total_imposto_local";
         if ($colTotalBrl !== '') $selectSums[] = "COALESCE(SUM(p.{$colTotalBrl}), 0) AS total_geral_brl";
+        if ($colPesoTotal !== '') $selectSums[] = "COALESCE(SUM(p.{$colPesoTotal}), 0) AS total_peso_kg";
+        if ($colDesconto !== '') $selectSums[] = "COALESCE(SUM(p.{$colDesconto}), 0) AS total_descontos";
         $selectSums[] = "COUNT(*) AS qtd_pedidos";
 
         $sql = "SELECT " . implode(', ', $selectSums) . " FROM pedidos p WHERE {$whereStr}";
@@ -235,6 +240,8 @@ class AdminRelatorioGeralController extends Controller {
             if ($colImpostos !== '') $sumFields[] = "COALESCE(SUM(p.{$colImpostos}), 0) AS impostos";
             if ($colFrete !== '') $sumFields[] = "COALESCE(SUM(p.{$colFrete}), 0) AS frete";
             if ($colImpostoLocal !== '') $sumFields[] = "COALESCE(SUM(p.{$colImpostoLocal}), 0) AS imposto_local";
+            if ($colPesoTotal !== '') $sumFields[] = "COALESCE(SUM(p.{$colPesoTotal}), 0) AS peso_kg";
+            if ($colDesconto !== '') $sumFields[] = "COALESCE(SUM(p.{$colDesconto}), 0) AS desconto";
             $sumFields[] = "COUNT(*) AS qtd";
 
             $sqlTM = "SELECT UPPER(COALESCE(p.{$colMoeda},'USD')) AS moeda, " . implode(', ', $sumFields)
@@ -246,7 +253,66 @@ class AdminRelatorioGeralController extends Controller {
             }
         }
 
-        $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'totaisPorMoedaCards', 'taxaUsdBrl', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList');
+        // === DETALHAMENTO DE DESCONTOS ===
+        $descontoDetalhe = [];
+        try {
+            // Buscar pedidos com desconto no período filtrado
+            $descontoCol = $colDesconto;
+            if ($descontoCol !== '') {
+                $colsUsuarios = [];
+                try { $stU = $this->db->query('DESCRIBE usuarios'); $colsUsuarios = $stU ? $stU->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                $colNomeUser = $this->pick($colsUsuarios, ['nome','name','nome_completo']);
+
+                // Buscar itens com desconto autorizado (da tabela desconto_autorizacoes)
+                $temDA = false;
+                try { $stDA = $this->db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'desconto_autorizacoes'"); $temDA = (int)$stDA->fetchColumn() > 0; } catch (\Exception $e) {}
+
+                if ($temDA) {
+                    // Buscar autorizações aprovadas no período
+                    $sqlDesc = "SELECT da.produto_id, da.produto_nome, da.preco_original, da.desconto_valor, da.desconto_tipo, da.preco_final, da.moeda, da.vendedor_nome, da.vendedor_id, da.created_at
+                        FROM desconto_autorizacoes da
+                        WHERE da.status = 'aprovado' AND da.created_at >= :ds AND da.created_at < DATE_ADD(:de, INTERVAL 1 DAY)
+                        ORDER BY da.created_at DESC LIMIT 100";
+                    $stDesc = $this->db->prepare($sqlDesc);
+                    $stDesc->execute([':ds' => $dateStart, ':de' => $dateEnd]);
+                    $descontoDetalhe = $stDesc->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+
+                // Fallback: se não há autorizações mas há desconto global nos pedidos
+                if (empty($descontoDetalhe) && in_array('desconto_global_aplicado', $cols, true)) {
+                    $adminJoin = ($colAdminCriador !== '' && $colNomeUser !== '')
+                        ? " LEFT JOIN usuarios u ON u.id = p.{$colAdminCriador}"
+                        : '';
+                    $adminSelect = ($colAdminCriador !== '' && $colNomeUser !== '')
+                        ? ", u.{$colNomeUser} AS vendedor_nome, p.{$colAdminCriador} AS vendedor_id"
+                        : ", NULL AS vendedor_nome, NULL AS vendedor_id";
+                    $codigoSelect = in_array('codigo_pedido', $cols, true) ? 'p.codigo_pedido' : 'p.id';
+                    $moedaSelectDesc = ($colMoeda !== '') ? "p.{$colMoeda}" : "'USD'";
+
+                    $sqlDescFallback = "SELECT {$codigoSelect} AS produto_nome, 
+                        COALESCE(p.{$colSubtotal}, p.{$colTotal}) AS preco_original,
+                        p.desconto_global_aplicado AS desconto_valor,
+                        'fixo' AS desconto_tipo,
+                        p.{$colTotal} AS preco_final,
+                        {$moedaSelectDesc} AS moeda,
+                        p.created_at
+                        {$adminSelect}
+                        FROM pedidos p{$adminJoin}
+                        WHERE p.desconto_global_aplicado > 0 AND {$whereStr}
+                        ORDER BY p.created_at DESC LIMIT 100";
+                    $stDescFb = $this->db->prepare($sqlDescFallback);
+                    $stDescFb->execute($params);
+                    $descontoDetalhe = $stDescFb->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('[FINANCEIRO] Erro detalhamento descontos: ' . $e->getMessage());
+        }
+
+        $data = compact('totais', 'porStatus', 'porMoeda', 'porPagamento', 'totaisPorMoedaCards', 'taxaUsdBrl', 'dateStart', 'dateEnd', 'statusFilter', 'moedaFilter', 'statusList', 'descontoDetalhe');
+
+        // Sincronizar descontos como despesa operacional (idempotente)
+        $this->sincronizarDescontosComoDespesa($descontoDetalhe);
 
         // === INTEGRAÇÃO DESPESAS ===
         $despesasResumo = ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
@@ -350,5 +416,85 @@ class AdminRelatorioGeralController extends Controller {
             if (in_array($c, $cols, true)) return $c;
         }
         return '';
+    }
+
+    /**
+     * Sincroniza descontos aprovados como despesas operacionais.
+     * Idempotente: só cria despesa se não existir registro com a mesma observação/referência.
+     */
+    private function sincronizarDescontosComoDespesa(array $descontoDetalhe): void {
+        if (empty($descontoDetalhe)) {
+            return;
+        }
+
+        try {
+            // Verificar se tabela despesas existe
+            $stCheck = $this->db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'despesas'");
+            if ((int)$stCheck->fetchColumn() === 0) {
+                return;
+            }
+
+            // Buscar categoria "Marketing" ou criar referência genérica
+            $categoriaId = null;
+            try {
+                $stCat = $this->db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'despesa_categorias'");
+                if ((int)$stCat->fetchColumn() > 0) {
+                    $stFind = $this->db->prepare("SELECT id FROM despesa_categorias WHERE LOWER(nome) IN ('descontos','desconto') AND ativa = 1 LIMIT 1");
+                    $stFind->execute();
+                    $categoriaId = $stFind->fetchColumn() ?: null;
+                    // Fallback: usar "Outros"
+                    if (!$categoriaId) {
+                        $stFind2 = $this->db->prepare("SELECT id FROM despesa_categorias WHERE LOWER(nome) = 'outros' AND ativa = 1 LIMIT 1");
+                        $stFind2->execute();
+                        $categoriaId = $stFind2->fetchColumn() ?: null;
+                    }
+                }
+            } catch (\Exception $e) {}
+
+            foreach ($descontoDetalhe as $dd) {
+                $descVal = (float)($dd['desconto_valor'] ?? 0);
+                if ($descVal <= 0) continue;
+
+                $moeda = strtoupper(trim((string)($dd['moeda'] ?? 'USD')));
+                $produtoNome = trim((string)($dd['produto_nome'] ?? 'Pedido'));
+                $vendedorNome = trim((string)($dd['vendedor_nome'] ?? ''));
+                $dataRef = isset($dd['created_at']) ? date('Y-m-d', strtotime($dd['created_at'])) : date('Y-m-d');
+                $competencia = date('Y-m-01', strtotime($dataRef));
+
+                // Referência única para evitar duplicatas
+                $prodId = (int)($dd['produto_id'] ?? 0);
+                $vendId = (int)($dd['vendedor_id'] ?? 0);
+                $ref = "desconto_auto_{$prodId}_{$vendId}_{$dataRef}_{$descVal}";
+
+                // Verificar se já existe
+                try {
+                    $stExists = $this->db->prepare("SELECT id FROM despesas WHERE observacoes LIKE :ref AND deleted_at IS NULL LIMIT 1");
+                    $stExists->execute([':ref' => '%' . $ref . '%']);
+                    if ($stExists->fetchColumn()) {
+                        continue; // Já registrado
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+
+                // Inserir despesa
+                $descricao = "Desconto - {$produtoNome}" . ($vendedorNome !== '' ? " (vendedor: {$vendedorNome})" : '');
+                $sql = "INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, observacoes, origem, created_at)
+                        VALUES (:desc, :cat, 'avulsa', :valor, :moeda, :comp, :venc, 'paga', NULL, :fav, :obs, 'sistema', NOW())";
+                $stIns = $this->db->prepare($sql);
+                $stIns->execute([
+                    ':desc' => $descricao,
+                    ':cat' => $categoriaId,
+                    ':valor' => $descVal,
+                    ':moeda' => $moeda,
+                    ':comp' => $competencia,
+                    ':venc' => $dataRef,
+                    ':fav' => $vendedorNome !== '' ? $vendedorNome : null,
+                    ':obs' => "Lançamento automático de desconto ({$ref})",
+                ]);
+            }
+        } catch (\Exception $e) {
+            error_log('[FINANCEIRO] Erro sincronizar descontos como despesa: ' . $e->getMessage());
+        }
     }
 }

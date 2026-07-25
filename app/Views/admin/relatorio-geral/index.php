@@ -229,6 +229,178 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <?php endforeach; ?>
     </div>
 
+    <!-- Cards Indicadores: Total KG e Total Descontos -->
+    <?php
+    $pesoUsd = (float)($usd['peso_kg'] ?? 0);
+    $pesoBrl = (float)($brl['peso_kg'] ?? 0);
+    $pesoTotal = $pesoUsd + $pesoBrl;
+    $descontoUsd = (float)($usd['desconto'] ?? 0);
+    $descontoBrl = (float)($brl['desconto'] ?? 0);
+    $descontoTotalBrl = $descontoBrl + ($descontoUsd * $taxaUsdBrl);
+    $descontoDetalhe = $descontoDetalhe ?? [];
+    ?>
+    <div class="row g-3 mb-4">
+        <!-- Total KG -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="border-top:3px solid #8b5cf6;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;background:#8b5cf615;">
+                                <i class="fas fa-weight-hanging" style="font-size:12px;color:#8b5cf6;"></i>
+                            </div>
+                            <span class="fw-semibold small">Peso total (KG)</span>
+                        </div>
+                        <i class="fas fa-info-circle text-muted" style="font-size:12px;" title="Soma do peso de todos os pedidos filtrados" data-bs-toggle="tooltip"></i>
+                    </div>
+                    <?php if ($pesoTotal > 0): ?>
+                    <div class="text-center">
+                        <span class="fs-3 fw-bold" style="color:#8b5cf6;"><?= number_format($pesoTotal, 2, ',', '.') ?> kg</span>
+                    </div>
+                    <?php if ($pesoUsd > 0 && $pesoBrl > 0): ?>
+                    <div class="d-flex justify-content-center gap-3 mt-2">
+                        <span class="badge bg-light text-dark">USD: <?= number_format($pesoUsd, 2, ',', '.') ?> kg</span>
+                        <span class="badge bg-light text-dark">BRL: <?= number_format($pesoBrl, 2, ',', '.') ?> kg</span>
+                    </div>
+                    <?php endif; ?>
+                    <?php else: ?>
+                    <div class="text-center py-3">
+                        <i class="fas fa-weight-hanging text-muted d-block mb-2" style="font-size:24px;opacity:.4;"></i>
+                        <div class="text-muted small fst-italic">Sem dados de peso no período</div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Descontos -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="border-top:3px solid #f43f5e;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;background:#f43f5e15;">
+                                <i class="fas fa-percent" style="font-size:12px;color:#f43f5e;"></i>
+                            </div>
+                            <span class="fw-semibold small">Descontos concedidos</span>
+                        </div>
+                        <i class="fas fa-info-circle text-muted" style="font-size:12px;" title="Total de descontos aplicados nos pedidos filtrados. Lançado como despesa operacional." data-bs-toggle="tooltip"></i>
+                    </div>
+                    <?php if ($descontoUsd > 0 || $descontoBrl > 0): ?>
+                        <?php if ($descontoUsd > 0): ?>
+                        <div class="d-flex align-items-baseline justify-content-between mb-1">
+                            <span class="text-muted small">USD</span>
+                            <span class="fs-5 fw-bold" style="color:#f43f5e;">$ <?= fmtNum($descontoUsd) ?></span>
+                        </div>
+                        <div class="d-flex align-items-baseline justify-content-between mb-2">
+                            <span class="text-muted" style="font-size:11px;">≈ BRL</span>
+                            <span class="text-muted small">R$ <?= fmtNum($descontoUsd * $taxaUsdBrl) ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($descontoBrl > 0): ?>
+                        <div class="d-flex align-items-baseline justify-content-between <?= $descontoUsd > 0 ? 'pt-2 border-top' : '' ?>">
+                            <span class="text-muted small">BRL</span>
+                            <span class="fs-5 fw-bold" style="color:#f43f5e;">R$ <?= fmtNum($descontoBrl) ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <div class="mt-3 pt-2 border-top d-flex align-items-baseline justify-content-between">
+                            <span class="fw-bold small text-uppercase" style="color:#f43f5e;font-size:11px;">Total em BRL</span>
+                            <span class="fw-bold fs-5" style="color:#f43f5e;">R$ <?= fmtNum($descontoTotalBrl) ?></span>
+                        </div>
+                    <?php else: ?>
+                    <div class="text-center py-3">
+                        <i class="fas fa-percent text-muted d-block mb-2" style="font-size:24px;opacity:.4;"></i>
+                        <div class="text-muted small fst-italic">Sem descontos no período</div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Qtd Descontos -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100" style="border-top:3px solid #f97316;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:28px;height:28px;background:#f9731615;">
+                                <i class="fas fa-tags" style="font-size:12px;color:#f97316;"></i>
+                            </div>
+                            <span class="fw-semibold small">Autorizações de desconto</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <span class="fs-3 fw-bold" style="color:#f97316;"><?= count($descontoDetalhe) ?></span>
+                        <div class="text-muted small">no período</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detalhamento de Descontos -->
+    <?php if (!empty($descontoDetalhe)): ?>
+    <div class="card border-0 shadow-sm mb-4" style="border-top:3px solid #f43f5e;">
+        <div class="card-header bg-white border-0 pt-3">
+            <div class="d-flex align-items-center gap-2">
+                <div class="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center" style="width:28px;height:28px;"><i class="fas fa-percent text-danger" style="font-size:11px;"></i></div>
+                <div><div class="fw-bold small">Detalhamento de Descontos</div><div class="text-muted" style="font-size:10px;">Discriminação por produto/pedido, agente e valores</div></div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size:12px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produto / Pedido</th>
+                            <th class="text-end">Valor Original</th>
+                            <th class="text-end">Desconto</th>
+                            <th>Agente (Vendedor)</th>
+                            <th class="text-end">Valor Final</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php
+                    $totalOriginal = 0; $totalDescontoVal = 0; $totalFinal = 0;
+                    foreach ($descontoDetalhe as $dd):
+                        $moedaDesc = strtoupper(trim((string)($dd['moeda'] ?? 'USD')));
+                        $simbolo = ($moedaDesc === 'BRL') ? 'R$' : '$';
+                        $original = (float)($dd['preco_original'] ?? 0);
+                        $descVal = (float)($dd['desconto_valor'] ?? 0);
+                        $final = (float)($dd['preco_final'] ?? 0);
+                        $vendedor = trim((string)($dd['vendedor_nome'] ?? ''));
+                        $data = isset($dd['created_at']) ? date('d/m/Y', strtotime($dd['created_at'])) : '-';
+                        $totalOriginal += $original;
+                        $totalDescontoVal += $descVal;
+                        $totalFinal += $final;
+                    ?>
+                        <tr>
+                            <td class="fw-semibold"><?= htmlspecialchars($dd['produto_nome'] ?? '-') ?></td>
+                            <td class="text-end"><?= $simbolo ?> <?= fmtNum($original) ?></td>
+                            <td class="text-end text-danger fw-bold">-<?= $simbolo ?> <?= fmtNum($descVal) ?></td>
+                            <td><?= $vendedor !== '' ? htmlspecialchars($vendedor) : '<span class="text-muted">-</span>' ?></td>
+                            <td class="text-end fw-bold"><?= $simbolo ?> <?= fmtNum($final) ?></td>
+                            <td class="text-muted"><?= $data ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                    <tfoot class="border-top fw-bold">
+                        <tr>
+                            <td>Total (<?= count($descontoDetalhe) ?> itens)</td>
+                            <td class="text-end"><?= fmtNum($totalOriginal) ?></td>
+                            <td class="text-end text-danger">-<?= fmtNum($totalDescontoVal) ?></td>
+                            <td></td>
+                            <td class="text-end"><?= fmtNum($totalFinal) ?></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- DRE - Demonstrativo de Resultado -->
     <?php
     $despesasResumo = $despesasResumo ?? ['total_brl' => 0, 'total_usd' => 0, 'total' => 0, 'pago_brl' => 0, 'pago_usd' => 0, 'pago' => 0, 'aberto' => 0, 'por_categoria' => []];
