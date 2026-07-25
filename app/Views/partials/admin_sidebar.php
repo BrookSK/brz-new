@@ -1137,7 +1137,7 @@ function renderAdminScripts() {
         echo '<style>.modal-backdrop{background:rgba(0,0,0,0.75)!important;}.modal-backdrop.show{opacity:1!important;}</style>';
     }
     echo '<script>
-window.abrirPrefsModal=function(){var i=setInterval(function(){if(typeof bootstrap!=="undefined"){clearInterval(i);new bootstrap.Modal(document.getElementById("prefsChangeModal")).show();}},100);};
+function abrirPrefsModal(){var el=document.getElementById("prefsChangeModal");if(!el)return;if(typeof bootstrap!=="undefined"&&bootstrap.Modal){bootstrap.Modal.getOrCreateInstance(el).show();}else{el.classList.add("show");el.style.display="block";el.setAttribute("aria-modal","true");var bk=document.createElement("div");bk.className="modal-backdrop fade show";bk.id="prefsBackdrop";document.body.appendChild(bk);document.body.classList.add("modal-open");el.querySelector(".btn-close,.btn-secondary").onclick=function(){el.classList.remove("show");el.style.display="none";var b=document.getElementById("prefsBackdrop");if(b)b.remove();document.body.classList.remove("modal-open");};}}
 function salvarPrefsChange(){var b=new FormData();b.append("idioma",document.getElementById("pref_idioma").value);b.append("moeda",document.getElementById("pref_moeda").value);fetch("/admin/preferences/salvar",{method:"POST",body:b}).then(function(r){return r.json()}).then(function(d){if(d.ok){location.reload();}else{alert(d.error||"Erro");}}).catch(function(e){alert("Erro: "+e.message);});}
 </script>';
 
