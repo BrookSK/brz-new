@@ -1228,7 +1228,7 @@ class PedidoManualService {
             $tc = strtolower(trim((string) $tipoCompra));
             if ($tc === '') {
                 $tipoCompra = null;
-            } elseif (!in_array($tc, ['online', 'offline'], true)) {
+            } elseif (!in_array($tc, ['online', 'offline', 'marketing'], true)) {
                 throw new \Exception('Tipo de compra inválido');
             } else {
                 $tipoCompra = $tc;
@@ -1642,6 +1642,11 @@ class PedidoManualService {
             }
 
             $this->db->commit();
+
+            // Registrar despesas automaticamente para pedidos tipo "marketing"
+            if ($tipoCompra === 'marketing') {
+                $this->registrarDespesasMarketing($pedidoId, $itens, $resumo, $moeda, $adminCriadorId);
+            }
 
             // Disparar sincronização QuickBooks para pedido manual
             try {
@@ -2262,5 +2267,142 @@ class PedidoManualService {
         }
 
         return $out;
+    }
+
+    /**
+     * Registra despesas automáticas para pedidos do tipo "marketing".
+     * Lança valor de produtos, impostos e demais custos como despesas separadas,
+     * com forma_pagamento = 'pagdev' (Fabiana).
+     */
+    private function registrarDespesasMarketing(int $pedidoId, array $itens, array $resumo, string $moeda, ?int $adminCriadorId): void {
+        try {
+            // Verificar se tabela despesas existe
+            if (!$this->tableExists('despesas')) {
+                error_log("[MARKETING DESPESA] Tabela despesas não existe. Pedido #{$pedidoId}");
+                return;
+            }
+
+            // Buscar categoria "Marketing" na tabela de categorias
+            $categoriaId = null;
+            if ($this->tableExists('despesa_categorias')) {
+                try {
+                    $stCat = $this->db->prepare("SELECT id FROM despesa_categorias WHERE LOWER(nome) = 'marketing' AND ativa = 1 LIMIT 1");
+                    $stCat->execute();
+                    $categoriaId = $stCat->fetchColumn() ?: null;
+                } catch (\Exception $e) {}
+            }
+
+            $competencia = date('Y-m-01');
+            $hoje = date('Y-m-d');
+
+            // Buscar código do pedido para referência na descrição
+            $codigoPedido = '';
+            try {
+                $colsPed = $this->getCols('pedidos');
+                $codCol = in_array('codigo_pedido', $colsPed, true) ? 'codigo_pedido' : (in_array('numero_pedido', $colsPed, true) ? 'numero_pedido' : '');
+                if ($codCol !== '') {
+                    $stCod = $this->db->prepare("SELECT {$codCol} FROM pedidos WHERE id = ? LIMIT 1");
+                    $stCod->execute([$pedidoId]);
+                    $codigoPedido = (string) ($stCod->fetchColumn() ?: '');
+                }
+            } catch (\Exception $e) {}
+            $refPedido = $codigoPedido !== '' ? $codigoPedido : "#{$pedidoId}";
+
+            // 1) Despesa: Valor dos Produtos (subtotal)
+            $subtotalProdutos = isset($resumo['subtotal_produtos']) ? (float) $resumo['subtotal_produtos'] : 0.0;
+            if ($subtotalProdutos <= 0) {
+                // Calcular a partir dos itens
+                foreach ($itens as $it) {
+                    $q = (int) ($it['quantidade'] ?? 0);
+                    $vu = (float) ($it['valor_unitario'] ?? 0);
+                    $subtotalProdutos += ($q * $vu);
+                }
+                $subtotalProdutos = round($subtotalProdutos, 2);
+            }
+
+            if ($subtotalProdutos > 0) {
+                $this->inserirDespesaMarketing(
+                    "Marketing - Produtos - Pedido {$refPedido}",
+                    $categoriaId,
+                    $subtotalProdutos,
+                    $moeda,
+                    $competencia,
+                    $hoje,
+                    $pedidoId,
+                    $adminCriadorId
+                );
+            }
+
+            // 2) Despesa: Impostos (valor_impostos + imposto_local)
+            $valorImpostos = (float) ($resumo['valor_impostos'] ?? 0);
+            $impostoLocal = (float) ($resumo['imposto_local'] ?? 0);
+            $totalImpostos = round($valorImpostos + $impostoLocal, 2);
+
+            if ($totalImpostos > 0) {
+                $this->inserirDespesaMarketing(
+                    "Marketing - Impostos - Pedido {$refPedido}",
+                    $categoriaId,
+                    $totalImpostos,
+                    $moeda,
+                    $competencia,
+                    $hoje,
+                    $pedidoId,
+                    $adminCriadorId
+                );
+            }
+
+            // 3) Despesa: Taxa de Serviço
+            $taxaServico = (float) ($resumo['taxa_servico'] ?? 0);
+            if ($taxaServico > 0) {
+                $this->inserirDespesaMarketing(
+                    "Marketing - Taxa de Serviço - Pedido {$refPedido}",
+                    $categoriaId,
+                    $taxaServico,
+                    $moeda,
+                    $competencia,
+                    $hoje,
+                    $pedidoId,
+                    $adminCriadorId
+                );
+            }
+
+            // 4) Despesa: Frete
+            $valorFrete = (float) ($resumo['valor_frete'] ?? 0);
+            if ($valorFrete > 0) {
+                $this->inserirDespesaMarketing(
+                    "Marketing - Frete - Pedido {$refPedido}",
+                    $categoriaId,
+                    $valorFrete,
+                    $moeda,
+                    $competencia,
+                    $hoje,
+                    $pedidoId,
+                    $adminCriadorId
+                );
+            }
+
+            error_log("[MARKETING DESPESA] Despesas registradas para pedido #{$pedidoId} (tipo_compra=marketing, pagamento=pagdev)");
+        } catch (\Exception $e) {
+            error_log("[MARKETING DESPESA] Erro ao registrar despesas pedido #{$pedidoId}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Insere uma despesa individual para compras de marketing.
+     */
+    private function inserirDespesaMarketing(string $descricao, ?int $categoriaId, float $valor, string $moeda, string $competencia, string $vencimento, int $pedidoId, ?int $criadorId): void {
+        $sql = "INSERT INTO despesas (descricao, categoria_id, tipo, valor, moeda, competencia, vencimento, status, forma_pagamento, favorecido, observacoes, origem, criado_por, created_at)
+                VALUES (:desc, :cat, 'avulsa', :valor, :moeda, :comp, :venc, 'paga', 'pagdev', 'Fabiana (PagDev)', :obs, 'sistema', :uid, NOW())";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            ':desc' => $descricao,
+            ':cat' => $categoriaId,
+            ':valor' => $valor,
+            ':moeda' => $moeda,
+            ':comp' => $competencia,
+            ':venc' => $vencimento,
+            ':obs' => "Lançamento automático - Pedido #{$pedidoId} (tipo: marketing, pagamento: PagDev)",
+            ':uid' => $criadorId,
+        ]);
     }
 }

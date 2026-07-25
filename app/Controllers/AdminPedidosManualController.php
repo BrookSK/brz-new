@@ -442,6 +442,7 @@ class AdminPedidosManualController extends Controller {
                                     <option value="" selected>Selecione...</option>
                                     <option value="online">Online</option>
                                     <option value="offline">Offline</option>
+                                    <option value="marketing">Marketing</option>
                                 </select>
                                 <div class="form-text">Obrigatório para pedidos manuais.</div>
                             </div>
@@ -2382,6 +2383,17 @@ document.addEventListener('DOMContentLoaded', function(){
         updateLinkVisibility();
     }
 
+    // Auto-selecionar PagDev quando tipo_compra = marketing
+    const tipoCompraSel = document.getElementById('tipo_compra');
+    if (tipoCompraSel) {
+        tipoCompraSel.addEventListener('change', function(){
+            if (this.value === 'marketing' && fpSel) {
+                fpSel.value = 'pagdev';
+                refreshOffline();
+            }
+        });
+    }
+
     const g = document.getElementById('gatewayLabel');
     if (g) g.textContent = (getSelectedMoeda() === 'BRL') ? 'Câmbio Real + AppMax' : 'Stripe';
     if (EXISTING_PEDIDO && Number(EXISTING_PEDIDO.cliente_id || 0) > 0) {
@@ -3022,8 +3034,8 @@ JS;
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
             $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
-            if (!in_array($tipoCompra, ['online', 'offline'], true)) {
-                throw new \Exception('Selecione o tipo de compra (online/offline)');
+            if (!in_array($tipoCompra, ['online', 'offline', 'marketing'], true)) {
+                throw new \Exception('Selecione o tipo de compra (online/offline/marketing)');
             }
 
             $enderecoEntrega = [
@@ -3243,8 +3255,8 @@ JS;
             $moeda = (string) $request->getParam('moeda', 'USD');
             $formaPagamento = (string) $request->getParam('forma_pagamento', '');
             $tipoCompra = strtolower(trim((string) $request->getParam('tipo_compra', '')));
-            if (!in_array($tipoCompra, ['online', 'offline'], true)) {
-                throw new \Exception('Selecione o tipo de compra (online/offline)');
+            if (!in_array($tipoCompra, ['online', 'offline', 'marketing'], true)) {
+                throw new \Exception('Selecione o tipo de compra (online/offline/marketing)');
             }
 
             // Verificar autorização PagDev para todos os usuários

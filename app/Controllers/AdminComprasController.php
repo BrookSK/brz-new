@@ -1224,7 +1224,7 @@ class AdminComprasController extends Controller {
             $statusView = in_array($statusView, ['pendente', 'concluidas'], true) ? $statusView : 'pendente';
 
             $tipoCompraView = strtolower(trim((string) $request->getParam('tipo_compra', 'todos')));
-            if (!in_array($tipoCompraView, ['offline', 'online', 'carne', 'todos'], true)) {
+            if (!in_array($tipoCompraView, ['offline', 'online', 'marketing', 'carne', 'todos'], true)) {
                 $tipoCompraView = 'todos';
             }
 
@@ -1258,6 +1258,8 @@ class AdminComprasController extends Controller {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'offline' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
                 } elseif ($tipoCompraView === 'online') {
                     $whereTipoCompra = " AND (lc.tipo_compra = 'online' OR lc.tipo_compra IS NULL OR lc.tipo_compra = '')";
+                } elseif ($tipoCompraView === 'marketing') {
+                    $whereTipoCompra = " AND lc.tipo_compra = 'marketing'";
                 } elseif ($tipoCompraView === 'carne') {
                     $whereTipoCompra = " AND lc.tipo_compra = 'carne'";
                 } else {
