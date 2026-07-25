@@ -4522,6 +4522,57 @@ document.addEventListener('DOMContentLoaded', function(){ onEditPaisChange(); })
     }
 })();</script>
 HTML;
+
+                    // === Seção Invoice (dados confirmados pelo cliente) ===
+                    $invoiceHtml = '';
+                    try {
+                        $dbInv = \Config\Database::getConnection();
+                        $stInv = $dbInv->prepare("SELECT * FROM pedido_invoices WHERE pedido_id = ? ORDER BY id DESC LIMIT 1");
+                        $stInv->execute([(int) $pedido['id']]);
+                        $invoiceData = $stInv->fetch(\PDO::FETCH_ASSOC);
+
+                        if ($invoiceData) {
+                            $invStatus = $invoiceData['status'] ?? '';
+                            $invStatusBadge = ['liberado' => 'warning', 'confirmado' => 'success', 'contestado' => 'danger'][$invStatus] ?? 'secondary';
+
+                            $invoiceHtml .= '<div class="card mb-4 border-' . $invStatusBadge . '"><div class="card-header bg-' . $invStatusBadge . ' bg-opacity-10"><h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Invoice <span class="badge bg-' . $invStatusBadge . ' ms-2">' . ucfirst($invStatus) . '</span></h5></div><div class="card-body">';
+
+                            if ($invStatus === 'contestado' && !empty($invoiceData['contestacao_motivo'])) {
+                                $invoiceHtml .= '<div class="alert alert-danger"><strong>Motivo da contestação:</strong><br>' . htmlspecialchars($invoiceData['contestacao_motivo']) . '</div>';
+                            }
+
+                            // Buscar itens do invoice
+                            $stInvItems = $dbInv->prepare("SELECT * FROM pedido_invoice_items WHERE invoice_id = ? ORDER BY id ASC");
+                            $stInvItems->execute([(int) $invoiceData['id']]);
+                            $invItems = $stInvItems->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                            if (!empty($invItems)) {
+                                $invoiceHtml .= '<div class="table-responsive"><table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Produto (etiqueta)</th><th>NCM</th><th>Valor (USD)</th><th>Peso</th><th>Qtd</th><th>Bateria</th><th>Perfume</th></tr></thead><tbody>';
+                                foreach ($invItems as $invIt) {
+                                    $invoiceHtml .= '<tr>'
+                                        . '<td>' . htmlspecialchars($invIt['nome_produto'] ?? '') . '</td>'
+                                        . '<td>' . htmlspecialchars($invIt['ncm'] ?? '-') . '</td>'
+                                        . '<td>$ ' . number_format((float)($invIt['declaration_value'] ?? 0), 2) . '</td>'
+                                        . '<td>' . number_format((float)($invIt['peso_kg'] ?? 0), 3) . ' kg</td>'
+                                        . '<td>' . (int)($invIt['quantidade'] ?? 1) . '</td>'
+                                        . '<td>' . (($invIt['tem_bateria'] ?? 'N') === 'S' ? '<span class="badge bg-warning">Sim</span>' : 'Não') . '</td>'
+                                        . '<td>' . (($invIt['tem_perfume'] ?? 'N') === 'S' ? '<span class="badge bg-info">Sim</span>' : 'Não') . '</td>'
+                                        . '</tr>';
+                                }
+                                $invoiceHtml .= '</tbody></table></div>';
+                            }
+
+                            if ($invoiceData['confirmado_em']) {
+                                $invoiceHtml .= '<small class="text-muted">Confirmado em: ' . date('d/m/Y H:i', strtotime($invoiceData['confirmado_em'])) . '</small>';
+                            }
+
+                            $invoiceHtml .= '</div></div>';
+                        }
+                    } catch (\Throwable $e) {}
+
+                    if ($invoiceHtml !== '') {
+                        echo '<div class="col-12">' . $invoiceHtml . '</div>';
+                    }
                     
                     echo '<div class="col-md-6">
                         <div class="card mb-4">
