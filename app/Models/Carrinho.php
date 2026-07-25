@@ -339,8 +339,18 @@ class Carrinho extends Model {
             // Inserir novo item
             $subtotal = $quantidade * $precoUnitario;
 
-            $colsIns = ['carrinho_id', 'produto_id', $varCol, 'variacao_descricao', 'quantidade', $unitCol, 'subtotal'];
-            $valsIns = [':carrinho_id', ':produto_id', ':produto_variacao_id', ':variacao_descricao', ':quantidade', ':valor_unitario', ':subtotal'];
+            // Workaround NO_AUTO_VALUE_ON_ZERO: calcular próximo ID manualmente
+            $nextId = 1;
+            try {
+                $stMaxId = $this->connection->query("SELECT COALESCE(MAX(id), 0) + 1 FROM carrinho_items");
+                $nextId = (int) $stMaxId->fetchColumn();
+                if ($nextId <= 0) $nextId = 1;
+            } catch (\Throwable $e) {
+                $nextId = 99999;
+            }
+
+            $colsIns = ['id', 'carrinho_id', 'produto_id', $varCol, 'variacao_descricao', 'quantidade', $unitCol, 'subtotal'];
+            $valsIns = [':next_id', ':carrinho_id', ':produto_id', ':produto_variacao_id', ':variacao_descricao', ':quantidade', ':valor_unitario', ':subtotal'];
             if ($hasPriceSnap) {
                 $colsIns[] = 'preco_unit_snapshot';
                 $valsIns[] = ':preco_unit_snapshot';
@@ -353,6 +363,7 @@ class Carrinho extends Model {
             $stmt = $this->connection->prepare(
                 'INSERT INTO carrinho_items (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $valsIns) . ')'
             );
+            $stmt->bindValue(':next_id', $nextId, \PDO::PARAM_INT);
             $stmt->bindParam(':carrinho_id', $carrinhoId);
             $stmt->bindParam(':produto_id', $produtoId);
             $stmt->bindValue(':produto_variacao_id', $produtoVariacaoId);
