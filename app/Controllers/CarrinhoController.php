@@ -227,10 +227,14 @@ class CarrinhoController extends Controller {
                     if ($qtd < 1) $qtd = 1;
                     $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                     $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
+                    $varIdPacote = (int) ($it['var_id'] ?? ($it['produto_variacao_id'] ?? 0));
+
+                    $itemKeySession = ((string) $pid) . ':' . ((string) $varIdPacote);
+                    $isAtivoSession = $this->getItemAtivoFromSession($itemKeySession);
 
                     $out[$key] = [
                         'produto_id' => $pid,
-                        'produto_variacao_id' => null,
+                        'produto_variacao_id' => isset($it['produto_variacao_id']) ? (int) $it['produto_variacao_id'] : null,
                         'variacao_descricao' => null,
                         'nome' => $it['nome_item'] ?? ($it['nome'] ?? 'Pacote'),
                         'price' => $vu,
@@ -249,7 +253,7 @@ class CarrinhoController extends Controller {
                         'foto_url' => $it['foto_url'] ?? null,
                         'comprovante_url' => $it['comprovante_url'] ?? null,
                         'carrinho_item_id' => (int) ($it['id'] ?? 0),
-                        'ativo' => 1,
+                        'ativo' => $isAtivoSession ? 1 : 0,
                     ];
                     continue;
                 }
@@ -1320,12 +1324,29 @@ class CarrinhoController extends Controller {
                 // Suporte a remoção de itens de pacote/fatura (produto_id >= 999990 ou negativo)
                 $affected = 0;
                 if ($produtoIdDb >= 999990 || $produtoIdDb < 0 || strpos((string) $produtoId, 'pacote_') === 0 || strpos((string) $produtoId, 'fatura_') === 0) {
+                    // Buscar pacote_id antes de deletar para atualizar status
+                    $pacoteIdRemover = null;
+                    try {
+                        $stFind = $this->carrinhoModel->getConnection()->prepare('SELECT pacote_id FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1');
+                        $stFind->execute([$cartId, $produtoIdDb]);
+                        $pacoteIdRemover = (int) $stFind->fetchColumn();
+                    } catch (\Throwable $e) {}
+
                     // Remover por produto_id
                     try {
                         $stDel = $this->carrinhoModel->getConnection()->prepare('DELETE FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ?');
                         $stDel->execute([$cartId, $produtoIdDb]);
                         $affected = $stDel->rowCount();
                     } catch (\Throwable $e) {}
+
+                    // Marcar pacote como descartado para que não seja re-adicionado
+                    if ($affected > 0 && $pacoteIdRemover > 0) {
+                        try {
+                            $this->carrinhoModel->getConnection()->prepare(
+                                "UPDATE pacotes_recebidos SET status = 'descartado' WHERE id = ? AND status = 'pendente'"
+                            )->execute([$pacoteIdRemover]);
+                        } catch (\Throwable $e) {}
+                    }
                 } else {
                     $affected = (int) $this->carrinhoModel->removerItem($cartId, (int) $produtoIdDb, $pvId);
                 }
