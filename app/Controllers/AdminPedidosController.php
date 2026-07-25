@@ -6603,6 +6603,8 @@ HTML;
             $novoStatusKey = strtolower(trim((string) $novoStatus));
             $cicloFechado = in_array($novoStatusKey, [
                 'produto_consolidado',
+                'consolidado',
+                'etiqueta_gerada',
                 'em_transporte',
                 'aguardando_liberacao_aduaneira',
                 'enviado_ao_destinatario',
@@ -7328,16 +7330,13 @@ HTML;
                             continue;
                         }
 
-                        // Descontar quantidade ja comprada que permaneceu na lista_compras
+                        // Pular se já existe registro de compra na lista_compras para este produto/pedido
                         try {
-                            $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                            $stQC = $pdo->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                             $stQC->execute([(int) $id, $produtoId]);
                             $jaCompradoQtd = (int) ($stQC->fetchColumn() ?: 0);
                             if ($jaCompradoQtd > 0) {
-                                $faltante = $faltante - $jaCompradoQtd;
-                                if ($faltante <= 0) {
-                                    continue;
-                                }
+                                continue;
                             }
                         } catch (\Exception $e) {}
 
@@ -7360,6 +7359,11 @@ HTML;
                             if (in_array('status', $colsLista, true)) {
                                 $cols[] = 'status';
                                 $vals[] = "'pendente'";
+                            }
+
+                            if (in_array('data_solicitacao', $colsLista, true)) {
+                                $cols[] = 'data_solicitacao';
+                                $vals[] = 'CURDATE()';
                             }
 
                             $sql = 'INSERT INTO lista_compras (' . implode(',', $cols) . ') VALUES (' . implode(',', $vals) . ')';
@@ -7521,6 +7525,22 @@ HTML;
                 }
             }
 
+            // Validar medidas para status que exigem (caixa fechada, etiqueta, transporte, etc.)
+            $statusExigeMedidas = ['produto_consolidado', 'consolidado', 'etiqueta_gerada', 'em_transporte', 'aguardando_liberacao_aduaneira', 'enviado_ao_destinatario', 'enviado', 'entregue'];
+            if (in_array(strtolower(trim($novoStatus)), $statusExigeMedidas, true)) {
+                $placeholdersMedidas = implode(',', array_fill(0, count($ids), '?'));
+                $stMedidas = $pdo->prepare("SELECT id FROM pedidos WHERE id IN ({$placeholdersMedidas}) AND (peso_total IS NULL OR peso_total <= 0 OR altura IS NULL OR altura <= 0 OR largura IS NULL OR largura <= 0 OR comprimento IS NULL OR comprimento <= 0)");
+                $stMedidas->execute(array_values($ids));
+                $semMedidas = $stMedidas->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+                if (!empty($semMedidas)) {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Os seguintes pedidos não possuem peso/medidas preenchidos: #' . implode(', #', $semMedidas) . '. Preencha antes de alterar para este status.',
+                    ]);
+                    exit;
+                }
+            }
+
             $set = [$statusCol . ' = ?'];
             $baseParams = [$novoStatus];
 
@@ -7668,13 +7688,12 @@ HTML;
                                         $faltante = $qtdPedido - $qtdReservada;
                                         if ($faltante <= 0) continue;
 
-                                        // Descontar já comprados
+                                        // Pular se já comprado
                                         try {
-                                            $stQC = $pdo->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                            $stQC = $pdo->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                                             $stQC->execute([$pid, $produtoId]);
                                             $jaComprado = (int) ($stQC->fetchColumn() ?: 0);
-                                            $faltante -= $jaComprado;
-                                            if ($faltante <= 0) continue;
+                                            if ($jaComprado > 0) continue;
                                         } catch (\Exception $e) {}
 
                                         // Inserir pendência
@@ -7695,6 +7714,11 @@ HTML;
                                         if (in_array('status', $colsListaMassa, true)) {
                                             $colsIns[] = 'status';
                                             $valsIns[] = "'pendente'";
+                                        }
+
+                                        if (in_array('data_solicitacao', $colsListaMassa, true)) {
+                                            $colsIns[] = 'data_solicitacao';
+                                            $valsIns[] = 'CURDATE()';
                                         }
 
                                         $pdo->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);

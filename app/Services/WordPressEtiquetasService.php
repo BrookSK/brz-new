@@ -316,6 +316,39 @@ class WordPressEtiquetasService
     }
 
     /**
+     * Corrigir metadados de um pacote no WordPress antes de gerar o PDF.
+     * Envia pedidoIdLocal e recipientName para que o WP salve.
+     */
+    public function fixPackageMeta(int $wpPostId, array $data): array
+    {
+        $url = $this->baseUrl . '/wp-json/brz/v1/packages/fix-meta/' . $wpPostId;
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'X-API-Key: ' . $this->apiKey,
+        ]);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'brz-system/1.0');
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            $decoded = json_decode($response, true);
+            return $decoded ?: ['success' => true];
+        }
+
+        return ['success' => false, 'error' => 'HTTP ' . $httpCode];
+    }
+
+    /**
      * Baixar PDF do container (etiqueta unitizador).
      */
     public function downloadContainerPdf(int $wpPostId): array|string

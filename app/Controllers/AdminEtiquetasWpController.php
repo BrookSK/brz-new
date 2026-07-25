@@ -214,6 +214,36 @@ class AdminEtiquetasWpController extends Controller
     }
 
     // =========================================================
+    // SALDO FINANCEIRO (CORREIOS)
+    // =========================================================
+
+    /**
+     * Consultar saldo financeiro direto da API dos Correios (mesmo do painel antigo).
+     * GET /admin/etiquetas-wp/saldo
+     */
+    public function saldo(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $svc = new \App\Services\CorreiosPacketService();
+        $r = $svc->getBalance();
+
+        if (empty($r['success'])) {
+            $this->json([
+                'success' => false,
+                'error' => (string) ($r['error'] ?? 'Falha ao consultar saldo.'),
+            ], 400);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'currentBalance' => $r['currentBalance'] ?? null,
+        ]);
+    }
+
+    // =========================================================
     // GERAR ETIQUETAS VIA WORDPRESS
     // =========================================================
 
@@ -529,6 +559,66 @@ class AdminEtiquetasWpController extends Controller
     }
 
     // =========================================================
+    // REGERAR ETIQUETA
+    // =========================================================
+
+    /**
+     * Regerar etiqueta: deleta a existente e gera nova com dados atuais do pedido.
+     * POST /admin/etiquetas-wp/regerar-etiqueta
+     * Body JSON: { pedido_id: int }
+     */
+    public function regerarEtiqueta(Request $request)
+    {
+        $auth = new AuthService();
+        $auth->requerPerfis(['admin', 'vendedor', 'suporte']);
+
+        $body = json_decode(file_get_contents('php://input'), true);
+        $pedidoId = (int) ($body['pedido_id'] ?? 0);
+        if ($pedidoId <= 0) {
+            $this->json(['success' => false, 'error' => 'pedido_id inválido'], 400);
+            return;
+        }
+
+        // Marcar etiqueta antiga como cancelada no WordPress (via fix-meta)
+        try {
+            if ($this->tableExists('correios_packet_etiquetas')) {
+                $stWp = $this->connection->prepare('SELECT wp_post_id FROM correios_packet_etiquetas WHERE pedido_id = ? LIMIT 1');
+                $stWp->execute([$pedidoId]);
+                $wpPostId = (int) ($stWp->fetchColumn() ?: 0);
+                if ($wpPostId > 0) {
+                    $this->wp->fixPackageMeta($wpPostId, ['packageStatus' => 'cancelado']);
+                }
+            }
+        } catch (\Exception $e) {
+            // Não bloquear se falhar a marcação no WP
+            error_log('[BRZ-REGERAR-WP] Erro ao marcar etiqueta como cancelada no WP (pedido #' . $pedidoId . '): ' . $e->getMessage());
+        }
+
+        // Deletar etiqueta local existente
+        try {
+            if ($this->tableExists('correios_packet_etiquetas')) {
+                $stDel = $this->connection->prepare('DELETE FROM correios_packet_etiquetas WHERE pedido_id = ?');
+                $stDel->execute([$pedidoId]);
+            }
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'error' => 'Erro ao deletar etiqueta anterior: ' . $e->getMessage()], 500);
+            return;
+        }
+
+        // Reverter status do pedido para permitir nova geração
+        try {
+            $pedidoModel = new PedidoEcommerce();
+            $pedidoModel->atualizarStatus($pedidoId, 'produto_consolidado', 'Etiqueta deletada para regeração (via WP)', $_SESSION['usuario_id'] ?? null);
+        } catch (\Exception $e) {
+            // Não bloquear se falhar a reversão de status
+            error_log('[BRZ-REGERAR-WP] Erro ao reverter status pedido #' . $pedidoId . ': ' . $e->getMessage());
+        }
+
+        // Agora gerar nova etiqueta usando o mesmo fluxo
+        $this->gerarEtiqueta($request);
+    }
+
+    // =========================================================
     // DOWNLOAD DE PDFs
     // =========================================================
 
@@ -546,6 +636,95 @@ class AdminEtiquetasWpController extends Controller
             http_response_code(400);
             echo 'ID inválido.';
             return;
+        }
+
+        // Antes de gerar o PDF, enviar dados de fix para o WP (pedido_id_local + items)
+        try {
+            // Buscar pedido_id_local a partir do wp_post_id no banco local
+            $st = $this->connection->prepare(
+                "SELECT pedido_id FROM correios_packet_etiquetas WHERE wp_post_id = ? LIMIT 1"
+            );
+            $st->execute([$wpPostId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            error_log('[BRZ-PDF-FIX] wp_post_id=' . $wpPostId . ' | etiqueta_row=' . json_encode($row));
+            if ($row && !empty($row['pedido_id'])) {
+                $pedidoId = (int) $row['pedido_id'];
+                $fixData = ['pedidoIdLocal' => $pedidoId];
+
+                // Buscar itens do pedido para enviar ao WP
+                try {
+                    // Detectar tabela de itens (pedido_itens ou pedido_items)
+                    $itensTable = null;
+                    foreach (['pedido_itens', 'pedido_items'] as $t) {
+                        try {
+                            $stCheck = $this->connection->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1");
+                            $stCheck->execute([$t]);
+                            if ($stCheck->fetchColumn()) { $itensTable = $t; break; }
+                        } catch (\Exception $e) {}
+                    }
+                    error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | itensTable=' . ($itensTable ?? 'NULL'));
+                    if ($itensTable) {
+                        $cols = [];
+                        try { $stC = $this->connection->query("DESCRIBE {$itensTable}"); $cols = $stC ? $stC->fetchAll(\PDO::FETCH_COLUMN) : []; } catch (\Exception $e) {}
+                        $nomeCol = in_array('nome_produto', $cols) ? 'nome_produto' : (in_array('nome', $cols) ? 'nome' : 'nome_produto');
+                        $precoCol = in_array('preco_unitario', $cols) ? 'preco_unitario' : (in_array('valor_unitario', $cols) ? 'valor_unitario' : 'preco_unitario');
+                        $qtdCol = in_array('quantidade', $cols) ? 'quantidade' : 'quantidade';
+                        $hasProdutoId = in_array('produto_id', $cols);
+
+                        // NCM vem da tabela produtos via JOIN
+                        if ($hasProdutoId) {
+                            $sql = "SELECT i.{$nomeCol}, i.{$precoCol}, i.{$qtdCol}, p.ncm 
+                                    FROM {$itensTable} i 
+                                    LEFT JOIN produtos p ON p.id = i.produto_id 
+                                    WHERE i.pedido_id = ?";
+                        } else {
+                            $sql = "SELECT {$nomeCol}, {$precoCol}, {$qtdCol} FROM {$itensTable} WHERE pedido_id = ?";
+                        }
+
+                        $stItems = $this->connection->prepare($sql);
+                        $stItems->execute([$pedidoId]);
+                        $itemsRows = $stItems->fetchAll(\PDO::FETCH_ASSOC);
+                        error_log('[BRZ-PDF-FIX] pedido_id=' . $pedidoId . ' | items_found=' . count($itemsRows) . ' | sample=' . json_encode($itemsRows[0] ?? []));
+                        if (!empty($itemsRows)) {
+                            // Verificar moeda do pedido para conversão BRL→USD
+                            $brlToUsdRate = 1.0;
+                            try {
+                                $stMoeda = $this->connection->prepare("SELECT moeda FROM pedidos WHERE id = ? LIMIT 1");
+                                $stMoeda->execute([$pedidoId]);
+                                $moedaPedido = strtoupper(trim((string) ($stMoeda->fetchColumn() ?: 'USD')));
+                                if ($moedaPedido === 'BRL') {
+                                    $usdRate = $this->getUsdToBrlRate();
+                                    $brlToUsdRate = ($usdRate > 0.000001) ? (1.0 / $usdRate) : (1.0 / 5.85);
+                                }
+                            } catch (\Exception $e) {}
+
+                            $items = [];
+                            foreach ($itemsRows as $it) {
+                                $ncmDigits = preg_replace('/\D/', '', $it['ncm'] ?? '');
+                                $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : (strlen($ncmDigits) >= 6 ? substr($ncmDigits, 0, 6) : $ncmDigits);
+                                $val = (float) ($it[$precoCol] ?? 0);
+                                if ($moedaPedido === 'BRL' && $val > 0) $val = $val * $brlToUsdRate;
+                                if ($val < 0.01) $val = 0.01;
+                                $items[] = [
+                                    'hsCode' => $hs,
+                                    'description' => $it[$nomeCol] ?? 'Item',
+                                    'quantity' => (int) ($it[$qtdCol] ?? 1),
+                                    'value' => (float) number_format($val, 2, '.', ''),
+                                ];
+                            }
+                            $fixData['items'] = $items;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('[BRZ-PDF-FIX] ERRO itens: ' . $e->getMessage());
+                }
+
+                error_log('[BRZ-PDF-FIX] Chamando fixPackageMeta | fixData=' . json_encode($fixData));
+                $fixResp = $this->wp->fixPackageMeta($wpPostId, $fixData);
+                error_log('[BRZ-PDF-FIX] fixPackageMeta resp=' . json_encode($fixResp));
+            }
+        } catch (\Exception $e) {
+            error_log('[BRZ-PDF-FIX] ERRO geral: ' . $e->getMessage());
         }
 
         $result = $this->wp->downloadPackagePdf($wpPostId);
@@ -678,6 +857,27 @@ class AdminEtiquetasWpController extends Controller
                     }
                 }
                 unset($pkg);
+
+                // Enriquecer com nome do cliente a partir do banco local quando não veio da API
+                $pedidoIds = array_filter(array_map(function($p) { return $p['pedido_id_local'] ?? null; }, $resp['data']));
+                if (!empty($pedidoIds)) {
+                    $in3 = implode(',', array_fill(0, count($pedidoIds), '?'));
+                    try {
+                        $st3 = $this->connection->prepare("SELECT p.id, p.cliente_nome FROM pedidos p WHERE p.id IN ({$in3})");
+                        $st3->execute(array_values($pedidoIds));
+                        $mapNomes = [];
+                        foreach ($st3->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                            $mapNomes[(int) $row['id']] = $row['cliente_nome'] ?? '';
+                        }
+                        foreach ($resp['data'] as &$pkg) {
+                            $pid = $pkg['pedido_id_local'] ?? null;
+                            if ($pid && isset($mapNomes[$pid]) && empty($pkg['recipient_name'])) {
+                                $pkg['recipient_name'] = $mapNomes[$pid];
+                            }
+                        }
+                        unset($pkg);
+                    } catch (\Exception $e) {}
+                }
             } catch (\Exception $e) {}
         }
 
@@ -850,6 +1050,7 @@ class AdminEtiquetasWpController extends Controller
 
         $payload = array_merge($destinatario, [
             'customerControlCode' => substr($customerControlCode, 0, 100),
+            'pedidoIdLocal' => $pid,
             'totalWeight' => $totalWeight,
             'packagingLength' => (float) number_format($packagingLength, 2, '.', ''),
             'packagingWidth' => (float) number_format($packagingWidth, 2, '.', ''),

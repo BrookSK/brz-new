@@ -429,6 +429,9 @@ class LiveShoppingService {
                             if (in_array('status', $colsLista, true)) {
                                 $colsIns[] = 'status'; $valsIns[] = "'pendente'";
                             }
+                            if (in_array('data_solicitacao', $colsLista, true)) {
+                                $colsIns[] = 'data_solicitacao'; $valsIns[] = 'CURDATE()';
+                            }
 
                             $this->pdo->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
                         }

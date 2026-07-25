@@ -2159,6 +2159,7 @@ class PedidoEcommerce {
     private const STATUSES_EXIGEM_MEDIDAS = [
         'produto_consolidado',
         'consolidado',
+        'etiqueta_gerada',
         'em_transporte',
         'aguardando_liberacao_aduaneira',
         'enviado_ao_destinatario',
@@ -2313,12 +2314,11 @@ class PedidoEcommerce {
                                     $faltante = $qtdPedido - $qtdReservada;
                                     if ($faltante <= 0) continue;
 
-                                    // Descontar já comprados
+                                    // Pular se já comprado
                                     try {
-                                        $stQC = $this->connection->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                                        $stQC = $this->connection->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                                         $stQC->execute([$pedidoId, $produtoId]);
-                                        $faltante -= (int) ($stQC->fetchColumn() ?: 0);
-                                        if ($faltante <= 0) continue;
+                                        if ((int) ($stQC->fetchColumn() ?: 0) > 0) continue;
                                     } catch (\Exception $e) {}
 
                                     $colsIns = ['produto_id', 'pedido_id'];
@@ -2332,6 +2332,9 @@ class PedidoEcommerce {
                                     }
                                     if (in_array('status', $colsListaEc, true)) {
                                         $colsIns[] = 'status'; $valsIns[] = "'pendente'";
+                                    }
+                                    if (in_array('data_solicitacao', $colsListaEc, true)) {
+                                        $colsIns[] = 'data_solicitacao'; $valsIns[] = 'CURDATE()';
                                     }
 
                                     $this->connection->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);

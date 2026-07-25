@@ -4356,12 +4356,11 @@ class PaymentService {
                 $faltante = $qtdPedido - $qtdReservada;
                 if ($faltante <= 0) continue;
 
-                // Descontar já comprados
+                // Pular se já comprado
                 try {
-                    $stQC = $db->prepare("SELECT COALESCE(SUM(quantidade_faltante), 0) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
+                    $stQC = $db->prepare("SELECT COUNT(*) FROM lista_compras WHERE pedido_id = ? AND produto_id = ? AND status = 'comprado'");
                     $stQC->execute([$pedidoId, $produtoId]);
-                    $faltante -= (int) ($stQC->fetchColumn() ?: 0);
-                    if ($faltante <= 0) continue;
+                    if ((int) ($stQC->fetchColumn() ?: 0) > 0) continue;
                 } catch (\Exception $e) {}
 
                 // Inserir pendência
@@ -4376,6 +4375,9 @@ class PaymentService {
                 }
                 if (in_array('status', $colsLista, true)) {
                     $colsIns[] = 'status'; $valsIns[] = "'pendente'";
+                }
+                if (in_array('data_solicitacao', $colsLista, true)) {
+                    $colsIns[] = 'data_solicitacao'; $valsIns[] = 'CURDATE()';
                 }
 
                 $db->prepare('INSERT INTO lista_compras (' . implode(',', $colsIns) . ') VALUES (' . implode(',', $valsIns) . ')')->execute($paramsIns);
