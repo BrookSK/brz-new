@@ -353,12 +353,16 @@ class CarrinhoController extends Controller {
             $tipoItem = $item['tipo_item'] ?? 'produto';
             $itemProdutoId = (int) ($item['produto_id'] ?? 0);
             if ($tipoItem === 'pacote_redirecionamento' || $tipoItem === 'fatura_adicional' || $itemProdutoId >= 999990 || $itemProdutoId <= 0) {
-                $itemKey = $k;
-                $isAtivo = $this->getItemAtivoFromSession('pacote_' . ($item['pacote_id'] ?? ($item['fatura_adicional_id'] ?? $k)));
+                $varIdPacoteLoop = (int) ($item['produto_variacao_id'] ?? 0);
+                $itemKeyStablePacote = ((string) $itemProdutoId) . ':' . ((string) $varIdPacoteLoop);
+                $isAtivo = $this->getItemAtivoFromSession($itemKeyStablePacote);
                 $pesoUnit = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? 0));
                 $pesoItem = $pesoUnit * (int) ($item['quantidade'] ?? 1);
                 $itemPrice = (float) ($item['price'] ?? ($item['preco_unitario'] ?? 0));
                 $itemSubtotal = $itemPrice * (int) ($item['quantidade'] ?? 1);
+                // Para pacotes, usar declaration_value como base para impostos
+                $declarationValueItem = (float) ($item['declaration_value'] ?? 0);
+                $subtotalParaCalculo = $declarationValueItem > 0 ? $declarationValueItem * (int) ($item['quantidade'] ?? 1) : $itemSubtotal;
 
                 $fotoUrl = $item['foto_url'] ?? null;
                 if (empty($fotoUrl)) {
@@ -389,7 +393,7 @@ class CarrinhoController extends Controller {
 
                 $totalItensAll += (int) ($item['quantidade'] ?? 0);
                 if ($isAtivo) {
-                    $subtotal += $itemSubtotal;
+                    $subtotal += $subtotalParaCalculo;
                     $pesoTotal += $pesoItem;
                     $totalItensAtivos += (int) ($item['quantidade'] ?? 0);
                 }
