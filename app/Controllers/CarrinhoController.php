@@ -356,6 +356,7 @@ class CarrinhoController extends Controller {
                 $varIdPacoteLoop = (int) ($item['produto_variacao_id'] ?? 0);
                 $itemKeyStablePacote = ((string) $itemProdutoId) . ':' . ((string) $varIdPacoteLoop);
                 $isAtivo = $this->getItemAtivoFromSession($itemKeyStablePacote);
+                error_log('[CARRINHO_PACOTE] key=' . $itemKeyStablePacote . ' isAtivo=' . ($isAtivo ? '1' : '0') . ' session=' . json_encode($_SESSION['carrinho_itens_ativos'] ?? []));
                 $pesoUnit = (float) ($item['stored_peso_unit'] ?? ($item['peso_kg'] ?? 0));
                 $pesoItem = $pesoUnit * (int) ($item['quantidade'] ?? 1);
                 $itemPrice = (float) ($item['price'] ?? ($item['preco_unitario'] ?? 0));
