@@ -6637,6 +6637,70 @@ HTML;
 
             // Enviar e-mail quando status muda para invoice_liberado
             if ($novoStatusKey === 'invoice_liberado') {
+                // Criar invoice se não existir
+                try {
+                    $stInvCheck = $pdo->prepare("SELECT id FROM pedido_invoices WHERE pedido_id = ? AND status = 'liberado' LIMIT 1");
+                    $stInvCheck->execute([(int) $id]);
+                    if (!$stInvCheck->fetchColumn()) {
+                        // Criar registro do invoice
+                        $stInvCreate = $pdo->prepare("INSERT INTO pedido_invoices (pedido_id, status, liberado_em) VALUES (?, 'liberado', NOW())");
+                        $stInvCreate->execute([(int) $id]);
+                        $novoInvoiceId = (int) $pdo->lastInsertId();
+
+                        // Copiar itens do pedido para pedido_invoice_items
+                        $itensTableInv = 'pedido_itens';
+                        try {
+                            $stT = $pdo->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'pedido_itens' LIMIT 1");
+                            $stT->execute();
+                            if (!$stT->fetchColumn()) $itensTableInv = 'pedido_items';
+                        } catch (\Throwable $e) {}
+
+                        $stItens = $pdo->prepare("SELECT * FROM {$itensTableInv} WHERE pedido_id = ?");
+                        $stItens->execute([(int) $id]);
+                        $itensInv = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                        foreach ($itensInv as $itInv) {
+                            $nomeInvItem = $itInv['nome_produto'] ?? ($itInv['produto_nome'] ?? ($itInv['nome'] ?? ($itInv['nome_item'] ?? 'Produto')));
+                            $ncmInv = $itInv['ncm'] ?? '';
+                            $declInv = (float) ($itInv['declaration_value'] ?? ($itInv['preco_unitario'] ?? ($itInv['valor_unitario'] ?? 0)));
+                            $pesoInv = (float) ($itInv['peso_kg'] ?? ($itInv['peso'] ?? 0));
+                            $qtdInv = (int) ($itInv['quantidade'] ?? 1);
+                            $pacoteIdInv = $itInv['pacote_id'] ?? null;
+                            $fotoInv = $itInv['foto_url'] ?? null;
+
+                            // Buscar dados do pacote se disponível
+                            if (!empty($pacoteIdInv)) {
+                                try {
+                                    $stPac = $pdo->prepare('SELECT nome, ncm, foto_url, peso_kg FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                                    $stPac->execute([(int) $pacoteIdInv]);
+                                    $pacRow = $stPac->fetch(\PDO::FETCH_ASSOC);
+                                    if ($pacRow) {
+                                        if (empty($nomeInvItem) || strpos($nomeInvItem, 'Produto #') === 0) $nomeInvItem = $pacRow['nome'];
+                                        if (empty($ncmInv)) $ncmInv = $pacRow['ncm'] ?? '';
+                                        if (empty($fotoInv)) $fotoInv = $pacRow['foto_url'];
+                                        if ($pesoInv <= 0) $pesoInv = (float) ($pacRow['peso_kg'] ?? 0);
+                                    }
+                                } catch (\Throwable $e) {}
+                            }
+
+                            $stInsInv = $pdo->prepare(
+                                "INSERT INTO pedido_invoice_items (invoice_id, pedido_item_id, pacote_id, nome_produto, ncm, declaration_value, peso_kg, quantidade, foto_url)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                            );
+                            $stInsInv->execute([
+                                $novoInvoiceId,
+                                $itInv['id'] ?? null,
+                                $pacoteIdInv,
+                                $nomeInvItem,
+                                $ncmInv,
+                                $declInv,
+                                $pesoInv,
+                                $qtdInv,
+                                $fotoInv,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {}
+
                 try {
                     $stUser = $pdo->prepare('SELECT u.nome, u.email FROM usuarios u INNER JOIN pedidos p ON p.usuario_id = u.id WHERE p.id = ? LIMIT 1');
                     $stUser->execute([(int) $id]);
