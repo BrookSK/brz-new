@@ -247,6 +247,7 @@ class CarrinhoController extends Controller {
                         'fatura_adicional_id' => $faturaId > 0 ? $faturaId : null,
                         'declaration_value' => isset($it['declaration_value']) ? (float) $it['declaration_value'] : null,
                         'foto_url' => $it['foto_url'] ?? null,
+                        'comprovante_url' => $it['comprovante_url'] ?? null,
                         'carrinho_item_id' => (int) ($it['id'] ?? 0),
                         'ativo' => 1,
                     ];
@@ -947,6 +948,79 @@ class CarrinhoController extends Controller {
         } catch (\Throwable $e) {
             $this->json(['success' => false, 'error' => 'Erro ao salvar'], 500);
         }
+    }
+
+    /**
+     * Upload de comprovante de compra para item de redirecionamento
+     * POST /carrinho/upload-comprovante
+     */
+    public function uploadComprovante(Request $request): void {
+        session_start();
+
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        if ($itemId <= 0) {
+            $this->json(['success' => false, 'error' => 'Item inválido'], 400);
+            return;
+        }
+
+        $uid = $this->getLoggedUserId();
+        if ($uid <= 0) {
+            $this->json(['success' => false, 'error' => 'Não autenticado'], 401);
+            return;
+        }
+
+        if (empty($_FILES['comprovante']) || $_FILES['comprovante']['error'] !== UPLOAD_ERR_OK) {
+            $this->json(['success' => false, 'error' => 'Nenhum arquivo enviado'], 400);
+            return;
+        }
+
+        $file = $_FILES['comprovante'];
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+        if (!in_array($file['type'], $allowedTypes, true)) {
+            $this->json(['success' => false, 'error' => 'Tipo de arquivo não permitido. Use imagem ou PDF.'], 400);
+            return;
+        }
+
+        // Max 10MB
+        if ($file['size'] > 10 * 1024 * 1024) {
+            $this->json(['success' => false, 'error' => 'Arquivo muito grande (max 10MB)'], 400);
+            return;
+        }
+
+        $uploadDir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/comprovantes/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0775, true);
+        }
+
+        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = 'comprovante_' . $uid . '_' . $itemId . '_' . time() . '.' . $ext;
+        $destino = $uploadDir . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            $this->json(['success' => false, 'error' => 'Erro ao salvar arquivo'], 500);
+            return;
+        }
+
+        $url = '/uploads/comprovantes/' . $filename;
+
+        // Salvar URL no carrinho_items
+        try {
+            $db = \Config\Database::getConnection();
+            $stmt = $db->prepare('UPDATE carrinho_items SET comprovante_url = ? WHERE id = ?');
+            $stmt->execute([$url, $itemId]);
+        } catch (\Throwable $e) {
+            // Tentar adicionar coluna se não existir
+            try {
+                $db->exec("ALTER TABLE carrinho_items ADD COLUMN comprovante_url TEXT NULL");
+                $stmt = $db->prepare('UPDATE carrinho_items SET comprovante_url = ? WHERE id = ?');
+                $stmt->execute([$url, $itemId]);
+            } catch (\Throwable $e2) {
+                $this->json(['success' => false, 'error' => 'Erro ao salvar no banco'], 500);
+                return;
+            }
+        }
+
+        $this->json(['success' => true, 'url' => $url]);
     }
 
     public function toggleAtivo(Request $request) {

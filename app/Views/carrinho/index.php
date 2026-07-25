@@ -161,6 +161,23 @@
                                                        onchange="salvarDeclarationValue(this)">
                                             </div>
                                             <small class="text-muted">Obrigatório para prosseguir ao checkout.</small>
+
+                                            <label class="form-label small fw-bold mb-1 mt-2 text-primary">
+                                                <i class="fas fa-file-image me-1"></i>Comprovante de Compra *
+                                            </label>
+                                            <?php if (!empty($item['comprovante_url'])): ?>
+                                                <div class="mb-1">
+                                                    <a href="<?= htmlspecialchars($item['comprovante_url']) ?>" target="_blank" class="btn btn-sm btn-outline-success">
+                                                        <i class="fas fa-eye me-1"></i>Ver comprovante
+                                                    </a>
+                                                    <small class="text-success ms-1"><i class="fas fa-check"></i> Enviado</small>
+                                                </div>
+                                            <?php endif; ?>
+                                            <input type="file" class="form-control form-control-sm" 
+                                                   accept="image/*,.pdf"
+                                                   data-item-id="<?= (int)($item['carrinho_item_id'] ?? 0) ?>"
+                                                   onchange="uploadComprovante(this)">
+                                            <small class="text-muted">Imagem ou PDF do comprovante.</small>
                                         </div>
                                     <?php endif; ?>
 
@@ -877,6 +894,44 @@ function salvarDeclarationValue(input) {
     })
     .catch(() => {
         input.classList.add('is-invalid');
+    });
+}
+
+// Upload comprovante de compra
+function uploadComprovante(input) {
+    const itemId = input.dataset.itemId;
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('comprovante', file);
+    formData.append('item_id', itemId);
+
+    input.disabled = true;
+    fetch('/carrinho/upload-comprovante', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        input.disabled = false;
+        if (data.success) {
+            // Adicionar link de visualização
+            const container = input.parentElement;
+            let viewLink = container.querySelector('.comprovante-link');
+            if (!viewLink) {
+                viewLink = document.createElement('div');
+                viewLink.className = 'comprovante-link mt-1';
+                input.before(viewLink);
+            }
+            viewLink.innerHTML = '<a href="' + data.url + '" target="_blank" class="btn btn-sm btn-outline-success"><i class="fas fa-eye me-1"></i>Ver comprovante</a> <small class="text-success ms-1"><i class="fas fa-check"></i> Enviado</small>';
+        } else {
+            alert(data.error || 'Erro ao enviar comprovante.');
+        }
+    })
+    .catch(() => {
+        input.disabled = false;
+        alert('Erro ao enviar. Tente novamente.');
     });
 }
 </script>

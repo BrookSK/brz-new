@@ -31,6 +31,7 @@ $router->post('/carrinho/remover', 'CarrinhoController', 'remover');
 $router->post('/carrinho/atualizar', 'CarrinhoController', 'atualizar');
 $router->post('/carrinho/toggle-ativo', 'CarrinhoController', 'toggleAtivo');
 $router->post('/carrinho/declaration-value', 'CarrinhoController', 'salvarDeclarationValue');
+$router->post('/carrinho/upload-comprovante', 'CarrinhoController', 'uploadComprovante');
 $router->post('/carrinho/limpar', 'CarrinhoController', 'limpar');
 $router->get('/carrinho/checkout', 'CarrinhoController', 'checkout');
 
