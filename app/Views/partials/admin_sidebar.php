@@ -256,6 +256,7 @@ function renderAdminSidebar($activePage = '') {
         'live-shop-orders' => ['icon' => 'fas fa-shopping-bag', 'label' => 'Pedidos da Live', 'url' => '/admin/live-shop/orders', 'roles' => ['admin', 'vendedor']],
         'live-shop-reports' => ['icon' => 'fas fa-chart-line', 'label' => 'Relatórios', 'url' => '/admin/live-shop/reports', 'roles' => ['admin', 'vendedor']],
         'quickbooks' => ['icon' => 'fas fa-calculator', 'label' => 'QuickBooks', 'url' => '/admin/quickbooks', 'roles' => ['admin']],
+        'marketing-calendario' => ['icon' => 'fas fa-calendar-alt', 'label' => 'Calendário', 'url' => '/admin/marketing-calendar', 'roles' => ['admin']],
         'email-marketing' => ['icon' => 'fas fa-envelope-open-text', 'label' => 'Email Marketing', 'url' => '/admin/email-marketing', 'roles' => ['admin']],
         'cart-recovery' => ['icon' => 'fas fa-cart-arrow-down', 'label' => 'Recuperação Carrinho', 'url' => '/admin/cart-recovery', 'roles' => ['admin','vendedor']],
         'mapa-calor-site' => ['icon' => 'fas fa-fire', 'label' => 'Mapa de Calor', 'url' => '/admin/mapa-calor-site', 'roles' => ['admin']],
@@ -449,7 +450,7 @@ function renderAdminSidebar($activePage = '') {
                 'Financeiro' => ['icon' => 'fas fa-credit-card', 'items' => ['pagamentos', 'relatorio-geral', 'despesas', 'comissoes-global', 'clube-recargas', 'quickbooks']],
                 'Demandas' => ['icon' => 'fas fa-tasks', 'items' => ['demandas-minhas', 'demandas-nova', 'demandas-painel', 'demandas-concluidos', 'demandas-arquivados']],
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
-                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['email-marketing', 'cart-recovery', 'mapa-calor-site']],
+                'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
                 'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'carteira-config', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];

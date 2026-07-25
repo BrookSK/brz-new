@@ -6,6 +6,11 @@ $router->get('/admin/dashboard', 'AdminDashboardController', 'index');
 
 // Marketing Calendar
 $router->get('/admin/marketing-calendar/dates', 'AdminMarketingCalendarController', 'getDates');
+$router->get('/admin/marketing-calendar', 'AdminMarketingCalendarController', 'index');
+$router->post('/admin/marketing-calendar/salvar', 'AdminMarketingCalendarController', 'salvar');
+$router->post('/admin/marketing-calendar/excluir', 'AdminMarketingCalendarController', 'excluir');
+$router->post('/admin/marketing-calendar/toggle', 'AdminMarketingCalendarController', 'toggle');
+$router->post('/admin/marketing-calendar/gerar-ia', 'AdminMarketingCalendarController', 'gerarIA');
 
 // Produtos
 $router->get('/admin/produtos', 'AdminProdutosController', 'index');
