@@ -2310,18 +2310,27 @@ class CheckoutController extends Controller {
                         if ($qtd < 1) $qtd = 1;
                         $vu = (float) ($it['unit_price'] ?? ($it['valor_unitario'] ?? ($it['preco_unitario'] ?? 0)));
                         $sub = (float) ($it['subtotal'] ?? ($vu * $qtd));
+                        $tipoItemC = (string) ($it['tipo_item'] ?? 'produto');
                         $out[$key] = [
                             'produto_id' => $pid,
                             'produto_variacao_id' => ($pvId > 0 ? $pvId : null),
                             'variacao_descricao' => $it['variacao_descricao'] ?? null,
-                            'nome' => $it['nome'] ?? null,
+                            'nome' => $it['nome_item'] ?? ($it['nome'] ?? null),
+                            'name' => $it['nome_item'] ?? ($it['nome'] ?? null),
                             'price' => $vu,
                             'preco_unitario' => $vu,
                             'quantidade' => $qtd,
                             'subtotal' => $sub,
-                            'peso' => 0.0,
+                            'peso' => (float) ($it['peso_kg'] ?? 0),
+                            'peso_kg' => (float) ($it['peso_kg'] ?? 0),
                             'is_free_offer' => (int) ($it['is_free_offer'] ?? 0),
                             'free_offer_original_price' => isset($it['free_offer_original_price']) ? (float) $it['free_offer_original_price'] : null,
+                            'tipo_item' => $tipoItemC,
+                            'pacote_id' => isset($it['pacote_id']) ? (int) $it['pacote_id'] : null,
+                            'fatura_adicional_id' => isset($it['fatura_adicional_id']) ? (int) $it['fatura_adicional_id'] : null,
+                            'declaration_value' => isset($it['declaration_value']) ? (float) $it['declaration_value'] : null,
+                            'foto_url' => $it['foto_url'] ?? null,
+                            'comprovante_url' => $it['comprovante_url'] ?? null,
                         ];
                     }
 
