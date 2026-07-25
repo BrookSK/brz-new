@@ -164,6 +164,9 @@ class InvoiceController extends Controller {
         // Atualizar status dos pacotes vinculados
         $this->atualizarStatusPacotes($pedidoId, 'invoice_confirmado');
 
+        // Notificar admins
+        $this->notificarAdmins($pedidoId, $usuario, 'confirmado');
+
         $this->setFlash('Invoice confirmado com sucesso! Seus dados foram salvos para a etiqueta de envio.', 'success');
         $this->redirect('/meus-pedidos');
     }
@@ -215,6 +218,9 @@ class InvoiceController extends Controller {
 
         // Atualizar status dos pacotes vinculados
         $this->atualizarStatusPacotes($pedidoId, 'invoice_contestado');
+
+        // Notificar admins
+        $this->notificarAdmins($pedidoId, $usuario, 'contestado', $motivo);
 
         $this->setFlash('Invoice contestado. Nossa equipe irá analisar e ajustar.', 'info');
         $this->redirect('/meus-pedidos');
@@ -281,6 +287,59 @@ class InvoiceController extends Controller {
             $st->execute([$status, $pedidoId]);
         } catch (\Throwable $e) {
             error_log('[Invoice] Erro ao atualizar pacotes: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Notificar todos os admins/vendedores sobre ação no invoice
+     */
+    private function notificarAdmins(int $pedidoId, array $cliente, string $acao, string $motivo = ''): void {
+        try {
+            // Buscar todos os admins/vendedores
+            $st = $this->connection->prepare("SELECT email, nome FROM usuarios WHERE perfil IN ('admin', 'vendedor') AND email IS NOT NULL AND email != ''");
+            $st->execute();
+            $admins = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            if (empty($admins)) return;
+
+            $nomeCliente = htmlspecialchars($cliente['nome'] ?? 'Cliente');
+            $emailCliente = htmlspecialchars($cliente['email'] ?? '');
+            $linkPedido = 'https://brazilianashop.com.br/admin/pedidos/editar/' . $pedidoId;
+
+            if ($acao === 'confirmado') {
+                $assunto = 'Invoice Confirmado - Pedido #' . $pedidoId;
+                $corpo = '<h2 style="color:#28a745;">Invoice Confirmado</h2>'
+                    . '<p>O cliente <strong>' . $nomeCliente . '</strong> (' . $emailCliente . ') confirmou os dados do invoice do pedido <strong>#' . $pedidoId . '</strong>.</p>'
+                    . '<p><strong>O pedido está pronto para gerar etiqueta.</strong></p>';
+            } else {
+                $assunto = 'Invoice Contestado - Pedido #' . $pedidoId;
+                $motivoHtml = htmlspecialchars($motivo);
+                $corpo = '<h2 style="color:#dc3545;">Invoice Contestado</h2>'
+                    . '<p>O cliente <strong>' . $nomeCliente . '</strong> (' . $emailCliente . ') contestou o invoice do pedido <strong>#' . $pedidoId . '</strong>.</p>'
+                    . '<div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:5px;padding:15px;margin:15px 0;"><strong>Motivo:</strong><br>' . $motivoHtml . '</div>'
+                    . '<p>Ajuste os dados e re-libere o invoice.</p>';
+            }
+
+            $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:0 auto;">'
+                . '<div style="background:#1a3a5c;padding:20px;text-align:center;"><h1 style="color:#fff;margin:0;font-size:22px;">Braziliana</h1></div>'
+                . '<div style="padding:30px 20px;">' . $corpo
+                . '<p style="text-align:center;margin-top:25px;"><a href="' . $linkPedido . '" style="background:#1a3a5c;color:#fff;text-decoration:none;padding:12px 30px;border-radius:5px;display:inline-block;">Ver Pedido no Admin</a></p>'
+                . '</div></body></html>';
+
+            $emailService = new \App\Services\EmailService();
+            foreach ($admins as $admin) {
+                try {
+                    $emailService->send(
+                        $admin['email'],
+                        $assunto,
+                        $html,
+                        'invoice_' . $acao . '_admin_' . $pedidoId . '_' . md5($admin['email']),
+                        ['evento' => 'invoice_' . $acao . '_admin', 'pedido_id' => $pedidoId]
+                    );
+                } catch (\Throwable $e) {}
+            }
+        } catch (\Throwable $e) {
+            error_log('[Invoice] Erro ao notificar admins: ' . $e->getMessage());
         }
     }
 
