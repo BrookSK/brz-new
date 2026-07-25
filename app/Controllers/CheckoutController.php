@@ -3285,11 +3285,23 @@ class CheckoutController extends Controller {
 
         // Validar valor mínimo de produtos (USD 5.00) — sempre em USD
         $subtotalCheckUsd = 0;
+        $temPacoteRedirecionamento = false;
+        $temProdutoNormal = false;
         $db = \Config\Database::getConnection();
         foreach ($carrinho as $cItem) {
             $pid = (int) ($cItem['produto_id'] ?? 0);
             $q = (int) ($cItem['quantidade'] ?? 1);
             if ($q < 1) $q = 1;
+
+            // Itens de pacote: não contam para o mínimo de produtos
+            $tipoItemCheck = $cItem['tipo_item'] ?? 'produto';
+            if ($tipoItemCheck === 'pacote_redirecionamento' || $tipoItemCheck === 'fatura_adicional' || $pid >= 999990) {
+                $temPacoteRedirecionamento = true;
+                continue;
+            }
+
+            $temProdutoNormal = true;
+
             // Buscar preço original em USD direto do produto
             $precoUsd = 0;
             if ($pid > 0) {
@@ -3310,7 +3322,7 @@ class CheckoutController extends Controller {
             }
             $subtotalCheckUsd += $precoUsd * $q;
         }
-        if ($subtotalCheckUsd < 5.00) {
+        if ($subtotalCheckUsd < 5.00 && $temProdutoNormal) {
             $this->json([
                 'error' => 'O valor mínimo de produtos para processamento é de $5.00 (USD). Seu subtotal atual é $' . number_format($subtotalCheckUsd, 2, '.', ',') . '.'
             ], 400);
