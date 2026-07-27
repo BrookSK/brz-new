@@ -231,6 +231,9 @@ $router->get('/admin/produtos/busca-ajax', 'AdminProdutosController', 'buscaAjax
 $router->get('/admin/configuracoes', 'AdminConfiguracoesController', 'index');
 $router->post('/admin/configuracoes/salvar', 'AdminConfiguracoesController', 'salvar');
 
+// Health Check — Câmbio Real
+$router->get('/admin/cambioreal-health', 'AdminCambioRealHealthController', 'index');
+
 // Configuração da Carteira (cobertura parcial)
 $router->get('/admin/carteira-config', 'AdminCarteiraConfigController', 'index');
 $router->post('/admin/carteira-config/salvar', 'AdminCarteiraConfigController', 'salvar');

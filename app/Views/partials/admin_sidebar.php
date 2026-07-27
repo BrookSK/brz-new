@@ -261,6 +261,7 @@ function renderAdminSidebar($activePage = '') {
         'cart-recovery' => ['icon' => 'fas fa-cart-arrow-down', 'label' => 'Recuperação Carrinho', 'url' => '/admin/cart-recovery', 'roles' => ['admin','vendedor']],
         'mapa-calor-site' => ['icon' => 'fas fa-fire', 'label' => 'Mapa de Calor', 'url' => '/admin/mapa-calor-site', 'roles' => ['admin']],
         'configuracoes' => ['icon' => 'fas fa-cog', 'label' => __('admin.menu.settings', 'Configurações'), 'url' => '/admin/configuracoes', 'roles' => ['admin']],
+        'cambioreal-health' => ['icon' => 'fas fa-heartbeat', 'label' => 'Câmbio Real Health', 'url' => '/admin/cambioreal-health', 'roles' => ['admin']],
         'carteira-config' => ['icon' => 'fas fa-wallet', 'label' => 'Config. Carteira', 'url' => '/admin/carteira-config', 'roles' => ['admin']],
         'email-logs' => ['icon' => 'fas fa-envelope', 'label' => 'Log de Emails', 'url' => '/admin/emails', 'roles' => ['admin']],
         'descontos' => ['icon' => 'fas fa-tag', 'label' => 'Autorizações Desconto', 'url' => '/admin/configuracoes/desconto/painel', 'roles' => ['admin']],

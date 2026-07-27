@@ -1081,6 +1081,128 @@ class PaymentService {
         return (string) $this->getCambioRealBaseUrl();
     }
 
+    /**
+     * Testa a conectividade com as duas contas Câmbio Real (Produtos e Taxas).
+     * Retorna um array com o resultado de cada conta.
+     */
+    public function testCambioRealConnectivity(): array {
+        $results = [];
+
+        // --- Conta 1: Produtos ---
+        $results['produtos'] = $this->testSingleCambioRealAccount(
+            'Câmbio Real (Produtos)',
+            $this->cambioRealEnabled,
+            $this->cambioRealAppId,
+            $this->cambioRealAppSecret,
+            $this->getCambioRealBaseUrl()
+        );
+
+        // --- Conta 2: Taxas ---
+        $results['taxas'] = $this->testSingleCambioRealAccount(
+            'Câmbio Real (Taxas)',
+            (!empty($this->cambioRealTaxasAppId) && !empty($this->cambioRealTaxasAppSecret)) ? '1' : '0',
+            $this->cambioRealTaxasAppId ?? '',
+            $this->cambioRealTaxasAppSecret ?? '',
+            $this->getCambioRealBaseUrl()
+        );
+
+        return $results;
+    }
+
+    /**
+     * Testa conectividade com uma conta individual do Câmbio Real.
+     */
+    private function testSingleCambioRealAccount(string $label, string $enabled, string $appId, string $appSecret, string $baseUrl): array {
+        $result = [
+            'label' => $label,
+            'enabled' => in_array(strtolower(trim($enabled)), ['1', 'true', 'yes', 'on'], true),
+            'configured' => !empty($appId) && !empty($appSecret),
+            'base_url' => $baseUrl,
+            'app_id_masked' => strlen($appId) > 4 ? substr($appId, 0, 4) . '****' : '(vazio)',
+            'status' => 'unknown',
+            'http_code' => null,
+            'latency_ms' => null,
+            'error' => null,
+        ];
+
+        if (!$result['configured']) {
+            $result['status'] = 'not_configured';
+            $result['error'] = 'APP ID ou APP SECRET não configurados.';
+            return $result;
+        }
+
+        if (!$result['enabled']) {
+            $result['status'] = 'disabled';
+            $result['error'] = 'Gateway desabilitado nas configurações.';
+            return $result;
+        }
+
+        // Fazer uma requisição leve (GET /service/v1/checkout/list com limit=1)
+        $url = rtrim($baseUrl, '/') . '/service/v1/checkout/list?limit=1';
+        $auth = base64_encode($appId . ':' . $appSecret);
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json; charset=utf-8',
+            'Authorization: Basic ' . $auth,
+            'X-APP-ID: ' . $appId,
+            'X-APP-SECRET: ' . $appSecret,
+            'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
+        ];
+
+        $start = microtime(true);
+
+        try {
+            if (!function_exists('curl_init')) {
+                $result['status'] = 'error';
+                $result['error'] = 'Extensão cURL não disponível no servidor.';
+                return $result;
+            }
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            $respBody = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            $latency = round((microtime(true) - $start) * 1000);
+            $result['latency_ms'] = $latency;
+            $result['http_code'] = $httpCode;
+
+            if (!empty($err)) {
+                $result['status'] = 'error';
+                $result['error'] = 'Erro de conexão: ' . $err;
+                return $result;
+            }
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                $result['status'] = 'ok';
+                return $result;
+            }
+
+            if (in_array($httpCode, [401, 403], true)) {
+                $result['status'] = 'auth_failed';
+                $result['error'] = 'Credenciais inválidas ou Base URL incorreta (HTTP ' . $httpCode . ').';
+                return $result;
+            }
+
+            // Qualquer outro erro
+            $decoded = json_decode((string) $respBody, true);
+            $msg = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : '';
+            $result['status'] = 'error';
+            $result['error'] = 'HTTP ' . $httpCode . ($msg !== '' ? ': ' . $msg : '');
+            return $result;
+        } catch (\Exception $e) {
+            $result['status'] = 'error';
+            $result['latency_ms'] = round((microtime(true) - $start) * 1000);
+            $result['error'] = $e->getMessage();
+            return $result;
+        }
+    }
+
     private function getCambioRealBaseUrl(): string {
         $base = trim((string) ($this->cambioRealBaseUrl ?? ''));
         if ($base !== '') {
