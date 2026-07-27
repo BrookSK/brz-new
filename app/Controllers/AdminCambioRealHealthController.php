@@ -136,6 +136,12 @@ class AdminCambioRealHealthController extends Controller
                             </td>
                         </tr>
                         <?php endif; ?>
+                        <?php if (!empty($account['exchange_rate'])): ?>
+                        <tr>
+                            <td class="text-muted">Câmbio (USD→BRL)</td>
+                            <td><strong>R$ <?= number_format($account['exchange_rate'], 4, ',', '.') ?></strong></td>
+                        </tr>
+                        <?php endif; ?>
                         <?php if (!empty($account['error'])): ?>
                         <tr>
                             <td class="text-muted">Detalhe</td>
@@ -151,7 +157,7 @@ class AdminCambioRealHealthController extends Controller
 
     <div class="mt-4 text-center text-muted" style="font-size: 0.8rem;">
         Verificado em <?= date('d/m/Y H:i:s') ?> &bull; 
-        O teste faz uma requisição GET leve ao endpoint <code>/service/v1/checkout/list</code> para validar autenticação.
+        O teste usa o endpoint <code>/service/v1/checkout/simulator</code> para validar autenticação e retornar o câmbio atual.
     </div>
 </div>
 </body>

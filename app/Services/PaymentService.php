@@ -1137,8 +1137,9 @@ class PaymentService {
             return $result;
         }
 
-        // Fazer uma requisição leve (GET /service/v1/checkout/list com limit=1)
-        $url = rtrim($baseUrl, '/') . '/service/v1/checkout/list?limit=1';
+        // Usar o endpoint /service/v1/checkout/simulator que é leve, não cria cobrança,
+        // e valida autenticação corretamente. Retorna dados do câmbio se OK, ou 401 se credenciais erradas.
+        $url = rtrim($baseUrl, '/') . '/service/v1/checkout/simulator';
         $auth = base64_encode($appId . ':' . $appSecret);
         $headers = [
             'Accept: application/json',
@@ -1148,6 +1149,14 @@ class PaymentService {
             'X-APP-SECRET: ' . $appSecret,
             'User-Agent: brz-new/1.0 (+https://brazilianashop.com)',
         ];
+
+        // Payload mínimo para simular uma conversão
+        $testPayload = json_encode([
+            'amount' => 100,
+            'currency' => 'USD',
+            'take_rates' => 0,
+            'payment_method' => 'pix',
+        ], JSON_UNESCAPED_UNICODE);
 
         $start = microtime(true);
 
@@ -1160,6 +1169,8 @@ class PaymentService {
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $testPayload);
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
@@ -1178,19 +1189,44 @@ class PaymentService {
                 return $result;
             }
 
+            $decoded = json_decode((string) $respBody, true);
+
+            // 401/403 = credenciais inválidas ou IP não autorizado
+            if (in_array($httpCode, [401, 403], true)) {
+                $result['status'] = 'auth_failed';
+                $msg = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : '';
+                $code = is_array($decoded) && isset($decoded['code']) ? (string) $decoded['code'] : '';
+                $detail = $code !== '' ? $code : 'HTTP ' . $httpCode;
+                if ($msg !== '') $detail .= ' — ' . $msg;
+                $result['error'] = 'Credenciais inválidas ou acesso bloqueado (' . $detail . ').';
+                return $result;
+            }
+
+            // 200 com status=success = tudo OK
             if ($httpCode >= 200 && $httpCode < 300) {
+                if (is_array($decoded) && ($decoded['status'] ?? '') === 'success') {
+                    $result['status'] = 'ok';
+                    // Extrair taxa de câmbio se disponível
+                    $data = $decoded['data'] ?? [];
+                    if (is_array($data) && isset($data['rate'])) {
+                        $result['exchange_rate'] = (float) $data['rate'];
+                    }
+                    return $result;
+                }
+                // 200 mas status != success (improvável, mas trata)
                 $result['status'] = 'ok';
                 return $result;
             }
 
-            if (in_array($httpCode, [401, 403], true)) {
-                $result['status'] = 'auth_failed';
-                $result['error'] = 'Credenciais inválidas ou Base URL incorreta (HTTP ' . $httpCode . ').';
+            // 5xx = servidor do Câmbio Real com problema
+            if ($httpCode >= 500) {
+                $msg = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : '';
+                $result['status'] = 'error';
+                $result['error'] = 'Servidor Câmbio Real com erro interno (HTTP ' . $httpCode . ')' . ($msg !== '' ? ': ' . $msg : '');
                 return $result;
             }
 
-            // Qualquer outro erro
-            $decoded = json_decode((string) $respBody, true);
+            // Outros erros (4xx exceto 401/403)
             $msg = is_array($decoded) && isset($decoded['message']) ? (string) $decoded['message'] : '';
             $result['status'] = 'error';
             $result['error'] = 'HTTP ' . $httpCode . ($msg !== '' ? ': ' . $msg : '');
