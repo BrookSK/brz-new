@@ -1527,7 +1527,7 @@ class AdminComprasController extends Controller {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Compras - Braziliana Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
     #lojaDropdownWrapper { flex: 1; }
@@ -1746,6 +1746,31 @@ class AdminComprasController extends Controller {
                     applyBtn.addEventListener("click", function() {
                         aplicarFiltro();
                     });
+
+                    // Fallback: forçar dropdown a funcionar caso Bootstrap não inicialize corretamente
+                    var dropBtn = document.getElementById("lojaDropdownBtn");
+                    var dropMenu = dropBtn ? dropBtn.nextElementSibling : null;
+                    if (dropBtn && dropMenu) {
+                        dropBtn.addEventListener("click", function(e) {
+                            e.stopPropagation();
+                            // Se Bootstrap dropdown não abriu, forçar manualmente
+                            setTimeout(function() {
+                                if (!dropMenu.classList.contains("show")) {
+                                    dropMenu.classList.add("show");
+                                    dropBtn.classList.add("show");
+                                    dropBtn.setAttribute("aria-expanded", "true");
+                                }
+                            }, 50);
+                        });
+                        // Fechar ao clicar fora
+                        document.addEventListener("click", function(e) {
+                            if (!dropBtn.contains(e.target) && !dropMenu.contains(e.target)) {
+                                dropMenu.classList.remove("show");
+                                dropBtn.classList.remove("show");
+                                dropBtn.setAttribute("aria-expanded", "false");
+                            }
+                        });
+                    }
                 });
                 </script>';
 
