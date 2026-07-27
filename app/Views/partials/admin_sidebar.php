@@ -453,7 +453,7 @@ function renderAdminSidebar($activePage = '') {
                 'Live Shop' => ['icon' => 'fas fa-video', 'items' => ['live-shop', 'live-shop-create', 'live-shop-orders', 'live-shop-reports']],
                 'Marketing' => ['icon' => 'fas fa-bullhorn', 'items' => ['marketing-calendario', 'email-marketing', 'cart-recovery', 'mapa-calor-site']],
                 'Redirecionamento' => ['icon' => 'fas fa-truck-fast', 'items' => ['redirecionamento-envios', 'redirecionamento-divergencias', 'redirecionamento-clientes', 'redirecionamento-tabela-pesos', 'redirecionamento-pagamentos', 'redirecionamento-comprovantes', 'redirecionamento-coletas']],
-                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'carteira-config', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
+                'Configurações' => ['icon' => 'fas fa-cog', 'items' => ['configuracoes', 'cambioreal-health', 'carteira-config', 'email-logs', 'usuarios', 'descontos', 'faq', 'copiloto', 'backup', 'documentacao-webhook']],
             ];
 
             foreach ($menuGroups as $groupName => $group) {
