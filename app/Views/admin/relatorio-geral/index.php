@@ -55,8 +55,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div class="d-flex align-items-center gap-3">
             <div>
-                <h1 class="page-title">Financeiro</h1>
-                <p class="page-subtitle">Visão consolidada de pedidos, receitas e impostos</p>
+                <h1 class="page-title"><?= __('admin.financial.title', 'Financeiro') ?></h1>
+                <p class="page-subtitle"><?= __('admin.financial.subtitle', 'Visão consolidada de pedidos, receitas e impostos') ?></p>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -65,17 +65,17 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                 <span class="small">USD → BRL</span>
                 <span class="fw-bold"><?= fmtNum($taxaUsdBrl) ?></span>
             </div>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalViewConfig"><i class="fas fa-globe me-1"></i><span class="d-none d-md-inline">Moeda</span></button>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i><span class="d-none d-md-inline">Exportar</span></button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalViewConfig"><i class="fas fa-globe me-1"></i><span class="d-none d-md-inline"><?= __('admin.financial.view_currency', 'Moeda') ?></span></button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDRE()"><i class="fas fa-download me-1"></i><span class="d-none d-md-inline"><?= __('admin.financial.export', 'Exportar') ?></span></button>
         </div>
     </div>
 
     <!-- Tabs -->
     <div class="mb-4">
         <ul class="nav nav-pills gap-2 flex-nowrap overflow-auto" role="tablist" style="-webkit-overflow-scrolling:touch;">
-            <li class="nav-item flex-shrink-0"><button class="nav-link active px-3 py-2" id="tab-geral" data-bs-toggle="tab" data-bs-target="#pane-geral" type="button"><i class="fas fa-chart-bar me-1"></i><span class="d-none d-sm-inline">Relatório </span>Geral</button></li>
-            <li class="nav-item flex-shrink-0"><button class="nav-link px-3 py-2" id="tab-regional" type="button" onclick="abrirModalRegional()"><i class="fas fa-globe me-1"></i>Regional</button></li>
-            <li class="nav-item flex-shrink-0"><button class="nav-link px-3 py-2" id="tab-dre" data-bs-toggle="tab" data-bs-target="#pane-dre" type="button"><i class="fas fa-file-invoice-dollar me-1"></i>DRE</button></li>
+            <li class="nav-item flex-shrink-0"><button class="nav-link active px-3 py-2" id="tab-geral" data-bs-toggle="tab" data-bs-target="#pane-geral" type="button"><i class="fas fa-chart-bar me-1"></i><span class="d-none d-sm-inline"><?= __('admin.financial.general_report', 'Relatório Geral') ?> </span></button></li>
+            <li class="nav-item flex-shrink-0"><button class="nav-link px-3 py-2" id="tab-regional" type="button" onclick="abrirModalRegional()"><i class="fas fa-globe me-1"></i><?= __('admin.financial.regional', 'Regional') ?></button></li>
+            <li class="nav-item flex-shrink-0"><button class="nav-link px-3 py-2" id="tab-dre" data-bs-toggle="tab" data-bs-target="#pane-dre" type="button"><i class="fas fa-file-invoice-dollar me-1"></i><?= __('admin.financial.dre', 'DRE') ?></button></li>
         </ul>
     </div>
 
@@ -86,24 +86,24 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center gap-2"><i class="fas fa-sliders-h text-muted"></i><span class="fw-semibold">Filtros do relatório</span></div>
-                <a href="/admin/relatorio-geral" class="text-muted small text-decoration-none"><i class="fas fa-times me-1"></i>Limpar filtros</a>
+                <div class="d-flex align-items-center gap-2"><i class="fas fa-sliders-h text-muted"></i><span class="fw-semibold"><?= __('admin.financial.filters', 'Filtros do relatório') ?></span></div>
+                <a href="/admin/relatorio-geral" class="text-muted small text-decoration-none"><i class="fas fa-times me-1"></i><?= __('admin.financial.clear_filters', 'Limpar filtros') ?></a>
             </div>
             <form method="GET" action="/admin/relatorio-geral">
                 <div class="d-flex align-items-end flex-wrap gap-3">
                     <!-- Datas -->
                     <div class="flex-shrink-0">
-                        <label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i>DATA INÍCIO</label>
+                        <label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i><?= strtoupper(__('admin.financial.date_start', 'DATA INÍCIO')) ?></label>
                         <input type="date" name="date_start" class="form-control form-control-sm" value="<?= htmlspecialchars($dateStart) ?>">
                     </div>
                     <div class="flex-shrink-0">
-                        <label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i>DATA FIM</label>
+                        <label class="form-label small text-muted mb-1"><i class="far fa-calendar me-1"></i><?= strtoupper(__('admin.financial.date_end', 'DATA FIM')) ?></label>
                         <input type="date" name="date_end" class="form-control form-control-sm" value="<?= htmlspecialchars($dateEnd) ?>">
                     </div>
 
                     <!-- Status como chips/checkboxes inline -->
                     <div class="flex-grow-1">
-                        <label class="form-label small text-muted mb-1"><i class="fas fa-tag me-1"></i>STATUS DO PEDIDO</label>
+                        <label class="form-label small text-muted mb-1"><i class="fas fa-tag me-1"></i><?= strtoupper(__('admin.financial.order_status', 'STATUS DO PEDIDO')) ?></label>
                         <div class="d-flex flex-wrap gap-1" id="statusChipsContainer">
                             <?php
                             $statusTooltips = [
@@ -126,9 +126,9 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
 
                     <!-- Moeda -->
                     <div>
-                        <label class="form-label small text-muted mb-1"><i class="fas fa-coins me-1"></i>MOEDA</label>
+                        <label class="form-label small text-muted mb-1"><i class="fas fa-coins me-1"></i><?= strtoupper(__('admin.financial.currency', 'MOEDA')) ?></label>
                         <select name="moeda" class="form-select form-select-sm" style="min-width:100px;">
-                            <option value="">Todas</option>
+                            <option value=""><?= __('admin.financial.all_currencies', 'Todas') ?></option>
                             <option value="BRL" <?= $moedaFilter === 'BRL' ? 'selected' : '' ?>>BRL — Real</option>
                             <option value="USD" <?= $moedaFilter === 'USD' ? 'selected' : '' ?>>USD — Dólar</option>
                         </select>
@@ -136,7 +136,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
 
                     <!-- Filtrar -->
                     <div>
-                        <button type="submit" class="btn btn-dark btn-sm px-4 py-2"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                        <button type="submit" class="btn btn-dark btn-sm px-4 py-2"><i class="fas fa-filter me-1"></i><?= __('admin.financial.filter_btn', 'Filtrar') ?></button>
                     </div>
                 </div>
             </form>
@@ -151,8 +151,8 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                     <i class="fas fa-receipt text-white"></i>
                 </div>
                 <div>
-                    <div class="text-white fw-semibold text-uppercase small">Total de pedidos</div>
-                    <div class="text-white text-opacity-75 small">Período: <?= $periodoLabel ?></div>
+                    <div class="text-white fw-semibold text-uppercase small"><?= __('admin.financial.total_orders', 'Total de pedidos') ?></div>
+                    <div class="text-white text-opacity-75 small"><?= __('admin.financial.period', 'Período') ?>: <?= $periodoLabel ?></div>
                 </div>
             </div>
             <div class="text-end">
@@ -164,12 +164,12 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
     <!-- Cards Financeiros -->
     <?php
     $campos = [
-        ['key'=>'total','label'=>'Total geral','icon'=>'fas fa-dollar-sign','color'=>'primary'],
-        ['key'=>'subtotal','label'=>'Subtotal produtos','icon'=>'fas fa-box','color'=>'success'],
-        ['key'=>'servicos','label'=>'Taxa de serviço','icon'=>'fas fa-concierge-bell','color'=>'info'],
-        ['key'=>'impostos','label'=>'Impostos','icon'=>'fas fa-landmark','color'=>'warning'],
-        ['key'=>'imposto_local','label'=>'Imposto local','icon'=>'fas fa-flag','color'=>'danger'],
-        ['key'=>'frete','label'=>'Frete','icon'=>'fas fa-truck','color'=>'secondary'],
+        ['key'=>'total','label'=>__('admin.financial.grand_total', 'Total geral'),'icon'=>'fas fa-dollar-sign','color'=>'primary'],
+        ['key'=>'subtotal','label'=>__('admin.financial.subtotal_products', 'Subtotal produtos'),'icon'=>'fas fa-box','color'=>'success'],
+        ['key'=>'servicos','label'=>__('admin.financial.service_fee', 'Taxa de serviço'),'icon'=>'fas fa-concierge-bell','color'=>'info'],
+        ['key'=>'impostos','label'=>__('admin.financial.taxes', 'Impostos'),'icon'=>'fas fa-landmark','color'=>'warning'],
+        ['key'=>'imposto_local','label'=>__('admin.financial.local_tax', 'Imposto local'),'icon'=>'fas fa-flag','color'=>'danger'],
+        ['key'=>'frete','label'=>__('admin.financial.shipping', 'Frete'),'icon'=>'fas fa-truck','color'=>'secondary'],
     ];
     $cardColors = ['primary'=>'#3b82f6','success'=>'#10b981','info'=>'#06b6d4','warning'=>'#f59e0b','danger'=>'#ef4444','secondary'=>'#64748b'];
     ?>
@@ -197,7 +197,7 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                 <?php if (!$temAlgo): ?>
                 <div class="text-center py-3">
                     <i class="fas fa-box-open text-muted d-block mb-2" style="font-size:24px;opacity:.4;"></i>
-                    <div class="text-muted small fst-italic">Sem valores de <?= strtolower($c['label']) ?> no período</div>
+                    <div class="text-muted small fst-italic"><?= __('admin.financial.no_values_period', 'Sem valores de') ?> <?= strtolower($c['label']) ?></div>
                 </div>
                 <?php else: ?>
                     <?php if ($vUsd > 0): ?>
@@ -419,9 +419,9 @@ $statusColors = ['pendente'=>'secondary','processando'=>'primary','pago'=>'succe
                 <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2">
                         <div class="rounded-circle bg-dark bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="fas fa-file-invoice-dollar text-dark" style="font-size:12px;"></i></div>
-                        <div><h6 class="fw-bold mb-0">DRE — Demonstrativo de Resultado</h6><span class="text-muted" style="font-size:10px;">Receitas vs Despesas no período</span></div>
+                        <div><h6 class="fw-bold mb-0"><?= __('admin.dre.title', 'DRE — Demonstrativo de Resultado') ?></h6><span class="text-muted" style="font-size:10px;"><?= __('admin.dre.revenue_vs_expenses', 'Receitas vs Despesas no período') ?></span></div>
                     </div>
-                    <a href="/admin/despesas" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i>Ver despesas</a>
+                    <a href="/admin/despesas" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i><?= __('admin.dre.view_expenses', 'Ver despesas') ?></a>
                 </div>
                 <div class="card-body">
                     <div class="row g-4">
