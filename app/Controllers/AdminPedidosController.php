@@ -2531,7 +2531,7 @@ JS;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - Braziliana Admin</title>
+    <title>' . __('admin.orders.title', 'Pedidos') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -2577,11 +2577,11 @@ JS;
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Pedidos (' . $total . ')</h1>
+                    <h1 class="page-title">' . __('admin.orders.title', 'Pedidos') . ' (' . $total . ')</h1>
                     <!-- Desktop: buttons inline -->
                     <div class="d-none d-md-flex gap-2">
                         <a href="/admin/pedidos/novo-manual" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>Novo Pedido Manual
+                            <i class="fas fa-plus me-1"></i>' . __('admin.orders.new_manual', 'Novo Pedido Manual') . '
                         </a>
                         <a href="/admin/pedidos/comissoes" class="btn btn-outline-primary">
                             <i class="fas fa-percentage me-1"></i>Minhas Comissões
@@ -2590,7 +2590,7 @@ JS;
                             <i class="fas fa-trash me-1"></i>Lixeira
                         </a>
                         <a class="btn btn-success" href="' . htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') . '">
-                            <i class="fas fa-download me-1"></i>Exportar XLSX
+                            <i class="fas fa-download me-1"></i>' . __('admin.orders.export', 'Exportar') . ' XLSX
                         </a>
                         <button type="button" class="btn btn-info" onclick="location.reload()">
                             <i class="fas fa-sync me-1"></i>Atualizar
@@ -2598,7 +2598,7 @@ JS;
                     </div>
                     <!-- Mobile: toggle button -->
                     <button class="btn btn-sm btn-outline-secondary d-md-none" type="button" onclick="document.getElementById(\'pedidosActionsCollapse\').classList.toggle(\'d-none\')">
-                        <i class="fas fa-ellipsis-v me-1"></i>Ações
+                        <i class="fas fa-ellipsis-v me-1"></i>' . __('admin.common.actions', 'Ações') . '
                     </button>
                 </div>
                 <!-- Mobile: collapsible actions -->
@@ -2615,13 +2615,13 @@ JS;
                 <form method="GET" class="row g-2 mb-4" id="pedidosFilterForm">
                     <div class="col-md-5">
                         <div class="input-group">
-                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="Buscar pedido, cliente ou email..." value="' . htmlspecialchars($busca) . '">
+                            <input type="text" class="form-control" name="busca" id="pedidosBuscaInput" placeholder="' . __('admin.orders.search_placeholder', 'Buscar por ID, nome, email...') . '" value="' . htmlspecialchars($busca) . '">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <select class="form-select" name="status" id="pedidosStatusSelect">
-                            <option value="">Todos status</option>
+                            <option value="">' . __('admin.orders.filter_status', 'Todos status') . '</option>
                             ' . $this->buildStatusOptions($status) . '
                             <option value="aguardando_comprovante" ' . ($status === 'aguardando_comprovante' ? 'selected' : '') . '>Aguardando Comprovante</option>
                         </select>
@@ -2781,7 +2781,7 @@ JS;
                 if (empty($pedidos)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.no_orders', 'Nenhum pedido encontrado.') . '</h5>
                     </div>';
                 }
                 
@@ -2902,7 +2902,7 @@ JS;
                 if (empty($pedidosUSD)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-dollar-sign fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido em dólar encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.no_orders', 'Nenhum pedido encontrado.') . '</h5>
                     </div>';
                 }
                 
@@ -3022,7 +3022,7 @@ JS;
                 if (empty($pedidosBRL)) {
                     echo '<div class="col-12 text-center py-5">
                         <i class="fas fa-currency-brl fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">Nenhum pedido em real encontrado</h5>
+                        <h5 class="text-muted">' . __('admin.orders.no_orders', 'Nenhum pedido encontrado.') . '</h5>
                     </div>';
                 }
                 

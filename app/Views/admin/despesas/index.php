@@ -19,38 +19,38 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div class="d-flex align-items-center gap-3">
-            <div><h1 class="page-title">Despesas</h1><p class="page-subtitle">Centro de controle de saídas, recorrências, parcelas e comissões</p></div>
+            <div><h1 class="page-title"><?= __('admin.expenses.title', 'Despesas') ?></h1><p class="page-subtitle"><?= __('admin.expenses.subtitle', 'Controle de despesas operacionais e financeiras') ?></p></div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <div class="border rounded-pill px-3 py-1 d-none d-lg-flex align-items-center gap-2 bg-white small">
-                <i class="fas fa-arrow-down text-danger" style="font-size:10px;"></i><span class="text-muted">Saídas hoje</span><span class="fw-bold"><?= fmtD($stats['vencido'] ?? 0) ?></span>
+                <i class="fas fa-arrow-down text-danger" style="font-size:10px;"></i><span class="text-muted"><?= __('admin.expenses.outflows_today', 'Saídas hoje') ?></span><span class="fw-bold"><?= fmtD($stats['vencido'] ?? 0) ?></span>
             </div>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i><span class="d-none d-md-inline">Exportar</span></button>
-            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDespView"><i class="fas fa-globe me-1"></i><span class="d-none d-md-inline">Moeda</span></button>
-            <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">Nova</span></button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" onclick="exportarDespesas()"><i class="fas fa-download me-1"></i><span class="d-none d-md-inline"><?= __('admin.expenses.export', 'Exportar') ?></span></button>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDespView"><i class="fas fa-globe me-1"></i><span class="d-none d-md-inline"><?= __('admin.expenses.currency', 'Moeda') ?></span></button>
+            <button class="btn btn-dark btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa"><i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline"><?= __('admin.expenses.new', 'Nova despesa') ?></span></button>
         </div>
     </div>
 
     <!-- Tabs: Mobile dropdown + Desktop tabs -->
     <div class="d-md-none mb-3">
         <select class="form-select" onchange="window.location.href=this.value">
-            <option value="/admin/despesas?tab=visao-geral" <?= $tab==='visao-geral'?'selected':'' ?>>Visão Geral</option>
-            <option value="/admin/despesas?tab=todas" <?= $tab==='todas'?'selected':'' ?>>Todas (<?= $countAll ?>)</option>
-            <option value="/admin/despesas?tab=recorrentes" <?= $tab==='recorrentes'?'selected':'' ?>>Recorrentes (<?= count($recorrencias) ?>)</option>
-            <option value="/admin/despesas?tab=parceladas" <?= $tab==='parceladas'?'selected':'' ?>>Parceladas (<?= count($parcelamentos) ?>)</option>
-            <option value="/admin/despesas?tab=comissoes" <?= $tab==='comissoes'?'selected':'' ?>>Comissões (<?= $countComissoes ?>)</option>
-            <option value="/admin/despesas?tab=categorias" <?= $tab==='categorias'?'selected':'' ?>>Categorias</option>
-            <option value="/admin/despesas?tab=relatorios" <?= $tab==='relatorios'?'selected':'' ?>>Relatórios</option>
+            <option value="/admin/despesas?tab=visao-geral" <?= $tab==='visao-geral'?'selected':'' ?>><?= __('admin.expenses.tab_overview', 'Visão Geral') ?></option>
+            <option value="/admin/despesas?tab=todas" <?= $tab==='todas'?'selected':'' ?>><?= __('admin.expenses.tab_all', 'Todas') ?> (<?= $countAll ?>)</option>
+            <option value="/admin/despesas?tab=recorrentes" <?= $tab==='recorrentes'?'selected':'' ?>><?= __('admin.expenses.tab_recurring', 'Recorrentes') ?> (<?= count($recorrencias) ?>)</option>
+            <option value="/admin/despesas?tab=parceladas" <?= $tab==='parceladas'?'selected':'' ?>><?= __('admin.expenses.tab_installments', 'Parceladas') ?> (<?= count($parcelamentos) ?>)</option>
+            <option value="/admin/despesas?tab=comissoes" <?= $tab==='comissoes'?'selected':'' ?>><?= __('admin.expenses.tab_commissions', 'Comissões') ?> (<?= $countComissoes ?>)</option>
+            <option value="/admin/despesas?tab=categorias" <?= $tab==='categorias'?'selected':'' ?>><?= __('admin.expenses.tab_categories', 'Categorias') ?></option>
+            <option value="/admin/despesas?tab=relatorios" <?= $tab==='relatorios'?'selected':'' ?>><?= __('admin.expenses.tab_reports', 'Relatórios') ?></option>
         </select>
     </div>
     <ul class="nav nav-tabs mb-4 d-none d-md-flex" role="tablist">
-        <li class="nav-item"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral">Visão Geral</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas">Todas <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes">Recorrentes <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas">Parceladas <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes">Comissões <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias">Categorias</a></li>
-        <li class="nav-item"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios">Relatórios</a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='visao-geral'?'active':'' ?>" href="/admin/despesas?tab=visao-geral"><?= __('admin.expenses.tab_overview', 'Visão Geral') ?></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='todas'?'active':'' ?>" href="/admin/despesas?tab=todas"><?= __('admin.expenses.tab_all', 'Todas') ?> <span class="badge bg-secondary ms-1"><?= $countAll ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='recorrentes'?'active':'' ?>" href="/admin/despesas?tab=recorrentes"><?= __('admin.expenses.tab_recurring', 'Recorrentes') ?> <span class="badge bg-secondary ms-1"><?= count($recorrencias) ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='parceladas'?'active':'' ?>" href="/admin/despesas?tab=parceladas"><?= __('admin.expenses.tab_installments', 'Parceladas') ?> <span class="badge bg-secondary ms-1"><?= count($parcelamentos) ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='comissoes'?'active':'' ?>" href="/admin/despesas?tab=comissoes"><?= __('admin.expenses.tab_commissions', 'Comissões') ?> <span class="badge bg-secondary ms-1"><?= $countComissoes ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='categorias'?'active':'' ?>" href="/admin/despesas?tab=categorias"><?= __('admin.expenses.tab_categories', 'Categorias') ?></a></li>
+        <li class="nav-item"><a class="nav-link <?= $tab==='relatorios'?'active':'' ?>" href="/admin/despesas?tab=relatorios"><?= __('admin.expenses.tab_reports', 'Relatórios') ?></a></li>
     </ul>
 
     <?php if (!empty($_SESSION['message'])): ?>
@@ -72,15 +72,15 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <div class="row g-4">
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-muted"></i>Recorrências ativas</h6><a href="/admin/despesas?tab=recorrentes" class="btn btn-sm btn-outline-primary">Ver todas</a></div>
+                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-muted"></i><?= __('admin.expenses.active_recurrences', 'Recorrências ativas') ?></h6><a href="/admin/despesas?tab=recorrentes" class="btn btn-sm btn-outline-primary"><?= __('admin.expenses.view_all', 'Ver todas') ?></a></div>
                 <div class="card-body p-0">
                     <?php if (empty($recorrencias)): ?>
-                    <div class="text-center text-muted py-4 small">Nenhuma recorrência ativa</div>
+                    <div class="text-center text-muted py-4 small"><?= __('admin.expenses.no_recurrences', 'Nenhuma recorrência ativa') ?></div>
                     <?php else: ?>
                     <div class="list-group list-group-flush">
                         <?php foreach (array_slice($recorrencias, 0, 5) as $r): ?>
                         <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= ucfirst($r['frequencia']) ?> · dia <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· até ' . date('m/Y', strtotime($r['data_fim'])) : '· sem fim' ?></div></div>
+                            <div><div class="fw-semibold small"><?= htmlspecialchars($r['descricao']) ?></div><div class="text-muted" style="font-size:10px;"><?= ucfirst($r['frequencia']) ?> · dia <?= $r['dia_vencimento'] ?> <?= $r['data_fim'] ? '· até ' . date('m/Y', strtotime($r['data_fim'])) : '· ' . __('admin.expenses.no_end', 'sem fim') ?></div></div>
                             <span class="fw-bold small"><?= fmtD($r['valor']) ?></span>
                         </div>
                         <?php endforeach; ?>
@@ -91,10 +91,10 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
         </div>
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0"><i class="fas fa-layer-group me-2 text-muted"></i>Parcelas em andamento</h6><a href="/admin/despesas?tab=parceladas" class="btn btn-sm btn-outline-primary">Ver todas</a></div>
+                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold mb-0"><i class="fas fa-layer-group me-2 text-muted"></i><?= __('admin.expenses.installments_in_progress', 'Parcelas em andamento') ?></h6><a href="/admin/despesas?tab=parceladas" class="btn btn-sm btn-outline-primary"><?= __('admin.expenses.view_all', 'Ver todas') ?></a></div>
                 <div class="card-body p-0">
                     <?php if (empty($parcelamentos)): ?>
-                    <div class="text-center text-muted py-4 small">Nenhum parcelamento ativo</div>
+                    <div class="text-center text-muted py-4 small"><?= __('admin.expenses.no_installments', 'Nenhum parcelamento ativo') ?></div>
                     <?php else: ?>
                     <div class="list-group list-group-flush">
                         <?php foreach (array_slice($parcelamentos, 0, 5) as $p): $pct = $p['quantidade_parcelas'] > 0 ? round($p['parcelas_pagas'] / $p['quantidade_parcelas'] * 100) : 0; ?>
@@ -131,7 +131,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
         <div class="card-header bg-white border-0 pt-3 d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-2">
                 <div class="rounded-circle bg-purple bg-opacity-10 d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:#8b5cf620;"><i class="fas fa-hand-holding-usd" style="color:#8b5cf6;font-size:12px;"></i></div>
-                <div><h6 class="fw-bold mb-0">Comissões · sincronizadas do sistema</h6><span class="text-muted" style="font-size:10px;">Geradas automaticamente a partir dos pedidos · Câmbio: 1 USD = R$ <?= number_format($comUsd, 2, ',', '.') ?></span></div>
+                <div><h6 class="fw-bold mb-0"><?= __('admin.expenses.commissions_synced', 'Comissões · sincronizadas do sistema') ?></h6><span class="text-muted" style="font-size:10px;"><?= __('admin.expenses.commissions_generated_from_orders', 'Geradas automaticamente a partir dos pedidos') ?> · <?= __('admin.expenses.exchange_rate', 'Câmbio') ?>: 1 USD = R$ <?= number_format($comUsd, 2, ',', '.') ?></span></div>
             </div>
             <a href="/admin/comissoes-global?periodo=<?= htmlspecialchars($comPeriodo) ?>" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="fas fa-external-link-alt me-1"></i>Ver completo</a>
         </div>
@@ -140,28 +140,28 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
             <form method="GET" action="/admin/despesas" class="d-flex align-items-end gap-3 mb-4">
                 <input type="hidden" name="tab" value="comissoes">
                 <div>
-                    <label class="form-label small text-muted mb-1">Período de comissão</label>
+                    <label class="form-label small text-muted mb-1"><?= __('admin.expenses.commission_period', 'Período de comissão') ?></label>
                     <input type="month" name="competencia_de" class="form-control form-control-sm" value="<?= htmlspecialchars($comPeriodo) ?>">
                 </div>
-                <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-filter me-1"></i><?= __('admin.expenses.filter', 'Filtrar') ?></button>
                 <span class="text-muted small">De <?= $comInicio ? date('d/m/Y', strtotime($comInicio)) : '' ?> até <?= $comFim ? date('d/m/Y', strtotime($comFim)) : '' ?></span>
             </form>
 
             <!-- Stats -->
             <div class="row g-3 mb-4">
-                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Geradas no período</div><div class="fw-bold fs-5"><?= fmtD($comTotal) ?></div></div></div>
-                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Vendedores</div><div class="fw-bold fs-5"><?= count($comVendedores) ?></div></div></div>
-                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Pedidos</div><div class="fw-bold fs-5"><?= array_sum(array_column($comVendedores, 'pedidos')) ?></div></div></div>
-                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small">Faturado (BRL)</div><div class="fw-bold fs-5"><?= fmtD(array_sum(array_column($comVendedores, 'faturado'))) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.generated_in_period', 'Geradas no período') ?></div><div class="fw-bold fs-5"><?= fmtD($comTotal) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.sellers', 'Vendedores') ?></div><div class="fw-bold fs-5"><?= count($comVendedores) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.orders', 'Pedidos') ?></div><div class="fw-bold fs-5"><?= array_sum(array_column($comVendedores, 'pedidos')) ?></div></div></div>
+                <div class="col-md-3"><div class="border rounded p-3 text-center"><div class="text-muted small"><?= __('admin.expenses.invoiced_brl', 'Faturado (BRL)') ?></div><div class="fw-bold fs-5"><?= fmtD(array_sum(array_column($comVendedores, 'faturado'))) ?></div></div></div>
             </div>
 
             <!-- Tabela -->
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0" style="font-size:12px;">
-                    <thead class="table-light"><tr><th>Vendedor</th><th class="text-end">Pedidos</th><th class="text-end">Bruto (R$)</th><th class="text-end">Custo Produto</th><th class="text-end">Impostos</th><th class="text-end">Líquido</th><th class="text-end">% Comissão</th><th class="text-end">Comissão Manual</th><th class="text-end">Comissão Proc.</th><th class="text-end fw-bold">Total Comissão</th></tr></thead>
+                    <thead class="table-light"><tr><th><?= __('admin.expenses.seller', 'Vendedor') ?></th><th class="text-end"><?= __('admin.expenses.orders', 'Pedidos') ?></th><th class="text-end"><?= __('admin.expenses.gross_brl', 'Bruto (R$)') ?></th><th class="text-end"><?= __('admin.expenses.product_cost', 'Custo Produto') ?></th><th class="text-end"><?= __('admin.expenses.taxes', 'Impostos') ?></th><th class="text-end"><?= __('admin.expenses.net', 'Líquido') ?></th><th class="text-end"><?= __('admin.expenses.commission_pct', '% Comissão') ?></th><th class="text-end"><?= __('admin.expenses.commission_manual', 'Comissão Manual') ?></th><th class="text-end"><?= __('admin.expenses.commission_proc', 'Comissão Proc.') ?></th><th class="text-end fw-bold"><?= __('admin.expenses.total_commission', 'Total Comissão') ?></th></tr></thead>
                     <tbody>
                     <?php if (empty($comVendedores)): ?>
-                    <tr><td colspan="10" class="text-center text-muted py-4">Nenhuma comissão no período.</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-4"><?= __('admin.expenses.no_commissions_in_period', 'Nenhuma comissão no período.') ?></td></tr>
                     <?php else: foreach ($comVendedores as $v): ?>
                     <tr>
                         <td><div class="fw-semibold"><?= htmlspecialchars($v['nome']) ?></div><div class="text-muted" style="font-size:10px;"><?= htmlspecialchars($v['email']) ?></div></td>
@@ -176,7 +176,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td class="text-end fw-bold"><?= fmtD($v['total_comissao']) ?></td>
                     </tr>
                     <?php endforeach; ?>
-                    <tr class="table-dark fw-bold"><td colspan="9" class="text-end">Total Geral</td><td class="text-end"><?= fmtD($comTotal) ?></td></tr>
+                    <tr class="table-dark fw-bold"><td colspan="9" class="text-end"><?= __('admin.expenses.grand_total', 'Total Geral') ?></td><td class="text-end"><?= fmtD($comTotal) ?></td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -187,23 +187,23 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
             <div class="d-flex flex-wrap gap-2 mb-3">
-                <a href="/admin/despesas?tab=todas" class="btn btn-sm <?= empty($filtros['rapido'])?'btn-dark':'btn-outline-secondary' ?> rounded-pill">Todas <?= $countAll ?></a>
-                <a href="/admin/despesas?tab=todas&rapido=vencidas" class="btn btn-sm <?= ($filtros['rapido']??'')==='vencidas'?'btn-danger':'btn-outline-danger' ?> rounded-pill">Vencidas <?= $countVencidas ?></a>
-                <a href="/admin/despesas?tab=todas&rapido=hoje" class="btn btn-sm <?= ($filtros['rapido']??'')==='hoje'?'btn-warning':'btn-outline-warning' ?> rounded-pill">Vencem hoje <?= $countHoje ?></a>
-                <a href="/admin/despesas?tab=todas&rapido=7dias" class="btn btn-sm <?= ($filtros['rapido']??'')==='7dias'?'btn-info':'btn-outline-info' ?> rounded-pill">Próx. 7 dias</a>
-                <a href="/admin/despesas?tab=todas&rapido=pagas" class="btn btn-sm <?= ($filtros['rapido']??'')==='pagas'?'btn-success':'btn-outline-success' ?> rounded-pill">Pagas</a>
-                <a href="/admin/despesas?tab=todas&rapido=fixas" class="btn btn-sm <?= ($filtros['rapido']??'')==='fixas'?'btn-primary':'btn-outline-primary' ?> rounded-pill">Fixas</a>
-                <a href="/admin/despesas?tab=todas&rapido=parcelas" class="btn btn-sm <?= ($filtros['rapido']??'')==='parcelas'?'btn-secondary':'btn-outline-secondary' ?> rounded-pill">Parcelas em aberto</a>
-                <a href="/admin/despesas?tab=todas&rapido=comissoes" class="btn btn-sm <?= ($filtros['rapido']??'')==='comissoes'?'btn-purple':'btn-outline-secondary' ?> rounded-pill">Comissões</a>
+                <a href="/admin/despesas?tab=todas" class="btn btn-sm <?= empty($filtros['rapido'])?'btn-dark':'btn-outline-secondary' ?> rounded-pill"><?= __('admin.expenses.tab_all', 'Todas') ?> <?= $countAll ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=vencidas" class="btn btn-sm <?= ($filtros['rapido']??'')==='vencidas'?'btn-danger':'btn-outline-danger' ?> rounded-pill"><?= __('admin.expenses.filter_overdue', 'Vencidas') ?> <?= $countVencidas ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=hoje" class="btn btn-sm <?= ($filtros['rapido']??'')==='hoje'?'btn-warning':'btn-outline-warning' ?> rounded-pill"><?= __('admin.expenses.filter_due_today', 'Vencem hoje') ?> <?= $countHoje ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=7dias" class="btn btn-sm <?= ($filtros['rapido']??'')==='7dias'?'btn-info':'btn-outline-info' ?> rounded-pill"><?= __('admin.expenses.filter_next_7_days', 'Próx. 7 dias') ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=pagas" class="btn btn-sm <?= ($filtros['rapido']??'')==='pagas'?'btn-success':'btn-outline-success' ?> rounded-pill"><?= __('admin.expenses.status_paid', 'Paga') ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=fixas" class="btn btn-sm <?= ($filtros['rapido']??'')==='fixas'?'btn-primary':'btn-outline-primary' ?> rounded-pill"><?= __('admin.expenses.type_fixed', 'Fixa') ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=parcelas" class="btn btn-sm <?= ($filtros['rapido']??'')==='parcelas'?'btn-secondary':'btn-outline-secondary' ?> rounded-pill"><?= __('admin.expenses.filter_open_installments', 'Parcelas em aberto') ?></a>
+                <a href="/admin/despesas?tab=todas&rapido=comissoes" class="btn btn-sm <?= ($filtros['rapido']??'')==='comissoes'?'btn-purple':'btn-outline-secondary' ?> rounded-pill"><?= __('admin.expenses.tab_commissions', 'Comissões') ?></a>
             </div>
             <form method="GET" action="/admin/despesas" class="row g-2 align-items-end">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
-                <div class="col-md-2"><label class="form-label small text-muted">Competência de</label><input type="month" name="competencia_de" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_de'] ?? '', 0, 7)) ?>"></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Até</label><input type="month" name="competencia_ate" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_ate'] ?? '', 0, 7)) ?>"></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Categoria</label><select name="categoria" class="form-select form-select-sm"><option value="">Todas</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>" <?= ($filtros['categoria']??'')==$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Status</label><select name="status" class="form-select form-select-sm"><option value="">Todos</option><option value="prevista" <?= ($filtros['status']??'')==='prevista'?'selected':'' ?>>Prevista</option><option value="a_vencer" <?= ($filtros['status']??'')==='a_vencer'?'selected':'' ?>>A vencer</option><option value="vencida" <?= ($filtros['status']??'')==='vencida'?'selected':'' ?>>Vencida</option><option value="paga" <?= ($filtros['status']??'')==='paga'?'selected':'' ?>>Paga</option><option value="cancelada" <?= ($filtros['status']??'')==='cancelada'?'selected':'' ?>>Cancelada</option></select></div>
-                <div class="col-md-2"><label class="form-label small text-muted">Tipo</label><select name="tipo" class="form-select form-select-sm"><option value="">Todos</option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>>Avulsa</option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>>Fixa</option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>>Recorrente</option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>>Parcelada</option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>>Comissão</option><option value="por_hora" <?= ($filtros['tipo']??'')==='por_hora'?'selected':'' ?>>Por Hora</option></select></div>
-                <div class="col-md-2"><button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= __('admin.expenses.competence_from', 'Competência de') ?></label><input type="month" name="competencia_de" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_de'] ?? '', 0, 7)) ?>"></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= __('admin.expenses.competence_to', 'Até') ?></label><input type="month" name="competencia_ate" class="form-control form-control-sm" value="<?= htmlspecialchars(substr($filtros['competencia_ate'] ?? '', 0, 7)) ?>"></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= __('admin.expenses.category', 'Categoria') ?></label><select name="categoria" class="form-select form-select-sm"><option value=""><?= __('admin.expenses.filter_all', 'Todas') ?></option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>" <?= ($filtros['categoria']??'')==$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= __('admin.expenses.status', 'Status') ?></label><select name="status" class="form-select form-select-sm"><option value=""><?= __('admin.expenses.filter_all_status', 'Todos') ?></option><option value="prevista" <?= ($filtros['status']??'')==='prevista'?'selected':'' ?>><?= __('admin.expenses.status_planned', 'Prevista') ?></option><option value="a_vencer" <?= ($filtros['status']??'')==='a_vencer'?'selected':'' ?>><?= __('admin.expenses.status_due_soon', 'A vencer') ?></option><option value="vencida" <?= ($filtros['status']??'')==='vencida'?'selected':'' ?>><?= __('admin.expenses.status_overdue', 'Vencida') ?></option><option value="paga" <?= ($filtros['status']??'')==='paga'?'selected':'' ?>><?= __('admin.expenses.status_paid', 'Paga') ?></option><option value="cancelada" <?= ($filtros['status']??'')==='cancelada'?'selected':'' ?>><?= __('admin.expenses.status_cancelled', 'Cancelada') ?></option></select></div>
+                <div class="col-md-2"><label class="form-label small text-muted"><?= __('admin.expenses.type', 'Tipo') ?></label><select name="tipo" class="form-select form-select-sm"><option value=""><?= __('admin.expenses.filter_all_status', 'Todos') ?></option><option value="avulsa" <?= ($filtros['tipo']??'')==='avulsa'?'selected':'' ?>><?= __('admin.expenses.type_single', 'Avulsa') ?></option><option value="fixa" <?= ($filtros['tipo']??'')==='fixa'?'selected':'' ?>><?= __('admin.expenses.type_fixed', 'Fixa') ?></option><option value="recorrente" <?= ($filtros['tipo']??'')==='recorrente'?'selected':'' ?>><?= __('admin.expenses.type_recurring', 'Recorrente') ?></option><option value="parcelada" <?= ($filtros['tipo']??'')==='parcelada'?'selected':'' ?>><?= __('admin.expenses.type_installment', 'Parcelada') ?></option><option value="comissao" <?= ($filtros['tipo']??'')==='comissao'?'selected':'' ?>><?= __('admin.expenses.type_commission', 'Comissão') ?></option><option value="por_hora" <?= ($filtros['tipo']??'')==='por_hora'?'selected':'' ?>><?= __('admin.expenses.type_hourly', 'Por Hora') ?></option></select></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-dark btn-sm w-100"><i class="fas fa-filter me-1"></i><?= __('admin.expenses.filter', 'Filtrar') ?></button></div>
             </form>
         </div>
     </div>
@@ -214,7 +214,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
             <!-- Mobile: Cards -->
             <div class="d-md-none p-3">
                 <?php if (empty($despesas)): ?>
-                    <div class="text-center text-muted py-4 small">Nenhuma despesa encontrada.</div>
+                    <div class="text-center text-muted py-4 small"><?= __('admin.expenses.no_results', 'Nenhuma despesa encontrada.') ?></div>
                 <?php else: ?>
                     <?php
                     $statusBadgeMobile = ['prevista'=>'bg-secondary','a_vencer'=>'bg-warning text-dark','vencida'=>'bg-danger','paga'=>'bg-success','parcialmente_paga'=>'bg-info','cancelada'=>'bg-dark bg-opacity-50'];
@@ -233,7 +233,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
                             <button type="button" class="btn btn-outline-primary py-0 px-1 btn-editar-despesa" style="font-size:11px;" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>" data-virtual="0"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
-                            <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-outline-success py-0 px-1" style="font-size:11px;"><i class="fas fa-check"></i></button></form>
+                            <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('<?= __('admin.expenses.confirm_mark_paid', 'Marcar como paga?') ?>')"><button type="submit" class="btn btn-outline-success py-0 px-1" style="font-size:11px;"><i class="fas fa-check"></i></button></form>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -245,10 +245,10 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
             <div class="d-none d-md-block">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0" style="font-size:12px;">
-                    <thead class="table-light"><tr><th></th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Competência</th><th>Vencimento</th><th class="text-end">Valor</th><th>Status</th><th>Origem</th><th>Ações</th></tr></thead>
+                    <thead class="table-light"><tr><th></th><th><?= __('admin.expenses.description', 'Descrição') ?></th><th><?= __('admin.expenses.category', 'Categoria') ?></th><th><?= __('admin.expenses.type', 'Tipo') ?></th><th><?= __('admin.expenses.competence', 'Competência') ?></th><th><?= __('admin.expenses.due_date', 'Vencimento') ?></th><th class="text-end"><?= __('admin.expenses.value', 'Valor') ?></th><th><?= __('admin.expenses.status', 'Status') ?></th><th><?= __('admin.expenses.origin', 'Origem') ?></th><th><?= __('admin.common.actions', 'Ações') ?></th></tr></thead>
                     <tbody>
                     <?php if (empty($despesas)): ?>
-                    <tr><td colspan="10" class="text-center text-muted py-4">Nenhuma despesa encontrada.</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-4"><?= __('admin.expenses.no_results', 'Nenhuma despesa encontrada.') ?></td></tr>
                     <?php else: ?>
                     <?php
                     $statusBadge = ['prevista'=>'bg-secondary','a_vencer'=>'bg-warning text-dark','vencida'=>'bg-danger','paga'=>'bg-success','parcialmente_paga'=>'bg-info','cancelada'=>'bg-dark bg-opacity-50'];
@@ -272,11 +272,11 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-editar-despesa" title="Editar" data-id="<?= $d['id'] ?>" data-descricao="<?= htmlspecialchars($d['descricao'] ?? '') ?>" data-categoria="<?= (int)($d['categoria_id'] ?? 0) ?>" data-valor="<?= (float)($d['valor'] ?? 0) ?>" data-moeda="<?= htmlspecialchars($d['moeda'] ?? 'BRL') ?>" data-competencia="<?= htmlspecialchars(substr($d['competencia'] ?? '', 0, 7)) ?>" data-vencimento="<?= htmlspecialchars($d['vencimento'] ?? '') ?>" data-status="<?= htmlspecialchars($d['status'] ?? 'prevista') ?>" data-forma-pagamento="<?= htmlspecialchars($d['forma_pagamento'] ?? '') ?>" data-favorecido="<?= htmlspecialchars($d['favorecido'] ?? '') ?>" data-observacoes="<?= htmlspecialchars($d['observacoes'] ?? '') ?>" data-virtual="0"><i class="fas fa-edit"></i></button>
                             <?php if ($d['status'] !== 'paga' && $d['status'] !== 'cancelada'): ?>
-                            <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('Marcar como paga?')"><button type="submit" class="btn btn-sm btn-outline-success" title="Pagar"><i class="fas fa-check"></i></button></form>
-                            <form method="POST" action="/admin/despesas/cancelar/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Cancelar?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar"><i class="fas fa-times"></i></button></form>
+                            <form method="POST" action="/admin/despesas/pagar/<?= $d['id'] ?>" class="d-inline" onsubmit="return confirm('<?= __('admin.expenses.confirm_mark_paid', 'Marcar como paga?') ?>')"><button type="submit" class="btn btn-sm btn-outline-success" title="<?= __('admin.expenses.mark_paid', 'Marcar como paga') ?>"><i class="fas fa-check"></i></button></form>
+                            <form method="POST" action="/admin/despesas/cancelar/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('<?= __('admin.expenses.confirm_cancel', 'Cancelar?') ?>')"><button type="submit" class="btn btn-sm btn-outline-danger" title="<?= __('admin.common.cancel', 'Cancelar') ?>"><i class="fas fa-times"></i></button></form>
                             <?php endif; ?>
                             <?php if ($d['status'] === 'cancelada'): ?>
-                            <form method="POST" action="/admin/despesas/excluir/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('Excluir permanentemente?')"><button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button></form>
+                            <form method="POST" action="/admin/despesas/excluir/<?= $d['id'] ?>" class="d-inline ms-1" onsubmit="return confirm('<?= __('admin.expenses.confirm_delete', 'Excluir permanentemente?') ?>')"><button type="submit" class="btn btn-sm btn-outline-danger" title="<?= __('admin.common.delete', 'Excluir') ?>"><i class="fas fa-trash"></i></button></form>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -295,16 +295,16 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <!-- RECORRENTES -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
-            <h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-info"></i>Recorrências Ativas</h6>
+            <h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-info"></i><?= __('admin.expenses.active_recurrences', 'Recorrências ativas') ?></h6>
             <button class="btn btn-sm btn-dark rounded-pill" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa" onclick="setTimeout(function(){document.getElementById('despesa-tipo').value='recorrente';toggleTipoFields();},300)"><i class="fas fa-plus me-1"></i>Nova</button>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0" style="font-size:12px;">
-                    <thead class="table-light"><tr><th>Descrição</th><th>Categoria</th><th>Frequência</th><th>Dia</th><th class="text-end">Valor</th><th>Próxima</th><th>Fim</th></tr></thead>
+                    <thead class="table-light"><tr><th><?= __('admin.expenses.description', 'Descrição') ?></th><th><?= __('admin.expenses.category', 'Categoria') ?></th><th><?= __('admin.expenses.frequency', 'Frequência') ?></th><th><?= __('admin.expenses.due_day', 'Dia') ?></th><th class="text-end"><?= __('admin.expenses.value', 'Valor') ?></th><th><?= __('admin.expenses.next_generation', 'Próxima') ?></th><th><?= __('admin.expenses.end', 'Fim') ?></th></tr></thead>
                     <tbody>
                     <?php if (empty($recorrencias)): ?>
-                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma recorrência cadastrada.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted py-4"><?= __('admin.expenses.no_recurrences_registered', 'Nenhuma recorrência cadastrada.') ?></td></tr>
                     <?php else: foreach ($recorrencias as $r): ?>
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($r['descricao']) ?></td>
@@ -313,7 +313,7 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
                         <td><?= $r['dia_vencimento'] ?? '-' ?></td>
                         <td class="text-end fw-bold"><?= fmtD($r['valor']) ?></td>
                         <td><?= $r['proxima_geracao'] ? date('d/m/Y', strtotime($r['proxima_geracao'])) : '-' ?></td>
-                        <td><?= $r['data_fim'] ? date('m/Y', strtotime($r['data_fim'])) : 'Sem fim' ?></td>
+                        <td><?= $r['data_fim'] ? date('m/Y', strtotime($r['data_fim'])) : __('admin.expenses.no_end', 'Sem fim') ?></td>
                     </tr>
                     <?php endforeach; endif; ?>
                     </tbody>
@@ -327,16 +327,16 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <!-- PARCELADAS -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
-            <h6 class="fw-bold mb-0"><i class="fas fa-layer-group me-2 text-warning"></i>Parcelamentos em Andamento</h6>
+            <h6 class="fw-bold mb-0"><i class="fas fa-layer-group me-2 text-warning"></i><?= __('admin.expenses.installments_in_progress', 'Parcelamentos em Andamento') ?></h6>
             <button class="btn btn-sm btn-dark rounded-pill" data-bs-toggle="modal" data-bs-target="#modalNovaDespesa" onclick="setTimeout(function(){document.getElementById('despesa-tipo').value='parcelada';toggleTipoFields();},300)"><i class="fas fa-plus me-1"></i>Novo</button>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0" style="font-size:12px;">
-                    <thead class="table-light"><tr><th>Descrição</th><th>Categoria</th><th class="text-end">Total</th><th>Parcelas</th><th class="text-end">Valor/Parc.</th><th class="text-end">Pago</th><th class="text-end">Saldo</th><th>Progresso</th></tr></thead>
+                    <thead class="table-light"><tr><th><?= __('admin.expenses.description', 'Descrição') ?></th><th><?= __('admin.expenses.category', 'Categoria') ?></th><th class="text-end"><?= __('admin.expenses.total', 'Total') ?></th><th><?= __('admin.expenses.installments', 'Parcelas') ?></th><th class="text-end"><?= __('admin.expenses.installment_value', 'Valor/Parc.') ?></th><th class="text-end"><?= __('admin.expenses.paid_amount', 'Pago') ?></th><th class="text-end"><?= __('admin.expenses.balance', 'Saldo') ?></th><th><?= __('admin.expenses.progress', 'Progresso') ?></th></tr></thead>
                     <tbody>
                     <?php if (empty($parcelamentos)): ?>
-                    <tr><td colspan="8" class="text-center text-muted py-4">Nenhum parcelamento ativo.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4"><?= __('admin.expenses.no_installments', 'Nenhum parcelamento ativo.') ?></td></tr>
                     <?php else: foreach ($parcelamentos as $p): $pct = $p['quantidade_parcelas'] > 0 ? round($p['parcelas_pagas'] / $p['quantidade_parcelas'] * 100) : 0; ?>
                     <tr>
                         <td class="fw-semibold"><?= htmlspecialchars($p['descricao']) ?></td>
@@ -359,11 +359,11 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <?php if ($tab === 'categorias'): ?>
     <!-- CATEGORIAS -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-tags me-2"></i>Categorias de Despesas</h6></div>
+        <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0"><i class="fas fa-tags me-2"></i><?= __('admin.expenses.expense_categories', 'Categorias de Despesas') ?></h6></div>
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">
-                    <thead class="table-light"><tr><th>Cor</th><th>Nome</th><th>Grupo</th><th>Status</th></tr></thead>
+                    <thead class="table-light"><tr><th><?= __('admin.expenses.color', 'Cor') ?></th><th><?= __('admin.expenses.name', 'Nome') ?></th><th><?= __('admin.expenses.group', 'Grupo') ?></th><th><?= __('admin.expenses.status', 'Status') ?></th></tr></thead>
                     <tbody>
                     <?php foreach ($categorias as $cat): ?>
                     <tr>
@@ -386,54 +386,54 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><i class="fas fa-chart-bar me-2 text-primary"></i>Relatório por Categoria</h6>
-                    <p class="text-muted small">Quanto foi gasto por tipo de despesa no período.</p>
-                    <a href="/admin/relatorio-geral" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i>Ver no Financeiro</a>
+                    <h6 class="fw-bold mb-1"><i class="fas fa-chart-bar me-2 text-primary"></i><?= __('admin.expenses.report_by_category', 'Relatório por Categoria') ?></h6>
+                    <p class="text-muted small"><?= __('admin.expenses.report_by_category_desc', 'Quanto foi gasto por tipo de despesa no período.') ?></p>
+                    <a href="/admin/relatorio-geral" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-1"></i><?= __('admin.expenses.view_in_financial', 'Ver no Financeiro') ?></a>
                 </div>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 text-info"></i>Relatório por Período</h6>
-                    <p class="text-muted small">Despesas por mês com comparativo.</p>
-                    <a href="/admin/despesas?tab=todas" class="btn btn-sm btn-outline-info"><i class="fas fa-filter me-1"></i>Filtrar por período</a>
+                    <h6 class="fw-bold mb-1"><i class="fas fa-calendar-alt me-2 text-info"></i><?= __('admin.expenses.report_by_period', 'Relatório por Período') ?></h6>
+                    <p class="text-muted small"><?= __('admin.expenses.report_by_period_desc', 'Despesas por mês com comparativo.') ?></p>
+                    <a href="/admin/despesas?tab=todas" class="btn btn-sm btn-outline-info"><i class="fas fa-filter me-1"></i><?= __('admin.expenses.filter_by_period', 'Filtrar por período') ?></a>
                 </div>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><i class="fas fa-sync-alt me-2 text-warning"></i>Relatório de Recorrências</h6>
-                    <p class="text-muted small">Despesas fixas e previsão de custos futuros.</p>
-                    <a href="/admin/despesas?tab=recorrentes" class="btn btn-sm btn-outline-warning"><i class="fas fa-list me-1"></i>Ver recorrências</a>
+                    <h6 class="fw-bold mb-1"><i class="fas fa-sync-alt me-2 text-warning"></i><?= __('admin.expenses.report_recurrences', 'Relatório de Recorrências') ?></h6>
+                    <p class="text-muted small"><?= __('admin.expenses.report_recurrences_desc', 'Despesas fixas e previsão de custos futuros.') ?></p>
+                    <a href="/admin/despesas?tab=recorrentes" class="btn btn-sm btn-outline-warning"><i class="fas fa-list me-1"></i><?= __('admin.expenses.view_recurrences', 'Ver recorrências') ?></a>
                 </div>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><i class="fas fa-layer-group me-2 text-danger"></i>Relatório de Parcelamentos</h6>
-                    <p class="text-muted small">Parcelas futuras, saldo total a pagar, compromissos.</p>
-                    <a href="/admin/despesas?tab=parceladas" class="btn btn-sm btn-outline-danger"><i class="fas fa-list me-1"></i>Ver parcelamentos</a>
+                    <h6 class="fw-bold mb-1"><i class="fas fa-layer-group me-2 text-danger"></i><?= __('admin.expenses.report_installments', 'Relatório de Parcelamentos') ?></h6>
+                    <p class="text-muted small"><?= __('admin.expenses.report_installments_desc', 'Parcelas futuras, saldo total a pagar, compromissos.') ?></p>
+                    <a href="/admin/despesas?tab=parceladas" class="btn btn-sm btn-outline-danger"><i class="fas fa-list me-1"></i><?= __('admin.expenses.view_installments', 'Ver parcelamentos') ?></a>
                 </div>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><i class="fas fa-hand-holding-usd me-2 text-purple"></i>Relatório de Comissões</h6>
-                    <p class="text-muted small">Comissão por pessoa, gerada, a pagar, paga.</p>
-                    <a href="/admin/despesas?tab=comissoes" class="btn btn-sm btn-outline-secondary"><i class="fas fa-list me-1"></i>Ver comissões</a>
+                    <h6 class="fw-bold mb-1"><i class="fas fa-hand-holding-usd me-2 text-purple"></i><?= __('admin.expenses.report_commissions', 'Relatório de Comissões') ?></h6>
+                    <p class="text-muted small"><?= __('admin.expenses.report_commissions_desc', 'Comissão por pessoa, gerada, a pagar, paga.') ?></p>
+                    <a href="/admin/despesas?tab=comissoes" class="btn btn-sm btn-outline-secondary"><i class="fas fa-list me-1"></i><?= __('admin.expenses.view_commissions', 'Ver comissões') ?></a>
                 </div>
             </div>
         </div>
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-1"><i class="fas fa-chart-line me-2 text-success"></i>Fluxo de Caixa Previsto</h6>
-                    <p class="text-muted small">Entradas previstas vs saídas previstas = saldo projetado.</p>
-                    <a href="/admin/relatorio-geral" class="btn btn-sm btn-outline-success"><i class="fas fa-external-link-alt me-1"></i>Ver DRE no Financeiro</a>
+                    <h6 class="fw-bold mb-1"><i class="fas fa-chart-line me-2 text-success"></i><?= __('admin.expenses.report_cashflow', 'Fluxo de Caixa Previsto') ?></h6>
+                    <p class="text-muted small"><?= __('admin.expenses.report_cashflow_desc', 'Entradas previstas vs saídas previstas = saldo projetado.') ?></p>
+                    <a href="/admin/relatorio-geral" class="btn btn-sm btn-outline-success"><i class="fas fa-external-link-alt me-1"></i><?= __('admin.expenses.view_dre', 'Ver DRE no Financeiro') ?></a>
                 </div>
             </div>
         </div>
@@ -445,12 +445,12 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
 <div class="modal fade" id="modalDespView" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-globe me-2"></i>Visualização</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-globe me-2"></i><?= __('admin.expenses.display_settings', 'Visualização') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="mb-3"><label class="form-label fw-semibold small">Moeda de exibição</label><select id="desp-view-currency" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
-                <div class="mb-0"><label class="form-label fw-semibold small">Idioma</label><select id="desp-view-lang" class="form-select"><option value="pt">Português (PT-BR)</option><option value="en">English (EN)</option></select></div>
+                <div class="mb-3"><label class="form-label fw-semibold small"><?= __('admin.expenses.display_currency', 'Moeda de exibição') ?></label><select id="desp-view-currency" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                <div class="mb-0"><label class="form-label fw-semibold small"><?= __('admin.expenses.display_language', 'Idioma') ?></label><select id="desp-view-lang" class="form-select"><option value="pt">Português (PT-BR)</option><option value="en">English (EN)</option></select></div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary btn-sm" onclick="applyDespView();bootstrap.Modal.getInstance(document.getElementById('modalDespView')).hide();"><i class="fas fa-check me-1"></i>Aplicar</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><?= __('admin.common.cancel', 'Cancelar') ?></button><button type="button" class="btn btn-primary btn-sm" onclick="applyDespView();bootstrap.Modal.getInstance(document.getElementById('modalDespView')).hide();"><i class="fas fa-check me-1"></i><?= __('admin.expenses.apply', 'Aplicar') ?></button></div>
         </div>
     </div>
 </div>
@@ -460,56 +460,56 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST" action="/admin/despesas/criar">
-            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Nova Despesa</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i><?= __('admin.expenses.new', 'Nova Despesa') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="row g-3">
-                    <div class="col-md-8"><label class="form-label small fw-semibold">Descrição</label><input type="text" name="descricao" class="form-control" required placeholder="Ex: Aluguel sede comercial"></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Tipo</label><select name="tipo" class="form-select" id="despesa-tipo" onchange="toggleTipoFields()"><option value="avulsa">Avulsa</option><option value="fixa">Fixa</option><option value="recorrente">Recorrente</option><option value="parcelada">Parcelada</option><option value="por_hora">Por Hora</option></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Categoria</label><select name="categoria_id" class="form-select"><option value="">Selecione</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" class="form-select" id="despesa-moeda" onchange="updateValorLabel()"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold" id="valor-label">Valor (R$)</label><input type="number" name="valor" class="form-control" step="0.01" min="0" required></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Competência</label><input type="month" name="competencia" class="form-control" value="<?= date('Y-m') ?>"></div>
-                    <div class="col-md-4" id="field-vencimento"><label class="form-label small fw-semibold">Vencimento</label><input type="date" name="vencimento" class="form-control"></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Forma de pagamento</label><select name="forma_pagamento" class="form-select"><option value="">Selecione</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito">Cartão de crédito</option><option value="transferencia">Transferência</option><option value="debito_automatico">Débito automático</option></select></div>
-                    <div class="col-md-6"><label class="form-label small fw-semibold">Favorecido</label><input type="text" name="favorecido" class="form-control" placeholder="Nome do fornecedor/beneficiário"></div>
-                    <div class="col-md-6"><label class="form-label small fw-semibold">Status</label><select name="status" class="form-select"><option value="prevista">Prevista</option><option value="a_vencer">A vencer</option><option value="paga">Paga</option></select></div>
+                    <div class="col-md-8"><label class="form-label small fw-semibold"><?= __('admin.expenses.description', 'Descrição') ?></label><input type="text" name="descricao" class="form-control" required placeholder="<?= __('admin.expenses.description_placeholder', 'Ex: Aluguel sede comercial') ?>"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.type', 'Tipo') ?></label><select name="tipo" class="form-select" id="despesa-tipo" onchange="toggleTipoFields()"><option value="avulsa"><?= __('admin.expenses.type_single', 'Avulsa') ?></option><option value="fixa"><?= __('admin.expenses.type_fixed', 'Fixa') ?></option><option value="recorrente"><?= __('admin.expenses.type_recurring', 'Recorrente') ?></option><option value="parcelada"><?= __('admin.expenses.type_installment', 'Parcelada') ?></option><option value="por_hora"><?= __('admin.expenses.type_hourly', 'Por Hora') ?></option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.category', 'Categoria') ?></label><select name="categoria_id" class="form-select"><option value=""><?= __('admin.expenses.select', 'Selecione') ?></option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.currency', 'Moeda') ?></label><select name="moeda" class="form-select" id="despesa-moeda" onchange="updateValorLabel()"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold" id="valor-label"><?= __('admin.expenses.value', 'Valor') ?> (R$)</label><input type="number" name="valor" class="form-control" step="0.01" min="0" required></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.competence', 'Competência') ?></label><input type="month" name="competencia" class="form-control" value="<?= date('Y-m') ?>"></div>
+                    <div class="col-md-4" id="field-vencimento"><label class="form-label small fw-semibold"><?= __('admin.expenses.due_date', 'Vencimento') ?></label><input type="date" name="vencimento" class="form-control"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.payment_method', 'Forma de pagamento') ?></label><select name="forma_pagamento" class="form-select"><option value=""><?= __('admin.expenses.select', 'Selecione') ?></option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito"><?= __('admin.expenses.payment_credit_card', 'Cartão de crédito') ?></option><option value="transferencia"><?= __('admin.expenses.payment_transfer', 'Transferência') ?></option><option value="debito_automatico"><?= __('admin.expenses.payment_auto_debit', 'Débito automático') ?></option></select></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold"><?= __('admin.expenses.payee', 'Favorecido') ?></label><input type="text" name="favorecido" class="form-control" placeholder="<?= __('admin.expenses.payee_placeholder', 'Nome do fornecedor/beneficiário') ?>"></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold"><?= __('admin.expenses.status', 'Status') ?></label><select name="status" class="form-select"><option value="prevista"><?= __('admin.expenses.status_planned', 'Prevista') ?></option><option value="a_vencer"><?= __('admin.expenses.status_due_soon', 'A vencer') ?></option><option value="paga"><?= __('admin.expenses.status_paid', 'Paga') ?></option></select></div>
                     <!-- Campos recorrência -->
                     <div class="col-12 d-none" id="fields-recorrencia">
                         <div class="card border-info"><div class="card-body">
-                            <h6 class="fw-bold small text-info mb-2"><i class="fas fa-sync-alt me-1"></i>Configuração da Recorrência</h6>
+                            <h6 class="fw-bold small text-info mb-2"><i class="fas fa-sync-alt me-1"></i><?= __('admin.expenses.recurrence_config', 'Configuração da Recorrência') ?></h6>
                             <div class="row g-2">
-                                <div class="col-md-4"><label class="form-label small">Frequência</label><select name="frequencia" class="form-select form-select-sm"><option value="mensal">Mensal</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="anual">Anual</option></select></div>
-                                <div class="col-md-4"><label class="form-label small">Dia do vencimento</label><input type="number" name="dia_vencimento" class="form-control form-control-sm" min="1" max="31" value="1"></div>
-                                <div class="col-md-4"><label class="form-label small">Data início</label><input type="date" name="data_inicio" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
-                                <div class="col-md-4"><label class="form-label small">Data fim (opcional)</label><input type="date" name="data_fim" class="form-control form-control-sm"></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.frequency', 'Frequência') ?></label><select name="frequencia" class="form-select form-select-sm"><option value="mensal"><?= __('admin.expenses.freq_monthly', 'Mensal') ?></option><option value="semanal"><?= __('admin.expenses.freq_weekly', 'Semanal') ?></option><option value="quinzenal"><?= __('admin.expenses.freq_biweekly', 'Quinzenal') ?></option><option value="anual"><?= __('admin.expenses.freq_yearly', 'Anual') ?></option></select></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.due_day', 'Dia do vencimento') ?></label><input type="number" name="dia_vencimento" class="form-control form-control-sm" min="1" max="31" value="1"></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.start_date', 'Data início') ?></label><input type="date" name="data_inicio" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.end_date', 'Data fim (opcional)') ?></label><input type="date" name="data_fim" class="form-control form-control-sm"></div>
                             </div>
                         </div></div>
                     </div>
                     <!-- Campos por hora -->
                     <div class="col-md-4 d-none" id="fields-por-hora">
-                        <label class="form-label small fw-semibold">Nome da pessoa</label><input type="text" name="pessoa_nome" class="form-control" placeholder="Ex: João Silva">
+                        <label class="form-label small fw-semibold"><?= __('admin.expenses.person_name', 'Nome da pessoa') ?></label><input type="text" name="pessoa_nome" class="form-control" placeholder="Ex: João Silva">
                     </div>
                     <div class="col-md-4 d-none" id="fields-por-hora-horas">
-                        <label class="form-label small fw-semibold">Horas trabalhadas</label><input type="number" name="horas_trabalhadas" class="form-control" step="0.5" min="0.5" placeholder="Ex: 8">
+                        <label class="form-label small fw-semibold"><?= __('admin.expenses.hours_worked', 'Horas trabalhadas') ?></label><input type="number" name="horas_trabalhadas" class="form-control" step="0.5" min="0.5" placeholder="Ex: 8">
                     </div>
                     <div class="col-md-4 d-none" id="fields-por-hora-valor">
-                        <label class="form-label small fw-semibold" id="valor-hora-label">Valor por hora (R$)</label><input type="number" name="valor_hora" class="form-control" step="0.01" min="0" placeholder="Ex: 50.00">
+                        <label class="form-label small fw-semibold" id="valor-hora-label"><?= __('admin.expenses.hourly_rate', 'Valor por hora (R$)') ?></label><input type="number" name="valor_hora" class="form-control" step="0.01" min="0" placeholder="Ex: 50.00">
                     </div>
                     <!-- Campos parcelamento -->
                     <div class="col-12 d-none" id="fields-parcelamento">
                         <div class="card border-warning"><div class="card-body">
-                            <h6 class="fw-bold small text-warning mb-2"><i class="fas fa-layer-group me-1"></i>Configuração do Parcelamento</h6>
+                            <h6 class="fw-bold small text-warning mb-2"><i class="fas fa-layer-group me-1"></i><?= __('admin.expenses.installment_config', 'Configuração do Parcelamento') ?></h6>
                             <div class="row g-2">
-                                <div class="col-md-4"><label class="form-label small">Valor total</label><input type="number" name="valor_total" class="form-control form-control-sm" step="0.01" min="0"></div>
-                                <div class="col-md-4"><label class="form-label small">Quantidade de parcelas</label><input type="number" name="quantidade_parcelas" class="form-control form-control-sm" min="2" max="60" value="10"></div>
-                                <div class="col-md-4"><label class="form-label small">Data 1ª parcela</label><input type="date" name="data_primeira_parcela" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.total_value', 'Valor total') ?></label><input type="number" name="valor_total" class="form-control form-control-sm" step="0.01" min="0"></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.num_installments', 'Quantidade de parcelas') ?></label><input type="number" name="quantidade_parcelas" class="form-control form-control-sm" min="2" max="60" value="10"></div>
+                                <div class="col-md-4"><label class="form-label small"><?= __('admin.expenses.first_installment_date', 'Data 1ª parcela') ?></label><input type="date" name="data_primeira_parcela" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
                             </div>
                         </div></div>
                     </div>
-                    <div class="col-12"><label class="form-label small fw-semibold">Observações</label><textarea name="observacoes" class="form-control" rows="2"></textarea></div>
+                    <div class="col-12"><label class="form-label small fw-semibold"><?= __('admin.expenses.notes', 'Observações') ?></label><textarea name="observacoes" class="form-control" rows="2"></textarea></div>
                 </div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-dark btn-sm px-4"><i class="fas fa-save me-1"></i>Salvar</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><?= __('admin.common.cancel', 'Cancelar') ?></button><button type="submit" class="btn btn-dark btn-sm px-4"><i class="fas fa-save me-1"></i><?= __('admin.common.save', 'Salvar') ?></button></div>
             </form>
         </div>
     </div>
@@ -520,22 +520,22 @@ $countComissoes = count(array_filter($despesas, fn($d) => ($d['tipo'] ?? '') ===
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST" id="formEditarDespesa" action="">
-            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Despesa</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title"><i class="fas fa-edit me-2"></i><?= __('admin.expenses.edit', 'Editar Despesa') ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="row g-3">
-                    <div class="col-md-8"><label class="form-label small fw-semibold">Descrição</label><input type="text" name="descricao" id="edit-descricao" class="form-control" required></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Categoria</label><select name="categoria_id" id="edit-categoria" class="form-select"><option value="">Selecione</option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Moeda</label><select name="moeda" id="edit-moeda" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Valor</label><input type="number" name="valor" id="edit-valor" class="form-control" step="0.01" min="0" required></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Competência</label><input type="month" name="competencia" id="edit-competencia" class="form-control"></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Vencimento</label><input type="date" name="vencimento" id="edit-vencimento" class="form-control"></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Status</label><select name="status" id="edit-status" class="form-select"><option value="prevista">Prevista</option><option value="a_vencer">A vencer</option><option value="vencida">Vencida</option><option value="paga">Paga</option><option value="cancelada">Cancelada</option></select></div>
-                    <div class="col-md-4"><label class="form-label small fw-semibold">Forma de pagamento</label><select name="forma_pagamento" id="edit-forma-pagamento" class="form-select"><option value="">Selecione</option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito">Cartão de crédito</option><option value="transferencia">Transferência</option><option value="debito_automatico">Débito automático</option></select></div>
-                    <div class="col-md-6"><label class="form-label small fw-semibold">Favorecido</label><input type="text" name="favorecido" id="edit-favorecido" class="form-control"></div>
-                    <div class="col-md-6"><label class="form-label small fw-semibold">Observações</label><textarea name="observacoes" id="edit-observacoes" class="form-control" rows="2"></textarea></div>
+                    <div class="col-md-8"><label class="form-label small fw-semibold"><?= __('admin.expenses.description', 'Descrição') ?></label><input type="text" name="descricao" id="edit-descricao" class="form-control" required></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.category', 'Categoria') ?></label><select name="categoria_id" id="edit-categoria" class="form-select"><option value=""><?= __('admin.expenses.select', 'Selecione') ?></option><?php foreach ($categorias as $cat): ?><option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['nome']) ?></option><?php endforeach; ?></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.currency', 'Moeda') ?></label><select name="moeda" id="edit-moeda" class="form-select"><option value="BRL">BRL (Real)</option><option value="USD">USD (Dólar)</option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.value', 'Valor') ?></label><input type="number" name="valor" id="edit-valor" class="form-control" step="0.01" min="0" required></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.competence', 'Competência') ?></label><input type="month" name="competencia" id="edit-competencia" class="form-control"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.due_date', 'Vencimento') ?></label><input type="date" name="vencimento" id="edit-vencimento" class="form-control"></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.status', 'Status') ?></label><select name="status" id="edit-status" class="form-select"><option value="prevista"><?= __('admin.expenses.status_planned', 'Prevista') ?></option><option value="a_vencer"><?= __('admin.expenses.status_due_soon', 'A vencer') ?></option><option value="vencida"><?= __('admin.expenses.status_overdue', 'Vencida') ?></option><option value="paga"><?= __('admin.expenses.status_paid', 'Paga') ?></option><option value="cancelada"><?= __('admin.expenses.status_cancelled', 'Cancelada') ?></option></select></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold"><?= __('admin.expenses.payment_method', 'Forma de pagamento') ?></label><select name="forma_pagamento" id="edit-forma-pagamento" class="form-select"><option value=""><?= __('admin.expenses.select', 'Selecione') ?></option><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="cartao_credito"><?= __('admin.expenses.payment_credit_card', 'Cartão de crédito') ?></option><option value="transferencia"><?= __('admin.expenses.payment_transfer', 'Transferência') ?></option><option value="debito_automatico"><?= __('admin.expenses.payment_auto_debit', 'Débito automático') ?></option></select></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold"><?= __('admin.expenses.payee', 'Favorecido') ?></label><input type="text" name="favorecido" id="edit-favorecido" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label small fw-semibold"><?= __('admin.expenses.notes', 'Observações') ?></label><textarea name="observacoes" id="edit-observacoes" class="form-control" rows="2"></textarea></div>
                 </div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-dark btn-sm px-4"><i class="fas fa-save me-1"></i>Salvar</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><?= __('admin.common.cancel', 'Cancelar') ?></button><button type="submit" class="btn btn-dark btn-sm px-4"><i class="fas fa-save me-1"></i><?= __('admin.common.save', 'Salvar') ?></button></div>
             </form>
         </div>
     </div>
