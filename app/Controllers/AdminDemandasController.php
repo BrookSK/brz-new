@@ -21,7 +21,7 @@ class AdminDemandasController extends Controller {
         // Verificar testes expirados ao carregar o painel
         $this->verificarTestesExpirados();
         $demandas = $this->listar();
-        $title = 'Painel de Demandas'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.title', 'Painel de Demandas'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/painel.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -35,7 +35,7 @@ class AdminDemandasController extends Controller {
             $uid = $_SESSION['usuario_id'] ?? 0;
             if ($uid) { $st = $this->db->prepare("SELECT nome FROM usuarios WHERE id = ? LIMIT 1"); $st->execute([$uid]); $nomeUsuario = (string)($st->fetchColumn() ?: ''); }
         } catch (\Exception $e) {}
-        $title = 'Nova Solicitação'; $sidebarActive = 'demandas-nova';
+        $title = __('admin.demands.new_request', 'Nova Solicitação'); $sidebarActive = 'demandas-nova';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/nova.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -44,7 +44,7 @@ class AdminDemandasController extends Controller {
     public function concluidos(Request $request) {
         $auth = new AuthService(); $auth->requerPerfis(['admin','suporte']);
         $demandas = $this->listar('concluido');
-        $title = 'Demandas Concluídas'; $sidebarActive = 'demandas-concluidos';
+        $title = __('admin.demands.completed', 'Demandas Concluídas'); $sidebarActive = 'demandas-concluidos';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/concluidos.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
@@ -67,17 +67,17 @@ class AdminDemandasController extends Controller {
         $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Minhas Solicitações'; $sidebarActive = 'demandas-minhas';
+        $title = __('admin.demands.my_requests', 'Minhas Solicitações'); $sidebarActive = 'demandas-minhas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3">';
         echo '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">';
-        echo '<h1 class="page-title">Minhas Solicitações</h1>';
-        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>Nova Solicitação</a>';
+        echo '<h1 class="page-title">' . __('admin.demands.my_requests', 'Minhas Solicitações') . '</h1>';
+        echo '<a href="/admin/demandas/nova" class="btn btn-dark btn-sm rounded-pill px-3"><i class="fas fa-plus me-1"></i>' . __('admin.demands.new_request', 'Nova Solicitação') . '</a>';
         echo '</div>';
 
         if (empty($demandas)) {
-            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">Nenhuma solicitação ainda</h5><p class="text-muted small">Clique em "Nova Solicitação" para registrar uma demanda.</p></div></div>';
+            echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5"><i class="fas fa-inbox fs-1 text-muted d-block mb-3 opacity-50"></i><h5 class="text-muted">' . __('admin.demands.no_requests', 'Nenhuma solicitação ainda') . '</h5><p class="text-muted small">' . __('admin.demands.no_requests_hint', 'Clique em "Nova Solicitação" para registrar uma demanda.') . '</p></div></div>';
         } else {
             foreach ($demandas as $d) {
                 $st = $statusLabels[$d['status']] ?? $d['status'];
@@ -129,35 +129,35 @@ class AdminDemandasController extends Controller {
         $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Solicitação #' . $id; $sidebarActive = 'demandas-minhas';
+        $title = __('admin.demands.request_number', 'Solicitação #{id}', ['id' => $id]); $sidebarActive = 'demandas-minhas';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3">';
-        echo '<a href="/admin/demandas/minhas" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>Voltar</a>';
+        echo '<a href="/admin/demandas/minhas" class="btn btn-sm btn-secondary mb-3"><i class="fas fa-arrow-left me-1"></i>' . __('admin.demands.back', 'Voltar') . '</a>';
 
         // Header
         echo '<div class="card border-0 shadow-sm mb-4"><div class="card-body">';
         echo '<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">';
         echo '<div><h5 class="fw-bold mb-1">' . htmlspecialchars($demanda['bloco1_titulo']) . '</h5>';
-        echo '<div class="text-muted small">Criada em ' . date('d/m/Y H:i', strtotime($demanda['created_at'])) . '</div></div>';
+        echo '<div class="text-muted small">' . __('admin.demands.created_at', 'Criada em') . ' ' . date('d/m/Y H:i', strtotime($demanda['created_at'])) . '</div></div>';
         echo '<span class="badge bg-' . ($statusCores[$demanda['status']] ?? 'secondary') . ' fs-6">' . ($statusLabels[$demanda['status']] ?? $demanda['status']) . '</span>';
         echo '</div>';
 
         // Motivo recusa
         if ($demanda['status'] === 'recusado' && !empty($demanda['motivo_recusa'])) {
-            echo '<div class="alert alert-danger mt-3 mb-0 small"><i class="fas fa-ban me-1"></i><strong>Motivo da recusa:</strong> ' . nl2br(htmlspecialchars($demanda['motivo_recusa'])) . '</div>';
+            echo '<div class="alert alert-danger mt-3 mb-0 small"><i class="fas fa-ban me-1"></i><strong>' . __('admin.demands.refusal_reason', 'Motivo da recusa') . ':</strong> ' . nl2br(htmlspecialchars($demanda['motivo_recusa'])) . '</div>';
         }
 
         // Aviso teste
         if ($demanda['status'] === 'em_teste') {
-            echo '<div class="alert alert-warning mt-3 mb-0 small"><i class="fas fa-stopwatch me-1"></i><strong>Em teste!</strong> Você tem 24h úteis para testar e dar seu parecer. Caso contrário, será fechada automaticamente.</div>';
+            echo '<div class="alert alert-warning mt-3 mb-0 small"><i class="fas fa-stopwatch me-1"></i><strong>' . __('admin.demands.status_testing', 'Em teste') . '!</strong> ' . __('admin.demands.test_warning', 'Você tem 24h úteis para testar e dar seu parecer. Caso contrário, será fechada automaticamente.') . '</div>';
         }
 
         echo '</div></div>';
 
         // Arquivos
         if (!empty($arquivosBug)) {
-            echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>Arquivos Anexados</h6></div><div class="card-body"><div class="row g-2">';
+            echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-paperclip me-1"></i>' . __('admin.demands.attached_files', 'Arquivos Anexados') . '</h6></div><div class="card-body"><div class="row g-2">';
             foreach ($arquivosBug as $arq) {
                 $isImg = str_starts_with($arq['tipo'] ?? '', 'image/');
                 echo '<div class="col-md-3 col-6"><div class="border rounded p-2 text-center">';
@@ -170,7 +170,7 @@ class AdminDemandasController extends Controller {
         }
 
         // Histórico resumido
-        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-history me-1"></i>Histórico</h6></div><div class="card-body p-0"><ul class="list-group list-group-flush">';
+        echo '<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold small"><i class="fas fa-history me-1"></i>' . __('admin.demands.history', 'Histórico') . '</h6></div><div class="card-body p-0"><ul class="list-group list-group-flush">';
         foreach ($historico as $h) {
             echo '<li class="list-group-item small"><strong>' . date('d/m H:i', strtotime($h['created_at'])) . '</strong> — ' . ucfirst(str_replace('_', ' ', $h['status_novo']));
             if ($h['observacao']) echo '<br><span class="text-muted">' . htmlspecialchars($h['observacao']) . '</span>';
@@ -179,10 +179,10 @@ class AdminDemandasController extends Controller {
         echo '</ul></div></div>';
 
         // Chat
-        echo '<div class="card border-0 shadow-sm mb-4" id="chat"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>Comunicação com o TI</h6><span class="badge bg-secondary">' . count($mensagens) . '</span></div>';
+        echo '<div class="card border-0 shadow-sm mb-4" id="chat"><div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center"><h6 class="fw-bold small mb-0"><i class="fas fa-comments me-1"></i>' . __('admin.demands.communication_it', 'Comunicação com o TI') . '</h6><span class="badge bg-secondary">' . count($mensagens) . '</span></div>';
         echo '<div class="card-body" style="max-height:400px;overflow-y:auto;">';
         if (empty($mensagens)) {
-            echo '<div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>Nenhuma mensagem ainda.</div>';
+            echo '<div class="text-center text-muted small py-3"><i class="fas fa-inbox d-block mb-1 fs-4 opacity-50"></i>' . __('admin.demands.no_messages', 'Nenhuma mensagem ainda.') . '</div>';
         } else {
             foreach ($mensagens as $msg) {
                 $isMeu = ((int)($msg['usuario_id'] ?? 0) === $uid);
@@ -205,9 +205,9 @@ class AdminDemandasController extends Controller {
 
         // Form enviar mensagem
         echo '<div class="card-footer bg-white border-top"><form method="POST" action="/admin/demandas/minha/' . $id . '/mensagem" enctype="multipart/form-data">';
-        echo '<div class="d-flex gap-2"><div class="flex-grow-1"><textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="Escreva uma mensagem..."></textarea></div></div>';
-        echo '<div class="d-flex justify-content-between align-items-center mt-2"><div><label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;"><i class="fas fa-paperclip me-1"></i>Anexar<input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip"></label></div>';
-        echo '<button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>Enviar</button></div>';
+        echo '<div class="d-flex gap-2"><div class="flex-grow-1"><textarea name="mensagem" class="form-control form-control-sm" rows="2" placeholder="' . __('admin.demands.write_message', 'Escreva uma mensagem...') . '"></textarea></div></div>';
+        echo '<div class="d-flex justify-content-between align-items-center mt-2"><div><label class="btn btn-sm btn-outline-secondary mb-0" style="cursor:pointer;"><i class="fas fa-paperclip me-1"></i>' . __('admin.demands.attach', 'Anexar') . '<input type="file" name="arquivos[]" multiple class="d-none" accept="image/*,video/*,.pdf,.doc,.docx,.zip"></label></div>';
+        echo '<button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane me-1"></i>' . __('admin.demands.send', 'Enviar') . '</button></div>';
         echo '</form></div></div>';
 
         echo '</div>';
@@ -842,11 +842,11 @@ class AdminDemandasController extends Controller {
             $usuarios = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         } catch (\Exception $e) {}
 
-        $title = 'Configurações de Demandas'; $sidebarActive = 'configuracoes';
+        $title = __('admin.demands.settings', 'Configurações de Demandas'); $sidebarActive = 'configuracoes';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-3"><div class="row justify-content-center"><div class="col-lg-8">';
-        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title">Configurações de Demandas</h1><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>Voltar</a></div>';
+        echo '<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title">' . __('admin.demands.settings', 'Configurações de Demandas') . '</h1><a href="/admin/configuracoes" class="btn btn-sm btn-secondary"><i class="fas fa-arrow-left me-1"></i>' . __('admin.demands.back', 'Voltar') . '</a></div>';
 
         if (!empty($_SESSION['message'])) {
             echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' alert-dismissible fade show">' . htmlspecialchars($_SESSION['message']) . '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
@@ -941,21 +941,21 @@ class AdminDemandasController extends Controller {
         }
 
         // Mostrar tela de senha
-        $title = 'Painel de Demandas - Acesso Restrito'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.restricted_access', 'Painel de Demandas - Acesso Restrito'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start();
         echo '<div class="container-fluid py-5"><div class="row justify-content-center"><div class="col-md-4">';
         echo '<div class="card border-0 shadow-sm"><div class="card-body text-center py-5">';
         echo '<i class="fas fa-lock fs-1 text-muted mb-3 d-block"></i>';
-        echo '<h5 class="fw-bold mb-3">Acesso Restrito</h5>';
-        echo '<p class="text-muted small mb-4">O painel de demandas requer autenticação adicional.</p>';
+        echo '<h5 class="fw-bold mb-3">' . __('admin.demands.restricted_access', 'Acesso Restrito') . '</h5>';
+        echo '<p class="text-muted small mb-4">' . __('admin.demands.restricted_access_hint', 'O painel de demandas requer autenticação adicional.') . '</p>';
         if (!empty($_SESSION['message'])) {
             echo '<div class="alert alert-' . ($_SESSION['message_type'] ?? 'info') . ' small">' . htmlspecialchars($_SESSION['message']) . '</div>';
             unset($_SESSION['message'], $_SESSION['message_type']);
         }
         echo '<form method="POST" action="/admin/demandas/painel">';
-        echo '<div class="mb-3"><input type="password" name="senha_painel" class="form-control text-center" placeholder="Digite a senha" autofocus required></div>';
-        echo '<button type="submit" class="btn btn-dark w-100"><i class="fas fa-unlock me-1"></i>Acessar</button>';
+        echo '<div class="mb-3"><input type="password" name="senha_painel" class="form-control text-center" placeholder="' . __('admin.demands.enter_password', 'Digite a senha') . '" autofocus required></div>';
+        echo '<button type="submit" class="btn btn-dark w-100"><i class="fas fa-unlock me-1"></i>' . __('admin.demands.access', 'Acessar') . '</button>';
         echo '</form>';
         echo '</div></div></div></div></div>';
         $content = ob_get_clean();
@@ -1168,7 +1168,7 @@ class AdminDemandasController extends Controller {
         $statusLabels = ['pendente'=>'Pendente','em_analise'=>'Em Análise','em_execucao'=>'Em Execução','em_teste'=>'Em Teste','recusado'=>'Recusado','concluido'=>'Concluído'];
         $statusCores = ['pendente'=>'secondary','em_analise'=>'primary','em_execucao'=>'warning','em_teste'=>'info','recusado'=>'danger','concluido'=>'success'];
 
-        $title = 'Demandas Arquivadas'; $sidebarActive = 'demandas-painel';
+        $title = __('admin.demands.archived', 'Demandas Arquivadas'); $sidebarActive = 'demandas-painel';
         include_once __DIR__ . '/../Views/partials/admin_sidebar.php';
         ob_start(); require __DIR__ . '/../Views/admin/demandas/arquivados.php'; $content = ob_get_clean();
         include __DIR__ . '/../Views/layouts/admin.php';
