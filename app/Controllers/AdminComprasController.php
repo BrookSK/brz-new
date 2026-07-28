@@ -1527,7 +1527,7 @@ class AdminComprasController extends Controller {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Compras - Braziliana Admin</title>
+    <title>' . __('admin.purchases.title', 'Lista de Compras') . ' - Braziliana Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -1553,11 +1553,11 @@ class AdminComprasController extends Controller {
         
         echo '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="page-title">Lista de Compras</h1>
+                    <h1 class="page-title">' . __('admin.purchases.title', 'Lista de Compras') . '</h1>
                     <div>';
 
         echo '<button type="button" class="btn btn-primary me-2" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')">
-                            <i class="fas fa-file-pdf me-1"></i>Gerar PDF
+                            <i class="fas fa-file-pdf me-1"></i>' . __('admin.purchases.generate_pdf', 'Gerar PDF') . '
                         </button>';
 
         if ($statusView !== 'pendente') {
@@ -1565,13 +1565,13 @@ class AdminComprasController extends Controller {
                             <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                             <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                             <button type="button" class="btn btn-secondary me-2" data-bs-toggle="modal" data-bs-target="#modalReabrirCompras">
-                                <i class="fas fa-rotate-left me-1"></i>Reabrir itens
+                                <i class="fas fa-rotate-left me-1"></i>' . __('admin.purchases.reopen_items', 'Reabrir itens') . '
                             </button>
                         </form>';
         }
 
         echo '<button type="button" class="btn btn-info" onclick="location.reload()">
-                            <i class="fas fa-sync me-1"></i>Atualizar
+                            <i class="fas fa-sync me-1"></i>' . __('admin.common.refresh', 'Atualizar') . '
                         </button>
                     </div>
                 </div>';
@@ -1579,8 +1579,8 @@ class AdminComprasController extends Controller {
                 $this->renderFlashIfAny();
 
                 echo '<div class="alert alert-info mb-3">'
-                    . '<div><strong>Importante:</strong> as quantidades exibidas na Lista de Compras representam o <strong>faltante</strong> considerando o estoque cadastrado (tela de Estoque), e não necessariamente o total pedido.</div>'
-                    . '<div class="small text-muted mt-1">Pedidos do site (online) e pedidos manuais seguem a mesma regra de cálculo do faltante.</div>'
+                    . '<div><strong>' . __('admin.common.important', 'Importante') . ':</strong> ' . __('admin.purchases.qty_note', 'as quantidades exibidas na Lista de Compras representam o <strong>faltante</strong> considerando o estoque cadastrado (tela de Estoque), e não necessariamente o total pedido.') . '</div>'
+                    . '<div class="small text-muted mt-1">' . __('admin.purchases.qty_note_sub', 'Pedidos do site (online) e pedidos manuais seguem a mesma regra de cálculo do faltante.') . '</div>'
                     . '</div>';
 
                 $qsLoja = '';
@@ -1593,8 +1593,8 @@ class AdminComprasController extends Controller {
                 }
 
                 echo '<div class="d-flex flex-wrap gap-2 mb-2">'
-                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . '">Pendentes</a>'
-                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">Concluídas</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'pendente' ? 'btn-primary' : 'btn-outline-primary') . '" href="/admin/estoque/compras?status=pendente' . $qsLoja . '">' . __('admin.purchases.pending', 'Pendentes') . '</a>'
+                    . '<a class="btn btn-sm ' . ($statusView === 'concluidas' ? 'btn-secondary' : 'btn-outline-secondary') . '" href="/admin/estoque/compras?status=concluidas' . $qsLoja . '">' . __('admin.purchases.completed', 'Concluídas') . '</a>'
                     . '</div>';
 
                 // Build active lojas array from query string (supports multi-select)
@@ -1610,11 +1610,11 @@ class AdminComprasController extends Controller {
                     $lojasAtivas = $lojasMulti;
                 }
 
-                $dropdownLabel = 'Todas as lojas';
+                $dropdownLabel = __('admin.purchases.all_stores', 'Todas as lojas');
                 if (in_array('sem_loja', $lojasAtivas)) {
-                    $dropdownLabel = 'Sem loja';
+                    $dropdownLabel = __('admin.purchases.no_store', 'Sem loja');
                     if (count($lojasAtivas) > 1) {
-                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                        $dropdownLabel = count($lojasAtivas) . ' ' . __('admin.purchases.stores_selected', 'lojas selecionadas');
                     }
                 } elseif (!empty($lojasAtivas)) {
                     if (count($lojasAtivas) === 1) {
@@ -1625,7 +1625,7 @@ class AdminComprasController extends Controller {
                             }
                         }
                     } else {
-                        $dropdownLabel = count($lojasAtivas) . ' lojas selecionadas';
+                        $dropdownLabel = count($lojasAtivas) . ' ' . __('admin.purchases.stores_selected', 'lojas selecionadas');
                     }
                 }
 
@@ -1638,12 +1638,12 @@ class AdminComprasController extends Controller {
                                 </button>
                                 <div class="dropdown-menu p-3" style="min-width:280px;max-height:320px;overflow-y:auto;" aria-labelledby="lojaDropdownBtn">
                                     <div class="mb-2">
-                                        <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="Buscar loja...">
+                                        <input type="text" class="form-control form-control-sm" id="lojaSearchInput" placeholder="' . __('admin.purchases.search_store', 'Buscar loja...') . '">
                                     </div>
                                     <div style="overflow-y:auto;max-height:240px;">
                                     <div class="form-check mb-1">
                                         <input class="form-check-input loja-check" type="checkbox" value="todas" id="lojaCheck_todas" ' . (empty($lojasAtivas) ? 'checked' : '') . '>
-                                        <label class="form-check-label" for="lojaCheck_todas">Todas</label>
+                                        <label class="form-check-label" for="lojaCheck_todas">' . __('admin.purchases.all', 'Todas') . '</label>
                                     </div>
                                     <hr class="my-1">';
 
@@ -1660,15 +1660,15 @@ class AdminComprasController extends Controller {
                 echo '<hr class="my-1">
                                     <div class="form-check mb-1 loja-item">
                                         <input class="form-check-input loja-check" type="checkbox" value="sem_loja" id="lojaCheck_sem" ' . (in_array('sem_loja', $lojasAtivas) ? 'checked' : '') . '>
-                                        <label class="form-check-label text-danger" for="lojaCheck_sem">Sem loja</label>
+                                        <label class="form-check-label text-danger" for="lojaCheck_sem">' . __('admin.purchases.no_store', 'Sem loja') . '</label>
                                     </div>
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-primary d-none" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>Aplicar</button>
+                            <button type="button" class="btn btn-sm btn-primary d-none" id="lojaApplyBtn"><i class="fas fa-filter me-1"></i>' . __('admin.purchases.apply', 'Aplicar') . '</button>
                         </div>'
-                    . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">Tipo:</small>'
-                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">Todos</a>'
+                    . '<div class="d-flex flex-wrap gap-1 align-items-center"><small class="text-muted me-1">' . __('admin.purchases.type', 'Tipo') . ':</small>'
+                    . '<a class="btn btn-sm ' . ($tipoCompraView === 'todos' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=todos">' . __('admin.purchases.type_all', 'Todos') . '</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'online' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=online">Online</a>'
                     . '<a class="btn btn-sm ' . ($tipoCompraView === 'offline' ? 'btn-dark' : 'btn-outline-dark') . '" href="/admin/estoque/compras?status=' . $statusView . $qsLoja . '&tipo_compra=offline">Offline</a>'
                     . '</div>'
@@ -1755,36 +1755,36 @@ class AdminComprasController extends Controller {
                     <div class="col-md-3">
                         <div class="card card-stats bg-primary text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Total Itens</h5>
+                                <h5 class="card-title">' . __('admin.purchases.total_items', 'Total Itens') . '</h5>
                                 <h3>' . number_format($estatisticas['total_itens']) . '</h3>
-                                <small>Na lista de compras</small>
+                                <small>' . __('admin.purchases.in_purchase_list', 'Na lista de compras') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-warning text-dark">
                             <div class="card-body">
-                                <h5 class="card-title">Pendentes</h5>
+                                <h5 class="card-title">' . __('admin.purchases.pending', 'Pendentes') . '</h5>
                                 <h3>' . number_format($estatisticas['pendentes']) . '</h3>
-                                <small>Aguardando compra</small>
+                                <small>' . __('admin.purchases.awaiting_purchase', 'Aguardando compra') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-success text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Comprados</h5>
+                                <h5 class="card-title">' . __('admin.purchases.purchased', 'Comprados') . '</h5>
                                 <h3>' . number_format($estatisticas['comprados']) . '</h3>
-                                <small>Itens adquiridos</small>
+                                <small>' . __('admin.purchases.items_acquired', 'Itens adquiridos') . '</small>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card card-stats bg-danger text-white">
                             <div class="card-body">
-                                <h5 class="card-title">Cancelados</h5>
+                                <h5 class="card-title">' . __('admin.purchases.cancelled', 'Cancelados') . '</h5>
                                 <h3>' . number_format($estatisticas['cancelados']) . '</h3>
-                                <small>Itens cancelados</small>
+                                <small>' . __('admin.purchases.items_cancelled', 'Itens cancelados') . '</small>
                             </div>
                         </div>
                     </div>
@@ -1793,17 +1793,17 @@ class AdminComprasController extends Controller {
                 // Tabela de Compras
                 echo '<div class="card">
                     <div class="card-header">
-                        <h5><i class="fas fa-list me-2"></i>Itens da Lista de Compras</h5>
+                        <h5><i class="fas fa-list me-2"></i>' . __('admin.purchases.list_items', 'Itens da Lista de Compras') . '</h5>
                     </div>
                     <div class="card-body">
                         <div class="d-flex justify-content-end gap-2 mb-3">';
 
                 if ($semLoja) {
-                    echo '<button type="button" class="btn btn-sm btn-outline-danger" disabled>PDF (Sem loja)</button>';
+                    echo '<button type="button" class="btn btn-sm btn-outline-danger" disabled>' . __('admin.purchases.pdf_no_store', 'PDF (Sem loja)') . '</button>';
                 } elseif ($lojaIdFilter > 0) {
-                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf?loja_id=' . (int) $lojaIdFilter . '\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>PDF desta loja</button>';
+                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf?loja_id=' . (int) $lojaIdFilter . '\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>' . __('admin.purchases.pdf_this_store', 'PDF desta loja') . '</button>';
                 } else {
-                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>PDF (geral)</button>';
+                    echo '<button type="button" class="btn btn-sm btn-outline-primary" onclick="window.open(\'/admin/estoque/compras/pdf\', \'_blank\')"><i class="fas fa-file-pdf me-1"></i>' . __('admin.purchases.pdf_all', 'PDF (geral)') . '</button>';
                 }
 
                 echo '        </div>
@@ -1811,13 +1811,13 @@ class AdminComprasController extends Controller {
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Produto</th>
-                                        <th>Loja</th>
-                                        <th>Quantidade</th>
-                                        <th>Status</th>
-                                        <th>Prioridade</th>
-                                        <th>Data Solicitação</th>
-                                        <th>Ações</th>
+                                        <th>' . __('admin.purchases.product', 'Produto') . '</th>
+                                        <th>' . __('admin.purchases.store', 'Loja') . '</th>
+                                        <th>' . __('admin.purchases.quantity', 'Quantidade') . '</th>
+                                        <th>' . __('admin.purchases.status', 'Status') . '</th>
+                                        <th>' . __('admin.purchases.priority', 'Prioridade') . '</th>
+                                        <th>' . __('admin.purchases.request_date', 'Data Solicitação') . '</th>
+                                        <th>' . __('admin.common.actions', 'Ações') . '</th>
                                     </tr>
                                 </thead>
                                 <tbody>';
@@ -1915,7 +1915,7 @@ class AdminComprasController extends Controller {
                                         . ((!empty($item['tipo_compra']) && $item['tipo_compra'] === 'carne') ? ' <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>' : '')
                                         . '</div></div>'
                                         . '</td>'
-                                        . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">Sem loja</span>') . '</td>'
+                                        . '<td>' . (!$missingLoja ? htmlspecialchars($lojaNome) : '<span class="badge bg-danger">' . __('admin.purchases.no_store', 'Sem loja') . '</span>') . '</td>'
                                         . '<td><span class="badge bg-primary">' . $qf . '</span></td>'
                                         . '<td><span class="badge bg-' . $status_class . '">' . ucfirst((string) $item['status']) . '</span></td>'
                                         . '<td><span class="badge bg-' . $prioridade_class . '">' . ucfirst((string) $item['prioridade']) . '</span></td>'
@@ -2016,13 +2016,13 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/definir-loja">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Definir loja do produto</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.set_store', 'Definir loja do produto') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="modal_produto_id" value="">
                                         <div class="mb-2 text-muted" id="modal_produto_nome"></div>
-                                        <label class="form-label">Loja *</label>
+                                        <label class="form-label">' . __('admin.purchases.store', 'Loja') . ' *</label>
                                         <select class="form-select" name="loja_id" required>
                                             <option value="">Selecione...</option>';
                 foreach ($lojas as $l) {
@@ -2031,8 +2031,8 @@ class AdminComprasController extends Controller {
                 echo '            </select>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.common.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-primary">' . __('admin.common.save', 'Salvar') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2044,17 +2044,17 @@ class AdminComprasController extends Controller {
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title">Pedidos relacionados</h5>
+                                    <h5 class="modal-title">' . __('admin.purchases.related_orders', 'Pedidos relacionados') . '</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-2 text-muted" id="pedidos_produto_nome"></div>
-                                    <div id="pedidos_loading" class="text-muted">Carregando...</div>
-                                    <div id="pedidos_empty" class="alert alert-warning d-none">Nenhum pedido encontrado para este item.</div>
+                                    <div id="pedidos_loading" class="text-muted">' . __('admin.common.loading', 'Carregando...') . '</div>
+                                    <div id="pedidos_empty" class="alert alert-warning d-none">' . __('admin.purchases.no_orders_found', 'Nenhum pedido encontrado para este item.') . '</div>
                                     <div class="accordion" id="accordionPedidos"></div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.common.close', 'Fechar') . '</button>
                                 </div>
                             </div>
                         </div>
@@ -2254,17 +2254,17 @@ class AdminComprasController extends Controller {
                                     <input type="hidden" name="loja_id" value="' . (int) $lojaIdFilter . '">
                                     <input type="hidden" name="sem_loja" value="' . ($semLoja ? '1' : '0') . '">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Reabrir itens</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.reopen_items', 'Reabrir itens') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="alert alert-secondary mb-0">
-                                            Deseja voltar para <strong>pendente</strong> todos os itens concluídos deste filtro?
+                                            ' . __('admin.purchases.reopen_confirm_all', 'Deseja voltar para <strong>pendente</strong> todos os itens concluídos deste filtro?') . '
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Reabrir</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.common.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-primary">' . __('admin.purchases.reopen', 'Reabrir') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2292,7 +2292,7 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/remover-item">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Remover item da lista</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.remove_item', 'Remover item da lista') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
@@ -2302,12 +2302,12 @@ class AdminComprasController extends Controller {
                                         <input type="hidden" name="redirect_loja_id" id="remover_redirect_loja_id" value="0">
                                         <input type="hidden" name="redirect_sem_loja" id="remover_redirect_sem_loja" value="0">
                                         <div class="alert alert-warning mb-0">
-                                            Tem certeza que deseja remover da lista o item <strong id="remover_produto_nome"></strong>?
+                                            ' . __('admin.purchases.remove_confirm', 'Tem certeza que deseja remover da lista o item') . ' <strong id="remover_produto_nome"></strong>?
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-danger">Remover</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.common.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-danger">' . __('admin.common.remove', 'Remover') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2336,19 +2336,19 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/reabrir">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Reabrir item</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.reopen_item', 'Reabrir item') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
                                         <input type="hidden" name="produto_id" id="reabrir_produto_id" value="">
                                         <input type="hidden" name="loja_id" id="reabrir_loja_id" value="0">
                                         <div class="alert alert-secondary mb-0">
-                                            Voltar para <strong>pendente</strong>: <strong id="reabrir_produto_nome"></strong>
+                                            ' . __('admin.purchases.reopen_to_pending', 'Voltar para <strong>pendente</strong>:') . ' <strong id="reabrir_produto_nome"></strong>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary">Reabrir</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.common.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-primary">' . __('admin.purchases.reopen', 'Reabrir') . '</button>
                                     </div>
                                 </form>
                             </div>
@@ -2373,7 +2373,7 @@ class AdminComprasController extends Controller {
                             <div class="modal-content">
                                 <form method="POST" action="/admin/estoque/compras/concluir">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Concluir item</h5>
+                                        <h5 class="modal-title">' . __('admin.purchases.complete_item', 'Concluir item') . '</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
@@ -2383,18 +2383,18 @@ class AdminComprasController extends Controller {
                                         <input type="hidden" name="redirect_sem_loja" id="concluir_redirect_sem_loja" value="0">
                                         <input type="hidden" name="redirect_lojas" id="concluir_redirect_lojas" value="">
                                         <div class="alert alert-success mb-0">
-                                            Concluir compra de: <strong id="concluir_produto_nome"></strong>
+                                            ' . __('admin.purchases.confirm_purchase', 'Concluir compra') . ' de: <strong id="concluir_produto_nome"></strong>
                                         </div>
                                         <div class="mt-3">
-                                            <label class="form-label">Quantidade comprada (apenas para compra parcial)</label>
+                                            <label class="form-label">' . __('admin.purchases.qty_purchased_partial', 'Quantidade comprada (apenas para compra parcial)') . '</label>
                                             <input type="number" class="form-control" name="quantidade_comprada" id="concluir_quantidade_comprada" min="0" max="0" value="0">
-                                            <div class="form-text">Se comprar parcial, informe quantos itens foram comprados. A diferença continuará pendente.</div>
+                                            <div class="form-text">' . __('admin.purchases.partial_help', 'Se comprar parcial, informe quantos itens foram comprados. A diferença continuará pendente.') . '</div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-success" name="modo" value="total">Confirmar compra total</button>
-                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">Confirmar parcial</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">' . __('admin.common.cancel', 'Cancelar') . '</button>
+                                        <button type="submit" class="btn btn-success" name="modo" value="total">' . __('admin.purchases.confirm_total', 'Confirmar compra total') . '</button>
+                                        <button type="submit" class="btn btn-outline-success" name="modo" value="parcial">' . __('admin.purchases.confirm_partial', 'Confirmar parcial') . '</button>
                                     </div>
                                 </form>
                             </div>
