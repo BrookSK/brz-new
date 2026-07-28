@@ -20,15 +20,15 @@ foreach ($eventos as $ev) {
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
         <div>
-            <h1 class="page-title">Calendário de Marketing</h1>
-            <p class="page-subtitle">Gerencie datas comemorativas e oportunidades de campanha</p>
+            <h1 class="page-title"><?= __('admin.marketing.calendar_title', 'Calendário de Marketing') ?></h1>
+            <p class="page-subtitle"><?= __('admin.marketing.calendar_subtitle', 'Gerencie datas comemorativas e oportunidades de campanha') ?></p>
         </div>
         <div class="d-flex gap-2">
             <button class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="gerarComIA()">
-                <i class="fas fa-robot me-1"></i>Gerar com IA
+                <i class="fas fa-robot me-1"></i><?= __('admin.marketing.generate_ai', 'Gerar com IA') ?>
             </button>
             <button class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEvento" onclick="novoEvento()">
-                <i class="fas fa-plus me-1"></i>Novo Evento
+                <i class="fas fa-plus me-1"></i><?= __('admin.marketing.new_event', 'Novo Evento') ?>
             </button>
         </div>
     </div>
@@ -38,7 +38,7 @@ foreach ($eventos as $ev) {
         <div class="card-body py-3">
             <form method="GET" class="d-flex align-items-end flex-wrap gap-3">
                 <div>
-                    <label class="form-label small text-muted mb-1">Ano</label>
+                    <label class="form-label small text-muted mb-1"><?= __('admin.marketing.year', 'Ano') ?></label>
                     <select name="ano" class="form-select form-select-sm" style="width:100px;">
                         <?php for ($y = date('Y') - 1; $y <= date('Y') + 2; $y++): ?>
                         <option value="<?= $y ?>" <?= $y == $ano ? 'selected' : '' ?>><?= $y ?></option>
@@ -46,25 +46,25 @@ foreach ($eventos as $ev) {
                     </select>
                 </div>
                 <div>
-                    <label class="form-label small text-muted mb-1">Mês</label>
+                    <label class="form-label small text-muted mb-1"><?= __('admin.marketing.month', 'Mês') ?></label>
                     <select name="mes" class="form-select form-select-sm" style="width:140px;">
-                        <option value="0">Todos</option>
+                        <option value="0"><?= __('admin.marketing.all_months', 'Todos') ?></option>
                         <?php for ($m = 1; $m <= 12; $m++): ?>
                         <option value="<?= $m ?>" <?= $m == $mes ? 'selected' : '' ?>><?= $meses[$m] ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
                 <div>
-                    <label class="form-label small text-muted mb-1">País</label>
+                    <label class="form-label small text-muted mb-1"><?= __('admin.marketing.country', 'País') ?></label>
                     <select name="pais" class="form-select form-select-sm" style="width:140px;">
-                        <option value="">Todos</option>
+                        <option value=""><?= __('admin.marketing.all_countries', 'Todos') ?></option>
                         <option value="BR" <?= $pais === 'BR' ? 'selected' : '' ?>>Brasil</option>
                         <option value="US" <?= $pais === 'US' ? 'selected' : '' ?>>Estados Unidos</option>
                         <option value="GLOBAL" <?= $pais === 'GLOBAL' ? 'selected' : '' ?>>Global</option>
                     </select>
                 </div>
                 <div>
-                    <button type="submit" class="btn btn-dark btn-sm px-3"><i class="fas fa-filter me-1"></i>Filtrar</button>
+                    <button type="submit" class="btn btn-dark btn-sm px-3"><i class="fas fa-filter me-1"></i><?= __('admin.financial.filter_btn', 'Filtrar') ?></button>
                 </div>
             </form>
         </div>
@@ -75,7 +75,7 @@ foreach ($eventos as $ev) {
         <div class="col-md-3">
             <div class="card border-0 shadow-sm text-center py-3">
                 <div class="fs-3 fw-bold text-primary"><?= count($eventos) ?></div>
-                <div class="text-muted small">Eventos no período</div>
+                <div class="text-muted small"><?= __('admin.marketing.events_in_period', 'Eventos no período') ?></div>
             </div>
         </div>
         <div class="col-md-3">
@@ -96,7 +96,7 @@ foreach ($eventos as $ev) {
                 $proximos = array_filter($eventos, fn($e) => $e['data_evento'] >= date('Y-m-d') && $e['ativo']);
                 ?>
                 <div class="fs-3 fw-bold text-warning"><?= count($proximos) ?></div>
-                <div class="text-muted small">Próximos</div>
+                <div class="text-muted small"><?= __('admin.marketing.upcoming', 'Próximos') ?></div>
             </div>
         </div>
     </div>
@@ -106,9 +106,9 @@ foreach ($eventos as $ev) {
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center py-5">
             <i class="fas fa-calendar-alt text-muted d-block mb-3" style="font-size:48px;opacity:.3;"></i>
-            <h5 class="text-muted">Nenhum evento cadastrado</h5>
-            <p class="text-muted small">Clique em "Gerar com IA" para criar sugestões automáticas ou adicione manualmente.</p>
-            <button class="btn btn-primary btn-sm" onclick="gerarComIA()"><i class="fas fa-robot me-1"></i>Gerar Sugestões com IA</button>
+            <h5 class="text-muted"><?= __('admin.marketing.no_events', 'Nenhum evento cadastrado') ?></h5>
+            <p class="text-muted small"><?= __('admin.marketing.no_events_hint', 'Clique em "Gerar com IA" para criar sugestões automáticas ou adicione manualmente.') ?></p>
+            <button class="btn btn-primary btn-sm" onclick="gerarComIA()"><i class="fas fa-robot me-1"></i><?= __('admin.marketing.generate_suggestions', 'Gerar Sugestões com IA') ?></button>
         </div>
     </div>
     <?php else: ?>
@@ -130,12 +130,12 @@ foreach ($eventos as $ev) {
                         <thead class="table-light">
                             <tr>
                                 <th style="width:40px;"></th>
-                                <th>Evento</th>
-                                <th>Data</th>
-                                <th>País</th>
-                                <th>Categoria</th>
-                                <th>Origem</th>
-                                <th class="text-end">Ações</th>
+                                <th><?= __('admin.marketing.event', 'Evento') ?></th>
+                                <th><?= __('admin.marketing.date', 'Data') ?></th>
+                                <th><?= __('admin.marketing.country', 'País') ?></th>
+                                <th><?= __('admin.marketing.category', 'Categoria') ?></th>
+                                <th><?= __('admin.marketing.origin', 'Origem') ?></th>
+                                <th class="text-end"><?= __('admin.common.actions', 'Ações') ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -155,7 +155,7 @@ foreach ($eventos as $ev) {
                                 </td>
                                 <td class="text-nowrap">
                                     <?= date('d/m', strtotime($ev['data_evento'])) ?>
-                                    <?php if ($isToday): ?><span class="badge bg-success ms-1">Hoje</span>
+                                    <?php if ($isToday): ?><span class="badge bg-success ms-1"><?= __('admin.marketing.today', 'Hoje') ?></span>
                                     <?php elseif (!$isPast && $daysUntil <= 7): ?><span class="badge bg-danger ms-1"><?= $daysUntil ?>d</span>
                                     <?php elseif (!$isPast && $daysUntil <= 30): ?><span class="badge bg-warning text-dark ms-1"><?= $daysUntil ?>d</span>
                                     <?php elseif (!$isPast): ?><span class="badge bg-light text-dark ms-1"><?= $daysUntil ?>d</span>
@@ -175,9 +175,9 @@ foreach ($eventos as $ev) {
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editarEvento(<?= htmlspecialchars(json_encode($ev)) ?>)" title="Editar"><i class="fas fa-pen"></i></button>
-                                    <button class="btn btn-sm btn-outline-<?= $ev['ativo'] ? 'warning' : 'success' ?>" onclick="toggleEvento(<?= $ev['id'] ?>)" title="<?= $ev['ativo'] ? 'Desativar' : 'Ativar' ?>"><i class="fas fa-<?= $ev['ativo'] ? 'eye-slash' : 'eye' ?>"></i></button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="excluirEvento(<?= $ev['id'] ?>, '<?= htmlspecialchars(addslashes($ev['titulo'])) ?>')" title="Excluir"><i class="fas fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editarEvento(<?= htmlspecialchars(json_encode($ev)) ?>)" title="<?= __('admin.marketing.edit', 'Editar') ?>"><i class="fas fa-pen"></i></button>
+                                    <button class="btn btn-sm btn-outline-<?= $ev['ativo'] ? 'warning' : 'success' ?>" onclick="toggleEvento(<?= $ev['id'] ?>)" title="<?= $ev['ativo'] ? __('admin.marketing.deactivate', 'Desativar') : __('admin.marketing.activate', 'Ativar') ?>"><i class="fas fa-<?= $ev['ativo'] ? 'eye-slash' : 'eye' ?>"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="excluirEvento(<?= $ev['id'] ?>, '<?= htmlspecialchars(addslashes($ev['titulo'])) ?>')" title="<?= __('admin.marketing.delete', 'Excluir') ?>"><i class="fas fa-trash"></i></button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -195,22 +195,22 @@ foreach ($eventos as $ev) {
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalEventoTitle">Novo Evento</h5>
+                <h5 class="modal-title" id="modalEventoTitle"><?= __('admin.marketing.new_event', 'Novo Evento') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="evento_id" value="0">
                 <div class="mb-3">
-                    <label class="form-label">Título *</label>
+                    <label class="form-label"><?= __('admin.common.title', 'Título') ?> *</label>
                     <input type="text" class="form-control" id="evento_titulo" required>
                 </div>
                 <div class="row g-3 mb-3">
                     <div class="col-6">
-                        <label class="form-label">Data *</label>
+                        <label class="form-label"><?= __('admin.marketing.date', 'Data') ?> *</label>
                         <input type="date" class="form-control" id="evento_data" required>
                     </div>
                     <div class="col-6">
-                        <label class="form-label">País</label>
+                        <label class="form-label"><?= __('admin.marketing.country', 'País') ?></label>
                         <select class="form-select" id="evento_pais">
                             <option value="BR">Brasil</option>
                             <option value="US">Estados Unidos</option>
@@ -228,7 +228,7 @@ foreach ($eventos as $ev) {
                         <input type="color" class="form-control form-control-color" id="evento_cor" value="#3b82f6">
                     </div>
                     <div class="col-4">
-                        <label class="form-label">Categoria</label>
+                        <label class="form-label"><?= __('admin.marketing.category', 'Categoria') ?></label>
                         <select class="form-select" id="evento_categoria">
                             <option value="comemorativa">Comemorativa</option>
                             <option value="promocional">Promocional</option>
@@ -243,8 +243,8 @@ foreach ($eventos as $ev) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="salvarEvento()"><i class="fas fa-save me-1"></i>Salvar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('admin.common.cancel', 'Cancelar') ?></button>
+                <button type="button" class="btn btn-primary" onclick="salvarEvento()"><i class="fas fa-save me-1"></i><?= __('admin.common.save', 'Salvar') ?></button>
             </div>
         </div>
     </div>
@@ -255,17 +255,17 @@ foreach ($eventos as $ev) {
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-robot me-2"></i>Gerar com IA</h5>
+                <h5 class="modal-title"><i class="fas fa-robot me-2"></i><?= __('admin.marketing.generate_ai', 'Gerar com IA') ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p class="small text-muted">A IA vai sugerir datas comemorativas e oportunidades de marketing. Eventos duplicados serão ignorados.</p>
                 <div class="mb-3">
-                    <label class="form-label">Ano</label>
+                    <label class="form-label"><?= __('admin.marketing.year', 'Ano') ?></label>
                     <input type="number" class="form-control" id="ia_ano" value="<?= $ano ?>">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">País (opcional)</label>
+                    <label class="form-label"><?= __('admin.marketing.country', 'País') ?> (opcional)</label>
                     <select class="form-select" id="ia_pais">
                         <option value="">Ambos (BR + US)</option>
                         <option value="BR">Apenas Brasil</option>
@@ -274,8 +274,8 @@ foreach ($eventos as $ev) {
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnGerarIA" onclick="confirmarGerarIA()"><i class="fas fa-magic me-1"></i>Gerar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?= __('admin.common.cancel', 'Cancelar') ?></button>
+                <button type="button" class="btn btn-primary" id="btnGerarIA" onclick="confirmarGerarIA()"><i class="fas fa-magic me-1"></i><?= __('admin.marketing.generate_ai', 'Gerar com IA') ?></button>
             </div>
         </div>
     </div>
@@ -283,7 +283,7 @@ foreach ($eventos as $ev) {
 
 <script>
 function novoEvento() {
-    document.getElementById('modalEventoTitle').textContent = 'Novo Evento';
+    document.getElementById('modalEventoTitle').textContent = '<?= __('admin.marketing.new_event', 'Novo Evento') ?>';
     document.getElementById('evento_id').value = '0';
     document.getElementById('evento_titulo').value = '';
     document.getElementById('evento_data').value = '';
@@ -295,7 +295,7 @@ function novoEvento() {
 }
 
 function editarEvento(ev) {
-    document.getElementById('modalEventoTitle').textContent = 'Editar Evento';
+    document.getElementById('modalEventoTitle').textContent = '<?= __('admin.marketing.edit_event', 'Editar Evento') ?>';
     document.getElementById('evento_id').value = ev.id;
     document.getElementById('evento_titulo').value = ev.titulo;
     document.getElementById('evento_data').value = ev.data_evento;

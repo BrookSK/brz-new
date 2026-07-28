@@ -666,17 +666,17 @@ class AdminDashboardController extends Controller {
         echo '<header class="page-header">
                 <div>
                     <h1 class="page-title">Dashboard</h1>
-                    <p class="page-subtitle">Resumo operacional, financeiro e comercial da empresa</p>
+                    <p class="page-subtitle">' . __('admin.dashboard.summary', 'Resumo operacional, financeiro e comercial da empresa') . '</p>
                 </div>
                 <button class="btn-dash-primary" onclick="location.reload()">
-                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                    <i class="bi bi-arrow-clockwise"></i> ' . __('admin.dashboard.update', 'Atualizar') . '
                 </button>
             </header>';
 
         // === CALENDÁRIO DE MARKETING ===
         echo '<section class="section-card">
                 <header class="section-card-header">
-                    <h2 class="section-title">Calendário de Marketing</h2>
+                    <h2 class="section-title">' . __('admin.dashboard.marketing_calendar', 'Calendário de Marketing') . '</h2>
                 </header>
                 <div class="section-body">';
         include __DIR__ . '/../Views/admin/partials/marketing_calendar_widget.php';
@@ -686,39 +686,39 @@ class AdminDashboardController extends Controller {
         echo '<section class="kpi-grid">
                 <article class="kpi-card">
                     <div>
-                        <div class="kpi-label">Produtos</div>
+                        <div class="kpi-label">' . __('admin.dashboard.products', 'Produtos') . '</div>
                         <div class="kpi-value">' . (int)$stats['produtos_total'] . '</div>
-                        <div class="kpi-subtext">' . (int)$stats['produtos_ativos'] . ' ativos</div>
+                        <div class="kpi-subtext">' . (int)$stats['produtos_ativos'] . ' ' . __('admin.dashboard.active', 'ativos') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-box-seam-fill"></i></div>
                 </article>
                 <article class="kpi-card">
                     <div>
-                        <div class="kpi-label">Pedidos</div>
+                        <div class="kpi-label">' . __('admin.dashboard.orders', 'Pedidos') . '</div>
                         <div class="kpi-value">' . (int)$stats['pedidos_total'] . '</div>
-                        <div class="kpi-subtext">Total</div>
+                        <div class="kpi-subtext">' . __('admin.dashboard.total', 'Total') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-cart-fill"></i></div>
                 </article>
                 <article class="kpi-card">
                     <div>
-                        <div class="kpi-label">Usuários</div>
+                        <div class="kpi-label">' . __('admin.dashboard.users', 'Usuários') . '</div>
                         <div class="kpi-value">' . number_format((int)$stats['usuarios_total']) . '</div>
-                        <div class="kpi-subtext">Cadastrados</div>
+                        <div class="kpi-subtext">' . __('admin.dashboard.registered', 'Cadastrados') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-people-fill"></i></div>
                 </article>
                 <article class="kpi-card is-featured">
                     <div>
-                        <div class="kpi-label">Faturamento BRL</div>
+                        <div class="kpi-label">' . __('admin.dashboard.revenue_brl_label', 'Faturamento BRL') . '</div>
                         <div class="kpi-value">R$ ' . number_format((float)($stats['faturamento_brl'] ?? 0), 2, ',', '.') . '</div>
-                        <div class="kpi-subtext">Pedidos pagos</div>
+                        <div class="kpi-subtext">' . __('admin.dashboard.paid_orders', 'Pedidos pagos') . '</div>
                     </div>
                     <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
                 </article>
                 <article class="kpi-card is-featured">
                     <div>
-                        <div class="kpi-label">Faturamento USD</div>
+                        <div class="kpi-label">' . __('admin.dashboard.revenue_usd_label', 'Faturamento USD') . '</div>
                         <div class="kpi-value">US$ ' . number_format((float)($stats['faturamento_usd'] ?? 0), 2, ',', '.') . '</div>
                         <div class="kpi-subtext">Pedidos pagos</div>
                     </div>
@@ -730,58 +730,58 @@ class AdminDashboardController extends Controller {
         echo '<section class="executive-grid">
                 <article class="section-card">
                     <header class="section-card-header">
-                        <h2 class="section-title">Resumo Gerencial</h2>
+                        <h2 class="section-title">' . __('admin.dashboard.executive_summary', 'Resumo Gerencial') . '</h2>
                     </header>
                     <div class="section-body">
                         <div class="summary-list">
                             <div class="summary-item">
-                                <div class="summary-label">Faturamento total</div>
+                                <div class="summary-label">' . __('admin.dashboard.total_revenue', 'Faturamento total') . '</div>
                                 <div class="summary-value">' . ($stats['faturamento_display'] ?: 'R$ 0,00') . '</div>
-                                <div class="summary-note">Pedidos pagos e processados</div>
+                                <div class="summary-note">' . __('admin.dashboard.paid_processed', 'Pedidos pagos e processados') . '</div>
                             </div>
                             <div class="summary-item">
-                                <div class="summary-label">Pedidos totais</div>
+                                <div class="summary-label">' . __('admin.dashboard.total_orders_label', 'Pedidos totais') . '</div>
                                 <div class="summary-value">' . (int)$stats['pedidos_total'] . '</div>
-                                <div class="summary-note">Todos os status</div>
+                                <div class="summary-note">' . __('admin.dashboard.all_statuses', 'Todos os status') . '</div>
                             </div>
                             <div class="summary-item">
-                                <div class="summary-label">Produtos ativos</div>
+                                <div class="summary-label">' . __('admin.dashboard.active_products', 'Produtos ativos') . '</div>
                                 <div class="summary-value">' . (int)$stats['produtos_ativos'] . '</div>
-                                <div class="summary-note">Disponíveis para venda</div>
+                                <div class="summary-note">' . __('admin.dashboard.available_for_sale', 'Disponíveis para venda') . '</div>
                             </div>
                             <div class="summary-item">
-                                <div class="summary-label">Usuários cadastrados</div>
+                                <div class="summary-label">' . __('admin.dashboard.registered_users', 'Usuários cadastrados') . '</div>
                                 <div class="summary-value">' . number_format((int)$stats['usuarios_total']) . '</div>
-                                <div class="summary-note">Total na plataforma</div>
+                                <div class="summary-note">' . __('admin.dashboard.total_on_platform', 'Total na plataforma') . '</div>
                             </div>
                         </div>
                     </div>
                 </article>
                 <article class="section-card">
                     <header class="section-card-header">
-                        <h2 class="section-title">Pontos de Atenção</h2>
+                        <h2 class="section-title">' . __('admin.dashboard.attention_points', 'Pontos de Atenção') . '</h2>
                     </header>
                     <div class="section-body">
                         <div class="insight-list">
                             <div class="insight-item">
                                 <div class="insight-icon"><i class="bi bi-cash-stack"></i></div>
                                 <div>
-                                    <div class="insight-title">Validar pedidos não pagos</div>
-                                    <div class="insight-text">Pedidos pendentes não devem entrar no total financeiro realizado.</div>
+                                    <div class="insight-title">' . __('admin.dashboard.validate_unpaid', 'Validar pedidos não pagos') . '</div>
+                                    <div class="insight-text">' . __('admin.dashboard.validate_unpaid_desc', 'Pedidos pendentes não devem entrar no total financeiro realizado.') . '</div>
                                 </div>
                             </div>
                             <div class="insight-item">
                                 <div class="insight-icon"><i class="bi bi-box-seam"></i></div>
                                 <div>
-                                    <div class="insight-title">Acompanhar estoque e validade</div>
-                                    <div class="insight-text">Produtos próximos do vencimento precisam continuar destacados no painel.</div>
+                                    <div class="insight-title">' . __('admin.dashboard.track_stock', 'Acompanhar estoque e validade') . '</div>
+                                    <div class="insight-text">' . __('admin.dashboard.track_stock_desc', 'Produtos próximos do vencimento precisam continuar destacados no painel.') . '</div>
                                 </div>
                             </div>
                             <div class="insight-item">
                                 <div class="insight-icon"><i class="bi bi-graph-up-arrow"></i></div>
                                 <div>
-                                    <div class="insight-title">Monitorar produtos campeões</div>
-                                    <div class="insight-text">Use os mais vendidos para direcionar lives, campanhas e reposição.</div>
+                                    <div class="insight-title">' . __('admin.dashboard.monitor_top_products', 'Monitorar produtos campeões') . '</div>
+                                    <div class="insight-text">' . __('admin.dashboard.monitor_top_products_desc', 'Use os mais vendidos para direcionar lives, campanhas e reposição.') . '</div>
                                 </div>
                             </div>
                         </div>
