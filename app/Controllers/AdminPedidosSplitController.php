@@ -642,6 +642,29 @@ document.addEventListener("DOMContentLoaded", function() {
             $novoPedidoId = (int) $this->connection->lastInsertId();
 
             // ===== MOVER/DIVIDIR ITENS PARA O NOVO PEDIDO =====
+
+            // Salvar histórico do split (snapshot antes de mover)
+            try {
+                $adminUid = null;
+                if (session_status() === PHP_SESSION_NONE) @session_start();
+                $adminUid = (int) ($_SESSION['usuario_id'] ?? 0);
+                if ($adminUid <= 0) $adminUid = null;
+
+                $stHist = $this->connection->prepare(
+                    "INSERT INTO pedido_split_historico (pedido_original_id, pedido_novo_id, itens_originais, itens_separados, usuario_id)
+                     VALUES (?, ?, ?, ?, ?)"
+                );
+                $stHist->execute([
+                    $pedidoId,
+                    $novoPedidoId,
+                    json_encode($todosItens, JSON_UNESCAPED_UNICODE),
+                    json_encode($itensSeparar, JSON_UNESCAPED_UNICODE),
+                    $adminUid,
+                ]);
+            } catch (\Throwable $e) {
+                // Não impedir o split se o histórico falhar
+            }
+
             foreach ($itensSeparar as $item) {
                 $itemId = (int) ($item['id'] ?? 0);
                 if ($itemId <= 0) continue;
@@ -671,6 +694,19 @@ document.addEventListener("DOMContentLoaded", function() {
                     // Item inteiro: mover para o novo pedido
                     $stmtMove = $this->connection->prepare('UPDATE ' . $itensTable . ' SET pedido_id = :novo_pedido_id WHERE id = :item_id');
                     $stmtMove->execute([':novo_pedido_id' => $novoPedidoId, ':item_id' => $itemId]);
+
+                    // Também mover na tabela alternativa se existir (pedido_itens vs pedido_items)
+                    $altTable = ($itensTable === 'pedido_itens') ? 'pedido_items' : 'pedido_itens';
+                    if ($this->tableExists($altTable)) {
+                        try {
+                            $colProdId = $this->pickCol($this->getTableColumns($altTable), ['produto_id']);
+                            $prodIdItem = $item[$colProdutoId] ?? $item['produto_id'] ?? null;
+                            if ($colProdId && $prodIdItem) {
+                                $stAlt = $this->connection->prepare('UPDATE ' . $altTable . ' SET pedido_id = :novo WHERE pedido_id = :orig AND ' . $colProdId . ' = :pid LIMIT 1');
+                                $stAlt->execute([':novo' => $novoPedidoId, ':orig' => $pedidoId, ':pid' => $prodIdItem]);
+                            }
+                        } catch (\Throwable $e) {}
+                    }
                 }
             }
 
