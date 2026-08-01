@@ -1905,36 +1905,36 @@ class AdminComprasController extends Controller {
                                         . ' data-bs-toggle="modal" data-bs-target="#modalRemoverItem"'
                                         . ' data-produto-id="' . (int) $item['produto_id'] . '"'
                                         . ' data-loja-id="' . (int) $lojaIdRow . '"'
-                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '"'
                                         . '><i class="fas fa-trash"></i></button>';
                                     $btnVerPedidos = '<button type="button" class="btn btn-outline-dark"'
                                         . ' data-bs-toggle="modal" data-bs-target="#modalPedidosItem"'
                                         . ' data-produto-id="' . (int) $item['produto_id'] . '"'
                                         . ' data-loja-id="' . (int) $lojaIdRow . '"'
                                         . ' data-sem-loja="' . ($missingLoja ? '1' : '0') . '"'
-                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '"'
                                         . '><i class="fas fa-eye"></i></button>';
                                     $btnReabrirItem = '<button type="button" class="btn btn-outline-secondary"'
                                         . ' data-bs-toggle="modal" data-bs-target="#modalReabrirItem"'
                                         . ' data-produto-id="' . (int) $item['produto_id'] . '"'
                                         . ' data-loja-id="' . (int) $lojaIdRow . '"'
-                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '"'
                                         . '><i class="fas fa-rotate-left"></i></button>';
                                     $btnLoja = $missingLoja
-                                        ? '<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLoja" data-produto-id="' . (int) $item['produto_id'] . '" data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"><i class="fas fa-store"></i></button>'
+                                        ? '<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalLoja" data-produto-id="' . (int) $item['produto_id'] . '" data-produto-nome="' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '"><i class="fas fa-store"></i></button>'
                                         : '';
                                     $btnConcluirItem = '<button type="button" class="btn btn-outline-success"'
                                         . ' data-bs-toggle="modal" data-bs-target="#modalConcluirItem"'
                                         . ' data-produto-id="' . (int) $item['produto_id'] . '"'
                                         . ' data-loja-id="' . (int) $lojaIdRow . '"'
-                                        . ' data-produto-nome="' . htmlspecialchars($item['produto_nome']) . '"'
+                                        . ' data-produto-nome="' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '"'
                                         . ' data-quantidade="' . (int) $qf . '"'
                                         . '><i class="fas fa-check"></i></button>';
 
                                     echo '<tr>'
                                         . '<td>'
                                         . '<div class="d-flex gap-2 align-items-center">' . $imgTag . '<div>'
-                                        . '<strong>' . htmlspecialchars($item['produto_nome']) . '</strong>'
+                                        . '<strong>' . htmlspecialchars((string) ($item['produto_nome'] ?? '')) . '</strong>'
                                         . '<br><small class="text-muted">ID: ' . (int) $item['produto_id'] . '</small>'
                                         . ((!empty($item['tipo_compra']) && $item['tipo_compra'] === 'carne') ? ' <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-file-invoice-dollar me-1"></i>Carnê</span>' : '')
                                         . '</div></div>'
