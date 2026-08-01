@@ -1032,6 +1032,10 @@ class AdminEtiquetasWpController extends Controller
             if ($ncmDigits === '' || strlen($ncmDigits) < 6) return ['_error' => 'Item #' . ($idx+1) . ' sem NCM'];
             $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
             $val = (float) ($it['preco_unitario'] ?? 0);
+            // Para itens de pacote: usar declaration_value se preco_unitario é 0
+            if ($val <= 0 && !empty($it['declaration_value'])) {
+                $val = (float) $it['declaration_value'];
+            }
             if ($moedaPedido === 'BRL' && $val > 0 && empty($it['_valor_ja_usd'])) $val = $val * $brlToUsdRate;
             if ($val < 0.01) $val = 0.01;
             $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', '')];

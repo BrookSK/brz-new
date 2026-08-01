@@ -117,3 +117,4 @@ ALTER TABLE pedido_itens ADD COLUMN pacote_id INT NULL;
 ALTER TABLE pedido_itens ADD COLUMN foto_url TEXT NULL;
 ALTER TABLE pedido_itens ADD COLUMN comprovante_url TEXT NULL;
 ALTER TABLE pedido_itens ADD COLUMN ncm VARCHAR(20) NULL;
+ALTER TABLE pedido_itens ADD COLUMN nome_item VARCHAR(255) NULL;

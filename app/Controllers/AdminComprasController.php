@@ -1035,6 +1035,27 @@ class AdminComprasController extends Controller {
     }
 
     private function resolveProdutoImagem(array $produto): ?string {
+        // Para itens de pacote/redirecionamento, buscar foto_url do pedido_itens
+        $prodId = (int) ($produto['produto_id'] ?? 0);
+        if ($prodId >= 999990) {
+            try {
+                $itensT = $this->findPedidoItensTable();
+                if ($itensT && $this->columnExists($itensT, 'foto_url')) {
+                    $st = $this->connection->prepare("SELECT foto_url FROM {$itensT} WHERE produto_id = ? AND foto_url IS NOT NULL AND foto_url != '' LIMIT 1");
+                    $st->execute([$prodId]);
+                    $fotoUrl = $st->fetchColumn();
+                    if ($fotoUrl) return (string) $fotoUrl;
+                }
+                // Fallback: buscar foto do pacotes_recebidos via pacote_id
+                if ($itensT && $this->columnExists($itensT, 'pacote_id')) {
+                    $st2 = $this->connection->prepare("SELECT pr.foto_url FROM pacotes_recebidos pr INNER JOIN {$itensT} pi ON pi.pacote_id = pr.id WHERE pi.produto_id = ? AND pr.foto_url IS NOT NULL LIMIT 1");
+                    $st2->execute([$prodId]);
+                    $fotoUrl2 = $st2->fetchColumn();
+                    if ($fotoUrl2) return (string) $fotoUrl2;
+                }
+            } catch (\Throwable $e) {}
+        }
+
         $candidates = ['foto_principal', 'imagem', 'image', 'thumb', 'thumbnail', 'imagem_raw', 'images'];
         foreach ($candidates as $c) {
             if (!isset($produto[$c]) || $produto[$c] === null || $produto[$c] === '') {
@@ -1899,6 +1920,39 @@ class AdminComprasController extends Controller {
                                     $nomeCustom = trim((string) ($item['nome_produto_custom'] ?? ''));
                                     if ($nomeCustom !== '') {
                                         $item['produto_nome'] = $nomeCustom;
+                                    }
+
+                                    // Para itens de pacote/redirecionamento (produto_id >= 999990), buscar nome e custo do pedido_itens
+                                    $produtoIdItem = (int) ($item['produto_id'] ?? 0);
+                                    if ($produtoIdItem >= 999990 || empty($item['produto_nome'])) {
+                                        // Tentar buscar nome da pedido_itens pelo produto_id virtual
+                                        try {
+                                            $itensTableLista = $this->findPedidoItensTable();
+                                            if ($itensTableLista) {
+                                                $colsItLista = $this->getTableColumns($itensTableLista);
+                                                $nomeColLista = in_array('nome', $colsItLista, true) ? 'nome' : (in_array('produto_nome', $colsItLista, true) ? 'produto_nome' : null);
+                                                $declColLista = in_array('declaration_value', $colsItLista, true) ? 'declaration_value' : null;
+                                                $tipoColLista = in_array('tipo_item', $colsItLista, true) ? 'tipo_item' : null;
+
+                                                if ($nomeColLista) {
+                                                    $whereItLista = $tipoColLista
+                                                        ? "WHERE produto_id = ? AND {$tipoColLista} = 'pacote_redirecionamento'"
+                                                        : "WHERE produto_id = ?";
+                                                    $selectItLista = $nomeColLista . ($declColLista ? ", {$declColLista}" : '');
+                                                    $stItLista = $this->connection->prepare("SELECT {$selectItLista} FROM {$itensTableLista} {$whereItLista} LIMIT 1");
+                                                    $stItLista->execute([$produtoIdItem]);
+                                                    $rowItLista = $stItLista->fetch(\PDO::FETCH_ASSOC);
+                                                    if ($rowItLista) {
+                                                        if (empty($item['produto_nome'])) {
+                                                            $item['produto_nome'] = $rowItLista[$nomeColLista] ?? '';
+                                                        }
+                                                        if ($declColLista && empty($item['cost_price']) && !empty($rowItLista[$declColLista])) {
+                                                            $item['cost_price'] = $rowItLista[$declColLista];
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } catch (\Throwable $e) {}
                                     }
                                      
                                     $btnRemoverItem = '<button type="button" class="btn btn-outline-danger"'
@@ -2918,7 +2972,22 @@ class AdminComprasController extends Controller {
                 $totalItens = 0;
                 if ($itensTable !== '') {
                     try {
-                        $stIt = $this->connection->prepare("SELECT COALESCE(SUM(quantidade), 0) FROM {$itensTable} WHERE pedido_id = ?");
+                        // Excluir itens de pacote/redirecionamento da contagem (não precisam ser comprados)
+                        $hasTipoItem = false;
+                        try {
+                            $stCI = $this->connection->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = 'tipo_item'");
+                            $stCI->execute([$itensTable]);
+                            $hasTipoItem = (int) $stCI->fetchColumn() > 0;
+                        } catch (\Exception $e) {}
+
+                        $sqlCount = "SELECT COALESCE(SUM(quantidade), 0) FROM {$itensTable} WHERE pedido_id = ?";
+                        if ($hasTipoItem) {
+                            $sqlCount .= " AND (tipo_item IS NULL OR tipo_item = 'produto')";
+                        } else {
+                            // Filtrar produto_id virtual de pacotes
+                            $sqlCount .= " AND (produto_id IS NULL OR produto_id < 999990)";
+                        }
+                        $stIt = $this->connection->prepare($sqlCount);
                         $stIt->execute([$pedidoId]);
                         $totalItens = (int) $stIt->fetchColumn();
                     } catch (\Exception $e) { $totalItens = 0; }

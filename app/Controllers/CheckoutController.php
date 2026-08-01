@@ -5664,6 +5664,44 @@ class CheckoutController extends Controller {
                 $valsInsP = [(int) $pedidoId, (int) $produtoId, $qtdPacote];
                 $phP = ['?', '?', '?'];
 
+                // Buscar NCM do pacote se não veio no item
+                $ncmPacote = (string) ($item['ncm'] ?? '');
+                if ($ncmPacote === '' && $pacoteIdItem > 0) {
+                    try {
+                        $stNcm = $db->prepare('SELECT ncm FROM pacotes_recebidos WHERE id = ? LIMIT 1');
+                        $stNcm->execute([$pacoteIdItem]);
+                        $ncmPacote = (string) ($stNcm->fetchColumn() ?: '');
+                    } catch (\Throwable $e) {}
+                }
+
+                // declaration_value: priorizar o valor do carrinho (preenchido pelo cliente)
+                // O carrinho armazena em carrinho_items.declaration_value
+                // O $item vem do getCarrinhoForCheckout que já inclui declaration_value
+                if ($declarationVal <= 0 && $pacoteIdItem > 0) {
+                    // Tentar buscar do carrinho_items
+                    try {
+                        $stDecl = $db->prepare(
+                            "SELECT declaration_value FROM carrinho_items WHERE pacote_id = ? AND tipo_item = 'pacote_redirecionamento' ORDER BY id DESC LIMIT 1"
+                        );
+                        $stDecl->execute([$pacoteIdItem]);
+                        $declFromCart = (float) ($stDecl->fetchColumn() ?: 0);
+                        if ($declFromCart > 0) $declarationVal = $declFromCart;
+                    } catch (\Throwable $e) {}
+                }
+
+                // comprovante_url: buscar do carrinho_items se não veio
+                $comprovanteUrl = $item['comprovante_url'] ?? null;
+                if (empty($comprovanteUrl) && $pacoteIdItem > 0) {
+                    try {
+                        $stComp = $db->prepare(
+                            "SELECT comprovante_url FROM carrinho_items WHERE pacote_id = ? AND tipo_item = 'pacote_redirecionamento' ORDER BY id DESC LIMIT 1"
+                        );
+                        $stComp->execute([$pacoteIdItem]);
+                        $compFromCart = $stComp->fetchColumn();
+                        if ($compFromCart) $comprovanteUrl = $compFromCart;
+                    } catch (\Throwable $e) {}
+                }
+
                 if (in_array('nome', $colsItens, true)) { $colsInsP[] = 'nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
                 elseif (in_array('produto_nome', $colsItens, true)) { $colsInsP[] = 'produto_nome'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
                 if (in_array('preco_unitario', $colsItens, true)) { $colsInsP[] = 'preco_unitario'; $valsInsP[] = $precoPacote; $phP[] = '?'; }
@@ -5675,7 +5713,9 @@ class CheckoutController extends Controller {
                 if (in_array('tipo_item', $colsItens, true)) { $colsInsP[] = 'tipo_item'; $valsInsP[] = $tipoItemSalvar; $phP[] = '?'; }
                 if (in_array('pacote_id', $colsItens, true)) { $colsInsP[] = 'pacote_id'; $valsInsP[] = $pacoteIdItem > 0 ? $pacoteIdItem : null; $phP[] = '?'; }
                 if (in_array('foto_url', $colsItens, true)) { $colsInsP[] = 'foto_url'; $valsInsP[] = $item['foto_url'] ?? null; $phP[] = '?'; }
-                if (in_array('comprovante_url', $colsItens, true)) { $colsInsP[] = 'comprovante_url'; $valsInsP[] = $item['comprovante_url'] ?? null; $phP[] = '?'; }
+                if (in_array('comprovante_url', $colsItens, true)) { $colsInsP[] = 'comprovante_url'; $valsInsP[] = $comprovanteUrl; $phP[] = '?'; }
+                if (in_array('ncm', $colsItens, true)) { $colsInsP[] = 'ncm'; $valsInsP[] = $ncmPacote; $phP[] = '?'; }
+                if (in_array('nome_item', $colsItens, true)) { $colsInsP[] = 'nome_item'; $valsInsP[] = $nomePacote; $phP[] = '?'; }
 
                 $sqlInsP = 'INSERT INTO ' . $itensTable . ' (' . implode(', ', $colsInsP) . ') VALUES (' . implode(', ', $phP) . ')';
                 $stInsP = $db->prepare($sqlInsP);

@@ -1570,13 +1570,24 @@ class PedidoEcommerce {
             }
 
             if ($ncmCol && $colProdutoId) {
-                $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
+                // Para produtos normais: JOIN na tabela produtos
+                // Para pacotes (produto_id >= 999990): usar ncm da própria coluna do item
+                if ($pick(['ncm']) !== null) {
+                    $selectParts[] = "COALESCE(pi.ncm, (SELECT pr." . $ncmCol . " FROM produtos pr WHERE pr.id = pi." . $colProdutoId . " AND pi." . $colProdutoId . " < 999990 LIMIT 1), '') AS ncm";
+                } else {
+                    $selectParts[] = '(SELECT pr.' . $ncmCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS ncm';
+                }
             } else {
                 $selectParts[] = "'' AS ncm";
             }
 
             if ($pesoCol && $colProdutoId) {
-                $selectParts[] = '(SELECT pr.' . $pesoCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS peso_kg';
+                // Para pacotes (produto_id >= 999990): usar peso_kg da própria coluna do item se existir
+                if ($pick(['peso_kg']) !== null) {
+                    $selectParts[] = "COALESCE(pi.peso_kg, (SELECT pr." . $pesoCol . " FROM produtos pr WHERE pr.id = pi." . $colProdutoId . " AND pi." . $colProdutoId . " < 999990 LIMIT 1)) AS peso_kg";
+                } else {
+                    $selectParts[] = '(SELECT pr.' . $pesoCol . ' FROM produtos pr WHERE pr.id = pi.' . $colProdutoId . ' LIMIT 1) AS peso_kg';
+                }
             } else {
                 $selectParts[] = 'NULL AS peso_kg';
             }
