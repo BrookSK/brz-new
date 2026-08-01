@@ -283,9 +283,15 @@ class AdminPacotesRecebidosController extends Controller {
             return null;
         }
 
-        $uploadDir = __DIR__ . '/../../public/uploads/pacotes/';
+        // Usar mesmo padrão dos uploads de produtos: $_SERVER['DOCUMENT_ROOT']/uploads/pacotes/
+        $docRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/\\');
+        $uploadDir = $docRoot . '/uploads/pacotes/';
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0775, true);
+            // Fallback: tentar public/uploads/pacotes/
+            $uploadDir = $docRoot . '/public/uploads/pacotes/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0775, true);
+            }
         }
 
         $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
@@ -293,7 +299,7 @@ class AdminPacotesRecebidosController extends Controller {
         $destino = $uploadDir . $filename;
 
         if (move_uploaded_file($file['tmp_name'], $destino)) {
-            return '/public/uploads/pacotes/' . $filename;
+            return '/uploads/pacotes/' . $filename;
         }
 
         return null;
