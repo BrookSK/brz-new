@@ -1382,6 +1382,7 @@ class AdminComprasController extends Controller {
                 . ($temPedidoEmLista ? ' LEFT JOIN pedidos ped ON ped.id = lc.pedido_id' : '')
                 . '   WHERE '
                 . ($statusView === 'concluidas' ? "lc.status IN ('comprado','cancelado')" : "lc.status = 'pendente'")
+                . " AND lc.produto_id < 999990"
                 . ($temPedidoEmLista ? " AND (lc.pedido_id IS NULL OR lc.pedido_id = 0 OR (" . ($temDeletedAt ? "ped.deleted_at IS NULL AND " : "") . "ped.status IN ('pago','processando','enviado','entregue','consolidado','produto_consolidado','rascunho_etiqueta','etiqueta_efetivada','aguardando_lib_alfandegaria','finalizacao_embalagem','entrega_finalizada','itens_comprados','itens_parcialmente_comprados')))" : '')
                 . $whereTipoCompra
                 // Excluir itens de pedidos de carnê (tela separada) - por tabela carnes E por forma_pagamento
