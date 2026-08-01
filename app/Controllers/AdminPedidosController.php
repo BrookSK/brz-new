@@ -3944,6 +3944,10 @@ HTML;
                                                     }
                                                     echo '<img src="' . htmlspecialchars($img) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
                                                          style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
+                                                } elseif (strpos($img, '/public/uploads/') === 0 || strpos($img, '/uploads/pacotes/') === 0) {
+                                                    // Path absoluto de pacotes/uploads — usar direto
+                                                    echo '<img src="' . htmlspecialchars($img) . '" alt="' . htmlspecialchars($item['nome_produto']) . '" 
+                                                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">';
                                                 } else {
                                                     // Remover caminho duplicado se existir
                                                     $imagemPath = $img;
