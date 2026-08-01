@@ -293,7 +293,7 @@ class AdminPacotesRecebidosController extends Controller {
         $destino = $uploadDir . $filename;
 
         if (move_uploaded_file($file['tmp_name'], $destino)) {
-            return '/uploads/pacotes/' . $filename;
+            return '/public/uploads/pacotes/' . $filename;
         }
 
         return null;

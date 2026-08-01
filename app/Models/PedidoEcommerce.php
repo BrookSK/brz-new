@@ -1723,6 +1723,11 @@ class PedidoEcommerce {
                         $item['preco_unitario'] = $vuAlt;
                     }
                 }
+                // Para pacotes de redirecionamento: usar declaration_value como preço se preco_unitario é 0
+                if ((float) ($item['preco_unitario'] ?? 0) <= 0 && !empty($item['declaration_value'])) {
+                    $item['preco_unitario'] = (float) $item['declaration_value'];
+                    $item['subtotal'] = (float) $item['declaration_value'] * (int) ($item['quantidade'] ?? 1);
+                }
                 if (!array_key_exists('ncm', $item) || $item['ncm'] === null) {
                     $item['ncm'] = '';
                 }
