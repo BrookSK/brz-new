@@ -2409,7 +2409,7 @@ class CheckoutController extends Controller {
                     $stPacotes->execute([$cartId]);
                     $pacotesNoCarrinho = $stPacotes->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                     foreach ($pacotesNoCarrinho as $pac) {
-                        if (empty($pac['declaration_value']) || (float) $pac['declaration_value'] <= 0 || empty($pac['comprovante_url'])) {
+                        if (empty($pac['declaration_value']) || (float) $pac['declaration_value'] <= 0) {
                             $pacoteSemDados = true;
                             break;
                         }
@@ -2420,7 +2420,7 @@ class CheckoutController extends Controller {
 
         if ($pacoteSemDados) {
             if (session_status() === PHP_SESSION_NONE) session_start();
-            $_SESSION['message'] = 'Preencha o valor declarado e envie o comprovante de compra para todos os itens de redirecionamento antes de prosseguir.';
+            $_SESSION['message'] = 'Preencha o valor declarado para todos os itens de redirecionamento antes de prosseguir.';
             $_SESSION['message_type'] = 'danger';
             $this->redirect('/carrinho');
             return;
