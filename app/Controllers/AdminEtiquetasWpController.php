@@ -46,6 +46,119 @@ class AdminEtiquetasWpController extends Controller
         return (string) preg_replace('/\D+/', '', $v);
     }
 
+    /**
+     * Consolidar itens por NCM quando há mais de $maxItens.
+     * Agrupa itens com mesmo NCM somando quantidades e valores.
+     * Mantém a descrição do item de maior valor como representante do grupo.
+     * Se após consolidação ainda exceder o limite, agrupa os menores num genérico.
+     */
+    private function consolidarItensPorNcm(array $itemsIn, int $maxItens = 20): array
+    {
+        // Agrupar por NCM
+        $grupos = [];
+        foreach ($itemsIn as $item) {
+            $ncm = trim((string) ($item['ncm'] ?? ''));
+            if ($ncm === '') $ncm = '_sem_ncm';
+            if (!isset($grupos[$ncm])) {
+                $grupos[$ncm] = [];
+            }
+            $grupos[$ncm][] = $item;
+        }
+
+        // Se o número de NCMs distintos já cabe no limite, consolidar cada grupo num único item
+        $resultado = [];
+        foreach ($grupos as $ncm => $itens) {
+            if (count($itens) === 1) {
+                $resultado[] = $itens[0];
+                continue;
+            }
+
+            // Consolidar: somar quantidades e valor total, usar descrição do item mais caro
+            $totalQtd = 0;
+            $totalValor = 0.0;
+            $maiorValor = 0.0;
+            $descMaior = '';
+            $pesoTotal = 0.0;
+            $temBateria = 'N';
+            $temPerfume = 'N';
+            $valorJaUsd = false;
+
+            foreach ($itens as $it) {
+                $qtd = (int) ($it['quantidade'] ?? 1);
+                $val = (float) ($it['preco_unitario'] ?? ($it['declaration_value'] ?? 0));
+                $valTotal = $val * $qtd;
+                $totalQtd += $qtd;
+                $totalValor += $valTotal;
+                $pesoTotal += (float) ($it['peso_kg'] ?? 0) * $qtd;
+                if ($valTotal > $maiorValor) {
+                    $maiorValor = $valTotal;
+                    $descMaior = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
+                }
+                if (($it['tem_bateria'] ?? 'N') === 'S') $temBateria = 'S';
+                if (($it['tem_perfume'] ?? 'N') === 'S') $temPerfume = 'S';
+                if (!empty($it['_valor_ja_usd'])) $valorJaUsd = true;
+            }
+
+            // Valor médio por unidade (para a declaração aduaneira)
+            $valorUnit = $totalQtd > 0 ? round($totalValor / $totalQtd, 2) : 0;
+
+            $resultado[] = [
+                'nome_produto' => $descMaior . (count($itens) > 1 ? ' (+' . (count($itens) - 1) . ')' : ''),
+                'nome' => $descMaior,
+                'ncm' => $ncm === '_sem_ncm' ? '' : $ncm,
+                'preco_unitario' => $valorUnit,
+                'declaration_value' => $valorUnit,
+                'quantidade' => $totalQtd,
+                'peso_kg' => $pesoTotal > 0 ? round($pesoTotal / $totalQtd, 3) : 0,
+                'tem_bateria' => $temBateria,
+                'tem_perfume' => $temPerfume,
+                '_valor_ja_usd' => $valorJaUsd,
+            ];
+        }
+
+        // Se ainda excede o limite após consolidação por NCM, agrupar os de menor valor
+        if (count($resultado) > $maxItens) {
+            // Ordenar por valor total (desc) — manter os maiores individuais
+            usort($resultado, function($a, $b) {
+                $va = (float) ($a['preco_unitario'] ?? 0) * (int) ($a['quantidade'] ?? 1);
+                $vb = (float) ($b['preco_unitario'] ?? 0) * (int) ($b['quantidade'] ?? 1);
+                return $vb <=> $va;
+            });
+
+            // Manter os top ($maxItens - 1) e agrupar o resto num item genérico
+            $top = array_slice($resultado, 0, $maxItens - 1);
+            $rest = array_slice($resultado, $maxItens - 1);
+
+            $restQtd = 0;
+            $restValor = 0.0;
+            $restNcm = '';
+            foreach ($rest as $r) {
+                $q = (int) ($r['quantidade'] ?? 1);
+                $v = (float) ($r['preco_unitario'] ?? 0);
+                $restQtd += $q;
+                $restValor += $v * $q;
+                if ($restNcm === '' && !empty($r['ncm'])) $restNcm = $r['ncm'];
+            }
+
+            $top[] = [
+                'nome_produto' => 'Outros itens (' . count($rest) . ' grupos)',
+                'nome' => 'Outros itens',
+                'ncm' => $restNcm,
+                'preco_unitario' => $restQtd > 0 ? round($restValor / $restQtd, 2) : 0,
+                'declaration_value' => $restQtd > 0 ? round($restValor / $restQtd, 2) : 0,
+                'quantidade' => $restQtd,
+                'peso_kg' => 0,
+                'tem_bateria' => 'N',
+                'tem_perfume' => 'N',
+                '_valor_ja_usd' => true,
+            ];
+
+            $resultado = $top;
+        }
+
+        return $resultado;
+    }
+
     private function getUsdToBrlRate(): float
     {
         try {
@@ -1012,7 +1125,9 @@ class AdminEtiquetasWpController extends Controller
             // Se falhar, usa itens normais do pedido
         }
         if (empty($itemsIn)) return ['_error' => 'Sem itens'];
-        if (count($itemsIn) > 20) return ['_error' => 'Mais de 20 itens'];
+
+        // Não limitar quantidade de itens (antigo - if (count($itemsIn) > 20) return ['_error' => 'Mais de 20 itens'];) — o WordPress (plugin) cuida de separar
+        // em 3 itens principais + folha suplementar internamente
 
         $moedaPedido = strtoupper(trim((string) ($pedido['moeda'] ?? ($pedido['currency'] ?? 'USD'))));
         $brlToUsdRate = 1.0;
