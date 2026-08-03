@@ -52,23 +52,23 @@ class PacoteRecebido extends Model {
         $params = [];
 
         if (!empty($filtros['suite'])) {
-            $where[] = 'numero_suite = :suite';
+            $where[] = 'p.numero_suite = :suite';
             $params[':suite'] = (int) $filtros['suite'];
         }
         if (!empty($filtros['status'])) {
-            $where[] = 'status = :status';
+            $where[] = 'p.status = :status';
             $params[':status'] = $filtros['status'];
         }
         if (!empty($filtros['data_inicio'])) {
-            $where[] = 'data_recebimento >= :data_inicio';
+            $where[] = 'p.data_recebimento >= :data_inicio';
             $params[':data_inicio'] = $filtros['data_inicio'];
         }
         if (!empty($filtros['data_fim'])) {
-            $where[] = 'data_recebimento <= :data_fim';
+            $where[] = 'p.data_recebimento <= :data_fim';
             $params[':data_fim'] = $filtros['data_fim'];
         }
         if (!empty($filtros['busca'])) {
-            $where[] = '(nome LIKE :busca OR fornecedor LIKE :busca2 OR CAST(numero_suite AS CHAR) LIKE :busca3)';
+            $where[] = '(p.nome LIKE :busca OR p.fornecedor LIKE :busca2 OR CAST(p.numero_suite AS CHAR) LIKE :busca3)';
             $params[':busca'] = '%' . $filtros['busca'] . '%';
             $params[':busca2'] = '%' . $filtros['busca'] . '%';
             $params[':busca3'] = '%' . $filtros['busca'] . '%';
@@ -78,7 +78,7 @@ class PacoteRecebido extends Model {
         $offset = ($pagina - 1) * $porPagina;
 
         // Total
-        $stmtTotal = $this->connection->prepare("SELECT COUNT(*) FROM {$this->table} {$whereClause}");
+        $stmtTotal = $this->connection->prepare("SELECT COUNT(*) FROM {$this->table} p LEFT JOIN usuarios u ON u.id = p.usuario_id {$whereClause}");
         $stmtTotal->execute($params);
         $total = (int) $stmtTotal->fetchColumn();
 
