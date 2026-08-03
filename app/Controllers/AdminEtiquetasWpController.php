@@ -821,40 +821,37 @@ class AdminEtiquetasWpController extends Controller
                             } catch (\Exception $e) {}
 
                             $items = [];
+
+                            // Determinar se os valores já estão em USD:
+                            // Se o pedido tem itens de pacote_redirecionamento, todos os preco_unitario estão em USD
+                            $todosUsd = false;
+                            if ($hasTipoItem) {
+                                foreach ($itemsRows as $checkRow) {
+                                    if (($checkRow['tipo_item'] ?? '') === 'pacote_redirecionamento' || (int) ($checkRow['produto_id'] ?? 0) >= 999990) {
+                                        $todosUsd = true;
+                                        break;
+                                    }
+                                }
+                            }
+
                             foreach ($itemsRows as $it) {
                                 // NCM: prioridade item_ncm > produto_ncm > produto_ncm_join
                                 $ncmRaw = (string) ($it['item_ncm'] ?? ($it['produto_ncm'] ?? ($it['produto_ncm_join'] ?? '')));
                                 $ncmDigits = preg_replace('/\D/', '', $ncmRaw);
                                 $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : (strlen($ncmDigits) >= 6 ? substr($ncmDigits, 0, 6) : $ncmDigits);
 
-                                // Valor: para pacotes, o preco_unitario JÁ está em USD, não converter
                                 $isPacoteItem = (($it['tipo_item'] ?? 'produto') === 'pacote_redirecionamento')
                                     || ((int) ($it['produto_id'] ?? 0) >= 999990);
 
                                 $val = (float) ($it[$precoCol] ?? 0);
-                                // Se tem declaration_value preenchido, usar ele (prioridade)
+                                // Se tem declaration_value preenchido para pacotes, usar ele
                                 if ($isPacoteItem && !empty($it['declaration_value']) && (float) $it['declaration_value'] > 0) {
                                     $val = (float) $it['declaration_value'];
                                 }
 
-                                // Para produtos normais em pedido BRL:
-                                // Verificar se o valor já está em USD (comparando com preço do produto)
-                                // Se preco_unitario ≈ preço do produto (em USD), NÃO converter
-                                $jaEhUsd = $isPacoteItem;
-                                if (!$jaEhUsd && $moedaPedido === 'BRL' && $hasProdutoId && (int) ($it['produto_id'] ?? 0) > 0 && (int) ($it['produto_id'] ?? 0) < 999990) {
-                                    try {
-                                        $stPreco = $this->connection->prepare("SELECT price FROM produtos WHERE id = ? LIMIT 1");
-                                        $stPreco->execute([(int) $it['produto_id']]);
-                                        $precoOriginalUsd = (float) ($stPreco->fetchColumn() ?: 0);
-                                        // Se o valor no pedido é próximo do preço USD do produto, está em USD
-                                        if ($precoOriginalUsd > 0 && abs($val - $precoOriginalUsd) < 1.00) {
-                                            $jaEhUsd = true;
-                                        }
-                                    } catch (\Throwable $e) {}
-                                }
-
-                                // Só converter se confirmado que NÃO é USD
-                                if (!$jaEhUsd && $moedaPedido === 'BRL' && $val > 0) {
+                                // Converter BRL→USD somente se pedido é BRL E valores estão em BRL
+                                // (pedidos mistos com pacotes salvam tudo em USD)
+                                if (!$todosUsd && $moedaPedido === 'BRL' && $val > 0) {
                                     $val = $val * $brlToUsdRate;
                                 }
 
