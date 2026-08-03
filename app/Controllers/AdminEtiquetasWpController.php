@@ -1085,6 +1085,50 @@ class AdminEtiquetasWpController extends Controller
         // Itens
         // Se o pedido tem invoice confirmado, usar dados do invoice (nome_produto, ncm, declaration_value)
         $itemsIn = isset($pedido['items']) && is_array($pedido['items']) ? $pedido['items'] : [];
+
+        // Verificar se os itens vieram da tabela correta (com tipo_item)
+        // Se não, buscar diretamente de pedido_itens que tem as colunas de pacote
+        $pedidoIdLocal = (int) ($pedido['id'] ?? 0);
+        $precisaBuscarDireto = false;
+        if (!empty($itemsIn)) {
+            // Se algum item tem produto_id >= 999990 mas NÃO tem tipo_item, os dados vieram de pedido_items (sem as colunas)
+            foreach ($itemsIn as $checkIt) {
+                if ((int) ($checkIt['produto_id'] ?? 0) >= 999990 && empty($checkIt['tipo_item'])) {
+                    $precisaBuscarDireto = true;
+                    break;
+                }
+            }
+        }
+
+        if ($precisaBuscarDireto && $pedidoIdLocal > 0) {
+            try {
+                $dbDireto = \Config\Database::getConnection();
+                $stDireto = $dbDireto->prepare(
+                    "SELECT *, preco_unitario AS preco_unitario FROM pedido_itens WHERE pedido_id = ? ORDER BY id ASC"
+                );
+                $stDireto->execute([$pedidoIdLocal]);
+                $itensDireto = $stDireto->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                if (!empty($itensDireto)) {
+                    $itemsIn = [];
+                    foreach ($itensDireto as $itD) {
+                        $itemsIn[] = [
+                            'produto_id' => (int) ($itD['produto_id'] ?? 0),
+                            'nome_produto' => $itD['nome_produto'] ?? ($itD['nome_item'] ?? ''),
+                            'nome' => $itD['nome_produto'] ?? ($itD['nome_item'] ?? ''),
+                            'ncm' => $itD['ncm'] ?? ($itD['produto_ncm'] ?? ''),
+                            'produto_ncm' => $itD['produto_ncm'] ?? ($itD['ncm'] ?? ''),
+                            'preco_unitario' => (float) ($itD['preco_unitario'] ?? 0),
+                            'declaration_value' => (float) ($itD['declaration_value'] ?? 0),
+                            'quantidade' => (int) ($itD['quantidade'] ?? 1),
+                            'peso_kg' => (float) ($itD['peso_manual'] ?? ($itD['peso_kg'] ?? 0)),
+                            'tipo_item' => $itD['tipo_item'] ?? 'produto',
+                            'pacote_id' => $itD['pacote_id'] ?? null,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
         try {
             $dbInv = \Config\Database::getConnection();
             $stInv = $dbInv->prepare(
