@@ -51,6 +51,13 @@
     </div>
     <!-- ETIQUETAS -->
     <div class="ewp-panel" id="panel-etiquetas">
+        <!-- Campo de busca -->
+        <div class="mb-3">
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" class="form-control" id="etiquetas-busca" placeholder="Buscar por pedido, cliente, tracking..." oninput="filtrarEtiquetas(this.value)">
+            </div>
+        </div>
         <div class="card ewp-card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center py-2">
                 <strong class="small">Pedidos em Caixa Fechada</strong>
@@ -167,6 +174,22 @@ if(empty($pedidosCF)):?><tr><td colspan="5" class="ewp-empty"><i class="fas fa-c
 
 <script>
 const BASE='/admin/etiquetas-wp';
+
+// Filtro de busca client-side
+function filtrarEtiquetas(termo) {
+    termo = termo.toLowerCase().trim();
+    // Filtrar tabela Caixa Fechada
+    document.querySelectorAll('#pedidos-body tr').forEach(tr => {
+        const text = tr.textContent.toLowerCase();
+        tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
+    });
+    // Filtrar tabela Pacotes gerados
+    document.querySelectorAll('#pacotes-body tr').forEach(tr => {
+        const text = tr.textContent.toLowerCase();
+        tr.style.display = (!termo || text.includes(termo)) ? '' : 'none';
+    });
+}
+
 function switchTab(t){document.querySelectorAll('.ewp-panel').forEach(p=>p.style.display='none');document.querySelectorAll('.ewp-tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('panel-'+t).style.display='block';event.target.classList.add('active');if(t==='containers'){carregarPacotesParaContainer();carregarContainers();}if(t==='faturas'){carregarContainersParaFatura();carregarFaturas();}if(t==='embarques'){carregarFaturasParaEmbarque();carregarEmbarques();}}
 document.addEventListener('DOMContentLoaded',()=>{checkConnection();carregarPacotes();});
 document.addEventListener('change',e=>{if(e.target.classList.contains('chk-pedido'))updateMassBtn();if(e.target.classList.contains('chk-cnt-pacote'))updateCntCount();});
