@@ -837,8 +837,24 @@ class AdminEtiquetasWpController extends Controller
                                     $val = (float) $it['declaration_value'];
                                 }
 
-                                // Só converter se NÃO for pacote e pedido for BRL
-                                if (!$isPacoteItem && $moedaPedido === 'BRL' && $val > 0) {
+                                // Para produtos normais em pedido BRL:
+                                // Verificar se o valor já está em USD (comparando com preço do produto)
+                                // Se preco_unitario ≈ preço do produto (em USD), NÃO converter
+                                $jaEhUsd = $isPacoteItem;
+                                if (!$jaEhUsd && $moedaPedido === 'BRL' && $hasProdutoId && (int) ($it['produto_id'] ?? 0) > 0 && (int) ($it['produto_id'] ?? 0) < 999990) {
+                                    try {
+                                        $stPreco = $this->connection->prepare("SELECT price FROM produtos WHERE id = ? LIMIT 1");
+                                        $stPreco->execute([(int) $it['produto_id']]);
+                                        $precoOriginalUsd = (float) ($stPreco->fetchColumn() ?: 0);
+                                        // Se o valor no pedido é próximo do preço USD do produto, está em USD
+                                        if ($precoOriginalUsd > 0 && abs($val - $precoOriginalUsd) < 1.00) {
+                                            $jaEhUsd = true;
+                                        }
+                                    } catch (\Throwable $e) {}
+                                }
+
+                                // Só converter se confirmado que NÃO é USD
+                                if (!$jaEhUsd && $moedaPedido === 'BRL' && $val > 0) {
                                     $val = $val * $brlToUsdRate;
                                 }
 
