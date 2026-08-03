@@ -1104,7 +1104,7 @@ class AdminEtiquetasWpController extends Controller
             try {
                 $dbDireto = \Config\Database::getConnection();
                 $stDireto = $dbDireto->prepare(
-                    "SELECT *, preco_unitario AS preco_unitario FROM pedido_itens WHERE pedido_id = ? ORDER BY id ASC"
+                    "SELECT * FROM pedido_itens WHERE pedido_id = ? ORDER BY id ASC"
                 );
                 $stDireto->execute([$pedidoIdLocal]);
                 $itensDireto = $stDireto->fetchAll(\PDO::FETCH_ASSOC) ?: [];
@@ -1123,6 +1123,7 @@ class AdminEtiquetasWpController extends Controller
                             'peso_kg' => (float) ($itD['peso_manual'] ?? ($itD['peso_kg'] ?? 0)),
                             'tipo_item' => $itD['tipo_item'] ?? 'produto',
                             'pacote_id' => $itD['pacote_id'] ?? null,
+                            '_valor_ja_usd' => (($itD['tipo_item'] ?? '') === 'pacote_redirecionamento'),
                         ];
                     }
                 }
