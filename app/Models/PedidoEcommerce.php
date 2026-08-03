@@ -1557,6 +1557,7 @@ class PedidoEcommerce {
             if ($pick(['nome_item']) !== null) $selectParts[] = 'pi.nome_item';
             if ($pick(['declaration_value']) !== null) $selectParts[] = 'pi.declaration_value';
             if ($pick(['comprovante_url']) !== null) $selectParts[] = 'pi.comprovante_url';
+            if ($pick(['produto_ncm']) !== null) $selectParts[] = 'pi.produto_ncm';
 
             // Fallback: buscar nome do produto na tabela produtos quando nome_produto do item estiver vazio
             if ($colProdutoId) {
@@ -1793,6 +1794,12 @@ class PedidoEcommerce {
                 // Se converter os itens aproxima mais do subtotal do pedido, então itens estavam em USD.
                 if ($diffConv + 0.01 < $diffNoConv) {
                     foreach ($itens as &$it) {
+                        // Não converter itens de pacote/redirecionamento (valor já é USD e deve permanecer USD)
+                        $tipoIt = $it['tipo_item'] ?? 'produto';
+                        $pidIt = (int) ($it['produto_id'] ?? 0);
+                        if ($tipoIt === 'pacote_redirecionamento' || $pidIt >= 999990) {
+                            continue;
+                        }
                         $it['preco_unitario'] = ((float) ($it['preco_unitario'] ?? 0)) * $taxaConversao;
                         $it['subtotal'] = ((float) ($it['subtotal'] ?? 0)) * $taxaConversao;
                     }

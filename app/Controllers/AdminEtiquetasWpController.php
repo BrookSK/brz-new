@@ -1143,15 +1143,29 @@ class AdminEtiquetasWpController extends Controller
             if ($qtd <= 0) return ['_error' => 'Item #' . ($idx+1) . ' qtd inválida'];
             $desc = trim((string) ($it['nome_produto'] ?? ($it['nome'] ?? 'Item')));
             if ($desc === '') $desc = 'Item ' . ($idx+1);
-            $ncmDigits = $this->onlyDigits((string) ($it['ncm'] ?? ''));
-            if ($ncmDigits === '' || strlen($ncmDigits) < 6) return ['_error' => 'Item #' . ($idx+1) . ' sem NCM'];
+
+            // NCM: tentar múltiplas fontes (ncm, produto_ncm, ncm_code)
+            $ncmRaw = (string) ($it['ncm'] ?? ($it['produto_ncm'] ?? ($it['ncm_code'] ?? '')));
+            $ncmDigits = $this->onlyDigits($ncmRaw);
+            if ($ncmDigits === '' || strlen($ncmDigits) < 6) return ['_error' => 'Item #' . ($idx+1) . ' sem NCM (' . $desc . ')'];
             $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : substr($ncmDigits, 0, 6);
+
+            // Valor: para itens de pacote (produto_id >= 999990), o valor SEMPRE está em USD
+            // Não importa se o pedido é BRL — o declaration_value/preco_unitario de pacotes é USD
+            $isPacote = ((int) ($it['produto_id'] ?? 0) >= 999990)
+                || (($it['tipo_item'] ?? 'produto') === 'pacote_redirecionamento')
+                || !empty($it['_valor_ja_usd']);
+
             $val = (float) ($it['preco_unitario'] ?? 0);
-            // Para itens de pacote: usar declaration_value se preco_unitario é 0
             if ($val <= 0 && !empty($it['declaration_value'])) {
                 $val = (float) $it['declaration_value'];
             }
-            if ($moedaPedido === 'BRL' && $val > 0 && empty($it['_valor_ja_usd'])) $val = $val * $brlToUsdRate;
+
+            // Só converter BRL→USD se NÃO for pacote e NÃO tiver flag _valor_ja_usd
+            if (!$isPacote && $moedaPedido === 'BRL' && $val > 0) {
+                $val = $val * $brlToUsdRate;
+            }
+
             if ($val < 0.01) $val = 0.01;
             $items[] = ['hsCode' => $hs, 'description' => substr($desc, 0, 500), 'quantity' => $qtd, 'value' => (float) number_format($val, 2, '.', '')];
         }
