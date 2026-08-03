@@ -1482,7 +1482,8 @@ class AdminPedidosEditController extends Controller {
 
             if (!$isPago) {
             foreach ($itensTables as $t) {
-                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id");
+                // Preservar itens de pacote/redirecionamento (não deletar, não recriar)
+                $stmt = $this->connection->prepare("DELETE FROM {$t} WHERE pedido_id = :pedido_id AND (produto_id IS NULL OR produto_id < 999990)");
                 $stmt->execute([':pedido_id' => $pedidoId]);
             }
 
