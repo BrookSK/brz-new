@@ -3986,7 +3986,12 @@ HTML;
 
                                             // Badge de status de compra (lista de compras)
                                             $itemCompraStatus = $item['compra_status'] ?? null;
-                                            if ($itemCompraStatus === 'comprado') {
+                                            $itemTipoItem = $item['tipo_item'] ?? 'produto';
+                                            $itemProdId = (int) ($item['produto_id'] ?? 0);
+                                            // Pacotes de redirecionamento não precisam ser comprados
+                                            if ($itemTipoItem === 'pacote_redirecionamento' || $itemProdId >= 999990) {
+                                                $nomeHtml .= ' <span class="badge bg-info"><i class="fas fa-box-open me-1"></i>Redirecionamento</span>';
+                                            } elseif ($itemCompraStatus === 'comprado') {
                                                 $nomeHtml .= ' <span class="badge bg-success"><i class="fas fa-check me-1"></i>Comprado</span>';
                                             } elseif ($itemCompraStatus === 'pendente') {
                                                 $statusPedidoAtual = strtolower(trim((string) ($pedido['status'] ?? '')));
