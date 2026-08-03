@@ -780,15 +780,26 @@ class AdminEtiquetasWpController extends Controller
                         $precoCol = in_array('preco_unitario', $cols) ? 'preco_unitario' : (in_array('valor_unitario', $cols) ? 'valor_unitario' : 'preco_unitario');
                         $qtdCol = in_array('quantidade', $cols) ? 'quantidade' : 'quantidade';
                         $hasProdutoId = in_array('produto_id', $cols);
+                        $hasNcmCol = in_array('ncm', $cols);
+                        $hasProdutoNcmCol = in_array('produto_ncm', $cols);
+                        $hasTipoItem = in_array('tipo_item', $cols);
+                        $hasDeclarationValue = in_array('declaration_value', $cols);
 
-                        // NCM vem da tabela produtos via JOIN
+                        // Buscar itens com NCM da própria tabela (prioridade) e da tabela produtos (fallback)
+                        $selectCols = "i.{$nomeCol}, i.{$precoCol}, i.{$qtdCol}";
+                        if ($hasProdutoId) $selectCols .= ", i.produto_id";
+                        if ($hasNcmCol) $selectCols .= ", i.ncm AS item_ncm";
+                        if ($hasProdutoNcmCol) $selectCols .= ", i.produto_ncm";
+                        if ($hasTipoItem) $selectCols .= ", i.tipo_item";
+                        if ($hasDeclarationValue) $selectCols .= ", i.declaration_value";
+
                         if ($hasProdutoId) {
-                            $sql = "SELECT i.{$nomeCol}, i.{$precoCol}, i.{$qtdCol}, p.ncm 
+                            $sql = "SELECT {$selectCols}, p.ncm AS produto_ncm_join
                                     FROM {$itensTable} i 
                                     LEFT JOIN produtos p ON p.id = i.produto_id 
                                     WHERE i.pedido_id = ?";
                         } else {
-                            $sql = "SELECT {$nomeCol}, {$precoCol}, {$qtdCol} FROM {$itensTable} WHERE pedido_id = ?";
+                            $sql = "SELECT {$selectCols} FROM {$itensTable} i WHERE i.pedido_id = ?";
                         }
 
                         $stItems = $this->connection->prepare($sql);
@@ -798,6 +809,7 @@ class AdminEtiquetasWpController extends Controller
                         if (!empty($itemsRows)) {
                             // Verificar moeda do pedido para conversão BRL→USD
                             $brlToUsdRate = 1.0;
+                            $moedaPedido = 'USD';
                             try {
                                 $stMoeda = $this->connection->prepare("SELECT moeda FROM pedidos WHERE id = ? LIMIT 1");
                                 $stMoeda->execute([$pedidoId]);
@@ -810,10 +822,26 @@ class AdminEtiquetasWpController extends Controller
 
                             $items = [];
                             foreach ($itemsRows as $it) {
-                                $ncmDigits = preg_replace('/\D/', '', $it['ncm'] ?? '');
+                                // NCM: prioridade item_ncm > produto_ncm > produto_ncm_join
+                                $ncmRaw = (string) ($it['item_ncm'] ?? ($it['produto_ncm'] ?? ($it['produto_ncm_join'] ?? '')));
+                                $ncmDigits = preg_replace('/\D/', '', $ncmRaw);
                                 $hs = strlen($ncmDigits) >= 8 ? substr($ncmDigits, 0, 8) : (strlen($ncmDigits) >= 6 ? substr($ncmDigits, 0, 6) : $ncmDigits);
+
+                                // Valor: para pacotes, o preco_unitario JÁ está em USD, não converter
+                                $isPacoteItem = (($it['tipo_item'] ?? 'produto') === 'pacote_redirecionamento')
+                                    || ((int) ($it['produto_id'] ?? 0) >= 999990);
+
                                 $val = (float) ($it[$precoCol] ?? 0);
-                                if ($moedaPedido === 'BRL' && $val > 0) $val = $val * $brlToUsdRate;
+                                // Se tem declaration_value preenchido, usar ele (prioridade)
+                                if ($isPacoteItem && !empty($it['declaration_value']) && (float) $it['declaration_value'] > 0) {
+                                    $val = (float) $it['declaration_value'];
+                                }
+
+                                // Só converter se NÃO for pacote e pedido for BRL
+                                if (!$isPacoteItem && $moedaPedido === 'BRL' && $val > 0) {
+                                    $val = $val * $brlToUsdRate;
+                                }
+
                                 if ($val < 0.01) $val = 0.01;
                                 $items[] = [
                                     'hsCode' => $hs,
