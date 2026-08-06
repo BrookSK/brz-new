@@ -145,39 +145,41 @@
 
             <!-- Endereço de Redirecionamento -->
             <div class="card shadow-sm mt-4">
-                <div class="card-header d-flex justify-content-between align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#collapseEnderecoRed" aria-expanded="false">
+                <div class="card-header d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#collapseEnderecoRed" aria-expanded="false" aria-controls="collapseEnderecoRed">
                     <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Endereço de Entrega (Redirecionamento)</h5>
-                    <i class="fas fa-chevron-down"></i>
+                    <i class="fas fa-chevron-down small"></i>
                 </div>
-                <div class="collapse" id="collapseEnderecoRed">
+                <div class="collapse show" id="collapseEnderecoRed">
                     <div class="card-body">
-                        <p class="text-muted mb-3">Use este endereço ao comprar em lojas americanas. Seus produtos serão recebidos no nosso armazém e enviados para o Brasil.</p>
-                        <div class="row g-2">
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-0">Endereço 1</label>
-                                <div class="fw-bold">1227 W Broad St</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted mb-0">Endereço 2 (Suíte)</label>
-                                <div class="fw-bold">Suite: <?= htmlspecialchars((string) ($usuario['suite'] ?? '-')) ?></div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-0">Cidade</label>
-                                <div class="fw-bold">Saint Pauls</div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-0">Estado</label>
-                                <div class="fw-bold">NC</div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted mb-0">CEP</label>
-                                <div class="fw-bold">28384</div>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small text-muted mb-0">País</label>
-                                <div class="fw-bold">Estados Unidos da América (EUA)</div>
-                            </div>
-                        </div>
+                        <p class="text-muted mb-3 small">Use este endereço ao comprar em lojas americanas. Seus produtos serão recebidos no nosso armazém e enviados para o Brasil.</p>
+                        <table class="table table-sm table-borderless mb-0">
+                            <tbody>
+                                <tr>
+                                    <td class="text-muted" style="width:130px;">Endereço 1</td>
+                                    <td class="fw-bold">1227 W Broad St</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Endereço 2</td>
+                                    <td class="fw-bold">Suite: <?= htmlspecialchars((string) ($usuario['suite'] ?? '-')) ?></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Cidade</td>
+                                    <td class="fw-bold">Saint Pauls</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Estado</td>
+                                    <td class="fw-bold">NC</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">CEP</td>
+                                    <td class="fw-bold">28384</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">País</td>
+                                    <td class="fw-bold">Estados Unidos da América (EUA)</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
