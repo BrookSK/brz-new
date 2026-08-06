@@ -143,6 +143,45 @@
                 </div>
             </div>
 
+            <!-- Endereço de Redirecionamento -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#collapseEnderecoRed" aria-expanded="false">
+                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Endereço de Entrega (Redirecionamento)</h5>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="collapse" id="collapseEnderecoRed">
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Use este endereço ao comprar em lojas americanas. Seus produtos serão recebidos no nosso armazém e enviados para o Brasil.</p>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-0">Endereço 1</label>
+                                <div class="fw-bold">1227 W Broad St</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-0">Endereço 2 (Suíte)</label>
+                                <div class="fw-bold">Suite: <?= htmlspecialchars((string) ($usuario['suite'] ?? '-')) ?></div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-0">Cidade</label>
+                                <div class="fw-bold">Saint Pauls</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-0">Estado</label>
+                                <div class="fw-bold">NC</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-0">CEP</label>
+                                <div class="fw-bold">28384</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small text-muted mb-0">País</label>
+                                <div class="fw-bold">Estados Unidos da América (EUA)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Wallet Balance Breakdown -->
             <?php
             $normalDisp = floatval($carteira_normal_disponivel ?? 0);
