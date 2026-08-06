@@ -193,29 +193,59 @@ class AdminPacotesRecebidosController extends Controller {
     }
 
     /**
-     * API: Buscar usuario por suite (AJAX)
+     * API: Buscar usuario por suite ou nome (AJAX)
      */
     public function buscarSuite(Request $request): void {
         $suite = (int) ($request->getParams()['suite'] ?? 0);
-        if ($suite <= 0) {
-            $this->json(['success' => false, 'message' => 'Suite inválida'], 400);
-            return;
+        $busca = trim($request->getParams()['busca'] ?? '');
+
+        // Se veio 'busca', pode ser suite (número) ou nome (texto)
+        if ($busca !== '' && $suite <= 0) {
+            if (is_numeric($busca)) {
+                $suite = (int) $busca;
+            }
         }
 
-        $usuario = $this->model->buscarUsuarioPorSuite($suite);
-        if (!$usuario) {
-            $this->json(['success' => false, 'message' => 'Nenhum cliente com esta suite'], 404);
-            return;
+        // Buscar por suite
+        if ($suite > 0) {
+            $usuario = $this->model->buscarUsuarioPorSuite($suite);
+            if ($usuario) {
+                $this->json([
+                    'success' => true,
+                    'usuario' => [
+                        'id' => $usuario['id'],
+                        'nome' => $usuario['nome'],
+                        'email' => $usuario['email'],
+                        'suite' => $usuario['suite'],
+                    ],
+                ]);
+                return;
+            }
         }
 
-        $this->json([
-            'success' => true,
-            'usuario' => [
-                'id' => $usuario['id'],
-                'nome' => $usuario['nome'],
-                'email' => $usuario['email'],
-            ],
-        ]);
+        // Buscar por nome
+        if ($busca !== '' && !is_numeric($busca)) {
+            try {
+                $db = \Config\Database::getConnection();
+                $st = $db->prepare("SELECT id, nome, email, suite FROM usuarios WHERE nome LIKE ? AND suite IS NOT NULL AND suite > 0 ORDER BY nome ASC LIMIT 1");
+                $st->execute(['%' . $busca . '%']);
+                $usuario = $st->fetch(\PDO::FETCH_ASSOC);
+                if ($usuario) {
+                    $this->json([
+                        'success' => true,
+                        'usuario' => [
+                            'id' => $usuario['id'],
+                            'nome' => $usuario['nome'],
+                            'email' => $usuario['email'],
+                            'suite' => $usuario['suite'],
+                        ],
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $this->json(['success' => false, 'message' => 'Nenhum cliente encontrado com "' . htmlspecialchars($busca ?: (string) $suite) . '"'], 404);
     }
 
     /**

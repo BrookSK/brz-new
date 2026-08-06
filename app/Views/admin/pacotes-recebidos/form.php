@@ -35,12 +35,13 @@
                 <?php endif; ?>
 
                 <div class="row g-3">
-                    <!-- Suite -->
+                    <!-- Suite / Nome -->
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Número da Suite *</label>
+                        <label class="form-label fw-bold">Suite ou Nome do Cliente *</label>
                         <div class="input-group">
-                            <input type="number" name="numero_suite" id="numero_suite" class="form-control" 
+                            <input type="text" name="numero_suite" id="numero_suite" class="form-control" 
                                    value="<?= htmlspecialchars($pacote['numero_suite'] ?? '') ?>" 
+                                   placeholder="Suite ou nome..."
                                    required <?= !$editavel ? 'readonly' : '' ?>>
                             <button type="button" class="btn btn-outline-primary" id="btnBuscarSuite" <?= !$editavel ? 'disabled' : '' ?>>
                                 <i class="fas fa-search"></i> Buscar
@@ -48,6 +49,7 @@
                         </div>
                         <div id="suiteInfo" class="form-text text-success" style="display:none;"></div>
                         <div id="suiteErro" class="form-text text-danger" style="display:none;"></div>
+                        <small class="form-text text-muted">Digite o número da suite ou o nome do cliente.</small>
                     </div>
 
                     <!-- Nome do Produto -->
@@ -224,26 +226,28 @@
     });
 })();
 
-// === Busca de usuario por suite (AJAX) ===
+// === Busca de usuario por suite ou nome (AJAX) ===
 document.getElementById('btnBuscarSuite')?.addEventListener('click', function() {
-    const suite = document.getElementById('numero_suite').value;
+    const termo = document.getElementById('numero_suite').value.trim();
     const infoEl = document.getElementById('suiteInfo');
     const erroEl = document.getElementById('suiteErro');
     
     infoEl.style.display = 'none';
     erroEl.style.display = 'none';
 
-    if (!suite || parseInt(suite) <= 0) {
-        erroEl.textContent = 'Informe um número de suite válido.';
+    if (!termo) {
+        erroEl.textContent = 'Informe um número de suite ou nome.';
         erroEl.style.display = 'block';
         return;
     }
 
-    fetch('/api/buscar-usuario-suite?suite=' + encodeURIComponent(suite))
+    fetch('/api/buscar-usuario-suite?busca=' + encodeURIComponent(termo))
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                infoEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>' + data.usuario.nome + ' (' + data.usuario.email + ')';
+                // Preencher o campo com a suite real encontrada
+                document.getElementById('numero_suite').value = data.usuario.suite;
+                infoEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>' + data.usuario.nome + ' (' + data.usuario.email + ') - Suite: ' + data.usuario.suite;
                 infoEl.style.display = 'block';
             } else {
                 erroEl.textContent = data.message || 'Nenhum cliente encontrado.';
