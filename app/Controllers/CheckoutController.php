@@ -2392,6 +2392,57 @@ class CheckoutController extends Controller {
             return;
         }
 
+        // Validar: não pode misturar pacotes de redirecionamento com produtos do site
+        $temPacoteAtivo = false;
+        $temProdutoAtivo = false;
+        try {
+            $db = \Config\Database::getConnection();
+            $uid = (int) ($usuario['id'] ?? 0);
+            if ($uid > 0) {
+                $stCart = $db->prepare('SELECT id FROM carrinhos WHERE usuario_id = ? ORDER BY created_at DESC LIMIT 1');
+                $stCart->execute([$uid]);
+                $cartIdCheck = (int) $stCart->fetchColumn();
+                if ($cartIdCheck > 0) {
+                    $stItens = $db->prepare("SELECT produto_id, tipo_item FROM carrinho_items WHERE carrinho_id = ?");
+                    $stItens->execute([$cartIdCheck]);
+                    $itensCheck = $stItens->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+                    if (session_status() === PHP_SESSION_NONE) session_start();
+                    foreach ($itensCheck as $ic) {
+                        $pidC = (int) ($ic['produto_id'] ?? 0);
+                        $varC = 0; // simplificado
+                        try {
+                            $stVar = $db->prepare("SELECT COALESCE(produto_variacao_id, 0) FROM carrinho_items WHERE carrinho_id = ? AND produto_id = ? LIMIT 1");
+                            $stVar->execute([$cartIdCheck, $pidC]);
+                            $varC = (int) $stVar->fetchColumn();
+                        } catch (\Throwable $e) {}
+                        $keyC = ((string) $pidC) . ':' . ((string) $varC);
+                        // Verificar se está ativo na session
+                        $ativoC = true;
+                        if (isset($_SESSION['carrinho_itens_ativos']) && is_array($_SESSION['carrinho_itens_ativos']) && array_key_exists($keyC, $_SESSION['carrinho_itens_ativos'])) {
+                            $ativoC = (bool) $_SESSION['carrinho_itens_ativos'][$keyC];
+                        }
+                        if (!$ativoC) continue;
+
+                        $tipoC = $ic['tipo_item'] ?? 'produto';
+                        if ($tipoC === 'pacote_redirecionamento' || $pidC >= 999990) {
+                            $temPacoteAtivo = true;
+                        } else {
+                            $temProdutoAtivo = true;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        if ($temPacoteAtivo && $temProdutoAtivo) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $_SESSION['message'] = 'Não é possível finalizar pedidos com produtos do site e pacotes de redirecionamento juntos. Desative um dos tipos no carrinho antes de prosseguir.';
+            $_SESSION['message_type'] = 'danger';
+            $this->redirect('/carrinho');
+            return;
+        }
+
         // Validar itens de redirecionamento: exigir declaration_value e comprovante
         $pacoteSemDados = false;
         try {
@@ -3286,6 +3337,25 @@ class CheckoutController extends Controller {
             $this->json([
                 'error' => 'Não foi possível validar a disponibilidade do carrinho. Tente novamente.',
             ], 500);
+            return;
+        }
+
+        // Validar: não pode misturar pacotes de redirecionamento com produtos do site (ativos)
+        $temPacoteNoCheckout = false;
+        $temProdutoNoCheckout = false;
+        foreach ($carrinho as $cItemMix) {
+            $tipoMix = $cItemMix['tipo_item'] ?? 'produto';
+            $pidMix = (int) ($cItemMix['produto_id'] ?? 0);
+            if ($tipoMix === 'pacote_redirecionamento' || $tipoMix === 'fatura_adicional' || $pidMix >= 999990) {
+                $temPacoteNoCheckout = true;
+            } else {
+                $temProdutoNoCheckout = true;
+            }
+        }
+        if ($temPacoteNoCheckout && $temProdutoNoCheckout) {
+            $this->json([
+                'error' => 'Não é possível finalizar pedidos com produtos do site e pacotes de redirecionamento juntos. Desative um dos tipos no carrinho.'
+            ], 400);
             return;
         }
 

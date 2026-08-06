@@ -476,8 +476,32 @@
                         <h5 id="total-valor" class="cart-currency total-value" data-original-value="<?= $total ?>"><?= number_format($total, 2, ',', '.') ?></h5>
                     </div>
                     
+                    <?php
+                    // Verificar se tem mix de pacotes + produtos ativos
+                    $temPacoteAtivoView = false;
+                    $temProdutoAtivoView = false;
+                    foreach ($carrinho as $ckMix => $cItemMix) {
+                        if (empty($cItemMix['ativo'])) continue;
+                        $tipoMix = $cItemMix['tipo_item'] ?? 'produto';
+                        $pidMix = (int) ($cItemMix['produto_id'] ?? 0);
+                        if ($tipoMix === 'pacote_redirecionamento' || $pidMix >= 999990) {
+                            $temPacoteAtivoView = true;
+                        } else {
+                            $temProdutoAtivoView = true;
+                        }
+                    }
+                    $mixBloqueado = ($temPacoteAtivoView && $temProdutoAtivoView);
+                    ?>
+
+                    <?php if ($mixBloqueado): ?>
+                    <div class="alert alert-danger small mb-3">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        <strong>Atenção:</strong> Não é possível finalizar com produtos do site e pacotes de redirecionamento juntos. Desative um dos tipos para prosseguir.
+                    </div>
+                    <?php endif; ?>
+
                     <div class="d-grid">
-                        <a id="btnCheckoutFromCart" href="/carrinho/checkout" class="btn btn-primary btn-lg" style="position: relative; z-index: 5;" onclick="try{window.location.href='/carrinho/checkout';}catch(e){} return false;">
+                        <a id="btnCheckoutFromCart" href="/carrinho/checkout" class="btn btn-primary btn-lg <?= $mixBloqueado ? 'disabled' : '' ?>" style="position: relative; z-index: 5;" <?= $mixBloqueado ? 'aria-disabled="true" tabindex="-1"' : 'onclick="try{window.location.href=\'/carrinho/checkout\';}catch(e){} return false;"' ?>>
                             <i class="fas fa-lock"></i> <?= __('cart.checkout', 'Finalizar Compra') ?>
                         </a>
                     </div>
