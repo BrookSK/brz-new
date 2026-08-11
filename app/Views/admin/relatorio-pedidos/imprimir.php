@@ -26,6 +26,9 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 .section-carne td{font-weight:bold;}
 .carne-progress{background:#e0e0e0;height:10px;border-radius:5px;overflow:hidden;margin:4px 0;}
 .carne-progress-bar{background:#1a237e;height:100%;border-radius:5px;}
+.tipo-pedido-banner{padding:10px 14px;margin-bottom:15px;border-radius:5px;border-left:5px solid;page-break-inside:avoid;}
+.tipo-pedido-banner .tipo-label{font-size:14px;font-weight:bold;margin:0 0 3px;}
+.tipo-pedido-banner .tipo-descricao{font-size:11px;margin:0;opacity:0.85;}
 @media print{.no-print{display:none;} @page{margin:10mm;}}
 </style>
 </head>
@@ -46,6 +49,14 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 <?php if (!empty($carneInfo)): ?>
 <div class="carne-banner">
     &#128179; PEDIDO VIA CARNÊ BRAZILIANA <span><?= (int)($carneInfo['parcelas_pagas'] ?? 0) ?>/<?= (int)($carneInfo['quantidade_parcelas'] ?? 0) ?> parcelas pagas</span>
+</div>
+<?php endif; ?>
+
+<!-- Tipo/Origem do Pedido -->
+<?php if (!empty($tipoPedido)): ?>
+<div class="tipo-pedido-banner" style="border-left-color:<?= htmlspecialchars($tipoPedido['cor']) ?>;background:<?= htmlspecialchars($tipoPedido['cor']) ?>12;">
+    <p class="tipo-label" style="color:<?= htmlspecialchars($tipoPedido['cor']) ?>;"><?= $tipoPedido['icone'] ?> <?= htmlspecialchars($tipoPedido['label']) ?></p>
+    <p class="tipo-descricao"><?= htmlspecialchars($tipoPedido['descricao']) ?></p>
 </div>
 <?php endif; ?>
 

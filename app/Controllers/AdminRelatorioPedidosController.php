@@ -428,6 +428,41 @@ class AdminRelatorioPedidosController extends Controller {
             // tabela carnes pode não existir
         }
 
+        // Determinar tipo/origem do pedido para exibição no PDF
+        $origemPedido = trim((string)($pedido['origem_pedido'] ?? ''));
+        $tipoPedido = [
+            'codigo' => $origemPedido,
+            'label' => 'Produtos do Site',
+            'descricao' => 'Pedido de produtos disponíveis no catálogo da loja.',
+            'cor' => '#0b6623', // verde
+            'icone' => '🛒',
+        ];
+        if ($origemPedido === 'redirecionamento') {
+            $tipoPedido = [
+                'codigo' => $origemPedido,
+                'label' => 'Redirecionamento de Pacote',
+                'descricao' => 'Pedido originado do serviço de redirecionamento de pacotes (compras próprias do cliente).',
+                'cor' => '#1565c0', // azul
+                'icone' => '📦',
+            ];
+        } elseif ($origemPedido === 'assessoria') {
+            $tipoPedido = [
+                'codigo' => $origemPedido,
+                'label' => 'Assessoria de Compra',
+                'descricao' => 'Pedido criado via orçamento de assessoria personalizada.',
+                'cor' => '#6a1b9a', // roxo
+                'icone' => '🎯',
+            ];
+        } elseif ($origemPedido === 'manual') {
+            $tipoPedido = [
+                'codigo' => $origemPedido,
+                'label' => 'Pedido Manual',
+                'descricao' => 'Pedido criado manualmente pela equipe administrativa.',
+                'cor' => '#e65100', // laranja
+                'icone' => '✏️',
+            ];
+        }
+
         require __DIR__ . '/../Views/admin/relatorio-pedidos/imprimir.php';
         exit;
     }
