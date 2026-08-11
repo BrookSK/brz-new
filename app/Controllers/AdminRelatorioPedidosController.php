@@ -429,9 +429,31 @@ class AdminRelatorioPedidosController extends Controller {
         }
 
         // Determinar tipo/origem do pedido para exibição no PDF
+        // Analisa cada item para saber se é redirecionamento ou produto do site
+        $itensRedirecionamento = 0;
+        $itensSite = 0;
+        foreach ($itens as $it) {
+            $tipoItem = (string)($it['tipo_item'] ?? '');
+            $prodId = (int)($it['produto_id'] ?? 0);
+            if ($tipoItem === 'pacote_redirecionamento' || $prodId >= 999990) {
+                $itensRedirecionamento++;
+            } else {
+                $itensSite++;
+            }
+        }
+
         $origemPedido = trim((string)($pedido['origem_pedido'] ?? ''));
+
+        // Fallback: se origem_pedido não está preenchido, inferir pelos itens
+        if ($origemPedido === '' && $itensRedirecionamento > 0 && $itensSite === 0) {
+            $origemPedido = 'redirecionamento';
+        } elseif ($origemPedido === '' && $itensRedirecionamento > 0 && $itensSite > 0) {
+            $origemPedido = 'misto';
+        }
+
+        // Montar informação do tipo de pedido
         $tipoPedido = [
-            'codigo' => $origemPedido,
+            'codigo' => $origemPedido ?: 'site',
             'label' => 'Produtos do Site',
             'descricao' => 'Pedido de produtos disponíveis no catálogo da loja.',
             'cor' => '#0b6623', // verde
@@ -444,6 +466,14 @@ class AdminRelatorioPedidosController extends Controller {
                 'descricao' => 'Pedido originado do serviço de redirecionamento de pacotes (compras próprias do cliente).',
                 'cor' => '#1565c0', // azul
                 'icone' => '📦',
+            ];
+        } elseif ($origemPedido === 'misto') {
+            $tipoPedido = [
+                'codigo' => $origemPedido,
+                'label' => 'Pedido Misto',
+                'descricao' => 'Este pedido contém ' . $itensRedirecionamento . ' item(ns) de redirecionamento e ' . $itensSite . ' item(ns) do catálogo do site.',
+                'cor' => '#37474f', // cinza escuro
+                'icone' => '🔀',
             ];
         } elseif ($origemPedido === 'assessoria') {
             $tipoPedido = [
@@ -462,6 +492,11 @@ class AdminRelatorioPedidosController extends Controller {
                 'icone' => '✏️',
             ];
         }
+
+        // Suite do cliente (importante para redirecionamento)
+        $tipoPedido['suite'] = $suite;
+        $tipoPedido['itens_redirecionamento'] = $itensRedirecionamento;
+        $tipoPedido['itens_site'] = $itensSite;
 
         require __DIR__ . '/../Views/admin/relatorio-pedidos/imprimir.php';
         exit;

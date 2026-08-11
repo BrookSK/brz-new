@@ -28,7 +28,11 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 .carne-progress-bar{background:#1a237e;height:100%;border-radius:5px;}
 .tipo-pedido-banner{padding:10px 14px;margin-bottom:15px;border-radius:5px;border-left:5px solid;page-break-inside:avoid;}
 .tipo-pedido-banner .tipo-label{font-size:14px;font-weight:bold;margin:0 0 3px;}
-.tipo-pedido-banner .tipo-descricao{font-size:11px;margin:0;opacity:0.85;}
+.tipo-pedido-banner .tipo-descricao{font-size:11px;margin:0 0 4px;opacity:0.85;}
+.tipo-pedido-banner .tipo-suite{font-size:12px;margin:4px 0 0;color:#333;}
+.tipo-pedido-banner .tipo-contagem{font-size:10px;margin:4px 0 0;color:#555;}
+.badge-redir{display:inline-block;background:#e3f2fd;color:#1565c0;border:1px solid #90caf9;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:bold;white-space:nowrap;}
+.badge-site{display:inline-block;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:bold;white-space:nowrap;}
 @media print{.no-print{display:none;} @page{margin:10mm;}}
 </style>
 </head>
@@ -57,6 +61,16 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 <div class="tipo-pedido-banner" style="border-left-color:<?= htmlspecialchars($tipoPedido['cor']) ?>;background:<?= htmlspecialchars($tipoPedido['cor']) ?>12;">
     <p class="tipo-label" style="color:<?= htmlspecialchars($tipoPedido['cor']) ?>;"><?= $tipoPedido['icone'] ?> <?= htmlspecialchars($tipoPedido['label']) ?></p>
     <p class="tipo-descricao"><?= htmlspecialchars($tipoPedido['descricao']) ?></p>
+    <?php if (($tipoPedido['codigo'] === 'redirecionamento' || $tipoPedido['codigo'] === 'misto') && !empty($tipoPedido['suite'])): ?>
+    <p class="tipo-suite">Suíte do cliente: <strong>#<?= htmlspecialchars($tipoPedido['suite']) ?></strong></p>
+    <?php endif; ?>
+    <?php if ($tipoPedido['itens_redirecionamento'] > 0 || $tipoPedido['itens_site'] > 0): ?>
+    <p class="tipo-contagem">
+        <?php if ($tipoPedido['itens_redirecionamento'] > 0): ?>📦 <?= $tipoPedido['itens_redirecionamento'] ?> item(ns) de redirecionamento<?php endif; ?>
+        <?php if ($tipoPedido['itens_redirecionamento'] > 0 && $tipoPedido['itens_site'] > 0): ?> &nbsp;|&nbsp; <?php endif; ?>
+        <?php if ($tipoPedido['itens_site'] > 0): ?>🛒 <?= $tipoPedido['itens_site'] ?> item(ns) do site<?php endif; ?>
+    </p>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -109,7 +123,7 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
 <div class="section">
     <div class="section-title">Itens do Pedido</div>
     <table class="item-table">
-        <thead><tr><th style="width:60px">Foto</th><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
+        <thead><tr><th style="width:60px">Foto</th><th>Produto</th><th>Tipo</th><th>Qtd</th><th>Preço Unit.</th><th>Total</th></tr></thead>
         <tbody>
         <?php
         $pesoTotal = 0;
@@ -124,24 +138,29 @@ th{background:#f8f9fa;font-weight:bold;width:30%;}
                 $peso = $pesosProdutos[(int)$it['produto_id']] ?? 0;
             }
             $pesoTotal += $peso * $qtd;
+            // Determinar tipo do item
+            $tipoItemAtual = (string)($it['tipo_item'] ?? '');
+            $prodIdItem = (int)($it['produto_id'] ?? 0);
+            $ehRedirecionamento = ($tipoItemAtual === 'pacote_redirecionamento' || $prodIdItem >= 999990);
         ?>
             <tr>
                 <td><?= $foto ? '<img src="'.htmlspecialchars($foto).'">' : '' ?></td>
                 <td><?= htmlspecialchars($nome) ?></td>
+                <td><?php if ($ehRedirecionamento): ?><span class="badge-redir">📦 Redir.</span><?php else: ?><span class="badge-site">🛒 Site</span><?php endif; ?></td>
                 <td><?= $qtd ?></td>
                 <td><?= $fmt($preco) ?></td>
                 <td><?= $fmt($sub) ?></td>
             </tr>
         <?php endforeach; ?>
-            <tr class="total-row"><td colspan="4">Subtotal</td><td><?= $fmt($pedido['subtotal'] ?? 0) ?></td></tr>
-            <tr class="total-row"><td colspan="4">Taxa de Serviço</td><td><?= $fmt($pedido['servicos'] ?? 0) ?></td></tr>
-            <tr class="total-row"><td colspan="4">Impostos</td><td><?= $fmt($pedido['impostos'] ?? 0) ?></td></tr>
+            <tr class="total-row"><td colspan="5">Subtotal</td><td><?= $fmt($pedido['subtotal'] ?? 0) ?></td></tr>
+            <tr class="total-row"><td colspan="5">Taxa de Serviço</td><td><?= $fmt($pedido['servicos'] ?? 0) ?></td></tr>
+            <tr class="total-row"><td colspan="5">Impostos</td><td><?= $fmt($pedido['impostos'] ?? 0) ?></td></tr>
             <?php if (((float)($pedido['imposto_local'] ?? 0)) > 0): ?>
-            <tr class="total-row"><td colspan="4">Imposto Local</td><td><?= $fmt($pedido['imposto_local']) ?></td></tr>
+            <tr class="total-row"><td colspan="5">Imposto Local</td><td><?= $fmt($pedido['imposto_local']) ?></td></tr>
             <?php endif; ?>
-            <tr class="total-row"><td colspan="4">Frete</td><td><?= ((float)($pedido['frete'] ?? 0)) <= 0 ? '<span class="highlight">Frete Grátis</span>' : $fmt($pedido['frete']) ?></td></tr>
-            <tr class="total-row"><td colspan="4">Peso Total</td><td class="highlight"><?= number_format($pesoTotal, 3, ',', '.') ?> kg</td></tr>
-            <tr class="total-row"><td colspan="4" style="font-size:13px;">Total do Pedido</td><td style="font-size:13px;"><?= $fmt($pedido['total'] ?? 0) ?></td></tr>
+            <tr class="total-row"><td colspan="5">Frete</td><td><?= ((float)($pedido['frete'] ?? 0)) <= 0 ? '<span class="highlight">Frete Grátis</span>' : $fmt($pedido['frete']) ?></td></tr>
+            <tr class="total-row"><td colspan="5">Peso Total</td><td class="highlight"><?= number_format($pesoTotal, 3, ',', '.') ?> kg</td></tr>
+            <tr class="total-row"><td colspan="5" style="font-size:13px;">Total do Pedido</td><td style="font-size:13px;"><?= $fmt($pedido['total'] ?? 0) ?></td></tr>
         </tbody>
     </table>
 </div>
