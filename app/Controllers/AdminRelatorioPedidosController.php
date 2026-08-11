@@ -444,48 +444,56 @@ class AdminRelatorioPedidosController extends Controller {
 
         $origemPedido = trim((string)($pedido['origem_pedido'] ?? ''));
 
-        // Fallback: se origem_pedido não está preenchido, inferir pelos itens
-        if ($origemPedido === '' && $itensRedirecionamento > 0 && $itensSite === 0) {
-            $origemPedido = 'redirecionamento';
-        } elseif ($origemPedido === '' && $itensRedirecionamento > 0 && $itensSite > 0) {
-            $origemPedido = 'misto';
+        // Determinar a origem REAL baseada nos itens (fonte primária de verdade)
+        // O campo origem_pedido pode estar vazio em pedidos antigos
+        $origemReal = $origemPedido;
+        if ($itensRedirecionamento > 0 && $itensSite === 0) {
+            $origemReal = 'redirecionamento';
+        } elseif ($itensRedirecionamento > 0 && $itensSite > 0) {
+            $origemReal = 'misto';
+        } elseif ($itensRedirecionamento === 0 && $itensSite > 0 && $origemPedido === '') {
+            $origemReal = 'site';
+        }
+        // Se origem_pedido tem valor válido (assessoria, manual) e não há itens de redir, respeitar
+        if ($origemPedido === 'assessoria' || $origemPedido === 'manual') {
+            $origemReal = $origemPedido;
         }
 
         // Montar informação do tipo de pedido
         $tipoPedido = [
-            'codigo' => $origemPedido ?: 'site',
+            'codigo' => 'site',
             'label' => 'Produtos do Site',
             'descricao' => 'Pedido de produtos disponíveis no catálogo da loja.',
             'cor' => '#0b6623', // verde
             'icone' => '🛒',
         ];
-        if ($origemPedido === 'redirecionamento') {
+        if ($origemReal === 'redirecionamento') {
             $tipoPedido = [
-                'codigo' => $origemPedido,
+                'codigo' => 'redirecionamento',
                 'label' => 'Redirecionamento de Pacote',
                 'descricao' => 'Pedido originado do serviço de redirecionamento de pacotes (compras próprias do cliente).',
                 'cor' => '#1565c0', // azul
                 'icone' => '📦',
             ];
-        } elseif ($origemPedido === 'misto') {
+        } elseif ($origemReal === 'misto') {
             $tipoPedido = [
-                'codigo' => $origemPedido,
+                'codigo' => 'misto',
                 'label' => 'Pedido Misto',
                 'descricao' => 'Este pedido contém ' . $itensRedirecionamento . ' item(ns) de redirecionamento e ' . $itensSite . ' item(ns) do catálogo do site.',
                 'cor' => '#37474f', // cinza escuro
                 'icone' => '🔀',
             ];
-        } elseif ($origemPedido === 'assessoria') {
+        } elseif ($origemReal === 'assessoria') {
             $tipoPedido = [
-                'codigo' => $origemPedido,
+                'codigo' => 'assessoria',
                 'label' => 'Assessoria de Compra',
                 'descricao' => 'Pedido criado via orçamento de assessoria personalizada.',
                 'cor' => '#6a1b9a', // roxo
                 'icone' => '🎯',
             ];
-        } elseif ($origemPedido === 'manual') {
+        } elseif ($origemReal === 'manual') {
             $tipoPedido = [
-                'codigo' => $origemPedido,
+                'codigo' => 'manual',
                 'label' => 'Pedido Manual',
                 'descricao' => 'Pedido criado manualmente pela equipe administrativa.',
                 'cor' => '#e65100', // laranja
