@@ -1203,7 +1203,7 @@ class PedidoManualService {
         return $default;
     }
 
-    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null, int $semComissao = 0): int {
+    public function criarPedidoManual(int $clienteId, string $moeda, array $itens, array $resumo = [], ?int $adminCriadorId = null, ?string $formaPagamento = null, ?array $enderecoEntrega = null, ?string $tipoCompra = null, int $semComissao = 0, bool $limitePesoAtivo = true): int {
         if ($clienteId <= 0) {
             throw new \Exception('Cliente inválido');
         }
@@ -1265,7 +1265,7 @@ class PedidoManualService {
         $valorFreteValidacao = isset($resumo['valor_frete']) ? (float) $resumo['valor_frete'] : 0.0;
         $resumoValidacao = $this->calcularResumoPadrao($moeda, $itens, $valorFreteValidacao);
         $pesoTotalReal = (float) ($resumoValidacao['peso_total'] ?? 0.0);
-        if ($pesoTotalReal > 30.0) {
+        if ($limitePesoAtivo && $pesoTotalReal > 30.0) {
             throw new \Exception('Peso excede o limite de 30kg para pedido manual (peso total: ' . rtrim(rtrim(number_format($pesoTotalReal, 3, '.', ''), '0'), '.') . 'kg).');
         }
 

@@ -723,6 +723,19 @@ class AdminPedidosManualController extends Controller {
                     </div>
                 </div>
 
+                <div class="card mb-3 border-warning">
+                    <div class="card-body py-2 px-3">
+                        <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                            <input type="hidden" name="limite_peso_ativo" value="0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="limitePesoAtivo" name="limite_peso_ativo" value="1" checked>
+                            <label class="form-check-label fw-semibold" for="limitePesoAtivo">
+                                <i class="fas fa-weight-hanging me-1 text-warning"></i> Limite de 30kg ativo
+                            </label>
+                            <small class="text-muted ms-2">(desative para permitir pedidos acima de 30kg)</small>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2 mb-4">
                     <button type="submit" class="btn btn-success" id="btnCriarPedidoManual">
                         <i class="fas fa-save"></i> Criar Pedido Manual
@@ -3104,7 +3117,8 @@ JS;
 
             $svc = new PedidoManualService();
             $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao);
+            $limitePesoAtivo = ((string) $request->getParam('limite_peso_ativo', '1') === '1');
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao, $limitePesoAtivo);
 
             // Se forma de pagamento é Carnê Braziliana, criar o carnê
             if (strtolower(trim($formaPagamento)) === 'carne_braziliana') {
@@ -3340,7 +3354,8 @@ JS;
 
             $svc = new PedidoManualService();
             $semComissao = ((string) $request->getParam('sem_comissao', '0') === '1') ? 1 : 0;
-            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao);
+            $limitePesoAtivo = ((string) $request->getParam('limite_peso_ativo', '1') === '1');
+            $pedidoId = $svc->criarPedidoManual($clienteId, $moeda, $itens, $resumo, $adminId, $formaPagamento !== '' ? $formaPagamento : null, $enderecoEntrega, $tipoCompra, $semComissao, $limitePesoAtivo);
 
             // Se forma de pagamento é Carnê Braziliana, criar o carnê
             if (strtolower(trim($formaPagamento)) === 'carne_braziliana') {
